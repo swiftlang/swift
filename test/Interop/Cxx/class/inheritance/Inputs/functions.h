@@ -30,8 +30,6 @@ struct Base {
   inline void refQualifierOverloads() const & {}
   inline void refQualifierOverloads() && {}
   inline void refQualifierOverloads() const && {}
-  // TODO: if these are unnamed we hit an (unrelated) SILGen bug. Same for
-  // subscripts.
   inline const char *takesArgsInBase(int a, int b, int c) const
       __attribute__((swift_attr("import_unsafe"))) {
     return "Base::takesArgsInBase";
@@ -169,3 +167,14 @@ inline int freeFuncRenamedToInit() __attribute__((swift_name("init()"))) {
 }
 // expected-warning@-3 {{ignoring swift_name attribute 'init()'; 'freeFuncRenamedToInit' cannot be imported as an initializer}}
 // expected-note@-4 {{use backticks (e.g. 'swift_name("`init`(...)")')}}
+
+struct UnnamedParams {
+  int takesUnnamed(int, bool, int *, const NonTrivial &, int &) const {
+    return 1;
+  }
+  int unnamedWithDefault(int = 7) const { return 2; }
+  int operator[](int) const { return 3; }
+  int operator()(int) const { return 4; }
+};
+
+struct DerivedFromUnnamedParams : UnnamedParams {};

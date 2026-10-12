@@ -144,8 +144,7 @@ float _stdlib_remainderf(float _self, float _other) {
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_squareRootf(float _self) {
 #if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
-  typedef float __m128 __attribute__((__vector_size__(16), __aligned__(16)));
-  return __builtin_ia32_sqrtss(__extension__ (__m128){ _self, 0, 0, 0 })[0];
+  return __builtin_elementwise_sqrt(_self);
 #else
   return __builtin_sqrtf(_self);
 #endif
@@ -172,20 +171,6 @@ long double _stdlib_squareRootl(long double _self) {
   return __builtin_sqrtl(_self);
 }
 #endif
-
-// Apple's math.h does not declare lgamma_r() etc by default, but they're
-// unconditionally exported by libsystem_m.dylib in all OS versions that
-// support Swift development; we simply need to provide declarations here.
-// In the macOS 15.0, iOS 18.0, et al SDKs, math.h unconditionally declares
-// lgamma_r() when building for Swift. Detect those SDKs by checking for a
-// header which was added in those versions. (Redeclaring the function
-// would cause an error where `lgamma_r` is ambiguous between the SDK
-// `_math.lgamma_r` and this `SwiftShims.lgamma_r`.)
-#if defined(__APPLE__) && !__has_include(<_modules/_math_h.h>)
-float lgammaf_r(float x, int *psigngam);
-double lgamma_r(double x, int *psigngam);
-long double lgammal_r(long double x, int *psigngam);
-#endif // defined(__APPLE__) && !__has_include(<_modules/_math_h.h>)
 
 #ifdef __cplusplus
 } // extern "C"

@@ -47,3 +47,31 @@ func CImplReturnsUnauditedCFTypeRef() -> Unmanaged<CFTypeRef>? { fatalError() }
 // expected-error@-1 {{could not find imported function 'CImplTakesCFTypeRef' matching global function 'CImplTakesAnyObject'; make sure you import the module or header that declares it}}
 func CImplTakesAnyObject(_ obj: AnyObject?) { }
 // expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+
+// An audited CF result can be implemented as returning 'Unmanaged', which
+// gives the implementation manual control over the retain count.
+@implementation @c
+func CImplReturnsAuditedCFString() -> Unmanaged<CFString> { fatalError() }
+
+@implementation @c
+func CImplReturnsAuditedNullableCFString() -> Unmanaged<CFString>? {
+  fatalError()
+}
+
+@implementation @c
+func CImplReturnsAuditedCFTypeRef() -> Unmanaged<CFTypeRef> { fatalError() }
+
+@implementation @c
+func CImplReturnsAuditedCFStringWrongType() -> Unmanaged<CFArray> { fatalError() }
+// expected-error@-1 {{global function 'CImplReturnsAuditedCFStringWrongType()' of type '() -> Unmanaged<CFArray>' does not match type '() -> CFString' declared by the header}}
+
+@implementation @c
+func CImplReturnsAuditedCFStringDroppedOptional() -> Unmanaged<CFString>? {
+  // expected-error@-1 {{global function 'CImplReturnsAuditedCFStringDroppedOptional()' of type '() -> Unmanaged<CFString>?' does not match type '() -> CFString' declared by the header}}
+  fatalError()
+}
+
+// Only results can be written as 'Unmanaged'.
+@implementation @c
+func CImplTakesAuditedCFString(_ string: Unmanaged<CFString>) { }
+// expected-error@-1 {{global function 'CImplTakesAuditedCFString' of type '(Unmanaged<CFString>) -> ()' does not match type '(CFString) -> Void' declared by the header}}

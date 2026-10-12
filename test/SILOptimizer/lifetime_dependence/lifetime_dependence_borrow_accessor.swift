@@ -4,6 +4,7 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -target %target-swift-6.2-abi-triple \
+// RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature BorrowAndMutateAccessors
 
@@ -14,6 +15,7 @@
 // RUN:   -verify \
 // RUN:   -module-name test \
 // RUN:   -target %target-swift-6.2-abi-triple \
+// RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature BorrowAndMutateAccessors \
 // RUN:   -Xllvm -sil-print-after=lifetime-dependence-insertion 2>&1 | %FileCheck %s
@@ -132,4 +134,20 @@ func escapingLocal(_ other: Holder) -> Span<Int> {
   return local.wrapped.span // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on the lifetime of variable 'local'}}
   // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+}
+
+struct Composite: ~Copyable {
+  var items: UniqueArray<UniqueArray<Int>>
+
+  // Lifetime dependent value derived from a subscript implemented via borrow accessor with @guaranteed_address
+  @_lifetime(borrow self)
+  func check(at index: Int) -> Span<Int> {
+    self.items[index].span
+  }
+
+  // Lifetime dependent value derived from a subscript implemented via mutate accessor
+  @_lifetime(&self)
+  mutating func checkMutable(at index: Int) -> MutableSpan<Int> {
+    self.items[index].mutableSpan
+  }
 }

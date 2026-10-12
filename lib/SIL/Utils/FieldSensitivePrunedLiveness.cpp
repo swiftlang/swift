@@ -43,7 +43,7 @@ static llvm::cl::opt<bool> EmitLogging(
 // We can only analyze components of structs whose storage is fully accessible
 // from Swift.
 static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
-  auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
+  auto structDecl = ktypeTy.getStructDecl();
   if (!structDecl || structDecl->hasUnreferenceableStorage())
     return nullptr;
   return structDecl;
@@ -102,7 +102,7 @@ uint32_t TypeConverter::getTypeSubElementCount(SILType type,
     return number;
   }
 
-  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = type.getEnumDecl()) {
     unsigned numElements = 0;
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
@@ -508,7 +508,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
                         [&](unsigned index) { return bv[index]; });
   };
 
-  if (auto *structDecl = type.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = type.getStructDecl()) {
     unsigned start = startEltOffset;
     for (auto *varDecl : structDecl->getStoredProperties()) {
       auto nextType = type.getFieldType(varDecl, fn);
@@ -536,7 +536,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
     return;
   }
 
-  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = type.getEnumDecl()) {
     struct ElementRecord {
       EnumElementDecl *element;
       unsigned start;
@@ -690,8 +690,10 @@ void TypeTreeLeafTypeRange::get(
     return;
   }
 
-  // An `inject_enum_addr` only initializes the enum tag.
-  if (isa<InjectEnumAddrInst>(op->getUser())) {
+  // An `inject_enum_addr` of a case with a payload only initializes the enum
+  // tag: the payload was already initialized via `init_enum_data_addr`.
+  if (auto *ieai = dyn_cast<InjectEnumAddrInst>(op->getUser());
+      ieai && ieai->getElement()->hasAssociatedValues()) {
     // Subtract the deinit bit, if any: the discriminator bit is before it:
     //
     // [ case1 bits ..., case2 bits, ..., discriminator bit, deinit bit ]

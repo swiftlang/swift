@@ -594,7 +594,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   case OwnershipKind::None:
     return true;
   case OwnershipKind::Owned:
-    // `@called(once)` closures, in contrast to regular closures, can have
+    // `@called(atMostOnce)` closures, in contrast to regular closures, can have
     // `@owned` parameters. DiagnosticDeadFunctionElimination pass replaces
     // whole body with an `unreachable` instruction which needs to be handled
     // specifically here because it removes lifetime ending uses for such

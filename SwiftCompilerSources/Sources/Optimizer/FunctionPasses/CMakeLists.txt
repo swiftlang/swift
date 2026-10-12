@@ -37,6 +37,7 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
   LifetimeResolution.swift
+  LifetimeResolutionDiagnose.swift
   LoopInvariantCodeMotion.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
@@ -53,5 +54,6 @@ swift_compiler_sources(Optimizer
   StripObjectHeaders.swift
   TempLValueElimination.swift
   TempRValueElimination.swift
+  TrivialOwnershipElimination.swift
   PackSpecialization.swift
 )

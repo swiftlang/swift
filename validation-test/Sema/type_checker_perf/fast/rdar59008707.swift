@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=80000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=80000 -solver-disable-promote-supertypes
+
 // REQUIRES: objc_interop
 
 import Foundation

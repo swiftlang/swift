@@ -87,6 +87,8 @@ set(backtracing_sources
   SymbolLocator.swift
   Utils.swift
   Win32Unwinder.swift
+
+  SafeReadMemory.cpp
 )
 
 set(runtime_sources

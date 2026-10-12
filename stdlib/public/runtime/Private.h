@@ -249,6 +249,13 @@ public:
     return  (c->Superclass && c->Superclass != getRootSuperclass());
   }
 
+  /// Complete instance layout and field offsets without registering the class
+  /// with the Objective-C runtime or installing its vtable.
+  SWIFT_RUNTIME_STDLIB_INTERNAL
+  void initClassFieldOffsetVector(ClassMetadata *self, size_t numFields,
+                                  const TypeLayout *const *fieldTypes,
+                                  size_t *fieldOffsets);
+
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///
@@ -577,6 +584,10 @@ public:
   /// \param context When non-NULL, receives any information about the
   /// execution context that is required to use this conformance.
   ///
+  /// \param numParamsExemptFromInvertibleChecks The number of leading generic
+  /// parameters whose arguments are not checked against the implicit
+  /// invertible protocol requirements (Copyable, Escapable).
+  ///
   /// \returns the error if an error occurred, None otherwise.
   std::optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericParamDescriptor> genericParams,
@@ -585,7 +596,8 @@ public:
       SubstGenericParameterRefFn substGenericParam,
       SubstGenericParameterOrdinalRefFn substGenericParamOrdinal,
       SubstDependentWitnessTableRefFn substWitnessTable,
-      ConformanceExecutionContext *context);
+      ConformanceExecutionContext *context,
+      unsigned numParamsExemptFromInvertibleChecks = 0);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -594,7 +606,7 @@ public:
   /// as to map the entire object readonly, or we might just want to avoid
   /// dirtying memory unnecessarily.
   template <class T>
-  static void assignUnlessEqual(T &dest, T newValue) {
+  inline void assignUnlessEqual(T &dest, T newValue) {
     if (dest != newValue)
       dest = newValue;
   }

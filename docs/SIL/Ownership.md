@@ -543,11 +543,10 @@ bb0(%0 : @owned $KlassPair):
 Address-only values are potentially unmovable when borrowed. This means
 that they cannot be forwarded with guaranteed ownership unless the
 forwarded value has the same representation as in the original value and
-can reuse the same storage. Non-destructive projection is allowed, such
-as `struct_extract`. Aggregation, such as
-`struct`, and destructive disaggregation, such as
-`switch_enum` is not allowed. This is an invariant for OSSA
-with opaque SIL values for these reasons:
+can reuse the same storage. Projection that does not modify the original
+value, such as `struct_extract` or `switch_enum`, is allowed.
+Aggregation, such as `struct`, is not allowed. This is an invariant for
+OSSA with opaque SIL values for these reasons:
 
 1. To avoid implicit semantic copies. For move-only values, this allows
 complete diagnostics. And in general, it makes it impossible for SIL
@@ -744,11 +743,29 @@ other interior pointers are guarded already.
 
 In order for programmer intended lifetimes to be maintained under
 optimization, the lifetimes of SIL values which correspond to named
-source-level values can only be modified in limited ways. Generally, the
-behavior is that the lifetime of a named source-level value is anchored
-to the variable's lexical scope and confined by **deinit barriers**.
-Specifically, code motion may not move the ends of these lifetimes
-across a deinit barrier.
+source-level values can only be modified in limited ways. Formal
+lifetime semantics fall into three categories: strict lifetimes,
+lexical lifetimes, or optimized lifetimes.
+
+### Strict lifetimes
+
+With `~Copyable` types, a deinit has a well-defined execution point
+with respect to all other side effects. This is either the point at
+which the variable is consumed, or, if it is not consumed, the point
+at which its lexical scope ends. At the end of a lexical scope,
+deinits run in reverse order in which the variables are declared. This
+means that `~Copyable` Swift types (i.e. `struct` or `enum` deinits)
+mirror the semantics of C++-style deinitializers.
+
+### Lexical lifetimes
+
+With Copyable types, the Swift compiler may introduce implicit copies
+and optimize lifetimes to eliminate other copies resulting in less
+than strict lifetimes. Generally, the behavior is that the lifetime of
+a named source-level value is anchored to the variable's lexical scope
+and confined by [**deinit barriers**](#deinit-barriers). Specifically,
+code motion may not move the ends of these lifetimes across a deinit
+barrier.
 
 Source level variables (lets, vars, ...) and function arguments will
 result in SIL-level lexical lifetimes if either of the two sets of
@@ -765,7 +782,20 @@ OR
     -   the type, variable, or argument is annotated
         `@_lexical`
 
-A type is eager-move by satisfying one of two conditions:
+### Optimized lifetimes
+
+Certain Copyable types are subject to more aggressive lifetime
+optimization. This is the case for copy-on-write types for which
+eliminating copies can allow in-place mutation. The compiler refers to
+these as eager-move types. It is also possible to mark specific
+variables as eager-move regardless of their type (as long as it is
+`Copyable`). The optimizer may end the lifetime of an eager-move value
+immediately after its last use regardless of the variable's lexical
+scope and independent of any side-effects present in the
+deinitializer.
+
+A type is eager-move by satisfying one of
+two conditions:
 
 1. Inferred: An aggregate is inferred to be eager-move if all of its
 fields are eager-move.
@@ -774,8 +804,14 @@ fields are eager-move.
 attribute that explicitly specifies it to be:
 `@_eagerMove`, `@_noImplicitCopy`.
 
-A variable or argument is eager-move by satisfying one of two
-conditions:
+`@_eagerMove` standard library types include:
+- String
+- Array
+- Set
+- Dictionary
+
+A variable or argument is eager-move, regardless of its type (as long
+as it is `Copyable`), by satisfying one of two conditions:
 
 1. Inferred: Its type is eager-move.
 
@@ -783,8 +819,11 @@ conditions:
 that specifies it to be: `@_eagerMove`,
 `@_noImplicitCopy`.
 
-These source-level rules result in a few sorts of SIL value whose
-destroys must not be moved across deinit barriers:
+### SIL support for lexical lifetimes
+
+Source-level lexical lifetime semantics require that the compiler
+recognize SIL values whose destroys must not be moved across deinit
+barriers:
 
 * `begin_borrow [lexical]`
 * `move_value [lexical]`
@@ -799,7 +838,7 @@ function arguments, there is no work to do: a
 function argument itself can be lexical.
 
 That the first three have constrained lifetimes is encoded in
-ValueBase::isLexical, which should be checked before changing the
+`ValueBase::isLexical`, which should be checked before changing the
 lifetime of a value.
 
 When a function is inlined into its caller, a lexical borrow scope is

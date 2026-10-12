@@ -731,8 +731,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
               false};
     }
   }
-  NominalTypeDecl *srcNominal = srcTy.getNominalOrBoundGenericNominal();
-  NominalTypeDecl *destNominal = destTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *srcNominal = srcTy.getNominalDecl();
+  NominalTypeDecl *destNominal = destTy.getNominalDecl();
   if (srcNominal && srcNominal == destNominal &&
       !layoutIsTypeDependent(srcNominal) &&
       srcTy.isObject() && destTy.isObject()) {
@@ -999,7 +999,12 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
 /// deleted together with the closure.
 static bool isDeadOnStackClosureUser(SILInstruction *user) {
   return isa<DeallocStackInst>(user) || isa<DebugValueInst>(user) ||
-         isa<DestroyValueInst>(user);
+         isa<DestroyValueInst>(user) ||
+         // `strong_release` is `destroy_value`'s non-OSSA equivalent: a
+         // dead on-stack closure can be found (and deleted) after ownership
+         // has been lowered from its function, e.g. when closure
+         // specialization folds `apply(partial_apply())` into a direct call.
+         isa<StrongReleaseInst>(user);
 }
 
 static bool
@@ -1148,13 +1153,29 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
         return false;
       }
     }
+
+    // Regular on-stack closures only borrow their captures, so their
+    // lifetime is managed outside of the closure and there's nothing to do
+    // here.
+
+    // A `@called(atMostOnce)` on-stack closure can also own (consume) its
+    // captures, and is responsible for releasing them via its destructor.
+    // Release such captures here to make up for that.
+    if (pa->hasCalledAtMostOnceSemantics()) {
+      SILBuilderContext builderCtxt(pa->getModule());
+      for (Operand &argOp : pa->getArgumentOperands()) {
+        if (!argOp.isConsuming())
+          continue;
+
+        SILBuilderWithScope builder(pa, builderCtxt);
+        emitDestroyOperation(builder, pa->getLoc(), argOp.get(), callbacks);
+      }
+    }
+
     for (auto *inst : reverse(deleteInsts))
       callbacks.deleteInst(inst);
     callbacks.deleteInst(pa);
 
-    // Note: the lifetime of the captured arguments is managed outside of the
-    // trivial closure value i.e: there will already be releases for the
-    // captured arguments. Releasing captured arguments is not necessary.
     return true;
   }
 
@@ -2408,7 +2429,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
     SILBuilderWithScope builder(insertionPoint, ctx);
     return builder.createTuple(insertionPoint->getLoc(), ty, elements);
   }
-  if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *decl = ty.getStructDecl()) {
     TypeExpansionContext tec = *function;
     auto &module = function->getModule();
     if (decl->isResilient(tec.getContext()->getParentModule(),
@@ -2431,7 +2452,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
 }
 
 static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
-  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = ty.getStructDecl()) {
     return swift::findUnreferenceableStorage(structDecl, ty, func);
   }
   if (auto tupleTy = ty.getAs<TupleType>()) {

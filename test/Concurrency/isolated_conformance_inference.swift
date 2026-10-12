@@ -44,6 +44,22 @@ nonisolated class CNonIsolated: P {
   @SomeGlobalActor func f() { } // expected-note{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
 }
 
+// Conformances to GlobalActor are never inferred as isolated.
+// expected-error@+4:8{{conformance of 'MainActorGlobalActor' to protocol 'GlobalActor' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:8{{turn data races into runtime errors with '@preconcurrency'}}{{none}}
+@MainActor
+@globalActor
+struct MainActorGlobalActor {
+  static let shared = SomeGlobalActor.shared // expected-note@:14{{main actor-isolated static property 'shared' cannot satisfy nonisolated requirement}}
+  // expected-note@-1:14{{mark static property 'shared' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
+@MainActor
+@globalActor
+struct MainActorGlobalActorNonisolatedShared {
+  nonisolated static let shared = SomeGlobalActor.shared
+}
+
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 

@@ -1671,7 +1671,7 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
 
   // Otherwise, use a subtype constraint for classes to cope with
   // inheritance.
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
                      cs.getConstraintLocator(locator),
                      /*isFavored=*/false, preparedOverload);
@@ -2096,8 +2096,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     }
   }
 
-  // Member type could be `@called(once)` if the method is consuming and base is
-  // non-Copyable.
+  // Member type could be `@called(atMostOnce)` if the method is consuming and
+  // base is non-Copyable.
   if (Context.LangOpts.hasFeature(Feature::CalledAttribute)) {
     if (auto *method = dyn_cast<FuncDecl>(value);
         method && method->isInstanceMethod() && method->getSelfAccessKind() == SelfAccessKind::Consuming) {
@@ -2106,10 +2106,11 @@ ConstraintSystem::getTypeOfMemberReferencePre(
 
       std::optional<AnyFunctionType::ExtInfo> newExtInfo;
       if (baseObjTy->hasTypeVariable())
-        newExtInfo =
-            methodTy->getExtInfo().withCalledOnceDependentType(baseObjTy);
+        newExtInfo = methodTy->getExtInfo().withExecutionSemanticsDependentType(
+            baseObjTy);
       else if (baseObjTy->isNoncopyable())
-        newExtInfo = methodTy->getExtInfo().withCalledOnce();
+        newExtInfo = methodTy->getExtInfo().withExecutionSemantics(
+            ExecutionSemantics::AtMostOnce);
 
       if (newExtInfo) {
         auto *newMethodTy = methodTy->withExtInfo(*newExtInfo);

@@ -9,7 +9,7 @@ sil_stage canonical
 import Swift
 import Builtin
 
-// CHECK-LABEL:      sil [serialized] [canonical] [ossa] @public_func :
+// CHECK-LABEL:      sil [serialized] [canonical] [stage=canonical] [ossa] @public_func :
 // CHECK-NONLE-NEXT: [global: ]
 // CHECK-NEXT:       bb0:
 sil [serialized] [ossa] @public_func : $@convention(thin) () -> () {
@@ -19,7 +19,7 @@ bb0:
   return %r
 }
 
-// CHECK-LABEL:      sil non_abi [serialized] [canonical] [ossa] @public_non_abi_func :
+// CHECK-LABEL:      sil non_abi [serialized] [canonical] [stage=canonical] [ossa] @public_non_abi_func :
 // CHECK-NEXT:       [global: ]
 // CHECK-NEXT:       bb0:
 sil non_abi [serialized] [ossa] @public_non_abi_func : $@convention(thin) () -> () {

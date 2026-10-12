@@ -179,12 +179,6 @@ CONSTANT_OWNERSHIP_INST(None, StoreBorrow)
 CONSTANT_OWNERSHIP_INST(Owned, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
-// `raw_pointer_to_ref` is only used to implement the `bridgeFromRawPointer`
-// builtin, which in turn is only used to create the empty COW buffer singletons
-// (Array, Set, Dictionary) and for the `UnsafeCurrentTask._task` ABI-compat
-// shim. Those objects are immortal, therefore the result doesn't need any
-// ownership.
-CONSTANT_OWNERSHIP_INST(None, RawPointerToRef)
 // TODO: It would be great to get rid of this.
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
@@ -207,6 +201,15 @@ CONSTANT_OWNERSHIP_INST(None, DereferenceAddrBorrow)
 CONSTANT_OWNERSHIP_INST(None, DereferenceBorrowAddr)
 
 #undef CONSTANT_OWNERSHIP_INST
+
+// An immortal object doesn't need to be released, so the result doesn't need
+// any ownership. Otherwise the result is a newly "created" +1 reference.
+ValueOwnershipKind ValueOwnershipKindClassifier::visitRawPointerToRefInst(
+    RawPointerToRefInst *i) {
+  if (i->isImmortal())
+    return OwnershipKind::None;
+  return OwnershipKind::Owned;
+}
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitStructExtractInst(StructExtractInst *sei) {
   if (sei->getType().isTrivial(*sei->getFunction()) ||
@@ -525,6 +528,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GenericExactSDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, ExactUDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericExactUDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, FAdd)
+CONSTANT_OWNERSHIP_BUILTIN(None, FAddRelaxed)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFAdd)
 CONSTANT_OWNERSHIP_BUILTIN(None, FCMP_OEQ)
 CONSTANT_OWNERSHIP_BUILTIN(None, FCMP_OGE)
@@ -541,6 +545,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, FCMP_UNE)
 CONSTANT_OWNERSHIP_BUILTIN(None, FDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, FMul)
+CONSTANT_OWNERSHIP_BUILTIN(None, FMulRelaxed)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFMul)
 CONSTANT_OWNERSHIP_BUILTIN(None, FNeg)
 CONSTANT_OWNERSHIP_BUILTIN(None, FPExt)
@@ -550,6 +555,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, FPTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, FRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, FSub)
+CONSTANT_OWNERSHIP_BUILTIN(None, FSubRelaxed)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFSub)
 CONSTANT_OWNERSHIP_BUILTIN(None, Freeze)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_EQ)

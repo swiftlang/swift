@@ -134,9 +134,12 @@ public:
   StringRef getFineModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FineModuleTracePath;
   }
-  StringRef getSerializedDiagnosticsPath() const {
+  StringRef getLLVMBitcodeDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs
-        .SerializedDiagnosticsPath;
+        .LLVMBitcodeDiagnosticsPath;
+  }
+  StringRef getSARIFDiagnosticsPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.SARIFDiagnosticsPath;
   }
   StringRef getFixItsOutputPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;

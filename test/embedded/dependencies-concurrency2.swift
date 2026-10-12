@@ -13,9 +13,12 @@
 ___assert_rtn
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
 _abort
 _exit
+_flockfile
 _free
+_funlockfile
 _malloc
 _memcpy
 _memmove

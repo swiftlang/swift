@@ -1375,7 +1375,8 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
       getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
       getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
       Inst->getCalleeConvention(), Inst->getResultIsolation(),
-      Inst->isCalledOnce(), Inst->isOnStack(), Inst->isStackAllocationNested(),
+      Inst->getExecutionSemantics(), Inst->isOnStack(),
+      Inst->isStackAllocationNested(),
       GenericSpecializationInformation::create(Inst, getBuilder()),
       ArgLocs ? std::optional<ArrayRef<SILLocation>>(*ArgLocs) : std::nullopt);
   recordClonedInstruction(Inst, NewInst);
@@ -2248,7 +2249,8 @@ SILCloner<ImplClass>::visitRawPointerToRefInst(RawPointerToRefInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createRawPointerToRef(getOpLocation(Inst->getLoc()),
                                                getOpValue(Inst->getOperand()),
-                                               getOpType(Inst->getType())));
+                                               getOpType(Inst->getType()),
+                                               Inst->isImmortal()));
 }
 
 template<typename ImplClass>
@@ -2317,8 +2319,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
-                              OpLoc, Inst->getCheckedCastOptions(),
-                              SrcValue, SrcType, DestValue, TargetType));
+                              OpLoc, Inst->getCheckedCastOptions(), SrcValue,
+                              SrcType, DestValue, TargetType, Inst->isCopy()));
 }
 
 template <typename ImplClass>
@@ -2433,6 +2435,15 @@ void SILCloner<ImplClass>::visitMarkUnresolvedNonCopyableValueInst(
       getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
       Inst->getCheckKind());
   recordClonedInstruction(Inst, MVI);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDiagnoseInst(DiagnoseInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *DI = getBuilder().createDiagnose(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand()),
+                                         Inst->getKind());
+  recordClonedInstruction(Inst, DI);
 }
 
 template <typename ImplClass>
@@ -3958,7 +3969,8 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
   SILValue SrcValue = getOpValue(Inst->getSrc());
-  SILValue DestValue = getOpValue(Inst->getDest());
+  SILValue DestValue =
+      Inst->hasDest() ? getOpValue(Inst->getDest()) : SILValue();
   CanType SrcType = getOpASTType(Inst->getSourceFormalType());
   CanType TargetType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

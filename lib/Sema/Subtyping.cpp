@@ -157,10 +157,10 @@ void swift::constraints::getTypeVariablesWithVariance(
 
 /// Determine whether the candidate type is a subclass of the superclass type.
 bool swift::constraints::isSubclassOf(Type candidateType, Type superclassType) {
-  if (!superclassType->getClassOrBoundGenericClass())
+  if (!superclassType->getClassDecl())
     return false;
 
-  if (!candidateType->getClassOrBoundGenericClass()) {
+  if (!candidateType->getClassDecl()) {
     candidateType = candidateType->getSuperclass();
     if (!candidateType)
       return false;
@@ -207,6 +207,34 @@ std::optional<bool>
 swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
   if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
       !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+    // Hack to deal with matchSendableExistentialToAnyInGenericArgumentPosition().
+    {
+      auto hasAnySendable = [](Type t) -> bool {
+        return t.findIf([](Type t) -> bool {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return false;
+          return t->getKnownProtocol() == KnownProtocolKind::Sendable;
+        });
+      };
+
+      auto rewriteAnySendableToAny = [](Type t) -> Type {
+        return t.transformRec([](TypeBase *t) -> std::optional<Type> {
+          // Don't recurse into protocol compositions.
+          if (t->is<ProtocolCompositionType>())
+            return t;
+          if (t->getKnownProtocol() == KnownProtocolKind::Sendable)
+            return t->getASTContext().TheAnyType;
+          return std::nullopt;
+        });
+      };
+
+      if (hasAnySendable(lhs))
+        lhs = rewriteAnySendableToAny(lhs);
+      if (hasAnySendable(rhs))
+        rhs = rewriteAnySendableToAny(rhs);
+    }
+
     return lhs->isEqual(rhs);
   }
 
@@ -231,7 +259,7 @@ swift::constraints::getConversionBehavior(Type type) {
     if (canType->hasParameterPack())
       return true;
 
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
     canType->getTypeVariables(referencedTypeVars);
     for (auto *typeVar : referencedTypeVars) {
       if (typeVar->getImpl().isPackExpansion())
@@ -431,7 +459,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
     if (type->is<DynamicSelfType>())
       return true;
 
-    auto *classDecl = type->getClassOrBoundGenericClass();
+    auto *classDecl = type->getClassDecl();
     return classDecl->getSuperclassDecl();
   }
   case ConversionBehavior::AnyHashable:
@@ -465,8 +493,8 @@ static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
 }
 
 static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
-  auto *lhsDecl = lhs->getClassOrBoundGenericClass();
-  auto *rhsDecl = rhs->getClassOrBoundGenericClass();
+  auto *lhsDecl = lhs->getClassDecl();
+  auto *rhsDecl = rhs->getClassDecl();
 
   if (lhsDecl == nullptr || rhsDecl == nullptr)
     return;
@@ -490,7 +518,7 @@ static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
 }
 
 static bool isCovariantInstanceType(Type t) {
-  return t->getClassOrBoundGenericClass() ||
+  return t->getClassDecl() ||
          t->is<ArchetypeType>();
 }
 
@@ -669,11 +697,13 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
       auto *lhsFunc = lhs->castTo<FunctionType>();
       auto *rhsFunc = rhs->castTo<FunctionType>();
 
-      // Note: getConversionBehavior() guarantees the function types don't
-      // contain any parameter packs, so we may assume their lengths are
-      // known.
-      if (lhsFunc->getNumParams() != rhsFunc->getNumParams())
-        return ConflictReason(ConflictFlag::FunctionParamCount);
+      auto lhsInfo = lhsFunc->getExtInfo();
+      auto rhsInfo = rhsFunc->getExtInfo();
+      auto reason = checkExtInfoConversion(cache,
+                                           lhsFunc, rhsFunc,
+                                           lhsInfo, rhsInfo, sig);
+      if (reason)
+        return reason;
 
       auto result = checkConversion(cache,
                                     lhsFunc->getResult(),
@@ -682,9 +712,54 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
       if (result)
         return result | ConflictFlag::FunctionResult;
 
-      for (unsigned i : indices(lhsFunc->getParams())) {
-        auto lhsParam = lhsFunc->getParams()[i];
-        auto rhsParam = rhsFunc->getParams()[i];
+      auto lhsParams = lhsFunc->getParams();
+      auto rhsParams = rhsFunc->getParams();
+
+      // Note: getConversionBehavior() guarantees the function types don't
+      // contain any parameter packs, so we may assume their lengths are
+      // known.
+      if (lhsFunc->getNumParams() != rhsFunc->getNumParams()) {
+        // Handle the "tuple splat" special case.
+        if (isSingleTupleParam(rhsParams) &&
+            AnyFunctionType::canComposeTuple(lhsParams)) {
+          // Implode the left-hand side arguments into a tuple and compare
+          // against the right-hand side parameter type.
+          auto lhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto rhsType = rhsParams[0].getPlainType();
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+          break;
+        } else if (isSingleTupleParam(lhsParams) &&
+                   AnyFunctionType::canComposeTuple(rhsParams)) {
+          // Implode the right-hand side parameters into a tuple and
+          // compare against the left-hand side argument type.
+          auto lhsType = lhsParams[0].getPlainType();
+          auto rhsType = AnyFunctionType::composeTuple(
+              lhsFunc->getASTContext(),
+              lhsParams,
+              ParameterFlagHandling::IgnoreNonEmpty);
+          auto result = checkConversion(cache, lhsType, rhsType, sig);
+          if (result)
+            return result | ConflictFlag::FunctionTupleSplat;
+
+          // Success.
+
+        }
+
+        // Otherwise, it's a conflict.
+        return ConflictReason(ConflictFlag::FunctionParamCount);
+      }
+
+      // Check each parameter against each argument.
+      for (unsigned i : indices(lhsParams)) {
+        auto lhsParam = lhsParams[i];
+        auto rhsParam = rhsParams[i];
 
         if (lhsParam.isInOut() != rhsParam.isInOut())
           return ConflictReason(ConflictFlag::FunctionParamFlags);
@@ -708,14 +783,6 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         }
       }
 
-      auto lhsInfo = lhsFunc->getExtInfo();
-      auto rhsInfo = rhsFunc->getExtInfo();
-      auto reason = checkExtInfoConversion(cache,
-                                           lhsFunc, rhsFunc,
-                                           lhsInfo, rhsInfo, sig);
-      if (reason)
-        return reason;
-
       break;
     }
 
@@ -738,16 +805,9 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         return ConflictFlag::TupleArity;
 
       for (unsigned i : indices(lhsTuple->getElements())) {
-        auto lhsElt = lhsTuple->getElement(i);
-        auto rhsElt = rhsTuple->getElement(i);
-        if (lhsElt.hasName() && rhsElt.hasName() &&
-            lhsElt.getName() != rhsElt.getName()) {
-          return ConflictFlag::TupleLabel;
-        }
-
-        auto result = checkConversion(cache,
-                                      lhsElt.getType(),
-                                      rhsElt.getType(), sig);
+        auto lhsElt = lhsTuple->getElementType(i);
+        auto rhsElt = rhsTuple->getElementType(i);
+        auto result = checkConversion(cache, lhsElt, rhsElt, sig);
         if (result)
           return result | ConflictFlag::TupleElement;
       }
@@ -945,7 +1005,7 @@ static void decomposeConstraintType(Type t,
 
     anyObject |= compositionTy->hasExplicitAnyObject();
     invertible |= compositionTy->getInverses();
-  } else if (t->getClassOrBoundGenericClass()) {
+  } else if (t->getClassDecl()) {
     superclass = t;
   } else {
     ABORT([&](auto &out) {
@@ -1076,7 +1136,9 @@ static Type superclassJoinMeetImpl(Operation op, Type lhs, Type rhs) {
     unsigned i = std::min(lhsSuper.size(), rhsSuper.size());
     while (i > 0) {
       --i;
-      if (lhsSuper[i]->isEqual(rhsSuper[i]))
+      auto result = isLikelyExactMatch(lhsSuper[i], rhsSuper[i]);
+      ASSERT(result);
+      if (*result)
         return lhsSuper[i];
     }
   } else {
@@ -1094,9 +1156,10 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, sendable, calledOnce, throwing, async;
+  bool noEscape, sendable, throwing, async;
+  std::optional<ExecutionSemantics> executionSemantics;
   Type sendableDep;
-  Type calledOnceDep;
+  Type executionSemanticsDep;
   Type thrownError;
 
   // Concurrency is too hard to reason about here.
@@ -1106,8 +1169,8 @@ extInfoJoinMeetImpl(Operation op,
   auto lhsSendableDep = lhsInfo.getSendableDependentType();
   auto rhsSendableDep = rhsInfo.getSendableDependentType();
 
-  auto lhsCalledOnceDep = lhsInfo.getCalledOnceDependentType();
-  auto rhsCalledOnceDep = rhsInfo.getCalledOnceDependentType();
+  auto lhsExecutionSemanticsDep = lhsInfo.getExecutionSemanticsDependentType();
+  auto rhsExecutionSemanticsDep = rhsInfo.getExecutionSemanticsDependentType();
 
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
@@ -1132,27 +1195,34 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
     }
 
-    if (lhsCalledOnceDep && rhsCalledOnceDep) {
-      // Form a tuple; its @called(once) iff both components are @called(once).
+    // The join has the more restrictive execution semantics.
+    if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      // Form a tuple; it's noncopyable iff either component is noncopyable.
       SmallVector<TupleTypeElt, 2> elts;
-      elts.push_back(lhsCalledOnceDep);
-      elts.push_back(rhsCalledOnceDep);
-      calledOnceDep = TupleType::get(elts, lhsSendableDep->getASTContext());
-      calledOnce = false;
-    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
-      if (rhsInfo.isCalledOnce())
-        calledOnceDep = lhsCalledOnceDep;
-      calledOnce = false;
-    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
-      if (lhsInfo.isCalledOnce())
-        calledOnceDep = rhsCalledOnceDep;
-      calledOnce = false;
+      elts.push_back(lhsExecutionSemanticsDep);
+      elts.push_back(rhsExecutionSemanticsDep);
+      executionSemanticsDep =
+          TupleType::get(elts, lhsExecutionSemanticsDep->getASTContext());
+    } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
+      if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = rhsInfo.getExecutionSemantics();
+      else
+        executionSemanticsDep = lhsExecutionSemanticsDep;
+    } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = lhsInfo.getExecutionSemantics();
+      else
+        executionSemanticsDep = rhsExecutionSemanticsDep;
     } else {
-      calledOnce = lhsInfo.isCalledOnce() && rhsInfo.isCalledOnce();
+      // The join suppresses the invertible protocols that either side does.
+      auto inverses =
+          getSuppressedInvertibleProtocols(lhsInfo.getExecutionSemantics());
+      inverses.insertAll(
+          getSuppressedInvertibleProtocols(rhsInfo.getExecutionSemantics()));
+      executionSemantics = getExecutionSemanticsSuppressing(inverses);
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
-    Type thrownError;
     if (throwing) {
       // Join is only typed-throws if both functions are typed throws.
       auto lhsThrownError = lhsInfo.getThrownError();
@@ -1188,29 +1258,27 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
     }
 
-    if (lhsCalledOnceDep && rhsCalledOnceDep) {
-      // We cannot represent the meet of two @called(once)-dependent types.
+    // The meet has the less restrictive execution semantics.
+    if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      // We cannot represent the meet of two execution semantics dependent
+      // types.
       return std::nullopt;
-    } else if (lhsCalledOnceDep && !rhsCalledOnceDep) {
-      if (rhsInfo.isCalledOnce()) {
-        calledOnce = true;
-      } else {
-        calledOnce = false;
-        calledOnceDep = lhsCalledOnceDep;
-      }
-    } else if (!lhsCalledOnceDep && rhsCalledOnceDep) {
-      if (lhsInfo.isCalledOnce()) {
-        calledOnce = true;
-      } else {
-        calledOnce = false;
-        calledOnceDep = rhsCalledOnceDep;
-      }
+    } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
+      if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemanticsDep = lhsExecutionSemanticsDep;
+    } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
+      if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemanticsDep = rhsExecutionSemanticsDep;
     } else {
-      calledOnce = lhsInfo.isCalledOnce() || rhsInfo.isCalledOnce();
+      // The meet suppresses the invertible protocols that both sides do.
+      auto inverses =
+          getSuppressedInvertibleProtocols(lhsInfo.getExecutionSemantics());
+      inverses.intersect(
+          getSuppressedInvertibleProtocols(rhsInfo.getExecutionSemantics()));
+      executionSemantics = getExecutionSemanticsSuppressing(inverses);
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
-    Type thrownError;
     if (throwing) {
       auto lhsThrownError = lhsInfo.getThrownError();
       auto rhsThrownError = rhsInfo.getThrownError();
@@ -1218,10 +1286,16 @@ extInfoJoinMeetImpl(Operation op,
       // Meet is typed-throws if at least one is typed throws.
       if (!lhsThrownError) {
         thrownError = rhsThrownError;
+      } else if (!rhsThrownError) {
+        thrownError = lhsThrownError;
       } else {
-        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
-        if (result && !*result)
+        bool uninhabited = false;
+        thrownError = subtypeMeet(lhsThrownError, rhsThrownError,
+                                  &uninhabited);
+        if (uninhabited) {
+          throwing = false;
           thrownError = Type();
+        }
       }
     }
   }
@@ -1233,8 +1307,8 @@ extInfoJoinMeetImpl(Operation op,
       .withAsync(async)
       .withSendable(sendable)
       .withSendableDependentType(sendableDep)
-      .withCalledOnce(calledOnce)
-      .withCalledOnceDependentType(calledOnceDep)
+      .withExecutionSemantics(executionSemantics)
+      .withExecutionSemanticsDependentType(executionSemanticsDep)
       .build();
 }
 
@@ -1511,7 +1585,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto result = existentialConstraintJoinMeetImpl(op, lhs, rhs);
       if (!result)
         return fail();
-      if (result->getClassOrBoundGenericClass())
+      if (result->getClassDecl())
         return result;
       ASSERT(!result->is<ExistentialType>());
       return ExistentialType::get(result);
@@ -1524,7 +1598,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
           op, lhsConstraint, rhsConstraint);
       if (!result)
         return fail();
-      if (result->getClassOrBoundGenericClass())
+      if (result->getClassDecl())
         return MetatypeType::get(result);
       ASSERT(!result->is<ExistentialType>());
       return ExistentialMetatypeType::get(result);
@@ -1793,6 +1867,48 @@ Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
   return openTypeJoinsAndMeetsRec(cs, type, locator);
 }
 
+bool swift::constraints::isPackExpansionType(Type type) {
+  if (type->is<PackExpansionType>())
+    return true;
+
+  if (auto *typeVar = type->getAs<TypeVariableType>())
+    return typeVar->getImpl().isPackExpansion();
+
+  return false;
+}
+
+/// Check whether given parameter list represents a single tuple
+/// or type variable which could be later resolved to tuple.
+/// This is useful for SE-0110 related fixes in `matchFunctionTypes`.
+bool swift::constraints::isSingleTupleParam(ArrayRef<AnyFunctionType::Param> params) {
+  if (params.size() != 1)
+    return false;
+
+  const auto &param = params.front();
+  if ((param.isVariadic() || isPackExpansionType(param.getPlainType())) ||
+      param.isInOut() || param.hasLabel() || param.isIsolated())
+    return false;
+
+  auto paramType = param.getPlainType();
+
+  // Support following case which was allowed until 5:
+  //
+  // func bar(_: (Int, Int) -> Void) {}
+  // let foo: ((Int, Int)?) -> Void = { _ in }
+  //
+  // bar(foo) // Ok
+  if (!paramType->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
+    paramType = paramType->lookThroughAllOptionalTypes();
+
+  // Parameter type should either a tuple or something that can become a
+  // tuple later on. Note that type parameters can appear here when we're
+  // called from disjunction selection to compare a function argument
+  // type against an unopened overload's parameter type.
+  return (paramType->is<TupleType>() ||
+          paramType->isTypeVariableOrMember() ||
+          paramType->isTypeParameter());
+}
+
 void swift::constraints::simple_display(llvm::raw_ostream &out,
                                         ConflictReason reason) {
   if (!reason)
@@ -1822,8 +1938,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " conformance";
   if (reason.contains(ConflictFlag::TupleArity))
     out << " tuple_arity";
-  if (reason.contains(ConflictFlag::TupleLabel))
-    out << " tuple_label";
   if (reason.contains(ConflictFlag::TupleElement))
     out << " tuple_element";
   if (reason.contains(ConflictFlag::Existential))
@@ -1844,4 +1958,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " function_throws";
   if (reason.contains(ConflictFlag::FunctionSendable))
     out << " function_sendable";
+  if (reason.contains(ConflictFlag::FunctionTupleSplat))
+    out << " function_tuple_splat";
 }

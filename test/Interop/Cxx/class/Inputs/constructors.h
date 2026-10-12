@@ -310,6 +310,7 @@ __attribute__((swift_attr("retain:Retain11")))
 __attribute__((swift_attr("release:Release11"))) CtorWithDefaultArg {
 public:
   int val = 1;
+  // expected-note@+1 2 {{annotate 'init(_:)' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
   CtorWithDefaultArg(int x = 2) : val(x) {}
 };
 
@@ -318,6 +319,8 @@ __attribute__((swift_attr("retain:Retain12"))) __attribute__((
     swift_attr("release:Release12"))) CtorWithDefaultAndNonDefaultArg {
 public:
   int val;
+  // expected-note@+2 {{'init(_:_:)' declared here}}
+  // expected-note@+1 2 {{annotate 'init(_:_:)' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
   CtorWithDefaultAndNonDefaultArg(int x, int y = 42) : val(x + y) {}
 };
 

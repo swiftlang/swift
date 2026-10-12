@@ -240,9 +240,6 @@ class Remangler : public RemanglerBase {
     Words.push_back(word, Factory);
   }
 
-  template <typename Mangler>
-  friend void mangleIdentifier(Mangler &M, StringRef ident);
-
   class EntityContext {
     bool AsContext = false;
   public:
@@ -855,6 +852,14 @@ ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
   RETURN_IF_ERROR(
       mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XO";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleCalledAtMostOnceFunctionType(Node *node,
+                                                            unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
+  Buffer << "XOo";
   return ManglingError::Success;
 }
 
@@ -1995,6 +2000,12 @@ ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplCalledAtMostOnceFunction(Node *node,
+                                                            unsigned depth) {
+  Buffer << "Oo";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
   Buffer << 'T';
   return ManglingError::Success;
@@ -2205,6 +2216,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplCalledOnceFunction:
         Buffer << 'O';
+        break;
+      case Node::Kind::ImplCalledAtMostOnceFunction:
+        Buffer << "Oo";
         break;
       case Node::Kind::ImplSendingResult:
         Buffer << 'T';

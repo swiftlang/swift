@@ -747,6 +747,14 @@ bool DebugValueInst::isExprTypeValid() const {
       if (varInfo.DIExpr.elements().empty() &&
           varInfo.Type == box->getAddressType().getObjectType())
         return true;
+
+    // Cannot have an object category undef value of an address-only type,
+    // except for the $error variable, which is handled differently.
+    if (isa<SILUndef>(operand) && valueType.isObject() &&
+        !valueType.isLoadableOrOpaque(*getFunction())
+        && varInfo.Name != "$error") {
+      return false;
+    }
   } else {
     // Transform: debug BB transforms the SSA values to its return type.
     if (debugBB->getNumArguments() != operands.size())
@@ -776,7 +784,7 @@ bool DebugValueInst::isExprTypeValid() const {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
       auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
       if (!FieldParent ||
-          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+          RunningType.getNominalDecl() != FieldParent)
         return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
@@ -967,11 +975,13 @@ BeginApplyInst::BeginApplyInst(
     ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
     std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing)
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    bool isUnresolved)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
                       typeDependentOperands, argLocs, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
-                                              allResultOwnerships) {
+                                              allResultOwnerships),
+      IsUnresolved(isUnresolved) {
   setApplyOptions(options);
   assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
@@ -983,7 +993,8 @@ BeginApplyInst *BeginApplyInst::create(
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
-    std::optional<ArrayRef<SILLocation>> argLocs) {
+    std::optional<ArrayRef<SILLocation>> argLocs,
+    bool isUnresolved) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -1036,7 +1047,8 @@ BeginApplyInst *BeginApplyInst::create(
   return ::new (buffer)
       BeginApplyInst(loc, callee, substCalleeSILType, resultTypes,
                      resultOwnerships, subs, args, typeDependentOperands,
-                     argLocs, options, specializationInfo, isolationCrossing);
+                     argLocs, options, specializationInfo, isolationCrossing,
+                     isUnresolved);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
@@ -1109,14 +1121,15 @@ PartialApplyInst *PartialApplyInst::create(
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested, bool isCalledOnce,
+    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    std::optional<ExecutionSemantics> executionSemantics,
     std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
-      F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
-      calleeConvention, resultIsolation, onStack, isCalledOnce);
+      F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(),
+      {}, calleeConvention, resultIsolation, onStack, executionSemantics);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -1377,7 +1390,7 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
   assert(witness && "Differentiability witness must not be null");
 #ifndef NDEBUG
   if (functionType.has_value()) {
-    assert(module.getStage() == SILStage::Lowered &&
+    assert(module.hasCommittedLowered() &&
            "Explicit type is valid only in lowered SIL");
   }
 #endif
@@ -1805,17 +1818,19 @@ UncheckedRefCastAddrInst::create(SILDebugLocation Loc, SILValue src,
 }
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, CheckedCastInstOptions options,
-    SILValue src, CanType srcType, SILValue dest,
-    CanType targetType, ArrayRef<SILValue> TypeDependentOperands)
+    SILDebugLocation Loc, CheckedCastInstOptions options, bool isCopy,
+    SILValue src, CanType srcType, SILValue dest, CanType targetType,
+    ArrayRef<SILValue> TypeDependentOperands)
     : AddrCastInstBase(Loc, src, srcType, dest, targetType,
-        TypeDependentOperands),
-      Options(options) {}
+                       TypeDependentOperands),
+      Options(options) {
+  sharedUInt8().UnconditionalCheckedCastAddrInst.isCopy = isCopy;
+}
 
-UnconditionalCheckedCastAddrInst *
-UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc,
-        CheckedCastInstOptions options, SILValue src,
-        CanType srcType, SILValue dest, CanType targetType, SILFunction &F) {
+UnconditionalCheckedCastAddrInst *UnconditionalCheckedCastAddrInst::create(
+    SILDebugLocation Loc, CheckedCastInstOptions options, bool isCopy,
+    SILValue src, CanType srcType, SILValue dest, CanType targetType,
+    SILFunction &F) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 4> allOperands;
   collectTypeDependentOperands(allOperands, F, srcType, targetType);
@@ -1823,21 +1838,21 @@ UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc,
       totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastAddrInst));
   return ::new (Buffer) UnconditionalCheckedCastAddrInst(
-    Loc, options, src, srcType, dest, targetType, allOperands);
+      Loc, options, isCopy, src, srcType, dest, targetType, allOperands);
 }
 
 CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(
   SILDebugLocation DebugLoc,
   CheckedCastInstOptions options,
   CastConsumptionKind consumptionKind,
-  SILValue src, CanType srcType, SILValue dest, CanType targetType,
-  ArrayRef<SILValue> TypeDependentOperands,
+  ArrayRef<SILValue> allOperands,
+  CanType srcType, SILType destLoweredType, CanType targetType,
   SILBasicBlock *successBB, SILBasicBlock *failureBB,
   ProfileCounter Target1Count, ProfileCounter Target2Count)
-      : AddrCastInstBase(DebugLoc, src, srcType, dest,
-            targetType, TypeDependentOperands, consumptionKind,
-            successBB, failureBB, Target1Count, Target2Count),
-        Options(options) {
+      : AddrCastInstBase(allOperands, DebugLoc, srcType, targetType,
+            consumptionKind, successBB, failureBB,
+            Target1Count, Target2Count),
+        Options(options), DestLoweredTy(destLoweredType) {
   assert(consumptionKind != CastConsumptionKind::BorrowAlways &&
          "BorrowAlways is not supported on addresses");
 }
@@ -1850,15 +1865,32 @@ CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
          SILFunction &F) {
+  bool hasDest = producesDestinationValue(consumptionKind);
+  // Always checked: if this is violated the operand list disagrees with
+  // CheckedCastAddrBranchInst::hasDest(), and getDest() then reads past the
+  // end of it while getNumTypeDependentOperands() underflows.
+  ASSERT(hasDest == (bool)dest &&
+         "a test_only cast must have no destination; every other kind needs one");
+
+  // Use the destination type for `as?` casts, target for `is` (test_only) tests.
+  SILType destLoweredType =
+      hasDest ? dest->getType()
+              : F.getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+                                 targetType)
+                    .getAddressType();
+
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 4> allOperands;
+  allOperands.push_back(src);
+  if (hasDest)
+    allOperands.push_back(dest);
   collectTypeDependentOperands(allOperands, F, srcType, targetType);
   unsigned size =
-      totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
+      totalSizeToAlloc<swift::Operand>(allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastAddrBranchInst));
   return ::new (Buffer) CheckedCastAddrBranchInst(
-    DebugLoc, options, consumptionKind,
-    src, srcType, dest, targetType, allOperands,
+    DebugLoc, options, consumptionKind, allOperands,
+    srcType, destLoweredType, targetType,
     successBB, failureBB, Target1Count, Target2Count);
 }
 
@@ -1876,7 +1908,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBaseWithTrailingOperands(
       Elems, Loc, Ty, forwardingOwnershipKind)
 {
-  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
+  assert(!Ty.getStructDecl()->hasUnreferenceableStorage());
 }
 
 BorrowedFromInst *BorrowedFromInst::create(SILDebugLocation DebugLoc, SILValue borrowedValue,
@@ -3013,8 +3045,10 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(
-      DebugLoc, options, Operand, TypeDependentOperands,
-      DestLoweredTy, DestFormalTy, forwardingOwnershipKind);
+      DebugLoc, options, Operand, TypeDependentOperands, DestLoweredTy,
+      DestFormalTy, forwardingOwnershipKind,
+      doesCastPreserveOwnershipForTypes(Mod, Operand->getType().getASTType(),
+                                        DestFormalTy));
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
@@ -3106,9 +3140,12 @@ ConvertFunctionInst *ConvertFunctionInst::create(
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
+  // This reads the module, not a function's stage, because F is nullable here.
+  // ConvertEscapeToNoEscapeInst::create has a function and reads its stage.
+  //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (Mod.getStage() != SILStage::Lowered) {
+  if (!Mod.haveFunctionTypesBeenRewritten()) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
@@ -3236,7 +3273,7 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
   //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (F.getModule().getStage() != SILStage::Lowered) {
+  if (F.getFunctionStage() != SILStage::Lowered) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
@@ -3321,9 +3358,9 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     StringRef objcString) {
   llvm::FoldingSetNodeID id;
   Profile(id, signature, rootType, valueType, components, objcString);
-  
-  void *insertPos;
-  auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
+
+  llvm::FoldingSetInsertToken insertToken;
+  auto existing = M.KeyPathPatterns.lookup(id, insertToken);
   if (existing)
     return existing;
   
@@ -3350,7 +3387,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
                                            components, objcString,
                                            maxOperandNo + 1);
-  M.KeyPathPatterns.InsertNode(newPattern, insertPos);
+  M.KeyPathPatterns.insert(newPattern, insertToken);
   return newPattern;
 }
 
@@ -3574,7 +3611,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootTy->getClassOrBoundGenericClass()) {
+      } else if (rootTy->getClassDecl()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       } else {
         keyPathClass = ctx.getWritableKeyPathDecl();
@@ -3672,7 +3709,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   CanType currentRoot = rootTy;
 
   for (const auto &comp : components) {
-    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+    bool rootIsClass = (bool)currentRoot->getClassDecl();
 
     switch (comp.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
@@ -3892,7 +3929,7 @@ DestructureStructInst::create(const SILFunction &F, SILDebugLocation Loc,
                               ValueOwnershipKind forwardingOwnershipKind) {
   auto &M = F.getModule();
 
-  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+  assert(Operand->getType().getStructDecl() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;

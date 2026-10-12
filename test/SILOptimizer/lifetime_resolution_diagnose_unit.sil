@@ -1,0 +1,96 @@
+// RUN: %target-sil-opt %s -test-runner -verify -sil-verify-none -sil-disable-input-verify -o /dev/null
+
+// Unit tests for the LifetimeResolutionDiagnose pass. Each function is hand-written
+// with the markers that LifetimeResolution's `legalize` would leave behind, so the
+// diagnose pass is exercised in isolation via its FunctionTest hook:
+//   - `diagnose [unpermitted_copy]` on a `load [copy]`  -> use-after-consume
+//   - `assign undef to [init]`                          -> use-before-init
+//
+// (The variable name renders empty here because hand-written SIL has no backing
+// VarDecl; from real Swift source the name resolves normally.)
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+
+sil @getK : $@convention(thin) () -> @owned K
+
+// A `load [copy]` tagged with `diagnose [unpermitted_copy]` is a consume that was
+// demoted to a copy because `%l2` still demanded the value below it. The error is
+// reported at that downstream use, with a note at the consume.
+sil [ossa] @diagnose_use_after_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_box ${ var K }, var, name "a"
+  %1 = mark_uninitialized [var] %0 : ${ var K }
+  %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
+  %root = project_box %2 : ${ var K }, 0
+  specify_test "lifetime_resolution_diagnose"
+
+  %val = apply %getFn() : $@convention(thin) () -> @owned K
+  assign %val to %root : $*K
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %c = load [copy] %d1 : $*K // expected-note {{consumed here}}
+  diagnose [unpermitted_copy] %c : $K
+  end_access %d1 : $*K
+  destroy_value %c : $K
+
+  %r1 = begin_access [deinit] [unknown] %root : $*K
+  %l2 = load [take] %r1 : $*K // expected-error {{used after consume}}
+  destroy_value %l2 : $K
+  end_access %r1 : $*K
+
+  end_borrow %2
+  destroy_value %1
+  %t = tuple ()
+  return %t
+}
+
+// A `diagnose [unpermitted_copy]` on a `copy_value`.
+sil [ossa] @diagnose_use_after_consume_value : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  specify_test "lifetime_resolution_diagnose"
+
+  %0 = apply %getFn() : $@convention(thin) () -> @owned K
+  %root = move_value [lexical] [var_decl] %0 : $K
+  debug_value %root, let, name "p"
+
+  %copy = copy_value %root : $K
+  diagnose [unpermitted_copy] %copy : $K
+  %m = move_value [allows_diagnostics] %copy : $K // expected-note {{consumed here}}
+  ignored_use %m
+  destroy_value %m : $K
+
+  ignored_use %root // expected-error {{used after consume}}
+  destroy_value %root : $K
+  %t = tuple ()
+  return %t
+}
+
+// An `assign undef to [init]` marks a root that was used while possibly
+// uninitialized. The error is reported at the first read that observes the undef
+// value, with a note at the declaration.
+sil [ossa] @diagnose_use_before_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var K }, var, name "b"
+  %1 = mark_uninitialized [var] %0 : ${ var K } // expected-note {{variable defined here}}
+  %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
+  %root = project_box %2 : ${ var K }, 0
+  assign undef to [init] %root : $*K
+  specify_test "lifetime_resolution_diagnose"
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %l1 = load [take] %d1 : $*K // expected-error {{used before being initialized}}
+  end_access %d1 : $*K
+  destroy_value %l1 : $K
+
+  end_borrow %2
+  destroy_value %1
+  %t = tuple ()
+  return %t
+}

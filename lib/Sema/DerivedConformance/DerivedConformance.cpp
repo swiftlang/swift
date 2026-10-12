@@ -18,12 +18,14 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
@@ -139,10 +141,9 @@ bool DerivedConformance::derivesProtocolConformance(
         // conformance.
       case KnownDerivableProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
-      
+
       case KnownDerivableProtocolKind::Comparable:
-        return !enumDecl->hasPotentiallyUnavailableCaseValue()
-            && canDeriveComparable(DC, enumDecl); 
+        return canDeriveComparable(DC, enumDecl);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -1120,10 +1121,24 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   }
   ASSERT(expansion);
 
+  auto *macro = C.getBuiltinDerivedConformanceMacroDecl(macroKind);
+
+  auto external = macro->getDefinition().getExternalMacro();
+  auto externalDef =
+      evaluateOrDefault(C.evaluator,
+                        ExternalMacroDefinitionRequest{&C, external.moduleName,
+                                                       external.macroTypeName},
+                        ExternalMacroDefinition::error(""));
+  if (externalDef.isError()) {
+    derived.ConformanceDecl->diagnose(
+        diag::derivation_macro_could_not_be_loaded,
+        external.macroTypeName, requirement->getName(), external.moduleName);
+    return nullptr;
+  }
+
   // Resolve the macro reference directly to the builtin MacroDecl, bypassing
   // name lookup.
-  expansion->setMacroRef(
-      ConcreteDeclRef(C.getBuiltinDerivedConformanceMacroDecl(macroKind)));
+  expansion->setMacroRef(ConcreteDeclRef(macro));
 
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
   // single one.
@@ -1138,8 +1153,13 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
 
     witness = vDecl;
   });
-  ASSERT(witness && "Expected a witness but got NULL");
-
+  
+  if (!witness) {
+    derived.ConformanceDecl->diagnose(
+        diag::failed_to_expand_derived_conformance, derived.getProtocolType());
+    return nullptr;
+  }
+  
   expansion->forEachExpandedNode([&](ASTNode node) {
     auto *decl = node.dyn_cast<Decl *>();
     if (!decl)
@@ -1259,6 +1279,29 @@ static void printAvailabilityQuery(llvm::raw_ostream &out,
   out << ")";
 }
 
+/// Prints the Swift source text of an enum case's raw value literal
+/// expression \p raw to \p out.
+static void printRawValueLiteral(llvm::raw_ostream &out,
+                                 const LiteralExpr *raw) {
+  if (auto *intLit = dyn_cast<IntegerLiteralExpr>(raw)) {
+    if (intLit->isNegative())
+      out << "-";
+    out << intLit->getDigitsText();
+  } else if (isa<NilLiteralExpr>(raw)) {
+    out << "nil";
+  } else if (auto *stringLit = dyn_cast<StringLiteralExpr>(raw)) {
+    out << QuotedString(stringLit->getValue());
+  } else if (auto *floatLit = dyn_cast<FloatLiteralExpr>(raw)) {
+    if (floatLit->isNegative())
+      out << "-";
+    out << floatLit->getDigitsText();
+  } else if (auto *boolLit = dyn_cast<BooleanLiteralExpr>(raw)) {
+    out << (boolLit->getValue() ? "true" : "false");
+  } else {
+    llvm_unreachable("invalid raw literal expr");
+  }
+}
+
 /// Prints a string containing swift syntax describing the case \p  decl with
 /// relevant information to \p out.
 static void printEnumCaseInfo(llvm::raw_ostream &out,
@@ -1289,7 +1332,16 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
   bool isReachable = !decl->isUnreachableAtRuntime() ||
                      decl->getParentEnum()->isUnreachableAtRuntime();
 
-  out << "], isReachable: " << (isReachable ? "true" : "false")
+  out << "], rawValue: ";
+  if (auto *raw = decl->getRawValueExpr()) {
+    std::string literalText;
+    auto litOut = llvm::raw_string_ostream(literalText);
+    printRawValueLiteral(litOut, raw);
+    out << QuotedString(litOut.str());
+  } else {
+    out << "nil";
+  }
+  out << ", isReachable: " << (isReachable ? "true" : "false")
       << ", isConstructible: " << (isConstructible ? "true" : "false")
       << ", runtimeAvailabilityQueries: [";
   llvm::interleaveComma(availabilityQueries, out,
@@ -1299,15 +1351,28 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
   out << "])";
 }
 
-/// Prints a string containing swift syntax describing the enum \p
-/// decl with relevant information to \p out.
-static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
-  out << "enumLike(EnumTypeInfo(isObjC: " << (decl->isObjC() ? "true" : "false")
+std::string swift::getEnumTypeInfoString(EnumDecl *decl) {
+  std::string s;
+  llvm::raw_string_ostream out(s);
+  out << "EnumTypeInfo(isObjC: " << (decl->isObjC() ? "true" : "false")
       << ", cases: [";
   llvm::interleaveComma(
       decl->getAllElements(), out,
       [&](const EnumElementDecl *elem) { printEnumCaseInfo(out, elem); });
-  out << "]))";
+  out << "], rawTypeName: ";
+  if (Type rawType = decl->getRawType()) {
+    out << QuotedString(rawType->getString());
+  } else {
+    out << "nil";
+  }
+  out << ")";
+  return s;
+}
+
+/// Prints a string containing swift syntax describing the enum \p
+/// decl with relevant information to \p out.
+static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
+  out << "enumLike(" << getEnumTypeInfoString(decl) << ")";
 }
 
 /// Prints a string containing swift syntax describing the stored property \p

@@ -217,8 +217,8 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x ptr]
 // CHECK-32-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] 13
 // CHECK-64-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] 10
-// CHECK-32-NEXT: call void @llvm.lifetime.start.p0(i64 12, ptr [[FIELDS]])
-// CHECK-64-NEXT: call void @llvm.lifetime.start.p0(i64 24, ptr [[FIELDS]])
+// CHECK-32-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
+// CHECK-64-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
@@ -264,7 +264,7 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [0 x ptr]
 // CHECK-32-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] 17
 // CHECK-64-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] 14
-// CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 0, ptr [[FIELDS]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [0 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)

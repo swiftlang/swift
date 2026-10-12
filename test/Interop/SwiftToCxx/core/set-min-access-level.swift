@@ -53,7 +53,7 @@ public struct S {
 // CHECK-PUBLIC-NOT: packageFunc
 // CHECK-PUBLIC-NOT: privateFunc
 // CHECK-PUBLIC: SWIFT_INLINE_THUNK swift::Int publicFunc(swift::Int x) noexcept SWIFT_SYMBOL("s:4Core10publicFuncyS2iF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-PUBLIC: SWIFT_INLINE_THUNK swift::Int S::publicMethod(swift::Int x) const {
+// CHECK-PUBLIC: SWIFT_INLINE_THUNK swift::Int S::publicMethod(swift::Int x) const noexcept {
 // CHECK-PUBLIC-NOT: packageMethod
 // CHECK-PUBLIC-NOT: internalMethod
 // CHECK-PUBLIC-NOT: privateMethod
@@ -62,8 +62,8 @@ public struct S {
 // CHECK-PACKAGE: SWIFT_INLINE_THUNK swift::Int packageFunc(swift::Int x) noexcept SWIFT_SYMBOL("s:4Core11packageFuncyS2iF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-PACKAGE-NOT: privateFunc
 // CHECK-PACKAGE: SWIFT_INLINE_THUNK swift::Int publicFunc(swift::Int x) noexcept SWIFT_SYMBOL("s:4Core10publicFuncyS2iF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-PACKAGE: SWIFT_INLINE_THUNK swift::Int S::publicMethod(swift::Int x) const {
-// CHECK-PACKAGE: SWIFT_INLINE_THUNK swift::Int S::packageMethod(swift::Int x) const {
+// CHECK-PACKAGE: SWIFT_INLINE_THUNK swift::Int S::publicMethod(swift::Int x) const noexcept {
+// CHECK-PACKAGE: SWIFT_INLINE_THUNK swift::Int S::packageMethod(swift::Int x) const noexcept {
 // CHECK-PACKAGE-NOT: internalMethod
 // CHECK-PACKAGE-NOT: privateMethod
 
@@ -71,9 +71,9 @@ public struct S {
 // CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int packageFunc(swift::Int x) noexcept SWIFT_SYMBOL("s:4Core11packageFuncyS2iF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-INTERNAL-NOT: privateFunc
 // CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int publicFunc(swift::Int x) noexcept SWIFT_SYMBOL("s:4Core10publicFuncyS2iF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int S::publicMethod(swift::Int x) const {
-// CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int S::packageMethod(swift::Int x) const {
-// CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int S::internalMethod(swift::Int x) const {
+// CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int S::publicMethod(swift::Int x) const noexcept {
+// CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int S::packageMethod(swift::Int x) const noexcept {
+// CHECK-INTERNAL: SWIFT_INLINE_THUNK swift::Int S::internalMethod(swift::Int x) const noexcept {
 // CHECK-INTERNAL-NOT: privateMethod
 
 // CHECK-DIAGNOSTIC: error: invalid minimum clang header access level 'inernal'; chose from 'public'|'package'|'internal'

@@ -271,7 +271,7 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
   if (!ty)
     return;
 
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   ty->getTypeVariables(typeVars);
   TypeVars.insert(typeVars.begin(), typeVars.end());
 }
@@ -279,7 +279,7 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
 void TypeVarRefCollector::inferTypeVars(PackExpansionExpr *E) {
   auto expansionType = CS.getType(E)->castTo<PackExpansionType>();
 
-  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
   expansionType->getTypeVariables(referencedVars);
   TypeVars.insert(referencedVars.begin(), referencedVars.end());
 }
@@ -336,9 +336,7 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
   if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
     if (isa<ReturnStmt>(stmt) && DCDepth == 0 &&
         !Locator->directlyAt<ClosureExpr>()) {
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
-      CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
-      TypeVars.insert(typeVars.begin(), typeVars.end());
+      CS.getClosureType(CE)->getResult()->getTypeVariables(TypeVars);
     }
   }
   return Action::Continue(stmt);
@@ -3338,7 +3336,7 @@ namespace {
           // resolved.
           if (args &&
               ctx.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-            SmallPtrSet<TypeVariableType *, 2> referencedVars;
+            SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
             for (const auto &arg : *args) {
               CS.getType(arg.getExpr())->getTypeVariables(referencedVars);
             }

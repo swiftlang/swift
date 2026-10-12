@@ -128,7 +128,7 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 2
 
 #if defined(__cplusplus)
 extern "C" {
@@ -302,7 +302,8 @@ void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignme
  * - Parameters:
  *   - size: The minimum number of bytes to allocate.
  *   - alignment: The minimum alignment of the resulting pointer, which must
- *     be a power of at least as large as `sizeof(void *)`.
+ *     be a power of two at least as large as `sizeof(void *)`, or be zero to
+ *     request the default alignment of 16 bytes.
  *   - flags: Flags to control the behavior of the allocation.
  *   - typeId: An identifier used by a typed allocator to e.g. place the
  *     allocation in a particular bucket.
@@ -344,6 +345,24 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_typedAllocate(
 void _swift_typedDeallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t size, __swift_size_t alignment, swift_dealloc_flags_t flags, __swift_typeid_t typeId);
 
 /**
+ * Acquires the standard output stream lock.
+ *
+ * Embedded Swift holds this lock across a complete print operation, including
+ * its terminator. The lock must be recursive: formatting a value can itself
+ * call print, and output writes may acquire the same stream lock internally.
+ * Each acquisition must be paired with `_swift_unlockStandardOutput` in the
+ * same execution context.
+ *
+ * Single-threaded platforms can implement both locking functions as no-ops.
+ */
+void _swift_lockStandardOutput(void);
+
+/**
+ * Releases one level of ownership of the standard output stream lock.
+ */
+void _swift_unlockStandardOutput(void);
+
+/**
  * Writes a sequence of UTF-8 code points to standard output.
  *
  * - Parameters:
@@ -357,6 +376,10 @@ void _swift_typedDeallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t si
  *
  * This function can be implemented as a call to fwrite or printf with the
  * specified number of code points.
+ *
+ * This function can be called with the standard output stream lock held.
+ * A single print operation can invoke it multiple times. Locking only within
+ * this function does not serialize an entire print operation.
  */
 __swift_size_t _swift_writeToStandardOutput(
     const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(count) chars,

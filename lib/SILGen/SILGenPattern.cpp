@@ -17,6 +17,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
+#include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -27,7 +28,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -567,6 +567,10 @@ private:
                       ConsumableManagedValue src,
                       const SpecializationHandler &handleSpec,
                       const FailureHandler &failure);
+  bool tryEmitNoncopyableIsDispatch(ArrayRef<RowToSpecialize> rows,
+                                    ConsumableManagedValue src,
+                                    const SpecializationHandler &handleSpec,
+                                    const FailureHandler &failure);
   void emitEnumElementObjectDispatch(ArrayRef<RowToSpecialize> rows,
                                      ConsumableManagedValue src,
                                      const SpecializationHandler &handleSpec,
@@ -1375,6 +1379,7 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
   case CastConsumptionKind::TakeOnSuccess: return isIrrefutable;
   case CastConsumptionKind::CopyOnSuccess: return false;
   case CastConsumptionKind::BorrowAlways: return false;
+  case CastConsumptionKind::TestOnly: return false;
   }
   llvm_unreachable("bad consumption kind");
 }
@@ -1421,7 +1426,8 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   //
   // If we're relying on ManualOwnership for explicit-copies enforcement,
   // we don't need the MoveOnlyWrapper.
-  if (!bindValue.getType().isMoveOnly() && !SGF.B.hasManualOwnershipAttr()) {
+  if (!bindValue.getType().isMoveOnly() &&
+      SGF.usingWrapperTypeImplicitCopyEnforcement()) {
     if (bindValue.getType().isAddress()) {
       bindValue = ManagedValue::forBorrowedAddressRValue(
         SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));
@@ -1631,6 +1637,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::TestOnly:
     return {ManagedValue::forBorrowedRValue(value), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess:
@@ -1648,6 +1655,7 @@ getManagedSubobject(SILGenFunction &SGF, ManagedValue value,
   switch (consumption) {
   case CastConsumptionKind::BorrowAlways:
   case CastConsumptionKind::CopyOnSuccess:
+  case CastConsumptionKind::TestOnly:
     return {value.unmanagedBorrow(), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess: {
@@ -1815,7 +1823,8 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                                    src.getFinalConsumption());
       }
       case CastConsumptionKind::CopyOnSuccess:
-      case CastConsumptionKind::BorrowAlways: {
+      case CastConsumptionKind::BorrowAlways:
+      case CastConsumptionKind::TestOnly: {
         // We translate copy_on_success => borrow_always.
         auto memberMV = ManagedValue::forBorrowedAddressRValue(member);
         return {SGF.B.createLoadBorrow(loc, memberMV),
@@ -1876,9 +1885,25 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // temporary if necessary.
 
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(
-        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
+  bool requiresAddress;
+  switch (computeCastStrategy(SGF, sourceType, targetType)) {
+  case CastStrategy::COM: {
+    ManagedValue value =
+        prepareCOMCastSource(SGF, loc, src.getFinalManagedValue());
+    if (!value.getType().isAddress()) {
+      auto temporary = SGF.emitTemporaryAllocation(loc, value.getType());
+      value = SGF.B.createStoreBorrowOrTrivial(loc, value.borrow(SGF, loc),
+                                               temporary);
+    }
+    return {value, CastConsumptionKind::CopyOnSuccess};
+  }
+  case CastStrategy::Address:
+    requiresAddress = true;
+    break;
+  case CastStrategy::Scalar:
+    requiresAddress = false;
+    break;
+  }
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
@@ -1939,11 +1964,124 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   return ConsumableManagedValue::forOwned(init->getManagedAddress());
 }
 
+/// Formally, `case is T` has the same meaning as `case _ as T`;
+/// they both verify the type without binding any payload in the result.
+static bool patternNeedsNoPayload(const Pattern *pattern) {
+  // True for `case is T`
+  if (!pattern)
+    return true;
+  // True for `case _ as T` (and variations thereof)
+  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
+}
+
+/// Try to dispatch a cast pattern by testing the subject's type
+/// in place instead of extracting its payload.  This supports
+/// noncopyable types and will also permit using more efficient
+/// test-only runtime functions for other `is` tests in the future.
+///
+/// This only supports the the no-binding form (`is T`, `_ as T`).
+/// Binding the payload additionally needs a borrowed projection out of
+/// the container, which is not yet implemented; that case returns false and is
+/// diagnosed by the caller.
+bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
+    ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+    const SpecializationHandler &handleCase, const FailureHandler &failure) {
+  auto *firstPattern = cast<IsPattern>(rows[0].Pattern);
+  CanType sourceType = firstPattern->getType()->getCanonicalType();
+  CanType targetType = getTargetType(rows[0]);
+
+  // For now, limit this path to noncopyable existentials
+  if (!canUseNoncopyableTypeTest(sourceType, targetType,
+                                 firstPattern->getCastKind()))
+    return false;
+
+  // The test reads the subject through a pointer.
+  // * Without OpaqueValues, return here if it's not an address
+  // * With OpaqueValues, fall through to borrow it into a temporary
+  ManagedValue subject = src.getFinalManagedValue();
+  if (!subject.getType().isAddress() && SGF.useLoweredAddresses())
+    return false;
+
+  // We can't yet support binding the payload, so diagnose here.
+  bool wantsPayload = false;
+  for (auto &row : rows) {
+    auto *is = cast<IsPattern>(row.Pattern);
+    if (!patternNeedsNoPayload(is->getSubPattern())) {
+      SGF.SGM.diagnose(is->getLoc(),
+                       diag::noncopyable_cast_pattern_binding_unimplemented);
+      wantsPayload = true;
+    }
+  }
+
+  // Enumerate the specializations of this test
+  SmallVector<SpecializedRow, 4> specializedRows;
+  specializedRows.reserve(rows.size());
+  for (auto &row : rows) {
+    assert(getTargetType(row) == targetType &&
+           "can only specialize on one type at a time");
+    specializedRows.push_back({});
+    specializedRows.back().RowIndex = row.RowIndex;
+    specializedRows.back().Patterns.push_back(
+        cast<IsPattern>(row.Pattern)->getSubPattern());
+  }
+
+  // Sketch the CFG and type test
+  SILLocation loc = rows[0].Pattern;
+
+  // Borrow a value subject into a temporary so the cast has an address to read.
+  // Close the borrow at the top of each successor block.
+  SILValue subjectTemp, subjectBorrow;
+  if (!subject.getType().isAddress()) {
+    subjectTemp = SGF.B.createAllocStack(loc, subject.getType());
+    subjectBorrow =
+        SGF.B.createStoreBorrow(loc, subject.getValue(), subjectTemp);
+    subject = ManagedValue::forBorrowedAddressRValue(subjectBorrow);
+  }
+  auto endSubjectBorrow = [&] {
+    if (!subjectTemp)
+      return;
+    SGF.B.createEndBorrow(loc, subjectBorrow);
+    SGF.B.createDeallocStack(loc, subjectTemp);
+  };
+
+  SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
+  SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
+  emitNoncopyableTypeTest(SGF, loc, subject, sourceType, targetType, trueBB,
+                          falseBB, rows[0].Count, ProfileCounter());
+
+  // Chain failure to the next case
+  SGF.B.setInsertionPoint(falseBB);
+  endSubjectBorrow();
+  failure(loc);
+
+  // Set up the success block.  If we diagnosed above, this is unreachable
+  SGF.B.setInsertionPoint(trueBB);
+  endSubjectBorrow();
+  if (wantsPayload) {
+    SGF.B.createUnreachable(loc);
+    return true;
+  }
+
+  // Leave the payload as `undef` since we bound nothing.
+  SILType payloadTy = SGF.getLoweredType(targetType).getAddressType();
+  ConsumableManagedValue payload = {
+      ManagedValue::forBorrowedAddressRValue(SILUndef::get(SGF.F, payloadTy)),
+      CastConsumptionKind::CopyOnSuccess};
+  // Recursively enumerate the specializations
+  handleCase(payload, specializedRows, failure);
+  assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+  return true;
+}
+
 /// Perform specialized dispatch for a sequence of IsPatterns.
 void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
                                       ConsumableManagedValue src,
                                       const SpecializationHandler &handleCase,
                                       const FailureHandler &failure) {
+  // Try to emit a noncopyable/noncopying dispatch
+  if (tryEmitNoncopyableIsDispatch(rows, src, handleCase, failure))
+    return;
+
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
   CanType targetType = getTargetType(rows[0]);
 
@@ -2054,7 +2192,7 @@ CaseBlocks::CaseBlocks(
   CaseInfos.reserve(rows.size());
   CaseCounts.reserve(rows.size());
 
-  auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+  auto enumDecl = sourceType.getEnumDecl();
 
   llvm::SmallDenseMap<EnumElementDecl *, unsigned, 16> caseToIndex;
   for (auto &row : rows) {
@@ -2282,8 +2420,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
     if (src.getType().isAddressOnly(SGF.F) &&
-        src.getOwnershipKind() == OwnershipKind::Guaranteed) {
-      // If it's an opaque value with guaranteed ownership, we need to copy.
+        src.getOwnershipKind() == OwnershipKind::Guaranteed &&
+        !src.getType().isMoveOnly()) {
+      // A noncopyable subject cannot be copied, so switch on the borrow.
       src = src.copy(SGF, PatternMatchStmt);
     }
 
@@ -2311,6 +2450,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::CopyOnSuccess:
   case CastConsumptionKind::BorrowAlways:
+  case CastConsumptionKind::TestOnly:
     // No change to src necessary.
     break;
 
@@ -2415,7 +2555,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
         eltValue = SGF.B.createUncheckedEnumDataAddrForTake(loc, finalValue, eltDecl, eltTy);
         break;
       }
-      case CastConsumptionKind::BorrowAlways: {
+      case CastConsumptionKind::BorrowAlways:
+      case CastConsumptionKind::TestOnly: {
         // See if we can apply the projection in-place for this enum.
         SILValue projection;
         if (UncheckedEnumDataAddrInstBase::isDestructive(
@@ -2470,6 +2611,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
           break;
           
         case CastConsumptionKind::BorrowAlways:
+        case CastConsumptionKind::TestOnly:
           eltValue = SGF.B.createLoadBorrow(loc, eltValue);
           break;
           
@@ -3389,17 +3531,16 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
     case AccessorKind::YieldingMutate:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-      // Read, modify, and addressors yield a borrowable reference.
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      // Read, modify, borrow, mutate, and addressors yield a borrowable
+      // reference.
       return true;
     case AccessorKind::Init:
     case AccessorKind::Set:
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       llvm_unreachable("should not be involved in a read");
-    case AccessorKind::Borrow:
-      llvm_unreachable("borrow accessor is not yet implemented");
-    case AccessorKind::Mutate:
-      llvm_unreachable("mutate accessor is not yet implemented");
     }
     llvm_unreachable("switch not covered?");
     
@@ -3769,7 +3910,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         getLoweredType(AbstractionPattern::getOpaque(), metatypeType);
     ManagedValue value = subject.getFinalManagedValue();
 
-    if (auto *singleEnumDecl = canSubjectTy->getEnumOrBoundGenericEnum()) {
+    if (auto *singleEnumDecl = canSubjectTy->getEnumDecl()) {
       if (singleEnumDecl->isObjC()) {
         auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
             B.createMetatype(loc, loweredMetatypeType));

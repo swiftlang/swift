@@ -76,29 +76,8 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   return true;
 }
 
-SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *pai) {
-  // partial_apply without any substitutions or arguments is just a
-  // thin_to_thick_function. thin_to_thick_function supports only thin operands.
-  if (!pai->hasSubstitutions() && (pai->getNumArguments() == 0) &&
-      pai->getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::Thin) {
-    if (!pai->isOnStack())
-      return Builder.createThinToThickFunction(pai->getLoc(), pai->getCallee(),
-                                               pai->getType());
-
-    // Remove dealloc_stack of partial_apply [stack].
-    // Iterating while delete use a copy.
-    SmallVector<Operand *, 8> uses(pai->getUses());
-    for (auto *use : uses)
-      if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser()))
-        eraseInstFromFunction(*dealloc);
-    auto *thinToThick = Builder.createThinToThickFunction(
-        pai->getLoc(), pai->getCallee(), pai->getType());
-    replaceInstUsesWith(*pai, thinToThick);
-    eraseInstFromFunction(*pai);
-    return nullptr;
-  }
-
+SILInstruction *
+SILCombiner::legacyVisitPartialApplyInst(PartialApplyInst *pai) {
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
   // -> %closure_typeB
@@ -424,7 +403,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       if (propDecl->hasClangNode() && propDecl->getInterfaceType()->isVoid())
         return false;
 
-      if (!parentTy.getStructOrBoundGenericStruct())
+      if (!parentTy.getStructDecl())
         hasOffset = false;
       break;
     }
@@ -474,7 +453,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType intType = AI->getType().getOptionalObjectType();
     if (!intType)
       return false;
-    StructDecl *intDecl = intType.getStructOrBoundGenericStruct();
+    StructDecl *intDecl = intType.getStructDecl();
     if (!intDecl || intDecl->getStoredProperties().size() != 1)
       return false;
     VarDecl *member = intDecl->getStoredProperties()[0];
@@ -1652,7 +1631,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (genericArgs.size() != 1)
     return false;
   auto ty = genericArgs[0]->getCanonicalType();
-  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+  if (ty->getStructDecl() || ty->getEnumDecl() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
       isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||

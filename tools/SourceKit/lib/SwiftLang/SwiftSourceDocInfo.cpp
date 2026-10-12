@@ -42,7 +42,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceManager.h"
-#include "clang/Index/USRGeneration.h"
+#include "clang/UnifiedSymbolResolution/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 
 #include "llvm/Support/MemoryBuffer.h"
@@ -2525,7 +2525,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   if (!fileSystem)
     return Receiver(RequestResult<CursorInfoData>::fromError(error));
 
-  if (auto IFaceGenRef = IFaceGenContexts.get(PrimaryFilePath)) {
+  if (IFaceGenContexts.get(PrimaryFilePath)) {
     LOG_WARN_FUNC("Info from usr for generated interface not implemented yet.");
     CursorInfoData Info;
     Info.InternalDiagnostic = "Info for generated interfaces not implemented.";

@@ -30,11 +30,17 @@ void swift_ASTGen_addQueuedDiagnostic(
     BridgedStringRef text,
     swift::DiagnosticKind severity,
     swift::SourceLoc sourceLoc,
+    BridgedStringRef diagnosticID,
     const BridgedDiagnosticCategoryEntry *_Nullable categoryChain,
     ptrdiff_t numCategoryChainEntries,
     const swift::CharSourceRange *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges,
     BridgedArrayRef /*BridgedFixIt*/ fixIts);
+bool swift_ASTGen_renderQueuedDiagnosticsAsSARIF(
+    void *_Nullable queued,
+    BridgedStringRef compilerVersion,
+    BridgedStringRef *_Nonnull renderedString,
+    BridgedStringRef *_Nonnull errorMessageOut);
 void swift_ASTGen_renderSingleDiagnostic(
     void *_Nonnull state,
     BridgedStringRef text,

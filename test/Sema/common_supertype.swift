@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes
+// RUN: %target-typecheck-verify-swift -solver-disable-enumerate-supertypes -target %target-swift-6.0-abi-triple
 
 class A {}
 class B: A {}
@@ -269,4 +269,54 @@ func testFunctionJoin3() -> [(String) -> Any?] {
 
 func testFunctionJoin4(s: String) -> Bool {
     return [f3, f4].contains { $0(s) != nil }
+}
+
+// Join of two class types that contain type variables was incorrectly computed
+// as 'Any'. This was reduced from a larger expression that appears in
+// stdlib/AnyHashable.swift.gyb.
+extension Sequence {
+  func xmap<R>(_: (Element) -> R) -> [R] {
+    return []
+  }
+}
+
+do {
+  protocol P {}
+
+  class C<T>: P {
+    init(_: T) {}
+  }
+
+  struct S {
+    init<T: P>(_: T) {}
+  }
+
+  func test(x: [Int]) -> [[S]] {
+    return x.xmap {
+      [
+        C($0 as Int),
+        C($0 as Int)
+      ].xmap(S.init)
+    }
+  }
+}
+
+// Test coverage for meet of typed throws, which is a bit special.
+do {
+
+  struct YourError: Error {}
+  struct MyError: Error {}
+
+  func g<T>(_: T, _: T) {}
+
+  func f(x: @escaping (() throws(YourError) -> ()) -> (),
+         y: @escaping (() throws(MyError) -> ()) -> (),
+         z: @escaping (() throws -> ()) -> ()) {
+    g(x, y)
+    g(y, x)
+    g(x, z)
+    g(z, x)
+    g(y, z)
+    g(z, y)
+  }
 }

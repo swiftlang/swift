@@ -3154,8 +3154,8 @@ public:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
-  /// Match the execution semantics between two functions currently
-  /// represented by `@called(once)` bit.
+  /// Match the execution semantics (exactly-once, at-most-once, or
+  /// unconstrained) between two functions.
   SolutionKind
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
@@ -4414,7 +4414,7 @@ class TypeVarRefCollector : public ASTWalker {
   DeclContext *DC;
   ConstraintLocator *Locator;
 
-  llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> TypeVars;
   unsigned DCDepth = 0;
 
 public:
@@ -4486,8 +4486,6 @@ Type isPlaceholderVar(PatternBindingDecl *PB);
 
 /// Dump an anchor node for a constraint locator or contextual type.
 void dumpAnchor(ASTNode anchor, SourceManager *SM, raw_ostream &out);
-
-bool isPackExpansionType(Type type);
 
 /// Check whether the type is a tuple consisting of a single unlabeled element
 /// of \c PackExpansionType or a type variable that represents a pack expansion

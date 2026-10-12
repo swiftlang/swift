@@ -557,6 +557,7 @@ static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
   case CastConsumptionKind::TakeOnSuccess: return "take_on_success";
   case CastConsumptionKind::CopyOnSuccess: return "copy_on_success";
   case CastConsumptionKind::BorrowAlways: return "borrow_always";
+  case CastConsumptionKind::TestOnly: return "test_only";
   }
   llvm_unreachable("bad cast consumption kind");
 }
@@ -928,8 +929,7 @@ public:
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(F);
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF),
-                std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       Ctx.initBlockIDs(RPOT);
       interleave(RPOT,
@@ -1821,6 +1821,8 @@ public:
   void visitBeginApplyInst(BeginApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isUnresolved())
+      *this << "[unresolved] ";
     visitApplyInstBase(AI);
   }
 
@@ -1873,8 +1875,15 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->isCalledOnce()) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      switch (*semantics) {
+      case ExecutionSemantics::AtMostOnce:
+        *this << "[called_at_most_once] ";
+        break;
+      case ExecutionSemantics::Once:
+        *this << "[called_once] ";
+        break;
+      }
     }
     visitApplyInstBase(CI);
   }
@@ -2330,6 +2339,8 @@ public:
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
+    if (CI->isCopy())
+      *this << "[copy] ";
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
@@ -2339,9 +2350,11 @@ public:
     printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetFormalType() << " in "
-          << getIDAndType(CI->getDest()) << ", "
-          << Ctx.getID(CI->getSuccessBB()) << ", "
+          << " to " << CI->getTargetFormalType();
+    // A test_only cast produces no value, so it has no destination operand.
+    if (CI->hasDest())
+      *this << " in " << getIDAndType(CI->getDest());
+    *this << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
     if (CI->getTrueBBCount())
       *this << " !true_count(" << CI->getTrueBBCount().getValue() << ")";
@@ -2437,6 +2450,8 @@ public:
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
+    if (CI->isImmortal())
+      *this << "[immortal] ";
     printUncheckedConversionInst(ConversionOperation(CI), CI->getOperand());
   }
 
@@ -2950,6 +2965,18 @@ public:
     *this << getIDAndType(RI->getOperand());
   }
 
+  void visitDiagnoseInst(DiagnoseInst *I) {
+    using DiagnoseKind = DiagnoseInst::DiagnoseKind;
+    switch (I->getKind()) {
+    case DiagnoseKind::Invalid:
+      llvm::report_fatal_error("Invalid?!");
+    case DiagnoseKind::UnpermittedCopy:
+      *this << "[unpermitted_copy] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitTypeValueInst(TypeValueInst *tvi) {
     *this << tvi->getType() << " for " << tvi->getParamType();
   }
@@ -3072,6 +3099,7 @@ public:
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
+          << (BAI->isUnresolved() ? "[unresolved] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitMoveOnlyWrapperToCopyableAddrInst(
@@ -3993,8 +4021,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // SIB) after importing canonical SIL from another module. If the imported
   // functions are reserialized (e.g. shared linkage), then we must preserve
   // this attribute.
-  if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
+  if (WasDeserializedCanonical && getModule().getStageFloor() == SILStage::Raw)
     OS << "[canonical] ";
+
+  // A function that is ahead of the module's stage floor carries its own stage.
+  // A function at the floor prints nothing: the module `sil_stage` line already
+  // captures this.
+  if (getFunctionStage() > getModule().getStageFloor())
+    OS << "[stage=" << getSILStageName(getFunctionStage()) << "] ";
 
   // If this function is not an external declaration /and/ is in ownership ssa
   // form, print [ossa].
@@ -4459,18 +4493,7 @@ static void printExternallyVisibleDecls(SILPrintContext &Ctx,
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_stage ";
-  switch (Stage) {
-  case SILStage::Raw:
-    OS << "raw";
-    break;
-  case SILStage::Canonical:
-    OS << "canonical";
-    break;
-  case SILStage::Lowered:
-    OS << "lowered";
-    break;
-  }
+  OS << "sil_stage " << getSILStageName(StageFloor);
 
   OS << "\n\nimport " << BUILTIN_NAME
      << "\nimport " << STDLIB_NAME
@@ -5138,7 +5161,7 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF), std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
       for (unsigned Index : indices(RPOT))

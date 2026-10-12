@@ -8,7 +8,7 @@ Embedded Swift is designed to fit constrained environments. In some cases, it is
   func createC() -> C { return C() } // warning: creating an instance of type 'C' involves heap allocation
   ```
 
-* Direct allocation of memory through `UnsafeMutablePointer` or similar"
+* Direct allocation of memory through `UnsafeMutablePointer` or similar:
   ```swift
   let p = UnsafeMutableBufferPointer<Double>.allocate(capacity: count) // warning: explicit heap allocation
   ```

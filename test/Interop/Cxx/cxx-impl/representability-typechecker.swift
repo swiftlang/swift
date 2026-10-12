@@ -7,7 +7,6 @@
 // REQUIRES: swift_feature_CxxImplementation
 
 import Functions
-import Matching
 
 
 // Primitives
@@ -67,21 +66,6 @@ func returnsNullablePtrToInt() -> UnsafeMutablePointer<CInt>? { fatalError() }
 func returnsNonnullPtrToInt() -> UnsafeMutablePointer<CInt> { fatalError() }
 
 
-// C++ references
-
-// expected-error@+2{{global function 'takesConstRef' cannot implement C++ function 'takesConstRef' because reference parameters and return types are not yet supported}}
-@cxx @implementation
-func takesConstRef(_ x: Int32) -> Int32 { return x }
-
-// expected-error@+2{{global function cannot be marked '@cxx' because inout parameters cannot be represented in C++}}
-@cxx @implementation
-func takesMutableRef(_ x: inout Int32) {}
-
-// expected-error@+2{{global function 'returnsMutableRef()' cannot implement C++ function 'returnsMutableRef' because reference parameters and return types are not yet supported}}
-@cxx @implementation
-func returnsMutableRef() -> UnsafeMutablePointer<Int32> { fatalError() }
-
-
 // Trivial struct
 
 @cxx @implementation
@@ -93,13 +77,9 @@ func returnsTrivialStruct() -> TrivialStruct { fatalError() }
 
 // Non-trivial classes
 
-// expected-error@+3{{global function cannot be marked '@cxx' because the type of the parameter cannot be represented in C++}}
-// expected-note@+2{{non-trivial C++ classes cannot be represented in C++}}
 @cxx @implementation
 func takesNonTrivial(_ obj: NonTrivialClass) {}
 
-// expected-error@+3{{global function cannot be marked '@cxx' because its result type cannot be represented in C++}}
-// expected-note@+2{{non-trivial C++ classes cannot be represented in C++}}
 @cxx @implementation
 func returnsNonTrivial() -> NonTrivialClass { fatalError() }
 

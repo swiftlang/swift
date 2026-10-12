@@ -1,0 +1,165 @@
+// Round-trip `checked_cast_addr_br test_only` through the printer, the parser,
+// and the serializer, independently of SILGen.
+//
+// RUN: %empty-directory(%t)
+//
+// Print/parse: parse this file, print it, parse the result again.
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true %s \
+// RUN:   | %target-sil-opt -sil-print-types -enable-sil-verify-all=true -emit-sorted-sil \
+// RUN:   | %FileCheck %s
+//
+// Serialize: parse, write a .sib, read it back, write another, print that.
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name test_only_roundtrip
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name test_only_roundtrip
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name test_only_roundtrip \
+// RUN:   -emit-sorted-sil | %FileCheck %s
+
+// `test_only` reports whether a cast would succeed without producing a value,
+// so it has no destination operand at all: it names only the target type. What
+// these tests pin down is that the shorter form survives printing, parsing, and
+// serialization, and that the operand list really is one shorter -- a stray
+// destination would show up as an extra `in %n` when printed back.
+//
+// Both pipelines end in -emit-sorted-sil, so the functions below are in
+// alphabetical order to match; add new ones in order.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+class D: C {}
+
+protocol P: ~Copyable {}
+
+protocol Q {}
+
+struct NC: ~Copyable, P {
+  var value: Builtin.Int64
+}
+
+// An undef destination on a *consuming* cast stays legal, and is unrelated to
+// test_only: undef propagates into arbitrary operands during optimization
+// (replaceAllUsesWithUndef), so it never was a usable marker for "no
+// destination". test/SIL/Parser/undef.sil has relied on this since long before
+// test_only existed.
+//
+// CHECK-LABEL: sil @take_always_undef_dest : $@convention(thin) (@in C) -> () {
+// CHECK:         checked_cast_addr_br take_always C in %0 : $*C to D in undef : $*D, {{bb[0-9]+}}, {{bb[0-9]+}}
+// CHECK:       } // end sil function 'take_always_undef_dest'
+sil @take_always_undef_dest : $@convention(thin) (@in C) -> () {
+bb0(%0 : $*C):
+  checked_cast_addr_br take_always C in %0 : $*C to D in undef : $*D, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The simplest shape: a class-to-subclass test that produces no value.
+//
+// CHECK-LABEL: sil @test_only_class : $@convention(thin) (@in C) -> () {
+// CHECK:         checked_cast_addr_br test_only C in %0 : $*C to D, {{bb[0-9]+}}, {{bb[0-9]+}}
+// CHECK:       } // end sil function 'test_only_class'
+sil @test_only_class : $@convention(thin) (@in C) -> () {
+bb0(%0 : $*C):
+  checked_cast_addr_br test_only C in %0 : $*C to D, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %0 : $*C
+  %r = tuple ()
+  return %r : $()
+}
+
+// The case this kind exists for: a noncopyable existential, where extracting the
+// payload to answer the question would be a copy the type forbids.
+//
+// CHECK-LABEL: sil @test_only_noncopyable_existential : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> () {
+// CHECK:         checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, {{bb[0-9]+}}, {{bb[0-9]+}}
+// CHECK:       } // end sil function 'test_only_noncopyable_existential'
+sil @test_only_noncopyable_existential : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> () {
+bb0(%0 : $*any P & ~Copyable):
+  checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A cast whose target is a local archetype. Type-dependent operands follow the
+// destination in the operand list, so with `test_only` they start one slot
+// earlier; the `type-defs:` comment below is what would go missing or land on
+// the wrong value if that arithmetic were off.
+//
+// The archetype's serial number is not stable across the .sib round-trip, so
+// capture whatever it is and require the cast to name the same one.
+//
+// CHECK-LABEL: sil @test_only_opened_archetype : $@convention(thin) (@in_guaranteed any P & ~Copyable, @in_guaranteed any Q) -> () {
+// CHECK:         [[OPENED:%[0-9]+]] = open_existential_addr immutable_access %1 : $*any Q to $*[[ARCH:@opened\([0-9]+, any Q\) Self]]
+// CHECK:         checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to [[ARCH]], {{bb[0-9]+}}, {{bb[0-9]+}} // type-defs: [[OPENED]]
+// CHECK:       } // end sil function 'test_only_opened_archetype'
+sil @test_only_opened_archetype : $@convention(thin) (@in_guaranteed any P & ~Copyable, @in_guaranteed any Q) -> () {
+bb0(%0 : $*any P & ~Copyable, %1 : $*any Q):
+  %2 = open_existential_addr immutable_access %1 : $*any Q to $*@opened(7, any Q) Self
+  checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to @opened(7, any Q) Self, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The source is only read, so the same address can be tested repeatedly and is
+// still live afterwards -- something no consuming kind permits.
+//
+// CHECK-LABEL: sil @test_only_repeated : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> () {
+// CHECK:         checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, {{bb[0-9]+}}, {{bb[0-9]+}}
+// CHECK:         checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, {{bb[0-9]+}}, {{bb[0-9]+}}
+// CHECK:       } // end sil function 'test_only_repeated'
+sil @test_only_repeated : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> () {
+bb0(%0 : $*any P & ~Copyable):
+  checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  br bb5
+
+bb5:
+  checked_cast_addr_br test_only any P & ~Copyable in %0 : $*any P & ~Copyable to NC, bb3, bb4
+
+bb3:
+  br bb6
+
+bb4:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}

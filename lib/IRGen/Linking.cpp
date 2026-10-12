@@ -81,16 +81,19 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
                            IGM.IRGen.Opts.ForcePublicLinkage,
-                           IGM.IRGen.Opts.InternalizeSymbols) {}
+                           IGM.IRGen.Opts.InternalizeSymbols,
+                           IGM.getSILModule().isWholeModule()) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
                                            bool forcePublicDecls,
-                                           bool isStaticLibrary)
+                                           bool isStaticLibrary,
+                                           std::optional<bool> isWholeModule)
     : IsELFObject(triple.isOSBinFormatELF()),
       IsMSVCEnvironment(triple.isWindowsMSVCEnvironment()),
       UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
-      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
+      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls),
+      IsWholeModule(isWholeModule) {}
 
 LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
                                             IRGenModule &IGM) {
@@ -721,9 +724,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
       // In embedded existentials mode we generate lazy public metadata on
-      // demand which makes the full metadata non-unique. (The address-point
-      // alias still uses the formal declaration linkage so that it survives
-      // GlobalDCE under -internalize-at-link.)
+      // demand which makes the full metadata non-unique.
       if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
         return SILLinkage::Shared;
 
@@ -752,6 +753,16 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return SILLinkage::Private;
     }
     case TypeMetadataAddress::AddressPoint: {
+      // In Embedded Swift, the address point is an alias into the full
+      // metadata, which is what IRGen references. The alias is defined
+      // wherever the full metadata is, with the same linkage.
+      if (nominal &&
+          nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        return LinkEntity::forTypeMetadata(getType(),
+                                           TypeMetadataAddress::FullMetadata)
+            .getLinkage(forDefinition);
+      }
+
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
                            : FormalLinkage::PublicUnique,
@@ -1179,7 +1190,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
       if (langOpts.hasFeature(Feature::Embedded)) {
         return IGM.EmbeddedExistentialsMetadataStructTy;
       }
-      if (getType().getClassOrBoundGenericClass())
+      if (getType().getClassDecl())
         return IGM.FullHeapMetadataStructTy;
       else
         return IGM.FullTypeMetadataStructTy;
@@ -1585,7 +1596,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return (getDecl()->isWeakImported(module) || getDecl()->isStatic());
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
-    return getType()->getClassOrBoundGenericClass()->isWeakImported(module);
+    return getType()->getClassDecl()->isWeakImported(module);
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
@@ -1715,7 +1726,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getDecl()->getDeclContext();
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
-    return getType()->getClassOrBoundGenericClass()->getDeclContext();
+    return getType()->getClassDecl()->getDeclContext();
 
   case Kind::SILFunction:
   case Kind::DynamicallyReplaceableFunctionVariable:
@@ -1834,19 +1845,25 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     return getSILFunction()->hasNonUniqueDefinition();
   }
 
+  // A coroutine function pointer is defined wherever its function is.
+  switch (getKind()) {
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+    return getUnderlyingEntityForCoroFunctionPointer().hasNonUniqueDefinition();
+  default:
+    break;
+  }
+
   if (getKind() == Kind::SILGlobalVariable ||
       getKind() == Kind::ReadOnlyGlobalObject)
     return getSILGlobalVariable()->hasNonUniqueDefinition();
 
   if (getKind() == Kind::TypeMetadata ||
       getKind() == Kind::ValueWitnessTable) {
-    // The address-point alias of type metadata is uniquely defined per
-    // binary even when the full metadata it references is shared, so it
-    // gets the formal declaration linkage rather than linkonce_odr.
-    if (getKind() == Kind::TypeMetadata &&
-        getMetadataAddress() == TypeMetadataAddress::AddressPoint)
-      return false;
-
     // For a nominal type, check its declaration.
     CanType type = getType();
     if (auto nominal = type->getAnyNominal()) {

@@ -23,7 +23,7 @@ public macro CxxFreestandingStruct() = #externalMacro(module: "MacroDefinition",
 // ---
 
 // CHECK:     class SWIFT_SYMBOL("s:9MacroUser0A14ExpandedStructV") MacroExpandedStruct final {
-// CHECK-DAG: SWIFT_INLINE_THUNK void member() const SWIFT_SYMBOL("s:9MacroUser0A14ExpandedStructV6memberyyF");
+// CHECK-DAG: SWIFT_INLINE_THUNK void member() const noexcept SWIFT_SYMBOL("s:9MacroUser0A14ExpandedStructV6memberyyF");
 #CxxFreestandingStruct
 
 // CHECK: class SWIFT_SYMBOL("s:9MacroUser10SomeStructV") SomeStruct final {
@@ -36,8 +36,8 @@ public struct SomeStruct {
 
   #CxxFreestandingFunc
 
-  // CHECK-DAG: SWIFT_INLINE_THUNK void peer_someMethod() const SWIFT_SYMBOL("s:9MacroUser10SomeStructV15peer_someMethodyyF");
-  // CHECK-DAG: SWIFT_INLINE_THUNK void someMethod() const SWIFT_SYMBOL("s:9MacroUser10SomeStructV10someMethodyyF");
-  // CHECK-DAG: SWIFT_INLINE_THUNK void cxxFreestanding() const SWIFT_SYMBOL("s:9MacroUser10SomeStructV15cxxFreestandingyyF");
-  // CHECK-DAG: SWIFT_INLINE_THUNK void member_SomeStruct() const SWIFT_SYMBOL("s:9MacroUser10SomeStructV07member_cD0yyF");
+  // CHECK-DAG: SWIFT_INLINE_THUNK void peer_someMethod() const noexcept SWIFT_SYMBOL("s:9MacroUser10SomeStructV15peer_someMethodyyF");
+  // CHECK-DAG: SWIFT_INLINE_THUNK void someMethod() const noexcept SWIFT_SYMBOL("s:9MacroUser10SomeStructV10someMethodyyF");
+  // CHECK-DAG: SWIFT_INLINE_THUNK void cxxFreestanding() const noexcept SWIFT_SYMBOL("s:9MacroUser10SomeStructV15cxxFreestandingyyF");
+  // CHECK-DAG: SWIFT_INLINE_THUNK void member_SomeStruct() const noexcept SWIFT_SYMBOL("s:9MacroUser10SomeStructV07member_cD0yyF");
 }

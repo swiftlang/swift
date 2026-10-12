@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -wmo %s -c -o %t/main.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/a.out -dead_strip
+// RUN: %if OS=macosx %{ %llvm-nm --defined-only --format=just-symbols %t/a.out | %FileCheck %s --check-prefix=DEBUG-SYMBOL %}
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
@@ -19,6 +20,9 @@ func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer?
 
 @_extern(c, "_swift_tls_set")
 func _swift_tls_set(_ key: Int, _ value: UnsafeMutableRawPointer?)
+
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_current_task_storage_kind
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_global_tls_array
 
 func check(_ condition: Bool) {
   if !condition {

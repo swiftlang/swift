@@ -417,6 +417,16 @@ using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
 ///
 ///     end_access %addr // %addr must be initialized here
 ///
+/// (4) mutate accessor.  Must be initialized at the end of the scope of the
+///     accessor's self argument: its enclosing modify access, or otherwise the
+///     scope of the address that self is marked on, e.g. (1) or (2).
+///
+///     (%yield, %token) = begin_apply ... -> @yields @inout Self
+///     %self = mark_unresolved_non_copyable_value %yield
+///     %addr = apply %mutate(%self) : $(@inout Self) -> @inout MOV
+///     ...
+///     end_apply %token // %addr must be initialized here
+///
 /// To enforce this requirement, function exiting instructions are treated as
 /// liveness uses of such addresses, ensuring that the address is initialized at
 /// that point.
@@ -504,6 +514,12 @@ static bool visitScopeEndsRequiringInit(
           visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
         }
         return true;
+      }
+      // Without an enclosing access, self is projected from a marked yield or
+      // inout argument whose scope ends are those of its marker.
+      if (auto *selfMark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+              stripAddressProjections(ai->getSelfArgument()))) {
+        return visitScopeEndsRequiringInit(selfMark, visit);
       }
       return false;
     }
@@ -1989,7 +2005,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
-        && !targetType.getEnumOrBoundGenericEnum()) {
+        && !targetType.getEnumDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
 
@@ -2019,7 +2035,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // deinit. We know that it must be non-copyable since copyable types
     // cannot contain non-copyable types and that our parent root type must be
     // an enum, tuple, or struct.
-    if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
+    if (auto *nom = iterType.getNominalDecl()) {
       if (auto error = shouldEmitPartialMutationErrorForType(
               iterType, nom, user->getFunction())) {
         return error;
@@ -2031,7 +2047,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
       auto isAllowedPartialConsume =
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
-           useState.address->getType().getNominalOrBoundGenericNominal());
+           useState.address->getType().getNominalDecl());
       if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
@@ -2698,16 +2714,30 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastAddrInst>(user)) {
+    if (cast->getSrc() == op->get() && cast->isCopy()) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (leafRanges.empty())
+        return false;
+      for (auto leafRange : leafRanges)
+        useState.recordLivenessUse(user, leafRange);
+      return true;
+    }
+  }
+
   // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
   // leaves Src in place. Model this by recording the take at the entry of the
   // success block rather than at the branch itself, so liveness treats Src as
   // consumed starting there while still live from the branch to the failure
-  // edge.
+  // edge. CopyOnSuccess never consumes Src, so it is only a liveness use.
+  // Both casts write to Dest, which must not be mistaken for a write to Src.
   if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
+    auto consumption = ccabi->getConsumptionKind();
     if (ccabi->getSrc() == op->get() &&
-        ccabi->getConsumptionKind() == CastConsumptionKind::TakeOnSuccess) {
-      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br "
-                                 "take_on_success Src: " << *user);
+        (consumption == CastConsumptionKind::TakeOnSuccess ||
+         consumption == CastConsumptionKind::CopyOnSuccess)) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: " << *user);
       SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
       TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
       if (!leafRanges.size()) {
@@ -2715,9 +2745,31 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         return false;
       }
 
-      auto *successEntry = &ccabi->getSuccessBB()->front();
       for (auto leafRange : leafRanges) {
-        useState.recordTakeUse(successEntry, leafRange);
+        if (consumption == CastConsumptionKind::TakeOnSuccess)
+          useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
+
+    // A test_only cast only reads Src -- it neither takes nor copies it, and
+    // writes nothing (it has no dest). That makes it a plain liveness use.  It
+    // can't fall through to the generic liveness path below, because other
+    // checked_cast_addr_br forms do write and that path asserts against any
+    // user whose memory behavior admits a write.
+    if (ccabi->getSrc() == op->get() &&
+        ccabi->getConsumptionKind() == CastConsumptionKind::TestOnly) {
+      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br test_only Src: "
+                              << *user);
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (!leafRanges.size()) {
+        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+        return false;
+      }
+
+      for (auto leafRange : leafRanges) {
         useState.recordLivenessUse(user, leafRange);
       }
       return true;
@@ -4186,9 +4238,13 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     // Move the debug_value to right after the markedAddress to ensure that we
     // do not actually change our liveness computation.
     //
-    // NOTE: The author is not sure if this can ever happen with SILGen output,
-    // but this is being put just to be safe.
-    di->moveAfter(markedAddress);
+    // Only do this if markedAddress is itself the initialization. Otherwise,
+    // moving the debug_value would place it before the real initialization,
+    // making the value live-in to the block. This happens when the debug_value
+    // belonged to a stacked [strict] mark that has already been checked and
+    // replaced by its operand.
+    if (addressBeginsInitialized(markedAddress))
+      di->moveAfter(markedAddress);
     liveness.updateForUse(di, TypeTreeLeafTypeRange(markedAddress),
                           false /*lifetime ending*/);
   }

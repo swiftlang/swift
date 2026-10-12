@@ -256,6 +256,7 @@ LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 BASELINE_LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 BASELINE_LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+BASELINE_LANGUAGE_FEATURE(BuiltinApplyIsolatedUnchecked, 0, "Builtin.applyActorIsolatedUnchecked and Builtin.applyGlobalActorIsolatedUnchecked")
 BASELINE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 BASELINE_LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
@@ -545,6 +546,9 @@ LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inh
 /// Enable @cxx @implementation for implementing C++ functions in Swift.
 EXPERIMENTAL_FEATURE(CxxImplementation, true)
 
+/// Expose noncopyable Swift structs and enums to C++ as move-only C++ classes.
+EXPERIMENTAL_FEATURE(GenerateBindingsForNoncopyableTypesInCXX, true)
+
 /// Allow a Swift class to subclass a C++ foreign reference type.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 
@@ -618,6 +622,9 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 /// Allow use of the @unsafe(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
 
+/// The Deinitable invertible protocol, which Copyable inherits
+SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
@@ -662,15 +669,15 @@ LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
-/// Allow stored properties of types from an internal bridging header in
-/// non-resilient modules. Layout will be encoded in the .swiftmodule.
-EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
-
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 
 /// Allow use of `@called(...)` on function types.
 EXPERIMENTAL_FEATURE(CalledAttribute, false)
+
+/// Allow structs, enums, and generic parameters to suppress `Deinitable`, for
+/// testing the compiler's support for `~Deinitable` types.
+EXPERIMENTAL_FEATURE(NondeinitableTypes, false)
 
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
@@ -688,13 +695,22 @@ LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builti
 EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
-EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
+LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote distributed actor references")
 
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
 
 /// Enable distributed actors in Embedded Swift.
-EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
+EXPERIMENTAL_FEATURE(EmbeddedDistributed, true)
+
+/// Enable type-based scope restrictions on ~Escapable types.
+EXPERIMENTAL_FEATURE(ScopeRestrictions, false)
+
+/// Builtins for relaxed floating-point operations.
+LANGUAGE_FEATURE(BuiltinRelaxedFP, 0, "Support for Builtin.F[Add,Sub,Mul]Relaxed")
+
+/// Enable usage of `Cell`, `ConstCell`, and `Volatile` from the standard library.
+EXPERIMENTAL_FEATURE(Cells, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

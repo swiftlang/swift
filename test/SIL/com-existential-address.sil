@@ -1,0 +1,38 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -enable-sil-verify-all -performance-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -emit-sib -module-name M %s -o %t/M.sib
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-com-interop -I %t -module-name M -enable-sil-verify-all %t/M.sib | %FileCheck %s
+
+sil_stage canonical
+import Builtin
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000003")
+public protocol IClassItem: AnyObject {}
+
+// Opening an address does not copy the interface or allocate a container.
+// Keep the address live so the performance check examines the opening.
+// CHECK-LABEL: sil {{.*}}@mutable_address
+// CHECK: open_existential_addr mutable_access %0 : $*any IItem to $*@opened({{.*}}, any IItem) Self
+// CHECK: address_to_pointer
+// CHECK: return
+sil [no_allocation] [perf_constraint] @mutable_address : $@convention(thin) (@inout IItem) -> Builtin.RawPointer {
+bb0(%value : $*IItem):
+  %open = open_existential_addr mutable_access %value : $*IItem to $*@opened(1, IItem) Self
+  %result = address_to_pointer %open : $*@opened(1, IItem) Self to $Builtin.RawPointer
+  return %result : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil {{.*}}@immutable_address
+// CHECK: open_existential_addr immutable_access %0 : $*any IClassItem to $*@opened({{.*}}, any IClassItem) Self
+// CHECK: address_to_pointer
+// CHECK: return
+sil @immutable_address : $@convention(thin) (@in_guaranteed IClassItem) -> Builtin.RawPointer {
+bb0(%value : $*IClassItem):
+  %open = open_existential_addr immutable_access %value : $*IClassItem to $*@opened(2, IClassItem) Self
+  %result = address_to_pointer %open : $*@opened(2, IClassItem) Self to $Builtin.RawPointer
+  return %result : $Builtin.RawPointer
+}

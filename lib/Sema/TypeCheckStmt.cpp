@@ -1596,8 +1596,10 @@ public:
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
 
-      // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->hasValueTypeDestructor()) {
+        // has to have a deinit or else it's pointless, unless the type is
+        // ~Deinitable, where `discard self` is how a value's lifetime ends.
+      } else if (!nominalDecl->hasValueTypeDestructor() &&
+                 nominalType->isDeinitable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -2603,9 +2605,17 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   
   auto ctor = otherCtorRef->getDecl();
   if (!ctor->isDesignatedInit()) {
+    // A Swift subclass of a C++ FRT calls the base's imported constructor.
+    // There is no designated initializer to chain to.
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      auto &ctx = fromCtor->getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          classDecl->isForeignReferenceType())
+        return false;
+    }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
-      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
+      if (auto classTy = selfTy->getClassDecl()) {
         assert(classTy->getSuperclass());
         auto &Diags = fromCtor->getASTContext().Diags;
         Diags.diagnose(apply->getArgs()->getLoc(), diag::chain_convenience_init,

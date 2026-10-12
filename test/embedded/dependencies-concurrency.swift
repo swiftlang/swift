@@ -9,15 +9,22 @@
 // RUN: comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt > %t/extra.txt
 // RUN: test ! -s %t/extra.txt
 
+// RUN: %llvm-nm --defined-only --format=just-symbols %t/a.out | %FileCheck %s --check-prefix=DEBUG-SYMBOL
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_asyncTaskSize
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_asyncTaskNameOffset
+
 //--- allowed-dependencies.txt
 ___assert_rtn
 ___error
 ___stack_chk_fail
 ___stack_chk_guard
+___stdoutp
 _abort
 _clock_gettime
 _exit
+_flockfile
 _free
+_funlockfile
 _malloc
 _memcpy
 _memmove

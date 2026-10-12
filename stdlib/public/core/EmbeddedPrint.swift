@@ -57,6 +57,8 @@ extension String {
 
 @inline(never)
 public func print(_ string: StaticString, terminator: StaticString = "\n") {
+  _swift_stdlib_flockfile_stdout()
+  defer { _swift_stdlib_funlockfile_stdout() }
   string.writeToStandardOutput()
   terminator.writeToStandardOutput()
 }
@@ -64,6 +66,8 @@ public func print(_ string: StaticString, terminator: StaticString = "\n") {
 @_disfavoredOverload
 @inline(never)
 public func print(_ string: String, terminator: StaticString = "\n") {
+  _swift_stdlib_flockfile_stdout()
+  defer { _swift_stdlib_funlockfile_stdout() }
   var string = string
   string.writeToStandardOutput()
   terminator.writeToStandardOutput()
@@ -72,6 +76,8 @@ public func print(_ string: String, terminator: StaticString = "\n") {
 @_disfavoredOverload
 @inline(never)
 public func print(_ object: some CustomStringConvertible, terminator: StaticString = "\n") {
+  _swift_stdlib_flockfile_stdout()
+  defer { _swift_stdlib_funlockfile_stdout() }
   var string = object.description
   string.writeToStandardOutput()
   terminator.writeToStandardOutput()
@@ -79,6 +85,8 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
 
 @inline(never)
 func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
+  _swift_stdlib_flockfile_stdout()
+  defer { _swift_stdlib_funlockfile_stdout() }
   unsafe writeChars(buf)
   terminator.writeToStandardOutput()
 }
@@ -145,11 +153,15 @@ extension BinaryInteger {
 
 @inline(never)
 public func print(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
+  _swift_stdlib_flockfile_stdout()
+  defer { _swift_stdlib_funlockfile_stdout() }
   integer.writeToStdout(radix: 10)
   print("", terminator: terminator)
 }
 
 internal func printAsHex(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
+  _swift_stdlib_flockfile_stdout()
+  defer { _swift_stdlib_funlockfile_stdout() }
   integer.writeToStdout(radix: 16)
   print("", terminator: terminator)
 }

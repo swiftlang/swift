@@ -556,40 +556,6 @@ bool ConstraintSystem::simplify() {
 
 namespace {
 
-template<typename T>
-void truncate(std::vector<T> &vec, unsigned newSize) {
-  assert(newSize <= vec.size() && "Not a truncation!");
-  vec.erase(vec.begin() + newSize, vec.end());
-}
-
-/// Truncate the given small vector to the given new size.
-template<typename T>
-void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
-  assert(newSize <= vec.size() && "Not a truncation!");
-  vec.erase(vec.begin() + newSize, vec.end());
-}
-
-template<typename T, unsigned N>
-void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
-  assert(newSize <= vec.size() && "Not a truncation!");
-  for (unsigned i = 0, n = vec.size() - newSize; i != n; ++i)
-    vec.pop_back();
-}
-
-template <typename K, typename V>
-void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
-  assert(newSize <= map.size() && "Not a truncation!");
-  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
-    map.pop_back();
-}
-
-template <typename K, typename V, unsigned N>
-void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
-  assert(newSize <= map.size() && "Not a truncation!");
-  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
-    map.pop_back();
-}
-
 template <typename V>
 void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
   while (vector.size() > newSize)
@@ -1494,7 +1460,7 @@ bool DisjunctionChoice::isUnaryOperator() const {
 bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
   // First, let's bring all referenced variables into scope.
   {
-    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
 
     if (cs.isDebugMode()) {

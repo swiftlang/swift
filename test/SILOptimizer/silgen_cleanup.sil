@@ -460,3 +460,31 @@ bb3:
   %13 = tuple ()
   return %13
 }
+
+sil @frob : $@convention(thin) (@inout Int) -> ()
+
+// CHECK-LABEL: sil @unresolved_accesses
+sil @unresolved_accesses : $@convention(thin) (@inout Int) -> () {
+// CHECK: bb0
+entry(%a : $*Int):
+// CHECK: begin_access [modify] [static] %
+  %access = begin_access [unresolved] [modify] [static] %a : $*Int
+  %frob = function_ref @frob : $@convention(thin) (@inout Int) -> ()
+  apply %frob(%access) : $@convention(thin) (@inout Int) -> ()
+  end_access %access
+  return undef : $()
+}
+
+sil @cofrob : $@yield_once @convention(thin) () -> @yields @inout Int
+
+// CHECK-LABEL: sil @unresolved_begin_apply
+sil @unresolved_begin_apply : $@convention(thin) () -> () {
+entry:
+  %cofrob = function_ref @cofrob : $@yield_once @convention(thin) () -> @yields @inout Int
+  // CHECK: begin_apply %
+  (%addr, %tok) = begin_apply [unresolved] %cofrob() : $@yield_once @convention(thin) () -> @yields @inout Int 
+  %frob = function_ref @frob : $@convention(thin) (@inout Int) -> ()
+  apply %frob(%addr) : $@convention(thin) (@inout Int) -> ()
+  end_apply %tok as $()
+  return undef : $()
+}

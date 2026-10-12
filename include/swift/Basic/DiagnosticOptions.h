@@ -38,6 +38,15 @@ public:
 
   enum FormattingStyle { LLVM, Swift };
 
+  /// The format in which diagnostics are written to a supplementary output.
+  enum class SerializedFormat {
+    /// A binary format built on LLVM's bitstream container.
+    LLVMBitcode,
+
+    /// The Static Analysis Results Interchange Format, a JSON-based standard.
+    SARIF,
+  };
+
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;
@@ -91,7 +100,7 @@ public:
 
   /// Suppress all warnings
   bool SuppressWarnings = false;
-  
+
   /// Suppress all notes
   bool SuppressNotes = false;
 
@@ -113,6 +122,9 @@ public:
   /// Whether to emit diagnostics in the terse LLVM style or in a more
   /// descriptive style that's specific to Swift.
   FormattingStyle PrintedFormattingStyle = FormattingStyle::Swift;
+
+  /// The format used when serializing diagnostics to a supplementary output.
+  SerializedFormat SerializedDiagnosticsFormat = SerializedFormat::LLVMBitcode;
 
   /// Whether to emit macro expansion buffers into separate, temporary files.
   bool EmitMacroExpansionFiles = true;

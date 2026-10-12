@@ -21,7 +21,7 @@ module Proj {
 
 // The user-declared copy constructor makes Owner self-contained, so returning
 // a pointer out of it is a projection.
-// expected-note@+1 2 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: its member 'ptr' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct Owner {
   void *ptr;
   Owner(const Owner &);
@@ -46,7 +46,7 @@ struct HasIter {
 struct SWIFT_NONESCAPABLE Slice {
   const int *p;
 };
-// expected-note@+1 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 {{this type has unknown escapability: its member 'ptr' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
 struct SelfContained {
   void *ptr;
   SelfContained(const SelfContained &);

@@ -2360,8 +2360,24 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
       });
   if (shouldDeserialize) {
     auto *primary = desc.context.dyn_cast<FileUnit *>();
-    silMod->getSILLoader()->getAllForModule(silMod->getSwiftModule()->getName(),
-                                            primary);
+    auto recordedFloor = silMod->getSILLoader()->getAllForModule(
+        silMod->getSwiftModule()->getName(), primary);
+
+    // A SIB records the stage floor its producing compilation committed to.
+    // That floor is the module's only when SIBs are all that is being lowered:
+    // SIL generated from source above is raw, and the floor must stay Raw for
+    // the mandatory pipeline to run over it. Among several SIBs the lowest
+    // floor wins, so a raw SIB still gets the mandatory pipeline next to a
+    // canonical one. Either way, each deserialized function keeps the stage
+    // recorded for it.
+    bool generatedFromSource =
+        desc.SourcesToEmit.has_value() ||
+        llvm::any_of(desc.getFilesToEmit(), [](const FileUnit *File) -> bool {
+          return isa<SourceFile>(File);
+        });
+    if (recordedFloor && !generatedFromSource &&
+        *recordedFloor > silMod->getStageFloor())
+      silMod->commitStage(*recordedFloor);
   }
 
   // Emit any delayed definitions that were forced.

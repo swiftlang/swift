@@ -596,14 +596,6 @@ private:
 void simple_display(raw_ostream &out, GenericSignature sig);
 
 inline bool CanGenericSignature::isActuallyCanonicalOrNull() const {
-#if LLVM_VERSION_MAJOR <= 21
-  if (getPointer() ==
-          llvm::DenseMapInfo<GenericSignatureImpl *>::getEmptyKey() ||
-      getPointer() ==
-          llvm::DenseMapInfo<GenericSignatureImpl *>::getTombstoneKey())
-    return true;
-#endif
-
   return getPointer() == nullptr || getPointer()->isCanonical();
 }
 
@@ -734,12 +726,6 @@ struct simplify_type<::swift::GenericSignature>
     : public simplify_type<const ::swift::GenericSignature> {};
 
 template <> struct DenseMapInfo<swift::GenericSignature> {
-  static swift::GenericSignature getEmptyKey() {
-    return llvm::DenseMapInfo<swift::GenericSignatureImpl *>::getEmptyKey();
-  }
-  static swift::GenericSignature getTombstoneKey() {
-    return llvm::DenseMapInfo<swift::GenericSignatureImpl *>::getTombstoneKey();
-  }
   static unsigned getHashValue(swift::GenericSignature Val) {
     return DenseMapInfo<swift::GenericSignatureImpl *>::getHashValue(
         Val.getPointer());

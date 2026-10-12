@@ -398,7 +398,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       embedded-concurrency
       swift_Concurrency
       IS_STDLIB
-      INSTALL_BINARY
 
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
@@ -421,7 +420,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     add_embedded_swift_target_library(
       embedded-concurrency-default-executor
       swift_ConcurrencyDefaultExecutor
-      INSTALL_BINARY
 
       CooperativeGlobalExecutor.cpp
 

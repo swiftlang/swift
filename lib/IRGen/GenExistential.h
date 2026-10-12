@@ -169,6 +169,10 @@ namespace irgen {
   void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
                               SILType existentialType, Explosion &out);
 
+  /// Bind the interface adjustments for an opened foreign COM value.
+  void bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                         CanArchetypeType archetype);
+
 } // end namespace irgen
 } // end namespace swift
 

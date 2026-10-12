@@ -121,12 +121,6 @@ public:
   EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getEnumInfo(decl).getKind();
   }
-
-  /// The prefix to be stripped from the names of the enum constants within the
-  /// given enum.
-  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *decl) {
-    return getEnumInfo(decl).getConstantNamePrefix();
-  }
 };
 
 // Utility functions of primary interest to enum constant naming

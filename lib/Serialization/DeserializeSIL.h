@@ -37,6 +37,12 @@ namespace swift {
     llvm::BitstreamCursor SILCursor;
     llvm::BitstreamCursor SILIndexCursor;
 
+    /// The stage floor the producing compilation committed to. Read eagerly
+    /// from the head of the SIL block, and reported only for a SIB, whose
+    /// module file is a whole module rather than a dependency. See
+    /// getRecordedStageFloor().
+    SILStage SerializedStageFloor = SILStage::Raw;
+
     class FuncTableInfo;
     using SerializedFuncTable =
       llvm::OnDiskIterableChainedHashTable<FuncTableInfo>;
@@ -226,6 +232,16 @@ namespace swift {
     }
     FileUnit *getFile() const {
       return MF->getFile();
+    }
+
+    /// For a SIB, the stage floor its producing compilation committed to.
+    /// std::nullopt for a .swiftmodule, whose functions each carry their own
+    /// stage. A SIB may be only part of the module being compiled, so the
+    /// caller decides whether this floor becomes the module's.
+    std::optional<SILStage> getRecordedStageFloor() const {
+      if (!MF->isSIB())
+        return std::nullopt;
+      return SerializedStageFloor;
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,

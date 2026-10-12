@@ -42,7 +42,7 @@ public func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawPointer, _
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ len: CInt) -> UnsafeMutableRawBufferPointer {
     return unsafe UnsafeMutableRawBufferPointer(start: unsafe myFunc(len), count: Int(len))
 }
@@ -50,7 +50,7 @@ public func myFunc(_ len: CInt) -> UnsafeMutableRawBufferPointer {
 @__swiftmacro_4test11nonEscaping15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func nonEscaping(_ len: CInt) -> UnsafeRawBufferPointer {
     return unsafe UnsafeRawBufferPointer(start: unsafe nonEscaping(len), count: Int(len))
 }
@@ -58,7 +58,7 @@ public func nonEscaping(_ len: CInt) -> UnsafeRawBufferPointer {
 @__swiftmacro_4test21lifetimeDependentCopy15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_disfavoredOverload
 public func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
     let len1 = CInt(exactly: p.byteCount)!
     let _pPtr = p.withUnsafeBytes {
@@ -73,7 +73,7 @@ public func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
 @__swiftmacro_4test23lifetimeDependentBorrow15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(borrow p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(borrow p) @_disfavoredOverload
 public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len2: CInt) -> RawSpan {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
@@ -82,7 +82,7 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len
 @__swiftmacro_4test24lifetimeDependentCopyMut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
 public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.byteCount)!
     let _pPtr = p.withUnsafeMutableBytes {
@@ -97,7 +97,7 @@ public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) ->
 @__swiftmacro_4test26lifetimeDependentBorrowMut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(borrow p) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(borrow p) @_disfavoredOverload
 public func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawBufferPointer, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe lifetimeDependentBorrowMut(p.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())

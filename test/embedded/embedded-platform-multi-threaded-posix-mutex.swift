@@ -7,7 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: synchronization
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 import Synchronization

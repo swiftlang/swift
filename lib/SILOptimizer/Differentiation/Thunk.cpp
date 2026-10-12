@@ -166,7 +166,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // lowered-address form. Record that (matching the caller) so the per-function
   // conventions used here -- and read by later passes -- don't treat the
   // thunk's address arguments as opaque values.
-  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+  thunk->inheritDerivedFrom(caller);
 
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
@@ -466,7 +466,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->setHasLoweredAddresses(parentThunk->hasLoweredAddresses());
+  thunk->inheritDerivedFrom(parentThunk);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -818,7 +818,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+  thunk->inheritDerivedFrom(caller);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);

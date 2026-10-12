@@ -105,10 +105,10 @@ extension Unicode.UTF8 {
   public struct ValidationError: Error, Sendable, Hashable
   {
     /// The kind of encoding error
-    public internal(set) var kind: Unicode.UTF8.ValidationError.Kind
+    public let kind: Unicode.UTF8.ValidationError.Kind
 
     /// The range of offsets into our input containing the error
-    public internal(set) var byteOffsets: Range<Int>
+    public let byteOffsets: Range<Int>
 
     @export(implementation)
     public init(
@@ -143,7 +143,7 @@ extension UTF8.ValidationError {
   @frozen
   public struct Kind: Error, Sendable, Hashable, RawRepresentable
    {
-    public internal(set) var rawValue: UInt8
+    public let rawValue: UInt8
 
     public init?(rawValue: UInt8) {
       guard rawValue <= 4 else { return nil }
@@ -190,10 +190,16 @@ extension UTF8.ValidationError {
     get { kind }
     @usableFromInline
     @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvs")
-    set { kind = newValue }
+    set { self = Self(newValue, byteOffsets) }
     @usableFromInline
     @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvM")
-    _modify { yield &kind }
+    _modify {
+      var kind = self.kind
+      defer {
+        self = Self(kind, byteOffsets)
+      }
+      yield &kind
+    }
   }
 
   /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
@@ -201,10 +207,16 @@ extension UTF8.ValidationError {
     get { byteOffsets }
     @usableFromInline
     @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvs")
-    set { byteOffsets = newValue }
+    set { self = Self(kind, newValue) }
     @usableFromInline
     @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvM")
-    _modify { yield &byteOffsets }
+    _modify {
+      var byteOffsets = self.byteOffsets
+      defer {
+        self = Self(kind, byteOffsets)
+      }
+      yield &byteOffsets
+    }
   }
 }
 
@@ -215,10 +227,16 @@ extension UTF8.ValidationError.Kind {
     get { rawValue }
     @usableFromInline
     @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvs")
-    set { rawValue = newValue }
+    set { self = Self(rawValue: newValue)! }
     @usableFromInline
     @_silgen_name("$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvM")
-    _modify { yield &rawValue }
+    _modify {
+      var newValue = rawValue
+      defer {
+        self = Self(rawValue: newValue)!
+      }
+      yield &newValue
+    }
   }
 }
 

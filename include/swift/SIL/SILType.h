@@ -32,6 +32,8 @@ namespace swift {
 class ASTContext;
 class VarDecl;
 class SILFunction;
+class SILModule;
+class TypeExpansionContext;
 
 namespace Lowering {
   class AbstractionPattern;
@@ -240,7 +242,7 @@ public:
   }
 
   /// Whether the type is an enum, struct, or tuple.
-  bool isAggregate() {
+  bool isAggregate() const {
     return is<TupleType>() || is<StructType>() ||
            is<BoundGenericStructType>() || is<EnumType>() ||
            is<BoundGenericEnumType>();
@@ -248,24 +250,24 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  ClassDecl *getClassOrBoundGenericClass() const {
-    return getASTType().getClassOrBoundGenericClass();
+  ClassDecl *getClassDecl() const {
+    return getASTType().getClassDecl();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  StructDecl *getStructOrBoundGenericStruct() const {
-    return getASTType().getStructOrBoundGenericStruct();
+  StructDecl *getStructDecl() const {
+    return getASTType().getStructDecl();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getASTType().getEnumOrBoundGenericEnum();
+  EnumDecl *getEnumDecl() const {
+    return getASTType().getEnumDecl();
   }
   
   /// Returns true if this type is an enum or contains an enum.
   bool isOrHasEnum() const {
     return getASTType().findIf([](Type ty) {
-      return ty->getEnumOrBoundGenericEnum() != nullptr;
+      return ty->getEnumDecl() != nullptr;
     });
   }
 
@@ -280,8 +282,8 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getASTType().getNominalOrBoundGenericNominal();
+  NominalTypeDecl *getNominalDecl() const {
+    return getASTType().getNominalDecl();
   }
 
   /// If this type maps to a Swift class, check if that class is a foreign
@@ -486,7 +488,7 @@ public:
   }
 
   bool isSensitive() const {
-    if (auto *nom = getNominalOrBoundGenericNominal())
+    if (auto *nom = getNominalDecl())
       return nom->getAttrs().hasAttribute<SensitiveAttr>();
     return false;
   }
@@ -518,9 +520,9 @@ public:
 
   static bool isClassOrClassMetatype(Type t) {
     if (auto *meta = t->getAs<AnyMetatypeType>()) {
-      return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
+      return bool(meta->getInstanceType()->getClassDecl());
     } else {
-      return bool(t->getClassOrBoundGenericClass());
+      return bool(t->getClassDecl());
     }
   }
 
@@ -904,12 +906,14 @@ public:
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
 
-  /// Returns true if this SILType is a `@called(once)` function type.
-  bool isCalledOnce() const;
+  /// Returns true if this SILType is a function type whose values can be
+  /// called at most once, which is true for every kind of `@called` attribute.
+  /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
+  bool hasCalledAtMostOnceSemantics() const;
 
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {
-    auto sd = getStructOrBoundGenericStruct();
+    auto sd = getStructDecl();
 
     if (!sd) {
       return nullptr;
@@ -1119,6 +1123,10 @@ public:
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions::printSIL()) const;
 
+  /// Print SIL type properties used by abstract type lowering.
+  void printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
+                                   TypeExpansionContext expansion) const;
+
   std::string getDebugDescription() const;
 };
 
@@ -1208,12 +1216,6 @@ struct DenseMapInfo<swift::SILType> {
   using SILType = swift::SILType;
   using PointerMapInfo = DenseMapInfo<void*>;
 public:
-  static SILType getEmptyKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getEmptyKey());
-  }
-  static SILType getTombstoneKey() {
-    return SILType::getFromOpaqueValue(PointerMapInfo::getTombstoneKey());
-  }
   static unsigned getHashValue(SILType t) {
     return PointerMapInfo::getHashValue(t.getOpaqueValue());
   }

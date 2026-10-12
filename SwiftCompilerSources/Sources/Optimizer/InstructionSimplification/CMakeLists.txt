@@ -43,6 +43,7 @@ swift_compiler_sources(Optimizer
   SimplifyPartialApply.swift
   SimplifyPhiArgument.swift
   SimplifyPointerToAddress.swift
+  SimplifyRawPointerToRef.swift
   SimplifyRefCasts.swift
   SimplifyRetainReleaseValue.swift
   SimplifyStoreBorrow.swift
@@ -51,6 +52,7 @@ swift_compiler_sources(Optimizer
   SimplifyStructExtract.swift
   SimplifySwitchEnum.swift
   SimplifySwitchEnumAddr.swift
+  SimplifyThinToThickFunction.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
   SimplifyTuplePackElementAddr.swift

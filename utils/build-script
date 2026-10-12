@@ -170,6 +170,29 @@ def validate_xcode_compatibility():
         )
 
 
+def validate_ci_host_is_not_intel_mac():
+    # CI is migrating its macOS machines to Apple Silicon. Maintain the
+    # invariant that CI only runs on Apple Silicon by aborting on any Intel
+    # Mac.
+    if sys.platform != 'darwin' or os.getenv("CI") != "1":
+        return
+
+    # Query the hardware rather than platform.machine() so that we still
+    # detect Apple Silicon when build-script is running under Rosetta. On
+    # Intel Macs this sysctl either does not exist or is 0.
+    result = subprocess.run(['sysctl', '-n', 'hw.optional.arm64'],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            universal_newlines=True)
+    if result.returncode == 0 and result.stdout.strip() == "1":
+        return
+
+    raise SystemExit(
+        f"error: running on an Intel Mac ('{platform.node()}') in CI (CI=1). "
+        "CI is migrating to Apple Silicon and Intel macOS machines are no "
+        "longer supported. Please report this machine so it can be replaced."
+    )
+
+
 def tar(source, destination):
     """
     Create a gzip archive of the file at 'source' at the given
@@ -1100,6 +1123,7 @@ def main():
             "(forgot to set $SWIFT_SOURCE_ROOT environment variable?)")
 
     validate_xcode_compatibility()
+    validate_ci_host_is_not_intel_mac()
 
     # Determine if we are invoked in the preset mode and dispatch accordingly.
     if any([(opt.startswith("--preset") or opt == "--show-presets")

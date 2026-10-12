@@ -35,6 +35,11 @@ STATISTIC(NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN,
           "Number of bridge retain/release eliminated by merging into "
           "bridgeRetain_n/bridgeRelease_n");
 
+/// The largest count passed to a single retain_n or release_n call. The
+/// Embedded runtime requires this to be no more than maxRefcountDelta in
+/// EmbeddedRuntime.swift.
+static constexpr size_t MaxRetainReleaseN = 256;
+
 /// Pimpl implementation of SwiftARCContractPass.
 namespace {
 
@@ -87,176 +92,81 @@ private:
 
 } // end anonymous namespace
 
-// FIXME: This method is pretty long since it is actually several smaller
-// optimizations that have been copied/pasted over time. This should be split
-// into those smaller (currently inline) functions.
+/// Replace the calls in \p List with calls made by \p CreateN, each covering at
+/// most MaxRetainReleaseN of them. Retains are merged at the first retain of each
+/// group and releases at the last release. Returns the number of calls removed.
+template <typename CreateNFn>
+static unsigned mergeIntoN(TinyPtrVector<CallInst *> &List, bool AtLast,
+                           ARCEntryPointBuilder &B, SwiftRCIdentity &RC,
+                           CreateNFn CreateN) {
+  unsigned NumRemoved = 0;
+  ArrayRef<CallInst *> Remaining = List;
+  while (Remaining.size() > 1) {
+    ArrayRef<CallInst *> Group = Remaining.take_front(MaxRetainReleaseN);
+    Remaining = Remaining.drop_front(Group.size());
+
+    CallInst *OldCI = AtLast ? Group.back() : Group.front();
+    B.setInsertPoint(OldCI);
+    Value *O = RC.getSwiftRCIdentityRoot(OldCI->getArgOperand(0));
+    CallInst *RI = OldCI;
+    for (auto *R : Group) {
+      if (B.isAtomic(R)) {
+        RI = R;
+        break;
+      }
+    }
+    CallInst *NewCI = CreateN(O, Group.size(), RI);
+
+    for (auto *Inst : Group) {
+      // Bridge retains may modify the input reference before forwarding it, so
+      // their results are used. A pointer cast may be needed when types have
+      // been obfuscated in some way.
+      if (!Inst->use_empty()) {
+        B.setInsertPoint(Inst);
+        Inst->replaceAllUsesWith(B.maybeCast(NewCI, Inst->getType()));
+      }
+      Inst->eraseFromParent();
+    }
+    NumRemoved += Group.size() - 1;
+  }
+  List.clear();
+  return NumRemoved;
+}
+
 void SwiftARCContractImpl::
 performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
-  // Go through all of our pointers and merge all of the retains with the
-  // first retain we saw and all of the releases with the last release we saw.
-  llvm::Value *O = nullptr;
   for (auto &P : PtrToLocalStateMap) {
-    auto &RetainList = P.second.RetainList;
-    if (RetainList.size() > 1) {
-      // Create the retainN call right by the first retain.
-      B.setInsertPoint(RetainList[0]);
-      O = RetainList[0]->getArgOperand(0);
-      auto *RI = RetainList[0];
-      for (auto R : RetainList) {
-        if (B.isAtomic(R)) {
-          RI = R;
-          break;
-        }
-      }
-      B.createRetainN(RC.getSwiftRCIdentityRoot(O), RetainList.size(), RI);
-
-      // Replace all uses of the retain instructions with our new retainN and
-      // then delete them.
-      for (auto *Inst : RetainList) {
-        Inst->eraseFromParent();
-        ++NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-      }
-
-      --NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-    }
-    RetainList.clear();
-
-    auto &ReleaseList = P.second.ReleaseList;
-    if (ReleaseList.size() > 1) {
-      // Create the releaseN call right by the last release.
-      auto *OldCI = ReleaseList[ReleaseList.size() - 1];
-      B.setInsertPoint(OldCI);
-      O = OldCI->getArgOperand(0);
-      auto *RI = OldCI;
-      for (auto R : ReleaseList) {
-        if (B.isAtomic(R)) {
-          RI = R;
-          break;
-        }
-      }
-      B.createReleaseN(RC.getSwiftRCIdentityRoot(O), ReleaseList.size(), RI);
-
-      // Remove all old release instructions.
-      for (auto *Inst : ReleaseList) {
-        Inst->eraseFromParent();
-        ++NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-      }
-
-      --NumRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-    }
-    ReleaseList.clear();
-
-    auto &UnknownObjectRetainList = P.second.UnknownObjectRetainList;
-    if (UnknownObjectRetainList.size() > 1) {
-      // Create the retainN call right by the first retain.
-      B.setInsertPoint(UnknownObjectRetainList[0]);
-      O = UnknownObjectRetainList[0]->getArgOperand(0);
-      auto *RI = UnknownObjectRetainList[0];
-      for (auto R : UnknownObjectRetainList) {
-        if (B.isAtomic(R)) {
-          RI = R;
-          break;
-        }
-      }
-      B.createUnknownObjectRetainN(RC.getSwiftRCIdentityRoot(O),
-                                   UnknownObjectRetainList.size(), RI);
-
-      // Replace all uses of the retain instructions with our new retainN and
-      // then delete them.
-      for (auto *Inst : UnknownObjectRetainList) {
-        Inst->eraseFromParent();
-        ++NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-      }
-
-      --NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-    }
-    UnknownObjectRetainList.clear();
-
-    auto &UnknownObjectReleaseList = P.second.UnknownObjectReleaseList;
-    if (UnknownObjectReleaseList.size() > 1) {
-      // Create the releaseN call right by the last release.
-      auto *OldCI =
-          UnknownObjectReleaseList[UnknownObjectReleaseList.size() - 1];
-      B.setInsertPoint(OldCI);
-      O = OldCI->getArgOperand(0);
-      auto *RI = OldCI;
-      for (auto R : UnknownObjectReleaseList) {
-        if (B.isAtomic(R)) {
-          RI = R;
-          break;
-        }
-      }
-      B.createUnknownObjectReleaseN(RC.getSwiftRCIdentityRoot(O),
-                                    UnknownObjectReleaseList.size(), RI);
-
-      // Remove all old release instructions.
-      for (auto *Inst : UnknownObjectReleaseList) {
-        Inst->eraseFromParent();
-        ++NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-      }
-
-      --NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-    }
-    UnknownObjectReleaseList.clear();
-
-    auto &BridgeRetainList = P.second.BridgeRetainList;
-    if (BridgeRetainList.size() > 1) {
-      // Create the releaseN call right by the first retain.
-      auto *OldCI = BridgeRetainList[0];
-      B.setInsertPoint(OldCI);
-      O = OldCI->getArgOperand(0);
-      auto *RI = OldCI;
-      for (auto R : BridgeRetainList) {
-        if (B.isAtomic(R)) {
-          RI = R;
-          break;
-        }
-      }
-      // Bridge retain may modify the input reference before forwarding it.
-      auto *I = B.createBridgeRetainN(RC.getSwiftRCIdentityRoot(O),
-                                      BridgeRetainList.size(), RI);
-
-      // Remove all old retain instructions.
-      for (auto *Inst : BridgeRetainList) {
-        // We may need to perform a pointer cast here to ensure that the output
-        // type of the retainN matches the output type. This can come up in
-        // cases where types have been obfuscated in some way. In such a case,
-        // we need the inert point to be at the retain location.
-        B.setInsertPoint(Inst);
-        Inst->replaceAllUsesWith(B.maybeCast(I, Inst->getType()));
-        Inst->eraseFromParent();
-        ++NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-      }
-
-      --NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-    }
-    BridgeRetainList.clear();
-
-    auto &BridgeReleaseList = P.second.BridgeReleaseList;
-    if (BridgeReleaseList.size() > 1) {
-      // Create the releaseN call right by the last release.
-      auto *OldCI = BridgeReleaseList[BridgeReleaseList.size() - 1];
-      B.setInsertPoint(OldCI);
-      O = OldCI->getArgOperand(0);
-      auto *RI = OldCI;
-      for (auto R : BridgeReleaseList) {
-        if (B.isAtomic(R)) {
-          RI = R;
-          break;
-        }
-      }
-      B.createBridgeReleaseN(RC.getSwiftRCIdentityRoot(O),
-                             BridgeReleaseList.size(), RI);
-
-      // Remove all old release instructions.
-      for (auto *Inst : BridgeReleaseList) {
-        Inst->eraseFromParent();
-        ++NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-      }
-
-      --NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN;
-    }
-    BridgeReleaseList.clear();
+    LocalState &S = P.second;
+    NumRetainReleasesEliminatedByMergingIntoRetainReleaseN +=
+        mergeIntoN(S.RetainList, /*AtLast=*/false, B, RC,
+                   [&](Value *O, unsigned N, CallInst *RI) {
+                     return B.createRetainN(O, N, RI);
+                   });
+    NumRetainReleasesEliminatedByMergingIntoRetainReleaseN +=
+        mergeIntoN(S.ReleaseList, /*AtLast=*/true, B, RC,
+                   [&](Value *O, unsigned N, CallInst *RI) {
+                     return B.createReleaseN(O, N, RI);
+                   });
+    NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN +=
+        mergeIntoN(S.UnknownObjectRetainList, /*AtLast=*/false, B, RC,
+                   [&](Value *O, unsigned N, CallInst *RI) {
+                     return B.createUnknownObjectRetainN(O, N, RI);
+                   });
+    NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN +=
+        mergeIntoN(S.UnknownObjectReleaseList, /*AtLast=*/true, B, RC,
+                   [&](Value *O, unsigned N, CallInst *RI) {
+                     return B.createUnknownObjectReleaseN(O, N, RI);
+                   });
+    NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN +=
+        mergeIntoN(S.BridgeRetainList, /*AtLast=*/false, B, RC,
+                   [&](Value *O, unsigned N, CallInst *RI) {
+                     return B.createBridgeRetainN(O, N, RI);
+                   });
+    NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN +=
+        mergeIntoN(S.BridgeReleaseList, /*AtLast=*/true, B, RC,
+                   [&](Value *O, unsigned N, CallInst *RI) {
+                     return B.createBridgeReleaseN(O, N, RI);
+                   });
   }
 }
 

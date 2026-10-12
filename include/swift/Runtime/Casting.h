@@ -246,6 +246,14 @@ const Metadata *
 swift_getDynamicType(OpaqueValue *value, const Metadata *self,
                      bool existentialMetatype);
 
+/// Return the native dynamic class metadata exposed through ISwiftObject, or
+/// staticType when the interface has no valid Swift identity. The interface is
+/// borrowed; querying identity may execute foreign code and releases the
+/// temporary interface reference before returning.
+SWIFT_RUNTIME_EXPORT
+const Metadata *swift_getCOMDynamicType(void *interface,
+                                        const Metadata *staticType);
+
 /// Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced

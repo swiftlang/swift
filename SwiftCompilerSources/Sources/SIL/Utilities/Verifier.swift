@@ -234,7 +234,9 @@ extension BeginAccessInst : VerifiableInstruction {
     //   end_access %1
     // ```
 
-    guard context.silStage == .canonical else {
+    // Read the function's stage, not the module floor, so a function that is
+    // ahead of the floor is verified here.
+    guard parentFunction.silStage == .canonical else {
       // Mandatory passes on raw SIL need to be completed until we can verify this.
       // Also, LoadableByAddress in lowered SIL can insert `copy_addr`s inside read-only access scope.
       // Therefore we can only run this verification in canonical SIL.

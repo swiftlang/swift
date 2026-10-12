@@ -1663,3 +1663,90 @@ bb9:
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @mutate_int : $@convention(thin) (@inout Int) -> ()
+
+// rdar://189007197 (https://github.com/swiftlang/swift/issues/92848)
+// The apply writes %1 through its @inout argument, so it must not be sunk
+// past the loads of %1 that feed the successor's block argument.
+//
+// CHECK-LABEL: sil @dont_sink_inout_apply_past_load :
+// CHECK:         [[S:%[0-9]+]] = alloc_stack $Int
+// CHECK:         [[F:%[0-9]+]] = function_ref @mutate_int
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]]([[S]])
+// CHECK-NEXT:    load [[S]]
+// CHECK:       bb2:
+// CHECK-NEXT:    apply [[F]]([[S]])
+// CHECK-NEXT:    load [[S]]
+// CHECK:       bb3([[R:%[0-9]+]] : $Int):
+// CHECK-NOT:     apply
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'dont_sink_inout_apply_past_load'
+sil @dont_sink_inout_apply_past_load : $@convention(thin) (Builtin.Int1, Int) -> Int {
+bb0(%0 : $Builtin.Int1, %v : $Int):
+  %1 = alloc_stack $Int
+  store %v to %1 : $*Int
+  %f = function_ref @mutate_int : $@convention(thin) (@inout Int) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %a1 = apply %f(%1) : $@convention(thin) (@inout Int) -> ()
+  %l1 = load %1 : $*Int
+  br bb3(%l1 : $Int)
+
+bb2:
+  %a2 = apply %f(%1) : $@convention(thin) (@inout Int) -> ()
+  %l2 = load %1 : $*Int
+  br bb3(%l2 : $Int)
+
+bb3(%r : $Int):
+  dealloc_stack %1 : $*Int
+  return %r : $Int
+}
+
+enum SinkTestEnum {
+  case a
+  case b
+}
+
+sil @mutate_sink_test_enum : $@convention(thin) (@inout SinkTestEnum) -> ()
+
+// Same as dont_sink_inout_apply_past_load, but the skipped reader is not a
+// load: select_enum_addr reads the enum through its address operand.
+//
+// CHECK-LABEL: sil @dont_sink_inout_apply_past_select_enum_addr :
+// CHECK:         [[S:%[0-9]+]] = alloc_stack $SinkTestEnum
+// CHECK:         [[F:%[0-9]+]] = function_ref @mutate_sink_test_enum
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]]([[S]])
+// CHECK-NEXT:    select_enum_addr [[S]]
+// CHECK:       bb2:
+// CHECK-NEXT:    apply [[F]]([[S]])
+// CHECK-NEXT:    select_enum_addr [[S]]
+// CHECK:       bb3({{%[0-9]+}} : $Builtin.Int1):
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'dont_sink_inout_apply_past_select_enum_addr'
+sil @dont_sink_inout_apply_past_select_enum_addr : $@convention(thin) (Builtin.Int1, SinkTestEnum) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %v : $SinkTestEnum):
+  %1 = alloc_stack $SinkTestEnum
+  store %v to %1 : $*SinkTestEnum
+  %t = integer_literal $Builtin.Int1, -1
+  %f0 = integer_literal $Builtin.Int1, 0
+  %f = function_ref @mutate_sink_test_enum : $@convention(thin) (@inout SinkTestEnum) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %a1 = apply %f(%1) : $@convention(thin) (@inout SinkTestEnum) -> ()
+  %s1 = select_enum_addr %1 : $*SinkTestEnum, case #SinkTestEnum.a!enumelt: %t, default %f0 : $Builtin.Int1
+  br bb3(%s1 : $Builtin.Int1)
+
+bb2:
+  %a2 = apply %f(%1) : $@convention(thin) (@inout SinkTestEnum) -> ()
+  %s2 = select_enum_addr %1 : $*SinkTestEnum, case #SinkTestEnum.a!enumelt: %t, default %f0 : $Builtin.Int1
+  br bb3(%s2 : $Builtin.Int1)
+
+bb3(%r : $Builtin.Int1):
+  dealloc_stack %1 : $*SinkTestEnum
+  return %r : $Builtin.Int1
+}

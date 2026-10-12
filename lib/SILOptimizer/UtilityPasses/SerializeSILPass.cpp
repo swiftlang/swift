@@ -313,6 +313,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExtendLifetimeInst:
+  case SILInstructionKind::DiagnoseInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:

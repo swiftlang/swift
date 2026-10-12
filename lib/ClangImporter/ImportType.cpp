@@ -37,6 +37,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
@@ -101,6 +102,7 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
   case clang::BuiltinType::BoundMember:
   case clang::BuiltinType::BuiltinFn:
   case clang::BuiltinType::IncompleteMatrixIdx:
+  case clang::BuiltinType::MetaInfo:
   case clang::BuiltinType::Overload:
   case clang::BuiltinType::PseudoObject:
   case clang::BuiltinType::UnknownAny:
@@ -192,6 +194,16 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+    return std::nullopt;
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+    return std::nullopt;
+
+    // SPIRV opaque builtin types that don't have Swift equivalents.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
     return std::nullopt;
   }
 
@@ -454,6 +466,16 @@ namespace {
           Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
           clang::SourceLocation());
       // FIXME: (?) HLSL types are not supported in Swift.
+      return Type();
+    }
+
+    ImportResult
+    VisitOverflowBehaviorType(const clang::OverflowBehaviorType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: handle OverflowBehaviorType.
       return Type();
     }
 
@@ -1057,9 +1079,10 @@ namespace {
     SUGAR_TYPE(Attributed)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(SubstTemplateTypeParm)
-    SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
+    SUGAR_TYPE(PredefinedSugar)
+    SUGAR_TYPE(LateParsedAttr)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
@@ -1491,7 +1514,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (!elementObj)
     return Type();
 
-  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  auto elementClass = elementObj->getClassDecl();
   if (!elementClass)
     return Type();
 
@@ -1801,9 +1824,6 @@ void swift::findSwiftAttributes(
       [&](clang::QualType type) -> clang::QualType {
     if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
       return MQT->isSugared() ? skipUnrelatedSugar(MQT->desugar()) : type;
-
-    if (auto *ET = dyn_cast<clang::ElaboratedType>(type))
-      return ET->isSugared() ? skipUnrelatedSugar(ET->desugar()) : type;
 
     return type;
   };
@@ -2834,22 +2854,30 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
     // HACK: Clang will crash while trying to instantiate this default arg.
     return false;
 
-  if (param->hasUninstantiatedDefaultArg() &&
-      isa<clang::CXXConstructorDecl>(functionDecl))
-    // HACK: Constructors of std::set have default arguments that rely on the
-    // comparator type being copyable.
-    return false;
-
-  clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;
   // Try to instantiate the default expression.
-  auto defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
-      clang::SourceLocation(), const_cast<clang::FunctionDecl *>(functionDecl),
-      const_cast<clang::ParmVarDecl *>(param));
+  clang::ExprResult defaultArgExprResult;
+  bool instantiationFailed;
+  {
+    auto &clangDiags = getClangSema().getDiagnostics();
+    bool prevSuppressAllDiagnostics = clangDiags.getSuppressAllDiagnostics();
+    clangDiags.setSuppressAllDiagnostics(true);
+    SWIFT_DEFER {
+      clangDiags.setSuppressAllDiagnostics(prevSuppressAllDiagnostics);
+    };
+    clang::DiagnosticErrorTrap errorTrap(clangDiags);
+    defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
+        clang::SourceLocation(),
+        const_cast<clang::FunctionDecl *>(functionDecl),
+        const_cast<clang::ParmVarDecl *>(param));
+    instantiationFailed =
+        !defaultArgExprResult.isUsable() || errorTrap.hasErrorOccurred();
+  }
   // If the default expression can't be instantiated, bail.
-  if (!defaultArgExprResult.isUsable())
+  if (instantiationFailed)
     return false;
 
-  defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
+  auto defaultArgExpr =
+      cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
 
   // If the type of this parameter is a view type, do not import the
   // default expression, since we cannot guarantee the lifetime of the
@@ -2892,12 +2920,13 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>()) {
-      if (attr->getAttribute() == "sending") {
-        paramInfo->setSending();
-        break;
-      }
-    }
+    // Note: only a 'sending' written on the parameter itself counts here; one
+    // written in type position is handled via ImportTypeAttr::Sending.
+    if (llvm::any_of(param->specific_attrs<clang::SwiftAttrAttr>(),
+                     [](const clang::SwiftAttrAttr *attr) {
+                       return attr->getAttribute() == "sending";
+                     }))
+      paramInfo->setSending();
   }
 
   // C++ types taking a reference might return a reference/pointer to a
@@ -2930,8 +2959,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.
-  // TODO: support default arguments of constructors
-  // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       impl->isDefaultArgSafeToImport(param) &&
@@ -3094,9 +3121,6 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
   // Don't introduce a default argument for the first parameter of setters.
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
-
-  if (auto elaboratedTy = type->getAs<clang::ElaboratedType>())
-    type = elaboratedTy->desugar();
 
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
@@ -3869,8 +3893,8 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum()) {
+  if (type->getStructDecl() ||
+      type->getEnumDecl()) {
     auto nominal = type->getAnyNominal();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;

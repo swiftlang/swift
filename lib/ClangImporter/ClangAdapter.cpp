@@ -140,6 +140,32 @@ importer::mostRefinedFunctionRedecl(const clang::FunctionDecl *fn) {
   return best;
 }
 
+void importer::printRecordName(llvm::raw_ostream &out,
+                               const clang::RecordDecl *decl) {
+  if (decl->getIdentifier())
+    out << decl->getName();
+  else if (decl->isAnonymousStructOrUnion())
+    out << "(anonymous record)";
+  else
+    out << "(unnamed record)";
+}
+
+bool importer::anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred) {
+  if (const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    for (const auto &base : cxxRecordDecl->bases())
+      if (pred(base.getType()))
+        return true;
+  }
+
+  for (const auto *field : decl->fields())
+    if (pred(field->getType()))
+      return true;
+
+  return false;
+}
+
 std::optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
@@ -181,7 +207,7 @@ importer::getClangDeclContextType(const clang::DeclContext *dc) {
   }
 
   if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
-    return ctx.getTagDeclType(tag);
+    return ctx.getCanonicalTagType(tag);
   }
 
   return clang::QualType();
@@ -398,6 +424,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::BoundMember:
     case clang::BuiltinType::BuiltinFn:
     case clang::BuiltinType::IncompleteMatrixIdx:
+    case clang::BuiltinType::MetaInfo:
     case clang::BuiltinType::Overload:
     case clang::BuiltinType::PseudoObject:
     case clang::BuiltinType::UnknownAny:
@@ -491,6 +518,16 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+      return OmissionTypeName();
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+      return OmissionTypeName();
+
+    // SPIR-V builtin types that don't have Swift equivalents.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
       return OmissionTypeName();
     }
   }

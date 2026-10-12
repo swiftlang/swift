@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=raw_pointer_to_ref | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+struct EmptyArrayStorage {
+  var t: Builtin.Int64
+}
+
+class C {}
+
+// The empty collection singletons (and the other objects which are created with
+// `raw_pointer_to_ref`) are immortal if the swift 5.1 runtime is available.
+
+sil_global @emptyArrayStorage : $EmptyArrayStorage
+
+// CHECK-LABEL: sil [ossa] @set_immortal_flag :
+// CHECK:         %2 = raw_pointer_to_ref [immortal] %1 to $C
+// CHECK:       } // end sil function 'set_immortal_flag'
+sil [ossa] @set_immortal_flag : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @emptyArrayStorage : $*EmptyArrayStorage
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 to $C
+  fix_lifetime %2
+  destroy_value %2
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @keep_immortal_flag :
+// CHECK:         %1 = raw_pointer_to_ref [immortal] %0 to $C
+// CHECK:       } // end sil function 'keep_immortal_flag'
+sil [ossa] @keep_immortal_flag : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = raw_pointer_to_ref [immortal] %0 to $C
+  fix_lifetime %1
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @dont_set_immortal_flag_on_unknown_pointer :
+// CHECK:         %1 = raw_pointer_to_ref %0 to $C
+// CHECK:       } // end sil function 'dont_set_immortal_flag_on_unknown_pointer'
+sil [ossa] @dont_set_immortal_flag_on_unknown_pointer : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = raw_pointer_to_ref %0 to $C
+  fix_lifetime %1
+  destroy_value %1
+  %3 = tuple ()
+  return %3
+}
+
+// A serialized function can be inlined into a client with an older deployment
+// target, therefore the swift 5.1 runtime cannot be assumed to be available.
+
+// CHECK-LABEL: sil [serialized] [ossa] @dont_set_immortal_flag_in_serialized_function :
+// CHECK:         %2 = raw_pointer_to_ref %1 to $C
+// CHECK:       } // end sil function 'dont_set_immortal_flag_in_serialized_function'
+sil [serialized] [ossa] @dont_set_immortal_flag_in_serialized_function : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @emptyArrayStorage : $*EmptyArrayStorage
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 to $C
+  fix_lifetime %2
+  destroy_value %2
+  %3 = tuple ()
+  return %3
+}
+

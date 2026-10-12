@@ -60,6 +60,13 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isLoadable(function.bridged)
   }
 
+  /// Returns true if value operations (e.g. destroys) can be done on this type in `function`.
+  /// This is not the case if the type is not fixed-size in the function's resilience domain
+  /// and its type metadata is not accessible, e.g. an internal type from another module.
+  public func isABIAccessible(in function: Function) -> Bool {
+    return bridged.isABIAccessible(function.bridged)
+  }
+
   public func isReferenceCounted(in function: Function) -> Bool {
     return bridged.isReferenceCounted(function.bridged)
   }
@@ -143,6 +150,21 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   // Returns a new SILFunctionType with changed "escapeness".
   public func getFunctionType(withNoEscape: Bool) -> Type {
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
+  }
+
+  /// Returns a function type with the given representation.
+  public func getFunctionType(withRepresentation representation: FunctionTypeRepresentation) -> Type {
+    bridged.getFunctionTypeWithRepresentation(representation.bridged).type
+  }
+
+  /// The convention under which the callee is passed.
+  public var calleeConvention: ArgumentConvention {
+    bridged.getCalleeConvention().convention
+  }
+
+  /// Returns a function type with the given callee convention.
+  public func getFunctionType(withCalleeConvention convention: ArgumentConvention) -> Type {
+    return bridged.getFunctionTypeWithCalleeConvention(convention.bridged).type
   }
 
   /// True if a function with this type can be code-generated in Embedded Swift.

@@ -30,12 +30,12 @@ using namespace constraints;
 
 Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                        bool isIsolated, ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(kind), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(false), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(isIsolated),
-      Nested(constraints), Locator(locator) {
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(kind), NumTypeVariables(typeVars.size()), HasFix(false),
+      HasDeclContext(false), HasRestriction(false), IsActive(false),
+      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
+      IsFavored(false), IsIsolated(isIsolated), Nested(constraints),
+      Locator(locator) {
   assert(kind == ConstraintKind::Disjunction ||
          kind == ConstraintKind::Conjunction);
 
@@ -55,12 +55,11 @@ static bool isAdmissibleType(Type type) {
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(Kind), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(false), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Types{First, Second, Type()},
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(Kind), NumTypeVariables(typeVars.size()), HasFix(false),
+      HasDeclContext(false), HasRestriction(false), IsActive(false),
+      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
+      IsFavored(false), IsIsolated(false), Types{First, Second, Type()},
       Locator(locator) {
   ASSERT(isAdmissibleType(First));
   ASSERT(isAdmissibleType(Second));
@@ -137,12 +136,11 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
                        ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(Kind), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(false), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Types{First, Second, Third},
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(Kind), NumTypeVariables(typeVars.size()), HasFix(false),
+      HasDeclContext(false), HasRestriction(false), IsActive(false),
+      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
+      IsFavored(false), IsIsolated(false), Types{First, Second, Third},
       Locator(locator) {
   ASSERT(isAdmissibleType(First));
   ASSERT(isAdmissibleType(Second));
@@ -204,12 +202,11 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        DeclNameRef member, DeclContext *useDC,
                        FunctionRefInfo functionRefInfo,
                        ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(kind), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(true), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Member{first, second, {member}},
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(kind), NumTypeVariables(typeVars.size()), HasFix(false),
+      HasDeclContext(true), HasRestriction(false), IsActive(false),
+      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
+      IsFavored(false), IsIsolated(false), Member{first, second, {member}},
       Locator(locator) {
   assert(kind == ConstraintKind::ValueMember ||
          kind == ConstraintKind::UnresolvedValueMember);
@@ -222,10 +219,10 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   *getTrailingObjects<DeclContext *>() = useDC;
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
-                       DeclContext *useDC,
+Constraint::Constraint(Type type, OverloadChoice choice,
+                       Type effectiveOverloadType, DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+                       ArrayRef<TypeVariableType *> typeVars)
     : Kind(ConstraintKind::BindOverload), NumTypeVariables(typeVars.size()),
       HasFix(fix != nullptr), HasDeclContext(true), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
@@ -242,12 +239,12 @@ Constraint::Constraint(Type type, OverloadChoice choice, Type effectiveOverloadT
 Constraint::Constraint(ConstraintKind kind,
                        ConversionRestrictionKind restriction, Type first,
                        Type second, ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+                       ArrayRef<TypeVariableType *> typeVars)
     : Kind(kind), Restriction(restriction), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(false), HasRestriction(true), IsActive(false),
-      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
-      IsFavored(false), IsIsolated(false), Types{first, second, Type()},
-      Locator(locator) {
+      HasFix(false), HasDeclContext(false), HasRestriction(true),
+      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
+      RememberChoice(false), IsFavored(false), IsIsolated(false),
+      Types{first, second, Type()}, Locator(locator) {
   ASSERT(isAdmissibleType(first));
   ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
@@ -255,12 +252,11 @@ Constraint::Constraint(ConstraintKind kind,
 
 Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
                        Type second, ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(kind), NumTypeVariables(typeVars.size()),
-      HasFix(fix != nullptr), HasDeclContext(false), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Types{first, second, Type()},
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(kind), NumTypeVariables(typeVars.size()), HasFix(fix != nullptr),
+      HasDeclContext(false), HasRestriction(false), IsActive(false),
+      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
+      IsFavored(false), IsIsolated(false), Types{first, second, Type()},
       Locator(locator) {
   ASSERT(isAdmissibleType(first));
   ASSERT(isAdmissibleType(second));
@@ -271,13 +267,12 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
 
 Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
                        bool isDiscarded, ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+                       ArrayRef<TypeVariableType *> typeVars)
     : Kind(ConstraintKind::SyntacticElement), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(false), HasRestriction(false), IsActive(false),
-      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
-      IsFavored(false), IsIsolated(false), isDiscarded(isDiscarded),
-      SyntacticElement{node},
-      Locator(locator) {
+      HasFix(false), HasDeclContext(false), HasRestriction(false),
+      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
+      RememberChoice(false), IsFavored(false), IsIsolated(false),
+      isDiscarded(isDiscarded), SyntacticElement{node}, Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   *getTrailingObjects<ContextualTypeInfo>() = context;
 }
@@ -285,12 +280,12 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
 Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
                        unsigned trailingClosureMatching, DeclContext *useDC,
                        ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(ConstraintKind::ApplicableFunction), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(true), HasRestriction(false), IsActive(false),
-      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
-      IsFavored(false), IsIsolated(false),
-      trailingClosureMatching(trailingClosureMatching),
+                       ArrayRef<TypeVariableType *> typeVars)
+    : Kind(ConstraintKind::ApplicableFunction),
+      NumTypeVariables(typeVars.size()), HasFix(false), HasDeclContext(true),
+      HasRestriction(false), IsActive(false), IsDisabled(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
+      IsIsolated(false), trailingClosureMatching(trailingClosureMatching),
       Locator(locator) {
   ASSERT(isAdmissibleType(appliedFn));
   ASSERT(isAdmissibleType(calleeType));
@@ -606,7 +601,7 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
 /// Recursively gather the set of type variables referenced by this constraint.
 static void
 gatherReferencedTypeVars(Constraint *constraint,
-                         SmallPtrSetImpl<TypeVariableType *> &typeVars) {
+                         SmallPtrSetVector<TypeVariableType *, 4> &typeVars) {
   switch (constraint->getKind()) {
   case ConstraintKind::Disjunction:
     for (auto nested : constraint->getNestedConstraints())
@@ -685,7 +680,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                ConstraintLocator *locator,
                                ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second && second->hasTypeVariable())
@@ -710,7 +705,8 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
       typeVars.size(), /*hasFix=*/0, /*hasDeclContext=*/0,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return ::new (mem) Constraint(kind, first, second, locator, typeVars);
+  return ::new (mem)
+      Constraint(kind, first, second, locator, typeVars.getArrayRef());
 }
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
@@ -718,8 +714,8 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                ConstraintLocator *locator,
                                ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars(extraTypeVars.begin(),
-                                              extraTypeVars.end());
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars(extraTypeVars.begin(),
+                                                    extraTypeVars.end());
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
@@ -733,9 +729,8 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
       typeVars.size(), /*hasFix=*/0, /*hasDeclContext=*/0,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return ::new (mem) Constraint(kind,
-                                first, second, third,
-                                locator, typeVars);
+  return ::new (mem)
+      Constraint(kind, first, second, third, locator, typeVars.getArrayRef());
 }
 
 Constraint *Constraint::createMemberOrOuterDisjunction(
@@ -765,7 +760,7 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
                                      FunctionRefInfo functionRefInfo,
                                      ConstraintLocator *locator) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
@@ -779,7 +774,7 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, useDC,
-                              functionRefInfo, locator, typeVars);
+                              functionRefInfo, locator, typeVars.getArrayRef());
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
@@ -788,7 +783,7 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
                                            ConstraintFix *fix,
                                            ConstraintLocator *locator) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (type->hasTypeVariable())
     type->getTypeVariables(typeVars);
   if (auto baseType = choice.getBaseType()) {
@@ -805,8 +800,8 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/1,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, effectiveOverloadType, useDC,
-                              fix, locator, typeVars);
+  return new (mem) Constraint(type, choice, effectiveOverloadType, useDC, fix,
+                              locator, typeVars.getArrayRef());
 }
 
 Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
@@ -815,7 +810,7 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
                                          Type first, Type second, 
                                          ConstraintLocator *locator) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
@@ -829,14 +824,14 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, restriction, first, second, locator,
-                              typeVars);
+                              typeVars.getArrayRef());
 }
 
 Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                     ConstraintFix *fix, Type first, Type second,
                                     ConstraintLocator *locator) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
@@ -849,7 +844,8 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/0,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
+  return new (mem)
+      Constraint(kind, fix, first, second, locator, typeVars.getArrayRef());
 }
 
 Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
@@ -858,7 +854,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
                                           RememberChoice_t rememberChoice) {
   // Unwrap any disjunctions inside the disjunction constraint; we only allow
   // disjunctions at the top level.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   bool unwrappedAny = false;
   SmallVector<Constraint *, 1> unwrapped;
   unsigned index = 0;
@@ -925,7 +921,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto disjunction = new (mem)
       Constraint(ConstraintKind::Disjunction, cs.allocateCopy(constraints),
-                 /*isIsolated=*/false, locator, typeVars);
+                 /*isIsolated=*/false, locator, typeVars.getArrayRef());
   disjunction->RememberChoice = (bool) rememberChoice;
   return disjunction;
 }
@@ -933,7 +929,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
 Constraint *Constraint::createConjunction(
     ConstraintSystem &cs, ArrayRef<Constraint *> constraints, bool isIsolated,
     ConstraintLocator *locator, ArrayRef<TypeVariableType *> referencedVars) {
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   typeVars.insert(referencedVars.begin(), referencedVars.end());
 
   // Conjunctions don't gather constraints from either elements
@@ -948,7 +944,7 @@ Constraint *Constraint::createConjunction(
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto conjunction = new (mem)
       Constraint(ConstraintKind::Conjunction, cs.allocateCopy(constraints),
-                 isIsolated, locator, typeVars);
+                 isIsolated, locator, typeVars.getArrayRef());
   return conjunction;
 }
 
@@ -957,7 +953,7 @@ Constraint *Constraint::createApplicableFunction(
     std::optional<TrailingClosureMatching> trailingClosureMatching,
     DeclContext *useDC, ConstraintLocator *locator) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())
     argumentFnType->getTypeVariables(typeVars);
   if (calleeType->hasTypeVariable())
@@ -986,7 +982,7 @@ Constraint *Constraint::createApplicableFunction(
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto constraint = new (mem)
       Constraint(argumentFnType, calleeType, rawTrailingClosureMatching, useDC,
-                 locator, typeVars);
+                 locator, typeVars.getArrayRef());
 
   return constraint;
 }
@@ -1005,7 +1001,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
                                                ConstraintLocator *locator,
                                                bool isDiscarded) {
   // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (auto contextTy = context.getType())
     contextTy->getTypeVariables(typeVars);
 
@@ -1015,7 +1011,8 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
       typeVars.size(), /*hasFix=*/0, /*hasDeclContext=*/0,
       /*hasContextualTypeInfo=*/1, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);
+  return new (mem)
+      Constraint(node, context, isDiscarded, locator, typeVars.getArrayRef());
 }
 
 std::optional<TrailingClosureMatching>

@@ -342,21 +342,26 @@ public struct Builder {
     return notifyNew(cast.getAs(UpcastInst.self))
   }
   
+  /// - Parameter destination: must be nil for a `.TestOnly` cast, which
+  ///   produces no value, and non-nil for every other consumption kind.
   @discardableResult
   public func createCheckedCastAddrBranch(
     source: Value, sourceFormalType: CanonicalType,
-    destination: Value, targetFormalType: CanonicalType,
+    destination: Value?, targetFormalType: CanonicalType,
     options: CheckedCastInstOptions,
     consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind,
     successBlock: BasicBlock,
     failureBlock: BasicBlock
   ) -> CheckedCastAddrBranchInst {
-    
+    precondition((consumptionKind == .TestOnly) == (destination == nil),
+                 "a test_only cast has no destination; every other kind needs one")
+
     let bridgedConsumption: BridgedInstruction.CastConsumptionKind
     switch consumptionKind {
       case .TakeAlways:    bridgedConsumption = .TakeAlways
       case .TakeOnSuccess: bridgedConsumption = .TakeOnSuccess
-      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess    
+      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess
+      case .TestOnly:      bridgedConsumption = .TestOnly
     }
 
     let cast = bridged.createCheckedCastAddrBranch(source.bridged, sourceFormalType.bridged,
@@ -371,11 +376,12 @@ public struct Builder {
   public func createUnconditionalCheckedCastAddr(
     options: CheckedCastInstOptions,
     source: Value, sourceFormalType: CanonicalType,
-    destination: Value, targetFormalType: CanonicalType
+    destination: Value, targetFormalType: CanonicalType,
+    isCopy: Bool = false
   ) -> UnconditionalCheckedCastAddrInst {
     let cast = bridged.createUnconditionalCheckedCastAddr(
         options.bridged, source.bridged, sourceFormalType.bridged,
-        destination.bridged, targetFormalType.bridged
+        destination.bridged, targetFormalType.bridged, isCopy
     )
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
   }
@@ -644,13 +650,14 @@ public struct Builder {
     isOnStack: Bool,
     /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
     isNested: Bool,
-    isCalledOnce: Bool,
+    executionSemantics: ExecutionSemantics?,
     argumentLocationsFrom: ApplySite? = nil
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
       let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
                                            substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested,
-                                           isCalledOnce, argumentLocationsFrom.bridged)
+                                           executionSemantics != nil, executionSemantics ?? .atMostOnce,
+                                           argumentLocationsFrom.bridged)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
@@ -773,6 +780,12 @@ public struct Builder {
     return notifyNew(store.getAs(StoreInst.self))
   }
 
+  @discardableResult
+  public func createAssign(source: Value, destination: Value, ownership: AssignInst.AssignOwnership) -> AssignInst {
+    let assign = bridged.createAssign(source.bridged, destination.bridged, ownership.rawValue)
+    return notifyNew(assign.getAs(AssignInst.self))
+  }
+
   public func createStoreBorrow(source: Value, destination: Value) -> StoreBorrowInst {
     let storeBorrow = bridged.createStoreBorrow(source.bridged, destination.bridged)
     return notifyNew(storeBorrow.getAs(StoreBorrowInst.self))
@@ -789,16 +802,12 @@ public struct Builder {
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 
-  public func createInitExistentialMetatype(
-    metatype: Value,
-    existentialType: Type,
-    conformances: [Conformance]
-  ) -> InitExistentialMetatypeInst {
-    let initExistential = conformances.map{ $0.bridged }.withBridgedArrayRef {
-      return bridged.createInitExistentialMetatype(metatype.bridged,
-                                                   existentialType.bridged,
-                                                   BridgedConformanceArray(pcArray: $0))
-    }
+  public func createInitExistentialMetatype(metatype: Value,
+                                            existentialType: Type,
+                                            conformances: ConformanceArray) -> InitExistentialMetatypeInst {
+    let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
+                                                                existentialType.bridged,
+                                                                conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
@@ -916,6 +925,12 @@ public struct Builder {
   public func createFixLifetime(operand: Value) -> FixLifetimeInst {
     let fixLifetime = bridged.createFixLifetime(operand.bridged)
     return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+
+  @discardableResult
+  public func createDiagnose(operand: Value, kind: DiagnoseInst.DiagnoseKind) -> DiagnoseInst {
+    let diagnose = bridged.createDiagnose(operand.bridged, kind.rawValue)
+    return notifyNew(diagnose.getAs(DiagnoseInst.self))
   }
 
   public func createDropDeinit(of value: Value) -> DropDeinitInst {

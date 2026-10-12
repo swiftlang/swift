@@ -116,7 +116,13 @@ private:
   /// The first lowering is always for ResilientExpansion::Minimal.
   mutable const TypeLowering *NextExpansion = nullptr;
 
+  void printProperties(llvm::raw_ostream &os, unsigned indentation) const;
+
 protected:
+  void printForAbstractTypeLayoutInfoBase(llvm::raw_ostream &os,
+                                       unsigned indentation,
+                                       llvm::StringRef concreteTypeName) const;
+
   TypeLowering(SILType type, SILTypeProperties properties,
                IsReferenceCounted_t isRefCounted,
                TypeExpansionContext expansionContext)
@@ -131,6 +137,11 @@ public:
 
   /// Print out the internal state of this type lowering into \p os.
   void print(llvm::raw_ostream &os) const;
+
+  /// Print the SIL-level properties that affect abstract type lowering.
+  virtual void printForAbstractTypeLayoutInfo(TypeConverter &TC,
+                                           llvm::raw_ostream &os,
+                                           unsigned indentation = 0) const = 0;
 
   /// Dump out the internal state of this type lowering to llvm::dbgs().
   SWIFT_DEBUG_DUMP;
@@ -518,9 +529,9 @@ enum class CaptureKind {
   /// A let constant captured as a pointer to storage
   Immutable,
   /// A local value captured directly, moved (not boxed or copied) into the
-  /// closure's context. This is only used for `@called(once)` closures that
-  /// capture `@called(once)` values at the moment because such closures
-  /// cannot be copied or called multiple times.
+  /// closure's context. This is only used for `@called(atMostOnce)` closures
+  /// that capture `@called(atMostOnce)` values at the moment because such
+  /// closures cannot be copied or called multiple times.
   Consuming,
 };
 
@@ -1310,15 +1321,6 @@ namespace llvm {
 
     using CanTypeInfo = DenseMapInfo<swift::CanType>;
 
-    // Use the second field because the first field can validly be null.
-    static CachingTypeKey getEmptyKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
-    static CachingTypeKey getTombstoneKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
         DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
@@ -1341,12 +1343,6 @@ namespace llvm {
 
     using SILDeclRefInfo = DenseMapInfo<swift::SILDeclRef>;
 
-    static OverrideKey getEmptyKey() {
-      return {SILDeclRefInfo::getEmptyKey(), SILDeclRefInfo::getEmptyKey()};
-    }
-    static OverrideKey getTombstoneKey() {
-      return {SILDeclRefInfo::getTombstoneKey(), SILDeclRefInfo::getTombstoneKey()};
-    }
     static unsigned getHashValue(OverrideKey val) {
       return hash_combine(SILDeclRefInfo::getHashValue(val.base),
                           SILDeclRefInfo::getHashValue(val.derived));

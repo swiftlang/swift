@@ -17,7 +17,7 @@ sil [ossa] @terminator_forwarding_none_to_owned : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_swiftEmptyArrayStorage : $*EmptyArraySingleton
   %1 = address_to_pointer [stack_protection] %0 to $Builtin.RawPointer
-  %2 = raw_pointer_to_ref %1 to $EmptyArrayStorageBase   // ownership = none
+  %2 = raw_pointer_to_ref [immortal] %1 to $EmptyArrayStorageBase   // ownership = none
   checked_cast_br EmptyArrayStorageBase in %2 to EmptyArrayStorageDerived, bb1, bb2, forwarding: @owned
 
 bb1(%4 : @owned $EmptyArrayStorageDerived):

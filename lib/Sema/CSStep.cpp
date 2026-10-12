@@ -147,18 +147,6 @@ void SplitterStep::computeFollowupSteps(
 }
 
 namespace {
-  /// Retrieve the size of a container.
-  template<typename Container>
-  unsigned getSize(const Container &container) {
-    return container.size();
-  }
-
-  /// Retrieve the size of a container referenced by a pointer.
-  template<typename Container>
-  unsigned getSize(const Container *container) {
-    return container->size();
-  }
-
   /// Identity getSize() for cases where we are working with a count.
   unsigned getSize(unsigned size) {
     return size;

@@ -159,8 +159,9 @@ void ASTExtInfoBuilder::checkInvariants() const {
   if (sendableDependentType)
     ASSERT(!isSendable() && sendableDependentType->hasTypeVariable());
 
-  if (calledOnceDependentType)
-    ASSERT(!isCalledOnce() && calledOnceDependentType->hasTypeVariable());
+  if (executionSemanticsDependentType)
+    ASSERT(!hasCalledAtMostOnceSemantics() &&
+           executionSemanticsDependentType->hasTypeVariable());
 }
 
 // MARK: - ASTExtInfo

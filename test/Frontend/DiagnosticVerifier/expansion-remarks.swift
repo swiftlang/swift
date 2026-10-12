@@ -14,6 +14,12 @@
 // RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-wrongline.swift 2>&1 | %FileCheck --check-prefix=CHECK-WRONGLINE %t/cross-buffer-location-wrongline.swift
 // RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-dup.swift 2>&1 | %FileCheck --check-prefix=CHECK-DUP %t/cross-buffer-location-dup.swift
 
+// A '// #name@N' marker defined in one file's expected-expansion block, then
+// referenced from a diagnostic in another file that is verified first. Passes
+// only because every expansion block's markers are bound before any file is
+// verified.
+// RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-file-order-a.swift %t/cross-file-order-b.swift
+
 // RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift
 // RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift -verify-child-notes
 // RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift 2>&1 | %FileCheck --check-prefix=DISABLED %t/ignore-macro-note.swift
@@ -92,6 +98,23 @@ func foo() {}
 // expected-error@#aLine{{cannot find 'a' in scope; did you mean 'x'?}} {{children:
 //   expected-note@#here{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
 //   expected-note@#xLine{{'x' declared here}}
+// }}
+
+//--- cross-file-order-a.swift
+// The '#markA' marker is defined in cross-file-order-b.swift, which is verified
+// after this file. The marker binding pre-pass runs over every buffer before
+// verification begins, so this backward, cross-file reference still resolves.
+// expected-warning@#markA{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+
+//--- cross-file-order-b.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("func foo(_ x: Int) {\nlet a = 2\n}")
+func foo() {}
+// expected-expansion@-1:14{{
+//   #markA@2
 // }}
 
 //--- cross-buffer-location-negative.swift

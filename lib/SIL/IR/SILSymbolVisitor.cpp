@@ -559,7 +559,8 @@ public:
 
     auto *accessor = dyn_cast<AccessorDecl>(AFD);
     if (accessor &&
-        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+        accessor->getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2) {
       addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
@@ -629,6 +630,11 @@ public:
         }
         if (VD->isLazilyInitializedGlobal())
           addFunction(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+        // A @_silgen_name variable is not lazily initialized, but SILGen
+        // still emits an addressor for it when it has an initial value.
+        else if (VD->getAttrs().hasAttribute<SILGenNameAttr>() &&
+                 VD->hasInitialValue() && !VD->isTopLevelGlobal())
+          addFunction(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
       }
       // Wrapped non-static member properties may have a backing initializer.
       auto initInfo = VD->getPropertyWrapperInitializerInfo();
@@ -658,9 +664,6 @@ public:
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
     if (canSkipNominal(NTD))
-      return;
-
-    if (NTD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
       return;
 
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
@@ -860,7 +863,8 @@ public:
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
             : Visitor{V.Visitor}, PD{PD},
-              Resilient{PD->getParentModule()->isResilient()},
+              Resilient{PD->getParentModule()->isResilient() &&
+                        !PD->isCOMInterface()},
               WitnessMethodElimination{
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
@@ -874,8 +878,11 @@ public:
           if (decl && decl->hasBody()) {
             Visitor.addFunction(declRef);
             auto *accessor = dyn_cast<AccessorDecl>(decl);
-            if (accessor && requiresFeatureCoroutineAccessors(
-                                accessor->getAccessorKind())) {
+            if (accessor &&
+                requiresFeatureCoroutineAccessors(
+                    accessor->getAccessorKind()) &&
+                accessor->getASTContext()
+                    .SILOpts.CoroutineAccessorsUseYieldOnce2) {
               Visitor.addCoroFunctionPointer(SILDeclRef(accessor));
             }
           }

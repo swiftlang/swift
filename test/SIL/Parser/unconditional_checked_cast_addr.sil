@@ -1,0 +1,40 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+// CHECK-LABEL: sil @copy_first
+// CHECK: unconditional_checked_cast_addr [prohibit_isolated_conformances] [copy] T
+sil @copy_first : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr [copy] [prohibit_isolated_conformances] T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @copy_last
+// CHECK: unconditional_checked_cast_addr [prohibit_isolated_conformances] [copy] T
+sil @copy_last : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr [prohibit_isolated_conformances] [copy] T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @copy_only
+// CHECK: unconditional_checked_cast_addr [copy] T
+sil @copy_only : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr [copy] T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @take
+// CHECK: unconditional_checked_cast_addr T
+sil @take : $@convention(thin) <T, U> (@in T) -> @out U {
+bb0(%0 : $*U, %1 : $*T):
+  unconditional_checked_cast_addr T in %1 : $*T to U in %0 : $*U
+  %2 = tuple ()
+  return %2 : $()
+}

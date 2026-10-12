@@ -196,8 +196,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// - If the value you pass to `significand` is NaN, the result is NaN.
   ///
   /// For any floating-point value `x` of type `F`, the result of the following
-  /// is equal to `x`, with the distinction that the result is canonicalized
-  /// if `x` is in a noncanonical encoding:
+  /// is interchangeable with `x`, with the distinction that the result is
+  /// canonicalized if `x` is in a noncanonical encoding:
   ///
   ///     let x0 = F(sign: x.sign, exponent: x.exponent, significand: x.significand)
   ///
@@ -1098,7 +1098,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter other: The value to compare with this value.
-  /// - Returns: `true` if `other` is greater than this value; otherwise,
+  /// - Returns: `true` if this value is less than or equal to `other`; otherwise,
   ///   `false`. If either this value or `other` is NaN, the result of this
   ///   method is `false`.
   func isLessThanOrEqualTo(_ other: Self) -> Bool

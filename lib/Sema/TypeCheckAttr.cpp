@@ -185,7 +185,6 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
-  IGNORED_ATTR(HasHiddenStoredProperties)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
@@ -717,7 +716,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     }
 
     // Types who are marked @_staticExclusiveOnly cannot have mutating functions.
-    if (auto SD = contextTy->getStructOrBoundGenericStruct()) {
+    if (auto SD = contextTy->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           attrModifier == SelfAccessKind::Mutating) {
         diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_mutating,
@@ -1766,18 +1765,6 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   return SourceRange();
 }
 
-/// Whether \p D is a `@cxx` instance method of an imported C++ foreign
-/// reference type.
-static bool isCxxForeignReferenceInstanceMethod(const Decl *D) {
-  if (!D->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
-    return false;
-  const auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || FD->isStatic())
-    return false;
-  const auto *classDecl = FD->getDeclContext()->getSelfClassDecl();
-  return classDecl && classDecl->isForeignReferenceType();
-}
-
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
@@ -1924,7 +1911,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
         if (FD && !cxxAttr->isInvalid())
           evaluateOrDefault(Ctx.evaluator,
                             TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
-        if (cxxAttr->isInvalid() || isCxxForeignReferenceInstanceMethod(AFD))
+        if (cxxAttr->isInvalid())
           return;
       }
 
@@ -2541,13 +2528,6 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
       !importer::isClangCxxRecord(dc))
     diagnose(attr->getLocation(), diag::cxx_invalid_context, attr);
 
-  // TODO: Instance methods of foreign reference types are not supported yet.
-  if (isCxxForeignReferenceInstanceMethod(D)) {
-    diagnose(attr->getLocation(), diag::cxx_foreign_reference_instance_method,
-             attr);
-    attr->setInvalid();
-  }
-
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())
     diagnose(attr->getLocation(), diag::cxx_incompatible_with_objc, D);
@@ -2661,7 +2641,8 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     }
 
     // Verify that the declaration is exposable.
-    auto repr = cxx_translation::getDeclRepresentation(VD, std::nullopt);
+    auto repr = cxx_translation::getDeclRepresentation(
+        VD, /*layoutQueries=*/nullptr);
     if (repr.isUnsupported())
       diagnose(attr->getLocation(),
                cxx_translation::diagnoseRepresenationError(*repr.error, VD));
@@ -3650,8 +3631,8 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     return;
   }
   // Only classes can have required constructors.
-  if (parentTy->getClassOrBoundGenericClass() &&
-      !parentTy->getClassOrBoundGenericClass()->isActor()) {
+  if (parentTy->getClassDecl() &&
+      !parentTy->getClassDecl()->isActor()) {
     // The constructor must be declared within the class itself.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C
@@ -6086,7 +6067,14 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     underlyingType = type;
 
   auto sig = var->getDeclContext()->getGenericSignatureOfContext();
-  if (!underlyingType->allowsOwnership(sig.getPointer())) {
+  if ((ownershipKind == ReferenceOwnership::Weak ||
+       ownershipKind == ReferenceOwnership::Unowned) &&
+      underlyingType->isCOMExistentialType()) {
+    Diags.diagnose(attr->getLocation(),
+                   diag::invalid_ownership_incompatible_class, underlyingType,
+                   ownershipKind);
+    attr->setInvalid();
+  } else if (!underlyingType->allowsOwnership(sig.getPointer())) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||
@@ -6099,7 +6087,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
-  ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
+  ClassDecl *underlyingClass = underlyingType->getClassDecl();
   if (underlyingClass) {
     if (underlyingClass->isIncompatibleWithWeakReferences()) {
       Diags
@@ -6135,15 +6123,18 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
-  // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
-  if (auto behavior = shouldDiagnoseEmbeddedLimitations(
-          dc, attr->getLocation(),
-          /*wasAlwaysEmbeddedError=*/true)) {
-    if (ownershipKind == ReferenceOwnership::Weak ||
-        ownershipKind == ReferenceOwnership::Unowned) {
-      Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
-               ownershipKind)
-        .limitBehavior(*behavior);
+  // Embedded Swift always allows unowned(unsafe), but only allows weak/unowned
+  // on 64-bit targets.
+  if (!ctx.LangOpts.Target.isArch64Bit()) {
+    if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+            dc, attr->getLocation(),
+            /*wasAlwaysEmbeddedError=*/true)) {
+      if (ownershipKind == ReferenceOwnership::Weak ||
+          ownershipKind == ReferenceOwnership::Unowned) {
+        Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
+                 ownershipKind)
+          .limitBehavior(*behavior);
+      }
     }
   }
 
@@ -9593,17 +9584,6 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
-}
-
-template <typename ATTR>
-static void forEachCustomAttribute(
-    Decl *decl,
-    llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
-  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    auto *nominal = attr->getNominalDecl();
-    if (nominal && nominal->getAttrs().hasAttribute<ATTR>())
-      fn(attr, nominal);
-  }
 }
 
 ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(

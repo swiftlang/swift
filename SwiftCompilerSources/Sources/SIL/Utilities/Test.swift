@@ -146,6 +146,7 @@ public func registerTests() {
     instructionIterationTest,
     instructionWorklistTest,
     smallProjectionPathTest,
+    fieldIndexTrieTest,
     getAccessBaseTest,
     accessPathTest,
     updateBorrowedFromTest,

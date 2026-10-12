@@ -67,6 +67,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -117,16 +118,17 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function type not in a parameter is, more or less, implicitly @escaping.
     // For Sendable, we want to behave as though it was not necessary because
     // function types that aren't in a parameter can be Sendable or not.
-    // For `@called(once)`, we want to behave as though it was not necessary
-    // because function types that aren't in a parameter can be called once
-    // or not.
-    // For `@called(once)`, we want to behave as though it was necessary, just
-    // like noescape, because a plain function type can always satisfy a
-    // `@called(once)` requirement but a `@called(once)` function type cannot
-    // satisfy a plain one.
+    // For `@called(atMostOnce)`, we want to behave as though it was not
+    // necessary because function types that aren't in a parameter can be
+    // called once or not.
+    // For `@called(atMostOnce)`, we want to behave as though it was necessary,
+    // just like noescape, because a plain function type can always satisfy a
+    // `@called(atMostOnce)` requirement but a `@called(atMostOnce)` function
+    // type cannot satisfy a plain one.
     // FIXME: Should we check for a Sendable bound on the requirement type?
-    bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping &&
-                          adjustment != TypeAdjustment::CalledOnceToPlain);
+    bool inRequirement =
+        (adjustment != TypeAdjustment::NoescapeToEscaping &&
+         adjustment != TypeAdjustment::ExecutionSemanticsToPlain);
     Type adjustedReqtType =
       adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
 
@@ -150,7 +152,32 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
 
   applyAdjustment(TypeAdjustment::NoescapeToEscaping);
   applyAdjustment(TypeAdjustment::NonsendableToSendable);
-  applyAdjustment(TypeAdjustment::CalledOnceToPlain);
+  applyAdjustment(TypeAdjustment::ExecutionSemanticsToPlain);
+
+  // When both sides have execution semantics, the witness can still differ
+  // from the requirement in the same ways that are allowed by function
+  // conversion rules.
+  if (auto *reqtFnType = reqtType->getAs<FunctionType>()) {
+    if (auto *witnessFnType = witnessType->getAs<FunctionType>()) {
+      auto reqtSemantics = reqtFnType->getExecutionSemantics();
+      auto witnessSemantics = witnessFnType->getExecutionSemantics();
+      if (reqtSemantics && witnessSemantics &&
+          reqtSemantics != witnessSemantics) {
+        switch (variance) {
+        case VarianceKind::None:
+          break;
+        case VarianceKind::Covariant:
+          if (canConvertExecutionSemantics(witnessSemantics, reqtSemantics))
+            reqtType = reqtFnType->withExecutionSemantics(witnessSemantics);
+          break;
+        case VarianceKind::Contravariant:
+          if (canConvertExecutionSemantics(reqtSemantics, witnessSemantics))
+            witnessType = witnessFnType->withExecutionSemantics(reqtSemantics);
+          break;
+        }
+      }
+    }
+  }
 
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
@@ -2050,9 +2077,16 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
     return std::nullopt;
 
   // We assume conformances in implicit code have already been checked for
-  // availability.
-  if (!dc->getParentSourceFile())
-    return std::nullopt;
+  // availability. The exception is automatically derived conformances for C++
+  // records, which still need to have their availability checked.
+  if (!dc->getParentSourceFile()) {
+    auto *conformingDecl = dc->getAsDecl();
+    bool isImportedCxxRecord =
+        conformingDecl &&
+        isa_and_nonnull<clang::CXXRecordDecl>(conformingDecl->getClangDecl());
+    if (!isImportedCxxRecord)
+      return std::nullopt;
+  }
 
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
@@ -2707,7 +2741,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       // conditional conformances involving them. Check the full stack of nested
       // types for any obj-c ones.
       while (nestedType) {
-        if (auto clazz = nestedType->getClassOrBoundGenericClass()) {
+        if (auto clazz = nestedType->getClassDecl()) {
           if (clazz->isTypeErasedGenericClass()) {
             Context.Diags.diagnose(ComplainLoc,
                                    diag::objc_generics_cannot_conditionally_conform,
@@ -2999,7 +3033,7 @@ static Type getRequirementTypeForDisplay(NormalProtocolConformance *conformance,
     // witnesses, when we have them.
     auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
     auto substSelfTy = conformance->getType();
-    if (isResult && substSelfTy->getClassOrBoundGenericClass())
+    if (isResult && substSelfTy->getClassDecl())
       substSelfTy = DynamicSelfType::get(selfTy, req->getASTContext());
     return type.subst([&](SubstitutableType *dependentType) {
                         if (dependentType->isEqual(selfTy))
@@ -5248,14 +5282,24 @@ static bool couldApplyNonisolated(WitnessIsolationError const &witnessError) {
     return false;
   if (auto *var = dyn_cast<VarDecl>(witnessError.witness)) {
     if (var->hasStorage()) {
+      // TODO: consider supporting patterns? Fix-it that can rewrite them to
+      // only isolate part? Skip them to avoid over isolating.
+      auto *PBD = var->getParentPatternBinding();
+      if (!PBD || PBD->getSingleVar() != var)
+        return false;
+      if (var->isLet())
+        return var->getTypeInContext()->isSendableType();
       // Mutable VarDecl with storage, for an immutable requirement, can be
       // converted to 'let nonisolated'.
-      return !var->isLet() && isa<VarDecl>(witnessError.requirement) &&
+      return isa<VarDecl>(witnessError.requirement) &&
              !cast<VarDecl>(witnessError.requirement)
                   ->isSettable(/*useDC=*/nullptr);
     }
-    // Computed VarDecl can be converted if no property wrapper is present.
-    return !var->hasAttachedPropertyWrapper();
+    // Computed VarDecl can be converted if no property wrapper, lazy, or
+    // override with observer is present.
+    return !var->hasAttachedPropertyWrapper() &&
+           !var->getAttrs().hasAttribute<LazyAttr>() &&
+           !(var->hasObservers() && var->getOverriddenDecl());
   }
   return isa<AbstractFunctionDecl, SubscriptDecl>(witnessError.witness);
 }
@@ -5381,8 +5425,17 @@ static void diagnoseConformanceIsolationErrors(
     }
 
     // Suggest isolating the conformance, if possible.
+    auto sendableMetatypeProto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+    auto *explicitConformance = conformance;
+
+    while (explicitConformance->getSourceKind() == ConformanceEntryKind::Implied)
+      explicitConformance = explicitConformance->getImplyingConformance();
+
+    bool refinesSendableMetatype =
+        sendableMetatypeProto &&
+        explicitConformance->getProtocol()->inheritsFrom(sendableMetatypeProto);
     if (potentialIsolation && potentialIsolation->isGlobalActor() &&
-        !conformance->isIsolated()) {
+        !conformance->isIsolated() && !refinesSendableMetatype) {
       bool isMainActor = false;
       Type globalActorType = potentialIsolation->getGlobalActor();
       if (auto nominal = globalActorType->getAnyNominal())
@@ -5435,8 +5488,7 @@ static void diagnoseConformanceIsolationErrors(
     if (!hasIsolatedConformances) {
       for (auto witness : potentialNonisolated) {
         auto var = dyn_cast<VarDecl>(witness);
-        // Not a variable, or a computed property.
-        if (!var || !var->hasStorage()) {
+        if (!var || !var->hasStorage() || var->isLet()) {
           ctx.Diags
               .diagnose(witness, diag::note_make_witness_nonisolated, witness)
               .fixItInsert(
@@ -5444,8 +5496,7 @@ static void diagnoseConformanceIsolationErrors(
                   "nonisolated ");
           continue;
         }
-        // Mutable variables (since we didn't add let witnesses), which can be
-        // converted to 'nonisolated let'.
+        // Mutable variables, which can be converted to 'nonisolated let'.
         auto loc = getFixItLocForVarToLet(var);
         if (loc.isValid()) {
           ctx.Diags.diagnose(var, diag::note_make_witness_immutable, var)
@@ -6215,7 +6266,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // missing things in the actor that don't help users diagnose the root problem.
   // Instead, we want to suggest adding the typealias.
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-    auto nominal = T->getNominalOrBoundGenericNominal();
+    auto nominal = T->getNominalDecl();
     if (!nominal)
       return;
 
@@ -6250,7 +6301,7 @@ void swift::diagnoseConformanceFailure(Type T,
 
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
-  if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = T->getEnumDecl()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         enumDecl->hasRawType() &&
         !enumDecl->getRawType()->is<ErrorType>()) {
@@ -6280,7 +6331,7 @@ void swift::diagnoseConformanceFailure(Type T,
   // One cannot meaningfully declare conformance to the NSObject protocol
   // in Swift. Suggest inheritance from NSObject instead.
   if (isNSObjectProtocol(Proto)) {
-    if (T->getClassOrBoundGenericClass()) {
+    if (T->getClassDecl()) {
       auto diag =
           diags.diagnose(ComplainLoc, diag::type_cannot_conform_to_nsobject,
                          T);
@@ -6296,7 +6347,7 @@ void swift::diagnoseConformanceFailure(Type T,
 
         // If it's a class, we cannot suggest a different class to inherit
         // from.
-        if (inheritedTy->getClassOrBoundGenericClass())
+        if (inheritedTy->getClassDecl())
           return;
 
         // Is it the NSObject protocol?
@@ -6397,7 +6448,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto) {
     return true;
   
   // A non-final class might have a subclass that conforms to the protocol.
-  if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto *classDecl = type->getClassDecl()) {
     if (!classDecl->isSemanticallyFinal())
       return true;
   }
@@ -7120,6 +7171,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
       case KnownProtocolKind::Escapable: {
         checkEscapableConformance(dc, ProtocolConformanceRef(conformance));
+        break;
+      }
+      case KnownProtocolKind::Deinitable: {
+        checkDeinitableConformance(dc, ProtocolConformanceRef(conformance));
         break;
       }
       case KnownProtocolKind::BitwiseCopyable: {

@@ -41,9 +41,9 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
 // CHECK: }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const SWIFT_SYMBOL("s:4Init16FirstSmallStructV1xs6UInt32Vvp");
-// CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init() SWIFT_SYMBOL("s:4Init16FirstSmallStructVACycfc");
-// CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init(swift::Int x) SWIFT_SYMBOL("s:4Init16FirstSmallStructVyACSicfc");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const noexcept SWIFT_SYMBOL("s:4Init16FirstSmallStructV1xs6UInt32Vvp");
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init() noexcept SWIFT_SYMBOL("s:4Init16FirstSmallStructVACycfc");
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init(swift::Int x) noexcept SWIFT_SYMBOL("s:4Init16FirstSmallStructVyACSicfc");
 // CHECK-NEXT: private:
 
 public struct LargeStruct {
@@ -69,9 +69,9 @@ public struct LargeStruct {
 }
 
 // CHECK: class SWIFT_SYMBOL("s:4Init11LargeStructV") LargeStruct final {
-// CHECK:       SWIFT_INLINE_THUNK swift::Int getX6() const SWIFT_SYMBOL("s:4Init11LargeStructV2x6Sivp");
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct init() SWIFT_SYMBOL("s:4Init11LargeStructVACycfc");
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct init(swift::Int x, const FirstSmallStruct& y) SWIFT_SYMBOL("s:4Init11LargeStructV1x1yACSi_AA010FirstSmallC0Vtcfc");
+// CHECK:       SWIFT_INLINE_THUNK swift::Int getX6() const noexcept SWIFT_SYMBOL("s:4Init11LargeStructV2x6Sivp");
+// CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct init() noexcept SWIFT_SYMBOL("s:4Init11LargeStructVACycfc");
+// CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct init(swift::Int x, const FirstSmallStruct& y) noexcept SWIFT_SYMBOL("s:4Init11LargeStructV1x1yACSi_AA010FirstSmallC0Vtcfc");
 // CHECK-NEXT: private:
 
 private class RefCountedClass {
@@ -98,8 +98,8 @@ public struct StructWithRefCountStoredProp {
     }
 }
 
-// CHECK:      static SWIFT_INLINE_THUNK StructWithRefCountStoredProp init() SWIFT_SYMBOL("s:4Init28StructWithRefCountStoredPropVACycfc");
-// CHECK-NEXT: static SWIFT_INLINE_THUNK StructWithRefCountStoredProp init(swift::Int x) SWIFT_SYMBOL("s:4Init28StructWithRefCountStoredPropV1xACSi_tcfc");
+// CHECK:      static SWIFT_INLINE_THUNK StructWithRefCountStoredProp init() noexcept SWIFT_SYMBOL("s:4Init28StructWithRefCountStoredPropVACycfc");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK StructWithRefCountStoredProp init(swift::Int x) noexcept SWIFT_SYMBOL("s:4Init28StructWithRefCountStoredPropV1xACSi_tcfc");
 
 
 public final class FinalClass {
@@ -138,54 +138,54 @@ public struct WrapOverloadedInits {
     }
 }
 
-// CHECK: static SWIFT_INLINE_THUNK WrapOverloadedInits init(swift::Int x) SWIFT_SYMBOL("s:4Init19WrapOverloadedInitsVyACSicfc");
+// CHECK: static SWIFT_INLINE_THUNK WrapOverloadedInits init(swift::Int x) noexcept SWIFT_SYMBOL("s:4Init19WrapOverloadedInitsVyACSicfc");
 // CHECK-NEXT: static SWIFT_INLINE_THUNK WrapOverloadedInits init(float
 // CHECK-NOT: WrapOverloadedInits init(
 
-// CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) {
+// CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) noexcept {
 // CHECK-NEXT: return _impl::_impl_BaseClass::makeRetained(Init::_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
 
-// CHECK: DerivedClass DerivedClass::init(swift::Int x, swift::Int y) {
+// CHECK: DerivedClass DerivedClass::init(swift::Int x, swift::Int y) noexcept {
 // CHECK-NEXT: _impl::_impl_DerivedClass::makeRetained(Init::_impl::$s4Init12DerivedClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClass>::getTypeMetadata()));
 
-// CHECK: DerivedClassTwo DerivedClassTwo::init(swift::Int x, swift::Int y) {
+// CHECK: DerivedClassTwo DerivedClassTwo::init(swift::Int x, swift::Int y) noexcept {
 // CHECK-NEXT: return _impl::_impl_DerivedClassTwo::makeRetained(Init::_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
 
-// CHECK: FinalClass FinalClass::init(const FirstSmallStruct& prop) {
+// CHECK: FinalClass FinalClass::init(const FirstSmallStruct& prop) noexcept {
 // CHECK-NEXT: return _impl::_impl_FinalClass::makeRetained(Init::_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
 
 
-// CHECK:      SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const {
+// CHECK:      SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const noexcept {
 // CHECK-NEXT: return Init::_impl::$s4Init16FirstSmallStructV1xs6UInt32Vvg(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct FirstSmallStruct::init() {
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct FirstSmallStruct::init() noexcept {
 // CHECK-NEXT: return Init::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_uint32_t_0_4(result, Init::_impl::$s4Init16FirstSmallStructVACycfC());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct FirstSmallStruct::init(swift::Int x) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct FirstSmallStruct::init(swift::Int x) noexcept {
 // CHECK-NEXT: return Init::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_uint32_t_0_4(result, Init::_impl::$s4Init16FirstSmallStructVyACSicfC(x));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK LargeStruct LargeStruct::init() {
+// CHECK:      SWIFT_INLINE_THUNK LargeStruct LargeStruct::init() noexcept {
 // CHECK-NEXT: return Init::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s4Init11LargeStructVACycfC(result);
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& y) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& y) noexcept {
 // CHECK-NEXT: return Init::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(result, x, Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(y)));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK StructWithRefCountStoredProp StructWithRefCountStoredProp::init() {
+// CHECK:      SWIFT_INLINE_THUNK StructWithRefCountStoredProp StructWithRefCountStoredProp::init() noexcept {
 // CHECK-NEXT: return Init::_impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_[[PTRENC]](result, Init::_impl::$s4Init28StructWithRefCountStoredPropVACycfC());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK StructWithRefCountStoredProp StructWithRefCountStoredProp::init(swift::Int x) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK StructWithRefCountStoredProp StructWithRefCountStoredProp::init(swift::Int x) noexcept {
 // CHECK-NEXT: return Init::_impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_[[PTRENC]](result, Init::_impl::$s4Init28StructWithRefCountStoredPropV1xACSi_tcfC(x));
 // CHECK-NEXT: });

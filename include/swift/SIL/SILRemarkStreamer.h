@@ -61,6 +61,8 @@ private:
 public:
   static std::unique_ptr<SILRemarkStreamer> create(SILModule &silModule);
 
+  ~SILRemarkStreamer();
+
 public:
   llvm::remarks::RemarkStreamer &getLLVMStreamer();
   const llvm::remarks::RemarkStreamer &getLLVMStreamer() const;
@@ -85,7 +87,8 @@ public:
 // Implementation for template member functions.
 
 // OptRemark type -> llvm::remarks::Type
-template <typename RemarkT> static llvm::remarks::Type toRemarkType() {
+template <typename RemarkT>
+llvm::remarks::Type toRemarkType() {
   if (std::is_same<RemarkT, OptRemark::RemarkPassed>::value)
     return llvm::remarks::Type::Passed;
   if (std::is_same<RemarkT, OptRemark::RemarkMissed>::value)

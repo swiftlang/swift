@@ -26,15 +26,15 @@ public struct Struct {
   }
 }
 
-// CHECK: SWIFT_INLINE_THUNK void method() const SWIFT_SYMBOL("s:7Methods6StructV6methodyyF") SWIFT_AVAILABILITY(macos,introduced=11);
-// CHECK: static SWIFT_INLINE_THUNK void staticMethod() SWIFT_SYMBOL("s:7Methods6StructV12staticMethodyyFZ") SWIFT_AVAILABILITY(macos,introduced=11);
-// CHECK: SWIFT_INLINE_THUNK void unavailableMethod() const SWIFT_SYMBOL("s:7Methods6StructV17unavailableMethodyyF") SWIFT_UNAVAILABLE_MSG("stuff happened");
-// CHECK: SWIFT_INLINE_THUNK swift::Int operator [](swift::Int x) const SWIFT_SYMBOL("s:7Methods6StructVyS2icig") SWIFT_AVAILABILITY(macos,introduced=11);
+// CHECK: SWIFT_INLINE_THUNK void method() const noexcept SWIFT_SYMBOL("s:7Methods6StructV6methodyyF") SWIFT_AVAILABILITY(macos,introduced=11);
+// CHECK: static SWIFT_INLINE_THUNK void staticMethod() noexcept SWIFT_SYMBOL("s:7Methods6StructV12staticMethodyyFZ") SWIFT_AVAILABILITY(macos,introduced=11);
+// CHECK: SWIFT_INLINE_THUNK void unavailableMethod() const noexcept SWIFT_SYMBOL("s:7Methods6StructV17unavailableMethodyyF") SWIFT_UNAVAILABLE_MSG("stuff happened");
+// CHECK: SWIFT_INLINE_THUNK swift::Int operator [](swift::Int x) const noexcept SWIFT_SYMBOL("s:7Methods6StructVyS2icig") SWIFT_AVAILABILITY(macos,introduced=11);
 
-// CHECK: SWIFT_INLINE_THUNK void Struct::method() const SWIFT_AVAILABILITY(macos,introduced=11) {
+// CHECK: SWIFT_INLINE_THUNK void Struct::method() const noexcept SWIFT_AVAILABILITY(macos,introduced=11) {
 
-// CHECK: SWIFT_INLINE_THUNK void Struct::staticMethod() SWIFT_AVAILABILITY(macos,introduced=11) {
+// CHECK: SWIFT_INLINE_THUNK void Struct::staticMethod() noexcept SWIFT_AVAILABILITY(macos,introduced=11) {
 
-// CHECK: SWIFT_INLINE_THUNK void Struct::unavailableMethod() const SWIFT_UNAVAILABLE_MSG("stuff happened") {
+// CHECK: SWIFT_INLINE_THUNK void Struct::unavailableMethod() const noexcept SWIFT_UNAVAILABLE_MSG("stuff happened") {
 
-// CHECK: SWIFT_INLINE_THUNK swift::Int Struct::operator [](swift::Int x) const SWIFT_SYMBOL("s:7Methods6StructVyS2icig") SWIFT_AVAILABILITY(macos,introduced=11)
+// CHECK: SWIFT_INLINE_THUNK swift::Int Struct::operator [](swift::Int x) const noexcept SWIFT_SYMBOL("s:7Methods6StructVyS2icig") SWIFT_AVAILABILITY(macos,introduced=11)

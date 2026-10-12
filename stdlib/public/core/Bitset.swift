@@ -353,7 +353,12 @@ extension _UnsafeBitset.Word: @unsafe Sequence, @unsafe IteratorProtocol {
 
 extension _UnsafeBitset {
   @export(implementation)
+#if os(Windows)
+  // Workaround for a mis-compile: https://github.com/swiftlang/swift/issues/92465
+  @inline(never)
+#else
   @inline(__always)
+#endif
   internal static func _withTemporaryUninitializedBitset<R, E: Error>(
     wordCount: Int,
     body: (_UnsafeBitset) throws(E) -> R

@@ -32,6 +32,10 @@ internal import Musl
 @_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
+#if os(Linux)
+internal import BacktracingImpl.OS.SafeReadMemory
+#endif
+
 @_spi(MemoryReaders)
 @available(BacktracingDT 6.2, *)
 public protocol MemoryReader {
@@ -270,6 +274,9 @@ public struct UncachedLocalMemoryReader: MemoryReader {
   var message: String
 }
 
+@_spi(MemoryReaders) public struct MemoryReadError: Error {
+}
+
 @_spi(MemoryReaders)
 public struct UncachedMemserverMemoryReader: MemoryReader {
   private var fd: CInt
@@ -390,15 +397,18 @@ public struct UncachedRemoteMemoryReader: MemoryReader {
 
 @_spi(MemoryReaders)
 public struct UncachedLocalMemoryReader: MemoryReader {
-  private var reader: RemoteMemoryReader
-
-  init() {
-    reader = RemoteMemoryReader(pid: getpid())
-  }
-
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
-    return try reader.fetch(from: address, into: buffer)
+    let ctx = _swift_begin_reading_memory()
+    defer {
+      _swift_end_reading_memory(ctx)
+    }
+    if !_swift_read_memory(
+      ctx, UnsafeRawPointer(bitPattern: UInt(address)),
+      buffer.baseAddress!, buffer.count
+    ) {
+      throw MemoryReadError()
+    }
   }
 }
 #endif

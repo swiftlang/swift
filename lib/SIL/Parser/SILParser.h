@@ -431,7 +431,8 @@ public:
   }
   
   /// Parse into checked cast options, such as [prohibit_isolated_conformances].
-  CheckedCastInstOptions parseCheckedCastInstOptions(bool *isExact);
+  CheckedCastInstOptions parseCheckedCastInstOptions(bool *isExact,
+                                                     bool *isCopy = nullptr);
 };
 
 } // namespace swift

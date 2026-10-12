@@ -16,12 +16,14 @@ struct Bar<T>: ~Copyable {
 }
 
 func inferredTuples<T>(x: Int, y: borrowing Butt, z: T) {
-    let a = (x, y) // expected-error{{type '(Int, Butt)' containing noncopyable element is not supported}}
-    let b = (y, z) // expected-error{{type '(Butt, T)' containing noncopyable element is not supported}}
-    let c = (x, y, z) // expected-error{{type '(Int, Butt, T)' containing noncopyable element is not supported}}
+    let a = (x, y) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
+    let b = (y, z) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
+    let c = (x, y, z) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
+    let d = (x, (y, z)) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
     _ = a
     _ = b
     _ = c
+    _ = d
 }
 
 // Avoid spurious diagnostic with the tuple here

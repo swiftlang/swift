@@ -162,7 +162,11 @@ private extension DevirtualizableDestroy {
   var type: Type { operand.value.type }
 
   func devirtualizeEnumPayloads(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
-    guard let cases = type.getEnumCases(in: parentFunction) else {
+    guard let cases = type.getEnumCases(in: parentFunction),
+          // We cannot destroy payloads which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          cases.allPayloadsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
     defer {
@@ -212,7 +216,11 @@ extension DestroyValueInst : DevirtualizableDestroy {
   }
 
   fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
-    guard let fields = type.getNominalFields(in: parentFunction) else {
+    guard let fields = type.getNominalFields(in: parentFunction),
+          // We cannot destroy fields which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          fields.allFieldsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
 
@@ -321,7 +329,11 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let builder = Builder(before: self, context)
 
-    guard let fields = type.getNominalFields(in: parentFunction) else {
+    guard let fields = type.getNominalFields(in: parentFunction),
+          // We cannot destroy fields which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          fields.allFieldsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
     defer {
@@ -476,10 +488,18 @@ private extension EnumCases {
   func allPayloadsAreTrivial(in function: Function) -> Bool {
     allSatisfy({ $0.payload?.isTrivial(in: function) ?? true })
   }
+
+  func allPayloadsAreABIAccessible(in function: Function) -> Bool {
+    allSatisfy({ $0.payload?.isABIAccessible(in: function) ?? true })
+  }
 }
 
 private extension NominalFieldsArray {
   func allFieldsAreTrivial(in function: Function) -> Bool {
     allSatisfy({ $0.isTrivial(in: function)})
+  }
+
+  func allFieldsAreABIAccessible(in function: Function) -> Bool {
+    allSatisfy({ $0.isABIAccessible(in: function) })
   }
 }

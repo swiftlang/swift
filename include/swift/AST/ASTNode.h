@@ -124,12 +124,6 @@ namespace llvm {
       : public CastInfo<To, const ASTNode::Base> {};
 
   template <> struct DenseMapInfo<ASTNode> {
-    static inline ASTNode getEmptyKey() {
-      return DenseMapInfo<swift::Expr *>::getEmptyKey();
-    }
-    static inline ASTNode getTombstoneKey() {
-      return DenseMapInfo<swift::Expr *>::getTombstoneKey();
-    }
     static unsigned getHashValue(const ASTNode Val) {
       return DenseMapInfo<void *>::getHashValue(Val.getOpaqueValue());
     }

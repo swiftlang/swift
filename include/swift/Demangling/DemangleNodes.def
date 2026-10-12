@@ -430,6 +430,8 @@ CONTEXT_NODE(MutateAccessor)
 NODE(AsyncMainEntryPoint)
 NODE(CalledOnceFunctionType)
 NODE(YieldTypes)
+NODE(CalledAtMostOnceFunctionType)
+NODE(ImplCalledAtMostOnceFunction)
 
 #undef CONTEXT_NODE
 #undef NODE

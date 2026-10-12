@@ -733,6 +733,15 @@ public:
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
+              // In C++ the class body only declares its members, and a
+              // forward declaration of the class template is enough for that.
+              // The member definitions are printed out of line after all
+              // types.
+              if (outputLangMode == OutputLanguageMode::Cxx) {
+                forwardDeclareType(TD);
+                needsToBeIndividuallyDelayed = true;
+                return;
+              }
               needsToBeIndividuallyDelayed = true;
               hadAnyDelayedMembers = true;
             }
@@ -978,6 +987,10 @@ public:
         // Immediately filter out invalid extensions.
         if (ED->isInvalid())
           return true;
+        // With lazy type checking, an extension of an unresolvable type
+        // might not have been diagnosed and marked invalid yet.
+        if (!ED->getExtendedNominal())
+          return true;
         if (outputLangMode == OutputLanguageMode::Cxx)
           return false;
         auto baseClass = ED->getSelfClassDecl();
@@ -1153,9 +1166,7 @@ public:
           continue;
         }
         auto representation = cxx_translation::getDeclRepresentation(
-            vd, [this](const NominalTypeDecl *decl) {
-              return printer.isZeroSized(decl);
-            });
+            vd, /*layoutQueries=*/&printer);
         if (nmtd->hasGenericParamList()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
@@ -1193,9 +1204,7 @@ public:
         emitStubComment(reasonIt->second);
       } else {
         auto representation = cxx_translation::getDeclRepresentation(
-            vd, [this](const NominalTypeDecl *decl) {
-              return printer.isZeroSized(decl);
-            });
+            vd, /*layoutQueries=*/&printer);
         std::string reasonStr;
         if (representation.isUnsupported() &&
             representation.error.has_value()) {

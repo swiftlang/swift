@@ -881,9 +881,9 @@ private:
         }
       }
     }
-    // If we're relying on ManualOwnership for explicit-copies enforcement,
-    // we don't need @noImplicitCopy / MoveOnlyWrapper.
-    if (SGF.B.hasManualOwnershipAttr())
+
+    // Do we actually need the wrapper type?
+    if (!SGF.usingWrapperTypeImplicitCopyEnforcement())
       isNoImplicitCopy = false;
 
     // If we have a no implicit copy argument and the argument is trivial,
@@ -1314,7 +1314,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   bool isNoImplicitCopy;
 
   if (ty.isTrivial(SGF.F) || ty.isMoveOnly() ||
-      SGF.B.hasManualOwnershipAttr()) {
+      !SGF.usingWrapperTypeImplicitCopyEnforcement()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
     isNoImplicitCopy = true;
@@ -1844,8 +1844,9 @@ uint16_t SILGenFunction::emitBasicProlog(
   // conventions; do the same for the `$error` debug placeholder, which
   // must only appear in a function whose SIL type has an error result
   // (SIL verifier enforces this invariant).
-  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr &&
-      F.getLoweredFunctionType()->hasErrorResult()) {
+  if (errorType && !(*errorType)->isNever() &&
+      F.getLoweredFunctionType()->hasErrorResult() &&
+      !F.getLoweredFunctionType()->hasIndirectErrorResult()) {
     CanType errorTypeInContext =
       DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);

@@ -76,9 +76,11 @@ func goodTest5<T : diag_values_of_module_type_foo.SomeProtocol>(_: T)
 //===--- Disallowed uses of module names.
 
 var badGlobal1 = Swift // expected-error {{expected module member name after module name}}
+// expected-error@-1 {{global variable 'badGlobal1' cannot have non-Deinitable type 'module<Swift>'}}
 
 class BadClass1 {
   var instanceVar1 = Swift // expected-error {{expected module member name after module name}}
+  // expected-error@-1 {{stored property 'instanceVar1' of 'Deinitable'-conforming class 'BadClass1' has non-Deinitable type 'module<Swift>'}}
   func instanceFunc1() {
     instanceVar1 = Swift // expected-error {{expected module member name after module name}}
   }

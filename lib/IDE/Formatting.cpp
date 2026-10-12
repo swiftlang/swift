@@ -1029,19 +1029,6 @@ public:
 
   /// Update the alignment for a list element.
   ///
-  /// \param Start
-  ///   The start location of the element.
-  /// \param End
-  ///   The end location of the element
-  /// \param WalkableParent
-  ///   An AST node that is, or contains the element, and is walkable.
-  template <typename T>
-  void updateAlignment(SourceLoc Start, SourceLoc End, T *WalkableParent) {
-    updateAlignment(SourceRange(Start, End), WalkableParent);
-  }
-
-  /// Update the alignment for a list element.
-  ///
   /// \param Range
   ///   The source range of the element.
   /// \param WalkableParent

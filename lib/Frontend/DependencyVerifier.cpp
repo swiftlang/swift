@@ -175,14 +175,6 @@ struct Obligation {
 
   public:
     struct Info {
-      static inline Obligation::Key getEmptyKey() {
-        return Obligation::Key{llvm::DenseMapInfo<StringRef>::getEmptyKey(),
-                               static_cast<Expectation::Kind>(~0)};
-      }
-      static inline Obligation::Key getTombstoneKey() {
-        return Obligation::Key{llvm::DenseMapInfo<StringRef>::getTombstoneKey(),
-                               static_cast<Expectation::Kind>(~0U - 1)};
-      }
       static unsigned getHashValue(const Obligation::Key &Val) {
         return llvm::hash_combine(Val.Name, Val.Kind);
       }

@@ -87,7 +87,16 @@ OUTPUT(ReferenceDependenciesFilePath, TY_SwiftDeps)
 /// how clients might use this in docs/Driver.md.
 ///
 /// \sa swift::serialized_diagnostics::createConsumer
-OUTPUT(SerializedDiagnosticsPath, TY_SerializedDiagnostics)
+OUTPUT(LLVMBitcodeDiagnosticsPath, TY_SerializedDiagnostics)
+
+/// Path to a file which should contain diagnostics for this frontend
+/// invocation, serialized to the Static Analysis Results Interchange Format
+/// (SARIF).
+///
+/// SARIF is a JSON-based standard for static analysis results.
+///
+/// \sa swift::sarif_diagnostics::createConsumer
+OUTPUT(SARIFDiagnosticsPath, TY_SARIFDiagnostics)
 
 /// The path to which we should output fix-its as source edits.
 ///

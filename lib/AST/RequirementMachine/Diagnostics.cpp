@@ -129,6 +129,13 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::DeinitableInverseRequiresNoncopyable: {
+      ctx.Diags.diagnose(loc, diag::deinitable_inverse_requires_noncopyable,
+                         error.getInverse().subject);
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::InvalidInverseOuterSubject: {
       auto inverse = error.getInverse();
       auto subjectType = inverse.subject;
@@ -388,6 +395,17 @@ void RequirementMachine::computeRequirementDiagnostics(
 
   // Check that the generic parameters with inverses truly lack the conformance.
   for (auto const& inverse : inverses) {
+    // If Copyable implies Deinitable, then applyInverses() already diagnosed a
+    // `~Deinitable` without `~Copyable`.
+    auto &ctx = inverse.protocol->getASTContext();
+    if (inverse.getKind() == InvertibleProtocolKind::Deinitable &&
+        InverseRequirement::copyableImpliesDeinitable(ctx)) {
+      if (auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable)) {
+        if (requiresProtocol(inverse.subject, copyable))
+          continue;
+      }
+    }
+
     // The Superclass and AnyObject checks here are based on the assumption that
     // a class cannot have an inverse applied to it. As a result, the existence
     // of a superclass bound always implies the existence of the conformance.

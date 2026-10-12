@@ -267,7 +267,63 @@ struct ComplexRecord3 {
 
   ComplexRecord3() : a(1), b(), c(false) {}
   ComplexRecord3& operator=(const ComplexRecord3& other);
-}; 
+};
+
+// Same, for the destructor and the move operations. ComplexRecord2 and
+// ComplexRecord3 cover the copy constructor and copy assignment.
+struct DtorWithView {
+  View b;
+
+  ~DtorWithView();
+};
+
+struct MoveOpsWithView {
+  View b;
+
+  MoveOpsWithView(MoveOpsWithView &&other);
+  MoveOpsWithView &operator=(MoveOpsWithView &&other);
+};
+
+// The demotion is transitive: HoldsView on its own is non-escapable, but
+// reached through a record that provides its own destruction it only makes it
+// unknown.
+struct HoldsView {
+  View v;
+};
+struct DtorWrapsHoldsView {
+  HoldsView h;
+
+  ~DtorWrapsHoldsView();
+};
+
+// SWIFT_ESCAPABLE_IF is a promise about the arguments, so the container's own
+// copy, move or destruction does not demote them: this stays non-escapable.
+template <typename T>
+struct SWIFT_ESCAPABLE_IF(T) OwningPair {
+  T first;
+
+  ~OwningPair();
+};
+
+// An unsafe annotation only makes escapability unknown, so it must not preempt
+// the non-escapable member. Both orders have to agree, in particular the one
+// where the unsafe member is visited first.
+struct SWIFT_UNSAFE Unsafe {
+  int x;
+};
+struct DtorWithUnsafe {
+  Unsafe u;
+
+  ~DtorWithUnsafe();
+};
+struct ViewThenUnsafe {
+  View v;
+  DtorWithUnsafe u;
+};
+struct UnsafeThenView {
+  DtorWithUnsafe u;
+  View v;
+};
 
 // expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
@@ -281,6 +337,29 @@ ComplexRecord m2();
 
 ComplexRecord2 m3(); // expected-note {{'m3()' has been explicitly marked unavailable here}}
 ComplexRecord3 m4(); // expected-note {{'m4()' has been explicitly marked unavailable here}}
+
+// Unknown rather than non-escapable, so these are unavailable rather than
+// ~Escapable.
+DtorWithView m5(); // expected-note {{'m5()' has been explicitly marked unavailable here}}
+MoveOpsWithView m6(); // expected-note {{'m6()' has been explicitly marked unavailable here}}
+DtorWrapsHoldsView m7(); // expected-note {{'m7()' has been explicitly marked unavailable here}}
+
+// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
+OwningPair<View> m8();
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+OwningPair<Owner> m9();
+
+// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
+ViewThenUnsafe m10();
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
+UnsafeThenView m11();
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
 
 // expected-error@+1 {{multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'}}
 struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
@@ -458,4 +537,11 @@ public func inferedEscapability() {
     m2()
     m3()  // expected-error {{'m3()' is unavailable: return type is unavailable in Swift}}
     m4()  // expected-error {{'m4()' is unavailable: return type is unavailable in Swift}}
+    m5()  // expected-error {{'m5()' is unavailable: return type is unavailable in Swift}}
+    m6()  // expected-error {{'m6()' is unavailable: return type is unavailable in Swift}}
+    m7()  // expected-error {{'m7()' is unavailable: return type is unavailable in Swift}}
+    m8()
+    m9()
+    m10()
+    m11()
 }

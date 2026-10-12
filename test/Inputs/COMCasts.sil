@@ -1,0 +1,60 @@
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol ISource: AnyObject {}
+@com(interface: "10000000-0000-0000-0000-000000000003")
+public protocol ITarget: AnyObject {}
+
+sil [ossa] @com_cast_conditional : $@convention(thin) (@owned any ISource) -> @owned Optional<any ITarget> {
+bb0(%source : @owned $any ISource):
+  checked_cast_br any ISource in %source : $any ISource to any ITarget, bb1, bb2
+bb1(%target : @owned $any ITarget):
+  %some = enum $Optional<any ITarget>, #Optional.some!enumelt, %target : $any ITarget
+  br bb3(%some : $Optional<any ITarget>)
+bb2(%failed : @owned $any ISource):
+  destroy_value %failed : $any ISource
+  %none = enum $Optional<any ITarget>, #Optional.none!enumelt
+  br bb3(%none : $Optional<any ITarget>)
+bb3(%result : @owned $Optional<any ITarget>):
+  return %result : $Optional<any ITarget>
+}
+
+sil [ossa] @com_cast_forced : $@convention(thin) (@owned any ISource) -> @owned any ITarget {
+bb0(%source : @owned $any ISource):
+  %target = unconditional_checked_cast %source : $any ISource to any ITarget
+  return %target : $any ITarget
+}
+
+sil [ossa] @com_cast_optional : $@convention(thin) (@owned Optional<any ISource>) -> @owned Optional<any ITarget> {
+bb0(%source : @owned $Optional<any ISource>):
+  checked_cast_br Optional<any ISource> in %source : $Optional<any ISource> to any ITarget, bb1, bb2
+bb1(%target : @owned $any ITarget):
+  %some = enum $Optional<any ITarget>, #Optional.some!enumelt, %target : $any ITarget
+  br bb3(%some : $Optional<any ITarget>)
+bb2(%failed : @owned $Optional<any ISource>):
+  destroy_value %failed : $Optional<any ISource>
+  %none = enum $Optional<any ITarget>, #Optional.none!enumelt
+  br bb3(%none : $Optional<any ITarget>)
+bb3(%result : @owned $Optional<any ITarget>):
+  return %result : $Optional<any ITarget>
+}
+
+@com(interface: "10000000-0000-0000-0000-000000000004")
+public protocol IMissing: AnyObject {}
+
+sil [ossa] @com_cast_missing : $@convention(thin) (@owned any ISource) -> @owned Optional<any IMissing> {
+bb0(%source : @owned $any ISource):
+  checked_cast_br any ISource in %source : $any ISource to any IMissing, bb1, bb2
+bb1(%target : @owned $any IMissing):
+  %some = enum $Optional<any IMissing>, #Optional.some!enumelt, %target : $any IMissing
+  br bb3(%some : $Optional<any IMissing>)
+bb2(%failed : @owned $any ISource):
+  destroy_value %failed : $any ISource
+  %none = enum $Optional<any IMissing>, #Optional.none!enumelt
+  br bb3(%none : $Optional<any IMissing>)
+bb3(%result : @owned $Optional<any IMissing>):
+  return %result : $Optional<any IMissing>
+}
+

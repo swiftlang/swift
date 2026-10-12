@@ -1072,7 +1072,10 @@ class SwiftDependencyScanningService {
   /// The CAS configuration created the Scanning Service if used.
   std::optional<llvm::cas::CASConfiguration> CASConfig;
 
-  /// The persistent Clang dependency scanner service
+  /// The persistent Clang dependency scanner service.
+  ///
+  /// Created by the first scan (see \c setupDependencyScanningService), which
+  /// is also what lets this double as the "already configured" flag.
   std::optional<clang::dependencies::DependencyScanningService>
       ClangScanningService;
 
@@ -1080,24 +1083,48 @@ class SwiftDependencyScanningService {
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
 
 public:
-  SwiftDependencyScanningService();
+  SwiftDependencyScanningService() : Alloc(), Saver(Alloc) {}
   SwiftDependencyScanningService(const SwiftDependencyScanningService &) =
       delete;
   SwiftDependencyScanningService &
   operator=(const SwiftDependencyScanningService &) = delete;
   virtual ~SwiftDependencyScanningService() {}
 
-  /// Setup caching service.
-  bool setupCachingDependencyScanningService(CompilerInstance &Instance);
+  /// Create the Clang dependency scanning service from \p Instance: the base
+  /// file system of its workers, and compiler caching if \p Instance requires
+  /// it.
+  ///
+  /// The service is created by the first scan and reused by every scan after
+  /// it, because re-creating it would drop its caches and dangle the references
+  /// held by an in-flight scan's workers. Creation must therefore happen before
+  /// any worker exists, which is why \c performModuleScan and
+  /// \c performModulePrescan call this before creating their
+  /// \c ModuleDependencyScanner; later calls are no-ops.
+  ///
+  /// \returns true if an error was diagnosed, which happens when \p Instance
+  /// asks for a CAS configuration the existing service cannot provide.
+  bool setupDependencyScanningService(CompilerInstance &Instance);
+
+  /// The CAS the Clang dependency scanning service was created with, or null if
+  /// it has not been created yet or does not use caching.
+  std::shared_ptr<llvm::cas::ObjectStore> getCAS() const {
+    return ClangScanningService ? ClangScanningService->getCAS() : nullptr;
+  }
+
+  /// The action cache the Clang dependency scanning service was created with,
+  /// or null if it has not been created yet or does not use caching.
+  std::shared_ptr<llvm::cas::ActionCache> getActionCache() const {
+    return ClangScanningService ? ClangScanningService->getActionCache()
+                                : nullptr;
+  }
 
   /// Allocate string inside ScanningService.
   StringRef save(StringRef str);
 
-  /// Get clang scanning service.
-  const clang::dependencies::DependencyScanningService &
-  getClangScanningService() const {
-    assert(ClangScanningService);
-    return *ClangScanningService;
+  /// Whether the Clang dependency scanning service has been created; see
+  /// \c setupDependencyScanningService.
+  bool hasClangScanningService() const {
+    return ClangScanningService.has_value();
   }
 
 private:

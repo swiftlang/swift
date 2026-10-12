@@ -86,8 +86,8 @@ public:
     IsConsumed = 1 << 2,
 
     /// IsSending is set when the vardecl is declared as a `sending` capture
-    /// i.e. `[sending x]`. Such captures are only valid in a `@called(once)`
-    /// closure.
+    /// i.e. `[sending x]`. Such captures are only valid in a
+    /// `@called(atMostOnce)` closure.
     IsSending = 1 << 3,
   };
 

@@ -816,6 +816,13 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
         // Therefore assume that the called function will both, read and write, to the address.
         return .abort
       }
+      if path.addressIsStored {
+        // The address was converted to a pointer and stored to memory which is passed to the callee.
+        // The callee can load the pointer and access the address, e.g. via a `pointer_to_address`.
+        // Such accesses are not described by argument effects, but by the global effects of the callee.
+        result.merge(with: calleeAnalysis.getSideEffects(ofApply: apply))
+        return .continueWalk
+      }
       let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
       result.merge(with: e)
     }

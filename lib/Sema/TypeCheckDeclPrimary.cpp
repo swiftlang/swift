@@ -459,7 +459,7 @@ static void checkInheritanceClause(
     // If this is a class type, it may be the superclass. We end up here when
     // the inherited type is either itself a class, or when it is a subclass
     // existential via the existential type path above.
-    if (inheritedTy->getClassOrBoundGenericClass()) {
+    if (inheritedTy->getClassDecl()) {
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
@@ -2159,6 +2159,16 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (!genericSig->requiresProtocol(ir.subject, ir.protocol))
       continue;
 
+    // If Copyable implies Deinitable, then applyInverses() already diagnosed a
+    // `~Deinitable` without `~Copyable`.
+    if (ir.getKind() == InvertibleProtocolKind::Deinitable &&
+        InverseRequirement::copyableImpliesDeinitable(ctx)) {
+      if (auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable)) {
+        if (genericSig->requiresProtocol(ir.subject, copyable))
+          continue;
+      }
+    }
+
     // We didn't diagnose this as an error for associated types prior to
     // SuppressedAssociatedTypesWithDefaults.
     //
@@ -2503,6 +2513,7 @@ public:
 
     case MacroDefinition::Kind::Invalid:
     case MacroDefinition::Kind::Builtin:
+    case MacroDefinition::Kind::Internal:
     case MacroDefinition::Kind::Expanded:
       // Nothing else to check here.
       break;
@@ -2573,6 +2584,33 @@ public:
     llvm_unreachable("hidden layout declarations are not type checked");
   }
 
+  /// Nothing consumes the value of a global, a static property, a lazy
+  /// property, or an `async let` binding explicitly, so its type must be
+  /// Deinitable.
+  static void checkNondeinitableStorage(VarDecl *VD) {
+    if (VD->isImplicit() || !VD->hasInterfaceType())
+      return;
+
+    enum : unsigned { Global, Static, Lazy, AsyncLet };
+    std::optional<unsigned> kind;
+    if (VD->isAsyncLet())
+      kind = AsyncLet;
+    else if (VD->getAttrs().hasAttribute<LazyAttr>())
+      kind = Lazy;
+    else if (VD->hasStorage() && VD->isStatic())
+      kind = Static;
+    else if (VD->hasStorage() && VD->getDeclContext()->isModuleScopeContext())
+      kind = Global;
+    if (!kind)
+      return;
+
+    auto type = VD->getTypeInContext();
+    if (type->hasError() || type->isDeinitable())
+      return;
+
+    VD->diagnose(diag::nondeinitable_storage, *kind, VD->getName(), type);
+  }
+
   void visitBoundVariable(VarDecl *VD) {
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
@@ -2633,6 +2671,8 @@ public:
       }
     }
 
+    checkNondeinitableStorage(VD);
+
     TypeChecker::checkDeclAttributes(VD);
 
     auto DC = VD->getDeclContext();
@@ -2686,7 +2726,7 @@ public:
     // completely type checked at that point.
     auto &DE = Ctx.Diags;
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = VD->getInterfaceType()->getNominalDecl()) {
         if (!nom->canBeCopyable()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
@@ -2696,7 +2736,7 @@ public:
     }
 
     // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
-    if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = VD->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>()) {
         auto isProtocolContext = isa<ProtocolDecl>(DC);
 
@@ -3439,9 +3479,7 @@ public:
     (void) getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
 
     for (auto ip : inverses) {
-      // Allow ~Copyable when MoveOnlyClasses is enabled
-      if (ip == InvertibleProtocolKind::Copyable
-          && ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))
+      if (decl->canSuppressInvertible(ip))
         continue;
 
       ctx.Diags.diagnose(decl->getLoc(),
@@ -3542,7 +3580,7 @@ public:
       });
 
     if (auto superclassTy = CD->getSuperclass()) {
-      ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+      ClassDecl *Super = superclassTy->getClassDecl();
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {
@@ -3775,7 +3813,10 @@ public:
       diagnoseUntypedThrows(FD, throwsLoc);
     }
 
-    if (!checkOverrides(FD)) {
+    // A @cxx implementation's `override` keyword is checked against its C++
+    // declaration when it is matched to the imported method.
+    if (!checkOverrides(FD) &&
+        !FD->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -4211,6 +4252,19 @@ public:
       diagnoseUntypedThrows(CD, throwsLoc);
     }
 
+    // If the class inherits from a C++ foreign reference type, prohibit
+    // failable and throwing initializers. There is no clear way to clean up the
+    // object if initialization fails.
+    if (auto classDecl = CD->getDeclContext()->getSelfClassDecl()) {
+      if (Ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
+          !classDecl->hasClangNode() &&
+          classDecl->getForeignReferenceSuperclassOrSelf() &&
+          (CD->isFailable() || CD->hasThrows())) {
+        CD->diagnose(diag::foreign_reference_subclass_init_cannot_fail, CD,
+                     CD->isFailable());
+      }
+    }
+
     // Check whether this initializer overrides an initializer in its
     // superclass.
     if (!checkOverrides(CD)) {
@@ -4342,6 +4396,13 @@ public:
                              DD->getDeclContext()->getImplementedObjCContext());
       if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
+      }
+
+      // A `~Deinitable` type cannot have a user-defined deinit.
+      if (nom && isa<StructDecl, EnumDecl>(nom) &&
+          nom->canConformTo(InvertibleProtocolKind::Deinitable) ==
+              TypeDecl::CanBeInvertible::Never) {
+        DD->diagnose(diag::deinitable_illegal_deinit, nom);
       }
 
       // Temporarily ban deinit on noncopyable enums, unless the experimental
@@ -4477,7 +4538,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // If we have a noimplicitcopy parameter, make sure that the underlying type
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = param->getInterfaceType()->getNominalDecl()) {
         if (!nom->canBeCopyable()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
@@ -4487,7 +4548,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     // @_staticExclusiveOnly types cannot be passed as 'inout', only as either
     // a borrow or as consuming.
-    if (auto SD = param->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = param->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           param->isInOut()) {
         SD->getASTContext().Diags.diagnoseWithNotes(

@@ -12,7 +12,7 @@
 
 // SYNTH-EMPTY:
 // BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// IDE-NEXT:@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func lineComment(_ p: UnsafeMutableBufferPointer<CInt>)
 // SYNTH-NEXT:public func lineComment(_ p: UnsafeMutableBufferPointer<CInt>)
 
 // SYNTH-EMPTY:
@@ -33,7 +33,7 @@
 // BOTH-NEXT:/// @param len the buffer length
 // BOTH-NEXT:/// @param p the buffer
 // BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func lineDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// IDE-NEXT:@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func lineDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
 // SYNTH-NEXT:public func lineDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
 
 // SYNTH-EMPTY:
@@ -42,7 +42,7 @@
 
 // SYNTH-EMPTY:
 // BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// IDE-NEXT:@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func blockComment(_ p: UnsafeMutableBufferPointer<CInt>)
 // SYNTH-NEXT:public func blockComment(_ p: UnsafeMutableBufferPointer<CInt>)
 
 // SYNTH-EMPTY:
@@ -65,5 +65,5 @@
 // BOTH-NEXT: * @param p   some integers to play with
 // BOTH-NEXT: */
 // BOTH-NEXT:/// This is an auto-generated wrapper for safer interop
-// IDE-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload public func blockDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
+// IDE-NEXT:@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func blockDocComment(_ p: UnsafeMutableBufferPointer<CInt>)
 // SYNTH-NEXT:public func blockDocComment(_ p: UnsafeMutableBufferPointer<CInt>)

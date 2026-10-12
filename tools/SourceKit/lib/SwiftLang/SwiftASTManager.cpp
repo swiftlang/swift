@@ -543,7 +543,7 @@ struct CacheValueCostInfo<ASTProducer> {
 template <>
 struct CacheKeyHashInfo<ASTKey> {
   static uintptr_t getHashValue(const ASTKey &Key) {
-    return Key.FSID.ComputeHash();
+    return Key.FSID.computeHash();
   }
   static bool isEqual(void *LHS, void *RHS) {
     return static_cast<ASTKey*>(LHS)->FSID == static_cast<ASTKey*>(RHS)->FSID;

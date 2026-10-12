@@ -484,7 +484,7 @@ public:
 
   void addLazyGlobalVariable(SILGlobalVariable *v);
 
-  void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
+  void addDynamicReplacement(SILFunction *f);
 
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
     DefaultIGMForFunction[f] = CurrentIGM;
@@ -654,15 +654,22 @@ private:
   std::string FunctionName;
 
   bool IsDistributed: 1;
+  bool HasLeadingImplicitActorIsolationParameter : 1;
 
   CanSILFunctionType Type;
   llvm::Constant *Address;
 
   explicit AccessibleFunction(std::string recordName, std::string funcName,
-                              bool isDistributed, CanSILFunctionType type,
-                              llvm::Constant *addr)
+                              bool isDistributed,
+                              bool hasLeadingImplicitActorIsolationParameter,
+                              CanSILFunctionType type, llvm::Constant *addr)
       : RecordName(recordName), FunctionName(funcName),
-        IsDistributed(isDistributed), Type(type), Address(addr) {}
+        IsDistributed(isDistributed),
+        HasLeadingImplicitActorIsolationParameter(hasLeadingImplicitActorIsolationParameter),
+        Type(type), Address(addr) {
+    assert((!hasLeadingImplicitActorIsolationParameter || isDistributed) &&
+           "currently only distributed accessors can take an isolated actor parameter");
+  }
 
 public:
   StringRef getRecordName() const { return RecordName; }
@@ -670,15 +677,19 @@ public:
 
   bool isDistributed() const { return IsDistributed; }
 
+  bool hasLeadingImplicitActorIsolationParameter() const {
+    return HasLeadingImplicitActorIsolationParameter;
+  }
+
   CanSILFunctionType getType() const { return Type; }
 
   llvm::Constant *getAddress() const { return Address; }
 
   static AccessibleFunction forSILFunction(IRGenModule &IGM, SILFunction *func);
-  static AccessibleFunction forDistributed(std::string recordName,
-                                           std::string accessorName,
-                                           CanSILFunctionType type,
-                                           llvm::Constant *address);
+  static AccessibleFunction
+  forDistributed(std::string recordName, std::string accessorName,
+                 bool hasLeadingImplicitActorIsolationParameter,
+                 CanSILFunctionType type, llvm::Constant *address);
 };
 
 enum class CStringSectionType {
@@ -1142,6 +1153,9 @@ public:
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
   const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
+
+  void dumpAbstractTypeLayoutInfo(CanType type, StringRef mangledName,
+                                  StringRef origin);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
@@ -1363,6 +1377,10 @@ public:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+  /// Global blocks, keyed by their invoke function and constant capture.
+  llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
+                 llvm::Constant *> GlobalBlocks;
+
 private:
   using CopyAddrHelperGenerator =
     llvm::function_ref<void(IRGenFunction &IGF, Address dest, Address src,
@@ -1521,7 +1539,6 @@ public:
   std::string CaptureDescriptorSection;
   std::string ReflectionStringsSection;
   std::string ReflectionTypeRefSection;
-  std::string MultiPayloadEnumDescriptorSection;
 
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
@@ -1601,7 +1618,6 @@ public:
   const char *getCaptureDescriptorMetadataSectionName();
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
-  const char *getMultiPayloadEnumDescriptorSectionName();
 
   static constexpr const char ObjCClassNameSectionName[] =
       "__TEXT,__objc_classname,cstring_literals";
@@ -1631,7 +1647,6 @@ public:
   ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
-  llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   llvm::Constant *
   getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
@@ -1640,6 +1655,12 @@ public:
   /// whose witness can never be reached, so that reaching one traps instead of
   /// requiring us to emit a real (dead) implementation.
   llvm::Function *getOrCreateDeadMethodErrorStub();
+
+  /// Like getOrCreateDeadMethodErrorStub(), but async.
+  llvm::Function *getOrCreateDeadMethodErrorAsyncStub();
+
+  /// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub().
+  llvm::Constant *getOrCreateDeadAsyncMethodErrorFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1669,6 +1690,10 @@ private:                                                                       \
   /// A local stub function that simply calls swift_deletedMethodError(),
   /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
   llvm::Function *DeadMethodErrorStub = nullptr;
+  /// Like DeadMethodErrorStub, but async.
+  llvm::Function *DeadMethodErrorAsyncStub = nullptr;
+  /// A local AsyncFunctionPointer wrapping DeadMethodErrorAsyncStub.
+  llvm::Constant *DeadAsyncMethodErrorFunctionPointer = nullptr;
   /// A Coroutine Function Pointer wrapping the above, suited for
   /// filling vtable/witness slots that point to "callee-allocated"
   /// (new ABI) coroutines.
@@ -2031,7 +2056,8 @@ public:
 
   llvm::Function *
   getAddrOfDistributedTargetAccessor(LinkEntity accessor,
-                                     ForDefinition_t forDefinition);
+                                     ForDefinition_t forDefinition,
+                                     bool hasIsolatedActorParameter);
 
   /// Emit a distributed accessor function for the given distributed thunk or
   /// protocol requirement.

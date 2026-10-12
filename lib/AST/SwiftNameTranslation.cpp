@@ -261,7 +261,7 @@ struct ObjCTypeWalker : TypeWalker {
   const ASTContext &ctx;
   ObjCTypeWalker(const ASTContext &ctx) : ctx(ctx) {}
   Action walkToTypePre(Type ty) override {
-    if (auto *nominal = ty->getNominalOrBoundGenericNominal()) {
+    if (auto *nominal = ty->getNominalDecl()) {
       if (auto clangDecl = nominal->getClangDecl()) {
         if (cxx_translation::isObjCxxOnly(clangDecl, ctx)) {
           hadObjCType = true;
@@ -308,13 +308,36 @@ bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
                        }));
 }
 
+bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(
+    const NominalTypeDecl *typeDecl) {
+  // A noncopyable type imported from C/C++ is exposed back as itself.
+  if (typeDecl->hasClangNode())
+    return false;
+  if (!typeDecl->getASTContext().LangOpts.hasFeature(
+          Feature::GenerateBindingsForNoncopyableTypesInCXX))
+    return false;
+  if (!isa<StructDecl>(typeDecl) && !isa<EnumDecl>(typeDecl))
+    return false;
+  // A conditionally copyable type would need its C++ copy operations deleted
+  // per specialization, so only an always-noncopyable type qualifies.
+  if (typeDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never)
+    return false;
+  // The moved-from flag is stored next to the Swift value, so the layout has
+  // to be statically known.
+  return !typeDecl->isGenericContext() && !typeDecl->isResilient();
+}
+
+bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(Type type) {
+  const auto *nominal = type->getNominalDecl();
+  return nominal && isNoncopyableValueTypeExposableToCxx(nominal);
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
-    const ValueDecl *VD,
-    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
+    const ValueDecl *VD, NominalTypeLayoutQueries *layoutQueries) {
   auto abiRole = ABIRoleInfo(VD);
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
-    return getDeclRepresentation(abiRole.getCounterpart(), isZeroSized);
+    return getDeclRepresentation(abiRole.getCounterpart(), layoutQueries);
 
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
@@ -340,10 +363,12 @@ swift::cxx_translation::getDeclRepresentation(
         return {ObjCxxOnly, std::nullopt};
       return {Unsupported, UnrepresentableProtocol};
     }
-    // Swift's consume semantics are not yet supported in C++.
-    // However, non-copyable types imported from C/C++ can be exposed back,
-    // as C++ already knows how to handle them.
-    if (!typeDecl->canBeCopyable() && !typeDecl->hasClangNode())
+    // A noncopyable type is exposed as a move-only C++ class. One imported from
+    // C/C++ is exposed back as itself, as C++ already knows how to handle it.
+    // 'isOpaqueLayout' is asked last: it lowers the type in IRGen.
+    if (!typeDecl->canBeCopyable() && !typeDecl->hasClangNode() &&
+        (!isNoncopyableValueTypeExposableToCxx(typeDecl) ||
+         (layoutQueries && layoutQueries->isOpaqueLayout(typeDecl))))
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
@@ -352,7 +377,8 @@ swift::cxx_translation::getDeclRepresentation(
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
     }
-    if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
+    if (!isa<ClassDecl>(typeDecl) && layoutQueries &&
+        layoutQueries->isZeroSized(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
   if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
@@ -380,7 +406,7 @@ swift::cxx_translation::getDeclRepresentation(
           for (const auto *param : *params) {
             auto paramType = param->getInterfaceType();
             if (!paramType->is<GenericTypeParamType>()) {
-              auto *nominal = paramType->getNominalOrBoundGenericNominal();
+              auto *nominal = paramType->getNominalDecl();
               if (!nominal || isa<ProtocolDecl>(nominal))
                 return {Unsupported, UnrepresentableEnumCaseType};
             }
@@ -457,6 +483,9 @@ bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
 
     case InvertibleProtocolKind::Escapable:
       continue;
+
+    case InvertibleProtocolKind::Deinitable:
+      break;
     }
 
     return false;

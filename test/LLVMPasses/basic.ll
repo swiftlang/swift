@@ -95,6 +95,35 @@ define void @retain_motion1(ptr %A) {
   ret void
 }
 
+; A monotonic store can't release an object either.
+
+; CHECK-LABEL: @retain_motion_monotonic_store(
+; CHECK-NEXT: store atomic i64 0, ptr %L monotonic
+; CHECK-NEXT: ret void
+
+define void @retain_motion_monotonic_store(ptr %A, ptr %L) {
+  tail call ptr @swift_retain(ptr %A)
+  store atomic i64 0, ptr %L monotonic, align 8
+  tail call void @swift_release(ptr %A) nounwind
+  ret void
+}
+
+; A release store can publish %A to another thread, which may then release it,
+; so the retain must not move past it.
+
+; CHECK-LABEL: @dont_move_retain_past_release_store(
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: store atomic i64 0, ptr %L release
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: ret void
+
+define void @dont_move_retain_past_release_store(ptr %A, ptr %L) {
+  tail call ptr @swift_retain(ptr %A)
+  store atomic i64 0, ptr %L release, align 8
+  tail call void @swift_release(ptr %A) nounwind
+  ret void
+}
+
 ; rdar://11583269 - Optimize out objc_retain/release(null)
 
 ; CHECK-LABEL: @objc_retain_release_null(
@@ -311,6 +340,27 @@ define void @dont_remove_redundant_check_unowned(ptr %A, ptr %B, ptr %C) {
 
   ; Could do a release of %A
   call void @unknown_func()
+
+  tail call ptr @swift_retainUnowned(ptr %A)
+  %L3 = load i64, ptr %A, align 8
+  tail call void @swift_release(ptr %A)
+  ret void
+}
+
+; CHECK-LABEL: @dont_remove_check_unowned_across_release_store
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_checkUnowned
+; CHECK-NEXT: store atomic
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_checkUnowned
+; CHECK-NEXT: ret
+define void @dont_remove_check_unowned_across_release_store(ptr %A, ptr %L) {
+  tail call ptr @swift_retainUnowned(ptr %A)
+  %L1 = load i64, ptr %A, align 8
+  tail call void @swift_release(ptr %A)
+
+  ; Could let another thread release %A
+  store atomic i64 0, ptr %L release, align 8
 
   tail call ptr @swift_retainUnowned(ptr %A)
   %L3 = load i64, ptr %A, align 8

@@ -10,6 +10,13 @@
 // RUN: cat %t/useclass.h     >> %t/fixed-useclass.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %target-interop-build-clangxx -fsyntax-only %S/Inputs/swift-subclass-generic-members.cpp -I %t -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
+
+// RUN: %target-swift-frontend %s -I %t -module-name UseClass -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/useclass-exposed.h
+// RUN: echo '#include "class.h"' > %t/fixed-useclass-exposed.h
+// RUN: cat %t/useclass-exposed.h >> %t/fixed-useclass-exposed.h
+// RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass-exposed.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %target-interop-build-clangxx -fsyntax-only %S/Inputs/swift-subclass-generic-members.cpp -I %t -DEXPLICIT_EXPOSURE -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
 
 // rdar://105396625
 // UNSUPPORTED: CPU=arm64e
@@ -67,6 +74,19 @@ public class CrossModuleDerivedDerivedClass: CrossModuleDerivedClass {
   }
 }
 
+@_expose(Cxx)
+public final class GenericMemberDerivedClass: BaseClass {
+  public override init() {}
+  public func getComputedProp() -> ZGeneric<Int> { ZGeneric(9) }
+  public func novel() -> ZGeneric<Int> { ZGeneric(11) }
+}
+
+@_expose(Cxx)
+public struct ZGeneric<T> {
+  public var value: T
+  public init(_ value: T) { self.value = value }
+}
+
 public func createCrossModuleDerivedClass() -> CrossModuleDerivedClass {
     return CrossModuleDerivedClass()
 }
@@ -83,10 +103,10 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 // CHECK-NEXT: SWIFT_EXTERN void $s8UseClass018CrossModuleDerivedB0C016virtualMethod2InE0yyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // virtualMethod2InDerived()
 
 
-// CHECK:      void CrossModuleDerivedClass::virtualMethod() {
+// CHECK:      void CrossModuleDerivedClass::virtualMethod() noexcept {
 // CHECK-NEXT: _impl::$s5Class04BaseA0C13virtualMethodyyFTj(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 
-// CHECK:      void CrossModuleDerivedClass::virtualMethodInDerived() {
+// CHECK:      void CrossModuleDerivedClass::virtualMethodInDerived() noexcept {
 // CHECK-NEXT: void ***selfPtr_ = reinterpret_cast<void ***>( ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: #ifdef __arm64e__
 // CHECK-NEXT: void **vtable_ = ptrauth_auth_data(*selfPtr_, ptrauth_key_process_independent_data, ptrauth_blend_discriminator(selfPtr_,27361));
@@ -100,17 +120,17 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 // CHECK-NEXT: (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 
-// CHECK:      swift::Int CrossModuleDerivedClass::getDerivedComputedProp() {
+// CHECK:      swift::Int CrossModuleDerivedClass::getDerivedComputedProp() noexcept {
 // CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + [[#VM1:]]) / sizeof(void *));
 
-// CHECK:      void CrossModuleDerivedClass::virtualMethod2InDerived() {
+// CHECK:      void CrossModuleDerivedClass::virtualMethod2InDerived() noexcept {
 // CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + [[#VM2:]]) / sizeof(void *));
 
-// CHECK:      void CrossModuleDerivedDerivedClass::virtualMethodInDerived() {
+// CHECK:      void CrossModuleDerivedDerivedClass::virtualMethodInDerived() noexcept {
 // CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + 0) / sizeof(void *));
 
-// CHECK:      swift::Int CrossModuleDerivedDerivedClass::getDerivedComputedProp() {
+// CHECK:      swift::Int CrossModuleDerivedDerivedClass::getDerivedComputedProp() noexcept {
 // CHECK:      FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + [[#VM1]]) / sizeof(void *));
 
-// CHECK:      void CrossModuleDerivedDerivedClass::virtualMethod2InDerived() {
+// CHECK:      void CrossModuleDerivedDerivedClass::virtualMethod2InDerived() noexcept {
 // CHECK-NEXT: _impl::$s8UseClass018CrossModuleDerivedeB0C016virtualMethod2InE0yyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));

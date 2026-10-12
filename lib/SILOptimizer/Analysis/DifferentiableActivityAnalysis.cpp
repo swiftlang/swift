@@ -208,7 +208,9 @@ void DifferentiableActivityInfo::propagateVaried(
   // addition to all successor block arguments.
   else if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(inst)) {
     if (isVaried(ccabi->getSrc(), i)) {
-      setVariedAndPropagateToUsers(ccabi->getDest(), i);
+      // A test_only cast has no destination to propagate to.
+      if (ccabi->hasDest())
+        setVariedAndPropagateToUsers(ccabi->getDest(), i);
       for (auto *succBB : ccabi->getSuccessorBlocks())
         for (auto *arg : succBB->getArguments())
           setVariedAndPropagateToUsers(arg, i);
@@ -303,7 +305,7 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
   if (isUseful(value, dependentVariableIndex))
     return;
   if (value->getType().isAddress() ||
-      value->getType().getClassOrBoundGenericClass()) {
+      value->getType().getClassDecl()) {
     propagateUsefulThroughAddress(value, dependentVariableIndex);
     return;
   }
@@ -396,7 +398,7 @@ void DifferentiableActivityInfo::propagateUseful(
 void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     SILValue value, unsigned dependentVariableIndex) {
   assert(value->getType().isAddress() ||
-         value->getType().getClassOrBoundGenericClass());
+         value->getType().getClassDecl());
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;

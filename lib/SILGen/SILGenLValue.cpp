@@ -1022,11 +1022,11 @@ namespace {
 
   /// A physical path component which projects out an opened archetype
   /// from an existential.
-  class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
+  class OpenAddressExistentialComponent : public PhysicalPathComponent {
   public:
-    OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype,
-                                   LValueTypeData typeData)
-        : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind,
+    OpenAddressExistentialComponent(CanArchetypeType openedArchetype,
+                                    LValueTypeData typeData)
+        : PhysicalPathComponent(typeData, OpenAddressExistentialKind,
                                 /*actorIsolation=*/std::nullopt) {
       assert(getSubstFormalType() == openedArchetype);
     }
@@ -1048,9 +1048,10 @@ namespace {
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
       case ExistentialRepresentation::COM:
-        llvm_unreachable("opening a COM existential is not implemented");
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
+          assert(rep == ExistentialRepresentation::Opaque &&
+                 "COM existential lvalue must be an address");
           assert(!SGF.useLoweredAddresses());
           auto borrow = SGF.B.createBeginBorrow(
               loc, base.getValue(), IsNotLexical, DoesNotHavePointerEscape);
@@ -1092,7 +1093,7 @@ namespace {
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "OpenOpaqueExistentialComponent("
+      OS.indent(indent) << "OpenAddressExistentialComponent("
                         << getSubstFormalType() << ")\n";
     }
   };
@@ -1245,7 +1246,7 @@ namespace {
           // handle delayed initialization of the boxes and convert those to
           // initable_but_not_consumable.
           //
-          // `@called(once)` values are always consumed by whatever uses
+          // `@called(atMostOnce)` values are always consumed by whatever uses
           // them, so a non-read access to one must permit consuming it,
           // unlike an ordinary noncopyable var/let box, which only permits
           // being fully reassigned.
@@ -1254,7 +1255,7 @@ namespace {
               isReadAccess(getAccessKind())
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         NoConsumeOrAssign
-              : Value.getType().isCalledOnce()
+              : Value.getType().hasCalledAtMostOnceSemantics()
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         ConsumableAndAssignable
                   : MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -1936,13 +1937,13 @@ namespace {
         if (BaseFormalType) {
           auto selfTy = base.getType().getASTType();
           auto metatypeTy = MetatypeType::get(selfTy);
-          if (selfTy->getClassOrBoundGenericClass()) {
+          if (selfTy->getClassDecl()) {
             selfMetatype = SGF.B
                                .createValueMetatype(
                                    loc, SGF.getLoweredType(metatypeTy), base)
                                .getValue();
           } else {
-            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            assert(BaseFormalType->getStructDecl());
             selfMetatype =
                 SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy));
           }
@@ -3601,14 +3602,11 @@ namespace {
           strategy.getKind() == AccessStrategy::DispatchToAccessor) {
         auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
         if (protocol && protocol->isCOMInterface()) {
-          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
-          if (selfType->is<ExistentialArchetypeType>()) {
-            strategy = AccessStrategy::getMaterializeToTemporary(
-                AccessStrategy::getAccessor(AccessorKind::Get,
-                                            /*dispatched=*/true),
-                AccessStrategy::getAccessor(AccessorKind::Set,
-                                            /*dispatched=*/true));
-          }
+          strategy = AccessStrategy::getMaterializeToTemporary(
+              AccessStrategy::getAccessor(AccessorKind::Get,
+                                          /*dispatched=*/true),
+              AccessStrategy::getAccessor(AccessorKind::Set,
+                                          /*dispatched=*/true));
         }
       }
 
@@ -4559,7 +4557,7 @@ void LValue::addMemberVarComponent(
         LV.add<RefElementComponent>(Storage, Options, varStorageType,
                                     typeData, ActorIso);
       } else {
-        assert(BaseFormalType->getStructOrBoundGenericStruct());
+        assert(BaseFormalType->getStructDecl());
         LV.add<StructElementComponent>(Storage, varStorageType, typeData,
                                        ActorIso);
       }
@@ -5005,6 +5003,17 @@ LValue SILGenLValue::visitLoadExpr(LoadExpr *e, SGFAccessKind accessKind,
 
 LValue SILGenLValue::visitConsumeExpr(ConsumeExpr *e, SGFAccessKind accessKind,
                                       LValueOptions options) {
+
+  // When using lifetime resolution, the consume expr just overrides the access
+  // kind under which we visit the sub expression.
+  if (SGF.getASTContext().SILOpts.EnableLifetimeResolution) {
+    auto loweredTy = SGF.getLoweredType(e->getSubExpr()->getType());
+    auto consumingAccess = loweredTy.isAddress()
+                               ? SGFAccessKind::OwnedAddressConsume
+                               : SGFAccessKind::OwnedObjectConsume;
+    return visitRec(e->getSubExpr(), consumingAccess, options);
+  }
+
   // Do formal evaluation of the base l-value.
   LValue baseLV = visitRec(e->getSubExpr(), SGFAccessKind::ReadWrite,
                            options.forComputedBaseLValue());
@@ -6091,10 +6100,9 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
     .getPreferredExistentialRepresentation();
   switch (rep) {
   case ExistentialRepresentation::COM:
-    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
-    lv.add<OpenOpaqueExistentialComponent>(openedArchetype, typeData);
+    lv.add<OpenAddressExistentialComponent>(openedArchetype, typeData);
     break;
   }
   case ExistentialRepresentation::Metatype:

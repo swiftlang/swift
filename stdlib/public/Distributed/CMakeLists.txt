@@ -59,6 +59,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
     -parse-stdlib
     -enable-experimental-feature AllowUnsafeAttribute
     -strict-memory-safety
+    -Xfrontend -enable-sil-opaque-values
 
   LINK_FLAGS
     "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
@@ -150,6 +151,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_DISTRIBUTE
       set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
     endif()
 
+    # A Darwin triple that has its own SDK has to receive it as `-isysroot`,
+    # not `--sysroot`. Other toolchains (e.g., WebAssembly) only find their
+    # C/C++ headers via `--sysroot`.
+    if(SWIFT_SDK_embedded_ARCH_${arch}_PATH AND "${triple}" MATCHES "-apple-")
+      set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
+    else()
+      set(SWIFT_SDK_embedded_USE_ISYSROOT FALSE)
+    endif()
+
     # lib/swift/embedded/Distributed.swiftmodule
     # lib/swift/embedded/<triple>/libswiftDistributed.a
     add_swift_target_library_single(
@@ -173,7 +183,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_DISTRIBUTE
         -enable-experimental-feature Embedded
         -parse-stdlib
         -DSWIFT_DISTRIBUTED_EMBEDDED
-        -Xfrontend -emit-empty-object-file
         -enable-experimental-feature AllowUnsafeAttribute
         -strict-memory-safety
       C_COMPILE_FLAGS

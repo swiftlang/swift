@@ -102,38 +102,38 @@ public struct TheGenericContainerInitNonTriv {
     let x: Int
 }
 
-// CHECK: SWIFT_INLINE_THUNK void AKlass::takeKlass() {
+// CHECK: SWIFT_INLINE_THUNK void AKlass::takeKlass() noexcept {
 // CHECK-NEXT: alignas(alignof(AKlass)) char copyBuffer_consumedParamCopy_this[sizeof(AKlass)];
 // CHECK-NEXT: auto &consumedParamCopy_this = *(new(copyBuffer_consumedParamCopy_this) AKlass(*this));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<AKlass> storageGuard_consumedParamCopy_this(consumedParamCopy_this);
 // CHECK-NEXT: _impl::$s4Init6AKlassC9takeKlassyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(consumedParamCopy_this));
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK InitFromEnumNonTrivial InitFromEnumNonTrivial::init(const EnumNonTrivial& x) {
+// CHECK: SWIFT_INLINE_THUNK InitFromEnumNonTrivial InitFromEnumNonTrivial::init(const EnumNonTrivial& x) noexcept {
 // CHECK-NEXT: alignas(alignof(EnumNonTrivial)) char copyBuffer_consumedParamCopy_x[sizeof(EnumNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_x = *(new(copyBuffer_consumedParamCopy_x) EnumNonTrivial(x));
 // CHECK-NEXT: ConsumedValueStorageDestroyer<EnumNonTrivial> storageGuard_consumedParamCopy_x(consumedParamCopy_x);
 // CHECK-NEXT: returnNewValue
 // CHECK-NEXT: _impl::_impl_EnumNonTrivial::getOpaquePointer(consumedParamCopy_x)
 
-// CHECK: SWIFT_INLINE_THUNK InitFromKlass InitFromKlass::init(const AKlass& x) {
+// CHECK: SWIFT_INLINE_THUNK InitFromKlass InitFromKlass::init(const AKlass& x) noexcept {
 // CHECK-NEXT: alignas(alignof(AKlass)) char copyBuffer_consumedParamCopy_x[sizeof(AKlass)];
 // CHECK-NEXT: auto &consumedParamCopy_x = *(new(copyBuffer_consumedParamCopy_x) AKlass(x));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<AKlass> storageGuard_consumedParamCopy_x(consumedParamCopy_x);
 // CHECK-NEXT: returnNewValue
 // CHECK-NEXT: swift::_impl::_impl_RefCountedClass::getOpaquePointer(consumedParamCopy_x)
 
-// CHECK: SWIFT_INLINE_THUNK InitFromLargeStructNonTrivial InitFromLargeStructNonTrivial::init(const LargeStructNonTrivial& x) {
+// CHECK: SWIFT_INLINE_THUNK InitFromLargeStructNonTrivial InitFromLargeStructNonTrivial::init(const LargeStructNonTrivial& x) noexcept {
 // CHECK-NEXT: alignas(alignof(LargeStructNonTrivial)) char copyBuffer_consumedParamCopy_x[sizeof(LargeStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_x = *(new(copyBuffer_consumedParamCopy_x) LargeStructNonTrivial(x));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<LargeStructNonTrivial> storageGuard_consumedParamCopy_x(consumedParamCopy_x);
 
-// CHECK:  SWIFT_INLINE_THUNK InitFromSmall InitFromSmall::init(const SmallStructNonTrivial& x) {
+// CHECK:  SWIFT_INLINE_THUNK InitFromSmall InitFromSmall::init(const SmallStructNonTrivial& x) noexcept {
 // CHECK-NEXT: alignas(alignof(SmallStructNonTrivial)) char copyBuffer_consumedParamCopy_x[sizeof(SmallStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_x = *(new(copyBuffer_consumedParamCopy_x) SmallStructNonTrivial(x));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<SmallStructNonTrivial> storageGuard_consumedParamCopy_x(consumedParamCopy_x);
 
-// CHECK: SWIFT_INLINE_THUNK void InitFromSmall::takeSmallLarge(const SmallStructNonTrivial& _1, const LargeStructNonTrivial& _2) const {
+// CHECK: SWIFT_INLINE_THUNK void InitFromSmall::takeSmallLarge(const SmallStructNonTrivial& _1, const LargeStructNonTrivial& _2) const noexcept {
 // CHECK-NEXT: alignas(alignof(SmallStructNonTrivial)) char copyBuffer_consumedParamCopy_1[sizeof(SmallStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_1 = *(new(copyBuffer_consumedParamCopy_1) SmallStructNonTrivial(_1));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<SmallStructNonTrivial> storageGuard_consumedParamCopy_1(consumedParamCopy_1);
@@ -142,14 +142,14 @@ public struct TheGenericContainerInitNonTriv {
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<LargeStructNonTrivial> storageGuard_consumedParamCopy_2(consumedParamCopy_2);
 // CHECK-NON_EVO-NEXT: Init::_impl::$s4Init0A9FromSmallV04takeC5LargeyyAA0C16StructNonTrivialVn_AA0efgH0VntF(Init::_impl::swift_interop_passDirect_Init_{{.*}}(Init::_impl::_impl_SmallStructNonTrivial::getOpaquePointer(consumedParamCopy_1)), Init::_impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_2), Init::_impl::swift_interop_passDirect_Init_{{.*}}(_getOpaquePointer()));
 
-// CHECK: SWIFT_INLINE_THUNK void LargeStructNonTrivial::takeMe() const {
+// CHECK: SWIFT_INLINE_THUNK void LargeStructNonTrivial::takeMe() const noexcept {
 // CHECK-NEXT: alignas(alignof(LargeStructNonTrivial)) char copyBuffer_consumedParamCopy_this[sizeof(LargeStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_this = *(new(copyBuffer_consumedParamCopy_this) LargeStructNonTrivial(*this));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<LargeStructNonTrivial> storageGuard_consumedParamCopy_this(consumedParamCopy_this);
 // CHECK-NEXT: Init::_impl::$s4Init21LargeStructNonTrivialV6takeMeyyF(Init::_impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_this));
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK TheGenericContainer<T_0_0> TheGenericContainer<T_0_0>::init(const T_0_0& x) {
+// CHECK: SWIFT_INLINE_THUNK TheGenericContainer<T_0_0> TheGenericContainer<T_0_0>::init(const T_0_0& x) noexcept {
 //CHECK-NEXT:#ifndef __cpp_concepts
 //CHECK-NEXT: static_assert
 //CHECK-NEXT:#endif // __cpp_concepts
@@ -159,7 +159,7 @@ public struct TheGenericContainerInitNonTriv {
 //CHECK-NEXT: returnNewValue
 //CHECK-NEXT: swift::_impl::getOpaquePointer(consumedParamCopy_x)
 
-// CHECK: SWIFT_INLINE_THUNK void TheGenericContainer<T_0_0>::takeGenericContainer() const {
+// CHECK: SWIFT_INLINE_THUNK void TheGenericContainer<T_0_0>::takeGenericContainer() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert
 // CHECK-NEXT: #endif // __cpp_concepts
@@ -169,10 +169,10 @@ public struct TheGenericContainerInitNonTriv {
 // CHECK-NEXT: _impl::$s4Init19TheGenericContainerV04takecD0yyF(swift::TypeMetadataTrait<TheGenericContainer<T_0_0>>::getTypeMetadata(), Init::_impl::_impl_TheGenericContainer<T_0_0>::getOpaquePointer(consumedParamCopy_this));
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK TheGenericContainerInitNonTriv TheGenericContainerInitNonTriv::init(const TheGenericContainer<AKlass>& x) {
+// CHECK: SWIFT_INLINE_THUNK TheGenericContainerInitNonTriv TheGenericContainerInitNonTriv::init(const TheGenericContainer<AKlass>& x) noexcept {
 // CHECK-NEXT: alignas(alignof(TheGenericContainer<AKlass>)) char copyBuffer_consumedParamCopy_x[sizeof(TheGenericContainer<AKlass>)];
 // CHECK-NEXT: auto &consumedParamCopy_x = *(new(copyBuffer_consumedParamCopy_x) TheGenericContainer<AKlass>(x));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<TheGenericContainer<AKlass>> storageGuard_consumedParamCopy_x(consumedParamCopy_x);
 
-// CHECK: SWIFT_INLINE_THUNK TheGenericContainerInitTriv TheGenericContainerInitTriv::init(const TheGenericContainer<swift::Int>& x) {
+// CHECK: SWIFT_INLINE_THUNK TheGenericContainerInitTriv TheGenericContainerInitTriv::init(const TheGenericContainer<swift::Int>& x) noexcept {
 // CHECK-NON_EVO-NEXT: return

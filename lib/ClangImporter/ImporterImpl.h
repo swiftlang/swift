@@ -740,6 +740,10 @@ public:
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
+  /// Accessors and operator functions synthesized around an imported function,
+  /// mapped back to it.
+  llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -838,12 +842,27 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
 
+  void recordForwardingSource(const ValueDecl *decl, ValueDecl *source) {
+    forwardingSources[decl] = source;
+  }
+  /// The declaration \p decl was synthesized around, whether it is a clone of
+  /// a base class member or an accessor or operator built on an imported
+  /// function.
+  ValueDecl *getForwardingSource(const ValueDecl *decl) {
+    if (auto *source = forwardingSources.lookup(decl))
+      return source;
+    return getOriginalForClonedMember(decl);
+  }
+
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   // Cache for already-specialized function templates and any thunks they may
-  // have.
-  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+  // have, per Swift declaration of the template: e.g. a member template and its
+  // '__<name>Unsafe' migration stub share a C++ specialization, but resolve to
+  // different Swift declarations.
+  llvm::DenseMap<std::pair<clang::FunctionDecl *, const ValueDecl *>,
+                 ValueDecl *>
       specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
@@ -2222,7 +2241,7 @@ void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+T *dynCastIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2235,7 +2254,7 @@ static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *castIgnoringCompatibilityAlias(Decl *D) {
+T *castIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2253,19 +2272,15 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail,
-                           ClangImporter::Implementation *importerImpl)
+                           const PlatformAvailability &avail)
       : // Update in response to D97702 landing.
         clang::ModuleFileExtension(), pchLookupTable(pchLookupTable),
         lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        importerImpl(importerImpl) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   void hashExtension(ExtensionHashBuilder &HBuilder) const override;
@@ -2385,6 +2400,19 @@ CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
                          ClangImporter::Implementation &Impl);
 
+/// Create the implicit 'newValue' parameter of a synthesized setter.
+ParamDecl *createNewValueParam(ASTContext &ctx, Type type, DeclContext *dc);
+
+/// Print the name of \p decl for a request's \c simple_display, falling back
+/// to a placeholder for an anonymous or otherwise unnamed record.
+void printRecordName(llvm::raw_ostream &out, const clang::RecordDecl *decl);
+
+/// Whether the type of any base class or field of \p decl satisfies \p pred.
+/// Bases are visited before fields; a non-C++ record has no bases.
+bool anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred);
+
 bool isViewType(const clang::CXXRecordDecl *decl);
 
 /// Determine whether \p type is a "direct view": a pointer or reference to a
@@ -2437,25 +2465,13 @@ std::optional<CxxUnsafetyReason>
 shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
                               ASTContext &ctx);
 
-/// Whether \p method keeps its original Swift name, and is imported
-/// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .
-///
-/// False unless \c ImportUnsafeCxxMethodsAsAlwaysUnsafe is enabled. Also false
-/// for the handful of C++ standard library methods that the overlay in
-/// stdlib/public/Cxx wraps in a safe Swift API of the same name, since the
-/// original-named import would shadow or ambiguate the wrapper.
-bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
-
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar().getTypePtr();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 
 inline clang::QualType desugarIfElaborated(clang::QualType type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar();
+  // FIXME: Remove this function after 2026 rebranch is complete.
   return type;
 }
 

@@ -4209,6 +4209,24 @@ namespace {
           expr->getElseExpr(), resultTy,
           cs.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(false))));
 
+      // If both branches inject their result into an optional, rewrite the
+      // ternary in terms of the injected values and then inject the result
+      // of the ternary. This is an opportunistic hack to help diagnostics
+      // which simplistically pattern match on the outermost expression
+      // being an InjectIntoOptionalExpr.
+      if (isa<InjectIntoOptionalExpr>(expr->getThenExpr()) &&
+          isa<InjectIntoOptionalExpr>(expr->getElseExpr())) {
+        auto objectTy = resultTy->getOptionalObjectType();
+        cs.setType(expr, objectTy);
+
+        auto *thenExpr = cast<InjectIntoOptionalExpr>(expr->getThenExpr());
+        auto *elseExpr = cast<InjectIntoOptionalExpr>(expr->getElseExpr());
+        expr->setThenExpr(thenExpr->getSubExpr());
+        expr->setElseExpr(elseExpr->getSubExpr());
+
+        return cs.cacheType(new (ctx) InjectIntoOptionalExpr(expr, resultTy));
+      }
+
       return expr;
     }
     
@@ -4327,7 +4345,7 @@ namespace {
           auto destObjectType = destValueType;
           if (auto metaTy = destObjectType->getAs<MetatypeType>())
             destObjectType = metaTy->getInstanceType();
-          if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
+          if (auto destClass = destObjectType->getClassDecl()) {
             if (destClass->getForeignClassKind() ==
                   ClassDecl::ForeignKind::CFType) {
               if (SuppressDiagnostics)
@@ -7053,7 +7071,7 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
     // FIXME: Ideally we would instead have already recorded a restriction
     // when solving the constraint, and we wouldn't need to duplicate this
     // part of coerceToType() here.
-    if (auto foreignClass = toType->getClassOrBoundGenericClass()) {
+    if (auto foreignClass = toType->getClassDecl()) {
       if (foreignClass->getForeignClassKind() ==
             ClassDecl::ForeignKind::CFType) {
         return cs.cacheType(new (ctx)
@@ -7435,7 +7453,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
-      auto foreignClass = fromType->getClassOrBoundGenericClass();
+      auto foreignClass = fromType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       auto asObjCClass =
@@ -7444,7 +7462,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ObjCTollFreeBridgeToCF: {
-      auto foreignClass = toType->getClassOrBoundGenericClass();
+      auto foreignClass = toType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       Expr *result = coerceToType(expr, objcType, locator);
@@ -7666,7 +7684,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::DynamicSelf:
   case TypeKind::BoundGenericClass:
   case TypeKind::Class: {
-    if (!toType->getClassOrBoundGenericClass())
+    if (!toType->getClassDecl())
       break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
@@ -7874,14 +7892,17 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate the
-    // '@called(once)' bit to the closure without invalidating prior analysis.
+    // '@called(atMostOnce)' bit to the closure without invalidating prior
+    // analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.isCalledOnce() && !fromEI.isCalledOnce()) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withCalledOnce());
+    if (toEI.hasCalledAtMostOnceSemantics() &&
+        !fromEI.hasCalledAtMostOnceSemantics()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withExecutionSemantics(toEI.getExecutionSemantics()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
-        // Propagating '@called(once)' might have satisfied the entire
+        // Propagating '@called(atMostOnce)' might have satisfied the entire
         // conversion. If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;
@@ -7977,7 +7998,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       llvm_unreachable("unhandled metatype kind");
     }
     
-    if (auto toClass = toType->getClassOrBoundGenericClass()) {
+    if (auto toClass = toType->getClassDecl()) {
       if (toClass->getName() == ctx.Id_Protocol
           && toClass->getModuleContext()->getName()
               == ctx.Id_ObjectiveC) {
@@ -8705,7 +8726,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We're constructing a value of nominal type.
-  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+  assert(ty->getNominalDecl() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
   // Consider the constructor decl reference expr 'implicit', but the

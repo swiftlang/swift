@@ -239,6 +239,14 @@ classes.
   beginning of the instance.
 - The **instance size** is a 32-bit field following the instance address point.
   This is the number of bytes of storage present in every object of this type.
+  A native class whose instance address point is nonzero can carry an optional
+  instance-prefix record in its nominal type descriptor. The record contains a
+  16-bit version, a 16-bit template size in pointer words, and a relative
+  reference to the template. The allocator copies those words immediately
+  before the instance address point. Any difference between the template size
+  and the address point is leading padding used to preserve instance
+  alignment. Generic metadata patterns carry the unpadded template size and
+  compute the aligned address point during field layout.
 - The **instance alignment mask** is a 16-bit field following the instance size.
   This is a set of low bits which must not be set in a pointer to an instance
   of this class.

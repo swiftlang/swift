@@ -2375,6 +2375,19 @@ void PrintAST::printRequirementSignature(ProtocolDecl *owner,
                         sig.getRequirements().end());
   }
 
+  // Compilers without the Deinitable protocol can't parse requirements that
+  // mention it.
+  if (Options.SuppressDeinitableProtocol) {
+    llvm::erase_if(requirements, [](Requirement req) {
+      return req.getKind() == RequirementKind::Conformance &&
+             req.getProtocolDecl()->isSpecificProtocol(
+                 KnownProtocolKind::Deinitable);
+    });
+    llvm::erase_if(inverses, [](InverseRequirement inverse) {
+      return inverse.getKind() == InvertibleProtocolKind::Deinitable;
+    });
+  }
+
   if (attachingTo) {
     llvm::erase_if(requirements,
                    [&](Requirement req) {
@@ -3667,6 +3680,13 @@ static void suppressingFeatureTildeSendable(PrintOptions &options,
 }
 
 static void
+suppressingFeatureDeinitableProtocol(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressDeinitableProtocol, true);
+  action();
+}
+
+static void
 suppressingFeatureCAttribute(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressCAttribute, true);
@@ -4859,7 +4879,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext());
       if (proto && Options.TransformContext) {
         auto BaseType = Options.TransformContext->getBaseType();
-        if (BaseType->getClassOrBoundGenericClass()) {
+        if (BaseType->getClassDecl()) {
           ResultTy = ResultTy.transformRec(
             [&](TypeBase *t) -> std::optional<Type> {
               if (isa<DependentMemberType>(t))
@@ -5098,7 +5118,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     // printing onto a class.
     bool isClassContext;
     if (CurrentType) {
-      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+      isClassContext = CurrentType->getClassDecl() != nullptr;
     } else {
       const DeclContext *dc = decl->getDeclContext();
       isClassContext = dc->getSelfClassDecl() != nullptr;
@@ -5317,6 +5337,10 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
       case MacroDefinition::Kind::Invalid:
       case MacroDefinition::Kind::Undefined:
         // Nothing to do.
+        break;
+
+      case MacroDefinition::Kind::Internal:
+        // Internal macros are compiler-synthesized and never printed.
         break;
 
       case MacroDefinition::Kind::External: {
@@ -6898,7 +6922,21 @@ public:
   }
 
   bool shouldDesugarTypeAliasType(TypeAliasType *T) {
-    return Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType;
+    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType)
+      return true;
+
+    // Implicit typealiases for generic parameters (such as the witness
+    // `typealias Element = Element` inferred for an associated type) are not
+    // printed in module interfaces, so references to them would not resolve.
+    // Print the underlying type instead.
+    if (Options.IsForSwiftInterface) {
+      auto *alias = T->getDecl();
+      if (alias->isImplicit() &&
+          alias->getUnderlyingType()->is<GenericTypeParamType>())
+        return true;
+    }
+
+    return false;
   }
 
   void visitTypeAliasType(TypeAliasType *T,
@@ -7261,10 +7299,16 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
-    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
-      Printer.printSimpleAttr("@called(once)") << " ";
+    if (!Options.excludeAttrKind(TypeAttrKind::Called)) {
+      if (auto semantics = info.getExecutionSemantics()) {
+        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+        Printer.printAttrName("@called");
+        Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
+        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+        Printer << " ";
+      }
     }
-    
+
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -7476,10 +7520,10 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
-    if (info.isCalledOnce()) {
+    if (auto semantics = info.getExecutionSemantics()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@called");
-      Printer << "(once)";
+      Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
       Printer << " ";
     }

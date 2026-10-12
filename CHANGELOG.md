@@ -5,6 +5,18 @@
 
 ## Swift (next)
 
+* [SE-0526][]:
+  Introduced task deadlines, available as `withDeadline(in:)`, which runs
+  an operation within a time limit, and cancels the operation's scope when
+  the deadline is exceeded. Nested deadlines compose and the "nearest"
+  deadline is the effective one:
+
+  ```swift
+  let result = try await withDeadline(in: .seconds(5)) {
+    try await fetchUserData()
+  }
+  ```
+
 * Actors are now allowed to conform to protocols annotated with global actor
   attributes. To support this, actors will no longer infer invalid global actor
   annotations from isolated property wrappers, or from protocols with inferred
@@ -11280,6 +11292,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0508]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0508-array-expression-trailing-closures.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
+[SE-0526]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0526-deadline.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

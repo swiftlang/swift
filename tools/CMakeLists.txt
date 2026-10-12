@@ -16,6 +16,10 @@ if(SWIFT_BUILD_SOURCEKIT)
   list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
 endif()
 
+if(SWIFT_BUILD_COMPILER_DYLIB)
+  add_swift_tool_subdirectory(swift-shlib)
+endif()
+
 add_swift_tool_subdirectory(driver)
 add_swift_tool_subdirectory(swift-compatibility-symbols)
 add_swift_tool_subdirectory(swift-demangle)

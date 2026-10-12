@@ -110,7 +110,8 @@ static bool shouldYieldThread() {
 /// Linux) or is a plain global (embedded), give it a stable name and protected
 /// visibility, enabling debuggers to locate the symbol by name and ensuring it
 /// survives stripping the symbol table.
-/// Bump _concurrency_current_task_storage_kind in Debug.h if this changes.
+/// Update swift_concurrency_current_task_storage_kind in
+/// swift/Runtime/ConcurrencyDebug.h if this changes.
 #ifdef SWIFT_THREAD_LOCAL
 extern "C" {
 // (windows) dllexport is not allowed on thread-local variables.
@@ -230,6 +231,37 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+namespace {
+/// Job that allows to use executor API to schedule a block of task-less
+/// synchronous code.
+class IsolatedDeinitJob : public Job {
+private:
+  void *Object;
+  DeinitWorkFunction *__ptrauth_swift_deinit_work_function Work;
+
+public:
+  IsolatedDeinitJob(JobPriority priority, void *object,
+                    DeinitWorkFunction * work)
+      : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
+        Work(work) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *_job) {
+    auto *job = cast<IsolatedDeinitJob>(_job);
+    void *object = job->Object;
+    DeinitWorkFunction *work = job->Work;
+    swift_cxx_deleteObject(job);
+    return work(object);
+  }
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::IsolatedDeinit;
+  }
+};
+} // namespace
+#endif
+
 /// This function establishes the Task's context and attempts to invoke
 /// it. The invocation may fail and the Task may not be run if the
 /// passed in exclusion value is not what is in the ActiveTaskStatus
@@ -294,7 +326,7 @@ void swift::runJobInEstablishedExecutorContext(Job *job,
 /// Runs the Task embedded in the stealer using the stealer's exclusion value.
 /// The stealer holds a reference to the Task which is released here. Stealers
 /// are not reference counted so the object is directly destroyed here.
-inline void AsyncTaskStealer::process(Job *_job) {
+void AsyncTaskStealer::process(Job *_job) {
   auto *stealer = cast<AsyncTaskStealer>(_job);
   SWIFT_TASK_DEBUG_LOG("Running stealer %p for Task %p", _job, stealer->Task);
 
@@ -364,10 +396,12 @@ SerialExecutorRef _swift_getActiveExecutor() {
     return executor;
   }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // If there's no tracking and we're on the main thread, then the main
   // executor is notionally active.
   if (isExecutingOnMainThread())
     return swift_getMainExecutor();
+#endif
 
   return SerialExecutorRef::generic();
 }
@@ -1639,6 +1673,11 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
   concurrency::trace::actor_enqueue(this, job);
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
 
+  // Isolated deinits need some special handling, as they may destroy the actor
+  // even with a defensive retain applied.
+  bool isIsolatedDeinitJob = isa<IsolatedDeinitJob>(job);
+  JobPriority requestedPriority = priority;
+
   auto oldState = _status().load(std::memory_order_relaxed);
   SwiftDefensiveRetainRAII thisRetainHelper{this};
   while (true) {
@@ -1648,6 +1687,16 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     Job *currentHead = oldState.getFirstUnprioritizedJob();
     setNextJob(job, currentHead);
     newState = newState.withFirstUnprioritizedJob(job);
+
+    // Isolated deinits can't escalate priority, so on an active actor they get
+    // at most whatever priority the actor has. Start from the requested
+    // priority each time, as a failed CAS may leave the actor idle.
+    if (isIsolatedDeinitJob) {
+      priority = requestedPriority;
+      if (!oldState.isIdle() && priority > oldState.getMaxPriority())
+        priority = oldState.getMaxPriority();
+      job->setPriority(priority);
+    }
 
     if (oldState.isIdle()) {
       // Schedule the actor
@@ -1705,6 +1754,11 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       if (oldState.getMaxPriority() != newState.getMaxPriority()) {
         // We still need `this`, assert that we did a defensive retain.
         assert(thisRetainHelper.isRetained());
+
+        // A defensive retain doesn't save us if the job is an isolated deinit.
+        // Isolated deinits don't need priority escalation, so we ensure they
+        // never escalate, and thus should never get here.
+        assert(!isIsolatedDeinitJob);
 
         if (newState.isRunning()) {
           // Actor is running on a thread, escalate the thread running it
@@ -1989,8 +2043,8 @@ void ProcessOutOfLineJob::process(Job *job) {
 
 void DefaultActorImpl::destroy() {
 #if SWIFT_CONCURRENCY_EMBEDDED
-  // Embedded runtime does not track the refcount inside deinit
-  // See swift_release_n_(object:,n:) in EmbeddedRuntime.swift
+  // swift_deallocClassInstance in EmbeddedRuntime.swift checks for a strong
+  // reference to self that outlived deinit.
 #else
   HeapObject *object = asAbstract(this);
   size_t retainCount = swift_retainCount(object);
@@ -2706,37 +2760,6 @@ swift_task_immediateImpl(AsyncTask *task,
     _swift_task_setCurrent(originalTask);
   }
 }
-
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-namespace {
-/// Job that allows to use executor API to schedule a block of task-less
-/// synchronous code.
-class IsolatedDeinitJob : public Job {
-private:
-  void *Object;
-  DeinitWorkFunction *__ptrauth_swift_deinit_work_function Work;
-
-public:
-  IsolatedDeinitJob(JobPriority priority, void *object,
-                    DeinitWorkFunction * work)
-      : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
-        Work(work) {}
-
-  SWIFT_CC(swiftasync)
-  static void process(Job *_job) {
-    auto *job = cast<IsolatedDeinitJob>(_job);
-    void *object = job->Object;
-    DeinitWorkFunction *work = job->Work;
-    swift_cxx_deleteObject(job);
-    return work(object);
-  }
-
-  static bool classof(const Job *job) {
-    return job->Flags.getKind() == JobKind::IsolatedDeinit;
-  }
-};
-} // namespace
-#endif
 
 SWIFT_CC(swift)
 static void swift_task_deinitOnExecutorImpl(void *object,

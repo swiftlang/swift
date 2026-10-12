@@ -125,9 +125,9 @@ public struct S {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-EMPTY:
-// CHECK-NEXT:   static SWIFT_INLINE_THUNK E init() SWIFT_SYMBOL("s:5Enums1EOACycfc");
-// CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int getTen() const SWIFT_SYMBOL("s:5Enums1EO3tenSivp");
-// CHECK-NEXT:   SWIFT_INLINE_THUNK void printSelf() const SWIFT_SYMBOL("s:5Enums1EO9printSelfyyF");
+// CHECK-NEXT:   static SWIFT_INLINE_THUNK E init() noexcept SWIFT_SYMBOL("s:5Enums1EOACycfc");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int getTen() const noexcept SWIFT_SYMBOL("s:5Enums1EO3tenSivp");
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void printSelf() const noexcept SWIFT_SYMBOL("s:5Enums1EO9printSelfyyF");
 // CHECK-NEXT: private:
 // CHECK:        SWIFT_INLINE_THUNK char * _Nonnull _destructiveProjectEnumData() noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
@@ -185,7 +185,7 @@ public struct S {
 // CHECK: }
 // CHECK-NEXT: }
 // CHECK-EMPTY:
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getHashValue() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getHashValue() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:
 
 // CHECK:      namespace Enums SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Enums") {
@@ -289,14 +289,14 @@ public struct S {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK bool E::isFoobar() const {
 // CHECK-NEXT:     return *this == E::foobar;
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK E E::init() {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E E::init() noexcept {
 // CHECK-NEXT:     return Enums::_impl::_impl_E::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:       Enums::_impl::swift_interop_returnDirect_Enums[[ENUMENCODING:[a-z0-9_]+]](result, Enums::_impl::$s5Enums1EOACycfC());
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int E::getTen() const {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK swift::Int E::getTen() const noexcept {
 // CHECK-NEXT:     return Enums::_impl::$s5Enums1EO3tenSivg(Enums::_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK void E::printSelf() const {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK void E::printSelf() const noexcept {
 // CHECK-NEXT:     Enums::_impl::$s5Enums1EO9printSelfyyF(Enums::_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }

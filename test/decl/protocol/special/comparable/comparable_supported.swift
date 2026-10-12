@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Comparable enum synthesis
 enum Angel: Comparable {
@@ -24,4 +27,29 @@ extension Birthyear: Comparable {}
 
 func canEatHotChip(_ birthyear:Birthyear) -> Bool {
   return birthyear > .nineties(3) // Okay
+}
+
+enum EnumWithUnavailableCase: Comparable {
+  case available
+
+  @available(*, unavailable)
+  case unavailable
+}
+
+enum EnumWithUnavailableCaseAndAssociatedValue: Comparable {
+  enum SomeComparable: Comparable {}
+
+  case none
+
+  @available(*, unavailable)
+  case some(SomeComparable)
+}
+
+enum EnumWithUnavailableCaseAndAssociatedValue2: Comparable {
+  enum SomeComparable: Comparable {}
+
+  case this(SomeComparable)
+
+  @available(*, unavailable)
+  case that(SomeComparable)
 }

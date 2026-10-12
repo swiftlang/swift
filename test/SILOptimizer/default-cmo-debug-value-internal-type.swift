@@ -32,6 +32,6 @@ public func publicEntry(_ x: Int) -> Int {
 // LOCAL:       } // end sil function '$s3Lib11publicEntryyS2iF'
 
 // The function exists in the swiftmodule, and has no debug_value.
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @$s3Lib11publicEntryyS2iF :
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @$s3Lib11publicEntryyS2iF :
 // CHECK-NOT:     debug_value
 // CHECK:       } // end sil function '$s3Lib11publicEntryyS2iF'

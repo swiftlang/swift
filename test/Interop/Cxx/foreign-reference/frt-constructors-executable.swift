@@ -74,4 +74,35 @@ FRTConstructorsTests.test("constructors with mixed ownership conventions, unreta
   c2.check()
 }
 
+FRTConstructorsTests.test("constructor with default pointer argument") {
+  let parent = FRTCtorWithDefaultPointerArg()
+  expectNil(parent.parent)
+  parent.check()
+
+  let child = FRTCtorWithDefaultPointerArg(parent)
+  expectNotNil(child.parent)
+  child.check()
+}
+
+FRTConstructorsTests.test("constructor with default integer arguments") {
+  let a = FRTCtorWithDefaultIntArgs(1, 2, 3)
+  expectEqual(a.value, 6)
+
+  let b = FRTCtorWithDefaultIntArgs(1, 2)
+  expectEqual(b.value, 126)
+
+  let c = FRTCtorWithDefaultIntArgs(1)
+  expectEqual(c.value, 580)
+}
+
+FRTConstructorsTests.test("constructor with unsafe default view argument") {
+  let a = FRTCtorWithUnsafeDefaultViewArg()
+  expectTrue(a.isNull)
+}
+
+FRTConstructorsTests.test("class template constructor with default argument") {
+  let a = FRTTemplateCtorWithDefaultArgInt(7)
+  expectEqual(a.value, 7)
+}
+
 runAllTests()

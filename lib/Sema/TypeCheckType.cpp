@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
@@ -2213,7 +2214,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
 
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
-      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal())
+      if (auto typeDecl = parentType->getNominalDecl())
         diagnose(typeDecl, diag::decl_declared_here, typeDecl);
     }
   }
@@ -2283,6 +2284,37 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
              declaredType)
         .fixItReplace(repr->getNameLoc().getSourceRange(),
                       declaredType.getString());
+  }
+}
+
+static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
+                                           const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  auto nameString = typeDecl->getName().str();
+  auto diag = [&](StringRef featureName) {
+    // Don't require this in the standard library or _Concurrency library.
+    auto module = dc->getParentModule();
+    if (module->isStdlibModule() || module->isConcurrencyModule())
+      return;
+  
+    ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature, nameString,
+                       featureName);
+  };
+
+  if (nameString == "Cell" ||
+      nameString == "ConstCell" ||
+      nameString == "Volatile") {
+    if (ctx.LangOpts.hasFeature(Feature::Cells))
+      return;
+
+    diag(Feature::Cells.getName());
   }
 }
 
@@ -2419,6 +2451,8 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseExperimentalStdlibTypes(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -3785,6 +3819,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
+  // TODO: Lower the specifiers into a type scope application instead of
+  // dropping the attribute.
+  if (auto scoped = claim<ScopedTypeAttr>(attrs)) {
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+        !scoped->isInvalid()) {
+      diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
+               "@_scoped", false, Feature::ScopeRestrictions.getName());
+      scoped->setInvalid();
+    }
+  }
+
   // Handle a type attribute that can only be used in inheritance clauses.
   // Returns true if we need to exit early, false otherwise.
   auto handleInheritedOnly = [&](AtTypeAttrBase *attr) {
@@ -4263,12 +4308,13 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->isCalledOnce()) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
         diagnose(eltTypeRepr->getLoc(),
-                 diag::called_once_cannot_be_used_with_borrowing);
+                 diag::called_attr_cannot_be_used_with_borrowing,
+                 CalledAttr::getSemanticsName(*fnTy->getExecutionSemantics()));
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
 
@@ -4278,7 +4324,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(once) is consuming by default and we don't
+      // @called(atMostOnce) is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;
@@ -4295,7 +4341,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
       // types.
-      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+      if (auto SD = ty->getStructDecl()) {
         if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
             ownership == ParamSpecifier::InOut) {
           diagnose(eltTypeRepr->getLoc(),
@@ -4788,7 +4834,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
-  bool isCalledOnce = false;
+  std::optional<ExecutionSemantics> executionSemantics;
   if (auto called = claim<CalledTypeAttr>(attrs)) {
     if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
       if (representation != FunctionTypeRepresentation::Swift) {
@@ -4799,8 +4845,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         parsedClangFunctionType = nullptr;
       }
 
-      if (!repr->isInvalid() && called->isOnce())
-        isCalledOnce = true;
+      if (!repr->isInvalid())
+        executionSemantics = called->getExecutionSemantics();
     } else {
       diagnoseInvalid(repr, called->getAttrLoc(),
                       diag::requires_experimental_feature, "@called", false,
@@ -4811,7 +4857,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult, isCalledOnce);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult, executionSemantics);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -5062,14 +5108,23 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  bool isCalledOnce = false;
+  // Function values with execution semantics own their context, so they must
+  // be thick.
+  std::optional<ExecutionSemantics> executionSemantics;
   if (auto *called = claim<CalledTypeAttr>(attrs)) {
-    isCalledOnce = called->isOnce();
+    if (representation != SILFunctionType::Representation::Thick) {
+      assert(conventionAttr);
+      diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                      diag::invalid_called_and_attr_attributes, conventionAttr);
+      hasError = true;
+    } else {
+      executionSemantics = called->getExecutionSemantics();
+    }
   }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isCalledOnce, isolation, diffKind, clangFnType,
+      executionSemantics, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
@@ -5567,10 +5622,46 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
   return result->hasError() ? ErrorType::get(ctx) : result;
 }
 
+/// Returns true if a reference to Deinitable in the given position is part of
+/// a `~Deinitable` that the NondeinitableTypes feature allows: in the
+/// inheritance clause of a struct or an enum, or on a generic parameter or an
+/// associated type.
+static bool canSuppressDeinitable(TypeResolutionOptions options,
+                                  DeclContext *dc) {
+  if (!dc->getASTContext().LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  if (!options.is(TypeResolverContext::Inverted))
+    return false;
+
+  switch (options.getBaseContext()) {
+  case TypeResolverContext::Inherited:
+    return isa<StructDecl>(dc) || isa<EnumDecl>(dc);
+  case TypeResolverContext::GenericParameterInherited:
+  case TypeResolverContext::AssociatedTypeInherited:
+  case TypeResolverContext::GenericRequirement:
+    return true;
+  default:
+    return false;
+  }
+}
+
 NeverNullType
 TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                      TypeResolutionOptions options) {
   Type result = resolveDeclRefTypeReprRec(repr, options);
+
+  // The compiler reserves Deinitable for its own use.
+  if (auto *protoTy = result->getAs<ProtocolType>()) {
+    if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Deinitable) &&
+        !getDeclContext()->getParentModule()->isStdlibModule() &&
+        !canSuppressDeinitable(options, getDeclContext())) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::deinitable_reserved);
+      repr->setInvalid();
+      return ErrorType::get(getASTContext());
+    }
+  }
 
   // Diagnose an error if generic arguments are missing.
   if (result->is<UnboundGenericType>() && !repr->hasGenericArgList() &&
@@ -5766,9 +5857,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        // `@called(once)` functions always have consuming semantics
+        // `@called(atMostOnce)` functions always have consuming semantics
         // regardless of whether they are @escaping or not.
-        if (fnTy->isCalledOnce())
+        if (fnTy->hasCalledAtMostOnceSemantics())
           break;
 
         diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),
@@ -6512,28 +6603,12 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
-  std::optional<unsigned> moveOnlyElementIndex = std::nullopt;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     auto ty = resolveType(tyR, elementOptions);
     if (ty->hasError()) {
       hadError = true;
-    }
-    // Tuples with move-only elements aren't yet supported.
-    // Track the presence of a noncopyable field for diagnostic purposes only.
-    // We don't need to re-diagnose if a tuple contains another tuple, though,
-    // since we should've diagnosed the inner tuple already.
-    // FIXME: This won't diagnose if the type contains unbound generics
-    if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
-        !options.contains(TypeResolutionFlags::SILMode) &&
-        inStage(TypeResolutionStage::Interface) &&
-        !moveOnlyElementIndex.has_value() && !ty->hasUnboundGenericType() &&
-        !ty->hasTypeVariable() && !isa<TupleTypeRepr>(tyR)) {
-      auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
-          resolution.getGenericSignature().getGenericEnvironment(), ty);
-      if (!contextTy->hasError() && contextTy->isNoncopyable())
-        moveOnlyElementIndex = i;
     }
 
     auto eltName = repr->getElementName(i);
@@ -6583,12 +6658,28 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !elements[0].getType()->is<PackExpansionType>())
       return elements[0].getType();
   }
-  
-  if (moveOnlyElementIndex.has_value()) {
-    auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
-    auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
-    assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
-    diagnose(loc, diag::tuple_move_only_not_supported, noncopyableTy);
+
+  // Diagnose the first element that a tuple can't contain. A nested tuple
+  // was already diagnosed when it was resolved.
+  // FIXME: This won't diagnose if the type contains unbound generics
+  if (!options.contains(TypeResolutionFlags::SILMode) &&
+      inStage(TypeResolutionStage::Interface)) {
+    auto *genericEnv = resolution.getGenericSignature().getGenericEnvironment();
+    for (unsigned i : indices(elements)) {
+      auto *tyR = repr->getElementType(i);
+      auto ty = elements[i].getType();
+      if (ty->hasUnboundGenericType() || ty->hasTypeVariable() ||
+          isa<TupleTypeRepr>(tyR))
+        continue;
+
+      auto contextTy =
+          GenericEnvironment::mapTypeIntoEnvironment(genericEnv, ty);
+      if (contextTy->hasError())
+        continue;
+
+      if (diagnoseUnsupportedTupleElement(contextTy, tyR->getLoc(), ctx))
+        break;
+    }
   }
 
   return TupleType::get(elements, ctx);
@@ -6763,6 +6854,13 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
       auto *proto = getASTContext().getProtocol(kp);
       for (auto *otherProto : layout.getProtocols()) {
+        // If Copyable implies Deinitable, then applyInverses() explains that
+        // `~Deinitable` also requires `~Copyable`.
+        if (ip == InvertibleProtocolKind::Deinitable &&
+            otherProto->isSpecificProtocol(KnownProtocolKind::Copyable) &&
+            InverseRequirement::copyableImpliesDeinitable(getASTContext()))
+          continue;
+
         if (proto == otherProto ||
             otherProto->inheritsFrom(proto)) {
           diagnose(repr->getLoc(),

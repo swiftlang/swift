@@ -65,7 +65,6 @@ class D {}
 extension D: SendableMetatypeProto {
   // expected-error@-1 {{conformance of 'D' to protocol 'SendableMetatypeProto' crosses into main actor-isolated code and can cause data races}}
   // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
-  // expected-note@-3 {{isolate this conformance to the main actor with '@MainActor'}}
   func sm() {}
   // expected-note@-1 {{main actor-isolated instance method 'sm()' cannot satisfy nonisolated requirement}}
   // expected-note@-2 {{mark instance method 'sm()' 'nonisolated'}}

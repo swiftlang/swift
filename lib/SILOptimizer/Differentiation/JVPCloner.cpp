@@ -1029,9 +1029,9 @@ public:
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
-       loc, uccai->getCheckedCastOptions(),
-        tanSrc, tanSrc->getType().getASTType(),
-        tanDest, tanDest->getType().getASTType());
+        loc, uccai->getCheckedCastOptions(), tanSrc,
+        tanSrc->getType().getASTType(), tanDest,
+        tanDest->getType().getASTType(), uccai->isCopy());
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
@@ -1797,7 +1797,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
-  differential->setHasLoweredAddresses(original->hasLoweredAddresses());
+  differential->inheritDerivedFrom(original);
 
   return differential;
 }

@@ -785,13 +785,6 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
-def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
-  HelpText<"Dump abstract layout information for Clang-backed types">;
-
-def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
-  HelpText<"Dump every hidden-type layout known to this compilation, "
-           "including those deserialized from imported swiftmodules">;
-
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
@@ -1050,6 +1043,12 @@ def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-
 
 def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
   HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
+
+def solver_enable_promote_supertypes : Flag<["-"], "solver-enable-promote-supertypes">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_promote_supertypes : Flag<["-"], "solver-disable-promote-supertypes">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -1353,6 +1352,11 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def dump_abstract_type_layout_info_EQ :
+  Joined<["-"], "dump-abstract-type-layout-info=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the selected compiler-facing layout information for serialized and recovered hidden types; one of 'sil-type', 'type-lowering', 'type-info', or 'all'">;
 
 def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
   Flags<[FrontendOption]>,

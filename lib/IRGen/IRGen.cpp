@@ -19,8 +19,8 @@
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
@@ -91,9 +91,7 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
-#if LLVM_VERSION_MAJOR >= 23
 #include "llvm/Transforms/Utils/AssignGUID.h"
-#endif
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
 #include "llvm/IR/DiagnosticInfo.h"
@@ -172,10 +170,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
 
+#if LLVM_VERSION_MAJOR < 24
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
+#endif
 
   if (Opts.EnableGlobalISel) {
     TargetOpts.EnableGlobalISel = true;
@@ -216,6 +216,13 @@ void setModuleFlags(IRGenModule &IGM) {
       IGM.getOptions().WitnessMethodElimination) {
     Module->addModuleFlag(llvm::Module::Error, "Virtual Function Elim", 1);
   }
+
+#if LLVM_VERSION_MAJOR >= 24
+  // WebAssembly doesn't support atomics yet, see
+  // https://github.com/apple/swift/issues/54533 for more details.
+  if (IGM.Triple.isOSBinFormatWasm())
+    Module->setThreadModel(llvm::ThreadModel::Single);
+#endif
 }
 
 static void align(llvm::Module *Module) {
@@ -427,7 +434,7 @@ void swift::performLLVMOptimizations(
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
-    Expected<PassPlugin> PassPlugin = PassPlugin::Load(PluginFile);
+    Expected<PassPlugin> PassPlugin = PassPlugin::load(PluginFile);
     if (PassPlugin) {
       PassPlugin->registerPassBuilderCallbacks(PB);
     } else {
@@ -601,7 +608,8 @@ void swift::performLLVMOptimizations(
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
     MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
-                                /*EmitSummaryIndex=*/false));
+                                /*EmitSummaryIndex=*/false,
+                                /*ShouldRenumberMetadata=*/true));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -610,12 +618,10 @@ void swift::performLLVMOptimizations(
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-#if LLVM_VERSION_MAJOR >= 23
       // ThinLTOBitcodeWriterPass requests ModuleSummaryIndexAnalysis, which
       // requires a GUID to be assigned to every GlobalValue. The LTO prelink
       // pipelines do that via AssignGUIDPass, but the O0 pipeline does not.
       MPM.addPass(AssignGUIDPass());
-#endif
       MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
@@ -625,12 +631,11 @@ void swift::performLLVMOptimizations(
         // lto summary.)
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
-#if LLVM_VERSION_MAJOR >= 23
+
         // BitcodeWriterPass with EmitSummaryIndex requests
         // ModuleSummaryIndexAnalysis, which requires a GUID to be assigned to
         // every GlobalValue; the per-module/O0 pipelines do not do that.
         MPM.addPass(AssignGUIDPass());
-#endif
       }
       MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
@@ -647,6 +652,7 @@ void swift::performLLVMOptimizations(
     if (irFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irFile, nullptr);
   }
 
@@ -808,6 +814,20 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::vfs::OutputBackend &Backend,
                         UnifiedStatsReporter *Stats) {
 
+  // Whenever we leave this function, finalize the main remark streamer (if the
+  // context owns one). Finalization flushes the remark string table to the end
+  // of the remarks file and deregisters the streamer from the context. It must
+  // happen before the streamer (owned by the context) is destroyed, both to
+  // produce a valid remarks file and to satisfy the RemarkStreamer destructor's
+  // assertion that its serializer was released. Using a scope guard ensures
+  // this covers every early return (e.g. incremental codegen skipping the
+  // object file), not just the successful codegen path.
+  auto &Ctxt = Module->getContext();
+  SWIFT_DEFER {
+    if (Ctxt.getMainRemarkStreamer())
+      llvm::finalizeLLVMOptimizationRemarks(Ctxt);
+  };
+
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
@@ -857,6 +877,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     }
 
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+      Module->renumberMetadataForAssembly();
       Module->print(*OutputFile, nullptr);
       return false;
     }
@@ -870,10 +891,10 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     if (irgenFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irgenFile, nullptr);
   }
 
-  auto &Ctxt = Module->getContext();
   std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
@@ -1431,8 +1452,8 @@ static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsig
 
       const auto format = SILOpts.OptRecordFormat;
       llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+          remarkSerializerOrErr =
+              llvm::remarks::createRemarkSerializer(format, *file);
       if (llvm::Error err = remarkSerializerOrErr.takeError()) {
         diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                             toString(std::move(err)));

@@ -375,7 +375,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   auto selfIfaceTy = selfDecl->getInterfaceType();
   SILType selfTy = SGF.getSILTypeInContext(selfResultInfo, loweredFunctionTy);
 
-  auto *decl = selfTy.getStructOrBoundGenericStruct();
+  auto *decl = selfTy.getStructDecl();
   assert(decl && "not a struct?!");
 
   std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;

@@ -61,6 +61,65 @@ struct SWIFT_ESCAPABLE Annotated {
 
 inline std::shared_ptr<Annotated> makeAnnotated() { return nullptr; }
 
+struct SWIFT_NONESCAPABLE View {
+  const int *p;
+};
+
+// Every note below lands on this one line, so they are stacked here. Buffer
+// itself is only ever the first link in the chain.
+// expected-note@+4 2 {{this type has unknown escapability: it depends on 'DtorWithView', whose escapability is unknown}}
+// expected-note@+3 2 {{this type has unknown escapability: it depends on 'DtorWrapsHoldsView', whose escapability is unknown}}
+// expected-note@+2 2 {{this type has unknown escapability: it depends on 'DtorWithBufferOfView', whose escapability is unknown}}
+template <typename T>
+struct Buffer {
+  T *data;
+  unsigned n;
+} SWIFT_ESCAPABLE_IF(T);
+
+// A record that provides its own destruction, so its non-escapable member
+// cannot settle it. Reaching it through a container keeps it imported, and the
+// chain ends on the record the user can annotate.
+// expected-note@+1 2 {{this type has unknown escapability: its member 'v' is non-escapable, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+struct DtorWithView {
+  View v;
+  ~DtorWithView();
+};
+
+struct HoldsView {
+  View v;
+};
+
+// The non-escapable type sits below the record that demoted it, so the note
+// blames the record without naming a member of it: 'v' belongs to HoldsView,
+// and HoldsView is plainly non-escapable rather than unknown.
+// expected-note@+1 2 {{this type has unknown escapability: it holds a non-escapable type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+struct DtorWrapsHoldsView {
+  HoldsView h;
+
+  ~DtorWrapsHoldsView();
+};
+
+// The non-escapable type arrives as a conditional template argument, which
+// records no member to name, so the note still has to blame this record rather
+// than the Buffer it came through.
+// expected-note@+1 2 {{this type has unknown escapability: it holds a non-escapable type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+struct DtorWithBufferOfView {
+  Buffer<View> b;
+
+  ~DtorWithBufferOfView();
+};
+
+using BufferOfDtorWithView = Buffer<DtorWithView>;
+using BufferOfDtorWrapsHoldsView = Buffer<DtorWrapsHoldsView>;
+using BufferOfDtorWithBufferOfView = Buffer<DtorWithBufferOfView>;
+inline BufferOfDtorWrapsHoldsView makeBufferOfDtorWrapsHoldsView() {
+  return {};
+}
+inline BufferOfDtorWithBufferOfView makeBufferOfDtorWithBufferOfView() {
+  return {};
+}
+inline BufferOfDtorWithView makeBufferOfDtorWithView() { return {}; }
+
 //--- test.swift
 import Esc
 import CxxStdlib
@@ -91,4 +150,27 @@ func pointerMember() {
 func annotatedArgument() {
   let p = makeAnnotated()
   _ = p
+}
+
+func nonEscapableMember() {
+  let d = makeBufferOfDtorWithView() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeBufferOfDtorWithView()' involves unsafe type}}
+  _ = d // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to let 'd' involves unsafe type}}
+}
+
+// The blame has to reach the record whose own destruction is the problem, not
+// whichever type happens to hold the non-escapable member.
+func nonEscapableBelowTheDemotingRecord() {
+  let d = makeBufferOfDtorWrapsHoldsView() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeBufferOfDtorWrapsHoldsView()' involves unsafe type}}
+  _ = d // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to let 'd' involves unsafe type}}
+}
+
+func nonEscapableViaConditionalArgument() {
+  let d = makeBufferOfDtorWithBufferOfView() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeBufferOfDtorWithBufferOfView()' involves unsafe type}}
+  _ = d // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to let 'd' involves unsafe type}}
 }

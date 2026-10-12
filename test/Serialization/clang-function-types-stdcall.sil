@@ -1,0 +1,33 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -parse-stdlib -use-clang-function-types -target i686-unknown-windows-msvc -module-name Library -emit-module %t/Library.sil -o %t/Library.swiftmodule
+// RUN: %target-swift-frontend -parse-stdlib -use-clang-function-types -target i686-unknown-windows-msvc -module-name Client -I %t -emit-ir -O %t/Client.sil | %FileCheck %s
+// REQUIRES: CODEGENERATOR=X86
+
+// A stored non-default calling convention must survive SIL deserialization.
+// CHECK-LABEL: define{{.*}} @call_imported(
+// CHECK: call x86_stdcallcc i32 %{{.*}}(i32 {{%.*}})
+
+//--- Library.sil
+sil_stage canonical
+import Builtin
+
+sil [transparent] [serialized] @invoke_stdcall : $@convention(thin) (@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%function : $@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, %value : $Builtin.Int32):
+  %result = apply %function(%value) : $@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32
+  return %result : $Builtin.Int32
+}
+
+//--- Client.sil
+sil_stage canonical
+import Builtin
+import Library
+
+sil @invoke_stdcall : $@convention(thin) (@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+
+sil @call_imported : $@convention(thin) (@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%function : $@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, %value : $Builtin.Int32):
+  %invoke = function_ref @invoke_stdcall : $@convention(thin) (@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %result = apply %invoke(%function, %value) : $@convention(thin) (@convention(c, cType: "int (__attribute__((stdcall)) *)(int)") (Builtin.Int32) -> Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  return %result : $Builtin.Int32
+}

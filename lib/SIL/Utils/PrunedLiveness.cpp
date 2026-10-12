@@ -352,6 +352,10 @@ LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
       break;
+    case OperandOwnership::DebugUse:
+      // A debug_value is allowed to be outside the lifetime of its operand,
+      // don't extend liveness for it.
+      break;
     case OperandOwnership::Borrow:
       summary.meet(updateForBorrowingOperand(use));
       break;

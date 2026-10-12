@@ -1373,7 +1373,7 @@ private:
     if (!Ty)
       return {false,{}};
     // Go from Pair<Int, Double> to Pair<T, U>.
-    auto *Decl = Ty->getNominalOrBoundGenericNominal();
+    auto *Decl = Ty->getNominalDecl();
     if (!Decl)
       return {false, {}};
     // Go from Pair<Int, Double> to Pair<T, U>.
@@ -1431,7 +1431,7 @@ private:
     // When emitting debug information for a type such as Pair<Int, Double>,
     // emit a description of all the fields for Pair<T, U>, and emit the regular
     // debug information for Pair<Int, Double>.
-    auto *Decl = Type->getNominalOrBoundGenericNominal();
+    auto *Decl = Type->getNominalDecl();
     if (!Decl)
       return nullptr;
 
@@ -2836,7 +2836,7 @@ private:
         }
       }
 
-      auto *TypeDecl = T->getNominalOrBoundGenericNominal();
+      auto *TypeDecl = T->getNominalDecl();
       if (!TypeDecl)
         return TypeWalker::Action::Continue;
 
@@ -2919,7 +2919,7 @@ private:
   /// @_originallyDefinedIn. Returns null if no type is annotated.
   NominalTypeDecl *getDeclAnnotatedByOriginallyDefinedIn(DebugTypeInfo DbgTy) {
     auto Type = DbgTy.getType();
-    auto *TypeDecl = Type->getNominalOrBoundGenericNominal();
+    auto *TypeDecl = Type->getNominalDecl();
     if (!TypeDecl)
       return nullptr;
 
@@ -2977,7 +2977,7 @@ private:
       TypeDecl = AliasDecl;
       Context = AliasDecl->getParent();
       ClangDecl = AliasDecl->getClangDecl();
-    } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+    } else if (auto *ND = DbgTy.getType()->getNominalDecl()) {
       TypeDecl = ND;
       // If this is an originally defined in type, we want to emit this type's
       // scope to be the ABI module.
@@ -4171,7 +4171,7 @@ struct DbgIntrinsicEmitter {
 
   ///
 
-  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+  llvm::DbgRecord *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL) {
     if (auto *Inst = InsertPt.dyn_cast<llvm::Instruction *>()) {
@@ -4182,7 +4182,7 @@ struct DbgIntrinsicEmitter {
     }
   }
 
-  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+  llvm::DbgRecord *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
@@ -4199,11 +4199,11 @@ struct DbgIntrinsicEmitter {
     }
 
     // DbgValue: keep expression as-is (all derefs are explicit).
-    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
+    return DIBuilder.insertDbgValue(Addr, VarInfo, Expr, DL,
                                              InsertBefore->getIterator());
   }
 
-  llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
+  llvm::DbgRecord *insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
@@ -4218,7 +4218,7 @@ struct DbgIntrinsicEmitter {
     }
 
     // DbgValue: keep expression as-is (all derefs are explicit).
-    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
+    return DIBuilder.insertDbgValue(Addr, VarInfo, Expr, DL, Block);
   }
 };
 
@@ -4258,7 +4258,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // /always/ emit an llvm.dbg.value of undef.
   // If we have undef, always emit a llvm.dbg.value in the current position.
   if (isa<llvm::UndefValue>(Storage)) {
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
+    DBuilder.insertDbgValue(Storage, Var, Expr, DL, ParentBlock);
     return;
   }
 
@@ -4357,13 +4357,13 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       // non-argument debug variable -- usually via a !DIExpression -- we
       // need to make sure that dbg.value is before any non-phi / no-dbg
       // instruction.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, InsertPt);
+      DBuilder.insertDbgValue(Storage, Var, Expr, DL, InsertPt);
 
       return;
     }
   }
 
-  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock->end());
+  DBuilder.insertDbgValue(Storage, Var, Expr, DL, ParentBlock->end());
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

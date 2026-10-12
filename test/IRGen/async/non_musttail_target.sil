@@ -11,7 +11,7 @@ sil @test_simple : $@async () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
-// CHECK:     call i1 (ptr, i1, ...) @llvm.coro.end.async
+// CHECK:     call void (ptr, i1, ...) @llvm.coro.end.async
 // CHECK-NOT: unreachable
 // CHECK:     ret void
 }

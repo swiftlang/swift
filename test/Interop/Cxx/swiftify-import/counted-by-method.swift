@@ -23,7 +23,7 @@
 struct ValueType {
   // expected-expansion@+8:56{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valBasic(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe valBasic(p.baseAddress, len)|}}
@@ -33,7 +33,7 @@ struct ValueType {
 
   // expected-expansion@+14:80{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valNoescape(_ p: Span<CInt>) {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
@@ -49,7 +49,7 @@ struct ValueType {
 
   // expected-expansion@+8:64{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public mutating func valNonconstSelf(_ p: UnsafeBufferPointer<CInt>) {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe valNonconstSelf(p.baseAddress, len)|}}
@@ -59,7 +59,7 @@ struct ValueType {
 
   // expected-expansion@+8:68{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valBasicVirt(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe valBasicVirt(p.baseAddress, len)|}}
@@ -69,7 +69,7 @@ struct ValueType {
 
   // expected-expansion@+19:103{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valLifetimebound(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
@@ -90,7 +90,7 @@ struct ValueType {
 
   // expected-expansion@+19:130{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valLifetimeboundVirtual(_ p: Span<CInt>) -> Span<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
@@ -111,7 +111,7 @@ struct ValueType {
 
   // expected-expansion@+12:55{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public borrowing func valLifetimeboundSelf(_ len: CInt) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let _resultValue: UnsafeMutablePointer<CInt>? = unsafe valLifetimeboundSelf(len)|}}
   //   expected-remark@5{{macro content: |    if unsafe _resultValue == nil {|}}
@@ -127,7 +127,7 @@ struct ValueType {
 struct InheritValue : public ValueType {
   // expected-expansion@+8:59{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valSubBasic(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe valSubBasic(p.baseAddress, len)|}}
@@ -138,7 +138,7 @@ struct InheritValue : public ValueType {
   // no lifetimebound annotation on override
   // expected-expansion@+8:97{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public func valLifetimeboundVirtual(_ p: UnsafeBufferPointer<CInt>) -> UnsafeBufferPointer<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe UnsafeBufferPointer<CInt>(start: unsafe valLifetimeboundVirtual(p.baseAddress, len), count: Int(len))|}}
@@ -150,7 +150,7 @@ struct InheritValue : public ValueType {
 struct SWIFT_REFERENCE RefType {
   // expected-expansion@+8:56{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refBasic(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe refBasic(p.baseAddress, len)|}}
@@ -162,7 +162,7 @@ struct SWIFT_REFERENCE RefType {
   // expected-expansion@+15:80{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
   //   expected-nonxros-error@2{{instance method cannot be more available than enclosing scope}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refNoescape(_ p: Span<CInt>) {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
@@ -178,7 +178,7 @@ struct SWIFT_REFERENCE RefType {
 
   // expected-expansion@+8:64{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refNonconstSelf(_ p: UnsafeBufferPointer<CInt>) {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe refNonconstSelf(p.baseAddress, len)|}}
@@ -188,7 +188,7 @@ struct SWIFT_REFERENCE RefType {
 
   // expected-expansion@+8:68{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refBasicVirt(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe refBasicVirt(p.baseAddress, len)|}}
@@ -200,7 +200,7 @@ struct SWIFT_REFERENCE RefType {
   // expected-expansion@+20:103{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
   //   expected-nonxros-error@2{{instance method cannot be more available than enclosing scope}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refLifetimebound(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
@@ -222,7 +222,7 @@ struct SWIFT_REFERENCE RefType {
   // expected-expansion@+20:130{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
   //   expected-nonxros-error@2{{instance method cannot be more available than enclosing scope}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refLifetimeboundVirtual(_ p: Span<CInt>) -> Span<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
@@ -243,7 +243,7 @@ struct SWIFT_REFERENCE RefType {
 
   // expected-expansion@+7:55{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public borrowing final func refLifetimeboundSelf(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {|}}
   //   expected-remark@4{{macro content: |    return unsafe UnsafeMutableBufferPointer<CInt>(start: unsafe refLifetimeboundSelf(len), count: Int(len))|}}
   //   expected-remark@5{{macro content: |}|}}
@@ -254,7 +254,7 @@ struct SWIFT_REFERENCE RefType {
 struct InheritRef : public RefType {
   // expected-expansion@+8:59{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refSubBasic(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe refSubBasic(p.baseAddress, len)|}}
@@ -269,7 +269,7 @@ struct InheritRef : public RefType {
 struct InheritRefPrivate : RefType {
   // expected-expansion@+8:66{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refPrivateSubBasic(_ p: UnsafeBufferPointer<CInt>) -> CInt {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    return unsafe refPrivateSubBasic(p.baseAddress, len)|}}
@@ -289,7 +289,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t -source-filename=x -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift | sed -e 's/@available(macOS 13\.3\.0, \*)/@available(SwiftStdlib 5.8, *)/'
-// GENERATED-HASH: a5d61faf4a14adb37e59220e887bdb0722bc41f0e742e193fc68b600cec455e1
+// GENERATED-HASH: d5468c53daef2e6e63bef3d62e5603032505d808f19e6d88733fe256c6838537
 import Test
 
 
@@ -297,26 +297,26 @@ extension ValueType {
   func call_valBasic_ValueType(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe valBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload func call_valBasic_ValueType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload func call_valBasic_ValueType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe valBasic(p)
   }
   func call_valNoescape_ValueType(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe valNoescape(p, len)
   }
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-    @_alwaysEmitIntoClient @_disfavoredOverload func call_valNoescape_ValueType(_ p: Span<CInt>) {
+    @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload func call_valNoescape_ValueType(_ p: Span<CInt>) {
     return valNoescape(p)
   }
   mutating func call_valNonconstSelf_ValueType(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe valNonconstSelf(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload mutating func call_valNonconstSelf_ValueType(_ p: UnsafeBufferPointer<CInt>) {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload mutating func call_valNonconstSelf_ValueType(_ p: UnsafeBufferPointer<CInt>) {
     return unsafe valNonconstSelf(p)
   }
   func call_valBasicVirt_ValueType(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe valBasicVirt(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload func call_valBasicVirt_ValueType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload func call_valBasicVirt_ValueType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe valBasicVirt(p)
   }
   func call_valLifetimebound_ValueType(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) -> UnsafeMutablePointer<CInt>! {
@@ -372,13 +372,13 @@ extension InheritValue {
   func call_valSubBasic_InheritValue(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe valSubBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload func call_valSubBasic_InheritValue(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload func call_valSubBasic_InheritValue(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe valSubBasic(p)
   }
   func call_valLifetimeboundVirtual_InheritValue(_ p: UnsafePointer<CInt>!, _ len: CInt) -> UnsafePointer<CInt>! {
     return unsafe valLifetimeboundVirtual(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload func call_valLifetimeboundVirtual_InheritValue(_ p: UnsafeBufferPointer<CInt>) -> UnsafeBufferPointer<CInt> {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload func call_valLifetimeboundVirtual_InheritValue(_ p: UnsafeBufferPointer<CInt>) -> UnsafeBufferPointer<CInt> {
     return unsafe valLifetimeboundVirtual(p)
   }
 }
@@ -388,7 +388,7 @@ extension RefType {
   final func call_refBasicVirt_RefType(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe refBasicVirt(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasicVirt_RefType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refBasicVirt_RefType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe refBasicVirt(p)
   }
   final func call_refLifetimeboundVirtual_RefType(_ p: UnsafePointer<CInt>!, _ len: CInt) -> UnsafePointer<CInt>! {
@@ -397,7 +397,7 @@ extension RefType {
   final func call_refBasic_RefType(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe refBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasic_RefType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refBasic_RefType(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe refBasic(p)
   }
   final func call_refNoescape_RefType(_ p: UnsafePointer<CInt>!, _ len: CInt) {
@@ -405,13 +405,13 @@ extension RefType {
   }
   // expected-nonxros-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType(_ p: Span<CInt>) {
+    @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refNoescape_RefType(_ p: Span<CInt>) {
     return refNoescape(p)
   }
   final func call_refNonconstSelf_RefType(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe refNonconstSelf(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNonconstSelf_RefType(_ p: UnsafeBufferPointer<CInt>) {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refNonconstSelf_RefType(_ p: UnsafeBufferPointer<CInt>) {
     return unsafe refNonconstSelf(p)
   }
   final func call_refLifetimebound_RefType(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) -> UnsafeMutablePointer<CInt>! {
@@ -430,13 +430,13 @@ extension InheritRef {
   final func call_refSubBasic_InheritRef(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe refSubBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refSubBasic_InheritRef(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refSubBasic_InheritRef(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe refSubBasic(p)
   }
   final func call_refBasicVirt_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe super.refBasicVirt(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasicVirt_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refBasicVirt_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     // expected-error@+1{{calling safe interop wrapper 'refBasicVirt' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasicVirt(p)
   }
@@ -446,7 +446,7 @@ extension InheritRef {
   final func call_refBasic_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe super.refBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasic_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refBasic_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     // expected-error@+1{{calling safe interop wrapper 'refBasic' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasic(p)
   }
@@ -455,14 +455,14 @@ extension InheritRef {
   }
   // expected-nonxros-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
+    @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
     // expected-error@+1{{calling safe interop wrapper 'refNoescape' in foreign reference type 'RefType' using 'super' is not supported}}
     return super.refNoescape(p)
   }
   final func call_refNonconstSelf_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe super.refNonconstSelf(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNonconstSelf_RefType_super(_ p: UnsafeBufferPointer<CInt>) {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refNonconstSelf_RefType_super(_ p: UnsafeBufferPointer<CInt>) {
     // expected-error@+1{{calling safe interop wrapper 'refNonconstSelf' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refNonconstSelf(p)
   }
@@ -482,13 +482,13 @@ extension InheritRefPrivate {
   final func call_refPrivateSubBasic_InheritRefPrivate(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe refPrivateSubBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refPrivateSubBasic_InheritRefPrivate(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refPrivateSubBasic_InheritRefPrivate(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     return unsafe refPrivateSubBasic(p)
   }
   final func call_refBasicVirt_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe super.refBasicVirt(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasicVirt_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refBasicVirt_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     // expected-error@+1{{calling safe interop wrapper 'refBasicVirt' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasicVirt(p)
   }
@@ -498,7 +498,7 @@ extension InheritRefPrivate {
   final func call_refBasic_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe super.refBasic(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasic_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refBasic_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
     // expected-error@+1{{calling safe interop wrapper 'refBasic' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasic(p)
   }
@@ -507,14 +507,14 @@ extension InheritRefPrivate {
   }
   // expected-nonxros-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-    @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
+    @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
     // expected-error@+1{{calling safe interop wrapper 'refNoescape' in foreign reference type 'RefType' using 'super' is not supported}}
     return super.refNoescape(p)
   }
   final func call_refNonconstSelf_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe super.refNonconstSelf(p, len)
   }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNonconstSelf_RefType_super(_ p: UnsafeBufferPointer<CInt>) {
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload final func call_refNonconstSelf_RefType_super(_ p: UnsafeBufferPointer<CInt>) {
     // expected-error@+1{{calling safe interop wrapper 'refNonconstSelf' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refNonconstSelf(p)
   }

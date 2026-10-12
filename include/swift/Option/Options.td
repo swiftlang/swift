@@ -522,6 +522,13 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_EQ
+    : Joined<["-"], "serialize-diagnostics=">,
+      Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput,
+             CacheInvariant]>,
+      HelpText<"Serialize diagnostics in a specific format: 'dia', a binary "
+               "format (the default), or 'sarif'">,
+      MetaVarName<"<format>">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
@@ -2242,6 +2249,12 @@ def incremental_dependency_scan:
   Flag<["-"], "incremental-dependency-scan">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Re-use/validate prior build dependency scan artifacts">;
+
+def incremental_dependency_scan_cache_path:
+  Separate<["-"], "incremental-dependency-scan-cache-path">,
+  Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
+  HelpText<"Specify the path to serialize/reuse the dependency scan cache">,
+  MetaVarName<"<path>">;
 
 def driver_experimental_explicit_module_build:
   Flag<["-"], "experimental-explicit-module-build">,

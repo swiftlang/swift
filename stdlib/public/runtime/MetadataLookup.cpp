@@ -323,7 +323,7 @@ namespace {
     }
 
     template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
+    [[maybe_unused]] static size_t getExtraAllocationSize(T &&... ignored) {
       return 0;
     }
   };
@@ -1107,7 +1107,7 @@ namespace {
     }
 
     template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
+    [[maybe_unused]] static size_t getExtraAllocationSize(T &&... ignored) {
       return 0;
     }
   };
@@ -1255,7 +1255,7 @@ public:
   }
 
   template <class... Args>
-  static size_t getExtraAllocationSize(Args &&... ignored) {
+  [[maybe_unused]] static size_t getExtraAllocationSize(Args &&... ignored) {
     return 0;
   }
 };
@@ -2054,7 +2054,9 @@ public:
     for (auto arg : genArgs)
       allArgsVec.push_back(arg.getMetadata());
 
-    // Collect any other generic arguments.
+    // Collect any other generic arguments. The generalization signature never
+    // records inverses, so don't check its parameters for Copyable and
+    // Escapable.
     auto error = _checkGenericRequirements(
         genSig.getParams(), genSig.getRequirements(), allArgsVec,
         [genArgs](unsigned depth, unsigned index) -> const Metadata * {
@@ -2074,7 +2076,7 @@ public:
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
         },
-        nullptr);
+        nullptr, /*numParamsExemptFromInvertibleChecks=*/genArgs.size());
     if (error)
       return *error;
 

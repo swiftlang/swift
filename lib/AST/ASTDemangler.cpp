@@ -513,6 +513,19 @@ void ASTBuilder::endPackExpansion() {
   ActivePackExpansions.pop_back();
 }
 
+static std::optional<ExecutionSemantics>
+getExecutionSemantics(FunctionMetadataExecutionSemantics semantics) {
+  switch (semantics) {
+  case FunctionMetadataExecutionSemantics::None:
+    return std::nullopt;
+  case FunctionMetadataExecutionSemantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case FunctionMetadataExecutionSemantics::Once:
+    return ExecutionSemantics::Once;
+  }
+  llvm_unreachable("unknown execution semantics");
+}
+
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags, ExtendedFunctionTypeFlags extFlags,
@@ -607,7 +620,7 @@ Type ASTBuilder::createFunctionType(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
                    /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult(),
-                   extFlags.isCalledOnce())
+                   getExecutionSemantics(extFlags.getExecutionSemantics()))
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();
@@ -730,6 +743,19 @@ getCoroutineKind(ImplCoroutineKind kind) {
   llvm_unreachable("unknown coroutine kind");
 }
 
+static std::optional<ExecutionSemantics>
+getExecutionSemantics(ImplFunctionExecutionSemantics semantics) {
+  switch (semantics) {
+  case ImplFunctionExecutionSemantics::None:
+    return std::nullopt;
+  case ImplFunctionExecutionSemantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case ImplFunctionExecutionSemantics::Once:
+    return ExecutionSemantics::Once;
+  }
+  llvm_unreachable("unknown execution semantics");
+}
+
 Type ASTBuilder::createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
     Demangle::ImplCoroutineKind coroutineKind,
@@ -850,12 +876,14 @@ Type ASTBuilder::createImplFunctionType(
   // TODO: Handle LifetimeDependenceInfo here. Sibling of the AST-level TODO
   // at the top of `createFunctionType` above; both must be implemented before
   // the IRGen workaround in lib/IRGen/IRGenDebugInfo.cpp can be removed.
-  auto einfo = SILFunctionType::ExtInfoBuilder(
-                   representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isSendable(), flags.isAsync(), unimplementable,
-                   flags.isCalledOnce(), isolation, diffKind, clangFnType,
-                   /*LifetimeDependenceInfo*/ {})
-                   .build();
+  auto einfo =
+      SILFunctionType::ExtInfoBuilder(
+          representation, flags.isPseudogeneric(), !flags.isEscaping(),
+          flags.isSendable(), flags.isAsync(), unimplementable,
+          getExecutionSemantics(flags.getExecutionSemantics()),
+          isolation, diffKind, clangFnType,
+          /*LifetimeDependenceInfo*/ {})
+          .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
@@ -871,7 +899,7 @@ Type ASTBuilder::createProtocolCompositionType(
   std::vector<Type> members;
   for (auto protocol : protocols)
     members.push_back(protocol->getDeclaredInterfaceType());
-  if (superclass && superclass->getClassOrBoundGenericClass())
+  if (superclass && superclass->getClassDecl())
     members.push_back(superclass);
 
   // FIXME: move-only generics
@@ -1074,7 +1102,7 @@ Type ASTBuilder::createConstrainedExistentialType(
             protoTy, /*allowAnchoredMatch=*/false));
         continue;
       }
-      ASSERT(member->getClassOrBoundGenericClass());
+      ASSERT(member->getClassDecl());
       addMember(member);
     }
   }

@@ -1680,6 +1680,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
+      case file_types::TY_SARIFDiagnostics:
       case file_types::TY_ClangHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:

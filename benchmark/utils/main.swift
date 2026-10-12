@@ -19,6 +19,7 @@ import AngryPhonebook
 import AnyHashableWithAClass
 import Array2D
 import ArrayAppend
+import ArrayCastTest
 import ArrayInClass
 import ArrayLiteral
 import ArrayOfGenericPOD
@@ -30,6 +31,7 @@ import ArraySetElement
 import ArraySliceTests
 import ArraySubscript
 import ArrayTests
+import AssumeIsolated
 import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
@@ -68,6 +70,7 @@ import CxxStringConversion
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
+import DistributedThunkHop
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -237,6 +240,7 @@ register(AngryPhonebook.benchmarks)
 register(AnyHashableWithAClass.benchmarks)
 register(Array2D.benchmarks)
 register(ArrayAppend.benchmarks)
+register(ArrayCastTest.benchmarks)
 register(ArrayInClass.benchmarks)
 register(ArrayLiteral.benchmarks)
 register(ArrayOfGenericPOD.benchmarks)
@@ -248,6 +252,7 @@ register(ArraySetElement.benchmarks)
 register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
 register(ArrayTests.benchmarks)
+register(AssumeIsolated.benchmarks)
 register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
@@ -286,6 +291,7 @@ register(CxxStringConversion.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
+register(DistributedThunkHop.benchmarks)
 register(DictOfArraysToArrayOfDicts.benchmarks)
 register(DictTest.benchmarks)
 register(DictTest2.benchmarks)

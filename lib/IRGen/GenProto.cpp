@@ -420,7 +420,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_CXX:
       if (!isSelfParameter) return;
-      if (type->getNominalOrBoundGenericNominal()) {
+      if (type->getNominalDecl()) {
         considerNewTypeSource(IsExact,
                               MetadataSource::Kind::GenericLValueMetadata,
                               type, paramIndex);
@@ -440,7 +440,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
       // Classes are sources of metadata.
-      if (type->getClassOrBoundGenericClass()) {
+      if (type->getClassDecl()) {
         considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
                               type, paramIndex);
         return;
@@ -463,7 +463,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         // Thick metatypes for Objective-C parameterized classes are not
         // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
-        if (auto classDecl = objTy->getClassOrBoundGenericClass())
+        if (auto classDecl = objTy->getClassDecl())
           if (classDecl->isTypeErasedGenericClass())
             return;
 
@@ -633,7 +633,7 @@ void EmitPolymorphicParameters::bindExtraSource(
           IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
-      auto *CD = selfTy.getClassOrBoundGenericClass();
+      auto *CD = selfTy.getClassDecl();
       // The self metadata here corresponds to the conforming type.
       // For an inheritable conformance, that may be a subclass of the static
       // type, and so the self metadata will be inexact. Currently, all
@@ -1011,9 +1011,13 @@ bool IRGenModule::isResilientConformance(
   //
   // This is an optimization -- a conformance of a non-generic type cannot
   // resiliently become dependent.
-  if (!conformance->getDeclContext()->isGenericContext() &&
+  // Also check the @_originallyDefinedIn attribute to make sure the conforming
+  // type wasn't moved into the protocol's module. In that case, we need to keep
+  // the conformance resilient.
+  if (!disableOptimizations &&
+      !conformance->getDeclContext()->isGenericContext() &&
       conformanceModule == conformance->getProtocol()->getParentModule() &&
-      !disableOptimizations)
+      conformance->isOriginallyInSameModuleAsProtocol())
     return false;
 
   // We have a resilient conformance.
@@ -1718,7 +1722,7 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
         // It should be never called. We add a pointer to an error function.
         if (isAsyncRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.getOrCreateDeadAsyncMethodErrorFunctionPointer(),
               IGM.FunctionPtrTy);
         } else if (isCalleeAllocatedCoroutineRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
@@ -2661,10 +2665,21 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
 
   const ConformanceInfo *info;
 
+  // Whether `wt` is the specialized witness table of `conf`. Specialized
+  // witness tables are shared by conformances which only differ in type sugar.
+  auto isSpecializedTableOf = [](SILWitnessTable *wt,
+                                 const ProtocolConformance *conf) {
+    auto canonical = [](const ProtocolConformance *c) {
+      return const_cast<ProtocolConformance *>(c)->getCanonicalConformance();
+    };
+    return wt && wt->isSpecialized() &&
+           canonical(wt->getConformance()) == canonical(conf);
+  };
+
   auto *specConf = conformance;
   if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conformance)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(inheritedC);
-    if (wt && wt->getConformance() == inheritedC) {
+    if (isSpecializedTableOf(wt, inheritedC)) {
       info = new SpecializedConformanceInfo(inheritedC);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -2676,7 +2691,7 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // directly use it.
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(specConf)) {
     SILWitnessTable *wt = getSILModule().lookUpWitnessTable(specConf);
-    if (wt && wt->getConformance() == sc) {
+    if (isSpecializedTableOf(wt, sc)) {
       info = new SpecializedConformanceInfo(sc);
       Conformances.try_emplace(conformance, info);
       return *info;
@@ -3921,6 +3936,25 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    if (proto->isCOMInterface()) {
+      auto archetype = cast<ArchetypeType>(srcType);
+      for (auto *required : archetype->getConformsTo()) {
+        if (!required->isCOMInterface())
+          continue;
+        auto *hierarchy = required->getCOMInterfaceHierarchy();
+        assert(hierarchy && !hierarchy->isInvalid());
+        if (!llvm::is_contained(hierarchy->getABIChain(), proto))
+          continue;
+        auto *adjustment =
+            emitArchetypeWitnessTableRef(IGF, archetype, required);
+        // Pack elements use pointer-sized slots shared with native witnesses.
+        if (adjustment->getType()->isPointerTy())
+          adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
+        return adjustment;
+      }
+      llvm_unreachable("COM archetype is missing an interface adjustment");
+    }
+
     auto archetype = cast<ArchetypeType>(srcType);
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
@@ -4331,6 +4365,12 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   }
 }
 
+llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {
+  if (isCOMInterfaceAdjustment())
+    return IGM.IntPtrTy;
+  return typeForKind(IGM, getKind());
+}
+
 void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
@@ -4353,6 +4393,10 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
   }
 
+  // A conformance loaded from a pack uses a pointer-sized storage slot. Restore
+  // the integer representation used for individual COM requirements.
+  if (requirement.isCOMInterfaceAdjustment() && value->getType()->isPointerTy())
+    value = IGF.Builder.CreatePtrToInt(value, IGF.IGM.IntPtrTy);
   assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {
@@ -4575,6 +4619,17 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   call->setDoesNotThrow();
   auto fn = IGF.Builder.CreateBitCast(call, IGM.PtrTy);
   return FunctionPointer::createSigned(fnType, fn, authInfo, signature);
+}
+
+llvm::Value *irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF,
+                                                      llvm::Value *value,
+                                                      CanType type,
+                                                      ProtocolDecl *protocol) {
+  assert(protocol->isCOMInterface());
+  auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
+  auto *adjustment = emitWitnessTableRef(IGF, type, conformance);
+  return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, value, adjustment,
+                                       "com.interface");
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,

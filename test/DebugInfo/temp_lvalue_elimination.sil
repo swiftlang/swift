@@ -1,18 +1,22 @@
-// RUN: %target-sil-opt -sil-print-types -sil-verify-all -temp-lvalue-elimination %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -sil-verify-all -temp-lvalue-elimination %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -sil-verify-all -mandatory-temp-lvalue-elimination %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
 sil_stage canonical
 
 
 import Builtin
 
 // This verifies that the TempLValueElimination pass correctly salvages the
-// debug variable attribute of alloc_stack instructions.
+// debug variable attribute of alloc_stack instructions, and that the mandatory
+// variant preserves such user-visible temporaries instead of eliminating them.
 //
 // CHECK-LABEL: sil @stack_var_elimination : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
 // CHECK:       bb0([[X:%[0-9]+]] : $*Builtin.Int32, [[VAL:%[0-9]+]] : $Builtin.Int32):
-// CHECK-NEXT:    debug_value [[X]] : $*Builtin.Int32, var, name "x"
-// CHECK-NEXT:    store [[VAL]] to [[X]] : $*Builtin.Int32
-// CHECK-NEXT:    [[E:%[0-9]+]] = tuple ()
-// CHECK-NEXT:    return [[E]] : $()
+// CHECK-OPT-NEXT:    debug_value [[X]] : $*Builtin.Int32, var, name "x"
+// CHECK-OPT-NEXT:    store [[VAL]] to [[X]] : $*Builtin.Int32
+// CHECK-OPT-NEXT:    tuple ()
+// CHECK-ONONE-NEXT:  alloc_stack [var_decl] $Builtin.Int32, var, name "x"
+// CHECK-ONONE-NEXT:  store [[VAL]] to
+// CHECK-ONONE-NEXT:  copy_addr
 // CHECK-LABEL: } // end sil function 'stack_var_elimination'
 sil @stack_var_elimination : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
@@ -21,5 +25,26 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
   copy_addr %2 to %0
   dealloc_stack %2
   %3 = tuple ()
+  return %3
+}
+
+// A temporary that is not backed by a user variable is eliminated by both the
+// normal and the mandatory pass. The mandatory pass inserts a debug_step to
+// preserve stepping behavior.
+//
+// CHECK-LABEL: sil @stack_elimination : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
+// CHECK:       bb0([[X:%[0-9]+]] : $*Builtin.Int32, [[VAL:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NOT:     alloc_stack
+// CHECK-NEXT:    store [[VAL]] to [[X]] : $*Builtin.Int32, loc "t.swift":1:1
+// CHECK-ONONE-NEXT:  debug_step , loc "t.swift":2:1
+// CHECK-NEXT:    tuple (), loc "t.swift":3:1
+// CHECK-LABEL: } // end sil function 'stack_elimination'
+sil @stack_elimination : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = alloc_stack $Builtin.Int32
+  store %1 to %2, loc "t.swift":1:1
+  copy_addr %2 to %0, loc "t.swift":2:1
+  dealloc_stack %2
+  %3 = tuple (), loc "t.swift":3:1
   return %3
 }

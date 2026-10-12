@@ -1389,7 +1389,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
             // Check for its arguments types, i.e. Foo, Bar.
             if (auto boundGeneric = varType->getAs<BoundGenericType>()) {
                 for (auto arg : boundGeneric->getGenericArgs()) {
-                  if (auto argNominal = arg->getNominalOrBoundGenericNominal()) {
+                  if (auto argNominal = arg->getNominalDecl()) {
                     if (auto argIDC = dyn_cast<IterableDeclContext>(argNominal)) {
                       argIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
                       if (argIDC->hasDeserializeMemberError()) {
@@ -1402,7 +1402,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
             } else if (auto tupleType = varType->getAs<TupleType>()) {
               // Handle TupleType, e.g. (Foo, Var).
               for (auto element : tupleType->getElements()) {
-                if (auto elementNominal = element.getType()->getNominalOrBoundGenericNominal()) {
+                if (auto elementNominal = element.getType()->getNominalDecl()) {
                     if (auto elementIDC = dyn_cast<IterableDeclContext>(elementNominal)) {
                       elementIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
                       if (elementIDC->hasDeserializeMemberError()) {
@@ -1412,7 +1412,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
                     }
                   }
                 }
-            } else if (auto varNominal = varType->getNominalOrBoundGenericNominal()) {
+            } else if (auto varNominal = varType->getNominalDecl()) {
               if (auto varIDC = dyn_cast<IterableDeclContext>(varNominal)) {
                 varIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
                 if (varIDC->hasDeserializeMemberError()) {

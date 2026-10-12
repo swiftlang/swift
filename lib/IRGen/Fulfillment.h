@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_FULFILLMENT_H
 
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/GenericRequirement.h"
@@ -172,6 +173,12 @@ public:
   }
 
 private:
+  /// The set of types whose superclass bound is currently being
+  /// expanded somewhere up the call stack. This is to prevent infinite
+  /// recursion as a superclass bound can be self-referential
+  /// (e.g. `protocol Q: Base<Self>`).
+  llvm::SmallPtrSet<TypeBase *, 4> SuperclassBoundsInProgress;
+
   bool searchNominalTypeMetadata(IRGenModule &IGM, CanType type,
                                  MetadataState metadataState, unsigned source,
                                  MetadataPath &&path,
