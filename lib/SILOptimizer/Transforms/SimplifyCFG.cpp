@@ -36,6 +36,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
@@ -852,6 +853,30 @@ static bool couldRemoveRelease(SILBasicBlock *SrcBB, SILValue SrcV,
   return IsReleaseOfDest;
 }
 
+/// Returns true if the condition of \p condBr is computed from \p arg, only
+/// considering instructions in the block of \p condBr.
+/// Only then, substituting a constant for \p arg has a chance to fold the
+/// cond_br after jump threading.
+static bool conditionDependsOnArgument(CondBranchInst *condBr,
+                                       SILArgument *arg) {
+  SILBasicBlock *block = condBr->getParent();
+  ValueWorklist worklist(condBr->getCondition());
+  unsigned numVisitedInsts = 0;
+  while (SILValue v = worklist.pop()) {
+    if (v == arg)
+      return true;
+    auto *inst = v->getDefiningInstruction();
+    if (!inst || inst->getParent() != block)
+      continue;
+    // Avoid compile time problems for corner cases of very large blocks.
+    if (++numVisitedInsts > 16)
+      return false;
+    for (SILValue op : inst->getOperandValues())
+      worklist.pushIfNotVisited(op);
+  }
+  return false;
+}
+
 /// Returns true if any instruction in \p block may write memory.
 static bool blockMayWriteMemory(SILBasicBlock *block) {
   for (auto instAndIdx : llvm::enumerate(*block)) {
@@ -945,9 +970,14 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   }
 
   if (ThreadingBudget == 0) {
-    if (isa<CondBranchInst>(destTerminator)) {
-      for (auto V : BI->getArgs()) {
-        if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+    if (auto *condBr = dyn_cast<CondBranchInst>(destTerminator)) {
+      for (unsigned i : indices(BI->getArgs())) {
+        SILValue V = BI->getArg(i);
+        // Jump threading a literal is only worth it if it can simplify the
+        // branch condition. Otherwise we would just duplicate code, which can
+        // lead to exponential code growth for chains of diamond-shaped CFGs.
+        if ((isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) &&
+            conditionDependsOnArgument(condBr, DestBB->getArgument(i))) {
           ThreadingBudget = 4;
           break;
         }
