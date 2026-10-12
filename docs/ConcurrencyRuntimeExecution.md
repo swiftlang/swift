@@ -275,8 +275,9 @@ An isolated `deinit` runs inline if the current context is isolated to the
 check counts the main executor as current even without a record.
 
 Otherwise, if the object is a default actor and the runtime can lock it, the
-`deinit` runs inline with the actor's serial executor. Otherwise the runtime
-enqueues an *isolated deinit job* on the serial executor.
+`deinit` runs inline in a record that has the actor's serial executor on top of
+the current context, like a processing job. Otherwise the runtime enqueues an
+*isolated deinit job* on the serial executor.
 
 ## 8. Executor hops
 

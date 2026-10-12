@@ -2737,11 +2737,10 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       //   * each object can be deinitialized only once, so call graph of
       //   deinit's cannot have cycles.
 
-      // Always create a new record to keep the code simple. The deinit runs
-      // synchronously and can't hop, so the record's task executor plays no
-      // part.
+      // Run the deinit in a record that has the actor's serial executor on
+      // top of the current context, like a processing job.
       ExecutorTrackingInfo trackingInfo;
-      trackingInfo.enter(newExecutor, ContextTaskExecutor());
+      trackingInfo.enterLockedDefaultActor(newExecutor);
 
       // Run the work.
       {
