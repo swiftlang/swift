@@ -405,17 +405,6 @@ public struct Hasher {
     unsafe _core.combine(bytes: bytes)
   }
 
-  /// Adds the contents of the given buffer to this hasher, mixing it into the
-  /// hasher state.
-  ///
-  /// - Parameter bytes: A raw memory buffer.
-  @export(implementation)
-  public mutating func combine(bytes: RawSpan) {
-    bytes.withUnsafeBytes { buffer in
-      self.combine(bytes: buffer)
-    }
-  }
-
   /// Finalize the hasher state and return the hash value.
   /// Finalizing invalidates the hasher; additional bits cannot be combined
   /// into it, and it cannot be finalized again.
@@ -489,5 +478,20 @@ public struct Hasher {
     var core = _Core(seed: seed)
     unsafe core.combine(bytes: bytes)
     return Int(truncatingIfNeeded: core.finalize())
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Hasher {
+  /// Adds the contents of the given buffer to this hasher, mixing it into the
+  /// hasher state.
+  ///
+  /// - Parameter bytes: A raw memory buffer.
+  @export(implementation)
+  public mutating func combine(bytes: RawSpan) {
+    bytes.withUnsafeBytes { buffer in
+      unsafe self.combine(bytes: buffer)
+    }
   }
 }
