@@ -2674,7 +2674,7 @@ swift_task_immediateImpl(AsyncTask *task,
     // no serial executor. The immediate marker stops the runtime from
     // switching during the synchronous start, because the caller needs its
     // thread back.
-    auto originalTask = ActiveTask::swap(task);
+    AsyncTask *originalTask = _swift_task_clearCurrent();
     swift_job_run(task, SerialExecutorRef::forSynchronousStart());
     _swift_task_setCurrent(originalTask);
   } else {
