@@ -53,6 +53,18 @@ tests.test("Double filter type/Collection/\(swiftVersion)") {
   backwardCompatible(Array(0..<10))
 }
 
+tests.test("Double filter predicate order/\(swiftVersion)") {
+  var calls: [Int] = []
+  let result = AnySequence(0..<4).lazy
+    .filter { calls.append(10 + $0); return $0 % 2 == 0 }
+    .filter { calls.append(20 + $0); return $0 == 0 }
+  expectEqual([], calls)
+  expectEqual([0], Array(result))
+  // The first predicate runs first, and the second one only runs for the
+  // elements that the first one accepts.
+  expectEqual([10, 20, 11, 12, 22, 13], calls)
+}
+
 tests.test("Double map type/Sequence/\(swiftVersion)") {
   func foldingLevels<S : Sequence>(_ xs: S) {
     var result = xs.lazy.map { $0 }.map { $0 }
