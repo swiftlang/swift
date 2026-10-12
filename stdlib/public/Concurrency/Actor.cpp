@@ -97,12 +97,6 @@ extern "C" void objc_autoreleasePoolPop(void *);
 
 using namespace swift;
 
-/// Should we yield the thread?
-static bool shouldYieldThread() {
-  // return dispatch_swift_job_should_yield();
-  return false;
-}
-
 /*****************************************************************************/
 /******************************* TASK TRACKING ******************************/
 /*****************************************************************************/
@@ -1970,11 +1964,6 @@ static void defaultActorDrain(DefaultActorImpl *actor,
         currentActor = asImpl(currentExecutor.getDefaultActor());
       }
 
-      if (shouldYieldThread()) {
-        currentActor->unlock(true);
-        break;
-      }
-
       currentActor->processIncomingQueue();
     }
 
@@ -2595,7 +2584,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto baseExecutor =
       record ? record->getBaseSerialExecutor() : SerialExecutorRef::generic();
   if (record && !currentExecutor.isForSynchronousStart() &&
-      !baseExecutor.isDefaultActor() && !shouldYieldThread()) {
+      !baseExecutor.isDefaultActor()) {
     // Code isolated to the base's serial executor, while a default actor is
     // locked on top of the base: unlock the actor and continue in the base
     // context.
