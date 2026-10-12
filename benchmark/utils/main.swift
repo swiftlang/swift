@@ -19,6 +19,7 @@ import AngryPhonebook
 import AnyHashableWithAClass
 import Array2D
 import ArrayAppend
+import ArrayCastTest
 import ArrayInClass
 import ArrayLiteral
 import ArrayOfGenericPOD
@@ -239,6 +240,7 @@ register(AngryPhonebook.benchmarks)
 register(AnyHashableWithAClass.benchmarks)
 register(Array2D.benchmarks)
 register(ArrayAppend.benchmarks)
+register(ArrayCastTest.benchmarks)
 register(ArrayInClass.benchmarks)
 register(ArrayLiteral.benchmarks)
 register(ArrayOfGenericPOD.benchmarks)
