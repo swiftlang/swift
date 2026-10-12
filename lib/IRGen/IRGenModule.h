@@ -1278,9 +1278,21 @@ public:
   /// `KeyPathInst::needsRuntimeInstantiation`).  Passing `argDataOffsets`
   /// collects the byte offset of each capturing component's argument data
   /// within the object, in component order.
-  llvm::Constant *
-  emitStaticKeyPathInstance(KeyPathInst *KPI,
-                            SmallVectorImpl<uint32_t> *argDataOffsets = nullptr);
+  ///
+  /// The template's computed accessor fields are signed against their own
+  /// address, so a copy of it has to re-sign them for the copy's address.
+  /// Passing `signedFields` collects what that takes.
+  struct StaticKeyPathSignedField {
+    /// Byte offset of the field within the object.
+    uint32_t offset;
+    /// The unsigned pointer stored in the field.
+    llvm::Constant *pointer;
+    /// The discriminator blended with the field's address.
+    llvm::ConstantInt *discriminator;
+  };
+  llvm::Constant *emitStaticKeyPathInstance(
+      KeyPathInst *KPI, SmallVectorImpl<uint32_t> *argDataOffsets = nullptr,
+      SmallVectorImpl<StaticKeyPathSignedField> *signedFields = nullptr);
   /// True if `KPI` can be described at compile time in the current
   /// compilation, rather than instantiated by `swift_getKeyPath`.  Currently
   /// limited to Embedded Swift; `KeyPathInst::getStaticInstanceClassType` is
