@@ -110,7 +110,6 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
-class ErrorExpr;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -8229,7 +8228,7 @@ class HoleType : public TypeBase {
   // recursive property logic in HoleType::get.
   using Originator =
       llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
-                         VarDecl *, ErrorExpr *, TypeRepr *>;
+                         VarDecl *, TypeRepr *>;
 
   Originator O;
 

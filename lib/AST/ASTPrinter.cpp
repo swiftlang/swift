@@ -6854,8 +6854,6 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
-      } else if (isa<ErrorExpr *>(originator)) {
-        Printer << "error_expr";
       } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
         visit(errTy);
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {

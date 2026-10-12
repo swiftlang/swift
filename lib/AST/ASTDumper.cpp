@@ -6351,8 +6351,6 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (isa<ErrorExpr *>(originator)) {
-        printFlag("error_expr");
       } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
         printRec(errTy, Label::always("error_type"));
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
