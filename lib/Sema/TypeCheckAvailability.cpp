@@ -1895,11 +1895,25 @@ static bool diagnoseTypedThrowsAvailability(
       ReferenceDC);
 }
 
-/// Make sure the generic arguments conform to all known invertible protocols.
-/// Runtimes prior to NoncopyableGenerics do not check if any of the
-/// generic arguments conform to Copyable/Escapable during dynamic casts.
-/// But a dynamic cast *needs* to check if the generic arguments conform,
-/// to determine if the cast should be permitted at all. For example:
+static bool lacksInvertibleConformance(Type type, InvertibleProtocolKind ip) {
+  switch (ip) {
+  case InvertibleProtocolKind::Copyable:
+    return type->isNoncopyable();
+  case InvertibleProtocolKind::Escapable:
+    return !type->isEscapable();
+  case InvertibleProtocolKind::Transferable:
+    return !type->isTransferable();
+  case InvertibleProtocolKind::Deinitable:
+    // Nothing can suppress Deinitable, so no type lacks it.
+    return false;
+  }
+  llvm_unreachable("unhandled InvertibleProtocolKind");
+}
+
+/// Older runtimes won't check for required invertible protocol conformances
+/// at runtime during a cast. But a dynamic cast *needs* to check if generic
+/// arguments conform, to determine if the cast should be permitted at all.
+/// For example:
 ///
 ///    struct X<T> {}
 ///    extension X: P where T: Y {}
@@ -1911,59 +1925,6 @@ static bool diagnoseTypedThrowsAvailability(
 ///
 /// The dynamic cast here must fail because Y does not conform to Copyable,
 /// thus X<Y> doesn't conform to P!
-///
-/// \param boundTy The generic type with its generic arguments.
-/// \returns the invertible protocol for which a conformance is missing in
-///          one of the generic arguments, or none if all are present for
-///          every generic argument.
-static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
-    NominalType *boundTy) {
-  for (auto arg : boundTy->getGenericArgs()) {
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      switch (ip) {
-      case InvertibleProtocolKind::Copyable:
-        if (arg->isNoncopyable())
-          return ip;
-        break;
-      case InvertibleProtocolKind::Escapable:
-        if (!arg->isEscapable())
-          return ip;
-        break;
-      case InvertibleProtocolKind::Deinitable:
-        // Nothing can suppress Deinitable, so no generic argument lacks it.
-        break;
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-/// Which invertible protocol, if any, an existential's own layout suppresses.
-static std::optional<InvertibleProtocolKind>
-checkExistentialForInvertibleReqs(CanType type) {
-  if (!type.isExistentialType())
-    return std::nullopt;
-
-  for (auto ip : InvertibleProtocolSet::allKnown()) {
-    switch (ip) {
-    case InvertibleProtocolKind::Copyable:
-      if (type->isNoncopyable())
-        return ip;
-      break;
-    case InvertibleProtocolKind::Escapable:
-      if (!type->isEscapable())
-        return ip;
-      break;
-    case InvertibleProtocolKind::Deinitable:
-      // Nothing can suppress Deinitable, so no existential lacks it.
-      break;
-    }
-  }
-  return std::nullopt;
-}
-
-/// Older runtimes won't check for required invertible protocol conformances
-/// at runtime during a cast.
 ///
 /// \param srcType the source or initial type of the cast
 /// \param refLoc source location of the cast
@@ -1979,43 +1940,57 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   // Either a generic argument that suppresses a requirement (`Wrapper<NC>`) or
   // an existential that suppresses one in its own layout (`any P & ~Copyable`).
   // Both need a runtime that understands `InvertedProtocols` requirements.
-  std::optional<InvertibleProtocolKind> missing;
+  InvertibleProtocolSet missing;
   bool fromExistential = false;
   if (auto boundTy = dyn_cast<NominalType>(type);
-      boundTy && boundTy->hasGenericArgs())
-    missing = checkGenericArgsForInvertibleReqs(boundTy);
-  if (!missing) {
-    missing = checkExistentialForInvertibleReqs(type);
-    fromExistential = missing.has_value();
-  }
-
-  if (missing) {
-    std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
-    switch (*missing) {
-    case InvertibleProtocolKind::Copyable:
-      diag = fromExistential
-          ? diag::availability_copyable_existential_casting_only_version_newer
-          : diag::availability_copyable_generics_casting_only_version_newer;
-      break;
-    case InvertibleProtocolKind::Escapable:
-      diag = fromExistential
-          ? diag::availability_escapable_existential_casting_only_version_newer
-          : diag::availability_escapable_generics_casting_only_version_newer;
-      break;
-    case InvertibleProtocolKind::Deinitable:
-      llvm_unreachable("nothing can suppress Deinitable");
+      boundTy && boundTy->hasGenericArgs()) {
+    for (auto arg : boundTy->getGenericArgs()) {
+      for (auto ip : InvertibleProtocolSet::allKnown()) {
+        if (lacksInvertibleConformance(arg, ip))
+          missing.insert(ip);
+      }
     }
-
-    // Enforce the availability restriction.
-    return TypeChecker::checkAvailability(
-        refLoc,
-        fromExistential
-            ? refDC->getASTContext().getParameterizedExistentialAvailability()
-            : refDC->getASTContext().getNoncopyableGenericsAvailability(),
-        *diag,
-        refDC);
+  } else if (type.isExistentialType()) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      if (lacksInvertibleConformance(type, ip))
+        missing.insert(ip);
+    }
+    fromExistential = true;
   }
-  return false;
+
+  if (missing.empty())
+    return false;
+
+  // Diagnose the protocol that needs the newest runtime, since satisfying its
+  // gate satisfies the others.
+  auto &ctx = refDC->getASTContext();
+  std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
+  AvailabilityRange availability =
+      fromExistential ? ctx.getParameterizedExistentialAvailability()
+                      : ctx.getNoncopyableGenericsAvailability();
+  if (missing.contains(InvertibleProtocolKind::Transferable)) {
+    diag =
+        fromExistential
+            ? diag::
+                  availability_transferable_existential_casting_only_version_newer
+            : diag::
+                  availability_transferable_generics_casting_only_version_newer;
+    availability = ctx.getTransferableAvailability();
+  } else if (missing.contains(InvertibleProtocolKind::Copyable)) {
+    diag =
+        fromExistential
+            ? diag::availability_copyable_existential_casting_only_version_newer
+            : diag::availability_copyable_generics_casting_only_version_newer;
+  } else {
+    ASSERT(missing.contains(InvertibleProtocolKind::Escapable));
+    diag =
+        fromExistential
+            ? diag::
+                  availability_escapable_existential_casting_only_version_newer
+            : diag::availability_escapable_generics_casting_only_version_newer;
+  }
+
+  return TypeChecker::checkAvailability(refLoc, availability, *diag, refDC);
 }
 
 /// Emit a suitable diagnostic if this cast would require new runtime

@@ -108,6 +108,7 @@ FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 FEATURE(CoroutineAccessors,                             FUTURE)
 FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
 FEATURE(CoroutineFunctions,                             FUTURE)
+FEATURE(Transferable,                                   FUTURE)
 
 #undef FEATURE
 #undef FUTURE
