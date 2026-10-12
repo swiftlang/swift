@@ -479,12 +479,12 @@ BridgedStringRef BridgedType::getFieldName(SwiftInt idx) const {
 }
 
 BridgedType::EnumElementIterator BridgedType::getFirstEnumCaseIterator() const {
-  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = unbridged().getEnumDecl();
   return bridge(enumDecl->getAllElements().begin());
 }
 
 bool BridgedType::isEndCaseIterator(EnumElementIterator i) const {
-  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = unbridged().getEnumDecl();
   return unbridge(i) == enumDecl->getAllElements().end();
 }
 
@@ -1750,8 +1750,12 @@ SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() c
   return swift::ApplySite(unbridged()).getSubstCalleeArgIndexOfFirstAppliedArg();
 }
 
-bool BridgedInstruction::PartialApplyInst_isCalledOnce() const {
-  return getAs<swift::PartialApplyInst>()->isCalledOnce();
+BridgedOptionalExecutionSemantics
+BridgedInstruction::PartialApplyInst_getExecutionSemantics() const {
+  if (auto semantics =
+          getAs<swift::PartialApplyInst>()->getExecutionSemantics())
+    return *semantics;
+  return {};
 }
 
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
@@ -1761,6 +1765,15 @@ bool BridgedInstruction::PartialApplyInst_isOnStack() const {
 bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
   return getAs<swift::PartialApplyInst>()->getResultIsolation() ==
          swift::SILFunctionTypeIsolation::forUnknown();
+}
+
+OptionalBridgedInstruction
+BridgedInstruction::PartialApplyInst_getNonEscapingClosureConversion() const {
+  auto *cvt =
+      swift::getNonEscapingClosureConversion(getAs<swift::PartialApplyInst>());
+  if (!cvt)
+    return {nullptr};
+  return {cvt->asSILNode()};
 }
 
 bool BridgedInstruction::PartialApplyInst_isStackAllocationNested() const {
@@ -3216,7 +3229,8 @@ BridgedInstruction BridgedBuilder::createPartialApply(
     BridgedValue funcRef, BridgedValueArray bridgedCapturedArgs,
     BridgedArgumentConvention calleeConvention,
     BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
-    bool isOnStack, bool isNested, bool isCalledOnce,
+    bool isOnStack, bool isNested, bool hasExecutionSemantics,
+    swift::ExecutionSemantics executionSemantics,
     OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
   llvm::ArrayRef<swift::SILValue> args =
@@ -3226,7 +3240,7 @@ BridgedInstruction BridgedBuilder::createPartialApply(
       args, getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
-      isCalledOnce,
+      hasExecutionSemantics ? std::optional(executionSemantics) : std::nullopt,
       isOnStack ? swift::PartialApplyInst::OnStack
                 : swift::PartialApplyInst::NotOnStack,
       swift::StackAllocationIsNested_t(isNested),
@@ -3775,7 +3789,7 @@ BridgedVTable BridgedContext::createSpecializedVTable(BridgedType classType,
   }
   swift::SILType classTy = classType.unbridged();
   return {swift::SILVTable::create(*context->getModule(),
-                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   classTy.getClassDecl(), classTy,
                                    serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                    entries)};
 }

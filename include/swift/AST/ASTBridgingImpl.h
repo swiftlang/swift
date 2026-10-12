@@ -760,8 +760,8 @@ bool BridgedASTType::isUnsafeMutableRawBufferPointerType() const {
   return unbridged()->isUnsafeMutableRawBufferPointer();
 }
 
-OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
-  return {unbridged()->getNominalOrBoundGenericNominal()};
+OptionalBridgedDeclObj BridgedASTType::getNominalDecl() const {
+  return {unbridged()->getNominalDecl()};
 }
 
 BridgedASTType::TraitResult BridgedASTType::canBeClass() const {
@@ -912,6 +912,13 @@ BridgedCanType::SILFunctionType_getSubstGenericSignature() const {
   return {swift::CanSILFunctionType(llvm::cast<swift::SILFunctionType>(type))
               ->getSubstGenericSignature()
               .getPointer()};
+}
+
+BridgedConformanceArray
+BridgedCanType::collectExistentialConformances(BridgedCanType existential) const {
+  return {swift::collectExistentialConformances(unbridged(),
+                                                existential.unbridged(),
+                                                /*allowMissing=*/ false)};
 }
 
 //===----------------------------------------------------------------------===//

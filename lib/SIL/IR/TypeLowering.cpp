@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "libsil"
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -812,13 +813,16 @@ namespace {
       // stored in that existential. This is distinct from an ordinary
       // generic parameter constrained to a COM interface, which keeps its
       // opaque Swift generic representation.
-      if (type->is<ExistentialArchetypeType>() &&
-          llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
-            return protocol->isCOMInterface();
-          })) {
-        return asImpl().handleNonTrivialAggregate(
-            type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-                   isSensitive, DoesNotHaveRawPointer, IsLexical});
+      if (type->hasCOMInterfaceConstraint()) {
+        if (type->is<ExistentialArchetypeType>())
+          return asImpl().handleNonTrivialAggregate(
+              type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+                     isSensitive, DoesNotHaveRawPointer, IsLexical});
+        // AnyObject alone does not establish native reference counting for a
+        // COM value. Keep copies and destruction behind its value witnesses.
+        if (!type->getSuperclass())
+          return asImpl().handleAddressOnly(
+              type, getOpaqueSILTypeProperties(isSensitive));
       }
 
       // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
@@ -1066,12 +1070,7 @@ namespace {
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
       auto *layoutInfo = type->getLayoutInfoDecl();
-      // TODO: Remove this legacy fallback once every HiddenType carries an
-      // abstract layout.
-      if (!layoutInfo)
-        return getTrivialSILTypeProperties(isSensitive);
-
-      assert(layoutInfo->Layout &&
+      assert(layoutInfo && layoutInfo->Layout &&
              "HiddenTypeLayoutInfoDecl should have abstract layout");
       return mergeIsTypeExpansionSensitive(
           isSensitive, layoutInfo->Layout->typeProperties);
@@ -1143,6 +1142,12 @@ namespace {
       return B.getFunction().hasOwnershipForTrivialValues();
     }
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "TrivialTypeLowering");
+    }
+
     TrivialTypeLowering(SILType type, SILTypeProperties properties,
                         TypeExpansionContext forExpansion)
       : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -1428,6 +1433,19 @@ namespace {
                                        forExpansion) {
     }
 
+    void printAggregateTypeLayoutInfo(TypeConverter &TC,
+                                      llvm::raw_ostream &os,
+                                      unsigned indentation,
+                                      StringRef concreteTypeName) const {
+      printForAbstractTypeLayoutInfoBase(os, indentation, concreteTypeName);
+      os.indent(indentation + 2) << "childTypeLowerings:\n";
+      for (const auto &[index, child] : llvm::enumerate(getChildren(TC))) {
+        os.indent(indentation + 4) << "- index: " << index << "\n";
+        child.getLowering().printForAbstractTypeLayoutInfo(
+            TC, os, indentation + 6);
+      }
+    }
+
     /// CRTP Default implementation of destructuring an aggregate value.
     ///
     /// Uses getChildren() and emitRValueProject() to create projections for
@@ -1566,6 +1584,12 @@ namespace {
     using Super = LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned>;
 
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(TC, os, indentation,
+                                   "LoadableTupleTypeLowering");
+    }
+
     LoadableTupleTypeLowering(CanType type, SILTypeProperties properties,
                               TypeExpansionContext forExpansion)
       : LoadableAggTypeLowering(type, properties, forExpansion) {}
@@ -1631,6 +1655,12 @@ namespace {
         LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl *>;
 
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(TC, os, indentation,
+                                   "LoadableStructTypeLowering");
+    }
+
     LoadableStructTypeLowering(CanType type, SILTypeProperties properties,
                                TypeExpansionContext forExpansion)
       : LoadableAggTypeLowering(type, properties, forExpansion) {}
@@ -1671,7 +1701,7 @@ namespace {
     void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
@@ -1685,6 +1715,12 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "LoadableEnumTypeLowering");
+    }
+
     LoadableEnumTypeLowering(CanType type, SILTypeProperties properties,
                              TypeExpansionContext forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
@@ -1732,6 +1768,13 @@ namespace {
                    NormalDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(
+          TC, os, indentation,
+          "NormalDifferentiableSILFunctionTypeLowering");
+    }
 
     SILValue emitRValueProject(
         SILBuilder &B, SILLocation loc, SILValue tupleValue,
@@ -1792,6 +1835,12 @@ namespace {
         LoadableAggTypeLowering<MoveOnlyLoadableStructTypeLowering, VarDecl *>;
 
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(TC, os, indentation,
+                                   "MoveOnlyLoadableStructTypeLowering");
+    }
+
     MoveOnlyLoadableStructTypeLowering(CanType type,
                                        SILTypeProperties properties,
                                        TypeExpansionContext forExpansion)
@@ -1833,7 +1882,7 @@ namespace {
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
       // A value type with a deinit cannot be memberwise destroyed.
-      if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
+      if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
           emitDestroyValue(B, loc, aggValue);
           return;
@@ -1846,7 +1895,7 @@ namespace {
     void lowerChildren(TypeConverter &TC,
                        SmallVectorImpl<Child> &children) const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
 
       for (auto prop : structDecl->getStoredProperties()) {
@@ -1861,6 +1910,12 @@ namespace {
   class MoveOnlyLoadableEnumTypeLowering final
       : public NonTrivialLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyLoadableEnumTypeLowering");
+    }
+
     MoveOnlyLoadableEnumTypeLowering(CanType type,
                                      SILTypeProperties properties,
                                      TypeExpansionContext forExpansion)
@@ -1908,6 +1963,13 @@ namespace {
                    LinearDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(
+          TC, os, indentation,
+          "LinearDifferentiableSILFunctionTypeLowering");
+    }
 
     SILValue emitRValueProject(
         SILBuilder &B, SILLocation loc, SILValue tupleValue,
@@ -1968,6 +2030,12 @@ namespace {
   /// A class for nonspecific loadable nontrivial types.
   class MiscNontrivialTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MiscNontrivialTypeLowering");
+    }
+
     MiscNontrivialTypeLowering(SILType type, SILTypeProperties properties,
                           TypeExpansionContext forExpansion)
         : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2007,6 +2075,12 @@ namespace {
   /// loadable.
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "ReferenceTypeLowering");
+    }
+
     ReferenceTypeLowering(SILType type, SILTypeProperties properties,
                           TypeExpansionContext forExpansion)
         : LeafLoadableTypeLowering(type, properties, IsReferenceCounted,
@@ -2038,6 +2112,12 @@ namespace {
   /// A class for move only types which are non-trivial and loadable
   class MoveOnlyReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyReferenceTypeLowering");
+    }
+
     MoveOnlyReferenceTypeLowering(SILType type, SILTypeProperties properties,
                                   TypeExpansionContext forExpansion)
         : LeafLoadableTypeLowering(type, properties, IsReferenceCounted,
@@ -2070,6 +2150,11 @@ namespace {
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
   public: \
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os, \
+                                     unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase( \
+          os, indentation, "Loadable" #Name "TypeLowering"); \
+    } \
     Loadable##Name##TypeLowering(SILType type, \
                                  TypeExpansionContext forExpansion, \
                                  SILTypeProperties props) \
@@ -2097,6 +2182,12 @@ namespace {
   /// A class for non-trivial, address-only types.
   class AddressOnlyTypeLowering : public TypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "AddressOnlyTypeLowering");
+    }
+
     AddressOnlyTypeLowering(SILType type, SILTypeProperties properties,
                             TypeExpansionContext forExpansion)
       : TypeLowering(type, properties, IsNotReferenceCounted,
@@ -2182,6 +2273,12 @@ namespace {
   /// A class for non-trivial, address-only, move only types.
   class MoveOnlyAddressOnlyTypeLowering : public TypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyAddressOnlyTypeLowering");
+    }
+
     MoveOnlyAddressOnlyTypeLowering(SILType type,
                                     SILTypeProperties properties,
                                     TypeExpansionContext forExpansion)
@@ -2273,6 +2370,12 @@ namespace {
   /// to catch obviously broken attempts to copy or destroy the buffer.
   class UnsafeValueBufferTypeLowering : public AddressOnlyTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "UnsafeValueBufferTypeLowering");
+    }
+
     UnsafeValueBufferTypeLowering(SILType type,
                                   TypeExpansionContext forExpansion,
                                   IsTypeExpansionSensitive_t isSensitive)
@@ -2302,6 +2405,12 @@ namespace {
   /// Lower address only types as opaque values.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "OpaqueValueTypeLowering");
+    }
+
     OpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
                             TypeExpansionContext forExpansion)
       : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2315,6 +2424,18 @@ namespace {
       } else {
         SILValue value = emitLoadOfCopy(B, loc, src, isTake);
         emitStoreOfCopy(B, loc, value, dest, isInit);
+      }
+    }
+
+    // Once AddressLowering has run the value really is in memory, so it has
+    // to be destroyed in place: loading an address-only type is invalid there.
+    // Mirrors the lowered-addresses branch in emitCopyInto() above.
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createDestroyAddr(loc, addr);
+      } else {
+        LeafLoadableTypeLowering::emitDestroyAddress(B, loc, addr);
       }
     }
 
@@ -2363,6 +2484,12 @@ namespace {
   /// FIXME: When you remove an unreachable, just delete the method.
   class MoveOnlyOpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyOpaqueValueTypeLowering");
+    }
+
     MoveOnlyOpaqueValueTypeLowering(SILType type,
                                     SILTypeProperties properties,
                                     TypeExpansionContext forExpansion)
@@ -2403,6 +2530,12 @@ namespace {
 
   class TrivialOpaqueValueTypeLowering : public LoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "TrivialOpaqueValueTypeLowering");
+    }
+
     TrivialOpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
                                    TypeExpansionContext forExpansion)
         : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2611,13 +2744,7 @@ namespace {
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
       auto *layoutInfo = type->getLayoutInfoDecl();
-      // TODO: Remove this legacy fallback once every HiddenType carries an
-      // abstract layout.
-      if (!layoutInfo)
-        return handleTrivial(type,
-                             getTrivialSILTypeProperties(isSensitive));
-
-      assert(layoutInfo->Layout &&
+      assert(layoutInfo && layoutInfo->Layout &&
              "HiddenTypeLayoutInfoDecl should have abstract layout");
       auto properties = mergeIsTypeExpansionSensitive(
           isSensitive, layoutInfo->Layout->typeProperties);
@@ -2852,15 +2979,6 @@ namespace {
       }
 
       if (handleResilience(structType, D, properties)) {
-        return handleAddressOnly(structType, properties);
-      }
-
-      // Force address-only when the struct has hidden stored properties from
-      // an internal bridging header.
-      if (D->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        properties.setAddressOnly();
-        properties.setNonTrivial();
-        properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
       }
 
@@ -3481,8 +3599,8 @@ bool TypeConverter::visitAggregateLeaves(
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
            isa<BuiltinFixedArrayType>(ty) ||
-           ty.getEnumOrBoundGenericEnum() ||
-           ty.getStructOrBoundGenericStruct();
+           ty.getEnumDecl() ||
+           ty.getStructDecl();
   };
   insertIntoWorklist(substType, origType, nullptr, std::nullopt);
   while (!worklist.empty()) {
@@ -3523,7 +3641,7 @@ bool TypeConverter::visitAggregateLeaves(
       } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
         insertIntoWorklist(array->getElementType(),
                            AbstractionPattern::getOpaque(), field, index);
-      } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+      } else if (auto *decl = ty.getStructDecl()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
@@ -3538,7 +3656,7 @@ bool TypeConverter::visitAggregateLeaves(
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              std::nullopt);
         }
-      } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
+      } else if (auto *decl = ty.getEnumDecl()) {
         auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
@@ -5111,7 +5229,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           //
           // However, only do this if its a 'let'; if the capture is
           // mutable, we're going to be capturing a box or an address.
-          if (captureType->getClassOrBoundGenericClass() &&
+          if (captureType->getClassDecl() &&
               capturedVar->isLet()) {
             // If we've already captured the same value already, just merge
             // flags.
@@ -5462,6 +5580,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
     return ABIDifference::NeedsThunk;
 
+  // An exactly-once value needs a context of its own, so forming one from any
+  // other thick function value needs a thunk, even from an at-most-once value
+  // with the same ABI. A thin function has no context, so thin-to-thick can
+  // form the value directly.
+  if (fnTy2->isCalledOnce() && !fnTy1->isCalledOnce() &&
+      fnTy1->getExtInfo().hasContext())
+    return ABIDifference::NeedsThunk;
+
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
@@ -5715,7 +5841,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
     TypeExpansionContext context, SILType enumType, EnumElementDecl *elt) {
 
-  auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
+  auto *enumDecl = enumType.getEnumDecl();
 
   assert(elt->getDeclContext() == enumDecl);
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
@@ -5827,7 +5953,7 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
                                      SILType Ty,
                                      TypeExpansionContext expansion) {
-  if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = Ty.getStructDecl()) {
     assert(
         !structDecl->isResilient(&TC.M, expansion.getResilienceExpansion()) &&
         " FSO should not be trying to explode resilient (ie address-only) "
@@ -5861,7 +5987,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     return;
   }
 
-  if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = Ty.getEnumDecl()) {
     if (enumDecl->isIndirect()) {
       return;
     }
@@ -5924,32 +6050,59 @@ bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
   return isLoadable() || !F.hasLoweredAddresses();
 }
 
-void TypeLowering::print(llvm::raw_ostream &os) const {
+void TypeLowering::printProperties(llvm::raw_ostream &os,
+                                   unsigned indentation) const {
   auto BOOL = [&](bool b) -> StringRef {
     if (b)
       return "true";
     return "false";
   };
-  os << "Type Lowering for lowered type: " << LoweredType << ".\n"
-     << "Expansion: " << getResilienceExpansion() << "\n"
-     << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
-     << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
-     << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"
-     << "isResilient: " << BOOL(Properties.isResilient()) << ".\n"
-     << "isTypeExpansionSensitive: "
-     << BOOL(Properties.isTypeExpansionSensitive()) << ".\n"
-     << "isInfinite: " << BOOL(Properties.isInfinite()) << ".\n"
-     << "isOrContainsRawPointer: " << BOOL(Properties.isOrContainsRawPointer())
-     << ".\n"
-     << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
-     << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
-     << "isAddressableForDependencies: "
-     << BOOL(Properties.isAddressableForDependencies()) << ".\n"
-     << "hasOnlyDefaultDeinit: "
-     << BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) << ".\n"
-     << "definitelyIsAddressableForDependencies: " << BOOL(Properties.definitelyIsAddressableForDependencies()) << ".\n"
-     << "definitelyIsOrContainsRawLayout: " << BOOL(Properties.definitelyIsOrContainsRawLayout()) << ".\n"
-     << "\n";
+
+  auto printProperty = [&](StringRef name, StringRef value) {
+    os.indent(indentation) << name << ": " << value << ".\n";
+  };
+
+  os.indent(indentation) << "Expansion: " << getResilienceExpansion() << "\n";
+  printProperty("isTrivial", BOOL(Properties.isTrivial()));
+  printProperty("isEscapable", BOOL(Properties.isEscapable()));
+  printProperty("isNonTrivialOnlyBecauseNonEscapable",
+                BOOL(Properties.isNonTrivialOnlyBecauseNonEscapable()));
+  printProperty("isReferenceCounted", BOOL(isReferenceCounted()));
+  printProperty("isFixedABI", BOOL(Properties.isFixedABI()));
+  printProperty("isAddressOnly", BOOL(Properties.isAddressOnly()));
+  printProperty("isResilient", BOOL(Properties.isResilient()));
+  printProperty("isTypeExpansionSensitive",
+                BOOL(Properties.isTypeExpansionSensitive()));
+  printProperty("isInfinite", BOOL(Properties.isInfinite()));
+  printProperty("isOrContainsRawPointer",
+                BOOL(Properties.isOrContainsRawPointer()));
+  printProperty("isLexical", BOOL(Properties.isLexical()));
+  printProperty("isOrContainsPack", BOOL(Properties.isOrContainsPack()));
+  printProperty("isAddressableForDependencies",
+                BOOL(Properties.isAddressableForDependencies()));
+  printProperty("isOrContainsRawLayout",
+                BOOL(Properties.isOrContainsRawLayout()));
+  printProperty("hasOnlyDefaultDeinit",
+                BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit));
+  printProperty("isVeryLargeType", BOOL(Properties.isVeryLargeType()));
+  printProperty("definitelyIsAddressableForDependencies",
+                BOOL(Properties.definitelyIsAddressableForDependencies()));
+  printProperty("definitelyIsOrContainsRawLayout",
+                BOOL(Properties.definitelyIsOrContainsRawLayout()));
+  os << "\n";
+}
+
+void TypeLowering::print(llvm::raw_ostream &os) const {
+  os << "Type Lowering for lowered type: " << LoweredType << ".\n";
+  printProperties(os, 0);
+}
+
+void TypeLowering::printForAbstractTypeLayoutInfoBase(
+    llvm::raw_ostream &os, unsigned indentation,
+    llvm::StringRef concreteTypeName) const {
+  os.indent(indentation) << "TypeLowering:\n";
+  os.indent(indentation + 2) << "class: " << concreteTypeName << "\n";
+  printProperties(os, indentation + 2);
 }
 
 void TypeLowering::dump() const {

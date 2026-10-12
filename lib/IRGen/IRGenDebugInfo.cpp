@@ -1373,7 +1373,7 @@ private:
     if (!Ty)
       return {false,{}};
     // Go from Pair<Int, Double> to Pair<T, U>.
-    auto *Decl = Ty->getNominalOrBoundGenericNominal();
+    auto *Decl = Ty->getNominalDecl();
     if (!Decl)
       return {false, {}};
     // Go from Pair<Int, Double> to Pair<T, U>.
@@ -1431,7 +1431,7 @@ private:
     // When emitting debug information for a type such as Pair<Int, Double>,
     // emit a description of all the fields for Pair<T, U>, and emit the regular
     // debug information for Pair<Int, Double>.
-    auto *Decl = Type->getNominalOrBoundGenericNominal();
+    auto *Decl = Type->getNominalDecl();
     if (!Decl)
       return nullptr;
 
@@ -2836,7 +2836,7 @@ private:
         }
       }
 
-      auto *TypeDecl = T->getNominalOrBoundGenericNominal();
+      auto *TypeDecl = T->getNominalDecl();
       if (!TypeDecl)
         return TypeWalker::Action::Continue;
 
@@ -2919,7 +2919,7 @@ private:
   /// @_originallyDefinedIn. Returns null if no type is annotated.
   NominalTypeDecl *getDeclAnnotatedByOriginallyDefinedIn(DebugTypeInfo DbgTy) {
     auto Type = DbgTy.getType();
-    auto *TypeDecl = Type->getNominalOrBoundGenericNominal();
+    auto *TypeDecl = Type->getNominalDecl();
     if (!TypeDecl)
       return nullptr;
 
@@ -2977,7 +2977,7 @@ private:
       TypeDecl = AliasDecl;
       Context = AliasDecl->getParent();
       ClangDecl = AliasDecl->getClangDecl();
-    } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+    } else if (auto *ND = DbgTy.getType()->getNominalDecl()) {
       TypeDecl = ND;
       // If this is an originally defined in type, we want to emit this type's
       // scope to be the ABI module.

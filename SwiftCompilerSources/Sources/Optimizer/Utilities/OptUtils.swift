@@ -316,7 +316,7 @@ extension ApplySite {
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
                                                 isOnStack: partialAp.isOnStack,
                                                 isNested:  partialAp.isNested,
-                                                isCalledOnce: partialAp.isCalledOnce,
+                                                executionSemantics: partialAp.executionSemantics,
                                                 argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
 

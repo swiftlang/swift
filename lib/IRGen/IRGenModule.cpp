@@ -1938,7 +1938,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     }
   }
 
-  if (!IRGen.Opts.DisableForceLoadSymbols && linkLib.shouldForceLoad()) {
+  // Embedded Swift does not use force-load symbols.
+  if (!IRGen.Opts.DisableForceLoadSymbols && linkLib.shouldForceLoad() &&
+      !Context.LangOpts.hasFeature(Feature::Embedded)) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk = cast<llvm::Function>(
@@ -2293,7 +2295,9 @@ void IRGenModule::emitAutolinkInfo() {
 
   Autolink.writeEntries(Entries, Metadata, *this);
 
-  if (!IRGen.Opts.ForceLoadSymbolName.empty()) {
+  // Embedded Swift does not use force-load symbols.
+  if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
+      !Context.LangOpts.hasFeature(Feature::Embedded)) {
     (void) createForceImportThunk(*this);
   }
 }
@@ -2334,6 +2338,14 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 bool IRGenModule::finalize() {
+  if (getOptions().DumpAbstractTypeLayoutInfo !=
+      IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
+    for (auto type : Context.getRecoveredHiddenTypes()) {
+      auto hidden = cast<HiddenType>(type);
+      dumpAbstractTypeLayoutInfo(type, hidden->getMangledName(), "recovery");
+    }
+  }
+
   const char *ModuleHashVarName = "llvm.swift_module_hash";
   if (IRGen.Opts.OutputKind == IRGenOutputKind::ObjectFile &&
       !Module.getGlobalVariable(ModuleHashVarName) &&
@@ -2491,7 +2503,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (!Triple.isOSDarwin() && !Context.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  auto *clDecl = objectType.getClassDecl();
   if (!clDecl)
     return false;
 

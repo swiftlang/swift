@@ -1512,7 +1512,7 @@ public:
         abort();
       }
 
-      if (!E->getType()->getClassOrBoundGenericClass()) {
+      if (!E->getType()->getClassDecl()) {
         Out << "ProtocolMetatypeToObject does not produce class:\n";
         E->dump(Out);
         Out << "\n";
@@ -1642,8 +1642,8 @@ public:
         abort();
       }
 
-      if (!destTy->getClassOrBoundGenericClass() ||
-          !(srcTy->getClassOrBoundGenericClass() ||
+      if (!destTy->getClassDecl() ||
+          !(srcTy->getClassDecl() ||
             srcTy->is<DynamicSelfType>())) {
         Out << "DerivedToBaseExpr does not involve class types:\n";
         E->dump(Out);
@@ -2264,8 +2264,16 @@ public:
       auto instance = metatype->getInstanceType();
       if (auto existential = metatype->getAs<ExistentialMetatypeType>())
         instance = existential->getExistentialInstanceType();
-      checkSameType(E->getBase()->getType(), instance,
-                    "base type of .Type expression");
+
+      Type baseType = E->getBase()->getType();
+      if (baseType->isCOMExistentialType()) {
+        if (!instance->isAny()) {
+          Out << "DynamicTypeExpr for a COM existential must have Any.Type\n";
+          abort();
+        }
+      } else {
+        checkSameType(baseType, instance, "base type of .Type expression");
+      }
       verifyCheckedBase(E);
     }
 
@@ -3744,7 +3752,7 @@ public:
       }
 
       // If the destination is a class, walk the supertypes of the source.
-      if (destTy->getClassOrBoundGenericClass()) {
+      if (destTy->getClassDecl()) {
         if (!destTy->isBindableToSuperclassOf(srcTy)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";

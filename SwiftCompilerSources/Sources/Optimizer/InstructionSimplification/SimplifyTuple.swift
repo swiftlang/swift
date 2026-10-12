@@ -12,8 +12,17 @@
 
 import SIL
 
-extension TupleInst : OnoneSimplifiable {
+extension TupleInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if !context.preserveDebugInfo {
+      // Eliminate `tuple_extract`s of an owned `tuple` where the `tuple_extract`s are inside a
+      // a borrow scope. See `StructInst.simplify` for details.
+      // Don't do this in -Onone, because it would change the debug info.
+      splitOwnedAggregate(context)
+      if isDeleted {
+        return
+      }
+    }
 
     // Eliminate the redundant instruction pair
     // ```

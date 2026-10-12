@@ -281,7 +281,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
       substitutionMap: calleeSubs,
       capturedArguments: arguments, calleeConvention: partialApply.calleeConvention,
       hasUnknownResultIsolation: partialApply.hasUnknownResultIsolation, isOnStack: partialApply.isOnStack,
-      isNested: partialApply.isNested, isCalledOnce: partialApply.isCalledOnce)
+      isNested: partialApply.isNested, executionSemantics: partialApply.executionSemantics)
     newClosure = newPartialApply
   }
   partialApply.uses.replaceAll(with: newClosure, context)

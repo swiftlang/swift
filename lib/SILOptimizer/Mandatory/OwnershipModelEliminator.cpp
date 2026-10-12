@@ -505,7 +505,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       // In `@called(atMostOnce)` case, consumed captures don't need the
       // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
       // value.
-      if (inst->isCalledOnce()) {
+      if (inst->hasCalledAtMostOnceSemantics()) {
         auto argConv = applySite.getArgumentConvention(argOp);
         if (!(op->getType().isMoveOnly() &&
               !argConv.isOwnedConventionInCaller()))
@@ -554,7 +554,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto loc = destroy->getLoc();
   auto operand = destroy->getOperand();
   auto operandTy = operand->getType();
-  NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = operandTy.getNominalDecl();
 
   if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {

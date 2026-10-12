@@ -1,0 +1,54 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -address-lowering -enable-sil-opaque-values -sil-print-types -sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem { func value(_ offset: Int32) -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IClassItem: IItem, AnyObject {}
+
+// Lookup and application borrow the same storage without copying the receiver.
+// CHECK-LABEL: sil [ossa] @borrowed
+// CHECK: bb0([[SELF:%.*]] : $*T, [[OFFSET:%.*]] : $Int32):
+// CHECK-NEXT: [[METHOD:%.*]] = com_method [[SELF]] : $*T, #IItem.value
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[OFFSET]], [[SELF]])
+// CHECK-NEXT: return [[RESULT]] : $Int32
+sil [ossa] @borrowed : $@convention(thin) <T: IItem> (@in_guaranteed T, Int32) -> Int32 {
+bb0(%self : @guaranteed $T, %offset : $Int32):
+  %method = com_method %self : $T, #IItem.value, $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  %result = apply %method(%offset, %self) : $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  return %result : $Int32
+}
+
+// An owned receiver remains alive through the lookup and application.
+// CHECK-LABEL: sil [ossa] @owned
+// CHECK: bb0([[SELF:%.*]] : $*T, [[OFFSET:%.*]] : $Int32):
+// CHECK-NEXT: [[METHOD:%.*]] = com_method [[SELF]] : $*T, #IItem.value
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[OFFSET]], [[SELF]])
+// CHECK-NEXT: destroy_addr [[SELF]] : $*T
+// CHECK-NEXT: return [[RESULT]] : $Int32
+sil [ossa] @owned : $@convention(thin) <T: IItem> (@in T, Int32) -> Int32 {
+bb0(%self : @owned $T, %offset : $Int32):
+  %borrow = begin_borrow %self : $T
+  %method = com_method %borrow : $T, #IItem.value, $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  %result = apply %method(%offset, %borrow) : $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  end_borrow %borrow : $T
+  destroy_value %self : $T
+  return %result : $Int32
+}
+
+// A COM class constraint still uses the generic address-only representation.
+// CHECK-LABEL: sil [ossa] @class_bound
+// CHECK: bb0([[SELF:%.*]] : $*T, [[OFFSET:%.*]] : $Int32):
+// CHECK-NEXT: [[METHOD:%.*]] = com_method [[SELF]] : $*T, #IItem.value
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[OFFSET]], [[SELF]])
+// CHECK-NEXT: return [[RESULT]] : $Int32
+sil [ossa] @class_bound : $@convention(thin) <T: IClassItem> (@in_guaranteed T, Int32) -> Int32 {
+bb0(%self : @guaranteed $T, %offset : $Int32):
+  %method = com_method %self : $T, #IItem.value, $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  %result = apply %method(%offset, %self) : $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  return %result : $Int32
+}

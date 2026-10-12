@@ -18,6 +18,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
+#include "swift/AST/AccessScope.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -195,6 +197,22 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   auto &C = actor->getASTContext();
   return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
+}
+
+bool swift::isDistributedActorStubMember(const ValueDecl *member) {
+  if (!member)
+    return false;
+
+  auto *ext = dyn_cast<ExtensionDecl>(member->getDeclContext());
+  if (!ext || !isa_and_nonnull<ProtocolDecl>(ext->getExtendedNominal()))
+    return false;
+
+  auto *stubProto = member->getASTContext().get_DistributedActorStubDecl();
+  if (!stubProto)
+    return false;
+
+  auto sig = ext->getGenericSignature();
+  return sig && sig->requiresProtocol(ext->getSelfInterfaceType(), stubProto);
 }
 
 Identifier swift::getDistributedResolvableProtocolStubName(ProtocolDecl *proto) {
@@ -521,6 +539,8 @@ swift::getDistributedSerializationRequirements(
 
   auto layout = serialReqType->getExistentialLayout();
   for (auto p : layout.getProtocols()) {
+    if (p->getInvertibleProtocolKind())
+      continue;
     requirementProtos.insert(p);
   }
 
@@ -913,7 +933,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     auto argumentTy = argumentParam->getInterfaceType();
     auto argumentInContextTy = mapTypeIntoEnvironment(argumentTy);
     if (argumentInContextTy->getAnyNominal() == C.getRemoteCallArgumentDecl()) {
-      auto argGenericParams = argumentInContextTy->getStructOrBoundGenericStruct()
+      auto argGenericParams = argumentInContextTy->getStructDecl()
           ->getGenericParams()->getParams();
       if (argGenericParams.size() != 1) {
         return false;
@@ -1475,7 +1495,7 @@ swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
   if (actorOrSystem->isDistributedActor()) {
     if (auto systemTy =
             getConcreteReplacementForProtocolActorSystemType(actorOrSystem)) {
-      system = systemTy->getNominalOrBoundGenericNominal();
+      system = systemTy->getNominalDecl();
     }
   }
 
@@ -1490,6 +1510,17 @@ swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
                            GetDistributedActorSystemRemoteCallFunctionRequest{
                                mutableSystem, /*isVoidReturn=*/isVoidReturn},
                            nullptr);
+}
+
+bool swift::isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
+    NominalTypeDecl *actorOrSystem, bool isVoidReturn) {
+  if (!actorOrSystem)
+    return false;
+  auto *witness =
+      getRemoteCallOnDistributedActorSystem(actorOrSystem, isVoidReturn);
+  if (!witness)
+    return false;
+  return getActorIsolation(witness).isNonisolatedNonsending();
 }
 
 /******************************************************************************/
@@ -1592,7 +1623,7 @@ FuncDecl *swift::getMakeInvocationEncoderOnDistributedActorSystem(
   auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
   assert(systemTy && "No specific ActorSystem type found!");
 
-  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  auto systemNominal = systemTy->getNominalDecl();
   assert(systemNominal && "No system nominal type found!");
 
   for (auto result :

@@ -518,8 +518,8 @@ private func getHash(
     }
 
   case let emi as ExistentialMetatypeInst:
-    // Only CSE the value-operand form; the address form is not safe.
-    if emi.operand.value.type.isAddress {
+    // COM metadata queries execute foreign code, and the address form reads mutable storage.
+    if emi.mayHaveSideEffects || emi.operand.value.type.isAddress {
       return nil
     }
     hasher.combine(ObjectIdentifier(ExistentialMetatypeInst.self))

@@ -132,6 +132,10 @@ namespace {
 
     Size HeaderSize;
 
+    /// Whether a stored property was laid out as empty because the instance
+    /// would otherwise not fit in 32 bits.
+    bool IsTooLarge = false;
+
   public:
     ClassLayoutBuilder(
         IRGenModule &IGM, SILType classType, ReferenceCounting refcounting,
@@ -163,7 +167,7 @@ namespace {
       }
 
       // Next, add the fields for the given class.
-      auto theClass = classType.getClassOrBoundGenericClass();
+      auto theClass = classType.getClassDecl();
       assert(theClass);
 
       if (theClass->getObjCImplementationDecl())
@@ -187,6 +191,8 @@ namespace {
     ArrayRef<ElementLayout> getElements() const {
       return Elements;
     }
+
+    bool isTooLarge() const { return IsTooLarge; }
 
     ClassLayout getClassLayout(llvm::Type *classTy) const {
       assert(!TailTypes);
@@ -237,7 +243,7 @@ namespace {
       } else if (theClass->hasSuperclass() &&
                  !theClass->isForeignReferenceType()) {
         SILType superclassType = classType.getSuperclass();
-        auto superclassDecl = superclassType.getClassOrBoundGenericClass();
+        auto superclassDecl = superclassType.getClassDecl();
         assert(superclassType && superclassDecl);
 
         if (IGM.hasResilientMetadata(superclassDecl,
@@ -363,6 +369,19 @@ namespace {
             Options |= ClassMetadataFlags::ClassHasGenericLayout;
           else
             Options |= ClassMetadataFlags::ClassHasResilientMembers;
+        }
+
+        // Instance sizes and field offsets must fit in 32 bits. Lay out a
+        // field that would extend past that limit as empty, so that no
+        // offset or size in the layout is truncated; the caller diagnoses
+        // the class and no object file is emitted.
+        if (auto *fixedTI = dyn_cast<FixedTypeInfo>(eltType)) {
+          Size end = CurSize.roundUpToAlignment(fixedTI->getFixedAlignment()) +
+                     fixedTI->getFixedSize();
+          if (end.getValue() > std::numeric_limits<uint32_t>::max()) {
+            IsTooLarge = true;
+            eltType = &IGM.getTypeInfo(SILType::getEmptyTupleType(IGM.Context));
+          }
         }
 
         auto element = ElementLayout::getIncomplete(*eltType);
@@ -503,9 +522,9 @@ ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
   builder.setAsBodyOfStruct(classTy);
 
   // The class instance size is recorded in a 32-bit metadata field, so a class
-  // whose instance size does not fit in 32 bits cannot be represented. Reject
-  // it instead of silently truncating the recorded size.
-  if (builder.getSize().getValue() > std::numeric_limits<uint32_t>::max()) {
+  // whose instance size does not fit in 32 bits cannot be represented. The
+  // builder lays out the overflowing fields as empty; reject the class here.
+  if (builder.isTooLarge()) {
     IGM.Context.Diags.diagnose(SourceLoc(), diag::fixed_type_too_large,
                                classType.getASTType());
   }
@@ -534,7 +553,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
 
   // Create the StructLayout, which is transferred to the caller (the caller is
   // responsible for deleting it).
-  return new StructLayout(builder, classType.getClassOrBoundGenericClass(),
+  return new StructLayout(builder, classType.getClassDecl(),
                           ResultTy, builder.getElements());
 }
 
@@ -697,7 +716,7 @@ MemberAccessStrategy
 irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
                                             SILType baseType, VarDecl *field) {
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
-  ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
+  ClassDecl *baseClass = baseType.getClassDecl();
 
   auto &classLayout = baseClassTI.getClassLayout(IGM, baseType,
                                                /*forBackwardDeployment=*/false);
@@ -745,7 +764,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
                                                              ClassType);
     Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                        ClassType.getClassOrBoundGenericClass(),
+                                        ClassType.getClassDecl(),
                                         metadata).first;
   }
   // Align up to the TailType.
@@ -902,7 +921,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     } else {
       std::tie(size, alignMask)
         = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                       selfType.getClassOrBoundGenericClass(),
+                                       selfType.getClassDecl(),
                                        metadata);
     }
 
@@ -954,7 +973,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   llvm::Value *size, *alignMask;
   std::tie(size, alignMask)
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                   selfType.getClassOrBoundGenericClass(),
+                                   selfType.getClassDecl(),
                                    metadata);
   std::tie(size, alignMask)
     = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
@@ -1000,7 +1019,7 @@ static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
 void irgen::emitClassDeallocation(IRGenFunction &IGF,
                                   SILType selfType,
                                   llvm::Value *selfValue) {
-  auto *theClass = selfType.getClassOrBoundGenericClass();
+  auto *theClass = selfType.getClassDecl();
 
   // We want to deallocate default actors or potential default
   // actors differently.  We assume that being a default actor
@@ -1047,7 +1066,7 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          SILType selfType,
                                          llvm::Value *selfValue,
                                          llvm::Value *metadataValue) {
-  auto *theClass = selfType.getClassOrBoundGenericClass();
+  auto *theClass = selfType.getClassDecl();
   assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal);
 
   llvm::Value *size, *alignMask;
@@ -2735,7 +2754,7 @@ static llvm::Constant *doEmitClassPrivateData(
 
 llvm::Constant *irgen::emitSpecializedGenericClassPrivateData(
     IRGenModule &IGM, ClassDecl *theClass, CanType theType) {
-  assert(theType->getClassOrBoundGenericClass() == theClass);
+  assert(theType->getClassDecl() == theClass);
   assert(theClass->getGenericEnvironment());
   Type ty = theType;
   PrettyStackTraceType stackTraceRAII(theClass->getASTContext(),
@@ -2955,7 +2974,7 @@ CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *C) {
 
 CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, CanType type,
                                         bool useArchetypes) {
-  auto cls = type->getClassOrBoundGenericClass();
+  auto cls = type->getClassDecl();
   if (cls->isNativeNSObjectSubclass()) {
     return getSuperclassDeclForMetadata(IGM, cls)->getDeclaredInterfaceType()
                                                  ->getCanonicalType();
@@ -3031,7 +3050,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
   // This needs to be kept up-to-date with getIsaEncodingForType.
 
-  if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = type.getClassDecl()) {
     return hasKnownSwiftMetadata(IGM, theClass);
   }
 

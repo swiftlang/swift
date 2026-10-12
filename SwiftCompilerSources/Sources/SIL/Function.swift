@@ -367,7 +367,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   public var isDeinitBarrier: Bool {
-    effects.sideEffects?.global.isDeinitBarrier ?? true
+    if hasSemanticsAttribute("realloc_array_buffer") {
+      return false
+    }
+    return effects.sideEffects?.global.isDeinitBarrier ?? true
   }
 
   public enum PerformanceConstraints {

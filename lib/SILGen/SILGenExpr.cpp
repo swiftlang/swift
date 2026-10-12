@@ -2698,7 +2698,7 @@ RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
 static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation loc) {
   SILValue v = array;
   SILType storageType;
-  while (auto *sd = v->getType().getStructOrBoundGenericStruct()) {
+  while (auto *sd = v->getType().getStructDecl()) {
     ASSERT(sd->getStoredProperties().size() == 1 &&
            "Array or its internal structs should have exactly one stored property");
     auto *se = SGF.getBuilder().createStructExtract(loc, v, v->getType().getFieldDecl(0));
@@ -3185,14 +3185,17 @@ static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
                                      SGFContext::AllowImmediatePlusZero);
 }
 
-SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
+SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                                             CanType resultType) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
 
   // For class, archetype, and protocol types, look up the dynamic metatype.
   if (baseTy.isAnyExistentialType()) {
-    SILType metaTy = getLoweredLoadableType(
-                                      CanExistentialMetatypeType::get(baseTy));
+    CanType metatype = baseTy.isCOMExistentialType() && resultType
+                           ? resultType
+                           : CanExistentialMetatypeType::get(baseTy);
+    SILType metaTy = getLoweredLoadableType(metatype);
     FormalEvaluationScope scope(*this);
     auto base = emitMetatypeOperand(*this, baseExpr).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
@@ -3226,7 +3229,8 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
 }
 
 RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
-  auto metatype = SGF.emitMetatypeOfValue(E, E->getBase());
+  auto metatype = SGF.emitMetatypeOfValue(E, E->getBase(),
+                                          E->getType()->getCanonicalType());
   return RValue(SGF, E,
                 ManagedValue::forObjectRValueWithoutOwnership(metatype));
 }
@@ -3668,7 +3672,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
     if (auto selfType = baseType->getAs<DynamicSelfType>())
       baseType = selfType->getSelfType()->getCanonicalType();
-    auto baseClass = baseType->getClassOrBoundGenericClass();
+    auto baseClass = baseType->getClassDecl();
 
     if (baseClass != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)

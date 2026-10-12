@@ -324,14 +324,14 @@ static void addAlignmentAttributeToBuilder(IRGenModule &IGM,
   }
 }
 
-static void addIndirectValueParameterAttributes(IRGenModule &IGM,
-                                                llvm::AttributeList &attrs,
-                                                const TypeInfo &ti,
-                                                unsigned argIndex,
-                                                bool addressable) {
+static void addIndirectValueParameterAttributes(
+    IRGenModule &IGM, llvm::AttributeList &attrs, const TypeInfo &ti,
+    unsigned argIndex, bool addressable, bool aliasable = false) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
-  // Value parameter pointers can't alias or be captured.
-  b.addAttribute(llvm::Attribute::NoAlias);
+  // Value parameter pointers can't alias or be captured. Values with interior
+  // mutability may be aliased while borrowed, though.
+  if (!aliasable)
+    b.addAttribute(llvm::Attribute::NoAlias);
   // Bitwise takable value types are guaranteed not to capture
   // a pointer into itself.
   if (!addressable && ti.isBitwiseTakable(ResilienceExpansion::Maximal))
@@ -637,6 +637,7 @@ namespace {
     llvm::Type *addIndirectResult(SILType resultType, bool useInReg = false);
 
     bool isAddressableParam(unsigned paramIdx);
+    bool hasInteriorMutability(SILType paramSILType);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.silConv);
@@ -1345,6 +1346,10 @@ namespace {
       case clang::BuiltinType::Void:
         llvm_unreachable("bare void type in ABI lowering");
 
+      // std::meta::info is a consteval-only type and is never imported.
+      case clang::BuiltinType::MetaInfo:
+        llvm_unreachable("consteval-only type in ABI lowering");
+
       // We should never see the OpenCL builtin types at all.
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLEvent:
@@ -1385,6 +1390,11 @@ namespace {
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
         llvm_unreachable("HLSL intangible type in ABI lowering");
+
+      // We should never see HLSL packed types at all.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+        llvm_unreachable("HLSL packed type in ABI lowering");
 
       // We should never see SPIRV opaque types at all.
 #define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
@@ -1716,10 +1726,10 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   auto &FI = isCXXMethod ?
       clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All) :
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr) :
       clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All);
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
@@ -1898,18 +1908,21 @@ const TypeInfo &SignatureExpansion::expand(unsigned paramIdx) {
   switch (auto conv = param.getConvention()) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Indirect_In_CXX:
+  case ParameterConvention::Indirect_In_CXX: {
+    bool interiorMutable = hasInteriorMutability(paramSILType);
     addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size(),
-                                        isAddressableParam(paramIdx));
+                                        isAddressableParam(paramIdx),
+                                        interiorMutable);
     addOpaquePointerParameter();
     return ti;
+  }
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     addInoutParameterAttributes(
-      IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
-      conv == ParameterConvention::Indirect_InoutAliasable,
-      isAddressableParam(paramIdx));
+        IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
+        conv == ParameterConvention::Indirect_InoutAliasable,
+        isAddressableParam(paramIdx));
     addOpaquePointerParameter();
     return ti;
 
@@ -1958,6 +1971,18 @@ bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
                                IGM.getGenericEnvironment(),
                                IGM.getSILTypes(),
                                IGM.getMaximalTypeExpansionContext());
+}
+
+/// Raw-layout storage (e.g. `_Cell`, `Atomic`, `Mutex`) may be mutated through
+/// pointers derived from its address while it is borrowed, so a borrowed
+/// raw-layout parameter must not be `noalias`. Inout parameters are still
+/// exclusive and can remain `noalias`.
+bool SignatureExpansion::hasInteriorMutability(SILType paramSILType) {
+  return IGM.getSILTypes()
+      .getTypeLowering(paramSILType, IGM.getMaximalTypeExpansionContext(),
+                       FnType->getInvocationGenericSignature())
+      .getRecursiveProperties()
+      .definitelyIsOrContainsRawLayout();
 }
 
 /// Does the given function type have a self parameter that should be

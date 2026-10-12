@@ -1,8 +1,5 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
-// rdar://170452940 - Test is failing in different configurations.
-// REQUIRES: rdar170452940
-
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: synchronization
@@ -11,6 +8,9 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// SILGen over-consumes a noncopyable value captured by a closure.
+// Tracked by https://github.com/swiftlang/swift/issues/93065
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Synchronization
 import Dispatch
@@ -437,6 +437,163 @@ func test_outer_task_cancelled_inner_shielded_group() async {
   await task.value
 }
 
+@available(SwiftStdlib 6.5, *)
+func test_task_cancel_again_inside_shield_keeps_reason() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_task_cancel_again_inside_shield_keeps_reason
+
+  // A task is only cancelled once. Cancelling it again inside a shield doesn't
+  // change the reason of the first cancellation.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel() }
+    await withTaskCancellationShield {
+      withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    }
+    print("reason:\(Task.cancellationReason.map { "\($0)" } ?? "nil")")
+    // CHECK: reason:unspecified
+  }.value
+}
+
+@available(SwiftStdlib 6.5, *)
+func test_unsafe_current_task_ignores_shield() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_unsafe_current_task_ignores_shield
+
+  // `UnsafeCurrentTask` reports the cancellation of the task itself, even
+  // inside a shield.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    withTaskCancellationShield {
+      withUnsafeCurrentTask { task in
+        print("in shield: isCancelled:\(task!.isCancelled)")
+        // CHECK: in shield: isCancelled:true
+        print("in shield: cancellationReason:\(task!.cancellationReason.map { "\($0)" } ?? "nil")")
+        // CHECK: in shield: cancellationReason:deadlineExpired
+      }
+    }
+  }.value
+}
+
+// A signal whose `wait()` ignores cancellation by spinning.
+final class CancellationIgnoringSignal: Sendable {
+  private let signalled = Atomic<Bool>(false)
+
+  var isSignalled: Bool {
+    signalled.load(ordering: .acquiring)
+  }
+
+  func signal() {
+    signalled.store(true, ordering: .releasing)
+  }
+
+  func wait() async {
+    while !isSignalled {
+      await Task.yield()
+    }
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+func test_task_cancel_fires_handler_outside_shield() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_task_cancel_fires_handler_outside_shield
+
+  // Cancelling a task while a shield is active only skips the handlers inside
+  // the shield. The handlers outside of the shield fire right away.
+  await Task {
+    let outsideFired = CancellationIgnoringSignal()
+    let insideFired = CancellationIgnoringSignal()
+    await withTaskCancellationHandler {
+      await withTaskCancellationShield {
+        await withTaskCancellationHandler {
+          withUnsafeCurrentTask { $0?.cancel() }
+          print("in shield: isCancelled:\(Task.isCancelled)")
+          // CHECK: in shield: isCancelled:false
+        } onCancel: {
+          insideFired.signal()
+        }
+      }
+    } onCancel: {
+      outsideFired.signal()
+    }
+    print("handler outside shield fired:\(outsideFired.isSignalled)")
+    // CHECK: handler outside shield fired:true
+    print("handler inside shield fired:\(insideFired.isSignalled)")
+    // CHECK: handler inside shield fired:false
+  }.value
+}
+
+@available(SwiftStdlib 6.4, *)
+func test_task_cancel_skips_running_children_inside_shield() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_task_cancel_skips_running_children_inside_shield
+
+  // Child tasks that are running inside a shield when the task gets cancelled
+  // are not cancelled. Child tasks outside of the shield are.
+  await Task {
+    let started = CancellationIgnoringSignal()
+    let cancelled = CancellationIgnoringSignal()
+
+    async let outsideChild: Bool = {
+      started.signal()
+      await cancelled.wait()
+      return Task.isCancelled
+    }()
+    await started.wait()
+
+    await withTaskCancellationShield {
+      let asyncLetStarted = CancellationIgnoringSignal()
+      async let asyncLetChild: Bool = {
+        asyncLetStarted.signal()
+        await cancelled.wait()
+        return Task.isCancelled
+      }()
+      await asyncLetStarted.wait()
+
+      await withTaskGroup(of: Bool.self) { group in
+        let groupChildStarted = CancellationIgnoringSignal()
+        group.addTask {
+          groupChildStarted.signal()
+          await cancelled.wait()
+          return Task.isCancelled
+        }
+        await groupChildStarted.wait()
+
+        withUnsafeCurrentTask { $0?.cancel() }
+        cancelled.signal()
+
+        print("group child in shield isCancelled:\(await group.next()!)")
+        // CHECK: group child in shield isCancelled:false
+      }
+      print("async let in shield isCancelled:\(await asyncLetChild)")
+      // CHECK: async let in shield isCancelled:false
+    }
+    print("async let outside shield isCancelled:\(await outsideChild)")
+    // CHECK: async let outside shield isCancelled:true
+  }.value
+}
+
+@available(SwiftStdlib 6.5, *)
+func test_task_group_child_added_inside_shield() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_task_group_child_added_inside_shield
+
+  // A child task belongs to its task group, so a shield around `addTask`
+  // doesn't prevent its cancellation. It gets the reason of the group.
+  await Task {
+    withUnsafeCurrentTask { $0?.cancel(reason: .deadlineExpired) }
+    await withTaskGroup(of: String.self) { group in
+      withTaskCancellationShield {
+        group.addTask {
+          "child: isCancelled:\(Task.isCancelled) reason:\(Task.cancellationReason.map { "\($0)" } ?? "nil")"
+        }
+      }
+      print(await group.next()!)
+      // CHECK: child: isCancelled:true reason:deadlineExpired
+    }
+  }.value
+}
+
 @available(SwiftStdlib 6.4, *)
 @main struct Main {
   static func main() async {
@@ -451,6 +608,11 @@ func test_outer_task_cancelled_inner_shielded_group() async {
     await test_hasActiveCancellationShield()
     await test_task_isCancelled_instance_vs_static()
     await test_outer_task_cancelled_inner_shielded_group()
+    await test_task_cancel_again_inside_shield_keeps_reason()
+    await test_unsafe_current_task_ignores_shield()
+    await test_task_cancel_fires_handler_outside_shield()
+    await test_task_cancel_skips_running_children_inside_shield()
+    await test_task_group_child_added_inside_shield()
     print("DONE")
   }
 }

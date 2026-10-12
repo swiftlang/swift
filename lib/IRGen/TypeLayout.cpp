@@ -1297,7 +1297,7 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
   case ScalarKind::ObjCReference: {
-    if (auto *classDecl = representative.getClassOrBoundGenericClass()) {
+    if (auto *classDecl = representative.getClassDecl()) {
       if (!classDecl->hasClangNode()) {
         B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
                       size);
@@ -2018,6 +2018,15 @@ void AlignedGroupEntry::assignWithCopy(IRGenFunction &IGF, Address dest,
 
 void AlignedGroupEntry::assignWithTake(IRGenFunction &IGF, Address dest,
                                        Address src) const {
+  // If the type has a deinit, the value being overwritten in the destination
+  // must be destroyed via that deinit; elementwise assignment would skip it.
+  // Destroy the old value first, then take-initialize.
+  if (auto *nominal = ty.getNominalDecl();
+      nominal && nominal->getValueTypeDestructor()) {
+    destroy(IGF, dest);
+    initWithTake(IGF, dest, src);
+    return;
+  }
   withEachEntry(
       IGF, dest, src,
       [&](TypeLayoutEntry *entry, Address entryDest, Address entrySrc) {
@@ -4332,8 +4341,8 @@ TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
   llvm::FoldingSetNodeID id;
   ScalarTypeLayoutEntry::Profile(id, cast<FixedTypeInfo>(ti), representative);
   // Do we already have an entry.
-  void *insertPos;
-  if (auto *entry = scalarEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = scalarEntries.lookup(id, insertToken)) {
     return entry;
   }
   // Otherwise, create a new one.
@@ -4341,7 +4350,7 @@ TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
   auto mem = bumpAllocator.Allocate(bytes, alignof(ScalarTypeLayoutEntry));
   auto newEntry = new (mem)
       ScalarTypeLayoutEntry(cast<FixedTypeInfo>(ti), representative, kind);
-  scalarEntries.InsertNode(newEntry, insertPos);
+  scalarEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }
@@ -4350,14 +4359,14 @@ ArchetypeLayoutEntry *
 TypeLayoutCache::getOrCreateArchetypeEntry(SILType archetype) {
   llvm::FoldingSetNodeID id;
   ArchetypeLayoutEntry::Profile(id, archetype);
-  void *insertPos;
-  if (auto *entry = archetypeEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = archetypeEntries.lookup(id, insertToken)) {
     return entry;
   }
   auto bytes = sizeof(ArchetypeLayoutEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(ArchetypeLayoutEntry));
   auto newEntry = new (mem) ArchetypeLayoutEntry(archetype);
-  archetypeEntries.InsertNode(newEntry, insertPos);
+  archetypeEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }
@@ -4367,8 +4376,8 @@ AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
     Alignment::int_type minimumAlignment, const TypeInfo &ti) {
   llvm::FoldingSetNodeID id;
   AlignedGroupEntry::Profile(id, entries, ty, minimumAlignment);
-  void *insertPos;
-  if (auto *entry = alignedGroupEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = alignedGroupEntries.lookup(id, insertToken)) {
     return entry;
   }
   auto bytes = sizeof(AlignedGroupEntry);
@@ -4381,7 +4390,7 @@ AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
 
   auto newEntry =
       new (mem) AlignedGroupEntry(entries, ty, minimumAlignment, fixedTypeInfo);
-  alignedGroupEntries.InsertNode(newEntry, insertPos);
+  alignedGroupEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }
@@ -4394,8 +4403,8 @@ EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
 
   llvm::FoldingSetNodeID id;
   EnumTypeLayoutEntry::Profile(id, numEmptyCases, nonEmptyCases);
-  void *insertPos;
-  if (auto *entry = enumEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = enumEntries.lookup(id, insertToken)) {
     return entry;
   }
   auto bytes = sizeof(EnumTypeLayoutEntry);
@@ -4411,7 +4420,7 @@ EnumTypeLayoutEntry *TypeLayoutCache::getOrCreateEnumEntry(
   auto newEntry = new (mem)
       EnumTypeLayoutEntry(numEmptyCases, nonEmptyCases, ty, fixedTypeInfo,
                           ti.getBestKnownAlignment().getValue(), fixedSize);
-  enumEntries.InsertNode(newEntry, insertPos);
+  enumEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }
@@ -4420,14 +4429,14 @@ ResilientTypeLayoutEntry *
 TypeLayoutCache::getOrCreateResilientEntry(SILType ty) {
   llvm::FoldingSetNodeID id;
   ResilientTypeLayoutEntry::Profile(id, ty);
-  void *insertPos;
-  if (auto *entry = resilientEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = resilientEntries.lookup(id, insertToken)) {
     return entry;
   }
   auto bytes = sizeof(ResilientTypeLayoutEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(ResilientTypeLayoutEntry));
   auto newEntry = new (mem) ResilientTypeLayoutEntry(ty);
-  resilientEntries.InsertNode(newEntry, insertPos);
+  resilientEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }
@@ -4439,8 +4448,8 @@ TypeLayoutCache::getOrCreateTypeInfoBasedEntry(const TypeInfo &ti,
   llvm::FoldingSetNodeID id;
   TypeInfoBasedTypeLayoutEntry::Profile(id, ti, representative);
   // Grab the entry from the cache if we have one
-  void *insertPos;
-  if (auto *entry = typeInfoBasedEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = typeInfoBasedEntries.lookup(id, insertToken)) {
     return entry;
   }
   // Otherwise, create a new one.
@@ -4448,7 +4457,7 @@ TypeLayoutCache::getOrCreateTypeInfoBasedEntry(const TypeInfo &ti,
   auto mem = bumpAllocator.Allocate(bytes, alignof(ScalarTypeLayoutEntry));
   auto newEntry = new (mem)
       TypeInfoBasedTypeLayoutEntry(cast<FixedTypeInfo>(ti), representative);
-  typeInfoBasedEntries.InsertNode(newEntry, insertPos);
+  typeInfoBasedEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }
@@ -4459,8 +4468,8 @@ ArrayLayoutEntry *TypeLayoutCache::getOrCreateArrayEntry(TypeLayoutEntry *elemen
   llvm::FoldingSetNodeID id;
   ArrayLayoutEntry::Profile(id, elementLayout, elementType, countType);
   // Grab the entry from the cache countType we have one
-  void *insertPos;
-  if (auto *entry = arrayEntries.FindNodeOrInsertPos(id, insertPos)) {
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *entry = arrayEntries.lookup(id, insertToken)) {
     return entry;
   }
   // Otherwise, create a new one.
@@ -4468,7 +4477,7 @@ ArrayLayoutEntry *TypeLayoutCache::getOrCreateArrayEntry(TypeLayoutEntry *elemen
   auto mem = bumpAllocator.Allocate(bytes, alignof(ArrayLayoutEntry));
   auto newEntry = new (mem) ArrayLayoutEntry(elementLayout, elementType,
                                              countType);
-  arrayEntries.InsertNode(newEntry, insertPos);
+  arrayEntries.insert(newEntry, insertToken);
   newEntry->computeProperties();
   return newEntry;
 }

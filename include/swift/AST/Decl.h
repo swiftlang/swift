@@ -5522,6 +5522,10 @@ public:
   bool walkSuperclasses(
       llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const;
 
+  /// Whether an inverse of the given invertible protocol in this class's
+  /// inheritance clause suppresses the implicit conformance.
+  bool canSuppressInvertible(InvertibleProtocolKind ip) const;
+
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
   bool requiresStoredPropertyInits() const {

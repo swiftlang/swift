@@ -20,7 +20,7 @@ public func dontCallAtMostOnceEscaping(_ f: @escaping @called(atMostOnce) () -> 
 // CHECK: [[CTX:%.*]] = load ptr, ptr [[CTX_ADDR]]
 // CHECK: call void @swift_release(ptr [[CTX]])
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test26dontCallAtMostOnceEscapingyyyyXOnF"(ptr %0, ptr %1)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test26dontCallAtMostOnceEscapingyyyyXOonF"(ptr %0, ptr %1)
 // CHECK: [[CTX_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.function, ptr %f, i32 0, i32 1
 // CHECK: [[CTX:%.*]] = load ptr, ptr [[CTX_ADDR]]
 // CHECK: call void @swift_release(ptr [[CTX]])
@@ -90,24 +90,24 @@ public func neverCalled(_ x: Int) {
   dontCallAtMostOnce { r.use() }
 }
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test24allOwnedCapturesEscapingyySiFyyXOfU_TA"(ptr swiftself %0)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test24allOwnedCapturesEscapingyySiFyyXOofU_TA"(ptr swiftself %0)
 // CHECK:  [[FIELD_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
 // CHECK:  [[X_ADDR:%.*]] = getelementptr inbounds{{.*}} %T4test8ResourceV, ptr [[FIELD_ADDR]], i32 0, i32 0
 // CHECK:  [[VALUE:%.*]] = load i64, ptr [[X_ADDR]]
 // CHECK:  call void @swift_deallocUninitializedObject(ptr %0,
-// CHECK:  tail call swiftcc void @"$s4test24allOwnedCapturesEscapingyySiFyyXOfU_"(i64 [[VALUE]])
+// CHECK:  tail call swiftcc void @"$s4test24allOwnedCapturesEscapingyySiFyyXOofU_"(i64 [[VALUE]])
 public func allOwnedCapturesEscaping(_ x: Int) {
   let r = Resource(x: x)
   callAtMostOnceEscaping { r.use() }
 }
 
-// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test21mixedCapturesEscapingyySiFyyXOfU_TA"(ptr swiftself %0)
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test21mixedCapturesEscapingyySiFyyXOofU_TA"(ptr swiftself %0)
 // CHECK:  [[TRACKER_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
 // CHECK:  [[TRACKER:%.*]] = load ptr, ptr [[TRACKER_ADDR]]
 // CHECK:  [[RESOURCE_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 2
 // CHECK:  [[X_ADDR:%.*]] = getelementptr inbounds{{.*}} %T4test8ResourceV, ptr [[RESOURCE_ADDR]], i32 0, i32 0
 // CHECK:  [[VALUE:%.*]] = load i64, ptr [[X_ADDR]]
-// CHECK:  call swiftcc void @"$s4test21mixedCapturesEscapingyySiFyyXOfU_"(ptr [[TRACKER]], i64 [[VALUE]])
+// CHECK:  call swiftcc void @"$s4test21mixedCapturesEscapingyySiFyyXOofU_"(ptr [[TRACKER]], i64 [[VALUE]])
 // CHECK:  [[TO_DESTROY_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
 // CHECK:  [[TO_DESTROY:%.*]] = load ptr, ptr [[TO_DESTROY_ADDR]]
 // CHECK:  call void @swift_release(ptr [[TO_DESTROY]])

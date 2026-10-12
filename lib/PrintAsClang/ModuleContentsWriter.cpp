@@ -733,6 +733,15 @@ public:
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
+              // In C++ the class body only declares its members, and a
+              // forward declaration of the class template is enough for that.
+              // The member definitions are printed out of line after all
+              // types.
+              if (outputLangMode == OutputLanguageMode::Cxx) {
+                forwardDeclareType(TD);
+                needsToBeIndividuallyDelayed = true;
+                return;
+              }
               needsToBeIndividuallyDelayed = true;
               hadAnyDelayedMembers = true;
             }
@@ -977,6 +986,10 @@ public:
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         // Immediately filter out invalid extensions.
         if (ED->isInvalid())
+          return true;
+        // With lazy type checking, an extension of an unresolvable type
+        // might not have been diagnosed and marked invalid yet.
+        if (!ED->getExtendedNominal())
           return true;
         if (outputLangMode == OutputLanguageMode::Cxx)
           return false;

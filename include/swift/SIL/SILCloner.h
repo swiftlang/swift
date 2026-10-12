@@ -1375,7 +1375,8 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
       getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
       getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
       Inst->getCalleeConvention(), Inst->getResultIsolation(),
-      Inst->isCalledOnce(), Inst->isOnStack(), Inst->isStackAllocationNested(),
+      Inst->getExecutionSemantics(), Inst->isOnStack(),
+      Inst->isStackAllocationNested(),
       GenericSpecializationInformation::create(Inst, getBuilder()),
       ArgLocs ? std::optional<ArrayRef<SILLocation>>(*ArgLocs) : std::nullopt);
   recordClonedInstruction(Inst, NewInst);

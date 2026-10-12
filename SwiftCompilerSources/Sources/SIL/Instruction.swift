@@ -175,9 +175,16 @@ public class Instruction : CustomStringConvertible, Hashable {
       return true
 
     case let builtin as BuiltinInst:
-      // A memory accessing builtin can be an implicit load weak, a synchronization point or a
-      // pointer access.
-      return builtin.mayReadOrWriteMemory
+      switch builtin.id {
+      case .CopyArray:
+        // Copying array elements only retains the elements. It cannot run any user code and
+        // therefore cannot observe a de-initializer running earlier.
+        return false
+      default:
+        // A memory accessing builtin can be an implicit load weak, a synchronization point or a
+        // pointer access.
+        return builtin.mayReadOrWriteMemory
+      }
 
     case let endBorrow as EndBorrowInst:
       // Accessing memory via an arbitrary pointer is a deinit barrier, because it may conflict
@@ -1669,14 +1676,28 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
-  /// True is this is a partial application of a `@called(atMostOnce)` function
-  /// value.
-  public var isCalledOnce: Bool { bridged.PartialApplyInst_isCalledOnce() }
+  /// The execution semantics of the resulting closure, such as
+  /// `@called(atMostOnce)`, or nil if it can be called any number of times.
+  public var executionSemantics: ExecutionSemantics? {
+    let semantics = bridged.PartialApplyInst_getExecutionSemantics()
+    return semantics.hasValue ? semantics.value : nil
+  }
+
+  /// True if the resulting closure can be called at most once, which is the case
+  /// for every kind of `@called` attribute.
+  public var hasCalledAtMostOnceSemantics: Bool { executionSemantics != nil }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
   /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
   /// non-escaping prior to ClosureLifetimeFixup.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
+
+  /// Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping partial_apply converted by
+  /// convert_escape_to_noescape [not_guaranteed]. If ClosureLifetimeFixup will promote this closure to
+  /// partial_apply [on_stack], return that conversion.
+  public var nonEscapingClosureConversion: ConvertEscapeToNoEscapeInst? {
+    bridged.PartialApplyInst_getNonEscapingClosureConversion().instruction as! ConvertEscapeToNoEscapeInst?
+  }
 
   // Warning: ClosureLifetimeFixup does not promote all non-escaping closures to on-stack. When that promotion fails, it
   // creates a fake destroy of the closure after the captured values that the closure depends on. This is invalid OSSA,

@@ -292,7 +292,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // special-case this instruction.
 OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *i) {
-  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+  return i->getType().castTo<SILFunctionType>()->hasCalledAtMostOnceSemantics()
              ? OperandOwnership::ForwardingConsume
              : OperandOwnership::PointerEscape;
 }
@@ -661,7 +661,7 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
       return OperandOwnership::TrivialUse;
     }
 
-    if (i->isCalledOnce()) {
+    if (i->hasCalledAtMostOnceSemantics()) {
       auto argConv = ApplySite(i).getArgumentConvention(op);
       // Borrowed non-Copyable captures aren't owned by the closure.
       if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
@@ -886,6 +886,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExactUDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericExactUDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExtractElement)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FAdd)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FAddRelaxed)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFAdd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FCMP_OEQ)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FCMP_OGE)
@@ -904,6 +905,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FCMP_UNO)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FMul)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FMulRelaxed)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFMul)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FNeg)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FPExt)
@@ -913,6 +915,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FPTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSub)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSubRelaxed)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Fence)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, Freeze)

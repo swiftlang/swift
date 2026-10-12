@@ -379,7 +379,7 @@ public:
       SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
           PartialApplyInst::OnStackKind::NotOnStack,
-      bool isCalledOnce = false);
+      std::optional<ExecutionSemantics> executionSemantics = std::nullopt);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -592,7 +592,7 @@ public:
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
           SILFunctionTypeIsolation::forUnknown(),
-      bool IsCalledOnce = false,
+      std::optional<ExecutionSemantics> Semantics = std::nullopt,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
@@ -610,8 +610,8 @@ public:
            "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested,
-        IsCalledOnce, ArgLocs));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, Semantics,
+        ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(
@@ -619,12 +619,13 @@ public:
       ArrayRef<SILValue> args, ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *specializationInfo = nullptr,
       std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
-      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt,
+      bool isUnresolved = false) {
     ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
            "createBeginApply argLocs, when supplied, must be parallel to args");
     return insert(BeginApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
-        specializationInfo, isolationCrossing, argLocs));
+        specializationInfo, isolationCrossing, argLocs, isUnresolved));
   }
 
   AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {
@@ -982,10 +983,11 @@ public:
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
                                      bool noNestedConflict,
-                                     bool fromBuiltin) {
+                                     bool fromBuiltin,
+                                     bool isUnresolved = false) {
     return insert(new (getModule()) BeginAccessInst(
         getSILDebugLocation(loc), address, accessKind, enforcement,
-        noNestedConflict, fromBuiltin));
+        noNestedConflict, fromBuiltin, isUnresolved));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -2110,7 +2112,7 @@ public:
     SILType opTy = operand->getType();
     if (opTy.is<TupleType>())
       return createDestructureTuple(loc, operand);
-    if (opTy.getStructOrBoundGenericStruct())
+    if (opTy.getStructDecl())
       return createDestructureStruct(loc, operand);
     llvm_unreachable("Can not emit a destructure for this type of operand.");
   }

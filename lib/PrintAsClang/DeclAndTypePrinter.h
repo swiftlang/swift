@@ -60,6 +60,8 @@ struct CxxDeclEmissionScope {
   /// lexical scope.
   llvm::StringMap<llvm::SmallVector<EmittedFunctionOverload, 2>>
       emittedFunctionOverloads;
+  /// Inherited names that newly printable members must not hide.
+  llvm::StringSet<> inheritedFunctionNamesToPreserve;
 };
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
@@ -129,7 +131,10 @@ public:
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
-  bool shouldInclude(const ValueDecl *VD);
+  /// Imported inherited members may be exposed by their supplied header even
+  /// when this header's exposure options would exclude them.
+  bool shouldInclude(const ValueDecl *VD,
+                     bool isImportedInheritedMember = false);
 
   bool isZeroSized(const NominalTypeDecl *decl) override;
 

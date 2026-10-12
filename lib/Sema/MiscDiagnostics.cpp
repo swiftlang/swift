@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEmbedded.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTPrinter.h"
@@ -309,14 +310,19 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         diagnoseDuplicateLabels(tupleExpr->getLoc(),
                                 tupleExpr->getElementNames());
 
-        // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable()
-            && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
-          auto noncopyableTy = E->getType();
-          assert(noncopyableTy->is<TupleType>() && "will use poor wording");
-          Ctx.Diags.diagnose(E->getLoc(),
-                             diag::tuple_containing_move_only_not_supported,
-                             noncopyableTy);
+        // Diagnose the first element that a tuple can't contain. A nested
+        // tuple was already diagnosed when it was formed.
+        for (auto *elt : tupleExpr->getElements()) {
+          auto eltTy = elt->getType();
+          if (!eltTy || eltTy->hasError())
+            continue;
+
+          eltTy = eltTy->getWithoutSpecifierType();
+          if (eltTy->is<TupleType>())
+            continue;
+
+          if (diagnoseUnsupportedTupleElement(eltTy, elt->getLoc(), Ctx))
+            break;
         }
       }
 
@@ -971,7 +977,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       BNK_Double,
     };
     BitcastableNumberKind getBitcastableNumberKind(Type t) const {
-      auto decl = t->getNominalOrBoundGenericNominal();
+      auto decl = t->getNominalDecl();
 #define MATCH_DECL(type) \
       if (decl == Ctx.get##type##Decl()) \
         return BNK_##type;
@@ -1090,7 +1096,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           auto d = Ctx.Diags.diagnose(DRE->getLoc(),
                               diag::bitcasting_to_change_pointer_kind,
                               fromTy, toTy,
-                              toTy->getStructOrBoundGenericStruct()->getName());
+                              toTy->getStructDecl()->getName());
           if (subExpr) {
             StringRef before, after;
             switch (toPTK) {
@@ -2331,7 +2337,7 @@ public:
     // Escaping `@called(atMostOnce)` closures are allowed to implicitly capture
     // `self` because the call (which is a consuming operation) would break
     // the cycle.
-    if (isCalledOnce(CE)) {
+    if (hasCalledAtMostOnceSemantics(CE)) {
       return false;
     }
 
@@ -2358,9 +2364,9 @@ public:
     return false;
   }
 
-  static bool isCalledOnce(const AbstractClosureExpr *ACE) {
+  static bool hasCalledAtMostOnceSemantics(const AbstractClosureExpr *ACE) {
     if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-      return funcTy->isCalledOnce();
+      return funcTy->hasCalledAtMostOnceSemantics();
     }
 
     return false;
@@ -2986,13 +2992,59 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
             return Action::Stop();
           }
 
-          if (!captureList->getClosureBody()->isCalledOnce()) {
+          if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
             Ctx.Diags.diagnose(V->getLoc(),
-                               diag::sending_capture_decl_requires_called_once);
+                               diag::sending_capture_decl_requires_called_closure);
             V->setInvalid();
             continue;
           }
         }
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  CaptureWalker W(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(W);
+}
+
+/// A closure owns its capture list entries, and destroying a closure destroys
+/// what it owns. So a closure that can be destroyed without running can't own
+/// a value that can't be destroyed implicitly.
+static void diagnoseNondeinitableCaptureListEntries(const Expr *E,
+                                                    const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class CaptureWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    CaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *captureList = dyn_cast<CaptureListExpr>(E);
+      if (!captureList)
+        return Action::Continue(E);
+
+      auto closureType = captureList->getClosureBody()->getType();
+      if (!closureType || closureType->hasError() ||
+          !closureType->isDeinitable())
+        return Action::Continue(E);
+
+      for (const auto &capture : captureList->getCaptureList()) {
+        auto *V = capture.getVar();
+        if (V->isInvalid())
+          continue;
+
+        auto type = V->getTypeInContext();
+        if (type->hasError() || type->isDeinitable())
+          continue;
+
+        Ctx.Diags.diagnose(V->getLoc(),
+                           diag::deinitable_closure_nondeinitable_capture,
+                           /*captureList=*/1, V, type);
       }
 
       return Action::Continue(E);
@@ -6908,6 +6960,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseMissingMemberImports(E, DC);
   diagnoseCxxFunctionCalls(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
+  diagnoseNondeinitableCaptureListEntries(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

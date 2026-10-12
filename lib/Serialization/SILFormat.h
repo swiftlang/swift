@@ -440,6 +440,7 @@ namespace sil_block {
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      BCFixed<1>,  // only referenced by debug info
                      BCFixed<2>,  // SIL stage
+                     BCFixed<1>,  // ownership for trivial values
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
@@ -580,6 +581,7 @@ namespace sil_block {
     ValueIDField,         // callee value
     ActorIsolationField, // Caller Isolation if we have one. Unspecified otherwise.
     ActorIsolationField, // Callee Isolation if we have one. Unspecified otherwise.
+    BCFixed<1>,          // unresolved
     BCArray<ValueIDField> // a list of arguments
   >;
 
@@ -597,7 +599,7 @@ namespace sil_block {
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<7>, // Optional attributes
+    BCFixed<8>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 

@@ -187,6 +187,23 @@ struct CompileCommandsTests {
     )
 
     assertParse(
+      #"clang -Xclang -fno-pch-timestamp -fsyntax-only"#, args: [
+        .option(.Xclang, spacing: .spaced, value: "-fno-pch-timestamp"),
+        .option(.f, spacing: .unspaced, value: "syntax-only"),
+      ]
+    )
+
+    assertParse(
+      #"clang -Xclang=-fno-pch-timestamp"#, args: [
+        .option(.Xclang, spacing: .equals, value: "-fno-pch-timestamp"),
+      ]
+    )
+
+    assertParse(
+      #"clang -Xclangas -x"#, args: [.value("-Xclangas"), .value("-x")]
+    )
+
+    assertParse(
       #"clang --I=a"#, args: [.value("--I=a")]
     )
 

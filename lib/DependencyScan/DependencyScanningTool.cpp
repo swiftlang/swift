@@ -12,12 +12,14 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/DependencyScan/StringUtils.h"
+#include "swift/Frontend/SARIFDiagnosticConsumer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -353,6 +355,35 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
   return std::move(*DependenciesOrErr);
 }
 
+/// Create the consumer that serializes a scan's diagnostics, in the format
+/// \p Invocation asks for, or null if no log was requested. The scanner reports
+/// diagnostics from several threads, so the consumer is thread-safe.
+static std::unique_ptr<DiagnosticConsumer>
+createSerializedDiagnosticsConsumer(const CompilerInvocation &Invocation) {
+  std::string Path;
+  std::unique_ptr<DiagnosticConsumer> (*CreateConsumer)(StringRef, bool);
+
+  switch (Invocation.getDiagnosticOptions().SerializedDiagnosticsFormat) {
+  case DiagnosticOptions::SerializedFormat::LLVMBitcode:
+    Path = Invocation.getSerializedDiagnosticsPathForAtMostOnePrimary();
+    CreateConsumer = serialized_diagnostics::createThreadSafeConsumer;
+    break;
+  case DiagnosticOptions::SerializedFormat::SARIF:
+#if SWIFT_BUILD_SARIF
+    Path = Invocation.getSARIFDiagnosticsPathForAtMostOnePrimary();
+    CreateConsumer = sarif_diagnostics::createThreadSafeConsumer;
+    break;
+#else
+    ABORT("'-serialize-diagnostics=sarif' is rejected while parsing "
+          "arguments in a build without SARIF support");
+#endif
+  }
+
+  if (Path.empty())
+    return nullptr;
+  return CreateConsumer(Path, false);
+}
+
 llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
     ArrayRef<const char *> CommandArgs, StringRef WorkingDir,
     std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
@@ -412,20 +443,14 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
     (void)Instance->getMainModule();
   }
 
-  auto SerializedDiagnosticsOutputPath =
-      Instance->getInvocation()
-          .getSerializedDiagnosticsPathForAtMostOnePrimary();
-  std::unique_ptr<DiagnosticConsumer> SerailizedDiagnosticsConsumer;
-  if (!SerializedDiagnosticsOutputPath.empty()) {
-    SerailizedDiagnosticsConsumer =
-        swift::serialized_diagnostics::createThreadSafeConsumer(
-            SerializedDiagnosticsOutputPath, false);
-    Instance->addDiagnosticConsumer(SerailizedDiagnosticsConsumer.get());
-  }
+  auto SerializedDiagnosticsConsumer =
+      createSerializedDiagnosticsConsumer(Instance->getInvocation());
+  if (SerializedDiagnosticsConsumer)
+    Instance->addDiagnosticConsumer(SerializedDiagnosticsConsumer.get());
 
   return ScanQueryContext{std::move(Instance),
                           std::move(ScannerDiagnosticsCollector),
-                          std::move(SerailizedDiagnosticsConsumer)};
+                          std::move(SerializedDiagnosticsConsumer)};
 }
 
 } // namespace dependencies

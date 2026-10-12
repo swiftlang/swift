@@ -3,6 +3,11 @@ module ForeignReference {
   requires cplusplus
 }
 
+module ForeignReferenceVirtual {
+  header "foreign-reference-virtual.h"
+  requires cplusplus
+}
+
 module Functions {
   header "functions.h"
   requires cplusplus
@@ -26,6 +31,16 @@ module Namespaces {
 module NonTrivial {
   header "non-trivial.h"
   requires cplusplus
+}
+
+module Operators {
+  header "operators.h"
+  requires cplusplus
+}
+
+module OperatorsCxx23 {
+  header "operators-cxx23.h"
+  requires cplusplus23
 }
 
 module Overloads {

@@ -1118,23 +1118,23 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       forwardedArgs.push_back(capture.forward(*this));
 
     // A `@called(atMostOnce)` closure value's callee convention must be
-    // `Direct_Owned` to match DefaultCalledOnceConventions, or the
-    // ABI-difference check treats it as needing a reabstraction thunk
-    // (which then fails: thunks are always Thin, and Thin + CalledOnce
-    // is an invalid combination).
-    auto calleeConvention = typeContext.ExpectedLoweredType->isCalledOnce()
-                                ? ParameterConvention::Direct_Owned
-                                : ParameterConvention::Direct_Guaranteed;
+    // `Direct_Owned` to match DefaultCalledAtMostOnceSemanticsConventions, or
+    // the ABI-difference check treats it as needing a reabstraction thunk
+    // (which then fails: thunks are always Thin, and Thin + `@called` is an
+    // invalid combination).
+    auto calleeConvention =
+        typeContext.ExpectedLoweredType->hasCalledAtMostOnceSemantics()
+            ? ParameterConvention::Direct_Owned
+            : ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
                             : SILFunctionTypeIsolation::forUnknown());
-    auto toClosure =
-      B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention, resultIsolation,
-                           PartialApplyInst::OnStackKind::NotOnStack,
-                           StackAllocationIsNested, nullptr,
-                           typeContext.ExpectedLoweredType->isCalledOnce());
+    auto toClosure = B.createPartialApply(
+        loc, functionRef, subs, forwardedArgs, calleeConvention,
+        resultIsolation, PartialApplyInst::OnStackKind::NotOnStack,
+        StackAllocationIsNested, nullptr,
+        typeContext.ExpectedLoweredType->getExecutionSemantics());
     result = emitManagedRValueWithCleanup(toClosure);
   }
 
@@ -1876,7 +1876,7 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
   // This is a loop because we want to handle types that wrap integer types,
   // like ObjCBool (which may be Bool or Int8).
   while (!value->getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    auto structDecl = value->getType().getStructDecl();
     assert(structDecl && "value for error result wasn't of struct type!");
     assert(structDecl->getStoredProperties().size() == 1);
     auto property = structDecl->getStoredProperties()[0];
@@ -1896,7 +1896,7 @@ SILValue SILGenFunction::emitWrapIntegerLiteral(SILLocation loc,
   
   // Or wrap a value in a struct, potentially multiple times to handle types
   // that wrap integer types like ObjCBool (which may be Bool or Int8).
-  auto structDecl = ty.getStructOrBoundGenericStruct();
+  auto structDecl = ty.getStructDecl();
   assert(structDecl && "value for error result wasn't of struct type!");
   assert(structDecl->getStoredProperties().size() == 1);
   auto property = structDecl->getStoredProperties()[0];
@@ -2013,7 +2013,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   auto metatypeTy = MetatypeType::get(selfTy);
 
   SILValue selfMetatype;
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     selfMetatype = B.createValueMetatype(loc, getLoweredType(metatypeTy),
                                          selfValue).getValue();
   } else {

@@ -650,13 +650,14 @@ public struct Builder {
     isOnStack: Bool,
     /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
     isNested: Bool,
-    isCalledOnce: Bool,
+    executionSemantics: ExecutionSemantics?,
     argumentLocationsFrom: ApplySite? = nil
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
       let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
                                            substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested,
-                                           isCalledOnce, argumentLocationsFrom.bridged)
+                                           executionSemantics != nil, executionSemantics ?? .atMostOnce,
+                                           argumentLocationsFrom.bridged)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
@@ -801,16 +802,12 @@ public struct Builder {
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 
-  public func createInitExistentialMetatype(
-    metatype: Value,
-    existentialType: Type,
-    conformances: [Conformance]
-  ) -> InitExistentialMetatypeInst {
-    let initExistential = conformances.map{ $0.bridged }.withBridgedArrayRef {
-      return bridged.createInitExistentialMetatype(metatype.bridged,
-                                                   existentialType.bridged,
-                                                   BridgedConformanceArray(pcArray: $0))
-    }
+  public func createInitExistentialMetatype(metatype: Value,
+                                            existentialType: Type,
+                                            conformances: ConformanceArray) -> InitExistentialMetatypeInst {
+    let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
+                                                                existentialType.bridged,
+                                                                conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 

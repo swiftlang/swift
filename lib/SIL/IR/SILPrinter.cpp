@@ -1821,6 +1821,8 @@ public:
   void visitBeginApplyInst(BeginApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isUnresolved())
+      *this << "[unresolved] ";
     visitApplyInstBase(AI);
   }
 
@@ -1873,8 +1875,15 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->isCalledOnce()) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      switch (*semantics) {
+      case ExecutionSemantics::AtMostOnce:
+        *this << "[called_at_most_once] ";
+        break;
+      case ExecutionSemantics::Once:
+        *this << "[called_once] ";
+        break;
+      }
     }
     visitApplyInstBase(CI);
   }
@@ -3090,6 +3099,7 @@ public:
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
+          << (BAI->isUnresolved() ? "[unresolved] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitMoveOnlyWrapperToCopyableAddrInst(

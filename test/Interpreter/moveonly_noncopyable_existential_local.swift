@@ -2,6 +2,10 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
 
 // REQUIRES: executable_test
+// Casting an existential that suppresses `Copyable` or `Escapable` needs
+// `swift_getExtendedExistentialTypeMetadata_unique`, which older runtimes lack.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // The move-only address checker treats a noncopyable existential as a single
 // opaque leaf of the type tree. Check that the liveness it computes from that is

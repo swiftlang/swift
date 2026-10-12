@@ -497,3 +497,162 @@ bb0:
   return %10
 }
 
+
+sil [_semantics "realloc_array_buffer"] @consumeAndCreateNew : $@convention(thin) (@owned Klass) -> @owned Klass
+
+// A `br` forwards the value into the phi argument of the destination block. The phi keeps the
+// object alive, so the destroy can be hoisted above the deinit barrier.
+// CHECK-LABEL: sil [ossa] @forward_through_phi :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'forward_through_phi'
+sil [ossa] @forward_through_phi : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0
+  br bb1(%1 : $Klass)
+
+bb1(%3 : @owned $Klass):
+  %4 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  return %3
+}
+
+// The shape of an accumulator loop, e.g. `array.reduce([]) { $0 + $1 }`: the copy of the
+// loop-carried accumulator is forwarded through a join phi and the accumulator is destroyed after
+// that join. The destroy can be hoisted above the deinit barrier because the forwarded copy keeps
+// the object alive.
+// CHECK-LABEL: sil [ossa] @forward_through_loop_phi :
+// CHECK:       bb1([[ACC:%[0-9]+]] : @owned $Klass):
+// CHECK-NEXT:    copy_value [[ACC]]
+// CHECK-NEXT:    destroy_value [[ACC]]
+// CHECK:       } // end sil function 'forward_through_loop_phi'
+sil [ossa] @forward_through_loop_phi : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  br bb1(%0 : $Klass)
+
+bb1(%2 : @owned $Klass):
+  %3 = copy_value %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4(%3 : $Klass)
+
+bb3:
+  br bb4(%3 : $Klass)
+
+bb4(%7 : @owned $Klass):
+  %8 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  destroy_value %2
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1(%7 : $Klass)
+
+bb6:
+  return %7
+}
+
+// `begin_cow_mutation` and `end_cow_mutation` forward the ownership of their operand.
+// CHECK-LABEL: sil [ossa] @forward_through_cow_mutation :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'forward_through_cow_mutation'
+sil [ossa] @forward_through_cow_mutation : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0
+  (%2, %3) = begin_cow_mutation %1 : $Klass
+  %4 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  %7 = end_cow_mutation %3 : $Klass
+  return %7
+}
+
+// A function annotated with "realloc_array_buffer" keeps the object alive in its result.
+// CHECK-LABEL: sil [ossa] @forward_through_semantics_call :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'forward_through_semantics_call'
+sil [ossa] @forward_through_semantics_call : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0
+  %2 = function_ref @consumeAndCreateNew : $@convention(thin) (@owned Klass) -> @owned Klass
+  %3 = apply %2(%1) : $@convention(thin) (@owned Klass) -> @owned Klass
+  %4 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  return %3
+}
+
+// Without the semantics attribute the call is opaque: the destroy must not be hoisted.
+// CHECK-LABEL: sil [ossa] @no_forward_through_plain_call :
+// CHECK:         apply
+// CHECK:         apply
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'no_forward_through_plain_call'
+sil [ossa] @no_forward_through_plain_call : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0
+  %2 = function_ref @takeAndCreateKlass : $@convention(thin) (@owned Klass) -> @owned Klass
+  %3 = apply %2(%1) : $@convention(thin) (@owned Klass) -> @owned Klass
+  %4 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  return %3
+}
+
+sil [ossa] @takeAndCreateKlass : $@convention(thin) (@owned Klass) -> @owned Klass
+
+// A phi is only known to keep the object alive if *all* of its incoming values are part of the
+// forward-extended liverange. Here the phi is fed by the copy on one edge and by an unrelated value
+// on the other, so on the second path nothing keeps the object alive and the destroy must not be
+// hoisted above the deinit barrier.
+// CHECK-LABEL: sil [ossa] @no_forward_through_partially_fed_phi :
+// CHECK:         apply
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'no_forward_through_partially_fed_phi'
+sil [ossa] @no_forward_through_partially_fed_phi : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = copy_value %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1
+  br bb3(%2 : $Klass)
+
+bb2:
+  destroy_value %2
+  br bb3(%1 : $Klass)
+
+bb3(%3 : @owned $Klass):
+  %4 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  return %3
+}
+
+// If every incoming value of the phi is the forwarded copy, the phi does keep the object alive and
+// the destroy can be hoisted.
+// CHECK-LABEL: sil [ossa] @forward_through_fully_fed_phi :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'forward_through_fully_fed_phi'
+sil [ossa] @forward_through_fully_fed_phi : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Klass)
+
+bb2:
+  br bb3(%1 : $Klass)
+
+bb3(%2 : @owned $Klass):
+  %3 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  destroy_value %0
+  return %2
+}

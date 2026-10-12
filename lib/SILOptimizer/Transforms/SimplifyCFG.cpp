@@ -1614,7 +1614,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // select_enum with the first case and swap our operands. This simplifies
   // later dominance based processing.
   if (auto *SEI = dyn_cast<SelectEnumInst>(BI->getCondition())) {
-    EnumDecl *E = SEI->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *E = SEI->getEnumOperand()->getType().getEnumDecl();
 
     auto AllElts = E->getAllElements();
     auto Iter = AllElts.begin();
@@ -1875,7 +1875,7 @@ static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
     if (auto *refCast = dyn_cast<UncheckedRefCastInst>(inst)) {
       // An unchecked_ref_cast on a safe objc_method apply behaves like the
       // optional (it is null if the optional was null).
-      if (refCast->getType().getClassOrBoundGenericClass() &&
+      if (refCast->getType().getClassDecl() &&
           std::find(objCApplies.begin(), objCApplies.end(),
                     refCast->getOperand()) != objCApplies.end())
         optionalPayloads.push_back(refCast);
@@ -2063,7 +2063,7 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
   auto optional = SEI->getOperand();
   auto optionalPayloadType = optional->getType().getOptionalObjectType();
   if (!optionalPayloadType ||
-      !optionalPayloadType.getClassOrBoundGenericClass())
+      !optionalPayloadType.getClassDecl())
     return false;
 
   if (SEI->getNumCases() != 2)
@@ -3071,7 +3071,7 @@ bool ArgumentSplitter::createNewArguments() {
 
   // Only handle struct and tuple type.
   SILType Ty = Arg->getType();
-  if (!Ty.getStructOrBoundGenericStruct() && !Ty.is<TupleType>())
+  if (!Ty.getStructDecl() && !Ty.is<TupleType>())
     return false;
 
   // Get the first level projection for the struct or tuple type.
@@ -3237,7 +3237,7 @@ static bool splitBBArguments(SILFunction &Fn) {
       SILType ArgTy = Arg->getType();
 
       if (!ArgTy.isObject() ||
-          (!ArgTy.is<TupleType>() && !ArgTy.getStructOrBoundGenericStruct())) {
+          (!ArgTy.is<TupleType>() && !ArgTy.getStructDecl())) {
         continue;
       }
 
@@ -3546,7 +3546,7 @@ static bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
     // If it does, then pick one of those cases as a default.
 
     // Count the number of possible case tags for a given enum type
-    auto *Enum = SEI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    auto *Enum = SEI->getOperand()->getType().getEnumDecl();
     unsigned ElemCount = 0;
     for (auto E : Enum->getAllElements()) {
       if (E)

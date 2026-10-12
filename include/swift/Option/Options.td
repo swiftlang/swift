@@ -2250,6 +2250,12 @@ def incremental_dependency_scan:
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Re-use/validate prior build dependency scan artifacts">;
 
+def incremental_dependency_scan_cache_path:
+  Separate<["-"], "incremental-dependency-scan-cache-path">,
+  Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
+  HelpText<"Specify the path to serialize/reuse the dependency scan cache">,
+  MetaVarName<"<path>">;
+
 def driver_experimental_explicit_module_build:
   Flag<["-"], "experimental-explicit-module-build">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,

@@ -25,12 +25,9 @@ bb0(%0 : $Optional<() -> ()>):
   // CHECK-64: [[FNPTR:%.*]] = inttoptr [[WORD:i64]] {{%.*}} to ptr
   // CHECK-32: [[FNPTR:%.*]] = inttoptr [[WORD:i32]] {{%.*}} to ptr
   // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] {{%.*}} to ptr
-  // CHECK: br label
-  // CHECK: [[FNPTR2:%.*]] = phi ptr [ [[FNPTR]], {{%.*}} ]
-  // CHECK: [[CTX2:%.*]] = phi ptr [ [[CTX]], {{%.*}} ]
 bb1(%1 : $() -> ()):
 
-  // CHECK: call swiftcc void [[FNPTR2]](ptr swiftself [[CTX2]])
+  // CHECK: call swiftcc void [[FNPTR]](ptr swiftself [[CTX]])
   apply %1() : $() -> ()
 
   // CHECK: br label [[CONT:%[0-9]+]]

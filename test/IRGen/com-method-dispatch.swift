@@ -109,9 +109,12 @@ public func leaf(_ interface: borrowing any ILeaf) -> CInt {
 
 // CHECK-LABEL: define{{.*}} swiftcc i32 @"$s1M4read
 // CHECK-SAME: (ptr [[SELF:%[^,) ]+]]
+// CHECK: call void @llvm.lifetime.start
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%[^,]+]],
 // CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 3
 // CHECK: [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
-// CHECK: call {{(x86_stdcallcc )?}}i32 [[METHOD]](ptr [[SELF]])
+// CHECK: [[RECEIVER:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[METHOD]](ptr [[RECEIVER]])
 // CHECK: ret i32
 public func read(_ interface: borrowing any IProperties) -> CInt {
   interface.value
@@ -119,9 +122,12 @@ public func read(_ interface: borrowing any IProperties) -> CInt {
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s1M5write
 // CHECK-SAME: (ptr [[SELF:%[^,) ]+]]
+// CHECK: call void @llvm.lifetime.start
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%[^,]+]],
 // CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 4
 // CHECK: [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
-// CHECK: call {{(x86_stdcallcc )?}}void [[METHOD]](ptr [[SELF]], i32 {{%.*}})
+// CHECK: [[RECEIVER:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: call {{(x86_stdcallcc )?}}void [[METHOD]](ptr [[RECEIVER]], i32 {{%.*}})
 // CHECK: ret void
 public func write(_ interface: borrowing any IProperties, _ value: CInt) {
   interface.value = value
@@ -129,9 +135,12 @@ public func write(_ interface: borrowing any IProperties, _ value: CInt) {
 
 // CHECK-LABEL: define{{.*}} swiftcc i32 @"$s1M13subscriptRead
 // CHECK-SAME: (ptr [[SELF:%[^,) ]+]]
+// CHECK: call void @llvm.lifetime.start
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%[^,]+]],
 // CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 5
 // CHECK: [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
-// CHECK: call {{(x86_stdcallcc )?}}i32 [[METHOD]](ptr [[SELF]], i32 {{%.*}})
+// CHECK: [[RECEIVER:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[METHOD]](ptr [[RECEIVER]], i32 {{%.*}})
 // CHECK: ret i32
 public func subscriptRead(_ interface: borrowing any IProperties, _ index: CInt) -> CInt {
   interface[index]
@@ -139,9 +148,12 @@ public func subscriptRead(_ interface: borrowing any IProperties, _ index: CInt)
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s1M5reset
 // CHECK-SAME: (ptr [[SELF:%[^,) ]+]]
+// CHECK: call void @llvm.lifetime.start
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%[^,]+]],
 // CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 6
 // CHECK: [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
-// CHECK: call {{(x86_stdcallcc )?}}void [[METHOD]](ptr [[SELF]])
+// CHECK: [[RECEIVER:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: call {{(x86_stdcallcc )?}}void [[METHOD]](ptr [[RECEIVER]])
 // CHECK: ret void
 public func reset(_ interface: borrowing any IProperties) {
   interface.reset()
@@ -164,12 +176,18 @@ public func temporary(_ factory: () -> any IBase, _ value: CInt) -> CInt {
 // Compound accesses call the getter and setter, never a foreign coroutine.
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s1M9increment
 // CHECK-SAME: (ptr [[SELF:%.*]])
+// CHECK: call void @llvm.lifetime.start
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%[^,]+]],
 // CHECK: [[GETSLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 3
 // CHECK: [[GET:%.*]] = load ptr, ptr [[GETSLOT]]
-// CHECK: call {{(x86_stdcallcc )?}}i32 [[GET]](ptr [[SELF]])
+// CHECK: [[RECEIVER:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[GET]](ptr [[RECEIVER]])
+// CHECK: call void @llvm.lifetime.start
+// CHECK: store ptr [[SELF]], ptr [[STORAGE:%[^,]+]],
 // CHECK: [[SETSLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 4
 // CHECK: [[SET:%.*]] = load ptr, ptr [[SETSLOT]]
-// CHECK: call {{(x86_stdcallcc )?}}void [[SET]](ptr [[SELF]], i32 {{%.*}})
+// CHECK: [[RECEIVER:%.*]] = load ptr, ptr [[STORAGE]]
+// CHECK: call {{(x86_stdcallcc )?}}void [[SET]](ptr [[RECEIVER]], i32 {{%.*}})
 // CHECK: ret void
 public func increment(_ interface: borrowing any IProperties) {
   interface.value += 1

@@ -4345,7 +4345,7 @@ namespace {
           auto destObjectType = destValueType;
           if (auto metaTy = destObjectType->getAs<MetatypeType>())
             destObjectType = metaTy->getInstanceType();
-          if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
+          if (auto destClass = destObjectType->getClassDecl()) {
             if (destClass->getForeignClassKind() ==
                   ClassDecl::ForeignKind::CFType) {
               if (SuppressDiagnostics)
@@ -7071,7 +7071,7 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
     // FIXME: Ideally we would instead have already recorded a restriction
     // when solving the constraint, and we wouldn't need to duplicate this
     // part of coerceToType() here.
-    if (auto foreignClass = toType->getClassOrBoundGenericClass()) {
+    if (auto foreignClass = toType->getClassDecl()) {
       if (foreignClass->getForeignClassKind() ==
             ClassDecl::ForeignKind::CFType) {
         return cs.cacheType(new (ctx)
@@ -7453,7 +7453,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
-      auto foreignClass = fromType->getClassOrBoundGenericClass();
+      auto foreignClass = fromType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       auto asObjCClass =
@@ -7462,7 +7462,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ObjCTollFreeBridgeToCF: {
-      auto foreignClass = toType->getClassOrBoundGenericClass();
+      auto foreignClass = toType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       Expr *result = coerceToType(expr, objcType, locator);
@@ -7684,7 +7684,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::DynamicSelf:
   case TypeKind::BoundGenericClass:
   case TypeKind::Class: {
-    if (!toType->getClassOrBoundGenericClass())
+    if (!toType->getClassDecl())
       break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
@@ -7895,8 +7895,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // '@called(atMostOnce)' bit to the closure without invalidating prior
     // analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.isCalledOnce() && !fromEI.isCalledOnce()) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withCalledOnce());
+    if (toEI.hasCalledAtMostOnceSemantics() &&
+        !fromEI.hasCalledAtMostOnceSemantics()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withExecutionSemantics(toEI.getExecutionSemantics()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
@@ -7996,7 +7998,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       llvm_unreachable("unhandled metatype kind");
     }
     
-    if (auto toClass = toType->getClassOrBoundGenericClass()) {
+    if (auto toClass = toType->getClassDecl()) {
       if (toClass->getName() == ctx.Id_Protocol
           && toClass->getModuleContext()->getName()
               == ctx.Id_ObjectiveC) {
@@ -8724,7 +8726,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We're constructing a value of nominal type.
-  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+  assert(ty->getNominalDecl() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
   // Consider the constructor decl reference expr 'implicit', but the

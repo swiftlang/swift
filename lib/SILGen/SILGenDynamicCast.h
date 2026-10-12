@@ -48,6 +48,33 @@ SILValue emitIsa(SILGenFunction &SGF, SILLocation loc,
                  Expr *operand, Type targetType,
                  CheckedCastKind castKind);
 
+/// True if a cast from \p sourceType to \p targetType can be answered by a
+/// non-consuming type test rather than by extracting the payload.
+bool canUseNoncopyableTypeTest(CanType sourceType, CanType targetType,
+                               CheckedCastKind castKind);
+
+/// Borrow the storage \p operand names so a type test can read it without
+/// copying or consuming it.
+///
+/// The caller must have established a FormalEvaluationScope covering the use
+/// of the returned value.
+ManagedValue emitTypeTestOperand(SILGenFunction &SGF, Expr *operand);
+
+/// Emit a non-consuming test of whether the existential at \p existentialAddr
+/// can be cast to \p targetType.  This implements certain `is` casting tests.
+///
+/// The source existential is only read. No value is produced on either edge.
+/// The caller must keep \p existentialAddr borrowed across the emitted
+/// terminator.
+///
+/// Only valid when canUseNoncopyableTypeTest() returns true.
+void emitNoncopyableTypeTest(SILGenFunction &SGF, SILLocation loc,
+                             ManagedValue existentialAddr, CanType sourceType,
+                             CanType targetType, SILBasicBlock *trueBB,
+                             SILBasicBlock *falseBB,
+                             ProfileCounter trueCount = ProfileCounter(),
+                             ProfileCounter falseCount = ProfileCounter());
+
 }
 }
 

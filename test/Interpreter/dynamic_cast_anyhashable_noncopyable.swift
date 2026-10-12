@@ -19,6 +19,11 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_NoncopyableCasting
 
+// Casting an existential that suppresses `Copyable` or `Escapable` needs
+// `swift_getExtendedExistentialTypeMetadata_unique`, which older runtimes lack.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 protocol P: ~Copyable {}
 
 /// Noncopyable *and* `Hashable`. The type checker accepts this, and the

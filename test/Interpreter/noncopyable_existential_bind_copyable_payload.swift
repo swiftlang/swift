@@ -3,6 +3,11 @@
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: executable_test
 
+// Casting an existential that suppresses `Copyable` or `Escapable` needs
+// `swift_getExtendedExistentialTypeMetadata_unique`, which older runtimes lack.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // A `~Copyable` existential can hold a `Copyable` payload, and that payload can
 // be trivial. Extracting it with `load [take]` asserts, because a trivial type's
 // value has `None` ownership where the load's result is assumed `Owned`:

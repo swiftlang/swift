@@ -7,7 +7,7 @@
 
 // 1. Compile api_grab_bag.swift to a .tbd and put it in %t
 
-// RUN: %target-swift-frontend -emit-module -o %t/APIGrabBag.framework/Modules/APIGrabBag.swiftmodule/%target-cpu.swiftmodule -emit-tbd-path %t/APIGrabBag.framework/APIGrabBag.tbd %S/Inputs/api_grab_bag.swift -module-name APIGrabBag -tbd-install_name %t/APIGrabBag.framework/APIGrabBag
+// RUN: %target-swift-frontend -emit-module -o %t/APIGrabBag.framework/Modules/APIGrabBag.swiftmodule/%target-cpu.swiftmodule -emit-tbd-path %t/APIGrabBag.framework/APIGrabBag.tbd %S/Inputs/api_grab_bag.swift -module-name APIGrabBag -tbd-install_name @executable_path/APIGrabBag.framework/APIGrabBag
 
 // 2. Compile the current file against the TBD
 
@@ -15,12 +15,12 @@
 
 // 3. Install the actual dylib into the framework
 
-// RUN: %target-build-swift -emit-library %S/Inputs/api_grab_bag.swift -module-name APIGrabBag -o %t/APIGrabBag.framework/APIGrabBag
+// RUN: %target-build-swift -emit-library %S/Inputs/api_grab_bag.swift -module-name APIGrabBag -o %t/APIGrabBag.framework/APIGrabBag -Xlinker -install_name -Xlinker @executable_path/APIGrabBag.framework/APIGrabBag
 
 // 4. Codesign the executable and run it
 
 // RUN: %target-codesign %t/executable %t/APIGrabBag.framework/APIGrabBag
-// RUN: %target-run %t/executable
+// RUN: %target-run %t/executable %t/APIGrabBag.framework
 
 import APIGrabBag
 

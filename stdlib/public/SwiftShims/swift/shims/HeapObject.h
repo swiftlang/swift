@@ -23,6 +23,7 @@
 #ifndef __swift__
 #include <type_traits>
 #include "swift/Basic/type_traits.h"
+#include "swift/Runtime/Config.h"
 
 namespace swift {
 
@@ -33,13 +34,7 @@ using HeapMetadata = TargetHeapMetadata<InProcess>;
 #else
 typedef struct HeapMetadata HeapMetadata;
 typedef struct HeapObject HeapObject;
-#endif
-
-#if !defined(__swift__) && __has_feature(ptrauth_calls)
-#include <ptrauth.h>
-#endif
-#ifndef __ptrauth_objc_isa_pointer
-#define __ptrauth_objc_isa_pointer
+#define __ptrauth_swift_heap_object_metadata
 #endif
 
 // The members of the HeapObject header that are not shared by a
@@ -51,7 +46,7 @@ typedef struct HeapObject HeapObject;
 /// This must match RefCountedStructTy in IRGen.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
-  HeapMetadata const *__ptrauth_objc_isa_pointer metadata;
+  HeapMetadata const *__ptrauth_swift_heap_object_metadata metadata;
 
 #if !SWIFT_RUNTIME_EMBEDDED
 

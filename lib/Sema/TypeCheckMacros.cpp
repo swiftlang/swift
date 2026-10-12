@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/InternalMacro.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PluginLoader.h"
@@ -1169,6 +1170,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     // Already diagnosed as an error elsewhere.
     return nullptr;
 
+  case MacroDefinition::Kind::Internal:
+    // Internal macros are only ever attached; they are never freestanding.
+    return nullptr;
+
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
@@ -1294,6 +1299,7 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   switch (auto definition = macro->getDefinition()) {
   case MacroDefinition::Kind::Expanded:
   case MacroDefinition::Kind::External:
+  case MacroDefinition::Kind::Internal:
   case MacroDefinition::Kind::Invalid:
   case MacroDefinition::Kind::Undefined:
     break;
@@ -1535,6 +1541,17 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     }
   }
 
+  case MacroDefinition::Kind::Internal: {
+    // Internal macros are implemented directly in the compiler and have
+    // direct access to the AST. They still produce source text that we parse
+    // into a macro-expansion buffer below.
+    std::string result =
+        macroDef.getInternalMacro()->expandAttached(ctx, attachedTo);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
+    break;
+  }
+
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
@@ -1688,6 +1705,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
+    return nullptr;
+
+  case MacroDefinition::Kind::Internal:
+    // Internal macros attach to declarations, not closures.
     return nullptr;
 
   case MacroDefinition::Kind::Builtin: {

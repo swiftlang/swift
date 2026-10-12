@@ -182,7 +182,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_DISTRIBUTE
         -enable-experimental-feature Embedded
         -parse-stdlib
         -DSWIFT_DISTRIBUTED_EMBEDDED
-        -Xfrontend -emit-empty-object-file
         -enable-experimental-feature AllowUnsafeAttribute
         -strict-memory-safety
       C_COMPILE_FLAGS

@@ -2940,29 +2940,41 @@ ConstraintSystem::matchFunctionExecutionSemantics(
     return SolutionKind::Unsolved;
   };
 
-  // First check to see if we have any @called(atMostOnce) dependent function
+  // First check to see if we have any execution semantics dependent function
   // types, if any of them still have unresolved type variables we need to wait
   // until they're fully resolved.
-  auto dep1 = func1->getCalledOnceDependentType();
+  auto dep1 = func1->getExecutionSemanticsDependentType();
   if (dep1) {
     dep1 = simplifyType(dep1);
     if (dep1->hasTypeVariable())
       return formUnsolved();
   }
-  auto dep2 = func2->getCalledOnceDependentType();
+  auto dep2 = func2->getExecutionSemanticsDependentType();
   if (dep2) {
     dep2 = simplifyType(dep2);
     if (dep2->hasTypeVariable())
       return formUnsolved();
   }
 
-  // Sendability is given by either the sendability of the dependent type if
-  // present, otherwise it's given by the function itself.
-  auto func1CalledOnce = dep1 ? dep1->isNoncopyable() : func1->isCalledOnce();
-  auto func2CalledOnce = dep2 ? dep2->isNoncopyable() : func2->isCalledOnce();
+  // The execution semantics are given by the invertible protocols that the
+  // dependent type suppresses if present, otherwise by the function itself.
+  auto getInverses = [](FunctionType *func, Type dep) {
+    if (!dep)
+      return getSuppressedInvertibleProtocols(func->getExecutionSemantics());
 
-  if (func1CalledOnce != func2CalledOnce) {
-    if (func1CalledOnce || kind < ConstraintKind::Subtype) {
+    InvertibleProtocolSet inverses;
+    if (dep->isNoncopyable())
+      inverses.insert(InvertibleProtocolKind::Copyable);
+    if (!dep->isDeinitable())
+      inverses.insert(InvertibleProtocolKind::Deinitable);
+    return inverses;
+  };
+  auto inverses1 = getInverses(func1, dep1);
+  auto inverses2 = getInverses(func2, dep2);
+
+  if (inverses1 != inverses2) {
+    // A conversion can suppress more invertible protocols, but never fewer.
+    if (kind < ConstraintKind::Subtype || !(inverses1 - inverses2).empty()) {
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
@@ -2972,7 +2984,12 @@ ConstraintSystem::matchFunctionExecutionSemantics(
         return SolutionKind::Error;
     }
 
-    increaseScore(SK_FunctionConversion, locator);
+    // Score each invertible protocol that differs, so that overload
+    // resolution prefers the closest execution semantics.
+    auto difference = (inverses1 - inverses2);
+    difference.insertAll(inverses2 - inverses1);
+    increaseScore(SK_FunctionConversion, locator,
+                  std::distance(difference.begin(), difference.end()));
   }
 
   return SolutionKind::Solved;
@@ -3826,12 +3843,12 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
                                        ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  auto classDecl2 = type2->getClassOrBoundGenericClass();
+  auto classDecl2 = type2->getClassDecl();
   SmallPtrSet<ClassDecl *, 4> superclasses1;
   for (auto super1 = type1->getSuperclass();
        super1;
        super1 = super1->getSuperclass()) {
-    auto superclass1 = super1->getClassOrBoundGenericClass();
+    auto superclass1 = super1->getClassDecl();
     if (superclass1 != classDecl2) {
       // Break if we have circular inheritance.
       if (superclass1 && !superclasses1.insert(superclass1).second)
@@ -5037,7 +5054,7 @@ static bool canBridgeThroughCast(ConstraintSystem &cs, Type fromType,
   // If we have a value of type AnyObject that we're trying to convert to
   // a class, force a downcast.
   // FIXME: Also allow types bridged through Objective-C classes.
-  if (fromType->isAnyObject() && toType->getClassOrBoundGenericClass())
+  if (fromType->isAnyObject() && toType->getClassDecl())
     return true;
 
   auto bridged = TypeChecker::getDynamicBridgedThroughObjCClass(cs.DC,
@@ -5510,6 +5527,18 @@ bool ConstraintSystem::repairFailures(
     // going on e.g. problem with escapiness).
     if (convertTo->isTypeVariableOrMember() || convertTo->isAny())
       return false;
+
+    // A call won't help if the function value itself lacks an invertible
+    // protocol that the existential requires, like Copyable or Deinitable.
+    if (convertTo->isExistentialType() && !fnType->hasTypeVariable() &&
+        !fnType->hasTypeParameter() && !convertTo->hasTypeParameter()) {
+      for (auto ip : InvertibleProtocolSet::allKnown()) {
+        auto *proto = getASTContext().getProtocol(getKnownProtocolKind(ip));
+        if (checkConformance(convertTo, proto) &&
+            !checkConformance(fnType, proto))
+          return false;
+      }
+    }
 
     ConstraintKind matchKind;
     if (resultType->is<TypeVariableType>()) {
@@ -7629,8 +7658,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // them. If they
   //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is
   //  converted.
+  //
+  // Also check the fixed types: a type variable can be bound to a tuple with
+  // an unresolved pack expansion, for example when matching the root and value
+  // of an identity key path to its contextual type.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
-      isTupleWithUnresolvedPackExpansion(origType2)) {
+      isTupleWithUnresolvedPackExpansion(origType2) ||
+      isTupleWithUnresolvedPackExpansion(type1) ||
+      isTupleWithUnresolvedPackExpansion(type2)) {
     auto isTypeVariableWrappedInOptional = [](Type type) {
       if (type->getOptionalObjectType()) {
         return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
@@ -7967,7 +8002,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto instanceType2 = meta2->getInstanceType();
       if (isa<MetatypeType>(meta1) &&
           !(instanceType1->mayHaveSuperclass() &&
-            instanceType2->getClassOrBoundGenericClass())) {
+            instanceType2->getClassDecl())) {
         subKind = ConstraintKind::Bind;
       }
 
@@ -8152,15 +8187,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (kind >= ConstraintKind::Subtype) {
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
-        type2->getClassOrBoundGenericClass() &&
-        type1->getClassOrBoundGenericClass()
-          != type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl() &&
+        type1->getClassDecl()
+          != type2->getClassDecl()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
 
     // Existential-to-superclass conversion.
     if (type1->isClassExistentialType() &&
-        type2->getClassOrBoundGenericClass()) {
+        type2->getClassDecl()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
 
@@ -8231,7 +8266,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Single @objc protocol value metatypes can be converted to the ObjC
         // Protocol class type.
         auto isProtocolClassType = [&](Type t) -> bool {
-          if (auto classDecl = t->getClassOrBoundGenericClass())
+          if (auto classDecl = t->getClassDecl())
             if (classDecl->getName() == getASTContext().Id_Protocol
                 && classDecl->getModuleContext()->getName()
                     == getASTContext().Id_ObjectiveC)
@@ -8830,7 +8865,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
                                  Type classType,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
-  if (!classType->getClassOrBoundGenericClass())
+  if (!classType->getClassDecl())
     return SolutionKind::Error;
 
   // Dig out the fixed type to which this type refers.
@@ -8895,8 +8930,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
   if (type->satisfiesClassConstraint()) {
     // If we have an exact match of class declarations, ensure the
     // generic arguments match.
-    if (type->getClassOrBoundGenericClass() ==
-        classType->getClassOrBoundGenericClass()) {
+    if (type->getClassDecl() ==
+        classType->getClassDecl()) {
       auto result = matchTypes(type, classType, ConstraintKind::Bind,
                                flags, locator);
       if (result != SolutionKind::Error)
@@ -9888,7 +9923,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                             ->getAs<ProtocolCompositionType>()) {
           auto newConstraintTy = PCT->withoutMarkerProtocols();
           if (!newConstraintTy->isEqual(PCT)) {
-            fromType = newConstraintTy->getClassOrBoundGenericClass()
+            fromType = newConstraintTy->getClassDecl()
                            ? newConstraintTy
                            : ExistentialType::get(newConstraintTy);
           }
@@ -9967,8 +10002,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If casting among classes, and there are open
     // type variables remaining, introduce a subtype constraint to help resolve
     // them.
-    if (fromType->getClassOrBoundGenericClass()
-        && toType->getClassOrBoundGenericClass()
+    if (fromType->getClassDecl()
+        && toType->getClassDecl()
         && (fromType->hasTypeVariable() || toType->hasTypeVariable())) {
       addConstraint(ConstraintKind::Subtype, toType, fromType,
                     getConstraintLocator(locator));
@@ -11273,7 +11308,7 @@ static bool isNonFinalClass(Type type) {
   if (auto dynamicSelf = type->getAs<DynamicSelfType>())
     type = dynamicSelf->getSelfType();
 
-  if (auto classDecl = type->getClassOrBoundGenericClass())
+  if (auto classDecl = type->getClassDecl())
     return !classDecl->isSemanticallyFinal();
 
   if (auto archetype = type->getAs<ArchetypeType>())
@@ -12587,12 +12622,14 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
-    // Infer `@called(atMostOnce)` from the contextual type.
-    if (!closureExtInfo.isCalledOnce()) {
-      if (auto calledOnceTy = contextualFnType->getCalledOnceDependentType()) {
-        closureExtInfo = closureExtInfo.withCalledOnceDependentType(calledOnceTy);
-      } else if (contextualFnType->isCalledOnce()) {
-        closureExtInfo = closureExtInfo.withCalledOnce();
+    // Infer execution semantics from the contextual type.
+    if (!closureExtInfo.hasCalledAtMostOnceSemantics()) {
+      if (auto executionSemanticsTy =
+              contextualFnType->getExecutionSemanticsDependentType()) {
+        closureExtInfo = closureExtInfo.withExecutionSemanticsDependentType(
+            executionSemanticsTy);
+      } else if (auto semantics = contextualFnType->getExecutionSemantics()) {
+        closureExtInfo = closureExtInfo.withExecutionSemantics(semantics);
       }
     }
   }
@@ -12709,7 +12746,10 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
-      dynamicType2 = ExistentialMetatypeType::get(type2);
+      if (type2->isCOMExistentialType())
+        dynamicType2 = ExistentialMetatypeType::get(getASTContext().TheAnyType);
+      else
+        dynamicType2 = ExistentialMetatypeType::get(type2);
     } else {
       dynamicType2 = MetatypeType::get(type2);
     }
@@ -15269,7 +15309,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    auto nativeClass = type1->getClassOrBoundGenericClass();
+    auto nativeClass = type1->getClassDecl();
     auto bridgedObjCClass
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 
@@ -15285,7 +15325,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    auto nativeClass = type2->getClassOrBoundGenericClass();
+    auto nativeClass = type2->getClassDecl();
     auto bridgedObjCClass
       = nativeClass->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 

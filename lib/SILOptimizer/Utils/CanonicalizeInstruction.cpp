@@ -384,7 +384,7 @@ broadenSingleElementStores(StoreInst *storeInst,
     auto *inst = cast<SingleValueInstruction>(op);
     SILValue baseAddr = inst->getOperand(0);
     SILType baseAddrType = baseAddr->getType();
-    auto *decl = baseAddrType.getStructOrBoundGenericStruct();
+    auto *decl = baseAddrType.getStructDecl();
     assert(
       !decl->isResilient(f->getModule().getSwiftModule(),
                          f->getResilienceExpansion()) &&

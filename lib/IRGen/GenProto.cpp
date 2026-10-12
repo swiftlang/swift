@@ -420,7 +420,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_CXX:
       if (!isSelfParameter) return;
-      if (type->getNominalOrBoundGenericNominal()) {
+      if (type->getNominalDecl()) {
         considerNewTypeSource(IsExact,
                               MetadataSource::Kind::GenericLValueMetadata,
                               type, paramIndex);
@@ -440,7 +440,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
       // Classes are sources of metadata.
-      if (type->getClassOrBoundGenericClass()) {
+      if (type->getClassDecl()) {
         considerNewTypeSource(IsInexact, MetadataSource::Kind::ClassPointer,
                               type, paramIndex);
         return;
@@ -463,7 +463,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
         // Thick metatypes for Objective-C parameterized classes are not
         // sources of metadata.
         CanType objTy = metatypeTy.getInstanceType();
-        if (auto classDecl = objTy->getClassOrBoundGenericClass())
+        if (auto classDecl = objTy->getClassDecl())
           if (classDecl->isTypeErasedGenericClass())
             return;
 
@@ -633,7 +633,7 @@ void EmitPolymorphicParameters::bindExtraSource(
           IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
-      auto *CD = selfTy.getClassOrBoundGenericClass();
+      auto *CD = selfTy.getClassDecl();
       // The self metadata here corresponds to the conforming type.
       // For an inheritable conformance, that may be a subclass of the static
       // type, and so the self metadata will be inexact. Currently, all
@@ -3936,6 +3936,25 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    if (proto->isCOMInterface()) {
+      auto archetype = cast<ArchetypeType>(srcType);
+      for (auto *required : archetype->getConformsTo()) {
+        if (!required->isCOMInterface())
+          continue;
+        auto *hierarchy = required->getCOMInterfaceHierarchy();
+        assert(hierarchy && !hierarchy->isInvalid());
+        if (!llvm::is_contained(hierarchy->getABIChain(), proto))
+          continue;
+        auto *adjustment =
+            emitArchetypeWitnessTableRef(IGF, archetype, required);
+        // Pack elements use pointer-sized slots shared with native witnesses.
+        if (adjustment->getType()->isPointerTy())
+          adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
+        return adjustment;
+      }
+      llvm_unreachable("COM archetype is missing an interface adjustment");
+    }
+
     auto archetype = cast<ArchetypeType>(srcType);
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
@@ -4346,6 +4365,12 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   }
 }
 
+llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {
+  if (isCOMInterfaceAdjustment())
+    return IGM.IntPtrTy;
+  return typeForKind(IGM, getKind());
+}
+
 void irgen::bindGenericRequirement(IRGenFunction &IGF,
                                    GenericRequirement requirement,
                                    llvm::Value *value,
@@ -4368,6 +4393,10 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
     }
   }
 
+  // A conformance loaded from a pack uses a pointer-sized storage slot. Restore
+  // the integer representation used for individual COM requirements.
+  if (requirement.isCOMInterfaceAdjustment() && value->getType()->isPointerTy())
+    value = IGF.Builder.CreatePtrToInt(value, IGF.IGM.IntPtrTy);
   assert(value->getType() == requirement.getType(IGF.IGM));
   switch (requirement.getKind()) {
   case GenericRequirement::Kind::Shape: {
@@ -4590,6 +4619,17 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   call->setDoesNotThrow();
   auto fn = IGF.Builder.CreateBitCast(call, IGM.PtrTy);
   return FunctionPointer::createSigned(fnType, fn, authInfo, signature);
+}
+
+llvm::Value *irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF,
+                                                      llvm::Value *value,
+                                                      CanType type,
+                                                      ProtocolDecl *protocol) {
+  assert(protocol->isCOMInterface());
+  auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
+  auto *adjustment = emitWitnessTableRef(IGF, type, conformance);
+  return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, value, adjustment,
+                                       "com.interface");
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,

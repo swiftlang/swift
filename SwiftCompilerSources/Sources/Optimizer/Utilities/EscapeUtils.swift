@@ -466,9 +466,11 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       default:
         return isEscaping
       }
+    case let metatype as ExistentialMetatypeInst:
+      return metatype.mayHaveSideEffects ? isEscaping : .continueWalk
     case is StrongRetainInst, is RetainValueInst, is DebugValueInst, is ValueMetatypeInst,
       is InitExistentialMetatypeInst, is OpenExistentialMetatypeInst,
-      is ExistentialMetatypeInst, is DeallocRefInst, is FixLifetimeInst,
+      is DeallocRefInst, is FixLifetimeInst,
       is ClassifyBridgeObjectInst, is BridgeObjectToWordInst, is EndBorrowInst,
       is StrongRetainInst, is RetainValueInst,
       is ClassMethodInst, is SuperMethodInst, is ObjCMethodInst,

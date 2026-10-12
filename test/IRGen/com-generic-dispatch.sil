@@ -1,0 +1,50 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem { func value(_ offset: Int32) -> Int32 }
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IExtended: IItem { func multiply(_ factor: Int32) -> Int32 }
+
+// The same signed adjustment is applied to the vtable lookup and the receiver.
+// An inherited requirement reuses the derived interface's adjustment.
+// CHECK-LABEL: define{{.*}} @inherited(
+// CHECK-SAME: ptr {{.*}}[[ADDRESS:%[^,) ]+]], i32 {{.*}}, ptr {{.*}}, i{{32|64}} [[ADJUSTMENT:%[^,)]+]])
+// CHECK: [[OBJECT:%.*]] = load ptr, ptr [[ADDRESS]]
+// CHECK: [[INTERFACE:%.*]] = getelementptr inbounds i8, ptr [[OBJECT]], i{{32|64}} [[ADJUSTMENT]]
+// CHECK: [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 3
+// CHECK: [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: [[SELF:%.*]] = load ptr, ptr [[ADDRESS]]
+// CHECK: [[RECEIVER:%.*]] = getelementptr inbounds i8, ptr [[SELF]], i{{32|64}} [[ADJUSTMENT]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[METHOD]](ptr [[RECEIVER]], i32 {{.*}})
+// CHECK: ret i32
+sil @inherited : $@convention(thin) <T: IExtended> (@in_guaranteed T, Int32) -> Int32 {
+bb0(%self : $*T, %offset : $Int32):
+  %method = com_method %self : $*T, #IItem.value, $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  %result = apply %method(%offset, %self) : $@convention(com_method) (Int32, @in_guaranteed T) -> Int32
+  return %result : $Int32
+}
+
+@com(interface: "10000000-0000-0000-0000-000000000003")
+public protocol IOther { func other() -> Int32 }
+
+// Different interface chains have independent adjustments. Select the one for
+// the protocol defining the method, not the first conformance on the receiver.
+// CHECK-LABEL: define{{.*}} @other(
+// CHECK-SAME: i{{32|64}} %T.IExtended, i{{32|64}} [[OTHER:%T.IOther]])
+// CHECK: getelementptr inbounds i8, ptr {{%.*}}, i{{32|64}} [[OTHER]]
+// CHECK: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i{{32|64}} 3
+// CHECK: [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
+// CHECK: [[SELF:%.*]] = getelementptr inbounds i8, ptr {{%.*}}, i{{32|64}} [[OTHER]]
+// CHECK: call {{(x86_stdcallcc )?}}i32 [[METHOD]](ptr [[SELF]])
+sil @other : $@convention(thin) <T where T: IExtended, T: IOther> (@in_guaranteed T) -> Int32 {
+bb0(%self : $*T):
+  %method = com_method %self : $*T, #IOther.other, $@convention(com_method) (@in_guaranteed T) -> Int32
+  %result = apply %method(%self) : $@convention(com_method) (@in_guaranteed T) -> Int32
+  return %result : $Int32
+}

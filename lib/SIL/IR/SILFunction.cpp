@@ -675,6 +675,11 @@ bool SILFunction::hasNonUniqueDefinition() const {
   if (getName() == getASTContext().getEntryPointFunctionName())
     return false;
 
+  // Any module that uses a generic function can create the same
+  // specialization of it.
+  if (isSpecialization())
+    return true;
+
   // If this is for a declaration, ask it.
   if (auto declRef = getDeclRef()) {
     return declRef.hasNonUniqueDefinition();
@@ -1106,7 +1111,7 @@ bool SILFunction::hasDynamicSelfMetadata() const {
   if (selfTy.isForeignReferenceType())
     return false;
 
-  return !!selfTy.getClassOrBoundGenericClass();
+  return !!selfTy.getClassDecl();
 }
 
 bool SILFunction::hasName(const char *Name) const {

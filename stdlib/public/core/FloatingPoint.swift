@@ -196,8 +196,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// - If the value you pass to `significand` is NaN, the result is NaN.
   ///
   /// For any floating-point value `x` of type `F`, the result of the following
-  /// is equal to `x`, with the distinction that the result is canonicalized
-  /// if `x` is in a noncanonical encoding:
+  /// is interchangeable with `x`, with the distinction that the result is
+  /// canonicalized if `x` is in a noncanonical encoding:
   ///
   ///     let x0 = F(sign: x.sign, exponent: x.exponent, significand: x.significand)
   ///

@@ -24,7 +24,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
@@ -278,11 +277,6 @@ const {
   if (originKind == DisallowedOriginKind::None)
     return DiagnosticBehavior::Ignore;
 
-  // If we can capture the layouts of hidden types, suppress
-  // diagnostic.
-  if (encapsulatedAsHiddenStoredProperty(D, originKind))
-    return DiagnosticBehavior::Ignore;
-
   auto &ctx = DC->getASTContext();
 
   if (shouldSuppressExportabilityDiagnosticsForHiddenTypes(
@@ -348,53 +342,6 @@ ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return std::nullopt;
-}
-
-bool ExportContext::encapsulatedAsHiddenStoredProperty(
-    const ValueDecl *D, DisallowedOriginKind originKind) const {
-  if (originKind != DisallowedOriginKind::InternalBridgingHeaderImport)
-    return false;
-  if (!getDeclContext()->getASTContext().LangOpts.hasFeature(
-          Feature::AbstractStoredPropertyLayout))
-    return false;
-  auto reason = getExportabilityReason();
-  if (!reason)
-    return false;
-  switch (*reason) {
-  case ExportabilityReason::ImplicitlyPublicVarDecl:
-  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
-    break;
-  default:
-    return false;
-  }
-
-  // Encapsulation applies. Record the hidden-type layout so it will be
-  // serialized into this module's hidden-type layouts block.
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
-    if (auto layout = computeClangAbstractLayout(nominal)) {
-      auto *DC = getDeclContext();
-      DC->getParentModule()->recordHiddenTypeLayout(
-          layout->mangledName, *layout);
-      // Also record the canonical type so the serializer can substitute a
-      // HiddenType placeholder for stored-property references in the emitted
-      // .swiftmodule, without re-mangling at every VarDecl serialization site.
-      DC->getASTContext().recordTypeToHideWhenEmittingModule(
-          nominal->getDeclaredInterfaceType()->getCanonicalType(),
-          layout->mangledName);
-      auto *enclosingStruct =
-          dyn_cast_or_null<StructDecl>(DC->getInnermostTypeContext());
-      ASSERT(enclosingStruct &&
-             "encapsulated hidden stored property must be inside a struct");
-      if (!enclosingStruct->getAttrs()
-               .hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        auto &ctx = DC->getASTContext();
-        enclosingStruct->getAttrs().add(
-            new (ctx) HasHiddenStoredPropertiesAttr(/*IsImplicit=*/true));
-      }
-      return true;
-    }
-  }
-  return false;
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
@@ -1980,7 +1927,35 @@ static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
       case InvertibleProtocolKind::Escapable:
         if (!arg->isEscapable())
           return ip;
+        break;
+      case InvertibleProtocolKind::Deinitable:
+        // Nothing can suppress Deinitable, so no generic argument lacks it.
+        break;
       }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Which invertible protocol, if any, an existential's own layout suppresses.
+static std::optional<InvertibleProtocolKind>
+checkExistentialForInvertibleReqs(CanType type) {
+  if (!type.isExistentialType())
+    return std::nullopt;
+
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
+    switch (ip) {
+    case InvertibleProtocolKind::Copyable:
+      if (type->isNoncopyable())
+        return ip;
+      break;
+    case InvertibleProtocolKind::Escapable:
+      if (!type->isEscapable())
+        return ip;
+      break;
+    case InvertibleProtocolKind::Deinitable:
+      // Nothing can suppress Deinitable, so no existential lacks it.
+      break;
     }
   }
   return std::nullopt;
@@ -2000,27 +1975,43 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 
   auto type = srcType->getCanonicalType();
 
-  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
-    if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
-      std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
-      switch (*missing) {
-      case InvertibleProtocolKind::Copyable:
-        diag =
-            diag::availability_copyable_generics_casting_only_version_newer;
-        break;
-      case InvertibleProtocolKind::Escapable:
-        diag =
-            diag::availability_escapable_generics_casting_only_version_newer;
-        break;
-      }
+  // Either a generic argument that suppresses a requirement (`Wrapper<NC>`) or
+  // an existential that suppresses one in its own layout (`any P & ~Copyable`).
+  // Both need a runtime that understands `InvertedProtocols` requirements.
+  std::optional<InvertibleProtocolKind> missing;
+  bool fromExistential = false;
+  if (auto boundTy = dyn_cast<BoundGenericType>(type))
+    missing = checkGenericArgsForInvertibleReqs(boundTy);
+  if (!missing) {
+    missing = checkExistentialForInvertibleReqs(type);
+    fromExistential = missing.has_value();
+  }
 
-      // Enforce the availability restriction.
-      return TypeChecker::checkAvailability(
-          refLoc,
-          refDC->getASTContext().getNoncopyableGenericsAvailability(),
-          *diag,
-          refDC);
+  if (missing) {
+    std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
+    switch (*missing) {
+    case InvertibleProtocolKind::Copyable:
+      diag = fromExistential
+          ? diag::availability_copyable_existential_casting_only_version_newer
+          : diag::availability_copyable_generics_casting_only_version_newer;
+      break;
+    case InvertibleProtocolKind::Escapable:
+      diag = fromExistential
+          ? diag::availability_escapable_existential_casting_only_version_newer
+          : diag::availability_escapable_generics_casting_only_version_newer;
+      break;
+    case InvertibleProtocolKind::Deinitable:
+      llvm_unreachable("nothing can suppress Deinitable");
     }
+
+    // Enforce the availability restriction.
+    return TypeChecker::checkAvailability(
+        refLoc,
+        fromExistential
+            ? refDC->getASTContext().getParameterizedExistentialAvailability()
+            : refDC->getASTContext().getNoncopyableGenericsAvailability(),
+        *diag,
+        refDC);
   }
   return false;
 }
@@ -2108,6 +2099,11 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
 
   auto type = refType->getCanonicalType();
 
+  // For casts, we do need the extended existential shape metadata,
+  // since casts do not open the existential.
+  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
+    return true;
+
   // SILGen emits these conversions by opening the outermost level of
   // existential, so we never need to emit type metadata for an
   // existential in such a position.  We necessarily have type metadata
@@ -2116,9 +2112,6 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
   if (type.isAnyExistentialType()) return false;
 
   if (checkTypeMetadataAvailabilityInternal(type, refLoc, refDC))
-    return true;
-
-  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
     return true;
 
   return false;

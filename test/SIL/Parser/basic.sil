@@ -1739,7 +1739,7 @@ class A {
 }
 
 // CHECK-LABEL: sil @test_access : $@convention(thin) (@guaranteed A) -> () {
-// CHECK: begin_access [read] [dynamic]
+// CHECK: begin_access [read] [dynamic] [unresolved] 
 // CHECK: begin_access [read] [dynamic] [no_nested_conflict]
 // CHECK: begin_unpaired_access [read] [dynamic]
 // CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict]
@@ -1748,7 +1748,7 @@ sil @test_access : $(@guaranteed A) -> () {
 bb0(%0 : $A):
   %1 = alloc_stack $Any
   %2 = ref_element_addr %0 : $A, #A.property
-  %3 = begin_access [dynamic] [read] %2 : $*Any
+  %3 = begin_access [unresolved] [dynamic] [read] %2 : $*Any
   copy_addr %3 to [init] %1 : $*Any
   end_access %3 : $*Any
   %6 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Any

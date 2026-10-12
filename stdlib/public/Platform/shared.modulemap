@@ -1,0 +1,77 @@
+//===--- WinSDK_Shared.modulemap ------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module WinSDK.Shared [system] {
+  module AFUnix {
+    header "shared/afunix.h"
+    export *
+  }
+
+  module DXGI {
+    header "shared/dxgi1_6.h"
+    export *
+
+    link "dxgi.lib"
+  }
+
+  module GUIDDef {
+    header "shared/guiddef.h"
+    export *
+  }
+
+  module APIFamily {
+    header "shared/winapifamily.h"
+    export *
+  }
+
+  module MinWinDef {
+    header "shared/minwindef.h"
+    export *
+  }
+
+  module RPC {
+    header "shared/rpc.h"
+    export *
+
+    link "RpcRT4.Lib"
+  }
+
+  module RPCNDR {
+    header "shared/rpcndr.h"
+    export *
+  }
+
+  module SDDL {
+    header "shared/sddl.h"
+    export *
+  }
+
+  module SDKDDKVer {
+    header "shared/sdkddkver.h"
+    export *
+  }
+
+  module WinError {
+    header "shared/winerror.h"
+    export *
+  }
+
+  module WTypesBase {
+    header "shared/wtypesbase.h"
+    export *
+  }
+
+  module WTypes {
+    header "shared/wtypes.h"
+    export *
+  }
+}

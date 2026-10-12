@@ -1001,8 +1001,11 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
         newYields.emplace_back(getStrippedType(yield.getType(), ctx),
                                yield.getFlags());
       }
-      auto newExtInfo = funcType->getExtInfo().withRepresentation(
-          AnyFunctionType::Representation::Swift);
+      auto extInfo = funcType->getExtInfo();
+      auto representation = extInfo.hasContext()
+                                ? AnyFunctionType::Representation::Swift
+                                : AnyFunctionType::Representation::Thin;
+      auto newExtInfo = extInfo.withRepresentation(representation);
       return FunctionType::get(
         newParams, newYields,
         getStrippedType(funcType->getResult(), ctx), newExtInfo);
@@ -1627,14 +1630,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // Post-1.0, we'll need to remove this hack in favor of richer constraint
     // declarations.
     if (!(score1 || score2)) {
-      if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType2 = type2->getNominalDecl()) {
         if ((nominalType2->getName() ==
              cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score2;
         }
       }
 
-      if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType1 = type1->getNominalDecl()) {
         if ((nominalType1->getName() ==
              cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score1;

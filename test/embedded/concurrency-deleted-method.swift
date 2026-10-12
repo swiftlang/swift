@@ -5,7 +5,9 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=EXIST-IR %s
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir > %t.ll
+// RUN: %FileCheck --check-prefix=EXIST-IR %s < %t.ll
+// RUN: %FileCheck --check-prefix=EXIST-IR-NO-ALIAS %s < %t.ll
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
 // RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
@@ -69,7 +71,9 @@ actor MyActor {
 // EXIST-IR-SAME:  ptr @_swift_dead_async_method_error_afp{{[^,]*}},
 // EXIST-IR-SAME:  ptr @"$e4main7MyActorCACycfC{{(.ptrauth[.0-9]*)?}}" }>
 
-// EXIST-IR-DAG: @"$e4main7MyActorCN" = {{.*}}alias{{.*}} ptr @"$e4main7MyActorCMf", i32 0, i32 1)
+// MyActor isn't @export(interface), so its full metadata is internal, and so
+// is the alias to its address point, which is unused here.
+// EXIST-IR-NO-ALIAS-NOT: @"$e4main7MyActorCN" =
 
 
 // EXIST-IR-NOT:  $e4main7MyActorC12thisIsUnusedyyYaF

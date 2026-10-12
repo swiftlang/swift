@@ -817,6 +817,16 @@ bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
                                              const Metadata *sourceValueType,
                                              const Metadata *targetValueType);
 
+// internal func _arrayDownCastTestIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ targetType: TargetValue.Type
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_arrayDownCastTestIndirect(OpaqueValue *source,
+                                      const Metadata *targetType,
+                                      const Metadata *sourceValueType,
+                                      const Metadata *targetValueType);
+
 // internal func _setDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Set<SourceValue>>,
 //   _ target: UnsafeMutablePointer<Set<TargetValue>>)
@@ -1060,13 +1070,11 @@ tryCastToArray(
       auto sourceArgs = srcType->getGenericArgs();
       auto destArgs = destType->getGenericArgs();
       if (isTestOnlyCast(destLocation)) {
-        // Try building a new array in a temporary, then discard.
-        // TODO: Make array tests more efficient by avoiding the copy
-        return testByProducingIntoTemporary(
-            destType, [&](OpaqueValue *temporary) {
-              return _swift_arrayDownCastConditionalIndirect(
-                  srcValue, temporary, sourceArgs[0], destArgs[0]);
-            });
+        // Check the elements in place; no result array is built.
+        return _swift_arrayDownCastTestIndirect(
+                   srcValue, destArgs[0], sourceArgs[0], destArgs[0])
+                   ? DynamicCastResult::TestSuccess
+                   : DynamicCastResult::Failure;
       }
       if (mayDeferChecks) {
         _swift_arrayDownCastIndirect(
@@ -2105,7 +2113,7 @@ public:
 
 } // namespace
 
-extern "C" SWIFT_RUNTIME_EXPORT const Metadata *
+SWIFT_RUNTIME_EXPORT const Metadata *
 swift::swift_getCOMDynamicType(void *interface, const Metadata *staticType) {
   COMSwiftObject identity(interface);
   return identity ? identity.getType() : staticType;
@@ -2362,7 +2370,8 @@ static DynamicCastResult tryCastToExtendedExistential(
     SubstGenericParametersFromMetadata substitutions(destExistentialShape,
                                                      allGenericArgsVec.data());
     // Verify the requirements in the requirement signature against the
-    // arguments from the source value.
+    // arguments from the source value. The leading generalization parameters
+    // never record inverses, so don't check them for Copyable and Escapable.
     ConformanceExecutionContext context;
     auto requirementSig = destExistentialShape->getRequirementSignature();
     auto error = swift::_checkGenericRequirements(
@@ -2380,7 +2389,8 @@ static DynamicCastResult tryCastToExtendedExistential(
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
         },
-        &context);
+        &context, /*numParamsExemptFromInvertibleChecks=*/
+        destExistentialShape->getNumGenSigParams());
     if (error)
       return DynamicCastResult::Failure;
 

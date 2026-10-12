@@ -2269,6 +2269,14 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
+ERROR(cxx_override_attr_not_override,none,
+      "%kind0 cannot be marked 'override' because its C++ declaration does not "
+      "override a base class method",
+      (const ValueDecl *))
+ERROR(cxx_override_attr_not_superclass,none,
+      "%kind0 cannot be marked 'override' because the C++ method it overrides "
+      "belongs to %1, which is not a superclass of %2 in Swift",
+      (const ValueDecl *, const clang::NamedDecl *, const ValueDecl *))
 ERROR(cxx_self_ownership_unsupported,none,
       "%kindonly0 cannot be marked '@cxx' because 'self' is "
       "'%select{borrowing|consuming}1'; a C++ method receives 'this' from its "
@@ -2682,19 +2690,19 @@ WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
 
-// @called(atMostOnce)
-ERROR(called_once_cannot_be_used_with_borrowing,none,
-      "'@called(atMostOnce)' cannot be used together with 'borrowing'", ())
-ERROR(called_once_function_type_mismatch,none,
-      "invalid conversion from '@called(atMostOnce)' function of type %0 "
-      "to function type %1", (Type, Type))
+// @called
+ERROR(called_attr_cannot_be_used_with_borrowing,none,
+      "'@called(%0)' cannot be used together with 'borrowing'", (StringRef))
+ERROR(called_attr_function_type_mismatch,none,
+      "invalid conversion from '@called(%0)' function of type %1 "
+      "to function type %2", (StringRef, Type, Type))
 ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
       "'CalledAttribute' is enabled",
       ())
-ERROR(sending_capture_decl_requires_called_once,none,
-      "'sending' capture may only be declared in a '@called(atMostOnce)' "
-      "closure",
+ERROR(sending_capture_decl_requires_called_closure,none,
+      "'sending' capture may only be declared in a '@called(atMostOnce)' or "
+      "'@called(exactlyOnce)' closure",
       ())
 
 // Alignment attribute
@@ -3074,6 +3082,21 @@ ERROR(inferred_opaque_type,none,
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
+ERROR(deinitable_reserved,none,
+      "'Deinitable' is reserved for use by the compiler", ())
+ERROR(deinitable_inverse_requires_noncopyable,none,
+      "%0 cannot suppress 'Deinitable' without also suppressing 'Copyable'",
+      (Type))
+ERROR(deinitable_nominal_inverse_requires_noncopyable,none,
+      "%kind0 cannot suppress 'Deinitable' without also suppressing "
+      "'Copyable'", (const ValueDecl *))
+ERROR(nondeinitable_storage,none,
+      "%select{global variable|static property|lazy property|"
+      "'async let' binding}0 %1 cannot have non-Deinitable type %2",
+      (unsigned, DeclName, Type))
+ERROR(deinitable_illegal_deinit,none,
+      "deinitializer cannot be declared in %kind0, which suppresses "
+      "'Deinitable'", (const ValueDecl *))
 
 // Extensions
 GROUPED_ERROR(non_nominal_extension,NominalTypes,none,
@@ -4518,6 +4541,12 @@ ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 ERROR(dynamic_self_default_arg,none,
       "covariant 'Self' type cannot be referenced from a default argument expression", ())
+
+// Experimental types
+
+ERROR(type_requires_experimental_feature,none,
+      "using '%0' requires an experimental feature; use '-enable-experimental-feature %1'",
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -6920,8 +6949,12 @@ ERROR(tuple_pack_element_label,none,
       ())
 ERROR(tuple_move_only_not_supported,none,
       "tuple with noncopyable element type %0 is not supported", (Type))
-ERROR(tuple_containing_move_only_not_supported,none,
-      "type %0 containing noncopyable element is not supported", (Type))
+ERROR(deinitable_closure_nondeinitable_capture,none,
+      "%select{consumed capture|capture list entry}0 %1 of "
+      "'Deinitable'-conforming closure has non-Deinitable type %2",
+      (unsigned, const ValueDecl *, Type))
+ERROR(tuple_nondeinitable_element,none,
+      "tuple cannot contain non-Deinitable element type %0", (Type))
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
@@ -7778,6 +7811,16 @@ ERROR(availability_copyable_generics_casting_only_version_newer, none,
 
 ERROR(availability_escapable_generics_casting_only_version_newer, none,
       "runtime support for casting types with nonescapable generic arguments "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_copyable_existential_casting_only_version_newer, none,
+      "runtime support for casting a non-'Copyable' existential "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_escapable_existential_casting_only_version_newer, none,
+      "runtime support for casting a non-'Escapable' existential "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 

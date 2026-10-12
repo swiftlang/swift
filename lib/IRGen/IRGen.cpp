@@ -19,8 +19,8 @@
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
@@ -91,9 +91,7 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
-#if LLVM_VERSION_MAJOR >= 23
 #include "llvm/Transforms/Utils/AssignGUID.h"
-#endif
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
 #include "llvm/IR/DiagnosticInfo.h"
@@ -172,10 +170,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
 
+#if LLVM_VERSION_MAJOR < 24
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
+#endif
 
   if (Opts.EnableGlobalISel) {
     TargetOpts.EnableGlobalISel = true;
@@ -216,6 +216,13 @@ void setModuleFlags(IRGenModule &IGM) {
       IGM.getOptions().WitnessMethodElimination) {
     Module->addModuleFlag(llvm::Module::Error, "Virtual Function Elim", 1);
   }
+
+#if LLVM_VERSION_MAJOR >= 24
+  // WebAssembly doesn't support atomics yet, see
+  // https://github.com/apple/swift/issues/54533 for more details.
+  if (IGM.Triple.isOSBinFormatWasm())
+    Module->setThreadModel(llvm::ThreadModel::Single);
+#endif
 }
 
 static void align(llvm::Module *Module) {
@@ -427,7 +434,7 @@ void swift::performLLVMOptimizations(
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
-    Expected<PassPlugin> PassPlugin = PassPlugin::Load(PluginFile);
+    Expected<PassPlugin> PassPlugin = PassPlugin::load(PluginFile);
     if (PassPlugin) {
       PassPlugin->registerPassBuilderCallbacks(PB);
     } else {
@@ -601,7 +608,8 @@ void swift::performLLVMOptimizations(
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
     MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
-                                /*EmitSummaryIndex=*/false));
+                                /*EmitSummaryIndex=*/false,
+                                /*ShouldRenumberMetadata=*/true));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -610,12 +618,10 @@ void swift::performLLVMOptimizations(
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-#if LLVM_VERSION_MAJOR >= 23
       // ThinLTOBitcodeWriterPass requests ModuleSummaryIndexAnalysis, which
       // requires a GUID to be assigned to every GlobalValue. The LTO prelink
       // pipelines do that via AssignGUIDPass, but the O0 pipeline does not.
       MPM.addPass(AssignGUIDPass());
-#endif
       MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
@@ -625,12 +631,11 @@ void swift::performLLVMOptimizations(
         // lto summary.)
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
-#if LLVM_VERSION_MAJOR >= 23
+
         // BitcodeWriterPass with EmitSummaryIndex requests
         // ModuleSummaryIndexAnalysis, which requires a GUID to be assigned to
         // every GlobalValue; the per-module/O0 pipelines do not do that.
         MPM.addPass(AssignGUIDPass());
-#endif
       }
       MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
@@ -647,6 +652,7 @@ void swift::performLLVMOptimizations(
     if (irFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irFile, nullptr);
   }
 
@@ -871,6 +877,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     }
 
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+      Module->renumberMetadataForAssembly();
       Module->print(*OutputFile, nullptr);
       return false;
     }
@@ -884,6 +891,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     if (irgenFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irgenFile, nullptr);
   }
 

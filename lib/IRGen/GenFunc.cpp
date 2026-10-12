@@ -227,6 +227,12 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -263,6 +269,12 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -292,6 +304,12 @@ namespace {
                                       IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -494,6 +512,12 @@ namespace {
                      align),
         FuncSignatureInfo(ty) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -531,6 +555,12 @@ namespace {
                          IsFixedSize, IsABIAccessible),
         CaptureOffset(captureOffset)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -2232,7 +2262,7 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        if (outType->isCalledOnce()) {
+        if (outType->hasCalledAtMostOnceSemantics()) {
           // Move value into the apply.
           cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
           consumedFields.set(fieldIndex);
@@ -2721,7 +2751,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
       // @called(atMostOnce) closures always get a context even if they are
       // stack promoted because they can have consuming captures.
-      if (outType->isCalledOnce()) {
+      if (outType->hasCalledAtMostOnceSemantics()) {
         assert(!outType->isTrivialNoEscape());
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures

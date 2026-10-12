@@ -57,7 +57,8 @@ SILType SILBuilder::getPartialApplyResultType(
     TypeExpansionContext context, SILType origTy, unsigned argCount,
     SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation,
-    PartialApplyInst::OnStackKind onStack, bool isCalledOnce) {
+    PartialApplyInst::OnStackKind onStack,
+    std::optional<ExecutionSemantics> executionSemantics) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs, context);
@@ -79,8 +80,8 @@ SILType SILBuilder::getPartialApplyResultType(
               argCount));
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();
-  if (isCalledOnce)
-    extInfoBuilder = extInfoBuilder.withCalledOnce();
+  if (executionSemantics)
+    extInfoBuilder = extInfoBuilder.withExecutionSemantics(executionSemantics);
   auto extInfo = extInfoBuilder.build();
 
   // If the original method has an @unowned_inner_pointer return, the partial
@@ -560,7 +561,7 @@ void SILBuilder::emitDestructureValueOperation(
 
   // If we do not have a tuple or a struct, add to our results list and return.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     results.emplace_back(v);
     return;
   }
@@ -590,7 +591,7 @@ void SILBuilder::emitDestructureAddressOperation(
 
   // If we do not have a tuple or a struct, add to our results list.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     results.emplace_back(v);
     return;
   }
@@ -610,7 +611,7 @@ void SILBuilder::emitDestructureAddressOperation(
 
   // If we do not have a tuple or a struct, add to our results list.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     return;
   }
 

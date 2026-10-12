@@ -4398,7 +4398,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
     Type Ty, TypoCorrectionResults &corrections, DeclNameRef memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
-  if (!Ty->getEnumOrBoundGenericEnum())
+  if (!Ty->getEnumDecl())
     return DeclName();
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
@@ -4415,10 +4415,10 @@ ValueDecl *MissingMemberFailure::
 findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
   IterableDeclContext *idc = nullptr;
 
-  if (auto ED = instanceTy->getEnumOrBoundGenericEnum()) {
+  if (auto ED = instanceTy->getEnumDecl()) {
     idc = ED;
   }
-  else if (auto SD = instanceTy->getStructOrBoundGenericStruct()) {
+  else if (auto SD = instanceTy->getStructDecl()) {
     // Did ClangImporter add OptionSet to this struct?
     for (auto protoAttr :
             SD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -4626,7 +4626,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     return true;
   } else {
     // Check for a few common cases that can cause missing members.
-    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    auto *ED = baseType->getEnumDecl();
     if (ED && getName().isSimpleName("rawValue")) {
       auto loc = ED->getNameLoc();
       if (loc.isValid()) {
@@ -7643,8 +7643,22 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
 
 bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     diagnoseAsError() {
-  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
-                 getToType());
+  auto getSemantics = [](Type type) -> std::optional<ExecutionSemantics> {
+    if (auto *fnType = type->getAs<FunctionType>())
+      return fnType->getExecutionSemantics();
+    return std::nullopt;
+  };
+
+  // The source has the execution semantics, unless the constraint required
+  // the two types to be equal.
+  auto semantics = getSemantics(getFromType());
+  if (!semantics)
+    semantics = getSemantics(getToType());
+
+  emitDiagnostic(diag::called_attr_function_type_mismatch,
+                 CalledAttr::getSemanticsName(
+                     semantics.value_or(ExecutionSemantics::AtMostOnce)),
+                 getFromType(), getToType());
   return true;
 }
 

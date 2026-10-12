@@ -2351,8 +2351,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
-  if (fn->isCalledOnce())
+  if (auto semantics = fn->getExecutionSemantics()) {
     OpArgs.push_back('O');
+    if (*semantics == ExecutionSemantics::AtMostOnce)
+      OpArgs.push_back('o');
+  }
 
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
@@ -3389,7 +3392,9 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
-    } else if (fn->isCalledOnce()) {
+    } else if (auto semantics = fn->getExecutionSemantics()) {
+      if (*semantics == ExecutionSemantics::AtMostOnce)
+        return appendOperator("XOo");
       return appendOperator("XO");
     }
     return appendOperator("c");
@@ -5031,6 +5036,7 @@ void ASTMangler::appendMacroExpansionContext(
   }
 
   SourceManager &sourceMgr = Context.SourceMgr;
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
 
   auto appendMacroExpansionLoc = [&]() {
     appendIdentifier(origDC->getParentModule()->getName().str());
@@ -5038,11 +5044,10 @@ void ASTMangler::appendMacroExpansionContext(
     auto *SF = origDC->getParentSourceFile();
     appendIdentifier(llvm::sys::path::filename(SF->getFilename()), /*allowRawIdentifiers=*/false);
 
-    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
+    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc, bufferID);
     appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));
   };
 
-  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
   auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
   if (!generatedSourceInfo) {
     return appendMacroExpansionLoc();

@@ -2049,6 +2049,24 @@ public:
       return checkLegalSILType(F, objectType, I);
     }
 
+    // Function values with execution semantics have a context. Thin
+    // functions, including closure bodies and thunks, never have execution
+    // semantics themselves; `partial_apply` or `thin_to_thick_function` adds
+    // them to the value. Calling an escaping value with execution semantics
+    // consumes its context; only a non-escaping one, such as a stack-promoted
+    // closure, can be `@callee_guaranteed`.
+    if (auto fnTy = dyn_cast<SILFunctionType>(rvalueType)) {
+      if (fnTy->hasCalledAtMostOnceSemantics()) {
+        require(fnTy->getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+                "function types with execution semantics must be thick");
+        require(fnTy->isNoEscape() || fnTy->getCalleeConvention() ==
+                                          ParameterConvention::Direct_Owned,
+                "escaping function types with execution semantics must be "
+                "@callee_owned");
+      }
+    }
+
     // Metatypes should have explicit representations.
     if (auto metatype = dyn_cast<AnyMetatypeType>(rvalueType)) {
       require(metatype->hasRepresentation(),
@@ -2129,7 +2147,7 @@ public:
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
-    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+    require(AI->isObjC() || AI->getType().getClassDecl(),
             "alloc_ref must allocate class");
     checkAllocRefBase(AI);
   }
@@ -2403,6 +2421,10 @@ public:
 
   void checkBeginApplyInst(BeginApplyInst *AI) {
     checkFullApplySite(AI);
+    
+    require(F.getFunctionStage() == SILStage::Raw
+            || !AI->isUnresolved(),
+            "begin_apply instructions must be fully resolved except in raw SIL");
 
     SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
     auto yieldResults = AI->getYieldedValues();
@@ -2545,11 +2567,21 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
+      // Only an exactly-once closure can capture an exactly-once value. The
+      // move checker diagnoses consumption of a value that is captured by
+      // address instead.
+      if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
+        require(p.value()->getType().isAddress() ||
+                    !argFnTy->isCalledOnce() ||
+                    PAI->getFunctionType()->isCalledOnce(),
+                "only an exactly-once closure can capture an exactly-once "
+                "value");
+      }
       if (PAI->isOnStack()) {
         // A `@called(atMostOnce)` closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
-        require(PAI->isCalledOnce() ||
+        require(PAI->hasCalledAtMostOnceSemantics() ||
                     !substConv.getSILArgumentConvention(argIdx)
                          .isOwnedConventionInCaller(),
                 "on-stack closures do not support owned arguments");
@@ -2657,7 +2689,7 @@ public:
           return true;
         if (t.getASTType() == t.getASTContext().TheNativeObjectType)
           return true;
-        if (auto clazz = t.getClassOrBoundGenericClass())
+        if (auto clazz = t.getClassDecl())
           // Must be a class defined in Swift.
           return clazz->hasKnownSwiftImplementation();
         return false;
@@ -2715,7 +2747,7 @@ public:
       require(arguments.size() == 1,
               "default-actor builtin can only operate on a single object");
       auto argType = arguments[0]->getType().getASTType();
-      auto argClass = argType.getClassOrBoundGenericClass();
+      auto argClass = argType.getClassDecl();
       require((argClass && argClass->isRootDefaultActor(M,
                                         F.getResilienceExpansion())) ||
               isa<BuiltinNativeObjectType>(argType),
@@ -3230,6 +3262,10 @@ public:
                     "result must be same type as operand");
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
+            
+    require(F.getFunctionStage() == SILStage::Raw
+            || !BAI->isUnresolved(),
+            "begin_access instructions must be fully resolved except in raw SIL");
 
     checkAccessEnforcement(BAI);
 
@@ -3658,7 +3694,7 @@ public:
     require(MU->getFunction()->getFunctionStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getClassOrBoundGenericClass() ||
+            Src->getType().getClassDecl() ||
             Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     requireSameType(Src->getType(), MU->getType(),
@@ -3912,7 +3948,7 @@ public:
   }
   
   void checkStructInst(StructInst *SI) {
-    auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
+    auto *structDecl = SI->getType().getStructDecl();
     require(structDecl, "StructInst must return a struct");
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
@@ -3940,7 +3976,7 @@ public:
   }
 
   void checkEnumInst(EnumInst *UI) {
-    EnumDecl *ud = UI->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getType().getEnumDecl();
     require(ud, "EnumInst must return an enum");
     require(UI->getElement()->getParentEnum() == ud,
             "EnumInst case must be a case of the result enum type");
@@ -3962,7 +3998,7 @@ public:
   }
 
   void checkInitEnumDataAddrInst(InitEnumDataAddrInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
@@ -3984,7 +4020,7 @@ public:
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
-    EnumDecl *ud = UI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getOperand()->getType().getEnumDecl();
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
@@ -4006,7 +4042,7 @@ public:
   }
 
   void checkUncheckedEnumDataAddrInst(UncheckedEnumDataAddrInstBase *UI) {
-    EnumDecl *ud = UI->getEnum()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *ud = UI->getEnum()->getType().getEnumDecl();
     require(ud, "instruction must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "instruction case must be a case of the enum operand type");
@@ -4050,7 +4086,7 @@ public:
               || IUAI->getOperand()->getType().is<BoundGenericEnumType>(),
             "InjectEnumAddrInst must take an enum operand");
     require(IUAI->getElement()->getParentEnum()
-              == IUAI->getOperand()->getType().getEnumOrBoundGenericEnum(),
+              == IUAI->getOperand()->getType().getEnumDecl(),
             "InjectEnumAddrInst case must be a case of the enum operand type");
     require(IUAI->getOperand()->getType().isAddress(),
             "InjectEnumAddrInst must take an address operand");
@@ -4144,6 +4180,11 @@ public:
     // metatype with the same constraint type as its existential operand.
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
+    if (MI->getOperand()->getType().getASTType().isCOMExistentialType()) {
+      require(formalInstanceTy->isAny(),
+              "COM existential_metatype result must be Any.Type");
+      return;
+    }
     if (formalInstanceTy->isConstraintType()) {
       require(MI->getOperand()->getType().is<ExistentialType>(),
               "existential_metatype operand must be an existential type");
@@ -4191,7 +4232,7 @@ public:
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
-    auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
+    auto *cd = DI->getOperand()->getType().getClassDecl();
     require(cd, "Operand of dealloc_ref must be of class type");
 
     require(!checkResilience(cd, F),
@@ -4200,13 +4241,13 @@ public:
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
             "First operand of dealloc_partial_ref must be object");
-    auto class1 = DPRI->getInstance()->getType().getClassOrBoundGenericClass();
+    auto class1 = DPRI->getInstance()->getType().getClassDecl();
     require(class1,
             "First operand of dealloc_partial_ref must be of class type");
     require(DPRI->getMetatype()->getType().is<MetatypeType>(),
             "Second operand of dealloc_partial_ref must be a metatype");
     auto class2 = DPRI->getMetatype()->getType().castTo<MetatypeType>()
-        ->getInstanceType()->getClassOrBoundGenericClass();
+        ->getInstanceType()->getClassDecl();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     require(class2->isSuperclassOf(class1),
@@ -4323,7 +4364,7 @@ public:
             "cannot struct_extract from address");
     require(EI->getType().isObject(),
             "result of struct_extract cannot be address");
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "must struct_extract from struct");
     require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
@@ -4378,7 +4419,7 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     require(operandTy.isAddress(),
             "must derive struct_element_addr from address");
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "struct_element_addr operand must be struct address");
     require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
@@ -4419,7 +4460,7 @@ public:
     require(EI->getField()->hasStorage(),
             "cannot get address of computed property with ref_element_addr");
     SILType operandTy = EI->getOperand()->getType();
-    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    ClassDecl *cd = operandTy.getClassDecl();
     require(cd, "ref_element_addr operand must be a class instance");
     require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
@@ -4444,7 +4485,7 @@ public:
     require(RTAI->getType().isAddress(),
             "result of ref_tail_addr must be lvalue");
     SILType operandTy = RTAI->getOperand()->getType();
-    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    ClassDecl *cd = operandTy.getClassDecl();
     require(cd, "ref_tail_addr operand must be a class instance");
     require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
@@ -4454,7 +4495,7 @@ public:
 
   void checkDestructureStructInst(DestructureStructInst *DSI) {
     SILType operandTy = DSI->getOperand()->getType();
-    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    StructDecl *sd = operandTy.getStructDecl();
     require(sd, "must struct_extract from struct");
     require(!checkResilience(sd, F),
             "cannot access storage of resilient struct");
@@ -4473,7 +4514,7 @@ public:
                 "destructure with none ownership kind operand and non-none "
                 "ownership kind result?!");
       }
-      if (operandTy.getNominalOrBoundGenericNominal()
+      if (operandTy.getNominalDecl()
           ->hasValueTypeDestructor()) {
         require(
           isa<DropDeinitInst>(lookThroughOwnershipInsts(DSI->getOperand())),
@@ -4747,7 +4788,7 @@ public:
     auto decl = CMI->getMember().getDecl();
     auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
-    require(methodClass->getClassOrBoundGenericClass(),
+    require(methodClass->getClassDecl(),
             "super_method must look up a class method");
 
     // The method ought to appear in the class vtable.
@@ -4773,7 +4814,7 @@ public:
     if (auto metatypeType = dyn_cast<MetatypeType>(operandInstanceType))
       operandInstanceType = metatypeType.getInstanceType();
 
-    if (operandInstanceType.getClassOrBoundGenericClass()) {
+    if (operandInstanceType.getClassDecl()) {
       auto overrideTy =
           TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
       requireSameType(
@@ -4852,7 +4893,7 @@ public:
     auto decl = member.getDecl();
     auto methodClass = decl->getDeclContext()->getDeclaredInterfaceType();
 
-    require(methodClass->getClassOrBoundGenericClass(),
+    require(methodClass->getClassDecl(),
             "objc_super_method must look up a class method");
   }
 
@@ -4860,9 +4901,11 @@ public:
     SILType operandType = OEI->getOperand()->getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
-    require(operandType.canUseExistentialRepresentation(
-                                        ExistentialRepresentation::Opaque),
-           "open_existential_addr must be applied to opaque existential");
+    auto representation = operandType.getPreferredExistentialRepresentation();
+    bool supported = representation == ExistentialRepresentation::Opaque ||
+                     representation == ExistentialRepresentation::COM;
+    require(supported, "open_existential_addr must be applied to opaque or COM "
+                       "existential");
 
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
@@ -5287,9 +5330,9 @@ public:
     }
 
     if (isExact) {
-      require(fromCanTy.getClassOrBoundGenericClass(),
+      require(fromCanTy.getClassDecl(),
               "downcast operand must be a class type");
-      require(toCanTy.getClassOrBoundGenericClass(),
+      require(toCanTy.getClassDecl(),
               "downcast must convert to a class type");
       require(fromCanTy->isBindableToSuperclassOf(toCanTy),
               "downcast must convert to a subclass");
@@ -5460,11 +5503,13 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
+    // The result can add execution semantics, because it forms the value.
     auto adjustedOperandExtInfo =
         opFTy->getExtInfo()
             .intoBuilder()
             .withRepresentation(SILFunctionType::Representation::Thick)
             .withNoEscape(resFTy->isNoEscape())
+            .withExecutionSemantics(resFTy->getExecutionSemantics())
             .build();
     require(adjustedOperandExtInfo.isEqualTo(resFTy->getExtInfo(),
                                              useClangTypes(opFTy)),
@@ -5522,7 +5567,7 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand()->getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      auto instClass = instTy->getClassOrBoundGenericClass();
+      auto instClass = instTy->getClassDecl();
       require(instClass,
               "upcast must convert a class metatype to a class metatype");
       
@@ -5556,7 +5601,7 @@ public:
           FromTy.getASTType().getOptionalObjectType());
     }
 
-    auto ToClass = ToTy.getClassOrBoundGenericClass();
+    auto ToClass = ToTy.getClassDecl();
     require(ToClass,
             "upcast must convert a class instance to a class type");
       if (ToClass->isTypeErasedGenericClass()) {
@@ -5703,6 +5748,13 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+
+    require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
+                                         resTI->getExecutionSemantics()),
+            "convert_function cannot drop execution semantics");
+    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
+            "convert_function cannot form an exactly-once value; a thunk "
+            "must form it");
   }
 
   void checkThunkInst(ThunkInst *ti) {
@@ -5838,7 +5890,7 @@ public:
 
   void checkSelectEnumCases(SelectEnumOperation SEO) {
     EnumDecl *eDecl =
-        SEO.getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+        SEO.getEnumOperand()->getType().getEnumDecl();
     require(eDecl, "select_enum operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -5941,7 +5993,7 @@ public:
             "switch_enum operand must be an object");
 
     SILType uTy = switchEnum->getOperand()->getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
+    EnumDecl *uDecl = uTy.getEnumDecl();
     require(uDecl, "switch_enum operand is not an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -6052,7 +6104,7 @@ public:
             "switch_enum_addr operand must be an address");
 
     SILType uTy = SOI->getOperand()->getType();
-    EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
+    EnumDecl *uDecl = uTy.getEnumDecl();
     require(uDecl, "switch_enum_addr operand must be an enum");
 
     // Find the set of enum elements for the type so we can verify
@@ -6294,7 +6346,7 @@ public:
             "objc_protocol must be applied to an @objc protocol");
     auto classTy = OPI->getType();
     require(classTy.isObject(), "objc_protocol must produce a value");
-    auto classDecl = classTy.getClassOrBoundGenericClass();
+    auto classDecl = classTy.getClassDecl();
     require(classDecl, "objc_protocol must produce a class instance");
     require(classDecl->getName() == F.getASTContext().Id_Protocol,
             "objc_protocol must produce an instance of ObjectiveC.Protocol class");
@@ -7098,10 +7150,17 @@ public:
             "Result and operand must have the same type.");
     require(type.isMoveOnly(/*orWrapped=*/false),
             "drop_deinit only allowed for move-only types");
-    require(type.getNominalOrBoundGenericNominal()
-            ->hasValueTypeDestructor(), "drop_deinit only allowed for "
-            "struct/enum types that define a deinit");
-    assert(!type.isTrivial(F) && "a type with a deinit is nontrivial");
+    // A ~Deinitable type has no deinit, and `discard self` is how its values'
+    // lifetimes end.
+    auto *nominal = type.getNominalDecl();
+    bool hasDeinit = nominal->hasValueTypeDestructor();
+    require(hasDeinit ||
+                nominal->canConformTo(InvertibleProtocolKind::Deinitable) ==
+                    TypeDecl::CanBeInvertible::Never,
+            "drop_deinit only allowed for struct/enum types that define a "
+            "deinit or that suppress Deinitable");
+    assert((!hasDeinit || !type.isTrivial(F)) &&
+           "a type with a deinit is nontrivial");
 
     checkDropDeinitUses(ddi);
   }

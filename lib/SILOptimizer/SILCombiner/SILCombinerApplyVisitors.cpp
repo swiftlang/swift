@@ -403,7 +403,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       if (propDecl->hasClangNode() && propDecl->getInterfaceType()->isVoid())
         return false;
 
-      if (!parentTy.getStructOrBoundGenericStruct())
+      if (!parentTy.getStructDecl())
         hasOffset = false;
       break;
     }
@@ -453,7 +453,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType intType = AI->getType().getOptionalObjectType();
     if (!intType)
       return false;
-    StructDecl *intDecl = intType.getStructOrBoundGenericStruct();
+    StructDecl *intDecl = intType.getStructDecl();
     if (!intDecl || intDecl->getStoredProperties().size() != 1)
       return false;
     VarDecl *member = intDecl->getStoredProperties()[0];
@@ -1631,7 +1631,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (genericArgs.size() != 1)
     return false;
   auto ty = genericArgs[0]->getCanonicalType();
-  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+  if (ty->getStructDecl() || ty->getEnumDecl() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
       isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||

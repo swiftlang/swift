@@ -2058,11 +2058,30 @@ static void emitPHINodesForType(IRGenSILFunction &IGF, SILType type,
   }
 }
 
+/// Returns true if \p bb is a case destination of a switch_enum which is its
+/// only predecessor. The switch_enum binds the payload argument of such a block
+/// directly, so it needs neither phi nodes nor a waypoint block.
+static bool isSingleSwitchEnumCaseDest(SILBasicBlock *bb) {
+  if (bb->args_empty()) {
+    return false;
+  }
+  auto *predBB = bb->getSinglePredecessorBlock();
+  if (!predBB || predBB == bb) {
+    return false;
+  }
+  auto *sei = dyn_cast<SwitchEnumInst>(predBB->getTerminator());
+  return sei && (!sei->hasDefault() || sei->getDefaultBB() != bb);
+}
+
 static PHINodeVector
 emitPHINodesForBBArgs(IRGenSILFunction &IGF,
                       SILBasicBlock *silBB,
                       llvm::BasicBlock *llBB) {
   PHINodeVector phis;
+  if (isSingleSwitchEnumCaseDest(silBB)) {
+    return phis;
+  }
+
   unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
 
   IGF.Builder.SetInsertPoint(llBB);
@@ -2627,7 +2646,7 @@ static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
   // Specify the exact Self type if we know it, either because the class
   // is final, or because the function we're emitting is a method with the
   // [exact_self_class] attribute set on it during the SIL pipeline.
-  bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
+  bool isExact = selfTy->getClassDecl()->isFinal()
     || IGF.CurSILFn->isExactSelfClass();
 
   IGF.setDynamicSelfMetadata(selfTy, isExact, value, selfKind);
@@ -3245,7 +3264,8 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     if (name == "swift_taskGroup_waitAll")
       return SpecialKind::TaskGroupWaitAll;
 
-    if (name == "swift_distributed_execute_target")
+    if (name == "swift_distributed_execute_target" ||
+        name == "swift_distributed_execute_target_with_isolation")
       return SpecialKind::DistributedExecuteTarget;
   }
 
@@ -3494,7 +3514,7 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
 
   Explosion e;
 
-  if (instanceTy.getClassOrBoundGenericClass()) {
+  if (instanceTy.getClassDecl()) {
     e.add(emitDynamicTypeOfHeapObject(*this,
                            getClassBaseValue(*this, i->getOperand()),
                            metaTy->getRepresentation(), instanceTy));
@@ -3527,8 +3547,14 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILType opType = op->getType();
 
   switch (opType.getPreferredExistentialRepresentation()) {
-  case ExistentialRepresentation::COM:
-    llvm_unreachable("COM existential metatype projection is not implemented");
+  case ExistentialRepresentation::COM: {
+    auto *interface = getLoweredSingletonExplosion(op);
+    auto *staticType = emitTypeMetadataRef(opType.getASTType());
+    auto *dynamicType = Builder.CreateCall(
+        IGM.getGetCOMDynamicTypeFunctionPointer(), {interface, staticType});
+    result.add(dynamicType);
+    break;
+  }
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
@@ -4046,6 +4072,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       selfValue = Builder.CreateLoad(storage, "com.self");
     } else {
       selfValue = getLoweredAddress(selfArg).getAddress();
+    }
+
+    auto type = selfArg->getType().getASTType();
+    if (origCalleeType->getRepresentation() ==
+            SILFunctionTypeRepresentation::COMMethod &&
+        type->is<ArchetypeType>() && !type->is<ExistentialArchetypeType>()) {
+      auto *method = cast<COMMethodInst>(site.getCallee());
+      auto *protocol =
+          cast<ProtocolDecl>(method->getMember().getDecl()->getDeclContext());
+      selfValue =
+          emitGenericCOMInterfaceProjection(*this, selfValue, type, protocol);
     }
   }
 
@@ -5223,15 +5260,16 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
     auto casePair = inst.getCase(i);
 
     // If the destination BB accepts the case argument, set up a waypoint BB so
-    // we can feed the values into the argument's PHI node(s).
-    //
-    // FIXME: This is cheesy when the destination BB has only the switch
-    // as a predecessor.
-    if (!casePair.second->args_empty())
+    // we can feed the values into the argument's PHI node(s). This is not
+    // needed if the switch is the only predecessor of the destination BB.
+    if (!casePair.second->args_empty() &&
+        !isSingleSwitchEnumCaseDest(casePair.second)) {
       dests.push_back({casePair.first,
         llvm::BasicBlock::Create(IGF.IGM.getLLVMContext())});
-    else
+    }
+    else {
       dests.push_back({casePair.first, IGF.getLoweredBB(casePair.second).bb});
+    }
   }
 
   llvm::BasicBlock *defaultDest = nullptr;
@@ -5255,6 +5293,26 @@ void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
   // Bind arguments for cases that want them.
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
     auto casePair = inst->getCase(i);
+
+    if (isSingleSwitchEnumCaseDest(casePair.second)) {
+      // Project the payload at the start of the destination BB and bind the
+      // argument to it directly. The destination BB is dominated by the
+      // switch, so it is emitted after this point.
+      SILBasicBlock *destBB = casePair.second;
+      assert(destBB->getNumArguments() == 1 &&
+             "switch_enum destination must have a single argument");
+      llvm::BasicBlock *origBB = Builder.GetInsertBlock();
+      Builder.SetInsertPoint(getLoweredBB(destBB).bb);
+
+      Explosion inValue = getLoweredExplosion(inst->getOperand(), &Builder);
+      Explosion projected;
+      emitProjectLoadableEnum(*this, inst->getOperand()->getType(),
+                               inValue, casePair.first, projected);
+      setLoweredExplosion(destBB->getArgument(0), projected);
+
+      Builder.SetInsertPoint(origBB);
+      continue;
+    }
 
     if (!casePair.second->args_empty()) {
       auto waypointBB = dests[i].second;
@@ -5823,7 +5881,7 @@ void IRGenSILFunction::visitUncheckedBorrowEnumDataAddrInst(
   // If we know the project operation is nondestructive, then we can do the
   // projection in place without using the scratch space.
   if (!UncheckedEnumDataAddrInstBase::isDestructive(
-                                     enumTy.getEnumOrBoundGenericEnum(),
+                                     enumTy.getEnumDecl(),
                                      this->CurSILFn)) {
     dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
                                                         enumTy, enumAddr,
@@ -6951,8 +7009,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 
   if (Decl) {
     Type Ty = Decl->getTypeInContext();
-    if (Ty->getClassOrBoundGenericClass() ||
-        Ty->getStructOrBoundGenericStruct())
+    if (Ty->getClassDecl() ||
+        Ty->getStructDecl())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));
   }
   emitDebugInfoAfterAllocStack(i, type, DbgTy, addr.getAddress());
@@ -8075,7 +8133,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
   llvm::Value *taggedRef = nullptr;
   llvm::Value *boBits = nullptr;
 
-  ClassDecl *Cl = i->getType().getClassOrBoundGenericClass();
+  ClassDecl *Cl = i->getType().getClassDecl();
   if (IGM.TargetInfo.hasObjCTaggedPointers() &&
       (!Cl || !isKnownNotTaggedPointer(IGM, Cl))) {
     boBits = Builder.CreatePtrToInt(bo, IGM.SizeTy);
@@ -8545,6 +8603,12 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
 
   auto openedArchetype = i->getType().castTo<ArchetypeType>();
 
+  if (baseTy.canUseExistentialRepresentation(ExistentialRepresentation::COM)) {
+    bindOpenedCOMExistentialArchetype(*this, openedArchetype);
+    setLoweredAddress(i, base);
+    return;
+  }
+
   // Insert a copy of the boxed value for COW semantics if necessary.
   auto accessKind = i->getAccessKind();
   Address object = emitOpaqueBoxedExistentialProjection(
@@ -8567,6 +8631,9 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
 }
 
 void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
+  bindOpenedCOMExistentialArchetype(*this,
+                                    i->getType().castTo<ArchetypeType>());
+
   Explosion base = getLoweredExplosion(i->getOperand());
 
   Explosion result;
@@ -9016,7 +9083,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     // Load the superclass of the static type of the 'self' value.
     llvm::Value *superMetadata;
     auto instanceTy = CanType(baseType.getASTType()->getMetatypeInstanceType());
-    if (!IGM.hasResilientMetadata(instanceTy.getClassOrBoundGenericClass(),
+    if (!IGM.hasResilientMetadata(instanceTy.getClassDecl(),
                                   ResilienceExpansion::Maximal)) {
       // It's still possible that the static type of 'self' is not resilient, in
       // which case we can assume its superclass.
@@ -9246,6 +9313,11 @@ void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
   } else {
     interface = getLoweredSingletonExplosion(i->getOperand());
   }
+  auto type = i->getOperand()->getType().getASTType();
+  if (type->is<ArchetypeType>() && !type->is<ExistentialArchetypeType>())
+    interface =
+        emitGenericCOMInterfaceProjection(*this, interface, type, protocol);
+
   Address pUnk(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
   auto *vtable = Builder.CreateLoad(pUnk, "com.vtable");
   Address lpVtbl(vtable, IGM.Int8PtrTy, IGM.getPointerAlignment());

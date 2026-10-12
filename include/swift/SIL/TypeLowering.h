@@ -116,7 +116,13 @@ private:
   /// The first lowering is always for ResilientExpansion::Minimal.
   mutable const TypeLowering *NextExpansion = nullptr;
 
+  void printProperties(llvm::raw_ostream &os, unsigned indentation) const;
+
 protected:
+  void printForAbstractTypeLayoutInfoBase(llvm::raw_ostream &os,
+                                       unsigned indentation,
+                                       llvm::StringRef concreteTypeName) const;
+
   TypeLowering(SILType type, SILTypeProperties properties,
                IsReferenceCounted_t isRefCounted,
                TypeExpansionContext expansionContext)
@@ -131,6 +137,11 @@ public:
 
   /// Print out the internal state of this type lowering into \p os.
   void print(llvm::raw_ostream &os) const;
+
+  /// Print the SIL-level properties that affect abstract type lowering.
+  virtual void printForAbstractTypeLayoutInfo(TypeConverter &TC,
+                                           llvm::raw_ostream &os,
+                                           unsigned indentation = 0) const = 0;
 
   /// Dump out the internal state of this type lowering to llvm::dbgs().
   SWIFT_DEBUG_DUMP;

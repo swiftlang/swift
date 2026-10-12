@@ -1596,8 +1596,10 @@ public:
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
 
-      // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->hasValueTypeDestructor()) {
+        // has to have a deinit or else it's pointless, unless the type is
+        // ~Deinitable, where `discard self` is how a value's lifetime ends.
+      } else if (!nominalDecl->hasValueTypeDestructor() &&
+                 nominalType->isDeinitable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -2613,7 +2615,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
-      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
+      if (auto classTy = selfTy->getClassDecl()) {
         assert(classTy->getSuperclass());
         auto &Diags = fromCtor->getASTContext().Diags;
         Diags.diagnose(apply->getArgs()->getLoc(), diag::chain_convenience_init,

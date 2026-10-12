@@ -63,22 +63,32 @@ class FindCapturedVars : public ASTWalker {
   /// The values that have consuming uses in the closure.
   llvm::SmallPtrSet<ValueDecl *, 1> ConsumedValues;
 
+  /// The values whose consumed captures were diagnosed because this closure
+  /// can't own them.
+  llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedOwnedCaptures;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
   OpaqueValueExpr *OpaqueValue = nullptr;
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
-  bool NoEscape, ObjC, CalledOnce;
+  bool NoEscape, ObjC, HasCalledAtMostOnceSemantics;
+  /// Whether this function can be destroyed without running, which is true
+  /// for every function except a @called(exactlyOnce) closure.
+  bool IsDeinitable;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
-                   bool ObjC, bool IsGenericFunction, bool IsCalledOnce)
+                   bool ObjC, bool IsGenericFunction,
+                   bool HasCalledAtMostOnceSemantics, bool IsDeinitable = true)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
-        NoEscape(NoEscape), ObjC(ObjC), CalledOnce(IsCalledOnce),
-        HasGenericParamCaptures(IsGenericFunction) {}
+        NoEscape(NoEscape), ObjC(ObjC),
+        HasCalledAtMostOnceSemantics(HasCalledAtMostOnceSemantics),
+        IsDeinitable(IsDeinitable), HasGenericParamCaptures(IsGenericFunction) {
+  }
 
   CaptureInfo getCaptureInfo() const {
     DynamicSelfType *dynamicSelfToRecord = nullptr;
@@ -259,6 +269,8 @@ public:
       Captures[entryNumber-1] = capture;
     }
 
+    checkOwnedCapture(capture);
+
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
     if (!ObjC
@@ -413,7 +425,7 @@ public:
               CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
 
-      if (CalledOnce && var->isSendingCapture())
+      if (HasCalledAtMostOnceSemantics && var->isSendingCapture())
         Flags |= CapturedValue::IsSending;
     }
 
@@ -421,7 +433,7 @@ public:
     if (NoEscape)
       Flags |= CapturedValue::IsNoEscape;
 
-    if (CalledOnce && ConsumedValues.count(D))
+    if (HasCalledAtMostOnceSemantics && ConsumedValues.count(D))
       Flags |= CapturedValue::IsConsumed;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
@@ -439,6 +451,29 @@ public:
     }
 
     return Action::SkipNode(DRE);
+  }
+
+  /// A closure owns the captures that it consumes, and destroying a closure
+  /// destroys what it owns. Therefore a closure that can be destroyed without
+  /// running can't own a non-Deinitable value.
+  void checkOwnedCapture(const CapturedValue &capture) {
+    if (!IsDeinitable || !capture.isConsumed())
+      return;
+
+    // Capture list entries are diagnosed where they're declared.
+    auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+    if (!var || !var->hasInterfaceType() || var->isCaptureList())
+      return;
+
+    auto type = var->getTypeInContext();
+    if (type->hasError() || type->isDeinitable())
+      return;
+
+    if (DiagnosedOwnedCaptures.insert(var).second) {
+      Context.Diags.diagnose(capture.getLoc(),
+                             diag::deinitable_closure_nondeinitable_capture,
+                             /*captureList=*/0, var, type);
+    }
   }
 
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
@@ -466,7 +501,7 @@ public:
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      if (!CalledOnce) {
+      if (!HasCalledAtMostOnceSemantics) {
         // Regular closures cannot consume their captures.
         Flags &= ~CapturedValue::IsConsumed;
         // ... or have `sending` captures.
@@ -513,7 +548,7 @@ public:
     if (isa<NominalTypeDecl>(D))
       return Action::SkipNode();
 
-    if (CalledOnce) {
+    if (HasCalledAtMostOnceSemantics) {
       if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
         auto *var = PBD->getSingleVar();
         if (var && var->hasStorage()) {
@@ -766,7 +801,7 @@ public:
       if (auto *callee =
               callSite->getCalledValue(/*skipFunctionConversions=*/true)) {
         // Calling a `@called(atMostOnce)` value is a consuming operation.
-        if (fnTy->isCalledOnce())
+        if (fnTy->hasCalledAtMostOnceSemantics())
           recordConsumingUse(callee);
 
         isInitializer = isa<ConstructorDecl>(callee);
@@ -795,7 +830,7 @@ public:
       checkType(E->getType(), E->getLoc());
     }
 
-    if (CalledOnce)
+    if (HasCalledAtMostOnceSemantics)
       recordConsumedValues(E);
 
     // Some kinds of expression don't really evaluate their subexpression,
@@ -908,7 +943,7 @@ public:
     }
 
     // `return` of a non-Copyable value is a consuming use.
-    if (CalledOnce && isa<ReturnStmt>(S)) {
+    if (HasCalledAtMostOnceSemantics && isa<ReturnStmt>(S)) {
       auto *returnStmt = cast<ReturnStmt>(S);
       if (returnStmt->hasResult()) {
         if (auto *V = getReferencedNonCopyableValue(returnStmt->getResult()))
@@ -976,9 +1011,10 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   auto fnType = type->castTo<AnyFunctionType>();
   bool isNoEscape = fnType->isNoEscape();
-  bool isCalledOnce = fnType->isCalledOnce();
+  bool hasCalledAtMostOnceSemantics = fnType->hasCalledAtMostOnceSemantics();
   FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, AFD->isObjC(),
-                          AFD->hasGenericParamList(), isCalledOnce);
+                          AFD->hasGenericParamList(),
+                          hasCalledAtMostOnceSemantics);
 
   if (auto *body = AFD->getTypecheckedBody())
     body->walk(finder);
@@ -1043,9 +1079,10 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
 
   auto fnType = type->castTo<FunctionType>();
   bool isNoEscape = fnType->isNoEscape();
-  bool isCalledOnce = fnType->isCalledOnce();
+  bool hasCalledAtMostOnceSemantics = fnType->hasCalledAtMostOnceSemantics();
   FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
-                          /*isObjC=*/false, /*isGeneric=*/false, isCalledOnce);
+                          /*isObjC=*/false, /*isGeneric=*/false,
+                          hasCalledAtMostOnceSemantics, fnType->isDeinitable());
   body->walk(finder);
 
   finder.checkType(type, ACE->getLoc());
@@ -1065,15 +1102,16 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   // A generic function always captures outer generic parameters.
   bool isGeneric = DC->isInnermostContextGeneric();
 
-  bool isCalledOnce = false;
+  bool hasCalledAtMostOnceSemantics = false;
   if (auto *closure = dyn_cast<AbstractClosureExpr>(E)) {
-    isCalledOnce = closure->isCalledOnce();
+    hasCalledAtMostOnceSemantics = closure->hasCalledAtMostOnceSemantics();
   }
 
   FindCapturedVars finder(E->getLoc(), DC,
                           /*isNoEscape=*/false,
                           /*isObjC=*/false,
-                          /*IsGeneric*/ isGeneric, isCalledOnce);
+                          /*IsGeneric*/ isGeneric,
+                          hasCalledAtMostOnceSemantics);
   E->walk(finder);
 
   if (!DC->getParent()->isLocalContext() &&
@@ -1102,7 +1140,7 @@ CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
                           /*NoEscape=*/false,
                           /*ObjC=*/false,
                           /*IsGenericFunction*/ false,
-                          /*IsCalledOnce=*/false);
+                          /*HasCalledAtMostOnceSemantics=*/false);
   init->walk(finder);
 
   auto &ctx = DC->getASTContext();

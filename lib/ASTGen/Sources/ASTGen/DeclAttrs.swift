@@ -270,7 +270,6 @@ extension ASTGenVisitor {
         .Frozen,
         .GKInspectable,
         .GlobalActor,
-        .HasHiddenStoredProperties,
         .HasInitialValue,
         .HasMissingDesignatedInitializers,
         .HasStorage,
@@ -2819,6 +2818,7 @@ extension ASTGenVisitor {
       attribute: node,
       {
         switch $0.rawText {
+        case "exactlyOnce": return .once
         case "atMostOnce": return .atMostOnce
         default: return nil
         }

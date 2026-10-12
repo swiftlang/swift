@@ -1450,6 +1450,8 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext,
                                swift::SourceLoc atLoc, swift::SourceRange range,
                                bool isAlways);
 
+BRIDGED_OPTIONAL(swift::ExecutionSemantics, ExecutionSemantics)
+
 SWIFT_NAME("BridgedCalledAttr.createParsed(_:atLoc:range:semantics:)")
 BridgedCalledAttr
 BridgedCalledAttr_createParsed(BridgedASTContext cContext,
@@ -2663,6 +2665,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCalledTypeAttrSemantics {
   BridgedCalledTypeAttrSemantics_AtMostOnce,
+  BridgedCalledTypeAttrSemantics_ExactlyOnce,
 };
 
 SWIFT_NAME("BridgedConventionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
@@ -3197,6 +3200,8 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinIsolationMacro,
 };
 
+struct BridgedConformanceArray;
+
 struct BridgedASTType {
   enum class TraitResult {
     IsNot,
@@ -3283,7 +3288,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isUnsafeMutableBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeRawBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeMutableRawBufferPointerType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalDecl() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
@@ -3323,6 +3328,8 @@ public:
   BRIDGED_INLINE bool hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanGenericSignature
   SILFunctionType_getSubstGenericSignature() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray collectExistentialConformances(
+      BridgedCanType existential) const;
 };
 
 struct BridgedASTTypeArray {

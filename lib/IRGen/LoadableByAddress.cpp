@@ -731,7 +731,9 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::EnumInst:
       case SILInstructionKind::MakeAddrBorrowInst:
       case SILInstructionKind::DereferenceAddrBorrowInst:
-      case SILInstructionKind::DereferenceBorrowAddrInst: {
+      case SILInstructionKind::DereferenceBorrowAddrInst:
+      case SILInstructionKind::UncheckedTrivialBitCastInst:
+      case SILInstructionKind::UncheckedBitwiseCastInst: {
         // TODO Any more instructions to add here?
         visitResultTyInst(cast<SingleValueInstruction>(currIns));
         break;
@@ -2538,6 +2540,18 @@ static void rewriteFunction(StructLoweringState &pass,
           Loc, operand, convInstr->getElement(), newSILType.getObjectType());
       break;
     }
+    case SILInstructionKind::UncheckedTrivialBitCastInst: {
+      auto *convInstr = cast<UncheckedTrivialBitCastInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedTrivialBitCast(
+          Loc, convInstr->getOperand(), newSILType.getObjectType());
+      break;
+    }
+    case SILInstructionKind::UncheckedBitwiseCastInst: {
+      auto *convInstr = cast<UncheckedBitwiseCastInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedBitwiseCast(
+          Loc, convInstr->getOperand(), newSILType.getObjectType());
+      break;
+    }
     case SILInstructionKind::DereferenceBorrowAddrInst: {
       auto dbaInstr = cast<DereferenceBorrowAddrInst>(instr);
       newInstr = resultTyBuilder.createDereferenceBorrowAddr(
@@ -2974,8 +2988,9 @@ void LoadableByAddress::recreateSingleApply(
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
-        castedApply->isOnStack(), castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation,
+        castedApply->getExecutionSemantics(), castedApply->isOnStack(),
+        castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }

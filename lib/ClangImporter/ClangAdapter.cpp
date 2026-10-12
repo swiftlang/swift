@@ -424,6 +424,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::BoundMember:
     case clang::BuiltinType::BuiltinFn:
     case clang::BuiltinType::IncompleteMatrixIdx:
+    case clang::BuiltinType::MetaInfo:
     case clang::BuiltinType::Overload:
     case clang::BuiltinType::PseudoObject:
     case clang::BuiltinType::UnknownAny:
@@ -517,6 +518,11 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+      return OmissionTypeName();
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
       return OmissionTypeName();
 
     // SPIR-V builtin types that don't have Swift equivalents.

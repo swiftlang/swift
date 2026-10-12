@@ -213,14 +213,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (typeDecl->hasGenericParamList()) {
     genericSignature = typeDecl->getGenericSignature();
     assert(cxx_translation::isExposableToCxx(genericSignature));
-
-    // FIXME: Can we make some better layout than opaque layout for generic
-    // types.
-  } else if (!typeDecl->isResilient()) {
+  }
+  bool isOpaqueLayout = declAndTypePrinter.isOpaqueLayout(typeDecl);
+  if (!isOpaqueLayout) {
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    // typeSizeAlign can be null if this is not a fixed-layout type,
-    // e.g. it has resilient fields.
     if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       declAndTypePrinter.getCxxDeclEmissionScope()
@@ -228,7 +225,6 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     }
   }
-  bool isOpaqueLayout = declAndTypePrinter.isOpaqueLayout(typeDecl);
   // A noncopyable type is exposed as a move-only C++ class. Because Swift's
   // moves are destructive and C++'s are not, such a class carries a flag that
   // records whether it was moved from, so that its destructor can be a no-op.

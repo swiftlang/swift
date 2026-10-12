@@ -302,7 +302,8 @@ void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignme
  * - Parameters:
  *   - size: The minimum number of bytes to allocate.
  *   - alignment: The minimum alignment of the resulting pointer, which must
- *     be a power of at least as large as `sizeof(void *)`.
+ *     be a power of two at least as large as `sizeof(void *)`, or be zero to
+ *     request the default alignment of 16 bytes.
  *   - flags: Flags to control the behavior of the allocation.
  *   - typeId: An identifier used by a typed allocator to e.g. place the
  *     allocation in a particular bucket.

@@ -3702,6 +3702,26 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
 
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath()) {
+    // A TBD file would describe symbols that the object file doesn't have.
+    if (Args.hasArg(OPT_emit_empty_object_file)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::tbd_not_supported_with_empty_object_file);
+      return true;
+    }
+
+    // Under the "inlinable" code generation model of Embedded Swift, which
+    // symbols get strong definitions depends on how they are used.
+    const auto &langOpts = Invocation.getLangOptions();
+    if (langOpts.hasFeature(Feature::Embedded) &&
+        langOpts.CodeGenerationModelOverride.value_or(
+            CodeGenerationModel::Inlinable) == CodeGenerationModel::Inlinable) {
+      Diags.diagnose(SourceLoc(),
+                     diag::tbd_not_supported_with_inlinable_code_generation);
+      return true;
+    }
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
   }
@@ -4177,6 +4197,25 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_dump_abstract_type_layout_info_EQ)) {
+    StringRef kind(A->getValue());
+    if (kind == "sil-type")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::SILType;
+    else if (kind == "type-lowering")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeLowering;
+    else if (kind == "type-info")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeInfo;
+    else if (kind == "all")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::All;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
   }
 
   auto getRuntimeCompatVersion = [&]() -> std::optional<llvm::VersionTuple> {

@@ -629,11 +629,11 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
         ctx.DeclarationNames.getIdentifier(&ctx.Idents.get("iterator_traits"));
     if (auto *iterator_traits = stdNS->lookup(iteratorTraitsId)
                                     .find_first<clang::ClassTemplateDecl>()) {
-      void *insertPos = nullptr; // unused
+      llvm::FoldingSetInsertToken insertToken; // unused
       auto declTy = sema.getASTContext().getCanonicalTagType(decl);
 
       if (auto *traitSpecialization = iterator_traits->findSpecialization(
-              {clang::TemplateArgument(declTy)}, insertPos);
+              {clang::TemplateArgument(declTy)}, insertToken);
           traitSpecialization && traitSpecialization->hasDefinition()) {
         if (traitSpecialization->isExplicitSpecialization()) {
           // Determine info from definition of iterator_traits specialization,

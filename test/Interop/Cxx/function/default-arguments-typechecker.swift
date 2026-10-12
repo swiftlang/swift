@@ -54,6 +54,13 @@ let _ = HasCtorWithDefaultArg(1, 2, 3)
 let _ = HasCtorWithDefaultArg(1, 2)
 let _ = HasCtorWithDefaultArg(1)
 
+let _ = HasTemplatedCtorWithDefaultArgInt(1)
+let _ = HasTemplatedCtorWithDefaultArgInt(1, 2)
+let _ = HasTemplatedCtorWithDefaultArgNonDefaultConstructible(1, NonDefaultConstructible(2))
+let _ = HasTemplatedCtorWithDefaultArgNonDefaultConstructible(1) // expected-error {{missing argument for parameter #2 in call}}
+
+InvalidStructNoDef().invalidDefaultExprMethod() // expected-error {{missing argument for parameter #1 in call}}
+
 let _ = TemplatedHasMethodWithDefaultArgFloat().isZero()
 let _ = TemplatedHasMethodWithDefaultArgFloat().isNonZero()
 let _ = TemplatedHasMethodWithDefaultArgInt().isZero()

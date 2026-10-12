@@ -939,18 +939,22 @@ case TypeKind::Id:
           }
         }
 
-        // Transform the @called(atMostOnce) dependent type if present.
-        if (auto calledOnceDep = origExtInfo.getCalledOnceDependentType()) {
-          auto [newCalledOnceDep, isCalledOnce] =
-              asDerived().transformCalledOnceDependentType(calledOnceDep);
-          if (!newCalledOnceDep) {
-            // If we're no longer @called(atMostOnce) dependent, update the
-            // @called(atMostOnce) bit.
-            extInfo = extInfo->withCalledOnceDependentType(Type());
-            extInfo = extInfo->withCalledOnce(isCalledOnce);
+        // Transform the execution semantics dependent type if present.
+        if (auto executionSemanticsDep =
+                origExtInfo.getExecutionSemanticsDependentType()) {
+          auto [newExecutionSemanticsDep, executionSemantics] =
+              asDerived().transformExecutionSemanticsDependentType(
+                  executionSemanticsDep);
+          if (!newExecutionSemanticsDep) {
+            // If we're no longer execution semantics dependent, update the
+            // execution semantics.
+            extInfo = extInfo->withExecutionSemanticsDependentType(Type());
+            extInfo = extInfo->withExecutionSemantics(executionSemantics);
             isUnchanged = false;
-          } else if (newCalledOnceDep.getPointer() != calledOnceDep.getPointer()) {
-            extInfo = extInfo->withCalledOnceDependentType(newCalledOnceDep);
+          } else if (newExecutionSemanticsDep.getPointer() !=
+                     executionSemanticsDep.getPointer()) {
+            extInfo = extInfo->withExecutionSemanticsDependentType(
+                newExecutionSemanticsDep);
             isUnchanged = false;
           }
         }
@@ -1214,8 +1218,9 @@ case TypeKind::Id:
     return std::make_pair(ty, false);
   }
 
-  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
-    return std::make_pair(ty, false);
+  std::pair<Type, std::optional<ExecutionSemantics>>
+  transformExecutionSemanticsDependentType(Type ty) {
+    return std::make_pair(ty, std::nullopt);
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

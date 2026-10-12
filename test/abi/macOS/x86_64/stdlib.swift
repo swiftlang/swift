@@ -1375,3 +1375,9 @@ Added: _swift_tupleWitnesses_pod_noninline
 
 // Recover the dynamic type of a COM interface through ISwiftObject.
 Added: _swift_getCOMDynamicType
+
+// Cell and ConstCell
+Added: _$ss4CellVMa
+Added: _$ss4CellVMn
+Added: _$ss9ConstCellVMa
+Added: _$ss9ConstCellVMn

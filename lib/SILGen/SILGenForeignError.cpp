@@ -108,7 +108,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
 /// Emit a value of a certain integer-like type.
 static SILValue emitIntValue(SILGenFunction &SGF, SILLocation loc,
                              SILType type, unsigned value) {
-  if (auto structDecl = type.getStructOrBoundGenericStruct()) {
+  if (auto structDecl = type.getStructDecl()) {
     auto properties = structDecl->getStoredProperties();
     assert(properties.size() == 1);
     SILType fieldType = type.getFieldType(properties[0], SGF.SGM.M,

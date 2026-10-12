@@ -1067,6 +1067,10 @@ unsigned Operand::getOperandNumber() const {
 }
 
 MemoryBehavior SILInstruction::getMemoryBehavior() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return MemoryBehavior::MayHaveSideEffects;
+  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
@@ -1090,15 +1094,16 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       auto &IAttrs = IInfo.getOrCreateFnAttributes(getModule().getASTContext());
       auto MemEffects = IAttrs.getMemoryEffects();
+      if (!IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
+        return MemoryBehavior::MayHaveSideEffects;
+      // Read-none? Note that this must be checked first, because
+      // `onlyReadsMemory` is also true for read-none.
+      if (MemEffects.doesNotAccessMemory())
+        return MemoryBehavior::None;
       // Read-only.
-      if (MemEffects.onlyReadsMemory() &&
-          IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
+      if (MemEffects.onlyReadsMemory())
         return MemoryBehavior::MayRead;
-      // Read-none?
-      return MemEffects.doesNotAccessMemory() &&
-                     IAttrs.hasAttribute(llvm::Attribute::NoUnwind)
-                 ? MemoryBehavior::None
-                 : MemoryBehavior::MayHaveSideEffects;
+      return MemoryBehavior::MayHaveSideEffects;
     }
   }
 
@@ -1198,6 +1203,10 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 bool SILInstruction::mayRelease() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return true;
+  }
   // Overrule a "DoesNotRelease" of dynamic casts. If a dynamic cast is not
   // RC identity preserving it can release it's source (in some cases - we are
   // conservative here).
@@ -2117,7 +2126,8 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 
       // A `@called(atMostOnce)` closure's context is consumed directly by the
       // `apply`/`try_apply` its passed to.
-      if (isCalledOnce() && isa<ApplyInst, TryApplyInst>(use->getUser())) {
+      if (hasCalledAtMostOnceSemantics() &&
+          isa<ApplyInst, TryApplyInst>(use->getUser())) {
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
@@ -2165,7 +2175,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
     // `destroy_value`.
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       consumingOperand = &dvi->getOperandRef();
-    } else if (isCalledOnce()) {
+    } else if (hasCalledAtMostOnceSemantics()) {
       // `@called(atMostOnce)` is consumed by an apply, look up the operand
       // where it appears.
       for (auto &operand : inst->getAllOperands()) {

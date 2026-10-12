@@ -76,7 +76,8 @@ end:
 // CHECK-64-simulator-true:     i64 1, label {{%.*}}
 // CHECK-64-simulator-true:     i64 2, label {{%.*}}
 // CHECK-64:   ]
-// CHECK-64:     phi ptr [ %0
+// CHECK-64-NOT: phi
+// CHECK-64:   ret void
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(ptr %0) {{.*}} {
 // CHECK-32:   switch i32 {{%.*}}, label {{%.*}}
@@ -84,7 +85,8 @@ end:
 // CHECK-32:     i32 1, label {{%.*}}
 // CHECK-32:     i32 2, label {{%.*}}
 // CHECK-32:   ]
-// CHECK-32:     phi ptr [ %0
+// CHECK-32-NOT: phi
+// CHECK-32:   ret void
 
 sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
 entry(%c : $SinglePayloadObjCProtocol):

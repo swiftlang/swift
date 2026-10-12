@@ -352,6 +352,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::EscapingObjCBlock:
   case Node::Kind::NoEscapeFunctionType:
   case Node::Kind::CalledOnceFunctionType:
+  case Node::Kind::CalledAtMostOnceFunctionType:
   case Node::Kind::ExplicitClosure:
   case Node::Kind::Extension:
   case Node::Kind::ExtensionAttachedMacroExpansion:
@@ -391,6 +392,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplErasedIsolation:
   case Node::Kind::ImplNonisolatedNonsendingIsolation:
   case Node::Kind::ImplCalledOnceFunction:
+  case Node::Kind::ImplCalledAtMostOnceFunction:
   case Node::Kind::ImplSendingResult:
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
@@ -846,6 +848,9 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
   case Node::Kind::NoEscapeFunctionType:
     break;
   case Node::Kind::CalledOnceFunctionType:
+    Printer << "@called(exactlyOnce) ";
+    break;
+  case Node::Kind::CalledAtMostOnceFunctionType:
     Printer << "@called(atMostOnce) ";
     break;
   case Node::Kind::AutoClosureType:
@@ -1401,6 +1406,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::CalledOnceFunctionType:
+    case Node::Kind::CalledAtMostOnceFunctionType:
     case Node::Kind::DependentGenericType:
       return false;
     default:
@@ -1741,6 +1747,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::UncurriedFunctionType:
   case Node::Kind::NoEscapeFunctionType:
   case Node::Kind::CalledOnceFunctionType:
+  case Node::Kind::CalledAtMostOnceFunctionType:
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
   case Node::Kind::ThinFunctionType:
@@ -2921,6 +2928,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@isolated(any)";
     return nullptr;
   case Node::Kind::ImplCalledOnceFunction:
+    Printer << "@called(exactlyOnce)";
+    return nullptr;
+  case Node::Kind::ImplCalledAtMostOnceFunction:
     Printer << "@called(atMostOnce)";
     return nullptr;
   case Node::Kind::ImplCoroutineKind:
@@ -3656,7 +3666,8 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
           t->getKind() != Node::Kind::UncurriedFunctionType &&
           t->getKind() != Node::Kind::CFunctionPointer &&
           t->getKind() != Node::Kind::ThinFunctionType &&
-          t->getKind() != Node::Kind::CalledOnceFunctionType) {
+          t->getKind() != Node::Kind::CalledOnceFunctionType &&
+          t->getKind() != Node::Kind::CalledAtMostOnceFunctionType) {
         TypePr = TypePrinting::WithColon;
       }
     }

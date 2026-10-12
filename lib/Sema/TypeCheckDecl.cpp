@@ -272,7 +272,7 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
     return false;
 
-  auto *inherited = decl->getRawType()->getEnumOrBoundGenericEnum();
+  auto *inherited = decl->getRawType()->getEnumDecl();
   if (!inherited)
     return false;
 
@@ -2400,12 +2400,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
-  // @called(atMostOnce) implies `consumed`.
+  // Every kind of @called implies `consumed`.
   if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-    if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
-      if (cast<CalledTypeAttr>(calledAttr)->isAtMostOnce())
-        return ParamSpecifier::Consuming;
-    }
+    if (attributedTy->has(TypeAttrKind::Called))
+      return ParamSpecifier::Consuming;
   }
 
   return ParamSpecifier::Default;
@@ -2501,12 +2499,14 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (auto *F = Ty->getAs<AnyFunctionType>()) {
-    if (F->isCalledOnce()) {
+    if (F->hasCalledAtMostOnceSemantics()) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
-        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                           diag::called_once_cannot_be_used_with_borrowing);
+        ctx.Diags.diagnose(
+            decl->getTypeRepr()->getLoc(),
+            diag::called_attr_cannot_be_used_with_borrowing,
+            CalledAttr::getSemanticsName(*F->getExecutionSemantics()));
         return ErrorType::get(ctx);
 
       case ParamSpecifier::InOut:
@@ -2578,9 +2578,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (auto *parentDecl = hiddenDecl->ParentDecl)
       parent = parentDecl->getDeclaredInterfaceType()->getCanonicalType();
 
-    auto hiddenType = HiddenType::get(
-        Context, hiddenDecl->MangledName, hiddenDecl->getModuleContext(),
-        hiddenDecl, parent);
+    auto hiddenType =
+        HiddenType::get(Context, hiddenDecl->MangledName, hiddenDecl, parent);
     return MetatypeType::get(hiddenType, Context);
   }
 

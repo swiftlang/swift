@@ -805,7 +805,7 @@ namespace {
         if (tp->isBool()) {
           arr.push_back(Space::forBool(true));
           arr.push_back(Space::forBool(false));
-        } else if (auto *E = tp->getEnumOrBoundGenericEnum()) {
+        } else if (auto *E = tp->getEnumDecl()) {
           // Look into each case of the enum and decompose it in turn.
           auto children = E->getAllElements();
           llvm::transform(
@@ -881,7 +881,7 @@ namespace {
 
       static bool canDecompose(Type tp) {
         return tp->is<TupleType>() || tp->isBool() ||
-               tp->getEnumOrBoundGenericEnum();
+               tp->getEnumDecl();
       }
 
       // Search the space for a reason to downgrade exhaustiveness errors to
@@ -1152,7 +1152,7 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
-        auto *theEnum = subjectType->getEnumOrBoundGenericEnum();
+        auto *theEnum = subjectType->getEnumDecl();
 
         if (theEnum) {
           auto *enumModule = theEnum->getParentModule();

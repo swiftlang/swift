@@ -89,19 +89,10 @@ Error cas::CachedResultLoader::replay(CallbackTy Callback) {
     }
   }
   {
-    // clang 23 replaced the public CompileJobResultSchema(ObjectStore &)
-    // constructor with a fallible create() factory, so that a CAS store
-    // failure surfaces as an Error instead of an invalid cantFail. Wrap the
-    // older constructor in an optional so the code below is spelled the same
-    // either way.
-#if LLVM_VERSION_MAJOR >= 23
     auto Schema = clang::cas::CompileJobResultSchema::create(CAS);
     if (!Schema)
       return Schema.takeError();
-#else
-    std::optional<clang::cas::CompileJobResultSchema> Schema(std::in_place,
-                                                             CAS);
-#endif
+
     if (Schema->isRootNode(*ResultProxy)) {
       auto Result = Schema->load(OutputRef);
       if (!Result)

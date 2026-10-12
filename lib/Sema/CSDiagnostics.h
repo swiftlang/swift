@@ -35,8 +35,6 @@
 namespace swift {
 namespace constraints {
 
-class FunctionArgpplyInfo;
-
 /// Base class for all of the possible diagnostics,
 /// provides most basic information such as location of
 /// the problem, parent expression and some utility methods.
