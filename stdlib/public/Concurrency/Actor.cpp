@@ -2543,6 +2543,19 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
       record ? record->getBaseSerialExecutor() : SerialExecutorRef::generic();
   if (record && !currentExecutor.isForSynchronousStart() &&
       !baseExecutor.isDefaultActor() && !shouldYieldThread()) {
+    // Code isolated to the base's serial executor, while a default actor is
+    // locked on top of the base: unlock the actor and continue in the base
+    // context.
+    if (currentExecutor.isDefaultActor() && !newExecutor.isGeneric() &&
+        newExecutor.getIdentity() == baseExecutor.getIdentity()) {
+      SWIFT_TASK_DEBUG_LOG("Task %p unlocks actor %p to return to %p", task,
+                           currentExecutor.getIdentity(),
+                           baseExecutor.getIdentity());
+      unlockDefaultActor(currentExecutor);
+      // 'return' forces tail call
+      return continueTaskWithSerialExecutor(task, baseExecutor, record);
+    }
+
     // Concurrent code while a default actor is locked, or code isolated to
     // another default actor. Both need a context that matches the task's
     // preference, so the base context must match it.

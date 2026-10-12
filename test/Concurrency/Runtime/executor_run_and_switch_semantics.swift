@@ -278,6 +278,14 @@ extension Actor {
     log.record(here("back on the actor again"))
   }
 
+  // Calls `custom`, recording where it runs before and after.
+  @inline(never)
+  func callCustomActor(_ log: EventLog, _ custom: CustomActor) async {
+    log.record(here("on the default actor"))
+    await custom.call(log, "on the custom actor")
+    log.record(here("back on the default actor"))
+  }
+
   // Starts a `Task.immediate` isolated to this actor, from this actor.
   func startImmediate(
     _ log: EventLog, executorPreference: (any TaskExecutor)?
@@ -843,6 +851,37 @@ struct Main {
       await joining.value
     }
 
+    tests.test("default actor processing on E passing both roles: a call to an actor isolated to E unlocks the default actor") {
+      let both = ManualExecutor("E")
+      let isolated = CustomActor(both)
+      let shared = DefaultActor("default actor")
+      let log = EventLog()
+      let task = Task.detached(executorPreference: both) { @MainActor in
+        log.record(here("on the main actor"))
+        await shared.callCustomActor(log, isolated)
+      }
+      // Potentially unexpected: `Task.detached(executorPreference:)` takes a
+      // closure without `@isolated(any)`, so the task starts as concurrent code
+      // on `E`, and only the closure's first hop goes to the main actor. From
+      // there it enqueues the task on the default actor, whose processing job
+      // goes to `E`, the task's preference.
+      both.runNextJob(passing: .both)
+      log.expectNext(["on the main actor [main, main]"])
+      expectEqual(1, both.pendingJobCount)
+      // `E` runs the processing job passing both roles. The call into the
+      // actor isolated to `E` unlocks the default actor, which returns to the
+      // base context `(E, E)`, and the call back locks the default actor
+      // again, all inline.
+      both.runNextJob(passing: .both)
+      log.expectNext([
+        "on the default actor [default actor, E]",
+        "on the custom actor [E, E]",
+        "back on the default actor [default actor, E]",
+      ])
+      expectEqual(0, both.pendingJobCount)
+      await task.value
+    }
+
     // MARK: Main actor
 
     tests.test("main actor, no preference: a same-actor call runs inline") {
@@ -1187,6 +1226,30 @@ struct Main {
       log.expectNext([
         "on the default actor [default actor, E]",
         "concurrent [E, E]",
+        "done [E, E]",
+      ])
+      expectEqual(0, both.pendingJobCount)
+      await task.value
+    }
+
+    tests.test("passing E in both roles, preferring E: code on a locked default actor calls an actor isolated to E inline") {
+      let both = ManualExecutor("E")
+      let isolated = CustomActor(both)
+      let idle = DefaultActor("default actor")
+      let log = EventLog()
+      let task = Task.detached(executorPreference: both) {
+        await idle.callCustomActor(log, isolated)
+        log.record(here("done"))
+      }
+      // The one job runs in the context `(E, E)`. The task locks the idle
+      // default actor on top of it. The call into the actor isolated to `E`
+      // unlocks the default actor, which returns to the base context, and the
+      // call back locks the default actor again, all inline.
+      both.runNextJob(passing: .both)
+      log.expectNext([
+        "on the default actor [default actor, E]",
+        "on the custom actor [E, E]",
+        "back on the default actor [default actor, E]",
         "done [E, E]",
       ])
       expectEqual(0, both.pendingJobCount)

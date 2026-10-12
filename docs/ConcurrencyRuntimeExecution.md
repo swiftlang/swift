@@ -335,6 +335,9 @@ following hold:
 
 Then the runtime switches in the following cases:
 
+- Code isolated to the base's serial executor, while the current context has a
+  default actor's serial executor. The runtime unlocks the actor, and the
+  current context is then the base context again, where the code runs inline.
 - Code isolated to a default actor `I` that is idle, if the base context matches
   the task's preference `P`. The runtime unlocks the default actor of the
   current context, if any, and locks `I`. The current context is then `(I, the
@@ -345,7 +348,7 @@ Then the runtime switches in the following cases:
   the current context is then the base context again, where the code runs inline
   by the rule above.
 
-The base context must match `P` in both cases, because a default actor runs on
+The base context must match `P` in the last two cases, because a default actor runs on
 its tasks' preferred task executors, and concurrent code runs on a thread of
 `P`. A default actor that the runtime locks on top of the base runs with the
 base's task executor.
