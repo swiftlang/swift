@@ -405,6 +405,17 @@ public struct Hasher {
     unsafe _core.combine(bytes: bytes)
   }
 
+  /// Adds the contents of the given buffer to this hasher, mixing it into the
+  /// hasher state.
+  ///
+  /// - Parameter bytes: A raw memory buffer.
+  @export(implementation)
+  public mutating func combine(bytes: RawSpan) {
+    bytes.withUnsafeBytes { buffer in
+      self.combine(bytes: buffer)
+    }
+  }
+
   /// Finalize the hasher state and return the hash value.
   /// Finalizing invalidates the hasher; additional bits cannot be combined
   /// into it, and it cannot be finalized again.
