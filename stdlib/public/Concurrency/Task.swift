@@ -685,9 +685,7 @@ extension Task where Success == Never, Failure == Never {
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       if #available(StdlibDeploymentTarget 6.3, *) {
-        let executor = Task.currentExecutor
-
-        executor.enqueue(ExecutorJob(context: job))
+        _enqueueOnCurrentExecutor(job)
       } else {
         fatalError("we shouldn't get here; if we have, availability is broken")
       }
@@ -1091,6 +1089,10 @@ internal func _getCurrentAsyncTask() -> _AsyncTask?
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
+
+@available(SwiftStdlib 6.3, *)
+@_silgen_name("_swift_task_enqueueOnCurrentExecutor")
+func _enqueueOnCurrentExecutor(_ job: Builtin.Job)
 
 @available(SwiftStdlib 5.9, *)
 func _enqueueJobGlobal(_ task: UnownedJob) {
