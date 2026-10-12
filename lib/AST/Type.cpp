@@ -4500,11 +4500,14 @@ Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
 /// Constructs a protocol composition corresponding to the `any ~Copyable &
 /// ~Escapable` type.
 ///
-/// Note: This includes the inverse of all current invertible protocols.
+/// Note: This includes the inverse of most current invertible protocols.
 Type ProtocolCompositionType::theUnconstrainedAnyType(const ASTContext &C) {
-  // Nothing can suppress Deinitable yet.
+  // Nothing can suppress Deinitable yet, and the standard library's
+  // unconstrained existentials, like the ones taken by metatype `==`, don't
+  // suppress Transferable.
   auto inverses = InvertibleProtocolSet::allKnown();
   inverses.remove(InvertibleProtocolKind::Deinitable);
+  inverses.remove(InvertibleProtocolKind::Transferable);
   return ProtocolCompositionType::get(C, {}, inverses,
                                       /*HasExplicitAnyObject=*/false);
 }

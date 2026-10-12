@@ -522,6 +522,9 @@ public:
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
 
+  /// Returns true if this type satisfies a conformance to Transferable.
+  bool isTransferable();
+
   /// Returns true if this contextual type satisfies a conformance to
   /// BitwiseCopyable.
   bool isBitwiseCopyable();

@@ -3109,6 +3109,9 @@ ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
 ERROR(deinitable_reserved,none,
       "'Deinitable' is reserved for use by the compiler", ())
+ERROR(transferable_protocol_requires_feature,none,
+      "'Transferable' requires '-enable-experimental-feature "
+      "TransferableProtocol'", ())
 ERROR(deinitable_inverse_requires_noncopyable,none,
       "%0 cannot suppress 'Deinitable' without also suppressing 'Copyable'",
       (Type))
@@ -7921,6 +7924,16 @@ ERROR(availability_variadic_type_only_version_newer, none,
       "parameter packs in generic types are only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
+ERROR(availability_transferable_generics_casting_only_version_newer, none,
+      "runtime support for casting types with non-transferable generic "
+      "arguments is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_transferable_existential_casting_only_version_newer, none,
+      "runtime support for casting a non-'Transferable' existential "
+      "is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
 
@@ -9042,6 +9055,12 @@ GROUPED_WARNING(legacy_suppressed_assoc_types, OldSuppressedAssociatedTypes, non
 ERROR(inverse_on_class, none,
       "%select{classes|actors}1 cannot be '~%0'",
       (StringRef, bool))
+ERROR(transferable_inverse_on_subclass, none,
+      "class %0 cannot be '~Transferable' because its superclass %1 can be "
+      "'Transferable'", (const ClassDecl *, const ClassDecl *))
+ERROR(transferable_conformance_on_subclass, none,
+      "conformance of class %0 to 'Transferable' must be inherited from its "
+      "superclass %1", (const ClassDecl *, const ClassDecl *))
 ERROR(inverse_with_class_constraint, none,
       "composition involving %select{class requirement %2|'AnyObject'}0 "
       "cannot contain '~%1'",

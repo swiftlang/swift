@@ -20,6 +20,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
@@ -220,6 +221,22 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
   assert(!conformance.isPack() && "not handled");
 
   auto *classDecl = dyn_cast<ClassDecl>(nominalDecl);
+  bool isTransferableSubclass = ip == InvertibleProtocolKind::Transferable &&
+                                classDecl && classDecl->hasSuperclass();
+
+  // A subclass can only be Transferable through its superclass; if the
+  // superclass is Transferable, an explicit conformance is merely redundant.
+  if (isTransferableSubclass && conformance.isConcrete() &&
+      isa<NormalProtocolConformance>(conformance.getConcrete()) &&
+      !checkConformance(
+          classDecl->mapTypeIntoEnvironment(classDecl->getSuperclass()),
+          conformance.getProtocol())) {
+    ctx.Diags.diagnose(conformanceLoc,
+                       diag::transferable_conformance_on_subclass,
+                       classDecl, classDecl->getSuperclassDecl());
+    return;
+  }
+
   if (!classDecl || classDecl->canSuppressInvertible(ip)) {
     // If the inheritance clause contains ~IP, reject an unconditional
     // conformance to IP.
@@ -230,14 +247,22 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
     }
   }
 
-  // All classes can store noncopyable/nonescaping values, but a class destroys
-  // its stored properties implicitly, so they must be Deinitable.
-  if (classDecl && ip != InvertibleProtocolKind::Deinitable)
+  // Copying a class reference or letting it escape doesn't copy its storage or
+  // let it escape, but transferring it transfers its storage, and destroying it
+  // destroys its storage. An actor's storage is isolated, so transferring the
+  // reference doesn't transfer the storage.
+  if (classDecl && ip != InvertibleProtocolKind::Deinitable &&
+      (ip != InvertibleProtocolKind::Transferable || classDecl->isAnyActor()))
     return;
 
-  // Nothing can suppress Deinitable yet.
-  bool canAddInverse = !hasExplicitInverse && !hasUnconditionalConformance &&
-                       ip != InvertibleProtocolKind::Deinitable;
+  // Nothing can suppress Deinitable yet, a subclass inherits Transferable, and
+  // `~Transferable` can't be written without the feature.
+  bool canAddInverse =
+      !hasExplicitInverse && !hasUnconditionalConformance &&
+      ip != InvertibleProtocolKind::Deinitable &&
+      !(ip == InvertibleProtocolKind::Transferable &&
+        (isTransferableSubclass ||
+         !ctx.LangOpts.hasFeature(Feature::TransferableProtocol)));
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (ip == InvertibleProtocolKind::Copyable) {
@@ -277,6 +302,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
         break;
       case InvertibleProtocolKind::Escapable:
         if (type->isEscapable())
+          return false;
+        break;
+      case InvertibleProtocolKind::Transferable:
+        if (type->isTransferable())
           return false;
         break;
       case InvertibleProtocolKind::Deinitable:
@@ -321,6 +350,12 @@ void swift::checkDeinitableConformance(DeclContext *dc,
                                        ProtocolConformanceRef conformance) {
   checkInvertibleConformanceCommon(dc, conformance,
                                    InvertibleProtocolKind::Deinitable);
+}
+
+void swift::checkTransferableConformance(DeclContext *dc,
+                                         ProtocolConformanceRef conformance) {
+  checkInvertibleConformanceCommon(dc, conformance,
+                                   InvertibleProtocolKind::Transferable);
 }
 
 void swift::checkCopyableConformance(DeclContext *dc,
