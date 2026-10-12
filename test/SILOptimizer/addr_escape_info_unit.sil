@@ -97,6 +97,10 @@ sil @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) 
 [%0: noescape]
 }
 
+sil @scoped_dependent_inout_arg : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+
+sil @inherited_dependent_arg : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
 // CHECK-NEXT:    ==>   %7 = apply %6(%5) : $@convention(thin) (@in Int) -> ()
@@ -1013,6 +1017,55 @@ bb0(%0 : $Int):
 
   %f = function_ref @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
   %a = apply %f(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_value %a
+  destroy_addr %1
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Address escape information for escape_via_scoped_dependent_inout:
+// CHECK: pair 0 - 1
+// CHECK-NEXT:   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+// CHECK-NEXT:   %{{.*}} = alloc_stack $Int
+// CHECK-NEXT: may alias
+// CHECK-LABEL: End function escape_via_scoped_dependent_inout
+sil [ossa] @escape_via_scoped_dependent_inout : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+
+  %f = function_ref @scoped_dependent_inout_arg : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_value %a
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Address escape information for noescape_via_inherited_dependence:
+// CHECK: pair 0 - 1
+// CHECK-NEXT:   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+// CHECK-NEXT:   %{{.*}} = alloc_stack $NE
+// CHECK-NEXT: no alias
+// CHECK-LABEL: End function noescape_via_inherited_dependence
+sil [ossa] @noescape_via_inherited_dependence : $@convention(thin) (@owned NE) -> () {
+bb0(%0 : @owned $NE):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $NE
+  store %0 to [init] %1
+
+  %f = function_ref @inherited_dependent_arg : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
 
   fix_lifetime %a
   fix_lifetime %1
