@@ -5874,7 +5874,15 @@ void PrintAST::visitPostfixUnaryExpr(PostfixUnaryExpr *expr) {
 void PrintAST::visitTupleElementExpr(TupleElementExpr *expr) {
   visit(expr->getBase());
   Printer << ".";
-  Printer << expr->getFieldNumber();
+  // Prefer the label when the element has one; the type checker has already
+  // resolved the access to an index.
+  auto baseTy = expr->getBase()->getType();
+  auto *tupleTy =
+      baseTy ? baseTy->getWithoutSpecifierType()->getAs<TupleType>() : nullptr;
+  if (tupleTy && tupleTy->getElement(expr->getFieldNumber()).hasName())
+    Printer << tupleTy->getElement(expr->getFieldNumber()).getName().str();
+  else
+    Printer << expr->getFieldNumber();
 }
 
 void PrintAST::visitDerivedToBaseExpr(DerivedToBaseExpr *expr) {
