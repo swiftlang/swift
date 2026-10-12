@@ -193,13 +193,9 @@ HashingTestSuite.test("Hashing/TopLevelHashing/UnsafeRawBufferPointer") {
   }
 }
 
-HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan")
-.require(.minimumStdlib(.stdlib_6_2))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
+HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan") {
   func checkTopLevelHash(
-    for array: [UInt8],
+    for array: ContiguousArray<UInt8>,
     seed: Int,
     file: String = #file,
     line: UInt = #line) {
@@ -223,8 +219,8 @@ HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan")
     Int(truncatingIfNeeded: 0x1827364554637281 as UInt64),
     Int(truncatingIfNeeded: 0xf9e8d7c6b5a49382 as UInt64)
   ] {
-    var zeros: [UInt8] = []
-    var integers: [UInt8] = []
+    var zeros: ContiguousArray<UInt8> = []
+    var integers: ContiguousArray<UInt8> = []
     for i: UInt8 in 0 ..< 20 {
       zeros.append(0)
       checkTopLevelHash(for: zeros, seed: seed)
