@@ -194,10 +194,7 @@ HashingTestSuite.test("Hashing/TopLevelHashing/UnsafeRawBufferPointer") {
 }
 
 HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
+.require(.minimumStdlib(.stdlib_6_2))
 .code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
