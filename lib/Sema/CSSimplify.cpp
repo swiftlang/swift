@@ -7385,6 +7385,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (desugar1->hasError() || desugar2->hasError())
     return SolutionKind::Error;
 
+  // Same goes for placeholders, these can currently leak into the constraint
+  // system.
+  // FIXME: Once we've fixed all the cases here we should remove this.
+  if (desugar1->hasPlaceholder() || desugar2->hasPlaceholder())
+    return SolutionKind::Error;
+
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
   // is a concrete type substituted for generic parameter,
@@ -7727,6 +7733,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::Error:
+    case TypeKind::Placeholder:
     case TypeKind::GenericTypeParam:
     case TypeKind::TypeVariable:
     case TypeKind::GenericFunction:
@@ -7768,8 +7775,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return result;
     }
 
-    case TypeKind::Hole:
-    case TypeKind::Placeholder: {
+    case TypeKind::Hole: {
       // If it's allowed to attempt fixes, let's delegate
       // decision to `repairFailures`, since depending on
       // locator we might either ignore such a mismatch,
