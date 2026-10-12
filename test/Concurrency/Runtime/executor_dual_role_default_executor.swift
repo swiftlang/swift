@@ -6,10 +6,13 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// A default executor that is both a serial and a task executor. However it
-// passes its roles when it runs a job, it must be as efficient as one passing
-// itself only as a task executor. That holds for a task without a preference
-// and for a task that prefers the default executor.
+// A default executor that is both a serial and a task executor. When it passes
+// its task executor role, alone or together with its serial executor role, it
+// must be as efficient as one passing itself only as a task executor. That
+// holds for a task without a preference and for a task that prefers the
+// default executor. Passing only its serial executor role gives a context
+// without a task executor, which doesn't match any preference, so that case
+// isn't tested here.
 
 @_spi(ExperimentalCustomExecutors) import _Concurrency
 import StdlibUnittest
@@ -124,7 +127,7 @@ func jobsForYielding(
     // Each yield takes two jobs: the yield's own job, which resumes the task,
     // and the task's job, which then runs the task's concurrent code inline.
     // With the task's first job, that is two jobs per yield plus one.
-    for roles in PassedRoles.allCases {
+    for roles in [PassedRoles.taskExecutorOnly, .both] {
       for preferringDefaultExecutor in [false, true] {
         let preference = preferringDefaultExecutor
           ? "preferring the default executor" : "without a preference"

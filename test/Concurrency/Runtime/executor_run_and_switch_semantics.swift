@@ -104,9 +104,9 @@ enum PassedRoles {
 // both roles through the same `enqueue`. It runs a job passing itself in one or
 // both of its roles.
 //
-// A loop of a pool, created with `pool`, is one of the pool's threads. It
-// passes the pool as its task executor, and also runs the jobs enqueued on the
-// pool.
+// A loop of a pool, created with `pool`, is one of the pool's threads. It also
+// runs the jobs enqueued on the pool. It passes itself as the task executor for
+// its own jobs, and the pool for the jobs of the pool.
 //
 // With `runsJobsUnlessHeld`, it runs a job as soon as it is enqueued, passing
 // itself as the task executor, unless it is held. The default executor of the
@@ -186,13 +186,15 @@ final class ManualExecutor: SerialExecutor, TaskExecutor, Sendable {
   }
 
   // Runs the next job, passing this executor in the given roles. A loop of a
-  // pool passes the pool as its task executor, and runs the jobs of its pool
-  // once it has none of its own.
+  // pool runs the jobs of its pool once it has none of its own, and passes the
+  // pool as the task executor for them.
   func runNextJob(passing roles: PassedRoles) {
-    guard let job = popJob() ?? pool?.popJob() else {
+    let ownJob = popJob()
+    guard let job = ownJob ?? pool?.popJob() else {
       preconditionFailure("no job enqueued")
     }
-    let taskExecutor = (pool ?? self).asUnownedTaskExecutor()
+    let taskExecutor =
+      (ownJob == nil ? pool ?? self : self).asUnownedTaskExecutor()
     runningJob(of: name) {
       switch roles {
       case .serialExecutorOnly:
@@ -204,6 +206,17 @@ final class ManualExecutor: SerialExecutor, TaskExecutor, Sendable {
           isolatedTo: asUnownedSerialExecutor(), taskExecutor: taskExecutor)
       }
     }
+  }
+
+  // Runs this executor's jobs, passing it in the given roles, until none is
+  // left. Returns how many jobs ran.
+  func runAllJobs(passing roles: PassedRoles) -> Int {
+    var jobsRun = 0
+    while pendingJobCount > 0 {
+      runNextJob(passing: roles)
+      jobsRun += 1
+    }
+    return jobsRun
   }
 
   // Runs the next job the way the Dispatch-based default executor does, with
@@ -1241,10 +1254,11 @@ struct Main {
       let task = startNonisolatedImmediate(log, idle, executorPreference: preference)
       // Potentially unexpected: The nonisolated immediate task runs the
       // `@concurrent` method inline, on the caller's thread rather than on its
-      // preference `P`, although its context records `P`. Started from the
-      // main actor, as here, that is the main thread. The task only reaches
-      // `P` after its first suspension. An immediate task isolated to the main
-      // actor does leave it for a `@concurrent` method.
+      // preference `P`. Its context has no task executor, but the synchronous
+      // start runs concurrent code inline until the task first suspends.
+      // Started from the main actor, as here, that is the main thread. The
+      // task only reaches `P` after its first suspension. An immediate task
+      // isolated to the main actor does leave it for a `@concurrent` method.
       log.expectNext([
         "immediate task started [Task.immediate, main]",
         "concurrent [Task.immediate, main]",
@@ -1373,7 +1387,7 @@ struct Main {
 
     // MARK: An executor that is both a serial and a task executor
 
-    tests.test("passing only E as serial executor, preferring E: isolated and concurrent code run inline") {
+    tests.test("passing only E as serial executor, preferring E: isolated code runs inline, concurrent code is enqueued") {
       let both = ManualExecutor("E")
       let isolated = CustomActor(both)
       let log = EventLog()
@@ -1382,17 +1396,17 @@ struct Main {
         await isolated.call(log, "on the actor")
         await concurrentCall(log, "concurrent")
       }
-      both.runNextJob(passing: .serialExecutorOnly)
       // The context `(E, none)` has `E`, so the call to the actor isolated to
-      // `E` runs inline. It also matches the preference for `E`, so the
-      // concurrent code runs inline too, and the context keeps `E` as its
-      // serial executor.
+      // `E` runs inline. It doesn't match the preference for `E`, because only
+      // its task executor counts and that is none. So every hop to concurrent
+      // code enqueues the task on `E` again.
+      let jobsRun = both.runAllJobs(passing: .serialExecutorOnly)
       log.expectNext([
         "started [E, E]",
         "on the actor [E, E]",
         "concurrent [E, E]",
       ])
-      expectEqual(0, both.pendingJobCount)
+      expectGT(jobsRun, 1)
       await task.value
     }
 
@@ -1605,10 +1619,9 @@ struct Main {
         await concurrentCall(log, "concurrent")
         log.record(here("back"))
       }
-      // The task is enqueued on `L1`, which runs it passing itself as the
-      // serial executor and its pool as the task executor. The context
-      // `(L1, pool)` matches the preference for `L1`, because its serial
-      // executor is `L1`.
+      // The task is enqueued on `L1`. It is one of `L1`'s own jobs, so `L1`
+      // runs it passing itself in both roles. The context `(L1, L1)` matches
+      // the preference for `L1`.
       loop.runNextJob(passing: .both)
       log.expectNext([
         "started [L1, L1]",

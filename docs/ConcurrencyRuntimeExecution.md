@@ -127,17 +127,12 @@ The next piece of code of a task has two requirements, its *isolation* and its
 
 ### Matching a preference
 
-Concurrent code must run on the task's preference `P`. An execution context `(S,
-T)` *matches* the preference `P` if one of these is true:
-
-- `T == P`. The context belongs to the preferred task executor.
-- `S == P`. The context runs as an executor that is both a serial and a task
-  executor, for example an event loop, and this executor is the preferred one.
-  Such an executor gets the jobs of both roles through the same `enqueue`. So
-  every thread it runs a job on is one of its threads in both roles. This also
-  covers contexts that only pass the serial role, for example a job that it runs
-  with `runSynchronously(on:)` and its serial executor, or an isolated
-  `Task.immediate` started from one of its jobs.
+Concurrent code must run on the task's preference `P`. An execution context
+`(S, T)` *matches* the preference `P` if `T == P`, so if the context belongs to
+the preferred task executor. The serial executor of the context doesn't matter.
+This is also true if `S` is an executor that is both a serial and a task
+executor and that executor is `P`. Such an executor has to pass its task
+executor role to get a context that matches.
 
 All comparisons use the executor identity.
 
@@ -182,7 +177,7 @@ An executor runs a job with one of the following entry points.
 
 | Entry point | Execution context |
 |---|---|
-| `swift_job_run(job, S)`, `ExecutorJob.runSynchronously(on: UnownedSerialExecutor)` | `(none, P)` if `S` is none, where `P` is the preference of the job's task, `(S, none)` otherwise |
+| `swift_job_run(job, S)`, `ExecutorJob.runSynchronously(on: UnownedSerialExecutor)` | `(none, P)` if `S` is none, where `P` is the preference of the job's task, `(none, none)` for the synchronous start of `Task.immediate`, `(S, none)` otherwise |
 | `swift_job_run_on_task_executor(job, T)`, `runSynchronously(on: UnownedTaskExecutor)` | `(none, T)` |
 | `swift_job_run_on_serial_and_task_executor(job, S, T)`, `runSynchronously(isolatedTo:taskExecutor:)` | `(S, T)` |
 
@@ -199,8 +194,14 @@ roles through the same `enqueue`. So it should run every job with both roles,
 itself as the serial executor and itself or its pool as the task executor. If it
 only passes the task executor, the serial executor of the context is none and
 code isolated to the executor doesn't run inline. If it only passes the serial
-executor, the context is `(E, none)` and concurrent code of tasks without a
-preference doesn't run inline, even if `E` is the default executor.
+executor, the context is `(E, none)`. That context matches no preference, so
+concurrent code is enqueued again on every hop, even if `E` is the preferred
+executor or the default executor.
+
+A thread of a pool that is also a serial executor, like an event loop in a
+group, should pass itself as the task executor for jobs from its own queue and
+the pool for jobs it takes from the pool. Otherwise the concurrent code of a
+task that prefers the loop doesn't run inline on it.
 
 ### Starting a task
 
@@ -272,7 +273,8 @@ return while the actor is still locked, or a processing job can stop because of
 a job whose task prefers another task executor. In all these cases the runtime
 unlocks the actor, the actor becomes scheduled again and the runtime enqueues a
 new processing job. It enqueues it on the preferred task executor of the next
-job's task, or on the default executor if that task prefers none.
+job's task, or on the default executor if that task prefers none. To find the
+next job, the runtime first sorts the incoming jobs into the queue.
 
 ### Isolated deinit
 
@@ -308,7 +310,7 @@ outcomes:
 |---|---|
 | Isolated to a custom serial executor `I` | `S == I` |
 | Isolated to a default actor `I` | `S == I` |
-| Concurrent | `S` is not a default actor, and `(S, T)` matches `P` |
+| Concurrent | `S` is not a default actor, and `T` matches `P` |
 
 Code isolated to an actor runs inline when the current context has the actor's
 serial executor. An actor with a custom serial executor runs its code on that
@@ -320,7 +322,8 @@ it. Unlocking the actor only to enqueue the same task again would add a round
 trip and wouldn't change where the code runs.
 
 Concurrent code runs inline in a context that matches the task's preference. It
-doesn't matter which serial executor the context has. The current context also
+doesn't matter which serial executor the context has. The exception is the
+synchronous start of `Task.immediate`, see section 9. The current context also
 keeps its serial executor while the thread runs the concurrent code. Because of
 that, a call back into code isolated to `S` runs inline too and `S` counts as
 the current executor. This is sound because the thread is busy running this
@@ -390,17 +393,20 @@ task first suspends:
 
 - If the operation isn't isolated, the runtime runs the task with
   `swift_job_run` and a serial executor of none that has an *immediate* marker.
-  The runtime doesn't switch while the marker is set, because the caller needs
-  its thread back. So a hop to a default actor is enqueued.
+  The context is `(none, none)`, because the thread is the caller's thread and
+  doesn't belong to a task executor. While the marker is set, concurrent code
+  runs inline, so the task really starts on the caller's thread. The runtime
+  doesn't switch while the marker is set, because the caller needs its thread
+  back. So a hop to a default actor is enqueued.
 - If the operation is isolated, the caller must already run with the serial
   executor of the operation. The runtime runs the task with `swift_job_run` and
   that executor. The base context then has that executor, so the runtime doesn't
   unlock it, not while the task runs and not when the job returns.
 
-Potentially unexpected: In the first case the context is `(none, P)`, like for
-any job run with `swift_job_run` and no serial executor, although the thread is
-the caller's thread and not a thread of `P`. Concurrent code of the task
-therefore runs inline on the caller's thread until the task first suspends.
+Potentially unexpected: In the first case concurrent code of the task runs
+inline on the caller's thread until the task first suspends, also when the task
+prefers a task executor. The runtime can't tell the hop at the start of the
+operation apart from a later hop to a `@concurrent` function.
 
 ## 10. Continuations
 

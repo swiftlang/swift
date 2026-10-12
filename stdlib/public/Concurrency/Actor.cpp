@@ -156,9 +156,17 @@ static TaskExecutorRef getDefaultTaskExecutor() {
   return defaultExecutor;
 }
 
-/// The task executor to report to tracing.
-static TaskExecutorRef tracedTaskExecutor(ContextTaskExecutor taskExecutor) {
-  return taskExecutor.getExplicit();
+/// Whether `a` and `b` are the same task executor. Undefined means the default
+/// executor. The default executor is only looked up if exactly one of them is
+/// undefined.
+static bool isSameTaskExecutor(TaskExecutorRef a, TaskExecutorRef b) {
+  if (a.isUndefined() && b.isUndefined())
+    return true;
+  auto identity = [](TaskExecutorRef executor) {
+    return executor.isDefined() ? executor.getIdentity()
+                                : getDefaultTaskExecutor().getIdentity();
+  };
+  return identity(a) == identity(b);
 }
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
@@ -213,7 +221,7 @@ static inline void taskInvokeWithExclusionValue(
     auto *record = ExecutorTrackingInfo::current();
     auto traceHandle = concurrency::trace::job_run_begin(
         task, record->getCurrentSerialExecutor(),
-        tracedTaskExecutor(record->getTaskExecutor()));
+        record->getTaskExecutor().getExplicit());
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
 
@@ -1866,18 +1874,8 @@ bool DefaultActorImpl::nextJobMayRunOn(TaskExecutorRef taskExecutor) {
   if (!job || !(isa<AsyncTask>(job) || isa<AsyncTaskStealer>(job)))
     return true;
 
-  // An undefined task executor and the default executor both mean the default
-  // executor.
-  auto preferred = TaskExecutorRef::fromTaskExecutorPreference(job);
-  if (preferred.isUndefined() && taskExecutor.isUndefined())
-    return true;
-  HeapObject *preferredIdentity = preferred.isDefined()
-                                      ? preferred.getIdentity()
-                                      : getDefaultTaskExecutor().getIdentity();
-  HeapObject *identity = taskExecutor.isDefined()
-                             ? taskExecutor.getIdentity()
-                             : getDefaultTaskExecutor().getIdentity();
-  return preferredIdentity == identity;
+  return isSameTaskExecutor(TaskExecutorRef::fromTaskExecutorPreference(job),
+                            taskExecutor);
 }
 
 // Called with actor lock held on current thread
@@ -2196,6 +2194,10 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
   SWIFT_TASK_DEBUG_LOG("Try unlock-ing actor %p with forceUnlock = %d", this, forceUnlock);
 
   _swift_tsan_release(this);
+  // Sort the incoming jobs into the queue first, so that the next job is the
+  // one the new processing job runs first.
+  if (forceUnlock)
+    processIncomingQueue();
   // The preferred task executor of the next job, if jobs remain. The new
   // processing job is enqueued there, like the first processing job is
   // enqueued on the preferred task executor of the job that scheduled the
@@ -2241,10 +2243,16 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
       newState = newState.withScheduled();
       newState = newState.withoutEscalatedPriority();
 
-      // Lock is still held at this point, so the jobs are still valid.
+      // Lock is still held at this point, so the jobs are still valid. Jobs
+      // that were enqueued after processIncomingQueue() above are only in the
+      // incoming list, which is in LIFO order, so its oldest job is the last
+      // one.
       Job *nextJob = prioritizedJobs.peek();
-      if (!nextJob)
+      if (!nextJob) {
         nextJob = oldState.getFirstUnprioritizedJob();
+        while (Job *next = getNextJob(nextJob))
+          nextJob = next;
+      }
       nextJobTaskExecutor = TaskExecutorRef::fromTaskExecutorPreference(nextJob);
     } else {
       // There is no work left to do - actor goes idle
@@ -2332,10 +2340,13 @@ SWIFT_CC(swift)
 static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   // A job run with no serial executor runs on a thread of its task's preferred
   // task executor, or of the default executor if the task prefers none. A job
-  // run with a custom serial executor runs on that.
-  auto taskExecutor = executor.isGeneric()
-                          ? TaskExecutorRef::fromTaskExecutorPreference(job)
-                          : TaskExecutorRef::undefined();
+  // run with a custom serial executor runs on that. The synchronous start of
+  // Task.immediate runs on the caller's thread, which belongs to no task
+  // executor.
+  auto taskExecutor =
+      executor.isGeneric() && !executor.isForSynchronousStart()
+          ? TaskExecutorRef::fromTaskExecutorPreference(job)
+          : TaskExecutorRef::undefined();
   swift_job_run_on_serial_and_task_executorImpl(job, executor, taskExecutor);
 }
 
@@ -2444,40 +2455,21 @@ namespace swift {
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
 
-/// Whether the execution context (serialExecutor, taskExecutor) matches the
+/// Whether a context with the task executor `taskExecutor` matches the
 /// preference `preferredTaskExecutor`, which is undefined if the task prefers
 /// none, which means the default executor. The context matches if its task
-/// executor is the preferred one, or if its serial executor is, which covers
-/// an executor that is both a serial and a task executor.
-///
-/// The common cases compare without looking up the default executor. The
-/// lookup is only needed when an explicit executor of the context could be the
-/// default executor, or when the task prefers the default executor
-/// explicitly.
-static bool contextMatchesPreference(SerialExecutorRef serialExecutor,
-                                     ContextTaskExecutor taskExecutor,
+/// executor is the preferred one. Its serial executor doesn't matter, even if
+/// it is the preferred task executor.
+static bool contextMatchesPreference(ContextTaskExecutor taskExecutor,
                                      TaskExecutorRef preferredTaskExecutor) {
+  // A preference for the default executor counts as no preference.
+  if (taskExecutor.isDefault())
+    return isSameTaskExecutor(TaskExecutorRef::undefined(),
+                              preferredTaskExecutor);
   auto explicitTaskExecutor = taskExecutor.getExplicit();
-
-  if (preferredTaskExecutor.isUndefined()) {
-    if (taskExecutor.isDefault())
-      return true;
-    if (explicitTaskExecutor.isUndefined() && serialExecutor.isGeneric())
-      return false;
-    preferredTaskExecutor = getDefaultTaskExecutor();
-  } else if (taskExecutor.isDefault()) {
-    // A preference for the default executor counts as no preference.
-    if (preferredTaskExecutor.getIdentity() ==
-        getDefaultTaskExecutor().getIdentity())
-      return true;
-  }
-
-  HeapObject *preferred = preferredTaskExecutor.getIdentity();
-  if (explicitTaskExecutor.isDefined() &&
-      explicitTaskExecutor.getIdentity() == preferred)
-    return true;
-  return !serialExecutor.isGeneric() &&
-         serialExecutor.getIdentity() == preferred;
+  if (explicitTaskExecutor.isUndefined())
+    return false;
+  return isSameTaskExecutor(explicitTaskExecutor, preferredTaskExecutor);
 }
 
 /// Whether concurrent code of a task that prefers `preferredTaskExecutor`
@@ -2486,12 +2478,15 @@ static bool contextMatchesPreference(SerialExecutorRef serialExecutor,
 static bool canRunConcurrentCodeInline(SerialExecutorRef serialExecutor,
                                        ContextTaskExecutor taskExecutor,
                                        TaskExecutorRef preferredTaskExecutor) {
+  // The synchronous start of Task.immediate runs on the caller's thread until
+  // the task first suspends. Its context has no task executor.
+  if (serialExecutor.isForSynchronousStart())
+    return true;
   // A context with a default actor's serial executor unlocks the actor first,
   // so that the actor can run its other jobs elsewhere.
   if (serialExecutor.isDefaultActor())
     return false;
-  return contextMatchesPreference(serialExecutor, taskExecutor,
-                                  preferredTaskExecutor);
+  return contextMatchesPreference(taskExecutor, preferredTaskExecutor);
 }
 
 /// Change the current serial executor of `record`, the record of the job that
@@ -2504,7 +2499,7 @@ static void continueTaskWithSerialExecutor(AsyncTask *task,
   // job's voucher belongs to the job's record.
   record->setCurrentSerialExecutor(serialExecutor);
   concurrency::trace::task_switch_executor(
-      task, serialExecutor, tracedTaskExecutor(record->getTaskExecutor()));
+      task, serialExecutor, record->getTaskExecutor().getExplicit());
   return task->runInFullyEstablishedContext(); // 'return' forces tail call
 }
 
@@ -2535,9 +2530,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // A running task always runs in the record of the job that runs it.
   auto record = ExecutorTrackingInfo::current();
   assert(record && "running a task without a record");
-  auto currentExecutor = record ? record->getCurrentSerialExecutor()
-                                : SerialExecutorRef::generic();
-  auto taskExecutor = record ? record->getTaskExecutor() : ContextTaskExecutor();
+  auto currentExecutor = record->getCurrentSerialExecutor();
+  auto taskExecutor = record->getTaskExecutor();
 
   // Running inline. `newExecutor` is the isolation of the code to run. It is
   // the generic executor if the code isn't isolated, which is concurrent code,
@@ -2581,9 +2575,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // base context, so a base context with a default actor's serial executor
   // never switches. Neither does the synchronous start of Task.immediate,
   // whose caller needs its thread back.
-  auto baseExecutor =
-      record ? record->getBaseSerialExecutor() : SerialExecutorRef::generic();
-  if (record && !currentExecutor.isForSynchronousStart() &&
+  auto baseExecutor = record->getBaseSerialExecutor();
+  if (!currentExecutor.isForSynchronousStart() &&
       !baseExecutor.isDefaultActor()) {
     // Code isolated to the base's serial executor, while a default actor is
     // locked on top of the base: unlock the actor and continue in the base
@@ -2608,8 +2601,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
       preferredTaskExecutor = task->getPreferredTaskExecutor();
 
     if ((switchesForConcurrentCode || switchesToDefaultActor) &&
-        contextMatchesPreference(baseExecutor, taskExecutor,
-                                 preferredTaskExecutor)) {
+        contextMatchesPreference(taskExecutor, preferredTaskExecutor)) {
       if (switchesForConcurrentCode) {
         SWIFT_TASK_DEBUG_LOG("Task %p unlocks actor %p to run concurrent code",
                              task, currentExecutor.getIdentity());

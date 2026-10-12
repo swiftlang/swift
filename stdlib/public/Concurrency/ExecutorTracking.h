@@ -41,13 +41,15 @@ public:
   /// The task executor of the context a job is run in with `serialExecutor`
   /// and `taskExecutor`, which is undefined if the executor passed none. A job
   /// run with no serial executor and no task executor runs on a thread of the
-  /// default executor.
+  /// default executor, except for the synchronous start of Task.immediate,
+  /// which runs on the caller's thread.
   static ContextTaskExecutor forJob(SerialExecutorRef serialExecutor,
                                     TaskExecutorRef taskExecutor) {
     if (taskExecutor.isDefined())
       return ContextTaskExecutor(taskExecutor, false);
     return ContextTaskExecutor(TaskExecutorRef::undefined(),
-                               serialExecutor.isGeneric());
+                               serialExecutor.isGeneric() &&
+                                   !serialExecutor.isForSynchronousStart());
   }
 
   /// Whether this is the default executor as its own case.
