@@ -5876,6 +5876,16 @@ void PrintAST::visitBridgeToObjCExpr(BridgeToObjCExpr *expr) {
 void PrintAST::visitObjCSelectorExpr(ObjCSelectorExpr *expr) {
   Printer << "#selector";
   Printer << "(";
+  switch (expr->getSelectorKind()) {
+  case ObjCSelectorExpr::Method:
+    break;
+  case ObjCSelectorExpr::Getter:
+    Printer << "getter: ";
+    break;
+  case ObjCSelectorExpr::Setter:
+    Printer << "setter: ";
+    break;
+  }
   visit(expr->getSubExpr());
   Printer << ")";
 }
