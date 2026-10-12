@@ -45,6 +45,52 @@
 // RUN:     -emit-irgen                                                        \
 // RUN:     | %FileCheck %s --color --dump-input=always
 
+/// Build everything again with opaque values
+// RUN: %empty-directory(%t/opaque-values)
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/FakeDistributedActorSystems.swiftmodule \
+// RUN:     -module-name FakeDistributedActorSystems                           \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:      %S/../Inputs/FakeDistributedActorSystems.swift                    \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -o %t/opaque-values/%target-library-name(FakeDistributedActorSystems)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/ResilientAPILib.swiftmodule     \
+// RUN:     -module-name ResilientAPILib                                       \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:     %t/src/ResilientAPILib.swift                                       \
+// RUN:     %t/src/ResilientAPILibFile2.swift                                  \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -o %t/opaque-values/%target-library-name(ResilientAPILib)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -module-name ResilientImplLib                                      \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:     %t/src/ResilientImplLib.swift                                      \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -lResilientAPILib                                                  \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -emit-irgen                                                        \
+// RUN:     | %FileCheck %s --color --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
