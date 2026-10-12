@@ -302,6 +302,12 @@ extension Int: SameSelfHolder {
   var number: Int { self }
 }
 
+protocol OtherSameSelfHolder<Value> where Value == Self {
+  associatedtype Value
+}
+
+extension Int: OtherSameSelfHolder {}
+
 protocol SameObjectHolder<Value>: AnyObject where Value == Self {
   associatedtype Value
   var number: Int { get }
@@ -313,7 +319,7 @@ final class SameObject: SameObjectHolder {
 }
 
 ParameterizedProtocolsTestSuite.test("selfAliasesGeneralizationParameter") {
-  typealias Value = SameSelfHolder<Int>
+  typealias Value = SameSelfHolder<Int> & OtherSameSelfHolder<Int>
   let type: Any.Type = (any Value).self
   let layout = _openExistential(type, do: genericLayout)
   expectEqual(MemoryLayout<any Value>.size, layout.0)

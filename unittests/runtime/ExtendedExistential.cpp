@@ -605,10 +605,12 @@ TEST(TestExtendedExistential, containerLayoutWithAliasedSelf) {
   auto shapeSpecs = [] {
     return shape(
       shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
-      genSig(param()),
+      genSig(param(), param()),
       reqSig(param(), param().withKeyArgument(false),
+             param().withKeyArgument(false),
              conforms(typeParam(0, 0), P()),
-             sameType(typeParam(0, 0), typeParam(1, 0)))
+             sameType(typeParam(0, 0), typeParam(0, 1)),
+             sameType(typeParam(0, 1), typeParam(1, 0)))
     );
   };
   auto classShape = buildGlobalShape([&] {

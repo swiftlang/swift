@@ -2319,14 +2319,13 @@ public:
     if (getReqSigParams()[getNumReqSigParams() - 1].hasKeyArgument())
       return selfType;
 
-    // Canonicalization can equate Self with a generalization parameter.
-    for (const auto &req : getRequirementSignature().getRequirements()) {
-      if (req.getKind() != GenericRequirementKind::SameType)
-        continue;
-      if (req.getMangledTypeName() == selfType)
-        return req.getParam();
-      if (req.getParam() == selfType)
-        return req.getMangledTypeName();
+    // Canonical same-type requirements form an ordered chain from the
+    // representative to its aliases. Walk backwards to resolve all aliases.
+    for (const auto &req :
+         llvm::reverse(getRequirementSignature().getRequirements())) {
+      if (req.getKind() == GenericRequirementKind::SameType &&
+          req.getMangledTypeName() == selfType)
+        selfType = req.getParam();
     }
     return selfType;
   }
