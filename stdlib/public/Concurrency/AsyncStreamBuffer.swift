@@ -509,7 +509,7 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next() async throws(Failure) -> Element? {
+    nonisolated(nonsending) func next() async throws(Failure) -> Element? {
       try await withTaskCancellationHandler { () throws(Failure) in
         try unsafe await withUnsafeThrowingContinuation {
           unsafe next($0)
@@ -539,8 +539,12 @@ extension AsyncThrowingStream {
 }
 
 // this is used to store closures; which are two words
-final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
-  var _value: Contents
+final class _AsyncStreamCriticalStorage<
+  Element, Failure: Error
+>: @unchecked Sendable {
+  typealias Value = (nonisolated(nonsending) () async throws(Failure) -> Element?)?
+
+  var _value: Value
   private init(_doNotCallMe: ()) {
     fatalError("_AsyncStreamCriticalStorage must be initialized by create")
   }
@@ -557,7 +561,7 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     unsafe _unlock(ptr)
   }
 
-  var value: Contents {
+  var value: Value {
     get {
       lock()
       let contents = _value
@@ -576,7 +580,7 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
 
   /// Atomically replaces the contents with `nil` and returns the previous
   /// contents. At most one caller observes a non-`nil` value.
-  func take<Wrapped>() -> Contents where Contents == Wrapped? {
+  func take() -> Value {
     lock()
     let contents = _value
     _value = nil
@@ -584,7 +588,7 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return contents
   }
 
-  static func create(_ initial: Contents) -> _AsyncStreamCriticalStorage {
+  static func create(_ initial: Value) -> _AsyncStreamCriticalStorage {
     let minimumCapacity = _lockWordCount()
     let storage = unsafe Builtin.allocWithTailElems_1(
       _AsyncStreamCriticalStorage.self,

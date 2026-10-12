@@ -265,9 +265,12 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 
   final class _Context {
     let storage: _Storage?
-    let produce: () async throws(Failure) -> Element?
+    let produce: nonisolated(nonsending) () async throws(Failure) -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async throws(Failure) -> Element?) {
+    init(
+      storage: _Storage? = nil,
+      produce: nonisolated(nonsending) @escaping () async throws(Failure) -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
@@ -449,9 +452,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
-    let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
-      = .create(produce)
-    context = _Context {
+    let storage: _AsyncStreamCriticalStorage = .create(produce)
+    self.context = _Context {
       return try await withTaskCancellationHandler {
         guard let result = try await storage.value?() else {
           storage.value = nil
@@ -504,11 +506,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   @available(SwiftStdlib 6.5, *)
   @preconcurrency
   public init(
-    unfolding produce: @escaping @Sendable () async throws(Failure) -> Element?
+    unfolding produce: nonisolated(nonsending) @escaping @Sendable () async throws(Failure) -> Element?
   ) {
-    let storage: _AsyncStreamCriticalStorage<Optional<() async throws(Failure) -> Element?>>
-      = .create(produce)
-    context = _Context { () throws(Failure) in
+    let storage: _AsyncStreamCriticalStorage = .create(produce)
+    self.context = _Context { () throws(Failure) in
       return try await withTaskCancellationHandler { () throws(Failure) in
         guard let result = try await storage.value?() else {
           storage.value = nil
@@ -766,7 +767,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   @available(SwiftStdlib 6.5, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
-    unfolding produce: @escaping () async throws(Failure) -> Element?
+    unfolding produce: nonisolated(nonsending) @escaping () async throws(Failure) -> Element?
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
