@@ -717,6 +717,7 @@ struct [[nodiscard]] ManglingError {
     MultiByteRelatedEntity,
     BadValueWitnessKind,
     NotAContextNode,
+    InvalidIdentifier,
   };
 
   Code        code;
