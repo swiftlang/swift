@@ -43,6 +43,10 @@ void checkDeinitableConformance(DeclContext *dc,
 void checkEscapableConformance(DeclContext *dc,
                                ProtocolConformanceRef conformance);
 
+/// Checks that all stored properties or associated values are Transferable.
+void checkTransferableConformance(DeclContext *dc,
+                                  ProtocolConformanceRef conformance);
+
 /// Diagnoses a tuple element of type \p eltTy at \p loc if tuples can't
 /// contain it.
 ///

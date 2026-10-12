@@ -5872,6 +5872,18 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(getASTContext());
     }
+
+    // SIL prints Transferable requirements, so it has to parse them back.
+    if (protoTy->getDecl()->isSpecificProtocol(
+            KnownProtocolKind::Transferable) &&
+        !isSILSourceFile() &&
+        !getASTContext().LangOpts.hasFeature(Feature::TransferableProtocol)) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(),
+                 diag::transferable_protocol_requires_feature);
+      repr->setInvalid();
+      return ErrorType::get(getASTContext());
+    }
   }
 
   // Diagnose an error if generic arguments are missing.
