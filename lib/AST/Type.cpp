@@ -62,7 +62,7 @@ using namespace swift;
 #include "swift/AST/TypeNodes.def"
 
 void TypeLoc::setType(Type Ty) {
-  assert(!Ty || !Ty->hasTypeVariable() || !Ty->hasPlaceholder());
+  assert(!Ty || !Ty->hasTypeVariableOrPlaceholder());
   this->Ty = Ty;
 }
 
