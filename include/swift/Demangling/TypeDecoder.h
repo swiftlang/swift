@@ -665,6 +665,19 @@ decodeShape(NodePointer Node) {
   return {Protocol, Requirements};
 }
 
+/// Returns the node kind for an escaping Swift function type that suppresses
+/// \p inverted. Function types record their execution semantics as the
+/// invertible protocols that they suppress: an at-most-once function type
+/// isn't Copyable, and an exactly-once one isn't Deinitable either.
+inline Node::Kind
+getEscapingSwiftFunctionNodeKind(InvertibleProtocolSet inverted) {
+  if (!inverted.contains(InvertibleProtocolKind::Copyable))
+    return Node::Kind::FunctionType;
+  if (inverted.contains(InvertibleProtocolKind::Deinitable))
+    return Node::Kind::CalledOnceFunctionType;
+  return Node::Kind::CalledAtMostOnceFunctionType;
+}
+
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
   TYPE_LOOKUP_ERROR_FMT("TypeDecoder.h:%u: Node kind %u \"%.*s\" - " Fmt,      \
                         __LINE__, (unsigned)Node->getKind(),                   \
@@ -1184,16 +1197,24 @@ protected:
           flags.withNumParameters(parameters.size())
               .withParameterFlags(hasParamFlags)
               .withEscaping(
-                          Node->getKind() == NodeKind::FunctionType ||
-                          Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock);
+                  Node->getKind() == NodeKind::FunctionType ||
+                  Node->getKind() == NodeKind::EscapingAutoClosureType ||
+                  Node->getKind() == NodeKind::EscapingObjCBlock ||
+                  // Only escaping function types with execution semantics
+                  // have their own manglings.
+                  Node->getKind() == NodeKind::CalledOnceFunctionType ||
+                  Node->getKind() == NodeKind::CalledAtMostOnceFunctionType);
 
-      if (Node->getKind() == NodeKind::CalledOnceFunctionType)
-        extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::Once);
-      else if (Node->getKind() == NodeKind::CalledAtMostOnceFunctionType)
-        extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::AtMostOnce);
+      // Function types record their execution semantics as the invertible
+      // protocols that they suppress.
+      if (Node->getKind() == NodeKind::CalledOnceFunctionType ||
+          Node->getKind() == NodeKind::CalledAtMostOnceFunctionType) {
+        auto inverted = extFlags.getInvertedProtocols();
+        inverted.insert(InvertibleProtocolKind::Copyable);
+        if (Node->getKind() == NodeKind::CalledOnceFunctionType)
+          inverted.insert(InvertibleProtocolKind::Deinitable);
+        extFlags = extFlags.withInvertedProtocols(inverted);
+      }
 
       auto result =
           decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,
