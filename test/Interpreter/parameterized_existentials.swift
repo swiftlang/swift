@@ -58,20 +58,13 @@ ParameterizedProtocolsTestSuite.test("casting") {
   expectEqual(a.box.value, 5)
 }
 
-final class SuperclassLifetimeCounter {
-  var destructions = 0
-}
-
 class HashableSuperclass<T: Hashable> {
   let value: T
-  let lifetime: SuperclassLifetimeCounter?
+  let token = LifetimeTracked(0)
 
-  init(_ value: T, lifetime: SuperclassLifetimeCounter? = nil) {
+  init(_ value: T) {
     self.value = value
-    self.lifetime = lifetime
   }
-
-  deinit { lifetime?.destructions += 1 }
 }
 
 protocol OtherSuperclassProtocol {
@@ -148,18 +141,17 @@ ParameterizedProtocolsTestSuite.test("genericSuperclassAssociatedConformance") {
 }
 
 ParameterizedProtocolsTestSuite.test("genericSuperclassCopying") {
-  let lifetime = SuperclassLifetimeCounter()
   do {
-    let value = HashableSuperclassHolder(42, lifetime: lifetime)
+    let value = HashableSuperclassHolder(42)
     var copies: [any HashableIntHolder] = [value, value]
     expectEqual(42, copies[0].value)
     copies.removeFirst()
     expectEqual(42, copies[0].value)
     withExtendedLifetime(copies) {
-      expectEqual(0, lifetime.destructions)
+      expectEqual(1, LifetimeTracked.instances)
     }
   }
-  expectEqual(1, lifetime.destructions)
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 protocol LeftHolder<Element> {
@@ -250,15 +242,12 @@ class HashablePairSuperclass<T: Hashable, U: Hashable>:
   FirstValueHolder, SecondValueHolder {
   let first: T
   let second: U
-  let lifetime: SuperclassLifetimeCounter?
+  let token = LifetimeTracked(0)
 
-  init(_ first: T, _ second: U, lifetime: SuperclassLifetimeCounter? = nil) {
+  init(_ first: T, _ second: U) {
     self.first = first
     self.second = second
-    self.lifetime = lifetime
   }
-
-  deinit { lifetime?.destructions += 1 }
 }
 
 final class HashablePairHolder:
@@ -277,9 +266,8 @@ ParameterizedProtocolsTestSuite.test("mergedGeneralizationConformances") {
   let metatypeLayout = _openExistential(metatype, do: genericLayout)
   expectEqual(MemoryLayout<any Value.Type>.size, metatypeLayout.0)
 
-  let lifetime = SuperclassLifetimeCounter()
   do {
-    let erased: Any = HashablePairHolder(42, 84, lifetime: lifetime)
+    let erased: Any = HashablePairHolder(42, 84)
     expectTrue(erased is any Value)
     let value = erased as? any Value
     expectEqual(42, value?.first)
@@ -294,10 +282,10 @@ ParameterizedProtocolsTestSuite.test("mergedGeneralizationConformances") {
     expectEqual(84, copies[0].second)
     expectTrue(copies[0].value)
     withExtendedLifetime(copies) {
-      expectEqual(0, lifetime.destructions)
+      expectEqual(1, LifetimeTracked.instances)
     }
   }
-  expectEqual(1, lifetime.destructions)
+  expectEqual(0, LifetimeTracked.instances)
 
   let erasedType: Any = HashablePairHolder.self
   let castType = erasedType as? any Value.Type
