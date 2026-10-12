@@ -3,6 +3,9 @@
 // RUN: %target-build-swift -module-name ActorsFramework -target %target-swift-6.0-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -plugin-path %swift-plugin-dir -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: env %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a.out 2>&1 | %FileCheck %s --color --dump-input=always
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name ActorsFramework -target %target-swift-6.0-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -plugin-path %swift-plugin-dir -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: env %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a-opaque-values.out 2>&1 | %FileCheck %s --color --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
