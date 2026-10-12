@@ -202,9 +202,10 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_6_0,
     Swift_6_1,
     Swift_6_2,
+    Swift_6_5,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_2
+    Latest = Swift_6_5
   };
 
   VersionRequirement latestRequirement = None;
@@ -220,6 +221,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
       auto isolation = fn->getIsolation();
       auto sendingResult = fn->hasSendingResult();
+
+      // The Swift 6.5 runtime is the first version able to demangle function
+      // types with execution semantics.
+      if (fn->getExecutionSemantics())
+        return addRequirement(Swift_6_5);
 
       // The mangling for nonisolated(nonsending) function types was introduced
       // in Swift 6.2.
@@ -293,6 +299,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   });
 
   switch (latestRequirement) {
+  case Swift_6_5: return llvm::VersionTuple(6, 5);
   case Swift_6_2: return llvm::VersionTuple(6, 2);
   case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);

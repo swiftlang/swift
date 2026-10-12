@@ -13,6 +13,7 @@
 #include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Range.h"
+#include "swift/Demangling/TypeDecoder.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
@@ -688,6 +689,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     case FunctionMetadataConvention::Swift:
       if (!func->isEscaping())
         kind = Node::Kind::NoEscapeFunctionType;
+      else if (func->hasExtendedFlags())
+        kind = getEscapingSwiftFunctionNodeKind(
+            func->getExtendedFlags().getInvertedProtocols());
       else
         kind = Node::Kind::FunctionType;
       break;
