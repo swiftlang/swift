@@ -1347,7 +1347,7 @@ REMARK(macro_loaded,none,
        (Identifier, unsigned, StringRef, StringRef))
 
 ERROR(resolved_macro_changed,none,
-      "resolved macro library '%0' failed verification: %1",
+      "resolved macro plugin '%0' failed verification: %1",
       (StringRef, StringRef))
 
 REMARK(transitive_dependency_behavior,none,
