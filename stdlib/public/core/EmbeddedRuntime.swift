@@ -425,10 +425,12 @@ private var _errorBoxDestroyImplRef: (Builtin.RawPointer) -> Void = { _ in }
 private func _ensureErrorMetadataInitialized() {
   guard !_errorMetadataInitialized else { return }
   _errorBoxDestroyImplRef = _errorBoxDestroyImpl
-  let destroyPtr = unsafe _swift_embedded_error_destroy_ptr()
-  unsafe withUnsafeMutablePointer(to: &_errorMetadataStorage.destroy) { p in
-    unsafe (p.pointee = UnsafeRawPointer(destroyPtr))
-  }
+  // The signature is address-diversified, so pass the slot's real address.
+  let destroyLocation = unsafe UnsafeMutableRawPointer(
+    Builtin.addressof(&_errorMetadataStorage)
+  ).advanced(by: MemoryLayout<UnsafeRawPointer>.size)
+    .assumingMemoryBound(to: UnsafeMutableRawPointer?.self)
+  unsafe _swift_embedded_error_store_destroy(destroyLocation)
   _errorMetadataInitialized = true
 }
 
