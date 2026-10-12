@@ -144,9 +144,28 @@ namespace swift {
 /// Define the thread-locals.
 SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
-ExecutorTrackingInfo::ActiveInfoInThread;
+ExecutorTrackingInfo::CurrentInThread;
 
 } // end namespace swift
+
+/// The default executor. It is set up before the first job is enqueued and
+/// never changes afterwards, so it is looked up only once.
+static TaskExecutorRef getDefaultTaskExecutor() {
+  static TaskExecutorRef defaultExecutor;
+  static swift::once_t defaultExecutorToken;
+  swift::once(
+      defaultExecutorToken,
+      [](void *context) {
+        *static_cast<TaskExecutorRef *>(context) = swift_getDefaultExecutor();
+      },
+      &defaultExecutor);
+  return defaultExecutor;
+}
+
+/// The task executor to report to tracing.
+static TaskExecutorRef tracedTaskExecutor(ContextTaskExecutor taskExecutor) {
+  return taskExecutor.getExplicit();
+}
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 namespace {
@@ -249,10 +268,10 @@ void AsyncTaskStealer::process(Job *_job) {
 
   auto *trackingInfo = ExecutorTrackingInfo::current();
 
-  taskInvokeWithExclusionValue(stealer->Task, trackingInfo->getActiveExecutor(),
-                               trackingInfo->getTaskExecutor(),
-                               stealer->ExclusionValue,
-                               AsyncTask::InvokeFlagsFromStealer);
+  taskInvokeWithExclusionValue(
+      stealer->Task, trackingInfo->getCurrentSerialExecutor(),
+      tracedTaskExecutor(trackingInfo->getTaskExecutor()),
+      stealer->ExclusionValue, AsyncTask::InvokeFlagsFromStealer);
 
   swift_release(stealer->Task);
 
@@ -283,7 +302,7 @@ AsyncTask *swift::_swift_task_setCurrent(AsyncTask *new_task) {
 SWIFT_CC(swift)
 static SerialExecutorRef swift_task_getCurrentExecutorImpl() {
   auto currentTracking = ExecutorTrackingInfo::current();
-  auto result = (currentTracking ? currentTracking->getActiveExecutor()
+  auto result = (currentTracking ? currentTracking->getCurrentSerialExecutor()
                                  : SerialExecutorRef::generic());
   SWIFT_TASK_DEBUG_LOG("getting current executor %p", result.getIdentity());
   return result;
@@ -306,7 +325,7 @@ extern "C" SWIFT_CC(swift)
 SerialExecutorRef _swift_getActiveExecutor() {
   auto currentTracking = ExecutorTrackingInfo::current();
   if (currentTracking) {
-    SerialExecutorRef executor = currentTracking->getActiveExecutor();
+    SerialExecutorRef executor = currentTracking->getCurrentSerialExecutor();
     // This might be an actor, in which case return nil ("generic")
     if (executor.isDefaultActor())
       return SerialExecutorRef::generic();
@@ -326,9 +345,12 @@ SerialExecutorRef _swift_getActiveExecutor() {
 extern "C" SWIFT_CC(swift)
 TaskExecutorRef _swift_getCurrentTaskExecutor() {
   auto currentTracking = ExecutorTrackingInfo::current();
-  if (currentTracking)
-    return currentTracking->getTaskExecutor();
-  return TaskExecutorRef::undefined();
+  if (!currentTracking)
+    return TaskExecutorRef::undefined();
+  auto taskExecutor = currentTracking->getTaskExecutor();
+  if (taskExecutor.isDefault())
+    return getDefaultTaskExecutor();
+  return taskExecutor.getExplicit();
 }
 
 extern "C" SWIFT_CC(swift)
@@ -572,7 +594,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     return false;
   }
 
-  SerialExecutorRef currentExecutor = current->getActiveExecutor();
+  SerialExecutorRef currentExecutor = current->getCurrentSerialExecutor();
   SWIFT_TASK_DEBUG_LOG("executor checking: current executor %p %s",
                        currentExecutor.getIdentity(), currentExecutor.getIdentityDebugName());
 
@@ -1525,6 +1547,8 @@ static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor)
 /******************** NEW DEFAULT ACTOR IMPLEMENTATION ***********************/
 /*****************************************************************************/
 
+/// The preferred task executor of the task `job` runs, or undefined if the task
+/// prefers none or if the job doesn't run a task.
 TaskExecutorRef TaskExecutorRef::fromTaskExecutorPreference(Job *job) {
   if (auto task = dyn_cast<AsyncTask>(job)) {
     return task->getPreferredTaskExecutor();
@@ -1849,35 +1873,20 @@ Job *DefaultActorImpl::drainOne() {
   return firstJob;
 }
 
-// Called from processing jobs which are created to drain an actor. We need to
-// reason about this function together with swift_task_switch because threads
-// can switch from "following actors" to "following tasks" and vice versa.
+// The processing job of a default actor. See
+// docs/ConcurrencyRuntimeExecution.md.
 //
-// The way this function works is as following:
+// It locks the actor and runs its jobs one after the other in a record that
+// has the actor's serial executor on top of the context the processing job
+// runs in. A task that runs can leave the actor in swift_task_switch:
 //
-// 1. We grab the actor lock for the actor we were scheduled to drain.
-// 2. Drain the first task out of the actor and run it. Henceforth, the thread
-// starts executing the task and following it around. It is no longer a
-// processing job for the actor. Note that it will hold the actor lock until it
-// needs to hop off the actor but conceptually, it is now a task executor as well.
-// 3. When the thread needs to hop off the actor, it is done deep in the
-// callstack of this function with an indirection through user code:
-// defaultActorDrain -> runJobInEstablishedExecutorContext ->  user
-// code -> a call to swift_task_switch to hop out of actor
-// 4. This call to swift_task_switch() will attempt to hop off the existing
-// actor and jump to the new one. There are 2 possible outcomes at that point:
-//   (a) We were able to hop to the new actor and so thread continues executing
-//   task. We then schedule a job for the old actor to continue if it has
-//   pending work
-//   (b) We were not able to take the fast path to the new actor, the task gets
-//   enqueued onto the new actor it is going to, and the thread now follows the
-//   actor we were trying to hop off. At this point, note that we don't give up
-//   the actor lock in `swift_task_switchImpl` so we will come back to
-//   defaultActorDrain with the actor lock still held.
-//
-// At the point of return from the job execution, we may not be holding the lock
-// of the same actor that we had started off with, so we need to reevaluate what
-// the current actor is
+// - If it switched to another default actor, the record's current serial
+//   executor is that actor, and the processing job continues with its queue.
+// - If it unlocked the actor to run concurrent code, the record's current
+//   serial executor is no longer a default actor, and the processing job
+//   stops.
+// - If it was enqueued elsewhere, the actor is still locked, and the
+//   processing job continues with the actor's next job.
 static void defaultActorDrain(DefaultActorImpl *actor) {
   SWIFT_TASK_DEBUG_LOG("Draining default actor %p", actor);
   DefaultActorImpl *currentActor = actor;
@@ -1893,53 +1902,42 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
   (void)actorLockAcquired;
   assert(actorLockAcquired);
 
-  // Setup a TSD for tracking current execution info
-  ExecutorTrackingInfo trackingInfo;
-  trackingInfo.enterAndShadow(
-      SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
-      /*taskExecutor, will be replaced per each job. */
-      TaskExecutorRef::undefined());
+  {
+    ExecutorTrackingInfo trackingInfo;
+    trackingInfo.enterLockedDefaultActor(
+        SerialExecutorRef::forDefaultActor(asAbstract(currentActor)));
 
-  while (true) {
-    Job *job = currentActor->drainOne();
-    if (job == NULL) {
-      // No work left to do, try unlocking the actor. This may fail if there is
-      // work concurrently enqueued in which case, we'd try again in the loop
-      if (currentActor->unlock(false)) {
+    while (true) {
+      Job *job = currentActor->drainOne();
+      if (job == NULL) {
+        // No work left to do, try unlocking the actor. This fails if a job was
+        // enqueued in the meantime, in which case we run it.
+        if (currentActor->unlock(false)) {
+          break;
+        }
+      } else {
+        runJobInEstablishedExecutorContext(
+            job, SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
+            tracedTaskExecutor(trackingInfo.getTaskExecutor()));
+
+        auto currentExecutor = trackingInfo.getCurrentSerialExecutor();
+        if (!currentExecutor.isDefaultActor()) {
+          // The task unlocked the actor to run concurrent code.
+          break;
+        }
+        currentActor = asImpl(currentExecutor.getDefaultActor());
+      }
+
+      if (shouldYieldThread()) {
+        currentActor->unlock(true);
         break;
       }
-    } else {
-      auto taskExecutor = TaskExecutorRef::fromTaskExecutorPreference(job);
-      trackingInfo.setTaskExecutor(taskExecutor);
 
-      // This thread is now going to follow the task on this actor.
-      // It may hop off the actor
-      runJobInEstablishedExecutorContext(
-          job,
-          SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
-          taskExecutor);
-
-      // We could have come back from the job on a generic executor and not as
-      // part of a default actor. If so, there is no more work left for us to do
-      // here.
-      auto currentExecutor = trackingInfo.getActiveExecutor();
-      if (!currentExecutor.isDefaultActor()) {
-        currentActor = nullptr;
-        break;
-      }
-      currentActor = asImpl(currentExecutor.getDefaultActor());
+      currentActor->processIncomingQueue();
     }
 
-    if (shouldYieldThread()) {
-      currentActor->unlock(true);
-      break;
-    }
-
-    currentActor->processIncomingQueue();
+    trackingInfo.leave();
   }
-
-  // Leave the tracking info.
-  trackingInfo.leave();
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 done:
@@ -2143,15 +2141,15 @@ retry:;
 #endif /* SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
 }
 
-/* This can be called in 2 ways:
- *    * force_unlock = true: Thread is following task and therefore wants to
- *    give up the current actor since task is switching away.
- *    * force_unlock = false: Thread is not necessarily following the task, it
- *    may want to follow actor if there is more work on it.
+/* Unlock the actor. This can be called in 2 ways:
+ *    * forceUnlock = true: A task leaves the actor, or a job returns with the
+ *    actor still locked. If jobs remain, the actor becomes scheduled and a new
+ *    processing job is enqueued on the default executor.
+ *    * forceUnlock = false: The processing job has run all jobs it knows of.
+ *    If jobs remain, the actor stays locked, so that the processing job runs
+ *    them.
  *
- *    Returns true if we managed to unlock the actor, false if we didn't. If the
- *    actor has more jobs remaining on it during unlock, this method will
- *    schedule the actor
+ *    Returns true if we managed to unlock the actor, false if we didn't.
  */
 bool DefaultActorImpl::unlock(bool forceUnlock)
 {
@@ -2259,69 +2257,50 @@ void DefaultActorImpl::releaseLock() {
 }
 #endif
 
+
+// Every method that runs a job ends up here. See
+// docs/ConcurrencyRuntimeExecution.md.
 SWIFT_CC(swift)
 SWIFT_RUNTIME_EXCEPTION_PERSONALITY
-static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
+static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
+                                             SerialExecutorRef serialExecutor,
+                                             TaskExecutorRef taskExecutor) {
+  SWIFT_TASK_DEBUG_LOG("Run job %p on serial executor %p task executor %p", job,
+                       serialExecutor.getIdentity(), taskExecutor.getIdentity());
   ExecutorTrackingInfo trackingInfo;
+  trackingInfo.enter(serialExecutor,
+                     ContextTaskExecutor::forJob(serialExecutor, taskExecutor));
 
-  // swift_job_run is a primary entrypoint for executors telling us to
-  // run jobs.  Actor executors won't expect us to switch off them
-  // during this operation.  But do allow switching if the executor
-  // is generic.
-  if (!executor.isGeneric()) {
-    trackingInfo.disallowSwitching();
-  }
-
-  auto taskExecutor = executor.isGeneric()
-                          ? TaskExecutorRef::fromTaskExecutorPreference(job)
-                          : TaskExecutorRef::undefined();
-
-  trackingInfo.enterAndShadow(executor, taskExecutor);
-
-  SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job, executor, taskExecutor);
+  runJobInEstablishedExecutorContext(
+      job, serialExecutor, tracedTaskExecutor(trackingInfo.getTaskExecutor()));
 
   trackingInfo.leave();
 
-  // Give up the current executor if this is a switching context
-  // (which, remember, only happens if we started out on a generic
-  // executor) and we've switched to a default actor.
-  auto currentExecutor = trackingInfo.getActiveExecutor();
-  if (trackingInfo.allowsSwitching() && currentExecutor.isDefaultActor()) {
+  // Unlock a default actor that a task locked on top of the base context and
+  // that is still locked when the job returns.
+  auto currentExecutor = trackingInfo.getCurrentSerialExecutor();
+  if (currentExecutor.isDefaultActor() &&
+      currentExecutor.getIdentity() !=
+          trackingInfo.getBaseSerialExecutor().getIdentity()) {
     asImpl(currentExecutor.getDefaultActor())->unlock(true);
   }
 }
 
 SWIFT_CC(swift)
-static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
-                                             SerialExecutorRef serialExecutor,
-                                             TaskExecutorRef taskExecutor) {
-  ExecutorTrackingInfo trackingInfo;
-  SWIFT_TASK_DEBUG_LOG("Run job %p on serial executor %p task executor %p", job,
-                       serialExecutor.getIdentity(), taskExecutor.getIdentity());
-
-  // TODO: we don't allow switching
-  trackingInfo.disallowSwitching();
-  trackingInfo.enterAndShadow(serialExecutor, taskExecutor);
-
-  SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job, serialExecutor, taskExecutor);
-
-  trackingInfo.leave();
-
-  // Give up the current executor if this is a switching context
-  // (which, remember, only happens if we started out on a generic
-  // executor) and we've switched to a default actor.
-  auto currentExecutor = trackingInfo.getActiveExecutor();
-  if (trackingInfo.allowsSwitching() && currentExecutor.isDefaultActor()) {
-    asImpl(currentExecutor.getDefaultActor())->unlock(true);
-  }
+static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
+  // A job run with no serial executor runs on a thread of its task's preferred
+  // task executor, or of the default executor if the task prefers none. A job
+  // run with a custom serial executor runs on that.
+  auto taskExecutor = executor.isGeneric()
+                          ? TaskExecutorRef::fromTaskExecutorPreference(job)
+                          : TaskExecutorRef::undefined();
+  swift_job_run_on_serial_and_task_executorImpl(job, executor, taskExecutor);
 }
 
 SWIFT_CC(swift)
 static void swift_job_run_on_task_executorImpl(Job *job,
                                                TaskExecutorRef taskExecutor) {
-  swift_job_run_on_serial_and_task_executor(
+  swift_job_run_on_serial_and_task_executorImpl(
       job, SerialExecutorRef::generic(), taskExecutor);
 }
 
@@ -2423,139 +2402,72 @@ namespace swift {
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
 
-/// Can the current executor give up its thread?
-static bool canGiveUpThreadForSwitch(ExecutorTrackingInfo *trackingInfo,
-                                     SerialExecutorRef currentExecutor) {
-  assert(trackingInfo || currentExecutor.isGeneric());
+/// Whether the execution context (serialExecutor, taskExecutor) matches the
+/// preference `preferredTaskExecutor`, which is undefined if the task prefers
+/// none, which means the default executor. The context matches if its task
+/// executor is the preferred one, or if its serial executor is, which covers
+/// an executor that is both a serial and a task executor.
+///
+/// The common cases compare without looking up the default executor. The
+/// lookup is only needed when an explicit executor of the context could be the
+/// default executor, or when the task prefers the default executor
+/// explicitly.
+static bool contextMatchesPreference(SerialExecutorRef serialExecutor,
+                                     ContextTaskExecutor taskExecutor,
+                                     TaskExecutorRef preferredTaskExecutor) {
+  auto explicitTaskExecutor = taskExecutor.getExplicit();
 
-  // Some contexts don't allow switching at all.
-  if (trackingInfo && !trackingInfo->allowsSwitching()) {
-    return false;
-  }
-
-  // We can certainly "give up" a generic executor to try to run
-  // a task for an actor.
-  if (currentExecutor.isGeneric()) {
-    if (currentExecutor.isForSynchronousStart()) {
+  if (preferredTaskExecutor.isUndefined()) {
+    if (taskExecutor.isDefault())
+      return true;
+    if (explicitTaskExecutor.isUndefined() && serialExecutor.isGeneric())
       return false;
-    }
-
-    return true;
+    preferredTaskExecutor = getDefaultTaskExecutor();
+  } else if (taskExecutor.isDefault()) {
+    // A preference for the default executor counts as no preference.
+    if (preferredTaskExecutor.getIdentity() ==
+        getDefaultTaskExecutor().getIdentity())
+      return true;
   }
 
-  // If the current executor is a default actor, we know how to make
-  // it give up its thread.
-  if (currentExecutor.isDefaultActor())
+  HeapObject *preferred = preferredTaskExecutor.getIdentity();
+  if (explicitTaskExecutor.isDefined() &&
+      explicitTaskExecutor.getIdentity() == preferred)
     return true;
-
-  return false;
+  return !serialExecutor.isGeneric() &&
+         serialExecutor.getIdentity() == preferred;
 }
 
-/// Tell the current executor to give up its thread, given that it
-/// returned true from canGiveUpThreadForSwitch().
-///
-/// Note that we don't update DefaultActorProcessingFrame here; we'll
-/// do that in runOnAssumedThread.
-static void giveUpThreadForSwitch(SerialExecutorRef currentExecutor) {
-  if (currentExecutor.isGeneric()) {
-    SWIFT_TASK_DEBUG_LOG("Giving up current generic executor %p",
-                         currentExecutor.getIdentity());
-    return;
-  }
-
-  asImpl(currentExecutor.getDefaultActor())->unlock(true);
-}
-
-/// Try to assume control of the current thread for the given executor
-/// in order to run the given job.
-///
-/// This doesn't actually run the job yet.
-///
-/// Note that we don't update DefaultActorProcessingFrame here; we'll
-/// do that in runOnAssumedThread.
-static bool tryAssumeThreadForSwitch(SerialExecutorRef newExecutor,
-                                     TaskExecutorRef newTaskExecutor) {
-  // If the new executor is generic, we don't need to do anything.
-  if (newExecutor.isGeneric() && newTaskExecutor.isUndefined()) {
-    return true;
-  }
-
-  // If the new executor is a default actor, ask it to assume the thread.
-  if (newExecutor.isDefaultActor()) {
-    return asImpl(newExecutor.getDefaultActor())->tryLock(false);
-  }
-
-  return false;
-}
-
-static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
-                            SerialExecutorRef newSerialExecutor,
-                            TaskExecutorRef currentTaskExecutor,
-                            TaskExecutorRef newTaskExecutor) {
-  if (currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity()) {
-    // If the target is the generic executor and the task has a preferred
-    // task executor whose identity matches our current serial executor,
-    // we're already running where task executor preference would switch to on enqueue.
-    if (newSerialExecutor.isGeneric() && newTaskExecutor.isDefined() &&
-        currentSerialExecutor.getIdentity() == newTaskExecutor.getIdentity()) {
-      return false;
-    }
-    return true; // must switch, new isolation context
-  }
-
-  // else, we may have to switch if the preferred task executor is different
-  if (currentTaskExecutor.getIdentity() == newTaskExecutor.getIdentity())
+/// Whether concurrent code of a task that prefers `preferredTaskExecutor`
+/// (undefined for none) can run inline in the execution context
+/// (serialExecutor, taskExecutor). See docs/ConcurrencyRuntimeExecution.md.
+static bool canRunConcurrentCodeInline(SerialExecutorRef serialExecutor,
+                                       ContextTaskExecutor taskExecutor,
+                                       TaskExecutorRef preferredTaskExecutor) {
+  // A context with a default actor's serial executor unlocks the actor first,
+  // so that the actor can run its other jobs elsewhere.
+  if (serialExecutor.isDefaultActor())
     return false;
-
-  if (currentTaskExecutor.isUndefined())
-    currentTaskExecutor = swift_getDefaultExecutor();
-  if (newTaskExecutor.isUndefined())
-    newTaskExecutor = swift_getDefaultExecutor();
-
-  return currentTaskExecutor.getIdentity() != newTaskExecutor.getIdentity();
+  return contextMatchesPreference(serialExecutor, taskExecutor,
+                                  preferredTaskExecutor);
 }
 
-/// Given that we've assumed control of an executor on this thread,
-/// continue to run the given task on it.
+/// Change the current serial executor of `record`, the record of the job that
+/// runs `task`, and continue running the task.
 SWIFT_CC(swiftasync)
-static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
-                               ExecutorTrackingInfo *oldTracking) {
-  // Note that this doesn't change the active task and so doesn't
-  // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
+static void continueTaskWithSerialExecutor(AsyncTask *task,
+                                           SerialExecutorRef serialExecutor,
+                                           ExecutorTrackingInfo *record) {
+  // Change the job's record rather than creating a new one, because the
+  // job's voucher belongs to the job's record.
+  record->setCurrentSerialExecutor(serialExecutor);
+  concurrency::trace::task_switch_executor(
+      task, serialExecutor, tracedTaskExecutor(record->getTaskExecutor()));
+  return task->runInFullyEstablishedContext(); // 'return' forces tail call
+}
 
-  // If there's already tracking info set up, just change the executor
-  // there and tail-call the task.  We don't want these frames to
-  // potentially accumulate linearly.
-  if (oldTracking) {
-    auto newTaskExecutor = task->getPreferredTaskExecutor();
-    oldTracking->setActiveExecutor(executor);
-    oldTracking->setTaskExecutor(newTaskExecutor);
-    concurrency::trace::task_switch_executor(task, executor, newTaskExecutor);
-
-    return task->runInFullyEstablishedContext(); // 'return' forces tail call
-  }
-
-  // Otherwise, set up tracking info.
-  ExecutorTrackingInfo trackingInfo;
-  trackingInfo.enterAndShadow(executor, task->getPreferredTaskExecutor());
-
-  // Run the new task.
-  task->runInFullyEstablishedContext();
-
-  // Leave the tracking frame, and give up the current actor if
-  // we have one.
-  //
-  // In principle, we could execute more tasks from the actor here, but
-  // that's probably not a reasonable thing to do in an assumed context
-  // rather than a dedicated actor-processing job.
-  executor = trackingInfo.getActiveExecutor();
-  trackingInfo.leave();
-
-  SWIFT_TASK_DEBUG_LOG("leaving assumed thread, current executor is %p",
-                       executor.getIdentity());
-
-  if (executor.isDefaultActor())
-    asImpl(executor.getDefaultActor())->unlock(true);
+static void unlockDefaultActor(SerialExecutorRef executor) {
+  asImpl(executor.getDefaultActor())->unlock(true);
 }
 
 #if SWIFT_TASK_DEBUG_LOG_ENABLED
@@ -2567,6 +2479,10 @@ static inline const char *safeGetIdentityDebugName(SerialExecutorRef exec) {
 }
 #endif
 
+// A hop of the current task to code isolated to `newExecutor`, which is the
+// generic executor for concurrent code. It runs the code inline, switches the
+// current context, or enqueues the task. See
+// docs/ConcurrencyRuntimeExecution.md.
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
@@ -2574,75 +2490,109 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   auto task = swift_task_getCurrent();
   assert(task && "no current task!");
 
-  auto trackingInfo = ExecutorTrackingInfo::current();
-  auto currentExecutor =
-    (trackingInfo ? trackingInfo->getActiveExecutor()
-                  : SerialExecutorRef::generic());
-  auto currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
-                                           : TaskExecutorRef::undefined());
-  auto newTaskExecutor = task->getPreferredTaskExecutor();
-  SWIFT_TASK_DEBUG_LOG(
-      "Task %p trying to switch executors: executor %p%s to "
-      "new serial executor: %p%s; task executor: from %p%s to %p%s",
-      task, currentExecutor.getIdentity(),
-      safeGetIdentityDebugName(currentExecutor), newExecutor.getIdentity(),
-      newExecutor.getIdentityDebugName(), currentTaskExecutor.getIdentity(),
-      currentTaskExecutor.isDefined() ? "" : " (undefined)",
-      newTaskExecutor.getIdentity(),
-      newTaskExecutor.isDefined() ? "" : " (undefined)");
+  // A running task always runs in the record of the job that runs it.
+  auto record = ExecutorTrackingInfo::current();
+  assert(record && "running a task without a record");
+  auto currentExecutor = record ? record->getCurrentSerialExecutor()
+                                : SerialExecutorRef::generic();
+  auto taskExecutor = record ? record->getTaskExecutor() : ContextTaskExecutor();
 
-  // If the current executor is compatible with running the new executor,
-  // we can just immediately continue running with the resume function
-  // we were passed in.
-  if (!mustSwitchToRun(currentExecutor, newExecutor, currentTaskExecutor,
-                       newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG("Task %p run inline", task);
-    return resumeFunction(resumeContext); // 'return' forces tail call
+  // Running inline. `newExecutor` is the isolation of the code to run. It is
+  // the generic executor if the code isn't isolated, which is concurrent code,
+  // and the actor's serial executor otherwise.
+  //
+  // Concurrent code runs inline in a context that matches the task's
+  // preference. Code isolated to an actor runs inline exactly when the current
+  // context has the actor's serial executor, whatever the task's preference.
+  // For a default actor, the preference only matters when switching below.
+  // Looking the preference up takes the task's status record lock if the task
+  // has one, so it is only done when needed.
+  auto preferredTaskExecutor = TaskExecutorRef::undefined();
+  bool runsInline;
+  if (newExecutor.isGeneric()) {
+    // Concurrent code.
+    preferredTaskExecutor = task->getPreferredTaskExecutor();
+    runsInline = canRunConcurrentCodeInline(currentExecutor, taskExecutor,
+                                            preferredTaskExecutor);
+  } else {
+    // Code isolated to an actor.
+    runsInline = currentExecutor.getIdentity() == newExecutor.getIdentity();
   }
+  SWIFT_TASK_DEBUG_LOG(
+      "Task %p hops from serial executor %p%s with task executor %p to "
+      "serial executor %p%s, inline: %d",
+      task, currentExecutor.getIdentity(),
+      safeGetIdentityDebugName(currentExecutor),
+      taskExecutor.getExplicit().getIdentity(),
+      newExecutor.getIdentity(), newExecutor.getIdentityDebugName(),
+      runsInline);
+
+  if (runsInline)
+    return resumeFunction(resumeContext); // 'return' forces tail call
 
   // Park the task for simplicity instead of trying to thread the
   // initial resumption information into everything below.
   task->ResumeContext = resumeContext;
   task->ResumeTask = resumeFunction;
 
-  // If the current executor can give up its thread, and the new executor
-  // can take over a thread, try to do so; but don't do this if we've
-  // been asked to yield the thread.
-  SWIFT_TASK_DEBUG_LOG("Task %p can give up thread?", task);
-  if (currentTaskExecutor.isUndefined() &&
-      canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
-      !shouldYieldThread()) {
+  // Switching. The runtime only locks and unlocks default actors on top of the
+  // base context, so a base context with a default actor's serial executor
+  // never switches. Neither does the synchronous start of Task.immediate,
+  // whose caller needs its thread back.
+  auto baseExecutor =
+      record ? record->getBaseSerialExecutor() : SerialExecutorRef::generic();
+  if (record && !currentExecutor.isForSynchronousStart() &&
+      !baseExecutor.isDefaultActor() && !shouldYieldThread()) {
+    // Concurrent code while a default actor is locked, or code isolated to
+    // another default actor. Both need a context that matches the task's
+    // preference, so the base context must match it.
+    bool switchesForConcurrentCode =
+        newExecutor.isGeneric() && currentExecutor.isDefaultActor();
+    bool switchesToDefaultActor = newExecutor.isDefaultActor();
+    if (switchesToDefaultActor)
+      preferredTaskExecutor = task->getPreferredTaskExecutor();
+
+    if ((switchesForConcurrentCode || switchesToDefaultActor) &&
+        contextMatchesPreference(baseExecutor, taskExecutor,
+                                 preferredTaskExecutor)) {
+      if (switchesForConcurrentCode) {
+        SWIFT_TASK_DEBUG_LOG("Task %p unlocks actor %p to run concurrent code",
+                             task, currentExecutor.getIdentity());
+        unlockDefaultActor(currentExecutor);
+        // 'return' forces tail call
+        return continueTaskWithSerialExecutor(task, baseExecutor, record);
+      }
+
+      auto newActor = asImpl(newExecutor.getDefaultActor());
 #if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-    // With actors-as-locks, tryAssumeThreadForSwitch always succeeds. We must
-    // give up the thread first, or else we may deadlock due to holding the old
-    // actor while trying to acquire the new one.
-    giveUpThreadForSwitch(currentExecutor);
-    bool success = tryAssumeThreadForSwitch(newExecutor, newTaskExecutor);
-    assert(success);
-    SWIFT_TASK_DEBUG_LOG(
-        "switched to new actor, task %p assumed thread for executor %p", task,
-        newExecutor.getIdentity());
-    // 'return' forces tail call
-    return runOnAssumedThread(task, newExecutor, trackingInfo);
+      // With actors-as-locks, locking always succeeds. We must unlock the
+      // current actor first, or else we may deadlock due to holding the old
+      // actor while trying to acquire the new one.
+      if (currentExecutor.isDefaultActor())
+        unlockDefaultActor(currentExecutor);
+      bool locked = newActor->tryLock(false);
+      assert(locked);
+      (void)locked;
 #else
-    // Without actors-as-locks, tryAssumeThreadForSwitch can fail. Try it first,
-    // and give up the thread only if it succeeds.
-    if (tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
-      SWIFT_TASK_DEBUG_LOG(
-          "switch succeeded, task %p assumed thread for executor %p", task,
-          newExecutor.getIdentity());
-      giveUpThreadForSwitch(currentExecutor);
-      // 'return' forces tail call
-      return runOnAssumedThread(task, newExecutor, trackingInfo);
-    }
+      // Without actors-as-locks, locking fails if the actor is running or
+      // scheduled. Only unlock the current actor once it has succeeded.
+      if (newActor->tryLock(false)) {
+        if (currentExecutor.isDefaultActor())
+          unlockDefaultActor(currentExecutor);
 #endif
+        SWIFT_TASK_DEBUG_LOG("Task %p locked actor %p to keep running", task,
+                             newExecutor.getIdentity());
+        // 'return' forces tail call
+        return continueTaskWithSerialExecutor(task, newExecutor, record);
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+      }
+#endif
+    }
   }
 
-  // Otherwise, just asynchronously enqueue the task on the given
-  // executor.
-  SWIFT_TASK_DEBUG_LOG(
-      "switch failed, task %p enqueued on executor %p (task executor: %p)",
-      task, newExecutor.getIdentity(), currentTaskExecutor.getIdentity());
+  // Enqueuing.
+  SWIFT_TASK_DEBUG_LOG("Task %p enqueued on serial executor %p", task,
+                       newExecutor.getIdentity());
 
   _swift_task_clearCurrent();
   task->flagAsAndEnqueueOnExecutor(newExecutor);
@@ -2654,15 +2604,13 @@ swift_task_immediateImpl(AsyncTask *task,
                          SerialExecutorRef targetExecutor) {
   swift_retain(task);
   if (targetExecutor.isGeneric()) {
-  // If the target is generic, it means that the closure did not specify
-  // an isolation explicitly. According to the "start synchronously" rules,
-  // we should therefore ignore the global and just start running on the
-  // caller immediately.
-  SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
-
-  auto originalTask = ActiveTask::swap(task);
-  swift_job_run(task, executor);
-  _swift_task_setCurrent(originalTask);
+    // The operation isn't isolated, so it starts on the caller's thread with
+    // no serial executor. The immediate marker stops the runtime from
+    // switching during the synchronous start, because the caller needs its
+    // thread back.
+    auto originalTask = ActiveTask::swap(task);
+    swift_job_run(task, SerialExecutorRef::forSynchronousStart());
+    _swift_task_setCurrent(originalTask);
   } else {
     assert(swift_task_isCurrentExecutor(targetExecutor) &&
            "'immediate' must only be invoked when it is correctly in "
@@ -2715,18 +2663,11 @@ static void swift_task_deinitOnExecutorImpl(void *object,
       //   * each object can be deinitialized only once, so call graph of
       //   deinit's cannot have cycles.
 
-      // Function runOnAssumedThread() tries to reuse existing tracking info,
-      // but we don't have a tail call anyway, so this does not help much here.
-      // Always create new tracking info to keep code simple.
+      // Always create a new record to keep the code simple. The deinit runs
+      // synchronously and can't hop, so the record's task executor plays no
+      // part.
       ExecutorTrackingInfo trackingInfo;
-
-      // The only place where ExecutorTrackingInfo::getTaskExecutor() is
-      // called is in swift_task_switch(), but swift_task_switch() cannot be
-      // called from the synchronous code. So it does not really matter what is
-      // set in the ExecutorTrackingInfo::ActiveExecutor for the duration of the
-      // isolated deinit - it is unobservable anyway.
-      TaskExecutorRef taskExecutor = TaskExecutorRef::undefined();
-      trackingInfo.enterAndShadow(newExecutor, taskExecutor);
+      trackingInfo.enter(newExecutor, ContextTaskExecutor());
 
       // Run the work.
       {
@@ -2736,9 +2677,8 @@ static void swift_task_deinitOnExecutorImpl(void *object,
 
       // `work` is a synchronous function, it cannot call swift_task_switch()
       // If it calls any synchronous API that may change executor inside
-      // tracking info, that API is also responsible for changing it back.
-      assert(newExecutor == trackingInfo.getActiveExecutor());
-      assert(taskExecutor == trackingInfo.getTaskExecutor());
+      // tracking info, that API is also responsible for changing it back.
+      assert(newExecutor == trackingInfo.getCurrentSerialExecutor());
 
       // Leave the tracking frame
       trackingInfo.leave();
