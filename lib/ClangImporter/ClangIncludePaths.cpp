@@ -21,11 +21,38 @@
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Options/Options.h"
+#include "llvm/Support/YAMLParser.h"
 #include "llvm/WindowsDriver/MSVCPaths.h"
 
 using namespace swift;
 
 using Path = SmallString<128>;
+
+namespace {
+/// An include directory where VFS files may be injected.
+struct IncludeDir {
+  /// The VFS target path with `.` and `..` removed.
+  Path path;
+
+  /// The real directory on disk when removing `..` across a symlink (e.g.
+  /// `/lib -> usr/lib`) makes \c path point to a different directory.
+  std::optional<Path> realPath;
+
+  StringRef pathOnDisk() const {
+    return realPath ? StringRef(*realPath) : StringRef(path);
+  }
+};
+} // namespace
+
+/// Remaps \c dir.path to \c dir.realPath in the VFS so headers relative to an
+/// injected module map resolve on disk.
+static void addRedirectedDirectory(
+    const IncludeDir &dir,
+    SmallVectorImpl<std::pair<std::string, std::string>> &redirectedDirs) {
+  if (dir.realPath)
+    redirectedDirs.emplace_back(std::string(dir.path),
+                                std::string(*dir.realPath));
+}
 
 static std::optional<Path> getActualModuleMapPath(
     StringRef name, SearchPathOptions &Opts, const LangOptions &LangOpts,
@@ -94,18 +121,20 @@ static std::optional<Path> getActualModuleMapPath(
 /// Given an include path directory, returns a path to inject the module map to.
 /// If a module map already exists, returns `None`.
 static std::optional<Path> getInjectedModuleMapPath(
-    const Path &dir,
+    const IncludeDir &dir,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  Path legacyPath(dir);
+  Path legacyPath(dir.pathOnDisk());
   llvm::sys::path::append(legacyPath, "module.map");
   if (vfs->exists(legacyPath))
     return std::nullopt;
 
-  Path path(dir);
-  llvm::sys::path::append(path, "module.modulemap");
-  if (vfs->exists(path))
+  Path existingPath(dir.pathOnDisk());
+  llvm::sys::path::append(existingPath, "module.modulemap");
+  if (vfs->exists(existingPath))
     return std::nullopt;
 
+  Path path(dir.path);
+  llvm::sys::path::append(path, "module.modulemap");
   return path;
 }
 
@@ -157,8 +186,9 @@ ClangImporter::createClangDriver(
 /// finding the include path for a specific library among a list of include
 /// paths.
 ///
-/// \return an absolute path without dots (`../`, './').
-static std::optional<Path> findFirstIncludeDir(
+/// \return an \c IncludeDir whose \c path is absolute and has no dots (`../`,
+/// './').
+static std::optional<IncludeDir> findFirstIncludeDir(
     const llvm::opt::InputArgList &args,
     const ArrayRef<const char *> expectedFileNames,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
@@ -187,9 +217,19 @@ static std::optional<Path> findFirstIncludeDir(
       // module map's virtual path must be absolute in the VFS overlay.
       if (vfs->makeAbsolute(dir))
         continue;
+      IncludeDir result{dir, std::nullopt};
       // VFS does not allow mapping paths that contain `../` or `./`.
-      llvm::sys::path::remove_dots(dir, /*remove_dot_dot=*/true);
-      return dir;
+      llvm::sys::path::remove_dots(result.path, /*remove_dot_dot=*/true);
+      if (result.path != dir) {
+        auto status = vfs->status(dir);
+        auto statusWithoutDots = vfs->status(result.path);
+        Path realPath;
+        if (status &&
+            !(statusWithoutDots && statusWithoutDots->equivalent(*status)) &&
+            !vfs->getRealPath(dir, realPath))
+          result.realPath = realPath;
+      }
+      return result;
     }
   }
   return std::nullopt;
@@ -231,11 +271,12 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
   return clangDriverArgs;
 }
 
-static SmallVector<std::pair<std::string, std::string>, 2>
-getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
-                   std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
-                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
-                   bool suppressDiagnostic) {
+static SmallVector<std::pair<std::string, std::string>, 2> getLibcFileMapping(
+    const ASTContext &ctx, StringRef modulemapFileName,
+    std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
+    bool suppressDiagnostic,
+    SmallVectorImpl<std::pair<std::string, std::string>> &redirectedDirs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
   // Extract the libc path from Clang driver.
@@ -255,7 +296,7 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
   // chosen headers to determine if the include path actually contains libc.
   // Ideally we would check that all of the headers referenced from the
   // modulemap are present.
-  Path libcDir;
+  IncludeDir libcDir;
   if (auto dir = findFirstIncludeDir(
           parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"}, vfs)) {
     libcDir = dir.value();
@@ -274,7 +315,7 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
     // FIXME: Emit a warning of some kind.
     return {};
 
-  Path injectedModuleMapPath(libcDir);
+  Path injectedModuleMapPath(libcDir.path);
   llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
   SmallVector<std::pair<std::string, std::string>, 2> vfsMappings{
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)}};
@@ -287,7 +328,7 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
       llvm::sys::path::remove_filename(actualHeaderPath);
       llvm::sys::path::append(actualHeaderPath, filename);
 
-      Path injectedHeaderPath(libcDir);
+      Path injectedHeaderPath(libcDir.path);
       llvm::sys::path::append(injectedHeaderPath, filename);
 
       vfsMappings.push_back(
@@ -295,11 +336,14 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
     }
   }
 
+  addRedirectedDirectory(libcDir, redirectedDirs);
   return vfsMappings;
 }
 
 static void getLibStdCxxFileMapping(
-    ClangInvocationFileMapping &fileMapping, const ASTContext &ctx,
+    ClangInvocationFileMapping &fileMapping,
+    SmallVectorImpl<std::pair<std::string, std::string>> &redirectedDirs,
+    const ASTContext &ctx,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
     bool suppressDiagnostic) {
   assert(ctx.LangOpts.EnableCXXInterop &&
@@ -338,7 +382,7 @@ static void getLibStdCxxFileMapping(
                               clang::options::OPT_nostdlibinc))
     return;
 
-  Path cxxStdlibDir;
+  IncludeDir cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
                                      {"cstdlib", "string", "vector"}, vfs)) {
     cxxStdlibDir = dir.value();
@@ -375,7 +419,7 @@ static void getLibStdCxxFileMapping(
   else
     return;
 
-  Path injectedHeaderPath(cxxStdlibDir);
+  Path injectedHeaderPath(cxxStdlibDir.path);
   llvm::sys::path::append(injectedHeaderPath, "libstdcxx.h");
 
   // Add additional headers to the static libstdc++ module map, only when these
@@ -395,6 +439,7 @@ static void getLibStdCxxFileMapping(
 
   fileMapping.redirectedFiles.push_back(
       {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+  addRedirectedDirectory(cxxStdlibDir, redirectedDirs);
 
   auto contents = (*buf)->getBuffer();
   auto headerInjectionPoint = contents.find("/// additional headers");
@@ -491,7 +536,7 @@ static void getLibStdCxxFileMapping(
   os << contents.substr(0, headerInjectionPoint);
   SmallString<256> filePath;
   auto includeHeaderInModuleMap = [&](StringRef filename) {
-    filePath.assign(cxxStdlibDir);
+    filePath.assign(cxxStdlibDir.pathOnDisk());
     llvm::sys::path::append(filePath, filename);
     if (vfs->exists(filePath))
       os << "header \"" << filename << "\"\n  ";
@@ -718,6 +763,34 @@ void GetWindowsFileMappings(
 }
 } // namespace
 
+/// Appends `directory-remap` roots to \p vfsYAML (which \c YAMLVFSWriter does
+/// not support directly) after the file entries so injected files take
+/// precedence.
+static void appendRedirectedDirectories(
+    std::string &vfsYAML,
+    ArrayRef<std::pair<std::string, std::string>> redirectedDirs) {
+  if (redirectedDirs.empty())
+    return;
+  static constexpr llvm::StringLiteral rootsEnd = "\n  ]\n}\n";
+  assert(StringRef(vfsYAML).ends_with(rootsEnd) &&
+         "unexpected YAMLVFSWriter output");
+  if (!StringRef(vfsYAML).ends_with(rootsEnd))
+    return;
+
+  std::string roots;
+  llvm::raw_string_ostream os(roots);
+  for (const auto &[virtualDir, realDir] : redirectedDirs) {
+    os << ",\n"
+       << "    {\n"
+       << "      'type': 'directory-remap',\n"
+       << "      'name': \"" << llvm::yaml::escape(virtualDir) << "\",\n"
+       << "      'external-contents': \"" << llvm::yaml::escape(realDir)
+       << "\"\n"
+       << "    }";
+  }
+  vfsYAML.insert(vfsYAML.size() - rootsEnd.size(), roots);
+}
+
 ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     const ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
     bool suppressDiagnostic) {
@@ -746,33 +819,35 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   // affected modulemaps.
   result.requiresBuiltinHeadersInSystemModules = false;
 
+  SmallVector<std::pair<std::string, std::string>, 1> redirectedDirs;
+
   SmallVector<std::pair<std::string, std::string>, 2> libcFileMapping;
   if (triple.isOSWASI()) {
     // WASI Mappings
     libcFileMapping =
-      getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs,
-                         suppressDiagnostic);
+        getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs,
+                           suppressDiagnostic, redirectedDirs);
 
     // WASI's module map needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
   } else if (triple.isOSEmscripten()) {
     // Emscripten Mappings
     libcFileMapping =
-      getLibcFileMapping(ctx, "emscripten-libc.modulemap", std::nullopt, vfs,
-                         suppressDiagnostic);
+        getLibcFileMapping(ctx, "emscripten-libc.modulemap", std::nullopt, vfs,
+                           suppressDiagnostic, redirectedDirs);
 
     // Emscripten's module map needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
   } else if (triple.isMusl()) {
     libcFileMapping =
-      getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs,
-                         suppressDiagnostic);
+        getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs,
+                           suppressDiagnostic, redirectedDirs);
   } else if (triple.isAndroid()) {
     // Android uses the android-specific module map that overlays the NDK.
     StringRef headerFiles[] = {"SwiftAndroidNDK.h", "SwiftBionic.h"};
     libcFileMapping =
-      getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs,
-                         suppressDiagnostic);
+        getLibcFileMapping(ctx, "android.modulemap", headerFiles, vfs,
+                           suppressDiagnostic, redirectedDirs);
 
     if (!libcFileMapping.empty()) {
       sysroot = libcFileMapping[0].first;
@@ -781,9 +856,9 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   } else if (triple.isOSGlibc() || triple.isOSOpenBSD() ||
              triple.isOSFreeBSD()) {
     // BSD/Linux Mappings
-    libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
-                                         StringRef("SwiftGlibc.h"), vfs,
-                                         suppressDiagnostic);
+    libcFileMapping =
+        getLibcFileMapping(ctx, "glibc.modulemap", StringRef("SwiftGlibc.h"),
+                           vfs, suppressDiagnostic, redirectedDirs);
 
     // glibc.modulemap needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
@@ -791,7 +866,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   result.redirectedFiles.append(libcFileMapping);
 
   if (ctx.LangOpts.EnableCXXInterop)
-    getLibStdCxxFileMapping(result, ctx, vfs, suppressDiagnostic);
+    getLibStdCxxFileMapping(result, redirectedDirs, ctx, vfs,
+                            suppressDiagnostic);
 
   GetWindowsFileMappings(result, ctx, vfs);
 
@@ -806,6 +882,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     std::string vfsYAML;
     llvm::raw_string_ostream os(vfsYAML);
     vfsWriter.write(os);
+    appendRedirectedDirectories(vfsYAML, redirectedDirs);
 
     result.overridenFiles.emplace_back(llvm::MemoryBuffer::getMemBufferCopy(
         vfsYAML, ClangImporter::getClangSystemOverlayFile(ctx.SearchPathOpts)));
