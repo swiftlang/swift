@@ -4560,10 +4560,18 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
            "objc partial_apply argument is not a single retainable pointer?!");
     llvm::Value *selfVal = llArgs.claimNext();
 
+    // LoadableByAddress may have inserted convert_function instructions that
+    // rewrite large types in the method's signature to be passed indirectly
+    // (see visitConvertFunctionInst). The message send itself still has to
+    // use the original foreign signature.
+    SILValue method = i->getCallee();
+    while (auto *cvt = dyn_cast<ConvertFunctionInst>(method))
+      method = cvt->getOperand();
+
     Explosion function;
     emitObjCPartialApplication(*this,
                                objcMethod,
-                               i->getOrigCalleeType(),
+                               method->getType().castTo<SILFunctionType>(),
                                i->getType().castTo<SILFunctionType>(),
                                selfVal,
                                i->getArguments()[0]->getType(),
