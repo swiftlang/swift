@@ -377,6 +377,7 @@ swift::constraints::getConversionBehavior(Type type) {
 
   case TypeKind::Error:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::UnboundGeneric:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:

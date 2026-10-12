@@ -111,7 +111,7 @@ public:
   /// Whether this type variable can bind to a noescape FunctionType.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
-  /// Whether this type variable can bind to a PlaceholderType.
+  /// Whether this type variable can bind to a HoleType.
   bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
 
   /// Whether this type variable can bind to a PackType.

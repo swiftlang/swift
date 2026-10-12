@@ -370,7 +370,7 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         arguments.size() > 0 &&
         llvm::all_of(arguments, [&](const AnyFunctionType::Param &arg) -> bool {
           auto argType = arg.getPlainType();
-          if (argType->isPlaceholder())
+          if (argType->is<HoleType>())
             return true;
 
           if (auto *typeVar = argType->getAs<TypeVariableType>())

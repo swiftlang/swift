@@ -862,7 +862,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
-      return PlaceholderType::get(Context, P);
+      return PlaceholderType::get(Context, /*repr*/ nullptr);
 
     Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     if (auto named = dyn_cast<NamedPattern>(P)) {
@@ -937,8 +937,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
                              diag::refutable_pattern_requires_initializer);
       return ErrorType::get(Context);
     }
-
-    return PlaceholderType::get(Context, P);
+    return PlaceholderType::get(Context, /*repr*/ nullptr);
   }
   llvm_unreachable("bad pattern kind!");
 }

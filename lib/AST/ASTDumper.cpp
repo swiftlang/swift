@@ -6340,6 +6340,11 @@ namespace {
 
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
+      printFoot();
+    }
+
+    void visitHoleType(HoleType *T, Label label) {
+      printCommon("hole_type", label);
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         printRec(typeVar, Label::always("type_variable"));
@@ -6354,8 +6359,6 @@ namespace {
         printRec(DMT, Label::always("dependent_member_type"));
       } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
-      } else if (isa<Pattern *>(originator)) {
-        printFlag("pattern");
       } else {
         assert(false && "unknown originator");
       }

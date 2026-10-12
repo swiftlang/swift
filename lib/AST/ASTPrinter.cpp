@@ -6837,10 +6837,17 @@ public:
     Printer << ")";
   }
 
-  void visitPlaceholderType(PlaceholderType *T,
-                            NonRecursivePrintOptions nrOptions) {
+  void visitPlaceholderType(PlaceholderType *, NonRecursivePrintOptions) {
     if (Options.PrintTypesForDebugging) {
-      Printer << "<<placeholder for ";
+      Printer << "<<placeholder>>";
+    } else {
+      Printer << "_";
+    }
+  }
+
+  void visitHoleType(HoleType *T, NonRecursivePrintOptions nrOptions) {
+    if (Options.PrintTypesForDebugging) {
+      Printer << "<<hole for ";
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         visit(typeVar);
@@ -6855,8 +6862,6 @@ public:
         visit(DMT);
       } else if (isa<TypeRepr *>(originator)) {
         Printer << "type_repr";
-      } else if (isa<Pattern *>(originator)) {
-        Printer << "pattern";
       } else {
         assert(false && "unknown originator");
       }

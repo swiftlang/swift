@@ -1582,7 +1582,7 @@ static ConstraintSystem::SolutionKind matchCallArguments(
           auto argument = argList->get(extraArg.first);
           auto argType = extraArg.second.getPlainType();
 
-          // Prevent closure resolution by binding it to a placeholder
+          // Prevent closure resolution by binding it to a hole
           // because the main issue here is invalid overload and
           // errors produced from the closure body are going to be
           // superfluous.
@@ -4321,8 +4321,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               // Superclass constraints are never satisfied by existentials,
               // even those that contain the superclass a la `any C & P`.
               if (!type1->isExistentialType() &&
-                  (type1->isPlaceholder() ||
-                  req->getRequirementKind() == RequirementKind::Superclass))
+                  (type1->is<HoleType>() ||
+                   req->getRequirementKind() == RequirementKind::Superclass))
                 return SolutionKind::Solved;
 
               auto *fix = fixRequirementFailure(*this, type1, type2, locator);
@@ -4804,7 +4804,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 
     // Don't allow the invalid pack reference to propagate to other
     // bindings.
-    type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
+    type = HoleType::get(typeVar->getASTContext(), typeVar);
   }
 
   // Binding to a pack expansion type is always an error in Swift 6 mode.
@@ -4836,7 +4836,7 @@ ConstraintSystem::matchTypesBindTypeVar(
 
       // Don't allow the pack expansion type to propagate to other
       // bindings.
-      type = PlaceholderType::get(typeVar->getASTContext(), typeVar);
+      type = HoleType::get(typeVar->getASTContext(), typeVar);
     }
   }
 
@@ -5077,10 +5077,9 @@ static bool
 repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator) {
-  // Don't check if any of the types have type variables or placeholders,
+  // Don't check if any of the types have type variables or holes,
   // `typeCheckCheckedCast` doesn't support checking solver-allocated types.
-  if (fromType->hasTypeVariableOrPlaceholder() ||
-      toType->hasTypeVariableOrPlaceholder()) {
+  if (fromType->hasTypeVariableOrHole() || toType->hasTypeVariableOrHole()) {
     return false;
   }
 
@@ -5599,7 +5598,7 @@ bool ConstraintSystem::repairFailures(
         // If left side is a hole, let's not record a fix since hole can
         // assume any type and already represents a problem elsewhere in
         // the expression.
-        if (lhs->isPlaceholder())
+        if (lhs->is<HoleType>())
           return true;
 
         auto *loc = getConstraintLocator(locator);
@@ -5634,7 +5633,7 @@ bool ConstraintSystem::repairFailures(
     if (auto objType = valueType->getOptionalObjectType())
       valueType = objType;
 
-    if (rawReprType->isTypeVariableOrMember() || rawReprType->isPlaceholder())
+    if (rawReprType->isTypeVariableOrMember() || rawReprType->is<HoleType>())
       return false;
 
     auto rawValue = isRawRepresentable(*this, rawReprType);
@@ -5717,7 +5716,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   auto maybeRepairKeyPathResultFailure = [&](KeyPathExpr *kpExpr) {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
     if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
       return false;
@@ -5757,7 +5756,7 @@ bool ConstraintSystem::repairFailures(
   // want to eagerly turn `$T0` into a hole since it's likely that `$T1` would
   // have provided the contextual info for it.
   auto tryPropagateHole = [&](Type from, Type to) {
-    if (from->isPlaceholder() && to->hasTypeVariable())
+    if (from->is<HoleType>() && to->hasTypeVariable())
       recordTypeVariablesAsHoles(to);
   };
 
@@ -5770,7 +5769,7 @@ bool ConstraintSystem::repairFailures(
       return true;
 
     if (getAsPattern<ExprPattern>(anchor)) {
-      if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      if (lhs->is<HoleType>() || rhs->is<HoleType>())
         return true;
     }
 
@@ -5908,9 +5907,9 @@ bool ConstraintSystem::repairFailures(
       if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
         return true;
 
-      // If either side is a placeholder then let's consider this
+      // If either side is a hole then let's consider this
       // assignment correctly typed.
-      if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      if (lhs->is<HoleType>() || rhs->is<HoleType>())
         return true;
 
       // Let's try to match source and destination types one more
@@ -6210,7 +6209,7 @@ bool ConstraintSystem::repairFailures(
     // it's going to be diagnosed by specialized fix which deals
     // with generic argument mismatches.
     if (matchKind == ConstraintKind::BindToPointerType) {
-      if (!rhs->isPlaceholder())
+      if (!rhs->is<HoleType>())
         break;
     }
 
@@ -6251,8 +6250,8 @@ bool ConstraintSystem::repairFailures(
                        locator);
     }
 
-    // If either type has a placeholder, consider this fixed.
-    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+    // If either type has a hole, consider this fixed.
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     // `lhs` - is an argument and `rhs` is a parameter type.
@@ -6451,8 +6450,8 @@ bool ConstraintSystem::repairFailures(
     // a conversion to another function type, see `matchFunctionTypes`.
     if (parentLoc->isForContextualType() ||
         parentLoc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-      // If either type has a placeholder, consider this fixed.
-      if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+      // If either type has a hole, consider this fixed.
+      if (lhs->hasHole() || rhs->hasHole())
         return true;
 
       // If there is a fix associated with contextual conversion or
@@ -6480,8 +6479,8 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
-    // If either type has a placeholder, consider this fixed.
-    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+    // If either type has a hole, consider this fixed.
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     // If requirement is something like `T == [Int]` let's let
@@ -6504,7 +6503,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ExistentialConstraintType: {
-    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     // If there are any restrictions/conversions left to attempt, wait.
@@ -6523,9 +6522,9 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
-    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // If either type is a hole, consider this fixed, eagerly propagating
     // a hole from the contextual type.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>()) {
       tryPropagateHole(rhs, lhs);
       return true;
     }
@@ -6549,9 +6548,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
-    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // If either type is a hole, consider this fixed, eagerly propagating
     // a hole from the contextual type.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>()) {
       tryPropagateHole(rhs, lhs);
       return true;
     }
@@ -6631,7 +6630,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionResult: {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>()) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
       return true;
@@ -6731,7 +6730,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::TupleElement: {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>()) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
       return true;
@@ -6861,7 +6860,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::SequenceElementType: {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>()) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
       return true;
@@ -6886,7 +6885,7 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::Condition: {
     // If the condition is already a hole, we're done.
-    if (lhs->isPlaceholder())
+    if (lhs->is<HoleType>())
       return true;
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
@@ -6903,7 +6902,7 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::UnresolvedMemberChainResult: {
     // Ignore this mismatch if base or result is already a hole.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
 
     if (hasAnyRestriction())
@@ -6944,14 +6943,14 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::InstanceType: {
-    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     break;
   }
 
   case ConstraintLocator::OptionalInjection: {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
 
     if (hasAnyRestriction())
@@ -6981,7 +6980,7 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TernaryBranch:
   case ConstraintLocator::SingleValueStmtResult: {
-    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+    if (lhs->hasHole() || rhs->hasHole())
       return true;
 
     // If there's a contextual type, let's consider it the source of truth and
@@ -7015,8 +7014,8 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::EnumPatternImplicitCastMatch: {
-    // If either type is a placeholder, consider this fixed.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    // If either type is a hole, consider this fixed.
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
 
     // If we're converting to an existential, we'll diagnose failures in
@@ -7043,13 +7042,13 @@ bool ConstraintSystem::repairFailures(
 
     // If member reference couldn't be resolved, let's allow pattern
     // to have holes.
-    if (rhs->isPlaceholder() && isMemberMatch) {
+    if (rhs->is<HoleType>() && isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       return true;
     }
 
-    // If either type is a placeholder, consider this fixed.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    // If either type is a hole, consider this fixed.
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
 
     if (isMemberMatch) {
@@ -7084,8 +7083,8 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::GenericArgument: {
-    // If any of the types is a placeholder, consider it fixed.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    // If any of the types is a hole, consider it fixed.
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
 
     // Ignoring the generic argument because we may have a generic requirement
@@ -7217,9 +7216,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::CoercionOperand: {
-    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // If either type is a hole, consider this fixed, eagerly propagating
     // a hole from the contextual type.
-    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>()) {
       tryPropagateHole(rhs, lhs);
       return true;
     }
@@ -7289,7 +7288,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::KeyPathDynamicMember: {
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
       return true;
     break;
   }
@@ -7769,6 +7768,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return result;
     }
 
+    case TypeKind::Hole:
     case TypeKind::Placeholder: {
       // If it's allowed to attempt fixes, let's delegate
       // decision to `repairFailures`, since depending on
@@ -7809,7 +7809,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // member couldn't be simplified down to the actual type, and
       // we wouldn't be able to solve this constraint, so let's just fail.
       // This should only happen outside of diagnostic mode, as otherwise the
-      // member is replaced by a placeholder in simplifyType.
+      // member is replaced by a hole in simplifyType.
       if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
         return SolutionKind::Error;
 
@@ -8571,7 +8571,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    if (type1->isPlaceholder() || type2->isPlaceholder())
+    if (type1->is<HoleType>() || type2->is<HoleType>())
       return SolutionKind::Solved;
 
     // If we are applying args, we may be able to emit a tailored fix.
@@ -8702,6 +8702,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::GenericTypeParam:
   case TypeKind::UnboundGeneric:
   case TypeKind::Integer:
+  case TypeKind::Placeholder:
   case TypeKind::Join:
   case TypeKind::Meet:
     ABORT([&](llvm::raw_ostream &out) {
@@ -8710,7 +8711,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     });
     
   case TypeKind::Error:
-  case TypeKind::Placeholder:
+  case TypeKind::Hole:
     return SolutionKind::Error;
 
   case TypeKind::TypeVariable:
@@ -8870,7 +8871,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
 
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
-  if (shouldAttemptFixes() && type->isPlaceholder()) {
+  if (shouldAttemptFixes() && type->is<HoleType>()) {
     // If the type associated with this subclass check is a "hole" in the
     // constraint system, let's consider this check a success without recording
     // a fix, because it's just a consequence of the other failure, e.g.
@@ -9052,7 +9053,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
-  if (shouldAttemptFixes() && type->isPlaceholder()) {
+  if (shouldAttemptFixes() && type->is<HoleType>()) {
     // If the type associated with this conformance check is a "hole" in the
     // constraint system, let's consider this check a success without recording
     // a fix, because it's just a consequence of the other failure, e.g.
@@ -9728,8 +9729,7 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
 
   // Both types have to be resolved, `typeCheckCheckedCast` doesn't support
   // checking solver-allocated types.
-  if (fromType->hasTypeVariableOrPlaceholder() ||
-      toType->hasTypeVariableOrPlaceholder()) {
+  if (fromType->hasTypeVariableOrHole() || toType->hasTypeVariableOrHole()) {
     return nullptr;
   }
 
@@ -10096,7 +10096,7 @@ ConstraintSystem::simplifyForEachElementConstraint(
     return SolutionKind::Unsolved;
   }
 
-  if (seqTy->isPlaceholder()) {
+  if (seqTy->is<HoleType>()) {
     recordTypeVariablesAsHoles(second);
     return SolutionKind::Solved;
   }
@@ -10185,7 +10185,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
     return SolutionKind::Unsolved;
   }
 
-  if (optTy->isPlaceholder()) {
+  if (optTy->is<HoleType>()) {
     if (auto *typeVar = second->getAs<TypeVariableType>())
       recordPotentialHole(typeVar);
     return SolutionKind::Solved;
@@ -10199,7 +10199,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
       return SolutionKind::Error;
     
     // Let's see if we can apply a specific fix here.
-    if (optTy->isPlaceholder())
+    if (optTy->is<HoleType>())
       return SolutionKind::Solved;
     
     auto fnType = optTy->getAs<FunctionType>();
@@ -10255,7 +10255,7 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
       ++unwrapCount;
     }
 
-    if (simplified->isPlaceholder()) {
+    if (simplified->is<HoleType>()) {
       if (auto *typeVar = second->getAs<TypeVariableType>())
         recordPotentialHole(typeVar);
       return SolutionKind::Solved;
@@ -10372,7 +10372,7 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
     return formUnsolved();
 
   if (shouldAttemptFixes()) {
-    if (elementType->isPlaceholder() || patternType->isPlaceholder())
+    if (elementType->is<HoleType>() || patternType->is<HoleType>())
       return SolutionKind::Solved;
   }
 
@@ -11648,7 +11648,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // of this constraint is delayed until base could be resolved),
       // or it is certain that base type can't be bound to any other
       // type but a hole.
-      auto shouldRecordFixForHole = [&](PlaceholderType *baseType) {
+      auto shouldRecordFixForHole = [&](HoleType *baseType) {
         auto *originator =
             baseType->getOriginator().dyn_cast<TypeVariableType *>();
 
@@ -11669,7 +11669,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         return originatorLoc == locator;
       };
 
-      if (auto *hole = underlyingType->getAs<PlaceholderType>()) {
+      if (auto *hole = underlyingType->getAs<HoleType>()) {
         if (shouldRecordFixForHole(hole)) {
           auto *fix = SpecifyBaseTypeForContextualMember::create(*this, member,
                                                                  locator);
@@ -11681,7 +11681,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         return SolutionKind::Solved;
       }
     } else if (kind == ConstraintKind::ValueMember &&
-               baseObjTy->getMetatypeInstanceType()->isPlaceholder()) {
+               baseObjTy->getMetatypeInstanceType()->is<HoleType>()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
       recordTypeVariablesAsHoles(memberTy);
@@ -11693,7 +11693,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // constraint to be present, which is may not be for a hole since we don't
     // attempt to solve them when all arguments are bound to holes.
     if (locator->isSubscriptMemberRef() &&
-        getFixedTypeRecursive(memberTy, /*rvalue*/ true)->isPlaceholder()) {
+        getFixedTypeRecursive(memberTy, /*rvalue*/ true)->is<HoleType>()) {
       auto hasDynamicMemberLookup = baseObjTy->getMetatypeInstanceType()
                                         ->eraseDynamicSelfType()
                                         ->hasDynamicMemberLookupAttribute();
@@ -12130,9 +12130,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFallbackTypeConstraint(
     return SolutionKind::Unsolved;
   }
 
-  // Propagate placeholders into an inferred closure type. Without this
+  // Propagate holes into an inferred closure type. Without this
   // we'd produce superfluous diagnostics about parameter/result types.
-  if (defaultableType->isPlaceholder() && locator.directlyAt<ClosureExpr>()) {
+  if (defaultableType->is<HoleType>() && locator.directlyAt<ClosureExpr>()) {
     recordTypeVariablesAsHoles(fallbackType);
   }
 
@@ -12161,7 +12161,7 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
   // If the wrapper type is a hole or a dependent member with no type variables,
   // don't record a fix, because this indicates that there was an error
   // elsewhere in the constraint system.
-  if (wrapperType->isPlaceholder() || wrapperType->is<DependentMemberType>())
+  if (wrapperType->is<HoleType>() || wrapperType->is<DependentMemberType>())
     return SolutionKind::Solved;
 
   auto *wrappedVar = getAsDecl<VarDecl>(locator.getAnchor());
@@ -12229,7 +12229,7 @@ ConstraintSystem::simplifyOneWayConstraint(
   }
 
   // Propagate holes through one-way constraints.
-  if (secondSimplified->isPlaceholder()) {
+  if (secondSimplified->is<HoleType>()) {
     recordAnyTypeVarAsPotentialHole(first);
     return SolutionKind::Solved;
   }
@@ -12466,7 +12466,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (!shouldAttemptFixes())
       return false;
 
-    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar));
+    assignFixedType(typeVar, HoleType::get(getASTContext(), typeVar));
     recordTypeVariablesAsHoles(inferredClosureType);
 
     return !recordFix(
@@ -12785,7 +12785,7 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   if (shouldAttemptFixes()) {
     // If we have a hole as a contextual type, eagerly produce holes in the
     // argument of `type(of:)`.
-    if (type1->isPlaceholder()) {
+    if (type1->is<HoleType>()) {
       recordTypeVariablesAsHoles(type2);
       return SolutionKind::Solved;
     }
@@ -13185,9 +13185,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
   auto tryMatchRootAndValueFromContextualType = [&](Type contextualTy) -> bool {
     Type contextualRootTy = Type(), contextualValueTy = Type();
 
-    // Placeholders are only allowed in the diagnostic mode so it's
+    // Holes are only allowed in the diagnostic mode so it's
     // okay to simply return `true` here.
-    if (contextualTy->isPlaceholder())
+    if (contextualTy->is<HoleType>())
       return true;
 
     if (contextualTy->is<ArchetypeType>()) {
@@ -13317,7 +13317,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       return SolutionKind::Solved;
 
     // If the root type has been bound to a hole, we cannot infer it.
-    if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->isPlaceholder())
+    if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->is<HoleType>())
       return SolutionKind::Solved;
   }
 
@@ -13372,7 +13372,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                       subflags, locator);
   }
 
-  if (keyPathTy->isPlaceholder()) {
+  if (keyPathTy->is<HoleType>()) {
     if (rootTy->hasTypeVariable()) {
       recordAnyTypeVarAsPotentialHole(rootTy);
     }
@@ -13575,15 +13575,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     }
     underlyingType =
         getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
-    if (underlyingType->isPlaceholder()) {
+    if (underlyingType->is<HoleType>()) {
       if (isForCodeCompletion()) {
         // In code completion mode it's important to attempt to infer as much
-        // type information as possible from the context, so let's delay placeholder
+        // type information as possible from the context, so let's delay hole
         // propagation to give parameters a chance to be inferred from
         // arguments and the result type a chance to be inferred from context.
         recordAnyTypeVarAsPotentialHole(func1);
       } else {
-        // In diagnostic mode, propagate function value placeholder to
+        // In diagnostic mode, propagate function value hole to
         // arguments and result. This helps to avoid recording extraneous
         // fixes because generic parameters and leading-dot syntax arguments
         // cannot be inferred in this case.
@@ -13613,7 +13613,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
       if (argsTy->getNumParams() > 0 &&
           llvm::all_of(argsTy->getParams(),
                        [](const FunctionType::Param &param) {
-                         return param.getPlainType()->isPlaceholder();
+                         return param.getPlainType()->is<HoleType>();
                        })) {
         recordTypeVariablesAsHoles(func1);
         recordTypeVariablesAsHoles(type2);
@@ -13935,7 +13935,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // they have to be marked as "holes".
     recordAnyTypeVarAsPotentialHole(func1);
 
-    if (desugar2->isPlaceholder())
+    if (desugar2->is<HoleType>())
       return SolutionKind::Solved;
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
@@ -14256,7 +14256,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
       return formUnsolved();
   }
 
-  if (packTy->hasPlaceholder()) {
+  if (packTy->hasHole()) {
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
@@ -14311,9 +14311,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
     return SolutionKind::Solved;
 
   if (shouldAttemptFixes()) {
-    // If there are placeholders involved shape mismatches are most
+    // If there are holes involved shape mismatches are most
     // likely just a symptom of some other issue i.e. type mismatch.
-    if (type1->hasPlaceholder() || type2->hasPlaceholder())
+    if (type1->hasHole() || type2->hasHole())
       return SolutionKind::Solved;
 
     auto recordShapeFix = [&](ConstraintFix *fix,
@@ -14478,7 +14478,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
 
   // Bail out if we haven't selected an overload yet.
   auto simplifiedBoundType = simplifyType(type1, flags);
-  if (simplifiedBoundType->isPlaceholder())
+  if (simplifiedBoundType->is<HoleType>())
     return SolutionKind::Solved;
   if (simplifiedBoundType->isTypeVariableOrMember())
     return formUnsolved();
@@ -14701,7 +14701,7 @@ ConstraintSystem::simplifyLValueObjectConstraint(
     return type->is<LValueType>();
   };
 
-  if (lvalueTy->isPlaceholder()) {
+  if (lvalueTy->is<HoleType>()) {
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
@@ -15734,8 +15734,7 @@ void ConstraintSystem::recordTypeVariablesAsHoles(Type type) {
       if (typeVar->getImpl().hasRepresentativeOrFixed())
         return;
 
-      assignFixedType(typeVar,
-                      PlaceholderType::get(getASTContext(), typeVar));
+      assignFixedType(typeVar, HoleType::get(getASTContext(), typeVar));
     }
   });
 }
@@ -17044,7 +17043,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
       if (choice->getKind() == ConstraintKind::BindOverload) {
         if (auto *choiceTy = choice->getFirstType()->getAs<TypeVariableType>()) {
           auto resolvedTy = getFixedType(choiceTy);
-          if (resolvedTy && resolvedTy->isPlaceholder())
+          if (resolvedTy && resolvedTy->is<HoleType>())
             return SolutionKind::Solved;
         }
       }

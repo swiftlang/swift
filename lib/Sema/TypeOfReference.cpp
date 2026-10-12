@@ -226,23 +226,11 @@ public:
   }
 
   Type transformPlaceholderType(PlaceholderType *placeholderTy) {
-    auto originator = placeholderTy->getOriginator();
-    if (auto *typeRepr = originator.dyn_cast<TypeRepr *>()) {
-      if (isa<PlaceholderTypeRepr>(typeRepr)) {
-        auto *loc = cs.getConstraintLocator(
-            locator, LocatorPathElt::PlaceholderType(typeRepr));
-        return createTypeVariable(loc);
-      }
-    } else if (auto *var = originator.dyn_cast<VarDecl *>()) {
-      if (var->getName().hasDollarPrefix()) {
-        auto *repr =
-            new (cs.getASTContext()) PlaceholderTypeRepr(var->getLoc());
-        auto *loc = cs.getConstraintLocator(
-            locator, LocatorPathElt::PlaceholderType(repr));
-        return createTypeVariable(loc);
-      }
+    SmallVector<LocatorPathElt, 1> elts;
+    if (auto *typeRepr = placeholderTy->getRepr()) {
+      elts.push_back(LocatorPathElt::PlaceholderType(typeRepr));
     }
-    return placeholderTy;
+    return createTypeVariable(cs.getConstraintLocator(locator, elts));
   }
 
   void openGenericTypeRequirements(GenericTypeDecl *D, SubstitutionMap subs) {
@@ -293,7 +281,7 @@ public:
   Type transformErrorType(ErrorType *errTy) {
     // For ErrorTypes we want to eagerly produce a hole since we know this is
     // where the issue is.
-    return PlaceholderType::get(cs.getASTContext(), errTy);
+    return HoleType::get(cs.getASTContext(), errTy);
   }
 
   Type transformDependentMemberType(DependentMemberType *DMT) {
@@ -303,8 +291,8 @@ public:
     // If the new base is a hole, propagate it to cover the entire
     // DependentMemberType.
     auto newBase = transform(DMT->getBase());
-    if (newBase->isPlaceholder())
-      return PlaceholderType::get(cs.getASTContext(), DMT);
+    if (newBase->is<HoleType>())
+      return HoleType::get(cs.getASTContext(), DMT);
 
     return DependentMemberType::get(newBase, assocTy);
   }
@@ -1076,11 +1064,12 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
 }
 
 /// For every parameter in \p type that has an error type, replace that
-/// parameter's type by a placeholder type, where \p value is the declaration
+/// parameter's type by a hole type, where \p value is the declaration
 /// that declared \p type. This is useful for code completion so we can match
 /// the types we do know instead of bailing out completely because \p type
 /// contains an error type.
-static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool hasAppliedSelf) {
+static Type replaceParamErrorTypeByHole(Type type, ValueDecl *value,
+                                        bool hasAppliedSelf) {
   if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
     return type;
   }
@@ -1101,9 +1090,8 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
     AnyFunctionType::Param param = typeParams[i];
     if (param.getPlainType()->is<ErrorType>()) {
       auto paramDecl = declParams[i];
-      auto placeholder =
-          PlaceholderType::get(paramDecl->getASTContext(), paramDecl);
-      newParams.push_back(param.withType(placeholder));
+      auto hole = HoleType::get(paramDecl->getASTContext(), paramDecl);
+      newParams.push_back(param.withType(hole));
     } else {
       newParams.push_back(param);
     }
@@ -1160,9 +1148,9 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
         locator, preparedOverload);
 
     if (isForCodeCompletion() && openedType->hasError()) {
-      // In code completion, replace error types by placeholder types so we can
+      // In code completion, replace error types by hole types so we can
       // match the types we know instead of bailing out completely.
-      openedType = replaceParamErrorTypeByPlaceholder(
+      openedType = replaceParamErrorTypeByHole(
           openedType, value, /*hasAppliedSelf=*/true);
     }
 
@@ -1214,7 +1202,7 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
+    // FIXME: Should we use replaceParamErrorTypeByHole() here?
 
     return {openedType, Type()};
   }
@@ -1853,9 +1841,9 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   }
 
   if (isForCodeCompletion() && type->hasError()) {
-    // In code completion, replace error types by placeholder types so we can
+    // In code completion, replace error types by hole types so we can
     // match the types we know instead of bailing out completely.
-    type = replaceParamErrorTypeByPlaceholder(type, value, hasAppliedSelf);
+    type = replaceParamErrorTypeByHole(type, value, hasAppliedSelf);
   }
 
   return type;

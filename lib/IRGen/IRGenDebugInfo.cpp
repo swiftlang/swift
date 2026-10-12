@@ -2048,6 +2048,7 @@ private:
     case TypeKind::TypeVariable:
     case TypeKind::ErrorUnion:
     case TypeKind::Placeholder:
+    case TypeKind::Hole:
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::Module:

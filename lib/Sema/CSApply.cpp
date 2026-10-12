@@ -109,7 +109,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   for (const auto &opened : openedTypes->second) {
     auto type = getFixedType(opened.second);
     if (opened.first->isParameterPack()) {
-      if (type->is<PlaceholderType>()) {
+      if (type->is<HoleType>()) {
         type = PackType::get(
             ctx,
             {PackExpansionType::get(ErrorType::get(ctx), ErrorType::get(ctx))});
@@ -7210,8 +7210,8 @@ Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
-  ASSERT(toType && !toType->hasError() &&
-         !toType->hasTypeVariableOrPlaceholder());
+  ASSERT(toType && !toType->hasError() && !toType->hasTypeVariableOrHole() &&
+         !toType->hasPlaceholder());
 
   // Diagnose conversions to invalid function types that couldn't be performed
   // beforehand because of placeholders.
@@ -9011,23 +9011,21 @@ namespace {
       exprType = solution.simplifyType(exprType);
       // assert((!expr->getType() || expr->getType()->isEqual(exprType)) &&
       //       "Mismatched types!");
-      assert(!exprType->getRecursiveProperties().isSolverAllocated() &&
-             "Should not write solver allocated type into expression!");
-      assert(!exprType->hasPlaceholder() &&
-             "Should not write type placeholders into expression!");
+      auto assertValidType = [](Type ty) {
+        assert(!ty->getRecursiveProperties().isSolverAllocated() &&
+               "Should not write solver allocated type into expression!");
+        assert(!ty->hasHole() && "Should not write holes into expression!");
+        assert(!ty->hasPlaceholder() &&
+               "Should not write placeholders into expression!");
+      };
+      assertValidType(exprType);
       expr->setType(exprType);
 
       if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
         for (auto i : indices(kp->getComponents())) {
-          Type componentType;
           if (cs.hasType(kp, i)) {
-            componentType = solution.simplifyType(cs.getType(kp, i));
-            assert(
-                !componentType->getRecursiveProperties().isSolverAllocated() &&
-                "Should not write solver allocated type into key-path "
-                "component!");
-            assert(!componentType->hasPlaceholder() &&
-                   "Should not write type placeholder into key-path component");
+            auto componentType = solution.simplifyType(cs.getType(kp, i));
+            assertValidType(componentType);
             kp->getMutableComponents()[i].setComponentType(componentType);
           }
         }
@@ -9898,7 +9896,8 @@ ConstraintSystem::applySolution(Solution &solution,
   // unresolved types.
   {
     auto isValidType = [&](Type ty) {
-      return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
+      return !ty->hasError() && !ty->hasPlaceholder() &&
+             !ty->hasTypeVariableOrHole();
     };
     for (auto pair : solution.typeBindings) {
       if (!isValidType(pair.second)) {
