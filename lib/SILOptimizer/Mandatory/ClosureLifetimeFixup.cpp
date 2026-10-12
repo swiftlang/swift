@@ -832,6 +832,9 @@ static SILValue tryRewriteToPartialApplyStack(
   for (unsigned i : indices(newPA->getArgumentOperands())) {
     auto &arg = newPA->getArgumentOperands()[i];
     SILValue copy = arg.get();
+    auto *wrapper = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(copy);
+    if (wrapper)
+      copy = wrapper->getOperand();
     // The temporary should be a local stack allocation.
     LLVM_DEBUG(llvm::dbgs() << "considering whether to eliminate copy of capture\n";
                copy->printInContext(llvm::dbgs());
@@ -867,13 +870,16 @@ static SILValue tryRewriteToPartialApplyStack(
     // It needs to have been initialized by copying from somewhere else.
     CopyAddrInst *initialization = nullptr;
     MarkDependenceInst *markDep = nullptr;
-    for (auto *use : stack->getUses()) {
+    SmallVector<Operand *, 8> uses(stack->getUses());
+    if (wrapper)
+      llvm::append_range(uses, wrapper->getUses());
+    for (auto *use : uses) {
       auto *user = use->getUser();
       // Since we removed the `dealloc_stack`s from the capture arguments,
       // the only uses of this stack slot should be the initialization, the
       // partial application, and possibly a mark_dependence from the
       // buffer to the partial application.
-      if (use->getUser() == newPA) {
+      if (user == newPA || user == wrapper) {
         continue;
       }
       if (auto mark = dyn_cast<MarkDependenceInst>(use->getUser())) {
@@ -886,7 +892,7 @@ static SILValue tryRewriteToPartialApplyStack(
         // Check if we're marking dependence on this stack slot for the current
         // partial_apply or it's chain of mark_dependences.
         if (!lookThroughMarkDependenceChainForValue(mark, newPA) ||
-            mark->getBase() != stack) {
+            mark->getBase() != arg.get()) {
           LLVM_DEBUG(llvm::dbgs() << "-- had unexpected mark_dependence use\n";
                      use->getUser()->print(llvm::dbgs()); llvm::dbgs() << "\n");
           initialization = nullptr;
@@ -910,7 +916,8 @@ static SILValue tryRewriteToPartialApplyStack(
       if (auto possibleInit = dyn_cast<CopyAddrInst>(use->getUser())) {
         // Should copy the source and initialize the destination.
         if (possibleInit->isTakeOfSrc() ||
-            !possibleInit->isInitializationOfDest()) {
+            !possibleInit->isInitializationOfDest() ||
+            possibleInit->getDest() != stack) {
           LLVM_DEBUG(
               llvm::dbgs()
                   << "-- had non-initialization, non-partial-apply use\n";
@@ -922,8 +929,9 @@ static SILValue tryRewriteToPartialApplyStack(
         initialization = possibleInit;
         continue;
       }
-      if (isa<DebugValueInst>(user) || isa<DestroyAddrInst>(user) ||
-          isa<DeallocStackInst>(user)) {
+      if (isa<DebugValueInst>(user) ||
+          (use->get() == stack &&
+           (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user)))) {
         continue;
       }
       LLVM_DEBUG(llvm::dbgs() << "-- unrecognized use\n");
@@ -998,9 +1006,14 @@ static SILValue tryRewriteToPartialApplyStack(
     // OK, we can use the original. Eliminate the copy and replace it with the
     // original.
     LLVM_DEBUG(llvm::dbgs() << "++ replacing with original!\n");
-    arg.set(orig);
-    if (markDep) {
-      markDep->setBase(orig);
+    if (wrapper) {
+      // Preserve the conversion to the callee's copyable parameter type,
+      // while keeping the original address visible to the move checker.
+      wrapper->setOperand(orig);
+    } else {
+      arg.set(orig);
+      if (markDep)
+        markDep->setBase(orig);
     }
     initialization->eraseFromParent();
     stack->eraseFromParent();
@@ -1046,7 +1059,11 @@ static SILValue tryRewriteToPartialApplyStack(
           return SILValue();
 
         // Don't need to destroy if we borrowed in place .
-        return borrowedOriginals.count(argValue) ? SILValue() : argValue;
+        SILValue original = argValue;
+        if (auto *wrapper =
+                dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(original))
+          original = wrapper->getOperand();
+        return borrowedOriginals.count(original) ? SILValue() : argValue;
       };
       insertDestroyOfCapturedArguments(newPA, builder, getArgToDestroy,
                                        newPA->getLoc());

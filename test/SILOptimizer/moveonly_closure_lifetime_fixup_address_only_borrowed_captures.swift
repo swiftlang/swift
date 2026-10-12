@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -sil-verify-all %s | %FileCheck %s
 
 // When ClosureLifetimeFixup promotes a closure to the stack, we should
 // eliminate the temporary copy of any borrowed move-only captures, so that
@@ -94,3 +94,50 @@ func testEscapedLater2<T>(_ e: consuming E<T>) {
     }
 }
 
+// Copyable borrowing parameters use move-only wrappers while checking ownership.
+// Removing the capture copy must also work through those wrappers.
+
+// CHECK-LABEL: sil {{.*}}testCopyableNeverEscaped
+// CHECK-NOT: copy_addr
+// CHECK: partial_apply {{.*}}[on_stack] {{.*}}(%0) :
+// CHECK-NOT: copy_addr
+// CHECK: return
+func testCopyableNeverEscaped<T>(_ c: borrowing C<T>) {
+  nonescaping {
+    borrow(c)
+  }
+}
+
+// CHECK-LABEL: sil {{.*}}testCopyableNestedCapture
+// CHECK-NOT: copy_addr
+// CHECK: partial_apply {{.*}}[on_stack] {{.*}}(%0) :
+// CHECK-NOT: copy_addr
+// CHECK: return
+func testCopyableNestedCapture<T>(_ c: borrowing C<T>) {
+  nonescaping {
+    nonescaping {
+      borrow(c)
+    }
+  }
+}
+
+func mayThrow() throws {}
+
+func throwingNonescaping(_ body: () throws -> ()) rethrows {
+  try body()
+}
+
+// CHECK-LABEL: sil {{.*}}testCopyableThrowingCapture
+// CHECK-NOT: copy_addr
+// CHECK: partial_apply {{.*}}[on_stack] {{.*}}(%0) :
+// CHECK-NOT: copy_addr
+// CHECK: try_apply
+func testCopyableThrowingCapture<T>(_ c: borrowing C<T>) throws {
+  try throwingNonescaping {
+    borrow(c)
+    try throwingNonescaping {
+      borrow(c)
+      try mayThrow()
+    }
+  }
+}
