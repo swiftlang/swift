@@ -251,8 +251,7 @@ A processing job does the following:
    and a preference for the default executor both count as the default
    executor, and jobs that aren't tasks may run in any processing job. For a
    job whose task prefers another task executor, the processing job unlocks
-   the actor and stops. Running the first job whatever its task prefers ensures
-   that every processing job makes progress.
+   the actor and stops. 
 4. A task that runs can leave the actor. If the task moved to another default
    actor, the processing job continues with that actor's queue. If the task
    unlocked the actor to run concurrent code, the processing job stops.
