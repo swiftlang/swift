@@ -2008,17 +2008,21 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
     }
   }
 
-  auto *ObjectHeaderTy = RefCountedStructTy;
-  auto *objectHeader = llvm::ConstantStruct::get(
-      ObjectHeaderTy,
-      {llvm::ConstantExpr::getBitCast(metadata,
-                                      ObjectHeaderTy->getElementType(0)),
-       swiftImmortalRefCount});
-
   ConstantInitBuilder initBuilder(*this);
   auto fields = initBuilder.beginStruct();
 
-  fields.add(objectHeader);
+  // The runtime authenticates the isa of every object it loads, so sign it the
+  // same way `emitConstantObject` does for static arrays: with the isa schema,
+  // address-discriminated on the slot within this global.
+  {
+    auto objectHeader = fields.beginStruct(RefCountedStructTy);
+    objectHeader.addSignedPointer(
+        llvm::ConstantExpr::getBitCast(metadata,
+                                       RefCountedStructTy->getElementType(0)),
+        getOptions().PointerAuth.ObjCIsaPointersSign, PointerAuthEntity());
+    objectHeader.add(swiftImmortalRefCount);
+    objectHeader.finishAndAddTo(fields);
+  }
 
   // `AnyKeyPath._kvcKeyPathStringPtr`. This slot is overloaded: it holds either
   // a real ObjC KVC string, or an encoded root-to-value byte offset, or null.
