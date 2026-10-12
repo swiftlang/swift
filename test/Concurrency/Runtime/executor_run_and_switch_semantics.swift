@@ -278,6 +278,15 @@ extension Actor {
     log.record(here("back on the actor again"))
   }
 
+  // Records `event`, then runs `body` synchronously on this actor.
+  @inline(never)
+  func callRunning(
+    _ log: EventLog, _ event: String, _ body: @Sendable () -> Void
+  ) async {
+    log.record(here(event))
+    body()
+  }
+
   // Calls `custom`, recording where it runs before and after.
   @inline(never)
   func callCustomActor(_ log: EventLog, _ custom: CustomActor) async {
@@ -880,6 +889,133 @@ struct Main {
       ])
       expectEqual(0, both.pendingJobCount)
       await task.value
+    }
+
+    tests.test("default actor processing: leaving the actor while a task waits on it enqueues the processing job on the waiting task's preference") {
+      let preference = ManualExecutor("P")
+      let shared = DefaultActor("default actor")
+      let log = EventLog()
+      testDefaultExecutor.hold()
+      let leaving = Task.detached(executorPreference: preference) {
+        await shared.callRunning(log, "leaving task on the actor") {
+          // Starts the waiting task while this task runs on the actor.
+          preference.runNextJob(passing: .taskExecutorOnly)
+        }
+        log.record(here("leaving task left the actor"))
+      }
+      let waiting = Task.detached(executorPreference: preference) {
+        await shared.call(log, "waiting task on the actor")
+        log.record(here("waiting task left the actor"))
+      }
+      // The leaving task locks the idle actor. While it runs on the actor, the
+      // waiting task starts and joins the actor's queue. The leaving task then
+      // unlocks the actor to run concurrent code. Jobs remain, so the runtime
+      // enqueues a new processing job on the preference of the next job's
+      // task, not on the default executor.
+      preference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "leaving task on the actor [default actor, P]",
+        "leaving task left the actor [none, P]",
+      ])
+      expectEqual(1, preference.pendingJobCount)
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
+      // The processing job runs the waiting task on the actor, and the waiting
+      // task unlocks the actor to run its concurrent code, all inline.
+      preference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "waiting task on the actor [default actor, P]",
+        "waiting task left the actor [none, P]",
+      ])
+      expectEqual(0, preference.pendingJobCount)
+      testDefaultExecutor.drainAndRelease()
+      await leaving.value
+      await waiting.value
+    }
+
+    tests.test("default actor processing: leaving the actor for concurrent code enqueues the processing job on the next job's preference, not the leaving task's") {
+      let leavingPreference = ManualExecutor("P1")
+      let waitingPreference = ManualExecutor("P2")
+      let shared = DefaultActor("default actor")
+      let log = EventLog()
+      testDefaultExecutor.hold()
+      let leaving = Task.detached(executorPreference: leavingPreference) {
+        await shared.callRunning(log, "leaving task on the actor") {
+          waitingPreference.runNextJob(passing: .taskExecutorOnly)
+        }
+        log.record(here("leaving task left the actor"))
+      }
+      let waiting = Task.detached(executorPreference: waitingPreference) {
+        await shared.call(log, "waiting task on the actor")
+      }
+      leavingPreference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "leaving task on the actor [default actor, P1]",
+        "leaving task left the actor [none, P1]",
+      ])
+      expectEqual(0, leavingPreference.pendingJobCount)
+      expectEqual(1, waitingPreference.pendingJobCount)
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
+      waitingPreference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext(["waiting task on the actor [default actor, P2]"])
+      expectEqual(0, waitingPreference.pendingJobCount)
+      testDefaultExecutor.drainAndRelease()
+      await leaving.value
+      await waiting.value
+    }
+
+    tests.test("default actor processing: a job that returns with the actor locked enqueues the processing job on the next job's preference") {
+      let leavingPreference = ManualExecutor("P1")
+      let waitingPreference = ManualExecutor("P2")
+      let executor = ManualExecutor("E")
+      let custom = CustomActor(executor)
+      let shared = DefaultActor("default actor")
+      let log = EventLog()
+      testDefaultExecutor.hold()
+      let leaving = Task.detached(executorPreference: leavingPreference) {
+        await shared.run {
+          log.record(here("leaving task on the actor"))
+          // Starts the waiting task while this task runs on the actor.
+          waitingPreference.runNextJob(passing: .taskExecutorOnly)
+          await custom.call(log, "leaving task on the custom actor")
+          log.record(here("leaving task back on the actor"))
+        }
+      }
+      let waiting = Task.detached(executorPreference: waitingPreference) {
+        await shared.call(log, "waiting task on the actor")
+        log.record(here("waiting task left the actor"))
+      }
+      // The leaving task locks the idle actor. While it runs on the actor, the
+      // waiting task joins the actor's queue. The leaving task's call into the
+      // custom actor is enqueued on `E`, so its job returns with the actor
+      // still locked. The entry point unlocks the actor, and the new
+      // processing job goes to the preference of the next job's task.
+      leavingPreference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext(["leaving task on the actor [default actor, P1]"])
+      expectEqual(0, leavingPreference.pendingJobCount)
+      expectEqual(1, waitingPreference.pendingJobCount)
+      expectEqual(1, executor.pendingJobCount)
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
+      waitingPreference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "waiting task on the actor [default actor, P2]",
+        "waiting task left the actor [none, P2]",
+      ])
+      // `E` runs the call. The context `(E, none)` doesn't match the leaving
+      // task's preference, so the call back to the idle actor schedules a
+      // processing job on that preference.
+      executor.runNextJob(passing: .serialExecutorOnly)
+      expectEqual(1, leavingPreference.pendingJobCount)
+      leavingPreference.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "leaving task on the custom actor [E, E]",
+        "leaving task back on the actor [default actor, P1]",
+      ])
+      expectEqual(0, leavingPreference.pendingJobCount)
+      expectEqual(0, waitingPreference.pendingJobCount)
+      expectEqual(0, executor.pendingJobCount)
+      testDefaultExecutor.drainAndRelease()
+      await leaving.value
+      await waiting.value
     }
 
     // MARK: Main actor

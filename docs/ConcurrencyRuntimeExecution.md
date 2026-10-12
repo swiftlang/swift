@@ -257,7 +257,8 @@ A processing job does the following:
 A task can also leave the actor while other jobs are still queued, or a job can
 return while the actor is still locked. The runtime then unlocks the actor, the
 actor becomes scheduled again, and the runtime enqueues a new processing job. It
-enqueues it on the default executor.
+enqueues it on the preferred task executor of the next job's task, or on the
+default executor if that task prefers none.
 
 ### Isolated deinit
 

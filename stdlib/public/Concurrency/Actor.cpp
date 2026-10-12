@@ -2144,7 +2144,8 @@ retry:;
 /* Unlock the actor. This can be called in 2 ways:
  *    * forceUnlock = true: A task leaves the actor, or a job returns with the
  *    actor still locked. If jobs remain, the actor becomes scheduled and a new
- *    processing job is enqueued on the default executor.
+ *    processing job is enqueued on the preferred task executor of the next
+ *    job, or on the default executor if its task prefers none.
  *    * forceUnlock = false: The processing job has run all jobs it knows of.
  *    If jobs remain, the actor stays locked, so that the processing job runs
  *    them.
@@ -2163,6 +2164,11 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
   SWIFT_TASK_DEBUG_LOG("Try unlock-ing actor %p with forceUnlock = %d", this, forceUnlock);
 
   _swift_tsan_release(this);
+  // The preferred task executor of the next job, if jobs remain. The new
+  // processing job is enqueued there, like the first processing job is
+  // enqueued on the preferred task executor of the job that scheduled the
+  // actor.
+  TaskExecutorRef nextJobTaskExecutor;
   while (true) {
     assert(oldState.isAnyRunning());
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -2202,6 +2208,12 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
       // away. (See tryLock function.)
       newState = newState.withScheduled();
       newState = newState.withoutEscalatedPriority();
+
+      // Lock is still held at this point, so the jobs are still valid.
+      Job *nextJob = prioritizedJobs.peek();
+      if (!nextJob)
+        nextJob = oldState.getFirstUnprioritizedJob();
+      nextJobTaskExecutor = TaskExecutorRef::fromTaskExecutorPreference(nextJob);
     } else {
       // There is no work left to do - actor goes idle
 
@@ -2222,8 +2234,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
       if (newState.isScheduled()) {
         // See ownership rule (6) in DefaultActorImpl
-        // FIXME: should we specify some task executor here, since otherwise we'll schedule on the global pool
-        scheduleActorProcessJob(newState.getMaxPriority(), TaskExecutorRef::undefined());
+        scheduleActorProcessJob(newState.getMaxPriority(), nextJobTaskExecutor);
       } else {
         // See ownership rule (5) in DefaultActorImpl
         SWIFT_TASK_DEBUG_LOG("Actor %p is idle now", this);
