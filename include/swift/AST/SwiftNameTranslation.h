@@ -122,6 +122,9 @@ DeclRepresentation
 getDeclRepresentation(const ValueDecl *VD,
                       NominalTypeLayoutQueries *layoutQueries);
 
+/// Whether the given declaration is isolated to the main actor.
+bool isMainActorIsolated(const ValueDecl *VD);
+
 /// Returns true if the given value decl is exposable to C++.
 inline bool isExposableToCxx(const ValueDecl *VD,
                              NominalTypeLayoutQueries *layoutQueries) {

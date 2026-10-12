@@ -154,6 +154,12 @@ public:
   void
   printObjCBlock(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
 
+  /// Print the given body in an #ifdef SWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR
+  /// block if \p isMainActorIsolated is set, or as is otherwise.
+  void printMainActorBlock(
+      bool isMainActorIsolated,
+      llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+
   /// Print the `swift::_impl::` namespace qualifier.
   void printSwiftImplQualifier() const;
 

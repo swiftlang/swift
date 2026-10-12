@@ -68,3 +68,34 @@ public distributed actor DistributedActorClass {
     @_expose(Cxx) // ok
     public struct NestedStruct {}
 }
+
+@globalActor
+public actor OtherGlobalActor {
+    public static let shared = OtherGlobalActor()
+}
+
+// The C++ thunks of main-actor-isolated declarations check their isolation at
+// runtime.
+@_expose(Cxx)
+@MainActor
+public struct MainActorStruct {
+    public let field: Int = 0
+
+    @_expose(Cxx) // ok
+    public init() {}
+
+    @_expose(Cxx) // ok
+    public func supportedMainActorMethod() {}
+
+    @_expose(Cxx) // ok
+    public var supportedMainActorProp: Int { 42 }
+
+    @_expose(Cxx) // expected-error {{async instance method 'methodAsync()' can not be exposed to C++}}
+    public func methodAsync() async {}
+
+    @_expose(Cxx) // expected-error {{async property 'propAsync' can not be exposed to C++}}
+    public var propAsync: Int { get async { 42 } }
+
+    @_expose(Cxx) // expected-error {{actor-isolated instance method 'otherGlobalActorMethod()' can not be exposed to C++}}
+    @OtherGlobalActor public func otherGlobalActorMethod() {}
+}

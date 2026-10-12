@@ -106,6 +106,12 @@
 #define SWIFT_SELF_LIFETIMEBOUND
 #endif
 
+/// The `SWIFT_MAIN_ACTOR` macro is applied to the inline thunks of Swift
+/// functions that are isolated to the main actor.
+#if !defined(SWIFT_MAIN_ACTOR)
+#define SWIFT_MAIN_ACTOR
+#endif
+
 namespace swift SWIFT_PRIVATE_ATTR {
 namespace _impl {
 
@@ -127,6 +133,39 @@ extern "C" void _swift_stdlib_reportFatalError(const char *_Nonnull prefix,
 extern "C" void _fatalError_Cxx_move_of_Swift_value_type_not_supported_yet();
 
 #pragma clang diagnostic pop
+
+// Main-actor-isolated Swift APIs are only declared when
+// SWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR is defined. Their thunks check that they
+// are called on the main actor, so a client that defines the macro has to link
+// against swift_Concurrency.
+
+/// Mirrors the layout of the Swift runtime's `SerialExecutorRef`.
+struct SerialExecutorRef {
+  void *_Nullable identity;
+  uintptr_t implementation;
+};
+
+extern "C" SerialExecutorRef swift_task_getMainExecutor() noexcept SWIFT_CALL;
+
+extern "C" bool
+swift_task_isCurrentExecutor(SerialExecutorRef executor) noexcept SWIFT_CALL;
+
+extern "C" void swift_task_reportUnexpectedExecutor(
+    const unsigned char *_Nonnull file, uintptr_t fileLength, bool fileIsASCII,
+    uintptr_t line, SerialExecutorRef executor) noexcept SWIFT_CALL;
+
+/// Reports a data race if the caller is not running on the main actor, like
+/// Swift's `_checkExpectedExecutor`.
+SWIFT_INLINE_PRIVATE_HELPER void
+checkMainActorIsolation(const char *_Nonnull file = __builtin_FILE(),
+                        uintptr_t line = __builtin_LINE()) noexcept {
+  SerialExecutorRef executor = swift_task_getMainExecutor();
+  if (swift_task_isCurrentExecutor(executor))
+    return;
+  swift_task_reportUnexpectedExecutor(
+      reinterpret_cast<const unsigned char *>(file), __builtin_strlen(file),
+      /*fileIsASCII=*/false, line, executor);
+}
 
 SWIFT_INLINE_THUNK void *_Nonnull opaqueAlloc(size_t size,
                                               size_t align) noexcept {

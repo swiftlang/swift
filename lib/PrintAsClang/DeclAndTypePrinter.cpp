@@ -1304,53 +1304,42 @@ private:
 
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
-      printDocumentationComment(AFD);
-      DeclAndTypeClangFunctionPrinter declPrinter(
-          os, owningPrinter.prologueOS, owningPrinter.typeMapping,
-          owningPrinter.interopContext, owningPrinter);
-      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        if (SD)
-          declPrinter.printCxxSubscriptAccessorMethod(
-              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
+      // Print the declaration in the class, then the out-of-line definition.
+      for (bool isDefinition : {false, true}) {
+        std::string member;
+        llvm::raw_string_ostream memberOS(member);
+        DeclAndTypeClangFunctionPrinter printer(
+            memberOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
+            owningPrinter.interopContext, owningPrinter);
+        if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+          if (SD)
+            printer.printCxxSubscriptAccessorMethod(
+                owningPrinter, typeDeclContext, accessor,
+                funcABI->getSignature(), funcABI->getSymbolName(), resultTy,
+                isDefinition, dispatchInfo);
+          else
+            printer.printCxxPropertyAccessorMethod(
+                owningPrinter, typeDeclContext, accessor,
+                funcABI->getSignature(), funcABI->getSymbolName(), resultTy,
+                /*isStatic=*/isClassMethod, isDefinition, dispatchInfo);
+        } else {
+          printer.printCxxMethod(
+              owningPrinter, typeDeclContext, AFD, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
-              /*isDefinition=*/false, dispatchInfo);
-        else
-          declPrinter.printCxxPropertyAccessorMethod(
-              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
-              funcABI->getSymbolName(), resultTy,
-              /*isStatic=*/isClassMethod,
-              /*isDefinition=*/false, dispatchInfo);
-      } else {
-        declPrinter.printCxxMethod(owningPrinter, typeDeclContext, AFD,
-                                   funcABI->getSignature(),
-                                   funcABI->getSymbolName(), resultTy,
-                                   /*isStatic=*/isClassMethod,
-                                   /*isDefinition=*/false, dispatchInfo);
-      }
-
-      DeclAndTypeClangFunctionPrinter defPrinter(
-          owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
-          owningPrinter.typeMapping, owningPrinter.interopContext,
-          owningPrinter);
-
-      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        if (SD)
-          defPrinter.printCxxSubscriptAccessorMethod(
-              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
-              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true,
-              dispatchInfo);
-        else
-          defPrinter.printCxxPropertyAccessorMethod(
-              owningPrinter, typeDeclContext, accessor, funcABI->getSignature(),
-              funcABI->getSymbolName(), resultTy,
-              /*isStatic=*/isClassMethod,
-              /*isDefinition=*/true, dispatchInfo);
-      } else {
-        defPrinter.printCxxMethod(owningPrinter, typeDeclContext, AFD,
-                                  funcABI->getSignature(),
-                                  funcABI->getSymbolName(), resultTy,
-                                  /*isStatic=*/isClassMethod,
-                                  /*isDefinition=*/true, dispatchInfo);
+              /*isStatic=*/isClassMethod, isDefinition, dispatchInfo);
+        }
+        // The method might still turn out to be unrepresentable, in which case
+        // only its indentation is printed.
+        if (StringRef(member).trim().empty())
+          continue;
+        auto &out = isDefinition ? owningPrinter.outOfLineDefinitionsOS : os;
+        ClangSyntaxPrinter(getASTContext(), out)
+            .printMainActorBlock(cxx_translation::isMainActorIsolated(AFD),
+                                 [&](raw_ostream &OS) {
+                                   if (!isDefinition)
+                                     printDocumentationComment(AFD);
+                                   OS << member;
+                                 });
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1677,31 +1666,35 @@ private:
     if (representation.isUnsupported())
       return representation;
 
-    os << cRepresentationOS.str();
-    // Swift functions can't throw exceptions, we can only
-    // throw them from C++ when emitting C++ inline thunks for the Swift
-    // functions.
-    if (!funcTy->isThrowing()) {
-      os << " SWIFT_NOEXCEPT";
-      // Lowered Never-returning functions *are* considered to return when they
-      // throw, so only use SWIFT_NORETURN on non-throwing functions.
-      if (funcTy->getResult()->isUninhabited())
-        os << " SWIFT_NORETURN";
-    }
-    if (!funcABI.useCCallingConvention())
-      os << " SWIFT_CALL";
-    printAvailability(FD);
-    os << ';';
-    if (funcABI.useMangledSymbolName()) {
-      // add a comment with a demangled function name.
-      os << " // ";
-      if (!comment.empty())
-        os << comment << ' ';
-      FD->getName().print(os);
-    }
-    os << "\n";
-    if (representation.isObjCxxOnly())
-      os << "#endif // defined(__OBJC__)\n";
+    printMainActorBlock(cxx_translation::isMainActorIsolated(FD),
+                        [&](raw_ostream &) {
+                          os << cRepresentationOS.str();
+                          // Swift functions can't throw exceptions, we can only
+                          // throw them from C++ when emitting C++ inline thunks
+                          // for the Swift functions.
+                          if (!funcTy->isThrowing()) {
+                            os << " SWIFT_NOEXCEPT";
+                            // Lowered Never-returning functions *are*
+                            // considered to return when they throw, so only use
+                            // SWIFT_NORETURN on non-throwing functions.
+                            if (funcTy->getResult()->isUninhabited())
+                              os << " SWIFT_NORETURN";
+                          }
+                          if (!funcABI.useCCallingConvention())
+                            os << " SWIFT_CALL";
+                          printAvailability(FD);
+                          os << ';';
+                          if (funcABI.useMangledSymbolName()) {
+                            // add a comment with a demangled function name.
+                            os << " // ";
+                            if (!comment.empty())
+                              os << comment << ' ';
+                            FD->getName().print(os);
+                          }
+                          os << "\n";
+                          if (representation.isObjCxxOnly())
+                            os << "#endif // defined(__OBJC__)\n";
+                        });
     return representation;
   }
 
@@ -2084,7 +2077,10 @@ private:
       if (!canPrintOverloadOfFunction(FD))
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
-      printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
+      printMainActorBlock(
+          cxx_translation::isMainActorIsolated(FD), [&](raw_ostream &) {
+            printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
+          });
       recordEmittedDeclInCurrentCxxLexicalScope(FD);
       return;
     }
