@@ -5554,16 +5554,16 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Yield> yields,
                                               Type result,
                                               std::optional<ExtInfo> info) {
-  assert(sig && "no generic signature for generic function type?!");
+  ASSERT(sig && "no generic signature for generic function type?!");
 
   // We do not allow type variables in GenericFunctionTypes. Note that if this
   // ever changes, we'll need to setup arena-specific allocation for
   // GenericFunctionTypes.
-  assert(llvm::none_of(params, [](Param param) {
-    return param.getPlainType()->hasTypeVariable();
+  ASSERT(llvm::none_of(params, [](Param param) {
+    return param.getPlainType()->hasTypeVariableOrHole();
   }));
-  assert(!result->hasTypeVariable());
-  assert(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
+  ASSERT(!result->hasTypeVariableOrHole());
+  ASSERT(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, yields, result, info);

@@ -9012,10 +9012,10 @@ namespace {
       // assert((!expr->getType() || expr->getType()->isEqual(exprType)) &&
       //       "Mismatched types!");
       auto assertValidType = [](Type ty) {
-        assert(!ty->getRecursiveProperties().isSolverAllocated() &&
+        ASSERT(!ty->getRecursiveProperties().isSolverAllocated() &&
                "Should not write solver allocated type into expression!");
-        assert(!ty->hasHole() && "Should not write holes into expression!");
-        assert(!ty->hasPlaceholder() &&
+        ASSERT(!ty->hasHole() && "Should not write holes into expression!");
+        ASSERT(!ty->hasPlaceholder() &&
                "Should not write placeholders into expression!");
       };
       assertValidType(exprType);
