@@ -1116,7 +1116,8 @@ namespace {
                                              DeclContext *declOrClosure,
                                              ParameterList *thunkParamList,
                                              ConstraintLocatorBuilder locator) {
-      auto *const fnTy = cs.getType(fnExpr)->castTo<FunctionType>();
+      auto *const fnTy =
+          solution.getResolvedType(fnExpr)->castTo<FunctionType>();
       auto *calleeFnTy = fnTy;
 
       if (baseExpr) {
@@ -1181,7 +1182,7 @@ namespace {
 
           paramRef = AppliedPropertyWrapperExpr::create(
               ctx, calleeDeclRef, calleeParamDecl, SourceLoc(),
-              appliedWrapper.wrapperType, paramRef, valueKind);
+              simplifyType(appliedWrapper.wrapperType), paramRef, valueKind);
           cs.cacheExprTypes(paramRef);
 
           newCalleeParams.push_back(calleeParam.withType(paramRef->getType()));

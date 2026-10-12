@@ -108,7 +108,13 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable() || !T->hasPlaceholder());
+  if (T) {
+    // TypeJoinExpr is only present during solving and so can use type variables
+    assert(isa<TypeJoinExpr>(this) || !T->hasTypeVariable());
+    // TypeExprs can have placeholder types, they get opened in CSGen
+    assert(isa<TypeExpr>(this) || isa<TypeJoinExpr>(this) ||
+           !T->hasPlaceholder());
+  }
   Ty = T;
 }
 
