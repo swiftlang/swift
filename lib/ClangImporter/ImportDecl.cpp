@@ -4481,7 +4481,8 @@ namespace {
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (param->hasAttr<clang::LifetimeBoundAttr>())
           processLifetimeBound(idx, param->getType());
-        if (const auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+        for (const auto *attr :
+             param->specific_attrs<clang::LifetimeCaptureByAttr>())
           processLifetimeCaptureBy(attr, idx, param->getType());
       }
       if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
@@ -4489,9 +4490,9 @@ namespace {
             result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
             /*forSelf=*/true);
-      if (auto attr =
-              getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
-                  decl))
+      for (const auto *attr :
+           getImplicitObjectParamAnnotations<clang::LifetimeCaptureByAttr>(
+               decl))
         processLifetimeCaptureBy(
             attr, result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());

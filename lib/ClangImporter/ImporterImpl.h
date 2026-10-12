@@ -2509,19 +2509,27 @@ TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
                                                 StringRef name);
 
 template <typename T>
-const T *
-getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+SmallVector<const T *, 1>
+getImplicitObjectParamAnnotations(const clang::FunctionDecl *FD) {
+  SmallVector<const T *, 1> result;
   const clang::TypeSourceInfo *TSI = FD->getTypeSourceInfo();
   if (!TSI)
-    return nullptr;
+    return result;
   clang::AttributedTypeLoc ATL;
   for (clang::TypeLoc TL = TSI->getTypeLoc();
        (ATL = TL.getAsAdjusted<clang::AttributedTypeLoc>());
        TL = ATL.getModifiedLoc()) {
     if (auto attr = ATL.getAttrAs<T>())
-      return attr;
+      result.push_back(attr);
   }
-  return nullptr;
+  return result;
+}
+
+template <typename T>
+const T *
+getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+  auto attrs = getImplicitObjectParamAnnotations<T>(FD);
+  return attrs.empty() ? nullptr : attrs.front();
 }
 
 /// Compute the foreign reference type info for \p decl without consulting or

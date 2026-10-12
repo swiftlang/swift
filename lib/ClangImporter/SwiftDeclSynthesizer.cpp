@@ -2366,7 +2366,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     // parameter need no copying: they are part of 'methodType'.
     if (auto *attr = param->getAttr<clang::LifetimeBoundAttr>())
       newParam->addAttr(attr->clone(clangCtx));
-    if (auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+    for (auto *attr : param->specific_attrs<clang::LifetimeCaptureByAttr>())
       newParam->addAttr(attr->clone(clangCtx));
     if (auto *attr = param->getAttr<clang::NoEscapeAttr>())
       newParam->addAttr(attr->clone(clangCtx));
