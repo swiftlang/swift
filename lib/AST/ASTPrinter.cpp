@@ -5786,7 +5786,21 @@ void PrintAST::visitSubscriptExpr(SubscriptExpr *expr) {
 }
 
 void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-  visit(expr->getSubExpr());
+  Expr *sub = expr->getSubExpr();
+  // The type checker lowers some `x is T` checks (optional-depth mismatch or
+  // collection downcast) into an implicit `x as? T` matched against `.some`;
+  // strip the implicit wrappers to print the original operand.
+  if (auto *evaluation = dyn_cast<OptionalEvaluationExpr>(sub))
+    sub = evaluation->getSubExpr();
+  if (auto *cast = dyn_cast<ConditionalCheckedCastExpr>(sub))
+    if (cast->isImplicit())
+      sub = cast->getSubExpr();
+  while (auto *bind = dyn_cast<BindOptionalExpr>(sub)) {
+    if (!bind->isImplicit())
+      break;
+    sub = bind->getSubExpr();
+  }
+  visit(sub);
   Printer << " is ";
   printTypeLoc(expr->getCaseTypeRepr());
 }
