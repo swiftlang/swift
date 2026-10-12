@@ -193,7 +193,9 @@ HashingTestSuite.test("Hashing/TopLevelHashing/UnsafeRawBufferPointer") {
   }
 }
 
-HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan") {
+HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
   func checkTopLevelHash(
     for array: ContiguousArray<UInt8>,
     seed: Int,
