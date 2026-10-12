@@ -5,7 +5,7 @@
 // type interpretation is built from the argument's syntax alone, without
 // lookup, and is resolved in the same type resolution as the unparenthesized
 // spelling.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -target %target-swift-6.2-abi-triple -enable-experimental-feature LiteralExpressions
+// RUN: %target-typecheck-verify-swift -swift-version 5 -target %target-swift-6.2-abi-triple -enable-experimental-feature LiteralExpressions -verify-additional-file Swift.Cell
 
 protocol Container<T> { associatedtype T }
 protocol Base { associatedtype Inner: Deep }
@@ -365,6 +365,87 @@ func resolvedOnceInExpressions() {
 
 typealias VoidPointee = Box<(UnsafePointer<Void>.Pointee)>
 // expected-warning@-1 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+
+// =============================================================================
+// Names that type lookup finds
+//
+// A lone name that type lookup finds is a type, even if it does not resolve as
+// one here, and is diagnosed as the unparenthesized spelling is. So is a
+// composition or an inverse of such names.
+// =============================================================================
+
+struct Generic<T> {} // expected-note {{generic struct 'Generic' declared here}}
+typealias UnboundGeneric = Box<(Generic)>
+// expected-error@-1 {{reference to generic type 'Generic' requires arguments in <...>}}
+
+struct Outer<T> {}
+extension Outer where T == Int { struct Nested {} }
+// expected-note@-1 {{requirement specified as 'T' == 'Int' [with T = T]}}
+extension Outer {
+  typealias UnmetContextualRequirement = Box<(Nested)>
+  // expected-error@-1 {{'Outer<T>.Nested' requires the types 'T' and 'Int' be equivalent}}
+}
+
+struct PackWithoutEach<each T> {
+  typealias A = Box<(T)>
+  // expected-error@-1 {{pack reference 'T' requires expansion using keyword 'repeat'}}
+  // expected-error@-2 {{type pack 'T' must be referenced with 'each'}}
+}
+
+// Type lookup finds a module by its name.
+typealias ModuleName = Box<(Swift)>
+// expected-error@-1 {{cannot find type 'Swift' in scope}}
+// expected-note@-2 {{cannot use module 'Swift' as a type}}
+
+// The standard library's 'Cell' requires an experimental feature.
+// expected-note@Swift.Cell:2 2 {{generic struct 'Cell' declared here}}
+typealias ExperimentalStdlibType = Box<(Cell)>
+// expected-error@-1 {{using 'Cell' requires an experimental feature; use '-enable-experimental-feature Cells'}}
+// expected-error@-2 {{reference to generic type 'Cell' requires arguments in <...>}}
+typealias ExperimentalStdlibComposition = Box<(Cell & P1)>
+// expected-error@-1 {{using 'Cell' requires an experimental feature; use '-enable-experimental-feature Cells'}}
+// expected-error@-2 {{reference to generic type 'Cell' requires arguments in <...>}}
+
+class ClassA {}
+class ClassB {}
+
+typealias CompositionWithStruct = Box<Int & P1>
+// expected-error@-1 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+typealias ParenCompositionWithStruct = Box<(Int & P1)>
+// expected-error@-1 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+typealias TwoClasses = Box<ClassA & ClassB>
+// expected-error@-1 {{protocol-constrained type cannot contain class 'ClassB' because it already contains class 'ClassA'}}
+typealias ParenTwoClasses = Box<(ClassA & ClassB)>
+// expected-error@-1 {{protocol-constrained type cannot contain class 'ClassB' because it already contains class 'ClassA'}}
+typealias InverseOfProtocol = Box<~P1>
+// expected-error@-1 {{type 'P1' cannot be suppressed}}
+typealias ParenInverseOfProtocol = Box<(~P1)>
+// expected-error@-1 {{type 'P1' cannot be suppressed}}
+
+struct NoncopyableBox<T: ~Copyable> {}
+typealias CopyableAndNot = NoncopyableBox<Copyable & ~Copyable>
+// expected-error@-1 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+typealias ParenCopyableAndNot = NoncopyableBox<(Copyable & ~Copyable)>
+// expected-error@-1 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+typealias AnyObjectAndNot = NoncopyableBox<AnyObject & ~Copyable>
+// expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Copyable'}}
+typealias ParenAnyObjectAndNot = NoncopyableBox<(AnyObject & ~Copyable)>
+// expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Copyable'}}
+
+// 'Self' names a type inside a type.
+struct SelfComposition {
+  var bare: Box<Self & P1>
+  // expected-error@-1 {{non-protocol, non-class type 'SelfComposition' cannot be used within a protocol-constrained type}}
+  var paren: Box<(Self & P1)>
+  // expected-error@-1 {{non-protocol, non-class type 'SelfComposition' cannot be used within a protocol-constrained type}}
+}
+
+class SelfInParameter {
+  func bare(_: Box<Self>) {}
+  // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'SelfInParameter'?}}
+  func paren(_: Box<(Self)>) {}
+  // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'SelfInParameter'?}}
+}
 
 // =============================================================================
 // Abandoned type interpretations

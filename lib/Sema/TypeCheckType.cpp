@@ -636,6 +636,11 @@ private:
   NeverNullType resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                                 TypeResolutionOptions options);
 
+  /// Whether \c resolveUnqualifiedIdentTypeRepr finds a type for \p repr,
+  /// even one that it then rejects.
+  bool isUnqualifiedTypeName(UnqualifiedIdentTypeRepr *repr,
+                             TypeResolutionOptions options);
+
   NeverNullType resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                                 UnqualifiedIdentTypeRepr *repr,
                                 TypeResolutionOptions options);
@@ -2349,6 +2354,32 @@ static bool diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
   return false;
 }
 
+/// The options with which type resolution looks up an unqualified type name.
+static NLOptions getUnqualifiedTypeLookupOptions(TypeResolutionOptions options) {
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
+  return lookupOptions;
+}
+
+/// Look up an unqualified type name as type resolution does. If nothing is
+/// found, try again with members of modules that are not directly imported,
+/// adding that flag to \p lookupOptions and setting
+/// \p didIgnoreMissingImports.
+static LookupResult lookupUnqualifiedTypeName(DeclContext *dc, DeclNameRef name,
+                                              SourceLoc loc,
+                                              NLOptions &lookupOptions,
+                                              bool &didIgnoreMissingImports) {
+  auto results = TypeChecker::lookupUnqualifiedType(dc, name, loc, lookupOptions);
+  if (!results && dc->getASTContext().LangOpts.hasFeature(
+                      Feature::MemberImportVisibility, /*allowMigration=*/true)) {
+    lookupOptions |= NLFlags::IgnoreMissingImports;
+    results = TypeChecker::lookupUnqualifiedType(dc, name, loc, lookupOptions);
+    didIgnoreMissingImports = true;
+  }
+  return results;
+}
+
 NeverNullType
 TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                               TypeResolutionOptions options) {
@@ -2395,22 +2426,10 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
     }
   }
 
-  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NLFlags::IncludeUsableFromInline;
-  auto globals =
-      TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(), lookupOptions);
-
-  // If the look up did not yield any results, try again but allow members from
-  // modules that are not directly imported to be accessible.
+  NLOptions lookupOptions = getUnqualifiedTypeLookupOptions(options);
   bool didIgnoreMissingImports = false;
-  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
-                                          /*allowMigration=*/true)) {
-    lookupOptions |= NLFlags::IgnoreMissingImports;
-    globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
-                                                 lookupOptions);
-    didIgnoreMissingImports = true;
-  }
+  auto globals = lookupUnqualifiedTypeName(DC, id, repr->getLoc(), lookupOptions,
+                                           didIgnoreMissingImports);
 
   // Process the names we found.
   Type current;
@@ -2532,6 +2551,27 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   // Complain and give ourselves a chance to recover.
   return diagnoseUnknownType(/*parent*/ nullptr, SourceRange(), repr,
                              lookupOptions, options);
+}
+
+bool TypeResolver::isUnqualifiedTypeName(UnqualifiedIdentTypeRepr *repr,
+                                         TypeResolutionOptions options) {
+  // The same sources as resolveUnqualifiedIdentTypeRepr, in the same order:
+  // SIL generic parameters, unqualified type lookup, and 'Self' inside a type.
+  auto id = repr->getNameRef();
+  if (silContext && silContext->GenericParams &&
+      silContext->GenericParams->lookUpGenericParam(id.getBaseIdentifier()))
+    return true;
+
+  NLOptions lookupOptions = getUnqualifiedTypeLookupOptions(options);
+  bool didIgnoreMissingImports = false;
+  if (!lookupUnqualifiedTypeName(getDeclContext(), id, repr->getLoc(),
+                                 lookupOptions, didIgnoreMissingImports)
+           .empty())
+    return true;
+
+  // 'Self' names a type inside a type, even where it can't be referenced.
+  return id.isSimpleName(getASTContext().Id_Self) &&
+         getDeclContext()->getInnermostTypeContext();
 }
 
 void TypeResolver::diagnoseAmbiguousMemberType(Type baseTy,
@@ -6220,6 +6260,30 @@ static bool couldBeLiteralExpression(TypeRepr *repr,
   return false;
 }
 
+/// Collects the names in \p repr into \p names, if \p repr is made only of
+/// unqualified names without generic arguments, combined with single
+/// parentheses, '&' and prefix '~'.
+static bool
+collectUnqualifiedNames(TypeRepr *repr,
+                        SmallVectorImpl<UnqualifiedIdentTypeRepr *> &names) {
+  if (auto *name = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
+    if (name->hasGenericArgList())
+      return false;
+    names.push_back(name);
+    return true;
+  }
+  if (auto *tuple = dyn_cast<TupleTypeRepr>(repr))
+    return tuple->isParenType() &&
+           collectUnqualifiedNames(tuple->getElementType(0), names);
+  if (auto *composition = dyn_cast<CompositionTypeRepr>(repr))
+    return llvm::all_of(composition->getTypes(), [&](TypeRepr *member) {
+      return collectUnqualifiedNames(member, names);
+    });
+  if (auto *inverse = dyn_cast<InverseTypeRepr>(repr))
+    return collectUnqualifiedNames(inverse->getConstraint(), names);
+  return false;
+}
+
 NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
     GenericArgumentExprTypeRepr *repr, DeclContext *dc,
     TypeResolutionOptions options) {
@@ -6298,6 +6362,17 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
       repr->setArgExpr(typeInterpretation);
       return trialType;
     }
+
+    // A name that type lookup finds is a type, even if it does not resolve as
+    // one here, for example because it is ambiguous. So is a composition or
+    // an inverse of such names, as in '(Int & P)'. Diagnose it as the
+    // unparenthesized spelling would be.
+    SmallVector<UnqualifiedIdentTypeRepr *, 2> names;
+    if (collectUnqualifiedNames(typeInterpretation->getTypeRepr(), names) &&
+        llvm::all_of(names, [&](UnqualifiedIdentTypeRepr *name) {
+          return isUnqualifiedTypeName(name, options);
+        }))
+      return commitToType(typeInterpretation);
   }
 
   // Attempt to type-check and constant-fold
