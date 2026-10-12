@@ -700,17 +700,16 @@ struct Main {
       await task.value
     }
 
-    tests.test("default actor processing on P: concurrent code of a task without a preference is enqueued on the default executor") {
+    tests.test("default actor processing on P: a task without a preference runs in a new processing job on the default executor") {
       let preference = ManualExecutor("P")
       let shared = DefaultActor("default actor")
       let log = EventLog()
       testDefaultExecutor.hold()
-      // The first task only schedules the actor's processing job on `P`. A
-      // processing job goes to the preference of the task whose job scheduled
-      // the actor, so a task without a preference needs another task to run its
-      // code on `P`. Both tasks call the actor from the main actor, so that
-      // they are enqueued on it. The main executor runs each job as soon as it
-      // is enqueued.
+      // The first task schedules the actor's processing job on `P`, and a task
+      // without a preference joins the actor's queue. A processing job goes to
+      // the preference of the task whose job scheduled the actor. Both tasks
+      // call the actor from the main actor, so that they are enqueued on it.
+      // The main executor runs each job as soon as it is enqueued.
       let scheduling = Task.detached(executorPreference: preference) { @MainActor in
         log.record(here("scheduling task on the main actor"))
         await shared.call(log, "scheduling task on the actor")
@@ -735,31 +734,37 @@ struct Main {
       log.expectNext(["task on the main actor [main, main]"])
       expectEqual(1, preference.pendingJobCount)
       expectEqual(0, testDefaultExecutor.pendingJobCount)
-      // Unexpected: This should not run both jobs on the actor's queue since
-      // one job has a preference and the other doesn't.
+      // The processing job on `P` runs the first task. The next job's task
+      // prefers the default executor, so the processing job unlocks the actor
+      // and stops, which enqueues a new processing job on the default
+      // executor.
       preference.runNextJob(passing: .taskExecutorOnly)
-      log.expectNext([
-        "scheduling task on the actor [default actor, P]",
-        "task on the actor [default actor, P]",
-      ])
-      expectEqual(1, testDefaultExecutor.pendingJobCount)
-      testDefaultExecutor.runNextJob(passing: .taskExecutorOnly)
-      log.expectNext(["task concurrent [none, default executor]"])
+      log.expectNext(["scheduling task on the actor [default actor, P]"])
       expectEqual(0, preference.pendingJobCount)
+      expectEqual(1, testDefaultExecutor.pendingJobCount)
+      // The new processing job runs the task on the actor. Its context
+      // `(none, default)` matches the task's preference, so the task unlocks
+      // the actor and runs its concurrent code inline.
+      testDefaultExecutor.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "task on the actor [default actor, default executor]",
+        "task concurrent [none, default executor]",
+      ])
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
       testDefaultExecutor.drainAndRelease()
       await scheduling.value
       await task.value
     }
 
-    tests.test("default actor processing on the default executor: a task preferring P runs its isolated code there") {
+    tests.test("default actor processing on the default executor: a task preferring P runs in a new processing job on P") {
       let preference = ManualExecutor("P")
       let shared = DefaultActor("default actor")
       let log = EventLog()
       testDefaultExecutor.hold()
-      // The first task only schedules the actor's processing job on the
-      // default executor. It prefers none and calls the actor from the main
-      // actor, so that it is enqueued on it. The main executor runs each job as
-      // soon as it is enqueued, so this happens right away.
+      // The first task schedules the actor's processing job on the default
+      // executor. It prefers none and calls the actor from the main actor, so
+      // that it is enqueued on it. The main executor runs each job as soon as
+      // it is enqueued, so this happens right away.
       let scheduling = Task.detached { @MainActor in
         log.record(here("scheduling task on the main actor"))
         await shared.call(log, "scheduling task on the actor")
@@ -776,19 +781,89 @@ struct Main {
       preference.runNextJob(passing: .taskExecutorOnly)
       expectEqual(1, testDefaultExecutor.pendingJobCount)
       expectEqual(0, preference.pendingJobCount)
+      // The processing job on the default executor runs the first task. The
+      // next job's task prefers `P`, so the processing job unlocks the actor
+      // and stops, which enqueues a new processing job on `P`.
       testDefaultExecutor.runNextJob(passing: .taskExecutorOnly)
-      // Unexpected: This is running both jobs on the default executor even though
-      // the second task had a preference set.
-      log.expectNext([
-        "scheduling task on the actor [default actor, default executor]",
-        "task on the actor [default actor, default executor]",
-      ])
+      log.expectNext(["scheduling task on the actor [default actor, default executor]"])
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
       expectEqual(1, preference.pendingJobCount)
+      // The new processing job runs the task on the actor. Its context
+      // `(none, P)` matches the task's preference, so the task unlocks the
+      // actor and runs its concurrent code inline.
       preference.runNextJob(passing: .taskExecutorOnly)
-      log.expectNext(["task concurrent [none, P]"])
+      log.expectNext([
+        "task on the actor [default actor, P]",
+        "task concurrent [none, P]",
+      ])
+      expectEqual(0, preference.pendingJobCount)
       testDefaultExecutor.drainAndRelease()
       await scheduling.value
       await task.value
+    }
+
+    tests.test("default actor processing: the jobs of tasks with different preferences each run on their task's preference") {
+      let first = ManualExecutor("P1")
+      let second = ManualExecutor("P2")
+      let shared = DefaultActor("default actor")
+      let log = EventLog()
+      testDefaultExecutor.hold()
+      // Three tasks, preferring `P1`, `P2` and no task executor, call the actor
+      // from the main actor, so that they are enqueued on it. The first one
+      // schedules the actor's processing job on `P1`, and the others join the
+      // actor's queue.
+      let firstTask = Task.detached(executorPreference: first) { @MainActor in
+        log.record(here("first task on the main actor"))
+        await shared.call(log, "first task on the actor")
+        log.record(here("first task back on the main actor"))
+      }
+      first.runNextJob(passing: .taskExecutorOnly)
+      let secondTask = Task.detached(executorPreference: second) { @MainActor in
+        log.record(here("second task on the main actor"))
+        await shared.call(log, "second task on the actor")
+        log.record(here("second task back on the main actor"))
+      }
+      second.runNextJob(passing: .taskExecutorOnly)
+      let thirdTask = Task.detached { @MainActor in
+        log.record(here("third task on the main actor"))
+        await shared.call(log, "third task on the actor")
+        log.record(here("third task back on the main actor"))
+      }
+      log.expectNext([
+        "first task on the main actor [main, main]",
+        "second task on the main actor [main, main]",
+        "third task on the main actor [main, main]",
+      ])
+      expectEqual(1, first.pendingJobCount)
+      expectEqual(0, second.pendingJobCount)
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
+      // Each processing job runs one task. It then unlocks the actor and
+      // stops, which enqueues a new processing job on the next task's
+      // preference.
+      first.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "first task on the actor [default actor, P1]",
+        "first task back on the main actor [main, main]",
+      ])
+      expectEqual(1, second.pendingJobCount)
+      second.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "second task on the actor [default actor, P2]",
+        "second task back on the main actor [main, main]",
+      ])
+      expectEqual(1, testDefaultExecutor.pendingJobCount)
+      testDefaultExecutor.runNextJob(passing: .taskExecutorOnly)
+      log.expectNext([
+        "third task on the actor [default actor, default executor]",
+        "third task back on the main actor [main, main]",
+      ])
+      expectEqual(0, first.pendingJobCount)
+      expectEqual(0, second.pendingJobCount)
+      expectEqual(0, testDefaultExecutor.pendingJobCount)
+      testDefaultExecutor.drainAndRelease()
+      await firstTask.value
+      await secondTask.value
+      await thirdTask.value
     }
 
     tests.test("default actor processing: the processing job continues with the queue of the actor a task switched to") {

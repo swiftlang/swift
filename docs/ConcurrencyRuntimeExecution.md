@@ -246,19 +246,26 @@ A processing job does the following:
    current context is the actor's serial executor together with the base's task
    executor.
 3. It sorts the incoming jobs into the actor's queue by priority and runs them
-   one after the other. A task that runs can leave the actor. If the task moved
-   to another default actor, the processing job continues with that actor's
-   queue. If the task unlocked the actor to run concurrent code, the processing
-   job stops.
-4. When no job is left, it unlocks the actor, which becomes idle. If a job was
+   one after the other. After its first job, it only runs a job whose task
+   prefers the task executor the processing job was enqueued on. No preference
+   and a preference for the default executor both count as the default
+   executor, and jobs that aren't tasks may run in any processing job. For a
+   job whose task prefers another task executor, the processing job unlocks
+   the actor and stops. Running the first job whatever its task prefers ensures
+   that every processing job makes progress.
+4. A task that runs can leave the actor. If the task moved to another default
+   actor, the processing job continues with that actor's queue. If the task
+   unlocked the actor to run concurrent code, the processing job stops.
+5. When no job is left, it unlocks the actor, which becomes idle. If a job was
    enqueued in the meantime, unlocking fails and the processing job runs that
    job too.
 
-A task can also leave the actor while other jobs are still queued, or a job can
-return while the actor is still locked. The runtime then unlocks the actor, the
-actor becomes scheduled again, and the runtime enqueues a new processing job. It
-enqueues it on the preferred task executor of the next job's task, or on the
-default executor if that task prefers none.
+A task can also leave the actor while other jobs are still queued, a job can
+return while the actor is still locked, or a processing job can stop for a job
+whose task prefers another task executor. The runtime then unlocks the actor,
+the actor becomes scheduled again, and the runtime enqueues a new processing
+job. It enqueues it on the preferred task executor of the next job's task, or
+on the default executor if that task prefers none.
 
 ### Isolated deinit
 

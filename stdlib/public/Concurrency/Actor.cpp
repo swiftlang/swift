@@ -931,10 +931,16 @@ class DefaultActorImpl;
 /// the actor.
 class ProcessOutOfLineJob : public Job {
   DefaultActorImpl *Actor;
+
+  /// The task executor the processing job is enqueued on, or undefined for the
+  /// default executor.
+  TaskExecutorRef TaskExecutor;
+
 public:
-  ProcessOutOfLineJob(DefaultActorImpl *actor, JobPriority priority)
+  ProcessOutOfLineJob(DefaultActorImpl *actor, JobPriority priority,
+                      TaskExecutorRef taskExecutor)
     : Job({JobKind::DefaultActorSeparate, priority}, &process),
-      Actor(actor) {}
+      Actor(actor), TaskExecutor(taskExecutor) {}
 
   SWIFT_CC(swiftasync)
   static void process(Job *job);
@@ -1428,6 +1434,12 @@ public:
   /// The calling thread must be holding the actor lock while calling this
   Job *drainOne();
 
+  /// Whether the next job in `prioritizedJobs`, if any, may run in a processing
+  /// job enqueued on `taskExecutor`. A job of a task may if the task prefers
+  /// that task executor. Other jobs express no preference and may run anywhere.
+  /// The calling thread must be holding the actor lock while calling this
+  bool nextJobMayRunOn(TaskExecutorRef taskExecutor);
+
   /// Atomically claims incoming jobs from ActiveActorStatus, and calls `handleUnprioritizedJobs()`.
   /// Called with actor lock held on current thread.
   void processIncomingQueue();
@@ -1584,7 +1596,8 @@ dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
 
 void DefaultActorImpl::scheduleActorProcessJob(
     JobPriority priority, TaskExecutorRef taskExecutor) {
-  Job *job = swift_cxx_newObject<ProcessOutOfLineJob>(this, priority);
+  Job *job =
+      swift_cxx_newObject<ProcessOutOfLineJob>(this, priority, taskExecutor);
   SWIFT_TASK_DEBUG_LOG(
       "Scheduling processing job %p for actor %p at priority %#zx, with taskExecutor %p", job, this,
       priority, taskExecutor.getIdentity());
@@ -1859,6 +1872,26 @@ void DefaultActorImpl::handleUnprioritizedJobs(Job *head) {
 }
 
 // Called with actor lock held on current thread
+bool DefaultActorImpl::nextJobMayRunOn(TaskExecutorRef taskExecutor) {
+  Job *job = prioritizedJobs.peek();
+  if (!job || !(isa<AsyncTask>(job) || isa<AsyncTaskStealer>(job)))
+    return true;
+
+  // An undefined task executor and the default executor both mean the default
+  // executor.
+  auto preferred = TaskExecutorRef::fromTaskExecutorPreference(job);
+  if (preferred.isUndefined() && taskExecutor.isUndefined())
+    return true;
+  HeapObject *preferredIdentity = preferred.isDefined()
+                                      ? preferred.getIdentity()
+                                      : getDefaultTaskExecutor().getIdentity();
+  HeapObject *identity = taskExecutor.isDefined()
+                             ? taskExecutor.getIdentity()
+                             : getDefaultTaskExecutor().getIdentity();
+  return preferredIdentity == identity;
+}
+
+// Called with actor lock held on current thread
 Job *DefaultActorImpl::drainOne() {
   SWIFT_TASK_DEBUG_LOG("Draining one job from default actor %p", this);
 
@@ -1887,7 +1920,14 @@ Job *DefaultActorImpl::drainOne() {
 //   stops.
 // - If it was enqueued elsewhere, the actor is still locked, and the
 //   processing job continues with the actor's next job.
-static void defaultActorDrain(DefaultActorImpl *actor) {
+//
+// After its first job, the processing job only runs a job of a task that
+// prefers the task executor the processing job is enqueued on. For a job of a
+// task that prefers another one, it unlocks the actor, which enqueues a new
+// processing job on that task's preference. Running the first job whatever its
+// task prefers ensures that every processing job makes progress.
+static void defaultActorDrain(DefaultActorImpl *actor,
+                              TaskExecutorRef taskExecutor) {
   SWIFT_TASK_DEBUG_LOG("Draining default actor %p", actor);
   DefaultActorImpl *currentActor = actor;
 
@@ -1907,7 +1947,15 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
     trackingInfo.enterLockedDefaultActor(
         SerialExecutorRef::forDefaultActor(asAbstract(currentActor)));
 
+    bool ranJob = false;
     while (true) {
+      if (ranJob && !currentActor->nextJobMayRunOn(taskExecutor)) {
+        // The next job's task prefers another task executor. Unlocking the
+        // actor enqueues a processing job there.
+        currentActor->unlock(true);
+        break;
+      }
+
       Job *job = currentActor->drainOne();
       if (job == NULL) {
         // No work left to do, try unlocking the actor. This fails if a job was
@@ -1919,6 +1967,7 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         runJobInEstablishedExecutorContext(
             job, SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
             tracedTaskExecutor(trackingInfo.getTaskExecutor()));
+        ranJob = true;
 
         auto currentExecutor = trackingInfo.getCurrentSerialExecutor();
         if (!currentExecutor.isDefaultActor()) {
@@ -1949,9 +1998,10 @@ SWIFT_CC(swiftasync)
 void ProcessOutOfLineJob::process(Job *job) {
   auto self = cast<ProcessOutOfLineJob>(job);
   DefaultActorImpl *actor = self->Actor;
+  TaskExecutorRef taskExecutor = self->TaskExecutor;
 
   swift_cxx_deleteObject(self);
-  return defaultActorDrain(actor); // 'return' forces tail call
+  return defaultActorDrain(actor, taskExecutor); // 'return' forces tail call
 }
 
 #endif /* !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS */
