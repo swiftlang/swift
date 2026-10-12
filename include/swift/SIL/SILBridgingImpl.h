@@ -2314,6 +2314,13 @@ BridgedInstruction::OpenPackElementInst_getOpenedGenericEnvironment() const {
   return {getAs<swift::OpenPackElementInst>()->getOpenedGenericEnvironment()};
 }
 
+BridgedSubstitutionMap
+BridgedInstruction::OpenPackElementInst_tryGetElementArchetypeSubstitutionMap()
+    const {
+  return {getAs<swift::OpenPackElementInst>()
+              ->tryGetElementArchetypeSubstitutionMap()};
+}
+
 bool BridgedInstruction::DifferentiableFunctionInst_hasExtractee(
     SwiftInt extractee) const {
   return getAs<swift::DifferentiableFunctionInst>()->hasExtractee(

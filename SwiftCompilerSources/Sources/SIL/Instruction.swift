@@ -2267,6 +2267,14 @@ final public class OpenPackElementInst : SingleValueInstruction {
   public var openedGenericEnvironment: GenericEnvironment {
     GenericEnvironment(bridged: bridged.OpenPackElementInst_getOpenedGenericEnvironment())
   }
+  public var elementArchetypeSubstitutionMap: SubstitutionMap? {
+    let map = SubstitutionMap(
+      bridged: bridged.OpenPackElementInst_tryGetElementArchetypeSubstitutionMap())
+    if map.isEmpty {
+      return nil
+    }
+    return map
+  }
 }
 final public class PackLengthInst : SingleValueInstruction {
   public var packType: CanonicalType {

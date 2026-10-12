@@ -1075,6 +1075,8 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType AnyPackIndexInst_getIndexedPackType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericEnvironment
   OpenPackElementInst_getOpenedGenericEnvironment() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap
+  OpenPackElementInst_tryGetElementArchetypeSubstitutionMap() const;
   BRIDGED_INLINE bool
   DifferentiableFunctionInst_hasExtractee(SwiftInt extractee) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue
