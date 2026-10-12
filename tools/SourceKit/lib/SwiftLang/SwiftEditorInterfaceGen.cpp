@@ -46,9 +46,13 @@ public:
     TextRange Range;
 
     TextReference(const ValueDecl *D, unsigned Offset, unsigned Length)
-      : Dcl(D), Mod(), Range{Offset, Length} {}
+        : Dcl(D), Mod(), Range{Offset, Length} {
+      CONDITIONAL_ASSERT(D);
+    }
     TextReference(const ModuleEntity Mod, unsigned Offset, unsigned Length)
-    : Mod(Mod), Range{Offset, Length} {}
+        : Mod(Mod), Range{Offset, Length} {
+      CONDITIONAL_ASSERT(Mod);
+    }
   };
 
   struct TextDecl {
@@ -266,7 +270,7 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
     if (Ref.Mod) {
       Kind = SwiftLangSupport::getUIDForModuleRef();
       IsSystem = Ref.Mod.isNonUserModule();
-    } else if (Ref.Dcl) {
+    } else {
       Kind = SwiftLangSupport::getUIDForDecl(Ref.Dcl, /*IsRef=*/true);
       IsSystem = Ref.Dcl->getModuleContext()->isNonUserModule();
     }

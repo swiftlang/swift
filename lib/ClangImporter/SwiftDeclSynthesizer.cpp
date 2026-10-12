@@ -1694,7 +1694,12 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
 
   // This default handles C++'s operator[] that returns a value type.
   Expr *propertyExpr = getterImplCallExpr;
-  PointerTypeKind ptrKind;
+
+  // FIXME: Make getAnyPointerElementType accept an optional or return an
+  // optional pair. A contract where the out parameter is set whenever the
+  // result is non-null invites human error.
+  const PointerTypeKind invalidPtrKind = PointerTypeKind(~0U);
+  PointerTypeKind ptrKind = invalidPtrKind;
 
   // The following check returns true if the subscript operator returns a
   // C++ reference type. This check actually checks to see if the type is
@@ -1703,6 +1708,8 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   // here.
   if (!isAddress &&
       getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
+    ASSERT(ptrKind != invalidPtrKind);
+
     // `getterImpl` can return either UnsafePointer or
     // UnsafeMutablePointer. Retrieve the corresponding `.pointee`
     // declaration.

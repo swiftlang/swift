@@ -439,7 +439,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     // Permit '()' when this method overrides a method with a
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
-    AbstractFunctionDecl *overridden;
+    AbstractFunctionDecl *overridden = nullptr;
     if (param->getTypeInContext()->isVoid() && AFD->hasThrows() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
@@ -1099,8 +1099,7 @@ bool swift::isRepresentableInLanguage(
     }
 
     // Determine the parameter index at which the error will go.
-    unsigned errorParameterIndex;
-    bool foundErrorParameterIndex = false;
+    std::optional<unsigned> errorParameterIndex;
 
     // If there is an explicit @objc attribute with a name, look for
     // the "error" selector piece.
@@ -1112,15 +1111,13 @@ bool swift::isRepresentableInLanguage(
           // the error parameter.
           auto piece = selectorPieces[i-1];
           if (piece == ctx.Id_error) {
-            errorParameterIndex = i-1;
-            foundErrorParameterIndex = true;
+            errorParameterIndex = i - 1;
             break;
           }
 
           // If the first selector piece ends with "Error", it's here.
           if (i == 1 && camel_case::getLastWord(piece.str()) == "Error") {
-            errorParameterIndex = i-1;
-            foundErrorParameterIndex = true;
+            errorParameterIndex = i - 1;
             break;
           }
         }
@@ -1129,7 +1126,7 @@ bool swift::isRepresentableInLanguage(
 
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
-    if (!foundErrorParameterIndex) {
+    if (!errorParameterIndex) {
       auto *paramList = AFD->getParameters();
       errorParameterIndex = paramList->size();
 
@@ -1141,11 +1138,12 @@ bool swift::isRepresentableInLanguage(
       // 'initFoo'.
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
         if (CD->isObjCZeroParameterWithLongSelector())
-          --errorParameterIndex;
+          --errorParameterIndex.value();
 
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
-        auto type = paramList->get(errorParameterIndex - 1)->getTypeInContext();
+        auto type =
+            paramList->get(errorParameterIndex.value() - 1)->getTypeInContext();
 
         // It can't be a trailing closure unless it has a specific form.
         // Only consider the rvalue type.
@@ -1157,7 +1155,7 @@ bool swift::isRepresentableInLanguage(
 
         // Is it a function type?
         if (!type->is<AnyFunctionType>()) break;
-        --errorParameterIndex;
+        --errorParameterIndex.value();
       }
     }
 
@@ -1168,7 +1166,7 @@ bool swift::isRepresentableInLanguage(
     switch (kind) {
     case ForeignErrorConvention::ZeroResult:
       errorConvention = ForeignErrorConvention::getZeroResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
@@ -1177,7 +1175,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NonZeroResult:
       errorConvention = ForeignErrorConvention::getNonZeroResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
@@ -1186,7 +1184,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::ZeroPreservedResult:
       errorConvention = ForeignErrorConvention::getZeroPreservedResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -1194,7 +1192,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NilResult:
       errorConvention = ForeignErrorConvention::getNilResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -1202,7 +1200,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NonNilError:
       errorConvention = ForeignErrorConvention::getNilResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
