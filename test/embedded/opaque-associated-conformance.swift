@@ -45,7 +45,7 @@ public func testNonGeneric() -> any P2 {
 // CHECK-LABEL: sil_witness_table shared [specialized] GenericClass<Int>: specialize <Int> (<T> GenericClass<T>: P module test) {
 // CHECK-NEXT:    associated_conformance (A: Q): dependent @_opaqueReturnTypeOf("$e4test12GenericClassC4makeQryF", 0) __<Int>
 // CHECK-NEXT:    associated_type A: @_opaqueReturnTypeOf("$e4test12GenericClassC4makeQryF", 0) __<Int>
-// CHECK-NEXT:    method #P.make{{.*}}: @$e4test12GenericClassCyxGAA1PA2aEP4make1AQzyFTWSi_Tgq5
+// CHECK-NEXT:    method #P.make{{.*}}: @$e4test12GenericClassCyxGAA1PA2aEP4make1AQzyFTWSi_TGq5
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table shared [specialized] GenericClass<Int>: specialize <Int> (<T> GenericClass<T>: P2 module test) {
