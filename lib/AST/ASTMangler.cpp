@@ -4331,7 +4331,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   //
   // `dropIsolation` is set here as a workaround because `dropGlobalActor`
   // used to call `withoutIsolation` unconditionally before.
-  if (decl->preconcurrency()) {
+  if (decl->preconcurrencyIncludingInferred()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
                               /*dropIsolation=*/true);
   }
