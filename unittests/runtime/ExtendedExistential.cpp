@@ -534,34 +534,29 @@ TEST(TestExtendedExistential, defaultMetatypeValueWitnesses) {
 }
 
 TEST(TestExtendedExistential, containerLayoutWithGeneralizationWitnesses) {
-  auto classShape = buildGlobalShape([] {
+  auto shapeSpecs = [] {
     return shape(
-      special(SpecialKind::Class),
       shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
       genSig(param(), conforms(typeParam(0, 0), Q())),
       reqSig(param(), param(),
              conforms(typeParam(0, 0), Q()),
              conforms(typeParam(1, 0), P()))
     );
+  };
+  auto classShape = buildGlobalShape([&] {
+    auto specs = shapeSpecs();
+    specs.emplace_back(special(SpecialKind::Class));
+    return specs;
   });
   EXPECT_EQ(classShape->getContainerSignatureLayoutSizeInWords(), 1u);
 
-  auto opaqueShape = buildGlobalShape([] {
-    return shape(
-      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
-      genSig(param(), conforms(typeParam(0, 0), Q())),
-      reqSig(param(), param(),
-             conforms(typeParam(0, 0), Q()),
-             conforms(typeParam(1, 0), P()))
-    );
-  });
+  auto opaqueShape = buildGlobalShape(shapeSpecs);
   EXPECT_EQ(opaqueShape->getContainerSignatureLayoutSizeInWords(), 2u);
 }
 
 TEST(TestExtendedExistential, containerLayoutWithRedundantParameters) {
-  auto classShape = buildGlobalShape([] {
+  auto shapeSpecs = [] {
     return shape(
-      special(SpecialKind::Class),
       shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
       genSig(param(), param()),
       reqSig(param(), param().withKeyArgument(false), param(),
@@ -569,26 +564,21 @@ TEST(TestExtendedExistential, containerLayoutWithRedundantParameters) {
              conforms(typeParam(1, 0), P()),
              conforms(typeParam(1, 0), Q()))
     );
+  };
+  auto classShape = buildGlobalShape([&] {
+    auto specs = shapeSpecs();
+    specs.emplace_back(special(SpecialKind::Class));
+    return specs;
   });
   EXPECT_EQ(classShape->getContainerSignatureLayoutSizeInWords(), 2u);
 
-  auto opaqueShape = buildGlobalShape([] {
-    return shape(
-      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
-      genSig(param(), param()),
-      reqSig(param(), param().withKeyArgument(false), param(),
-             sameType(typeParam(0, 0), typeParam(0, 1)),
-             conforms(typeParam(1, 0), P()),
-             conforms(typeParam(1, 0), Q()))
-    );
-  });
+  auto opaqueShape = buildGlobalShape(shapeSpecs);
   EXPECT_EQ(opaqueShape->getContainerSignatureLayoutSizeInWords(), 3u);
 }
 
 TEST(TestExtendedExistential, containerLayoutWithMergedGeneralizationWitnesses) {
-  auto classShape = buildGlobalShape([] {
+  auto shapeSpecs = [] {
     return shape(
-      special(SpecialKind::Class),
       shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 2))),
       genSig(param(), param(), param(),
              conforms(typeParam(0, 0), Q()),
@@ -599,46 +589,35 @@ TEST(TestExtendedExistential, containerLayoutWithMergedGeneralizationWitnesses) 
              conforms(typeParam(1, 0), P()),
              conforms(typeParam(1, 0), Q()))
     );
+  };
+  auto classShape = buildGlobalShape([&] {
+    auto specs = shapeSpecs();
+    specs.emplace_back(special(SpecialKind::Class));
+    return specs;
   });
   EXPECT_EQ(classShape->getContainerSignatureLayoutSizeInWords(), 2u);
 
-  auto opaqueShape = buildGlobalShape([] {
-    return shape(
-      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 2))),
-      genSig(param(), param(), param(),
-             conforms(typeParam(0, 0), Q()),
-             conforms(typeParam(0, 1), Q())),
-      reqSig(param(), param().withKeyArgument(false), param(), param(),
-             conforms(typeParam(0, 0), Q()),
-             sameType(typeParam(0, 0), typeParam(0, 1)),
-             conforms(typeParam(1, 0), P()),
-             conforms(typeParam(1, 0), Q()))
-    );
-  });
+  auto opaqueShape = buildGlobalShape(shapeSpecs);
   EXPECT_EQ(opaqueShape->getContainerSignatureLayoutSizeInWords(), 3u);
 }
 
 TEST(TestExtendedExistential, containerLayoutWithAliasedSelf) {
-  auto classShape = buildGlobalShape([] {
+  auto shapeSpecs = [] {
     return shape(
-      special(SpecialKind::Class),
       shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
       genSig(param()),
       reqSig(param(), param().withKeyArgument(false),
              conforms(typeParam(0, 0), P()),
              sameType(typeParam(0, 0), typeParam(1, 0)))
     );
+  };
+  auto classShape = buildGlobalShape([&] {
+    auto specs = shapeSpecs();
+    specs.emplace_back(special(SpecialKind::Class));
+    return specs;
   });
   EXPECT_EQ(classShape->getContainerSignatureLayoutSizeInWords(), 1u);
 
-  auto opaqueShape = buildGlobalShape([] {
-    return shape(
-      shapeType(parameterizedProtocol(P(), "Element", typeParam(0, 0))),
-      genSig(param()),
-      reqSig(param(), param().withKeyArgument(false),
-             conforms(typeParam(0, 0), P()),
-             sameType(typeParam(0, 0), typeParam(1, 0)))
-    );
-  });
+  auto opaqueShape = buildGlobalShape(shapeSpecs);
   EXPECT_EQ(opaqueShape->getContainerSignatureLayoutSizeInWords(), 2u);
 }
