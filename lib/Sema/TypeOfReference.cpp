@@ -1064,37 +1064,24 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
 }
 
 /// For every parameter in \p type that has an error type, replace that
-/// parameter's type by a hole type, where \p value is the declaration
-/// that declared \p type. This is useful for code completion so we can match
-/// the types we do know instead of bailing out completely because \p type
-/// contains an error type.
-static Type replaceParamErrorTypeByHole(Type type, ValueDecl *value,
-                                        bool hasAppliedSelf) {
-  if (!type->is<AnyFunctionType>() || !isa<AbstractFunctionDecl>(value)) {
+/// parameter's type by a hole type. This is useful for code completion so we
+/// can match the types we do know instead of bailing out completely because
+/// \p type contains an error type.
+static Type replaceParamErrorTypeByHole(Type type) {
+  auto funcType = type->getAs<AnyFunctionType>();
+  if (!funcType)
     return type;
-  }
-  auto funcType = type->castTo<AnyFunctionType>();
-  auto funcDecl = cast<AbstractFunctionDecl>(value);
 
-  SmallVector<ParamDecl *> declParams;
-  if (hasAppliedSelf) {
-    declParams.append(funcDecl->getParameters()->begin(), funcDecl->getParameters()->end());
-  } else {
-    declParams.push_back(funcDecl->getImplicitSelfDecl());
-  }
-  auto typeParams = funcType->getParams();
-  assert(declParams.size() == typeParams.size());
+  auto funcParams = funcType->getParams();
   SmallVector<AnyFunctionType::Param, 4> newParams;
-  newParams.reserve(declParams.size());
-  for (auto i : indices(typeParams)) {
-    AnyFunctionType::Param param = typeParams[i];
+  newParams.reserve(funcParams.size());
+  for (auto &param : funcParams) {
     if (param.getPlainType()->is<ErrorType>()) {
       newParams.push_back(param.withType(HoleType::get(param.getPlainType())));
     } else {
       newParams.push_back(param);
     }
   }
-  assert(newParams.size() == declParams.size());
   return FunctionType::get(newParams, funcType->getYields(),
                            funcType->getResult(), funcType->getExtInfo());
 }
@@ -1148,8 +1135,7 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by hole types so we can
       // match the types we know instead of bailing out completely.
-      openedType = replaceParamErrorTypeByHole(
-          openedType, value, /*hasAppliedSelf=*/true);
+      openedType = replaceParamErrorTypeByHole(openedType);
     }
 
     // If we opened up any type variables, record the replacements.
@@ -1838,10 +1824,11 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     }
   }
 
-  if (isForCodeCompletion() && type->hasError()) {
+  if (isForCodeCompletion() && type->hasError() &&
+      isa<AbstractFunctionDecl>(value)) {
     // In code completion, replace error types by hole types so we can
     // match the types we know instead of bailing out completely.
-    type = replaceParamErrorTypeByHole(type, value, hasAppliedSelf);
+    type = replaceParamErrorTypeByHole(type);
   }
 
   return type;
