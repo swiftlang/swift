@@ -1795,6 +1795,8 @@ struct BridgedCloner {
   void setInsertionPoint(BridgedInstruction beforeInst) const;
   void registerLocalArchetypeRemapping(BridgedGenericEnvironment from,
                                        BridgedGenericEnvironment to) const;
+  void registerConcreteLocalArchetypeMapping(BridgedGenericEnvironment from,
+                                             BridgedSubstitutionMap to) const;
   SWIFT_IMPORT_UNSAFE BridgedType getOpType(BridgedType type) const;
 };
 

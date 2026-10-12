@@ -185,6 +185,10 @@ public struct Cloner<Context: MutatingContext> {
     bridged.registerLocalArchetypeRemapping(from.bridged, to.bridged)
   }
 
+  public func registerConcreteLocalArchetypeMapping(from: GenericEnvironment, to: SubstitutionMap) {
+    bridged.registerConcreteLocalArchetypeMapping(from.bridged, to.bridged)
+  }
+
   public func setInsertionPoint(before instruction: Instruction) {
     bridged.setInsertionPoint(instruction.bridged)
   }
