@@ -8099,10 +8099,10 @@ TypeVariableType : public TypeBase {
       : TypeBase(TypeKind::TypeVariable, &C,
                  RecursiveTypeProperties::HasTypeVariable |
                      RecursiveTypeProperties::SolverAllocated) {
-    // Note: the ID may overflow (current limit is 2^20 - 1).
+    // Note: the ID may overflow (current limit is 2^26 - 1).
     Bits.TypeVariableType.ID = ID;
     if (Bits.TypeVariableType.ID != ID) {
-      llvm::report_fatal_error("Type variable id overflow");
+      ABORT("Type variable id overflow");
     }
   }
 
