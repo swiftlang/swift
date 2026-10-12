@@ -2397,7 +2397,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     }
 
     llvm::Value *componentArgsBufSize = allParamValues.takeLast();
-    llvm::Value *componentArgsBuf;
+    llvm::Value *componentArgsBuf = nullptr;
     bool hasSubscriptIndices = params.size() > baseIndexOfIndicesArguments;
 
     // Bind the indices arguments if present.

@@ -8417,7 +8417,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   };
 
   // If we have a setter, rectify it with the getter.
-  ParamDecl *setterIndex;
+  ParamDecl *setterIndex = nullptr;
   bool getterAndSetterInSameType = false;
   bool isIUO = getter->isImplicitlyUnwrappedOptional();
   if (setter) {

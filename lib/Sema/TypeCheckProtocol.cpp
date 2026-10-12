@@ -1820,7 +1820,7 @@ bool WitnessChecker::findBestWitness(
     Done
   };
 
-  bool anyFromUnconstrainedExtension;
+  bool anyFromUnconstrainedExtension = false;
   numViable = 0;
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {

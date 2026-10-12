@@ -1477,7 +1477,7 @@ public:
             const irgen::MetadataSource &Source,
             const MetadataPath &Path) {
 
-      const reflection::MetadataSource *Root;
+      const reflection::MetadataSource *Root = nullptr;
       switch (Source.getKind()) {
       case irgen::MetadataSource::Kind::SelfMetadata:
       case irgen::MetadataSource::Kind::SelfWitnessTable:
