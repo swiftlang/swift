@@ -156,12 +156,6 @@ struct PotentialBinding {
             /*source=*/locator, /*originator=*/nullptr};
   }
 
-  static PotentialBinding forPlaceholder(Type placeholderTy) {
-    return {placeholderTy, AllowedBindingKind::Exact,
-            PointerUnion<Constraint *, ConstraintLocator *>(),
-            /*originator=*/nullptr};
-  }
-
   void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
 
   bool operator==(const PotentialBinding &other) const {
