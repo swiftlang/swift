@@ -8558,10 +8558,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  // A value of type T! can be converted to type U if T is convertible
-  // to U by force-unwrapping the source value.
-  // A value of type T, T?, or T! can be converted to type U? or U! if
-  // T is convertible to U.
+  // A value of type T can be converted to type T?.
+  // A value of type T? can be converted to type U?, if T can be converted to U.
   if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
     if (getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
       if (!type1->getOptionalObjectType() && type2->getOptionalObjectType()) {
