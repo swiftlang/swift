@@ -448,9 +448,9 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
-      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+      "deinitializers may only be declared within a class, actor, or non-'Copyable' type", ())
 ERROR(destructor_decl_on_noncopyable_enum,none,
-      "deinitializers are not yet supported on noncopyable enums", ())
+      "deinitializers are not yet supported on non-'Copyable' enums", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,

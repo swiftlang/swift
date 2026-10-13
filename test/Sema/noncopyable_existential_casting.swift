@@ -30,17 +30,17 @@ func isExistential(_ box: consuming any P & ~Copyable) {
 func castToExistential(_ box: consuming any P & ~Copyable) {
   // Destination is still an existential: not yet supported.
   _ = box as? any Q & ~Copyable // expected-warning {{cast from 'any P & ~Copyable' to unrelated type 'any Q & ~Copyable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 }
 
 func castToArchetype<T: P & ~Copyable>(_ box: consuming any P & ~Copyable, _: T.Type) {
   // Destination is still an archetype: not yet supported.
   _ = box as? T // expected-warning {{cast from 'any P & ~Copyable' to unrelated type 'T' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 }
 
 func castFromConcrete(_ mo: consuming S) {
   // Source is noncopyable but not an existential: still unsupported.
   _ = mo as? Unrelated // expected-warning {{cast from 'S' to unrelated type 'Unrelated' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 }

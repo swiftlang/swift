@@ -81,9 +81,9 @@ public struct FrozenMO: ~Copyable {
 // The rejections below must not be because 'MO' itself is not exposed.
 // CHECK: class SWIFT_SYMBOL({{.*}}) MO final {
 
-// CHECK-DAG: class Box { } SWIFT_UNAVAILABLE_MSG("noncopyable generic struct 'Box' can not yet be represented in C++");
+// CHECK-DAG: class Box { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' generic struct 'Box' can not yet be represented in C++");
 // CHECK-DAG: class EnumWithMOPayload { } SWIFT_UNAVAILABLE_MSG("Swift enum 'EnumWithMOPayload' cannot be represented in C++");
-// CHECK-DAG: class OpaqueMO { } SWIFT_UNAVAILABLE_MSG("noncopyable struct 'OpaqueMO' can not yet be represented in C++");
+// CHECK-DAG: class OpaqueMO { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'OpaqueMO' can not yet be represented in C++");
 // CHECK-DAG: // Unavailable in C++: Swift global function 'makeOpaqueMO(_:)'. Return type 'OpaqueMO' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'optMO()'. Return type 'MO?' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takeOptMO(_:)'. Parameter 'x' of type 'MO?' is not representable in C++.
@@ -99,4 +99,4 @@ public struct FrozenMO: ~Copyable {
 // EVO: class SWIFT_SYMBOL({{.*}}) FrozenMO final {
 // EVO: SWIFT_INLINE_THUNK FrozenMO(FrozenMO &&other) noexcept {
 // EVO: bool _isMovedFrom = false;
-// EVO: class MO { } SWIFT_UNAVAILABLE_MSG("noncopyable struct 'MO' can not yet be represented in C++");
+// EVO: class MO { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'MO' can not yet be represented in C++");

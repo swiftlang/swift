@@ -14,12 +14,12 @@ enum E1: ~Copyable {
     case second(S)
 }
 
-indirect enum E2: ~Copyable { // expected-error {{noncopyable enum 'E2' cannot be marked indirect or have indirect cases yet}}
+indirect enum E2: ~Copyable { // expected-error {{non-'Copyable' enum 'E2' cannot be marked indirect or have indirect cases yet}}
     case first
     case second(S)
 }
 
 enum E3: ~Copyable {
     case first
-    indirect case second(S) // expected-error {{noncopyable enum 'E3' cannot be marked indirect or have indirect cases yet}}
+    indirect case second(S) // expected-error {{non-'Copyable' enum 'E3' cannot be marked indirect or have indirect cases yet}}
 }

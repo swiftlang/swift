@@ -103,7 +103,7 @@ func requiring<T: Deinitable>(_: T) {} // expected-error {{'Deinitable' is reser
 
 // Containment
 struct Holder: ~Copyable {
-  var nd: ND // expected-error {{stored property 'nd' of 'Deinitable'-conforming struct 'Holder' has non-Deinitable type 'ND'}}
+  var nd: ND // expected-error {{stored property 'nd' of 'Deinitable'-conforming struct 'Holder' has non-'Deinitable' type 'ND'}}
 }
 
 struct DeinitableHolder: ~Copyable, ~Deinitable {
@@ -134,39 +134,39 @@ func spelled(_: consuming Box<ND>) {} // expected-error {{type 'ND' does not con
 func makeND() -> ND { ND() }
 
 class ClassHolder {
-  var nd: ND // expected-error {{stored property 'nd' of 'Deinitable'-conforming class 'ClassHolder' has non-Deinitable type 'ND'}}
+  var nd: ND // expected-error {{stored property 'nd' of 'Deinitable'-conforming class 'ClassHolder' has non-'Deinitable' type 'ND'}}
   init() { nd = ND() }
 }
 
 actor ActorHolder {
-  let nd = ND() // expected-error {{stored property 'nd' of 'Deinitable'-conforming actor 'ActorHolder' has non-Deinitable type 'ND'}}
+  let nd = ND() // expected-error {{stored property 'nd' of 'Deinitable'-conforming actor 'ActorHolder' has non-'Deinitable' type 'ND'}}
 }
 
-let globalND = ND() // expected-error {{global variable 'globalND' cannot have non-Deinitable type 'ND'}}
+let globalND = ND() // expected-error {{global variable 'globalND' cannot have non-'Deinitable' type 'ND'}}
 
 struct StaticHolder: ~Copyable, ~Deinitable {
-  static let staticND = ND() // expected-error {{static property 'staticND' cannot have non-Deinitable type 'ND'}}
+  static let staticND = ND() // expected-error {{static property 'staticND' cannot have non-'Deinitable' type 'ND'}}
 }
 
 class LazyHolder {
-  lazy var nd = ND() // expected-error {{lazy property 'nd' cannot have non-Deinitable type 'ND'}}
+  lazy var nd = ND() // expected-error {{lazy property 'nd' cannot have non-'Deinitable' type 'ND'}}
 }
 
 func asyncLet() async {
-  async let x = makeND() // expected-error {{'async let' binding 'x' cannot have non-Deinitable type 'ND'}}
+  async let x = makeND() // expected-error {{'async let' binding 'x' cannot have non-'Deinitable' type 'ND'}}
   _ = await x
 }
 
 func tuples<T: ~Copyable & ~Deinitable>(_ t: consuming T) {
   let _: (ND, Int) = (ND(), 0)
-  // expected-movetuples-error@-1 2 {{tuple cannot contain non-Deinitable element type 'ND'}}
-  // expected-copytuples-error@-2 2 {{tuple with noncopyable element type 'ND' is not supported}}
+  // expected-movetuples-error@-1 2 {{tuple cannot contain non-'Deinitable' element type 'ND'}}
+  // expected-copytuples-error@-2 2 {{tuple with non-'Copyable' element type 'ND' is not supported}}
   let _ = (makeND(), 1)
-  // expected-movetuples-error@-1 {{tuple cannot contain non-Deinitable element type 'ND'}}
-  // expected-copytuples-error@-2 {{tuple with noncopyable element type 'ND' is not supported}}
+  // expected-movetuples-error@-1 {{tuple cannot contain non-'Deinitable' element type 'ND'}}
+  // expected-copytuples-error@-2 {{tuple with non-'Copyable' element type 'ND' is not supported}}
   let _ = (t, 1)
-  // expected-movetuples-error@-1 {{tuple cannot contain non-Deinitable element type 'T'}}
-  // expected-copytuples-error@-2 {{tuple with noncopyable element type 'T' is not supported}}
+  // expected-movetuples-error@-1 {{tuple cannot contain non-'Deinitable' element type 'T'}}
+  // expected-copytuples-error@-2 {{tuple with non-'Copyable' element type 'T' is not supported}}
 }
 
 // MARK: - Optional and existentials
@@ -220,15 +220,15 @@ func closureCaptureLists(
   _ nd1: consuming ND, _ nd2: consuming ND, _ nc: consuming NC
 ) {
   let _ = { [nd1] in nd1.peek() }
-  // expected-error@-1 {{capture list entry 'nd1' of 'Deinitable'-conforming closure has non-Deinitable type 'ND'}}
+  // expected-error@-1 {{capture list entry 'nd1' of 'Deinitable'-conforming closure has non-'Deinitable' type 'ND'}}
   let _ = { @called(atMostOnce) [nd2] in nd2.finish() }
-  // expected-error@-1 {{capture list entry 'nd2' of 'Deinitable'-conforming closure has non-Deinitable type 'ND'}}
+  // expected-error@-1 {{capture list entry 'nd2' of 'Deinitable'-conforming closure has non-'Deinitable' type 'ND'}}
   let _ = { [nc] in nc.finish() } // Ok
 }
 
 func closureConsumedCaptures(_ nd: consuming ND, _ nc: consuming NC) {
   let _ = { @called(atMostOnce) in nd.finish() }
-  // expected-error@-1 {{consumed capture 'nd' of 'Deinitable'-conforming closure has non-Deinitable type 'ND'}}
+  // expected-error@-1 {{consumed capture 'nd' of 'Deinitable'-conforming closure has non-'Deinitable' type 'ND'}}
   let _ = { @called(atMostOnce) in nc.finish() } // Ok
 }
 
@@ -240,5 +240,5 @@ func closureBorrowedCaptures(_ nd: borrowing ND) {
 
 func closureGenericCaptures<T: ~Copyable & ~Deinitable>(_ t: consuming T) {
   let _ = { [t] in _ = t }
-  // expected-error@-1 {{capture list entry 't' of 'Deinitable'-conforming closure has non-Deinitable type 'T'}}
+  // expected-error@-1 {{capture list entry 't' of 'Deinitable'-conforming closure has non-'Deinitable' type 'T'}}
 }
