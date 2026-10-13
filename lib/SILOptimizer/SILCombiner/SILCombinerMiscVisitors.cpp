@@ -912,15 +912,11 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
 
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
     // destroys with a destroy of its operand.
+    salvageDebugInfo(tedai);
     while (!tedai->use_empty()) {
       Operand *use = *tedai->use_begin();
-      SILInstruction *user = use->getUser();
-      if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
-        dai->setOperand(tedai->getEnum());
-      } else {
-        assert(user->isDebugInstruction());
-        eraseInstFromFunction(*user);
-      }
+      auto *dai = cast<DestroyAddrInst>(use->getUser());
+      dai->setOperand(tedai->getEnum());
     }
     return eraseInstFromFunction(*tedai);
   }
@@ -951,15 +947,10 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
   // loads. Perform the transformation on each load at the load's use site. The
   // reason that we have to do this is that otherwise we would be hoisting the
   // loads causing us to need to consider additional ARC issues.
+  salvageDebugInfo(tedai);
   while (!tedai->use_empty()) {
     auto *use = *tedai->use_begin();
     auto *user = use->getUser();
-
-    // Delete debug insts.
-    if (user->isDebugInstruction()) {
-      eraseInstFromFunction(*user);
-      continue;
-    }
 
     // Insert a new Load of the enum and extract the data from that.
     //

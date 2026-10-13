@@ -2315,6 +2315,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::ConvertEscapeToNoEscapeInst:
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::RefElementAddrInst:
