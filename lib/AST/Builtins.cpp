@@ -3808,23 +3808,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getWithUnsafeContinuation(Context, Id, /*throws=*/true);
 
   case BuiltinValueKind::CreateSplitContinuation:
-    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
-      return nullptr;
     return getCreateSplitContinuation(Context, Id);
 
   case BuiltinValueKind::AwaitSplitThrowingContinuation:
-    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
-      return nullptr;
     return getAwaitSplitThrowingContinuation(Context, Id);
 
   case BuiltinValueKind::GetSplitContinuationAddr:
-    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
-      return nullptr;
     return getGetSplitContinuationAddr(Context, Id);
 
   case BuiltinValueKind::DestroySplitContinuation:
-    if (!Context.LangOpts.hasFeature(Feature::SplitContinuations))
-      return nullptr;
     return getDestroySplitContinuation(Context, Id);
 
   case BuiltinValueKind::HopToActor:

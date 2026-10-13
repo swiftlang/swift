@@ -1,15 +1,13 @@
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -enable-experimental-feature SplitContinuations)
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O -enable-experimental-feature SplitContinuations)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 
 @_spi(Concurrency) import _Concurrency
 @_spi(ExperimentalCustomExecutors) import _Concurrency
-@_spi(SplitContinuation) import _Concurrency
 import StdlibUnittest
 import SwiftPrivateThreadExtras
 import Synchronization
@@ -160,10 +158,10 @@ nonisolated(nonsending) func suspend<Success: ~Copyable, Failure: Error>(
   case .split:
     return try await withContinuation(of: Success.self, throwing: Failure.self) {
       (continuation: consuming Continuation<Success, Failure>,
-       awaiter: consuming ContinuationAwaiter<Success, Failure>)
+       waiter: consuming ContinuationWaiter<Success, Failure>)
         async throws(Failure) -> Success in
       handOff(continuation)
-      return try await awaiter.wait()
+      return try await waiter.wait()
     }
   case .regular:
     return try await withContinuation(of: Success.self, throwing: Failure.self) {
@@ -194,51 +192,118 @@ enum ResumeForm: CaseIterable, Sendable {
   }
 }
 
+// The types a continuation can be resumed through.
+enum ResumerKind: CaseIterable, CustomStringConvertible, Sendable {
+  case continuation
+  case unsafe
+  case checked
+
+  var description: String {
+    switch self {
+    case .continuation: "Continuation"
+    case .unsafe: "UnsafeContinuation"
+    case .checked: "CheckedContinuation"
+    }
+  }
+}
+
+// The execution context a resumer offers.
+enum Offer: Sendable {
+  case taskExecutor(UnownedTaskExecutor)
+  case serialExecutor(UnownedSerialExecutor)
+  case both(UnownedSerialExecutor, UnownedTaskExecutor)
+}
+
+// The `resumeSynchronously` overloads every kind of continuation provides.
+protocol SynchronouslyResumable: ~Copyable {
+  consuming func resumeSynchronously(
+    returning value: consuming sending Int, on taskExecutor: UnownedTaskExecutor)
+  consuming func resumeSynchronously(
+    throwing error: consuming TestError, on taskExecutor: UnownedTaskExecutor)
+  consuming func resumeSynchronously(
+    with result: consuming sending Result<Int, TestError>, on taskExecutor: UnownedTaskExecutor)
+
+  consuming func resumeSynchronously(
+    returning value: consuming sending Int, isolatedTo serialExecutor: UnownedSerialExecutor)
+  consuming func resumeSynchronously(
+    throwing error: consuming TestError, isolatedTo serialExecutor: UnownedSerialExecutor)
+  consuming func resumeSynchronously(
+    with result: consuming sending Result<Int, TestError>,
+    isolatedTo serialExecutor: UnownedSerialExecutor)
+
+  consuming func resumeSynchronously(
+    returning value: consuming sending Int, isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor)
+  consuming func resumeSynchronously(
+    throwing error: consuming TestError, isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor)
+  consuming func resumeSynchronously(
+    with result: consuming sending Result<Int, TestError>,
+    isolatedTo serialExecutor: UnownedSerialExecutor, taskExecutor: UnownedTaskExecutor)
+}
+
+extension Continuation: SynchronouslyResumable where Success == Int, Failure == TestError {}
+extension UnsafeContinuation: SynchronouslyResumable where T == Int, E == TestError {}
+extension CheckedContinuation: SynchronouslyResumable where T == Int, E == TestError {}
+
+extension SynchronouslyResumable where Self: ~Copyable {
+  consuming func resumeSynchronously(_ form: ResumeForm, offering offer: Offer) {
+    switch offer {
+    case .taskExecutor(let taskExecutor):
+      switch form {
+      case .returning:
+        resumeSynchronously(returning: form.code, on: taskExecutor)
+      case .throwing:
+        resumeSynchronously(throwing: TestError(code: form.code), on: taskExecutor)
+      case .resultSuccess:
+        resumeSynchronously(with: .success(form.code), on: taskExecutor)
+      case .resultFailure:
+        resumeSynchronously(with: .failure(TestError(code: form.code)), on: taskExecutor)
+      }
+    case .serialExecutor(let serialExecutor):
+      switch form {
+      case .returning:
+        resumeSynchronously(returning: form.code, isolatedTo: serialExecutor)
+      case .throwing:
+        resumeSynchronously(throwing: TestError(code: form.code), isolatedTo: serialExecutor)
+      case .resultSuccess:
+        resumeSynchronously(with: .success(form.code), isolatedTo: serialExecutor)
+      case .resultFailure:
+        resumeSynchronously(with: .failure(TestError(code: form.code)), isolatedTo: serialExecutor)
+      }
+    case .both(let serialExecutor, let taskExecutor):
+      switch form {
+      case .returning:
+        resumeSynchronously(
+          returning: form.code, isolatedTo: serialExecutor, taskExecutor: taskExecutor)
+      case .throwing:
+        resumeSynchronously(
+          throwing: TestError(code: form.code), isolatedTo: serialExecutor,
+          taskExecutor: taskExecutor)
+      case .resultSuccess:
+        resumeSynchronously(
+          with: .success(form.code), isolatedTo: serialExecutor, taskExecutor: taskExecutor)
+      case .resultFailure:
+        resumeSynchronously(
+          with: .failure(TestError(code: form.code)), isolatedTo: serialExecutor,
+          taskExecutor: taskExecutor)
+      }
+    }
+  }
+}
+
 extension Continuation where Success == Int, Failure == TestError {
-  consuming func resume(_ form: ResumeForm, on taskExecutor: UnownedTaskExecutor) {
-    switch form {
-    case .returning:
-      resume(returning: form.code, on: taskExecutor)
-    case .throwing:
-      resume(throwing: TestError(code: form.code), on: taskExecutor)
-    case .resultSuccess:
-      resume(with: .success(form.code), on: taskExecutor)
-    case .resultFailure:
-      resume(with: .failure(TestError(code: form.code)), on: taskExecutor)
-    }
-  }
-
-  consuming func resume(_ form: ResumeForm, isolatedTo serialExecutor: UnownedSerialExecutor) {
-    switch form {
-    case .returning:
-      resume(returning: form.code, isolatedTo: serialExecutor)
-    case .throwing:
-      resume(throwing: TestError(code: form.code), isolatedTo: serialExecutor)
-    case .resultSuccess:
-      resume(with: .success(form.code), isolatedTo: serialExecutor)
-    case .resultFailure:
-      resume(with: .failure(TestError(code: form.code)), isolatedTo: serialExecutor)
-    }
-  }
-
-  consuming func resume(
-    _ form: ResumeForm,
-    isolatedTo serialExecutor: UnownedSerialExecutor,
-    taskExecutor: UnownedTaskExecutor
+  // Resumes through a continuation of the given kind, converted from this one.
+  consuming func resumeSynchronously(
+    _ form: ResumeForm, offering offer: Offer, as resumer: ResumerKind
   ) {
-    switch form {
-    case .returning:
-      resume(returning: form.code, isolatedTo: serialExecutor, taskExecutor: taskExecutor)
-    case .throwing:
-      resume(
-        throwing: TestError(code: form.code), isolatedTo: serialExecutor,
-        taskExecutor: taskExecutor)
-    case .resultSuccess:
-      resume(with: .success(form.code), isolatedTo: serialExecutor, taskExecutor: taskExecutor)
-    case .resultFailure:
-      resume(
-        with: .failure(TestError(code: form.code)), isolatedTo: serialExecutor,
-        taskExecutor: taskExecutor)
+    switch resumer {
+    case .continuation:
+      resumeSynchronously(form, offering: offer)
+    case .unsafe:
+      unsafe UnsafeContinuation(self).resumeSynchronously(form, offering: offer)
+    case .checked:
+      CheckedContinuation(self).resumeSynchronously(form, offering: offer)
     }
   }
 }
@@ -332,13 +397,13 @@ actor Worker {
   // Awaits a split continuation created elsewhere, on this actor, calling
   // `beforeWaiting` right before suspending.
   func awaitIt(
-    _ awaiter: consuming ContinuationAwaiter<Int, Never>,
+    _ waiter: consuming ContinuationWaiter<Int, Never>,
     log: EventLog,
     beforeWaiting: @Sendable () -> Void
   ) async -> Int {
     beforeWaiting()
-    let value = await awaiter.wait()
-    log.record("awaiter resumed")
+    let value = await waiter.wait()
+    log.record("waiter resumed")
     return value
   }
 
@@ -355,12 +420,12 @@ nonisolated func startImmediatelyAndCallActor(
     let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
       let holder = ContinuationHolder(continuation)
       Task.detached {
-        holder.take().resume(
+        holder.take().resumeSynchronously(
           returning: 19, on: globalConcurrentExecutor.asUnownedTaskExecutor())
         log.record("resume returned")
       }
     }
-    log.record("awaiter resumed")
+    log.record("waiter resumed")
     _ = await counter.increment()
     log.record("actor call returned")
     return value
@@ -381,36 +446,41 @@ struct Main {
     // MARK: Both kinds of continuation
 
     for kind in ContinuationKind.allCases {
-      tests.test("\(kind): offering a nonisolated task's task executor donates the thread, for every form of resume") {
-        let pool = ManualTaskExecutor()
-        let log = EventLog()
-        let task = Task.detached(executorPreference: pool) { () -> [Int] in
-          var codes: [Int] = []
-          for form in ResumeForm.allCases {
-            codes.append(await suspendForCode(kind) { continuation in
-              let holder = ContinuationHolder(continuation)
-              Task.detached(executorPreference: pool) {
-                holder.take().resume(form, on: pool.asUnownedTaskExecutor())
-                log.record("resume returned")
-              }
-            })
-            log.record("awaiter resumed")
+      // The UnsafeContinuation and CheckedContinuation overloads don't depend on
+      // the kind of continuation, so they only run with regular ones.
+      for resumer in ResumerKind.allCases where resumer == .continuation || kind == .regular {
+        tests.test("\(kind), resumed through \(resumer): offering a nonisolated task's task executor donates the thread, for every form of resume") {
+          let pool = ManualTaskExecutor()
+          let log = EventLog()
+          let task = Task.detached(executorPreference: pool) { () -> [Int] in
+            var codes: [Int] = []
+            for form in ResumeForm.allCases {
+              codes.append(await suspendForCode(kind) { continuation in
+                let holder = ContinuationHolder(continuation)
+                Task.detached(executorPreference: pool) {
+                  holder.take().resumeSynchronously(
+                    form, offering: .taskExecutor(pool.asUnownedTaskExecutor()), as: resumer)
+                  log.record("resume returned")
+                }
+              })
+              log.record("waiter resumed")
+            }
+            return codes
           }
-          return codes
+          // The awaiting task up to its first suspension, then one resumer per
+          // form, each of which runs the awaiting task on to its next one.
+          pool.runNextJob()
+          for _ in ResumeForm.allCases { pool.runNextJob() }
+          // One donated resume per form.
+          expectEqual(
+            ["waiter resumed", "resume returned",
+             "waiter resumed", "resume returned",
+             "waiter resumed", "resume returned",
+             "waiter resumed", "resume returned"],
+            log.recorded)
+          expectEqual(0, pool.pendingJobCount)
+          expectEqual(ResumeForm.allCases.map(\.code), await task.value)
         }
-        // The awaiting task up to its first suspension, then one resumer per
-        // form, each of which runs the awaiting task on to its next one.
-        pool.runNextJob()
-        for _ in ResumeForm.allCases { pool.runNextJob() }
-        // One donated resume per form.
-        expectEqual(
-          ["awaiter resumed", "resume returned",
-           "awaiter resumed", "resume returned",
-           "awaiter resumed", "resume returned",
-           "awaiter resumed", "resume returned"],
-          log.recorded)
-        expectEqual(0, pool.pendingJobCount)
-        expectEqual(ResumeForm.allCases.map(\.code), await task.value)
       }
 
       tests.test("\(kind): offering an unrelated task executor enqueues") {
@@ -421,11 +491,11 @@ struct Main {
           let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
             let holder = ContinuationHolder(continuation)
             Task.detached(executorPreference: unrelated) {
-              holder.take().resume(returning: 5, on: unrelated.asUnownedTaskExecutor())
+              holder.take().resumeSynchronously(returning: 5, on: unrelated.asUnownedTaskExecutor())
               log.record("resume returned")
             }
           }
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return value
         }
         pool.runNextJob()
@@ -434,7 +504,7 @@ struct Main {
         expectEqual(["resume returned"], log.recorded)
         expectEqual(1, pool.pendingJobCount)
         pool.runNextJob()
-        expectEqual(["resume returned", "awaiter resumed"], log.recorded)
+        expectEqual(["resume returned", "waiter resumed"], log.recorded)
         expectEqual(5, await task.value)
       }
 
@@ -445,18 +515,18 @@ struct Main {
           let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
             let holder = ContinuationHolder(continuation)
             Task.detached {
-              holder.take().resume(
+              holder.take().resumeSynchronously(
                 returning: 6, on: globalConcurrentExecutor.asUnownedTaskExecutor())
               log.record("resume returned")
             }
           }
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return value
         }
         // The awaiting task up to its suspension, then the resumer.
         generic.runNextJob()
         generic.runNextJob()
-        expectEqual(["awaiter resumed", "resume returned"], log.recorded)
+        expectEqual(["waiter resumed", "resume returned"], log.recorded)
         expectEqual(0, generic.pendingJobCount)
         generic.drainAndRelease()
         expectEqual(6, await task.value)
@@ -470,12 +540,12 @@ struct Main {
           let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
             let holder = ContinuationHolder(continuation)
             Task.detached(executorPreference: executor) {
-              holder.take().resume(
+              holder.take().resumeSynchronously(
                 returning: 7, isolatedTo: executor.asUnownedSerialExecutor())
               log.record("resume returned")
             }
           }
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return value
         }
         generic.runNextJob()
@@ -484,44 +554,50 @@ struct Main {
         expectEqual(["resume returned"], log.recorded)
         expectEqual(1, generic.pendingJobCount)
         generic.runNextJob()
-        expectEqual(["resume returned", "awaiter resumed"], log.recorded)
+        expectEqual(["resume returned", "waiter resumed"], log.recorded)
         generic.drainAndRelease()
         expectEqual(7, await task.value)
       }
 
-      tests.test("\(kind): offering an actor-isolated task's actor executor donates the thread, for every form of resume") {
-        let executor = ManualExecutor()
-        let isolated = Worker(executor)
-        let log = EventLog()
-        let task = Task.detached {
-          await isolated.run { () -> [Int] in
-            var codes: [Int] = []
-            for form in ResumeForm.allCases {
-              codes.append(await suspendForCode(kind) { continuation in
-                let holder = ContinuationHolder(continuation)
-                Task.detached(executorPreference: executor) {
-                  holder.take().resume(form, isolatedTo: executor.asUnownedSerialExecutor())
-                  log.record("resume returned")
-                }
-              })
-              log.record("awaiter resumed")
+      // The UnsafeContinuation and CheckedContinuation overloads don't depend on
+      // the kind of continuation, so they only run with regular ones.
+      for resumer in ResumerKind.allCases where resumer == .continuation || kind == .regular {
+        tests.test("\(kind), resumed through \(resumer): offering an actor-isolated task's actor executor donates the thread, for every form of resume") {
+          let executor = ManualExecutor()
+          let isolated = Worker(executor)
+          let log = EventLog()
+          let task = Task.detached {
+            await isolated.run { () -> [Int] in
+              var codes: [Int] = []
+              for form in ResumeForm.allCases {
+                codes.append(await suspendForCode(kind) { continuation in
+                  let holder = ContinuationHolder(continuation)
+                  Task.detached(executorPreference: executor) {
+                    holder.take().resumeSynchronously(
+                      form, offering: .serialExecutor(executor.asUnownedSerialExecutor()),
+                      as: resumer)
+                    log.record("resume returned")
+                  }
+                })
+                log.record("waiter resumed")
+              }
+              return codes
             }
-            return codes
           }
+          // The hop onto the actor, up to the first suspension, then one resumer
+          // per form.
+          executor.runNextJob()
+          for _ in ResumeForm.allCases { executor.runNextJob() }
+          // One donated resume per form.
+          expectEqual(
+            ["waiter resumed", "resume returned",
+             "waiter resumed", "resume returned",
+             "waiter resumed", "resume returned",
+             "waiter resumed", "resume returned"],
+            log.recorded)
+          expectEqual(0, executor.pendingJobCount)
+          expectEqual(ResumeForm.allCases.map(\.code), await task.value)
         }
-        // The hop onto the actor, up to the first suspension, then one resumer
-        // per form.
-        executor.runNextJob()
-        for _ in ResumeForm.allCases { executor.runNextJob() }
-        // One donated resume per form.
-        expectEqual(
-          ["awaiter resumed", "resume returned",
-           "awaiter resumed", "resume returned",
-           "awaiter resumed", "resume returned",
-           "awaiter resumed", "resume returned"],
-          log.recorded)
-        expectEqual(0, executor.pendingJobCount)
-        expectEqual(ResumeForm.allCases.map(\.code), await task.value)
       }
 
       tests.test("\(kind): offering another serial executor enqueues on the actor's executor") {
@@ -535,11 +611,11 @@ struct Main {
             let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
               let holder = ContinuationHolder(continuation)
               Task.detached(executorPreference: other) {
-                holder.take().resume(returning: 8, isolatedTo: other.asUnownedSerialExecutor())
+                holder.take().resumeSynchronously(returning: 8, isolatedTo: other.asUnownedSerialExecutor())
                 log.record("resume returned")
               }
             }
-            log.record("awaiter resumed")
+            log.record("waiter resumed")
             return value
           }
         }
@@ -553,7 +629,7 @@ struct Main {
         expectEqual(1, executor.pendingJobCount)
         expectEqual(0, generic.pendingJobCount)
         executor.runNextJob()
-        expectEqual(["resume returned", "awaiter resumed"], log.recorded)
+        expectEqual(["resume returned", "waiter resumed"], log.recorded)
         generic.drainAndRelease()
         expectEqual(8, await task.value)
       }
@@ -568,14 +644,14 @@ struct Main {
             let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
               let holder = ContinuationHolder(continuation)
               Task.detached(executorPreference: preference) {
-                holder.take().resume(returning: 9, on: preference.asUnownedTaskExecutor())
+                holder.take().resumeSynchronously(returning: 9, on: preference.asUnownedTaskExecutor())
                 log.record("resume returned")
               }
             }
-            log.record("awaiter resumed on the actor")
+            log.record("waiter resumed on the actor")
             return value
           }
-          log.record("awaiter left the actor")
+          log.record("waiter left the actor")
           return value
         }
         // The task starts and hops onto the actor, suspends there, then the
@@ -588,66 +664,72 @@ struct Main {
         expectEqual(1, executor.pendingJobCount)
         executor.runNextJob(taskExecutor: preference.asUnownedTaskExecutor())
         // Leaving the actor enqueues the task back onto its task executor.
-        expectEqual(["resume returned", "awaiter resumed on the actor"], log.recorded)
+        expectEqual(["resume returned", "waiter resumed on the actor"], log.recorded)
         expectEqual(1, preference.pendingJobCount)
         preference.runNextJob()
         expectEqual(
-          ["resume returned", "awaiter resumed on the actor", "awaiter left the actor"],
+          ["resume returned", "waiter resumed on the actor", "waiter left the actor"],
           log.recorded)
         expectEqual(9, await task.value)
       }
 
-      tests.test("\(kind): offering an actor's executor and the task's task executor donates the thread, for every form of resume") {
-        let executor = ManualExecutor()
-        let preference = ManualTaskExecutor()
-        let isolated = Worker(executor)
-        let log = EventLog()
-        let task = Task.detached(executorPreference: preference) {
-          let codes = await isolated.run { () -> [Int] in
-            var codes: [Int] = []
-            for form in ResumeForm.allCases {
-              codes.append(await suspendForCode(kind) { continuation in
-                let holder = ContinuationHolder(continuation)
-                Task.detached(executorPreference: executor) {
-                  holder.take().resume(
-                    form,
-                    isolatedTo: executor.asUnownedSerialExecutor(),
-                    taskExecutor: preference.asUnownedTaskExecutor())
-                  log.record("resume returned")
-                }
-              })
-              log.record("awaiter resumed on the actor")
-              await isolated.touch()
-              log.record("same-actor call returned")
+      // The UnsafeContinuation and CheckedContinuation overloads don't depend on
+      // the kind of continuation, so they only run with regular ones.
+      for resumer in ResumerKind.allCases where resumer == .continuation || kind == .regular {
+        tests.test("\(kind), resumed through \(resumer): offering an actor's executor and the task's task executor donates the thread, for every form of resume") {
+          let executor = ManualExecutor()
+          let preference = ManualTaskExecutor()
+          let isolated = Worker(executor)
+          let log = EventLog()
+          let task = Task.detached(executorPreference: preference) {
+            let codes = await isolated.run { () -> [Int] in
+              var codes: [Int] = []
+              for form in ResumeForm.allCases {
+                codes.append(await suspendForCode(kind) { continuation in
+                  let holder = ContinuationHolder(continuation)
+                  Task.detached(executorPreference: executor) {
+                    holder.take().resumeSynchronously(
+                      form,
+                      offering: .both(
+                        executor.asUnownedSerialExecutor(),
+                        preference.asUnownedTaskExecutor()),
+                      as: resumer)
+                    log.record("resume returned")
+                  }
+                })
+                log.record("waiter resumed on the actor")
+                await isolated.touch()
+                log.record("same-actor call returned")
+              }
+              return codes
             }
+            log.record("waiter left the actor")
             return codes
           }
-          log.record("awaiter left the actor")
-          return codes
-        }
-        // The task starts and hops onto the actor, up to its first suspension,
-        // then one resumer per form.
-        preference.runNextJob()
-        executor.runNextJob(taskExecutor: preference.asUnownedTaskExecutor())
-        for _ in ResumeForm.allCases {
+          // The task starts and hops onto the actor, up to its first suspension,
+          // then one resumer per form.
+          preference.runNextJob()
           executor.runNextJob(taskExecutor: preference.asUnownedTaskExecutor())
+          for _ in ResumeForm.allCases {
+            executor.runNextJob(taskExecutor: preference.asUnownedTaskExecutor())
+          }
+          // Each donated thread is set up on both executors, so it keeps running
+          // the task on the actor: through the hop back onto the actor after the
+          // await and through the same-actor call. Only leaving the actor
+          // enqueues the task back onto its task executor.
+          let onTheActor = [
+            "waiter resumed on the actor", "same-actor call returned", "resume returned",
+            "waiter resumed on the actor", "same-actor call returned", "resume returned",
+            "waiter resumed on the actor", "same-actor call returned", "resume returned",
+            "waiter resumed on the actor", "same-actor call returned", "resume returned",
+          ]
+          expectEqual(onTheActor, log.recorded)
+          expectEqual(0, executor.pendingJobCount)
+          expectEqual(1, preference.pendingJobCount)
+          preference.runNextJob()
+          expectEqual(onTheActor + ["waiter left the actor"], log.recorded)
+          expectEqual(ResumeForm.allCases.map(\.code), await task.value)
         }
-        // Each donated thread is set up on both executors, so it keeps running
-        // the task on the actor: through the hop back onto the actor after the
-        // await and through the same-actor call. Only leaving the actor
-        // enqueues the task back onto its task executor.
-        let onTheActor = [
-          "awaiter resumed on the actor", "same-actor call returned", "resume returned",
-          "awaiter resumed on the actor", "same-actor call returned", "resume returned",
-          "awaiter resumed on the actor", "same-actor call returned", "resume returned",
-          "awaiter resumed on the actor", "same-actor call returned", "resume returned",
-        ]
-        expectEqual(onTheActor, log.recorded)
-        expectEqual(0, executor.pendingJobCount)
-        expectEqual(1, preference.pendingJobCount)
-        preference.runNextJob()
-        expectEqual(onTheActor + ["awaiter left the actor"], log.recorded)
-        expectEqual(ResumeForm.allCases.map(\.code), await task.value)
       }
 
       tests.test("\(kind): offering only an actor's executor enqueues when the task has a task executor preference") {
@@ -660,14 +742,14 @@ struct Main {
             let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
               let holder = ContinuationHolder(continuation)
               Task.detached(executorPreference: executor) {
-                holder.take().resume(returning: 10, isolatedTo: executor.asUnownedSerialExecutor())
+                holder.take().resumeSynchronously(returning: 10, isolatedTo: executor.asUnownedSerialExecutor())
                 log.record("resume returned")
               }
             }
-            log.record("awaiter resumed on the actor")
+            log.record("waiter resumed on the actor")
             return value
           }
-          log.record("awaiter left the actor")
+          log.record("waiter left the actor")
           return value
         }
         // The task starts and hops onto the actor, suspends there, then the
@@ -691,11 +773,11 @@ struct Main {
         expectEqual(["resume returned"], log.recorded)
         expectEqual(1, executor.pendingJobCount)
         executor.runNextJob(taskExecutor: preference.asUnownedTaskExecutor())
-        expectEqual(["resume returned", "awaiter resumed on the actor"], log.recorded)
+        expectEqual(["resume returned", "waiter resumed on the actor"], log.recorded)
         expectEqual(1, preference.pendingJobCount)
         preference.runNextJob()
         expectEqual(
-          ["resume returned", "awaiter resumed on the actor", "awaiter left the actor"],
+          ["resume returned", "waiter resumed on the actor", "waiter left the actor"],
           log.recorded)
         expectEqual(10, await task.value)
       }
@@ -707,16 +789,16 @@ struct Main {
           let tracked = await suspend(kind, of: LifetimeTracked.self, throwing: Never.self) { continuation in
             let holder = ContinuationHolder(continuation)
             Task.detached(executorPreference: pool) {
-              holder.take().resume(returning: LifetimeTracked(11), on: pool.asUnownedTaskExecutor())
+              holder.take().resumeSynchronously(returning: LifetimeTracked(11), on: pool.asUnownedTaskExecutor())
               log.record("resume returned")
             }
           }
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return tracked.value
         }
         pool.runNextJob()
         pool.runNextJob()
-        expectEqual(["awaiter resumed", "resume returned"], log.recorded)
+        expectEqual(["waiter resumed", "resume returned"], log.recorded)
         expectEqual(0, pool.pendingJobCount)
         expectEqual(11, await task.value)
       }
@@ -729,17 +811,17 @@ struct Main {
           let token = await suspend(kind, of: Token.self, throwing: Never.self) { continuation in
             let holder = ContinuationHolder(continuation)
             Task.detached(executorPreference: pool) {
-              holder.take().resume(
+              holder.take().resumeSynchronously(
                 returning: Token(value: 12, drops: drops), on: pool.asUnownedTaskExecutor())
               log.record("resume returned")
             }
           }
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return token.value
         }
         pool.runNextJob()
         pool.runNextJob()
-        expectEqual(["awaiter resumed", "resume returned"], log.recorded)
+        expectEqual(["waiter resumed", "resume returned"], log.recorded)
         expectEqual(0, pool.pendingJobCount)
         expectEqual(12, await task.value)
         expectEqual(1, drops.value)
@@ -749,7 +831,7 @@ struct Main {
         let pool = ManualTaskExecutor()
         let task = Task.detached(executorPreference: pool) {
           await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
-            continuation.resume(returning: 13, on: pool.asUnownedTaskExecutor())
+            continuation.resumeSynchronously(returning: 13, on: pool.asUnownedTaskExecutor())
           }
         }
         // The awaiting task finds the continuation already resumed.
@@ -766,17 +848,17 @@ struct Main {
           let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
             handOff.store(continuation)
           }
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return value
         }
         // Drive the executor from a thread that runs no task.
         let (_, thread) = _stdlib_thread_create_block({ _ in
           pool.runNextJob()
-          handOff.take().resume(returning: 14, on: pool.asUnownedTaskExecutor())
+          handOff.take().resumeSynchronously(returning: 14, on: pool.asUnownedTaskExecutor())
           log.record("resume returned")
         }, ())
         _ = _stdlib_thread_join(thread!, Void.self)
-        expectEqual(["awaiter resumed", "resume returned"], log.recorded)
+        expectEqual(["waiter resumed", "resume returned"], log.recorded)
         expectEqual(0, pool.pendingJobCount)
         expectEqual(14, await task.value)
       }
@@ -788,11 +870,11 @@ struct Main {
           let value = await suspend(kind, of: Int.self, throwing: Never.self) { continuation in
             let holder = ContinuationHolder(continuation)
             Task.detached(executorPreference: pool) {
-              holder.take().resume(returning: 15, on: pool.asUnownedTaskExecutor())
+              holder.take().resumeSynchronously(returning: 15, on: pool.asUnownedTaskExecutor())
               log.record("resume returned")
             }
           }
-          log.record(Task.isCancelled ? "awaiter resumed, cancelled" : "awaiter resumed")
+          log.record(Task.isCancelled ? "waiter resumed, cancelled" : "waiter resumed")
           return value
         }
         pool.runNextJob()
@@ -801,7 +883,7 @@ struct Main {
         expectEqual([], log.recorded)
         expectEqual(1, pool.pendingJobCount)
         pool.runNextJob()
-        expectEqual(["awaiter resumed, cancelled", "resume returned"], log.recorded)
+        expectEqual(["waiter resumed, cancelled", "resume returned"], log.recorded)
         expectEqual(0, pool.pendingJobCount)
         expectEqual(15, await task.value)
       }
@@ -815,7 +897,7 @@ struct Main {
         generic.runNextJob()
         // The donated thread runs the task on, taking over the idle actor for
         // the actor call, all before the resume returns.
-        expectEqual(["awaiter resumed", "actor call returned", "resume returned"], log.recorded)
+        expectEqual(["waiter resumed", "actor call returned", "resume returned"], log.recorded)
         generic.drainAndRelease()
         expectEqual(19, await task.value)
       }
@@ -829,16 +911,16 @@ struct Main {
       let task = Task.detached(executorPreference: pool) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           Task.detached(executorPreference: pool) {
-            holder.take().resume(returning: 16, on: pool.asUnownedTaskExecutor())
+            holder.take().resumeSynchronously(returning: 16, on: pool.asUnownedTaskExecutor())
             log.record("resume returned")
           }
-          let value = await awaiter.wait(
+          let value = await waiter.wait(
             onCancel: { log.record("cancellation handler") },
             onEscalate: { _ in log.record("escalation handler") })
-          log.record("awaiter resumed")
+          log.record("waiter resumed")
           return value
         }
       }
@@ -849,7 +931,7 @@ struct Main {
       expectEqual(["cancellation handler"], log.recorded)
       expectEqual(1, pool.pendingJobCount)
       pool.runNextJob()
-      expectEqual(["cancellation handler", "awaiter resumed", "resume returned"], log.recorded)
+      expectEqual(["cancellation handler", "waiter resumed", "resume returned"], log.recorded)
       expectEqual(0, pool.pendingJobCount)
       expectEqual(16, await task.value)
     }
@@ -868,13 +950,13 @@ struct Main {
         await creating.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
-             awaiter: consuming ContinuationAwaiter<Int, Never>) in
+             waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
-            return await awaiting.awaitIt(awaiter, log: log) {
+            return await awaiting.awaitIt(waiter, log: log) {
               // Start the resumer only now, so that it runs after the task has
               // suspended rather than resuming ahead of the await.
               Task.detached(executorPreference: awaitingExecutor) {
-                holder.take().resume(
+                holder.take().resumeSynchronously(
                   returning: 17, isolatedTo: awaitingExecutor.asUnownedSerialExecutor())
                 log.record("resume returned")
               }
@@ -888,7 +970,7 @@ struct Main {
       awaitingExecutor.runNextJob()
       // The resumer, offering the awaiting actor's executor.
       awaitingExecutor.runNextJob()
-      expectEqual(["awaiter resumed", "resume returned"], log.recorded)
+      expectEqual(["waiter resumed", "resume returned"], log.recorded)
       // Returning from the awaiting actor takes the task back to the creating
       // one.
       expectEqual(1, creatingExecutor.pendingJobCount)
@@ -906,13 +988,13 @@ struct Main {
         await creating.run {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
-             awaiter: consuming ContinuationAwaiter<Int, Never>) in
+             waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
-            return await awaiting.awaitIt(awaiter, log: log) {
+            return await awaiting.awaitIt(waiter, log: log) {
               // Start the resumer only now, so that it runs after the task has
               // suspended rather than resuming ahead of the await.
               Task.detached(executorPreference: creatingExecutor) {
-                holder.take().resume(
+                holder.take().resumeSynchronously(
                   returning: 20, isolatedTo: creatingExecutor.asUnownedSerialExecutor())
                 log.record("resume returned")
               }
@@ -929,7 +1011,7 @@ struct Main {
       expectEqual(["resume returned"], log.recorded)
       expectEqual(1, awaitingExecutor.pendingJobCount)
       awaitingExecutor.runNextJob()
-      expectEqual(["resume returned", "awaiter resumed"], log.recorded)
+      expectEqual(["resume returned", "waiter resumed"], log.recorded)
       // Returning from the awaiting actor takes the task back to the creating
       // one.
       expectEqual(1, creatingExecutor.pendingJobCount)
@@ -947,18 +1029,18 @@ struct Main {
       let task = Task.detached(executorPreference: atCreation) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
-          var slot: ContinuationAwaiter<Int, Never>? = consume awaiter
+          var slot: ContinuationWaiter<Int, Never>? = consume waiter
           return await withTaskExecutorPreference(atAwait) {
             // Start the resumer only now, so that it runs after the task has
             // suspended rather than resuming ahead of the await.
             Task.detached(executorPreference: atAwait) {
-              holder.take().resume(returning: 18, on: atAwait.asUnownedTaskExecutor())
+              holder.take().resumeSynchronously(returning: 18, on: atAwait.asUnownedTaskExecutor())
               log.record("resume returned")
             }
             let value = await slot.take()!.wait()
-            log.record("awaiter resumed")
+            log.record("waiter resumed")
             return value
           }
         }
@@ -969,7 +1051,7 @@ struct Main {
       atAwait.runNextJob()
       // The resumer, offering the preference at the await.
       atAwait.runNextJob()
-      expectEqual(["awaiter resumed", "resume returned"], log.recorded)
+      expectEqual(["waiter resumed", "resume returned"], log.recorded)
       // Leaving the preference's scope takes the task back to the one it was
       // created under.
       expectEqual(1, atCreation.pendingJobCount)
@@ -984,18 +1066,18 @@ struct Main {
       let task = Task.detached(executorPreference: atCreation) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
-          var slot: ContinuationAwaiter<Int, Never>? = consume awaiter
+          var slot: ContinuationWaiter<Int, Never>? = consume waiter
           return await withTaskExecutorPreference(atAwait) {
             // Start the resumer only now, so that it runs after the task has
             // suspended rather than resuming ahead of the await.
             Task.detached(executorPreference: atCreation) {
-              holder.take().resume(returning: 21, on: atCreation.asUnownedTaskExecutor())
+              holder.take().resumeSynchronously(returning: 21, on: atCreation.asUnownedTaskExecutor())
               log.record("resume returned")
             }
             let value = await slot.take()!.wait()
-            log.record("awaiter resumed")
+            log.record("waiter resumed")
             return value
           }
         }
@@ -1009,7 +1091,7 @@ struct Main {
       expectEqual(["resume returned"], log.recorded)
       expectEqual(1, atAwait.pendingJobCount)
       atAwait.runNextJob()
-      expectEqual(["resume returned", "awaiter resumed"], log.recorded)
+      expectEqual(["resume returned", "waiter resumed"], log.recorded)
       // Leaving the preference's scope takes the task back to the one it was
       // created under.
       expectEqual(1, atCreation.pendingJobCount)

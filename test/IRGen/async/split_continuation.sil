@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -sil-verify-all -enable-experimental-feature SplitContinuations | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: PTRSIZE=64
-// REQUIRES: swift_feature_SplitContinuations
 // The extern_weak checks below assert Darwin's back-deployment weak-linking
 // convention; Linux emits an ordinary declare for the same symbol.
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=xros
