@@ -4470,6 +4470,20 @@ $SDKSupplementalRuntimes = @(
   "Runtime"
 )
 
+# Copies the standard library sources that Runtimes builds from.
+# TODO: remove this once the migration is completed.
+function Sync-Runtimes {
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $BuildPlatform
+
+    Push-Location "${SourceCache}\swift\Runtimes"
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
+    Pop-Location
+  }
+}
+
 function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $SDKIdentifier         = $Context.SDKIdentifier
   $Variant               = $Context.Variant
@@ -4495,16 +4509,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
   $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
-  # TODO: remove this once the migration is completed.
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $BuildPlatform
-
-    Push-Location "${SourceCache}\swift\Runtimes"
-    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
-    $CMakeBin = (Get-CMake).Path
-    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
-    Pop-Location
-  }
+  Sync-Runtimes
 
   Invoke-IsolatingEnvVars {
     # TODO(compnerd) build statically for static builds
@@ -4940,6 +4945,37 @@ roots:
     }
 
   }
+}
+
+# Builds the Windows SDK of one architecture into the SDK named $SDKIdentifier.
+function Build-WindowsSDK([Hashtable] $Platform, [string] $SDKIdentifier) {
+  Build-SDKDependencies @($Platform) -Compilers $Compilers.Stage1
+
+  if ($Platform.LinkModes.contains("dynamic")) {
+    Invoke-BuildStep Build-SDK $Platform -Context @{
+      SDKIdentifier        = $SDKIdentifier;
+      Variant              = "Dynamic";
+      Compilers            = $Compilers.Stage1;
+      Static               = $false;
+      BuildFoundation      = $true;
+      SupplementalRuntimes = $SDKSupplementalRuntimes;
+    }
+  }
+
+  if ($Platform.LinkModes.contains("static")) {
+    Invoke-BuildStep Build-SDK $Platform -Context @{
+      SDKIdentifier        = $SDKIdentifier;
+      Variant              = "Static";
+      Compilers            = $Compilers.Stage1;
+      Static               = $true;
+      BuildFoundation      = $true;
+      SupplementalRuntimes = $SDKSupplementalRuntimes;
+    }
+  }
+
+  $SDKROOT = Get-SwiftSDK -OS Windows -Identifier $SDKIdentifier
+  ConvertTo-ThickLayout -Platform $Platform -Resources "${SDKROOT}\usr\lib\swift\windows"        -Filter @("*.lib")
+  ConvertTo-ThickLayout -Platform $Platform -Resources "${SDKROOT}\usr\lib\swift_static\windows" -Filter @("*.lib")
 }
 
 function Build-SQLite([Hashtable] $Platform,
@@ -6085,188 +6121,204 @@ if ($Toolchain) {
     SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
+}
 
-  Invoke-BuildStep Build-SDK $HostPlatform -Context @{
-    SDKIdentifier        = $HostPlatform.OS.ToString();
-    Variant              = "Dynamic";
-    Compilers            = $Compilers.Stage1;
-    Static               = $false;
-    BuildFoundation      = $true;
-    SupplementalRuntimes = $SDKSupplementalRuntimes;
-  }
-
-  # ── Stage2 Compiler ───────────────────────────────────────────────────────
-  Invoke-BuildStep Build-CMark $HostPlatform
-  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
-
-  # The tools are built with the Stage1 compilers, so those that do not need
-  # Stage2 build alongside it.
-  Invoke-BuildBranches {
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
-      Assembler       = $Assemblers.Stage1;
-      CCompiler       = $Compilers.Stage1.C;
-      CXXCompiler     = $Compilers.Stage1.CXX;
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-      DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
-    }
-    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
-    Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
-
-    # ── Stage2 Compiler Runtimes ────────────────────────────────────────────
-    Get-SelectedSDKBuilds | ForEach-Object {
-      Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+# The Windows SDKs of the other architectures only need the Stage1 compilers,
+# so they build alongside the rest of the toolchain, each into its own SDK, and
+# are merged into the Windows SDK below.
+Sync-Runtimes
+Invoke-BuildBranches {
+  if ($Toolchain) {
+    Invoke-BuildStep Build-SDK $HostPlatform -Context @{
+      SDKIdentifier        = $HostPlatform.OS.ToString();
+      Variant              = "Dynamic";
+      Compilers            = $Compilers.Stage1;
+      Static               = $false;
+      BuildFoundation      = $true;
+      SupplementalRuntimes = $SDKSupplementalRuntimes;
     }
 
-    # ── Stage2 Compiler Macros ──────────────────────────────────────────────
-    Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    # ── Stage2 Compiler ─────────────────────────────────────────────────────
+    Invoke-BuildStep Build-CMark $HostPlatform
+    Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
+
+    # The tools are built with the Stage1 compilers, so those that do not need
+    # Stage2 build alongside it.
+    Invoke-BuildBranches {
+      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+        Assembler       = $Assemblers.Stage1;
+        CCompiler       = $Compilers.Stage1.C;
+        CXXCompiler     = $Compilers.Stage1.CXX;
+        SwiftCompiler   = $Compilers.Stage1.Swift;
+        SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+        DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+      }
+      Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
+      Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
+
+      # ── Stage2 Compiler Runtimes ──────────────────────────────────────────
+      Get-SelectedSDKBuilds | ForEach-Object {
+        Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+      }
+
+      # ── Stage2 Compiler Macros ────────────────────────────────────────────
+      Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
+        SwiftCompiler   = $Compilers.Stage1.Swift;
+        SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+        SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+      }
+      Invoke-BuildStep Build-TestingMacros $HostPlatform @{
+        SwiftCompiler   = $Compilers.Stage1.Swift;
+        SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+        SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+      }
+    } {
+      # ── Stage2 Toolchain ──────────────────────────────────────────────────
+      Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
+      Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-LLBuild $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-ASN1 $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-Crypto $HostPlatform @{
+        Assembler = $Assemblers.Stage1;
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-Collections $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-Certificates $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-System $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-Subprocess $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-Markdown $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
+      Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-SymbolKit $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-DocC $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+      Invoke-BuildStep Build-Inspect $HostPlatform @{
+        Compilers = $Compilers.Stage1;
+        SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+      }
+    }
+
+    # The tools that need Stage2.
+    Invoke-BuildStep Build-Driver $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+
+      LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
+      Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
+      Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
+    }
+    Invoke-BuildStep Build-Build $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-PackageManager $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
       SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
     }
-    Invoke-BuildStep Build-TestingMacros $HostPlatform @{
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    Invoke-BuildStep Build-Format $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
       SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
     }
-  } {
-    # ── Stage2 Toolchain ────────────────────────────────────────────────────
-    Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
-    Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
+    Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
       Compilers = $Compilers.Stage1;
       SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-LLBuild $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-ASN1 $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-Crypto $HostPlatform @{
-      Assembler = $Assemblers.Stage1;
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-Collections $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-Certificates $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-System $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-Subprocess $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-Markdown $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
-    Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-SymbolKit $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-DocC $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-    Invoke-BuildStep Build-Inspect $HostPlatform @{
-      Compilers = $Compilers.Stage1;
-      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    }
-  }
-
-  # The tools that need Stage2.
-  Invoke-BuildStep Build-Driver $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-
-    LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
-    Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
-    Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
-  }
-  Invoke-BuildStep Build-Build $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-PackageManager $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-Format $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-
-  Repair-Toolchain $HostPlatform.ToolchainInstallRoot
-
-  # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
-  if ($IncludeNoAsserts) {
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
-      Assembler       = $Assemblers.Stage1;
-      CCompiler       = $Compilers.Stage1.C;
-      CXXCompiler     = $Compilers.Stage1.CXX;
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-      DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+      SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
     }
 
-    Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
+    Repair-Toolchain $HostPlatform.ToolchainInstallRoot
 
-    # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
-    # Use robocopy for efficient copying
-    #   /E : Copies subdirectories, including empty ones.
-    #   /XC: Excludes existing files with the same timestamp but different file sizes.
-    #   /XN: Excludes existing files that are newer than the copy in the source directory.
-    #   /XO: Excludes existing files that are older than the copy in the source directory.
-    #   /NFL: Do not list copied files in output
-    #   /NDL: Do not list directories in output
-    #   /NJH: Do not write a job header
-    #   /NC: Do not write file classes
-    #   /NS: Do not write file sizes
-    #   /NP: Do not show progress indicator
-    & robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
-    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts"
-  }
-
-  if ($HostPlatform.OS -eq [OS]::Windows) {
-    $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
-      ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
-      RuntimeLocation = $HostRuntimeBin;
-    }
+    # ── Stage2 NoAsserts Compiler ───────────────────────────────────────────
     if ($IncludeNoAsserts) {
+      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
+        Assembler       = $Assemblers.Stage1;
+        CCompiler       = $Compilers.Stage1.C;
+        CXXCompiler     = $Compilers.Stage1.CXX;
+        SwiftCompiler   = $Compilers.Stage1.Swift;
+        SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+        DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+      }
+
+      Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
+
+      # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
+      # Use robocopy for efficient copying
+      #   /E : Copies subdirectories, including empty ones.
+      #   /XC: Excludes existing files with the same timestamp but different file sizes.
+      #   /XN: Excludes existing files that are newer than the copy in the source directory.
+      #   /XO: Excludes existing files that are older than the copy in the source directory.
+      #   /NFL: Do not list copied files in output
+      #   /NDL: Do not list directories in output
+      #   /NJH: Do not write a job header
+      #   /NC: Do not write file classes
+      #   /NS: Do not write file sizes
+      #   /NP: Do not show progress indicator
+      & robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
+      Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts"
+    }
+
+    if ($HostPlatform.OS -eq [OS]::Windows) {
+      $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
+      $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
       Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
-        ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
+        ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
         RuntimeLocation = $HostRuntimeBin;
+      }
+      if ($IncludeNoAsserts) {
+        Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+          ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
+          RuntimeLocation = $HostRuntimeBin;
+        }
+      }
+    }
+  }
+} {
+  if ($Windows) {
+    foreach ($Build in $WindowsSDKBuilds) {
+      if ($Build -ne $HostPlatform) {
+        Build-WindowsSDK $Build -SDKIdentifier "Windows-$($Build.Architecture.LLVMName)"
       }
     }
   }
@@ -6277,35 +6329,15 @@ if ($IncludeDS2) {
 }
 
 if ($Windows) {
-  Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
-
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
-    if ($Build.LinkModes.contains("dynamic")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
-        SDKIdentifier        = "Windows";
-        Variant              = "Dynamic";
-        Compilers            = $Compilers.Stage1;
-        Static               = $false;
-        BuildFoundation      = $true;
-        SupplementalRuntimes = $SDKSupplementalRuntimes;
-      }
+    if ($Build -eq $HostPlatform) {
+      Build-WindowsSDK $Build -SDKIdentifier "Windows"
+    } else {
+      $ArchitectureSDK = Get-SwiftSDK -OS Windows -Identifier "Windows-$($Build.Architecture.LLVMName)"
+      Copy-Directory "$ArchitectureSDK\*" $SDKROOT
+      Remove-Item -Force -Recurse $ArchitectureSDK
     }
-
-    if ($Build.LinkModes.contains("static")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
-        SDKIdentifier        = "Windows";
-        Variant              = "Static";
-        Compilers            = $Compilers.Stage1;
-        Static               = $true;
-        BuildFoundation      = $true;
-        SupplementalRuntimes = $SDKSupplementalRuntimes;
-      }
-    }
-
-    ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\windows"        -Filter @("*.lib")
-    ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift_static\windows" -Filter @("*.lib")
-
   }
 
   Install-SDK $WindowsSDKBuilds
