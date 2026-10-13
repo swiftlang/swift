@@ -13,14 +13,29 @@ struct S {}
 class B : A<S> {}
 sil_vtable B {}
 
+struct GS<T> {
+  var t: T
+}
+
+enum GE<T> {
+  case a(T)
+}
+
 // CHECK: [[B_DESCRIPTOR:@"\$s4test1BCMn\.ptrauth(\.[0-9]+)?"]] = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1BCMn", i32 2, i64 0, i64 44678 }, section "llvm.ptrauth"
 
+// The runtime passes the instantiation function a signed descriptor.
 // CHECK-LABEL: define internal ptr @"$s4test1ACMi"(ptr %0, ptr %1, ptr %2)
-// CHECK: [[INT:%.*]] = ptrtoint ptr %0 to i64
-// CHECK: [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 [[INT]], i32 2, i64 44678)
-// CHECK: [[PTR:%.*]] = inttoptr i64 [[SIGNED]] to ptr
-// CHECK: [[METADATA:%.*]] = call ptr @swift_allocateGenericClassMetadata(ptr [[PTR]], ptr %1, ptr %2)
+// CHECK-NOT: @llvm.ptrauth.sign
+// CHECK: [[METADATA:%.*]] = call ptr @swift_allocateGenericClassMetadata(ptr %0, ptr %1, ptr %2)
 // CHECK: ret ptr [[METADATA]]
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s4test1BCMa"(i64 %0)
 // CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata(i64 %0, ptr [[B_DESCRIPTOR]])
+
+// CHECK-LABEL: define internal ptr @"$s4test2GSVMi"(ptr %0, ptr %1, ptr %2)
+// CHECK-NOT: @llvm.ptrauth.sign
+// CHECK: call ptr @swift_allocateGenericValueMetadata(ptr %0, ptr %1, ptr %2,
+
+// CHECK-LABEL: define internal ptr @"$s4test2GEOMi"(ptr %0, ptr %1, ptr %2)
+// CHECK-NOT: @llvm.ptrauth.sign
+// CHECK: call ptr @swift_allocateGenericValueMetadata(ptr %0, ptr %1, ptr %2,

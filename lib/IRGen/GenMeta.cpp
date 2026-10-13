@@ -5249,15 +5249,6 @@ namespace {
                                       llvm::Value *descriptor,
                                       llvm::Value *arguments,
                                       llvm::Value *templatePointer) {
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
-
       auto metadata = IGF.Builder.CreateCall(
           getLayoutString() ?
             IGM.getAllocateGenericClassMetadataWithLayoutStringFunctionPointer() :
@@ -6241,15 +6232,6 @@ namespace {
       auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
 
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
-
       if (layoutStringsEnabled(IGM)) {
         auto *call = IGF.Builder.CreateCall(
             IGM.getAllocateGenericValueMetadataWithLayoutStringFunctionPointer(),
@@ -7006,15 +6988,6 @@ namespace {
       auto &layout = IGM.getMetadataLayout(Target);
       auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
-
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
 
       if (layoutStringsEnabled(IGM)) {
         auto *call = IGF.Builder.CreateCall(
