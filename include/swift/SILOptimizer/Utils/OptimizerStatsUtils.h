@@ -17,6 +17,7 @@
 
 namespace swift {
 class SILFunction;
+class SILInstruction;
 class SILModule;
 class SILTransform;
 class SILPassManager;
@@ -53,6 +54,10 @@ void updateSILModuleStatsBeforeSubpass(SILFunction *F, StringRef Label,
                                        SILTransform *Transform,
                                        SILPassManager &PM, int PassNumber,
                                        unsigned SubpassNumber);
+/// Records that debug info for \p I could not be salvaged.
+/// If \p I has no debug uses, nothing is recorded.
+/// Enabled by -sil-stats-lost-variables.
+void recordMissingSalvage(SILInstruction *I);
 
 } // end namespace swift
 
