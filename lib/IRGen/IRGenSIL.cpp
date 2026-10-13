@@ -73,6 +73,8 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Transforms/Utils/Local.h"
 
+#include <map>
+
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
@@ -403,11 +405,13 @@ public:
 
   /// With closure captures it is actually possible to have two function
   /// arguments that both have the same name. Until this is fixed, we need to
-  /// also hash the ArgNo here.
-  using StackSlotKey =
-      std::pair<unsigned, std::pair<const SILDebugScope *, StringRef>>;
+  /// also hash the ArgNo here. Fragments of the same variable (e.g. the fields
+  /// of an SROA'd tuple or struct) each need their own slot, so the encoded
+  /// fragment path is part of the key as well.
+  using StackSlotKey = std::tuple<unsigned, const SILDebugScope *, StringRef,
+                                  llvm::SmallVector<uint64_t, 4>>;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
-  llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
+  std::map<StackSlotKey, Address> ShadowStackSlots;
   llvm::SmallDenseMap<llvm::Value *, Address, 8> TaskAllocStackSlots;
   llvm::SmallDenseMap<Decl *, Identifier, 8> AnonymousVariables;
   llvm::SmallDenseSet<llvm::Value *, 4> PackShapeExpressions;
@@ -967,8 +971,7 @@ public:
                          std::optional<Alignment> _Align, bool Init,
                          bool WasMoved) {
     auto Align = _Align.value_or(IGM.getPointerAlignment());
-    unsigned ArgNo = VarInfo.ArgNo;
-    auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
+    auto &Alloca = ShadowStackSlots[getShadowStackSlotKey(Scope, VarInfo)];
 
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
@@ -1005,6 +1008,32 @@ public:
     // reinit. Otherwise, callers may use the alloca's insert point. The
     // optimizer will eliminate these later without issue.
     return Alloca;
+  }
+
+  /// Return the key of the shadow-copy slot for \p VarInfo in \p Scope.
+  static StackSlotKey getShadowStackSlotKey(const SILDebugScope *Scope,
+                                            const SILDebugVariable &VarInfo) {
+    llvm::SmallVector<uint64_t, 4> Fragment;
+    for (const SILDIExprElement &Elt :
+         VarInfo.DIExpr.getFragmentPart().elements()) {
+      Fragment.push_back(Elt.getKind());
+      switch (Elt.getKind()) {
+      case SILDIExprElement::OperatorKind:
+        Fragment.push_back(uint64_t(Elt.getAsOperator()));
+        break;
+      case SILDIExprElement::DeclKind:
+        Fragment.push_back(reinterpret_cast<uintptr_t>(Elt.getAsDecl()));
+        break;
+      case SILDIExprElement::ConstIntKind:
+        Fragment.push_back(*Elt.getAsConstInt());
+        break;
+      case SILDIExprElement::TypeKind:
+        Fragment.push_back(
+            reinterpret_cast<uintptr_t>(Elt.getAsType().getPointer()));
+        break;
+      }
+    }
+    return {VarInfo.ArgNo, Scope, VarInfo.Name, std::move(Fragment)};
   }
 
   bool shouldShadowVariable(SILDebugVariable varInfo, bool isAnonymous) {
@@ -1060,15 +1089,14 @@ public:
 
     // The same variable can be described in one scope by debug_values of
     // different storage kinds (e.g. a loadable value and, for async code, an
-    // alloc_box projection). Shadow slots are keyed by {ArgNo, Scope, Name} and
-    // reuse one alloca, so a differently-typed store cannot fit it; keep the
-    // existing shadow copy instead. rdar://181840734
-    unsigned ArgNo = VarInfo.ArgNo;
+    // alloc_box projection). Shadow slots are keyed by {ArgNo, Scope, Name,
+    // Fragment} and reuse one alloca, so a differently-typed store cannot fit
+    // it; keep the existing shadow copy instead. rdar://181840734
     auto existingSlot =
-        ShadowStackSlots.lookup({ArgNo, {Scope, VarInfo.Name}});
-    if (!WasMoved && existingSlot.isValid() &&
-        existingSlot.getElementType() != Storage->getType() &&
-        existingSlot.getElementType() !=
+        ShadowStackSlots.find(getShadowStackSlotKey(Scope, VarInfo));
+    if (!WasMoved && existingSlot != ShadowStackSlots.end() &&
+        existingSlot->second.getElementType() != Storage->getType() &&
+        existingSlot->second.getElementType() !=
             Storage->stripPointerCasts()->getType()) {
       return Storage;
     }
@@ -1148,8 +1176,7 @@ public:
       return;
     }
 
-    unsigned ArgNo = VarInfo.ArgNo;
-    auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
+    auto &Alloca = ShadowStackSlots[getShadowStackSlotKey(Scope, VarInfo)];
     if (Alloca.isValid()) {
       (void)e.claimAll();
       // Async functions use the value of the artificial address.
