@@ -117,7 +117,7 @@ static void lookUpCFStringGetCStringPtr(void *) {
       dlsym(RTLD_DEFAULT, "CFStringGetCStringPtr"));
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t *
 swift_stdlib_NSStringASCIIPointer(id _Nonnull string) {
   swift_once(&lookUpCFStringGetCStringPtrOnce,
