@@ -1389,29 +1389,30 @@ const void
         reinterpret_cast<void *>(task_future_wait_resume_adapter);
 
 const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
-  const void *result = reinterpret_cast<const void *>(ResumeTask);
+  auto resumeTask = ResumeTask;
+  const void *result = reinterpret_cast<const void *>(resumeTask);
 
-  if (ResumeTask == non_future_adapter) {
+  // When the task isn't starting, another thread may be changing ResumeTask
+  // and ResumeContext, so don't look through the adapters.
+  if (!isStarting)
+    return __ptrauth_swift_runtime_function_entry_strip(result);
+
+  if (resumeTask == non_future_adapter) {
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(ResumeContext) - sizeof(AsyncContextPrefix));
     result =
         reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
-  } else if (ResumeTask == future_adapter) {
+  } else if (resumeTask == future_adapter) {
     auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
         reinterpret_cast<char *>(ResumeContext) -
         sizeof(FutureAsyncContextPrefix));
     result =
         reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
-  }
-
-  // Future contexts may not be valid if the task was already running before.
-  if (isStarting) {
-    if (ResumeTask == task_wait_throwing_resume_adapter) {
-      auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
-      result = reinterpret_cast<const void *>(context->ResumeParent);
-    } else if (ResumeTask == task_future_wait_resume_adapter) {
-      result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
-    }
+  } else if (resumeTask == task_wait_throwing_resume_adapter) {
+    auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
+    result = reinterpret_cast<const void *>(context->ResumeParent);
+  } else if (resumeTask == task_future_wait_resume_adapter) {
+    result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
   }
 
   return __ptrauth_swift_runtime_function_entry_strip(result);
