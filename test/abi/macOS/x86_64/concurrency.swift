@@ -579,16 +579,21 @@ Added: _$ss6TaskIDV9_rawValues6UInt64VvM
 Added: _$ss6TaskIDV9_rawValues6UInt64VvpMV
 Added: _$ss6TaskIDV9_rawValues6UInt64Vvs
 
-// Split continuation: the ContinuationAwaiter await half (the resume half reuses
+// Split continuations: the ContinuationWaiter wait half (the resume half reuses
 // the existing Continuation) and the split continuation runtime entry points
 // it is built on.  The cancellation and priority-escalation handlers installed on
 // a suspension use the ordinary per-handler entry points, so they add nothing.
-Added: _$ss19ContinuationAwaiterVMa
-Added: _$ss19ContinuationAwaiterVMn
-Added: _$ss19ContinuationAwaiterVsRi_zrlE7contextAByxq_GBc_tcfC
-Added: _$ss19ContinuationAwaiterVsRi_zrlE7contextBcvg
-Added: _$ss19ContinuationAwaiterVsRi_zrlEfD
+Added: _$ss18ContinuationWaiterVMa
+Added: _$ss18ContinuationWaiterVMn
+Added: _$ss18ContinuationWaiterVsRi_zrlE7contextAByxq_GBc_tcfC
+Added: _$ss18ContinuationWaiterVsRi_zrlE7contextBcvg
+Added: _$ss18ContinuationWaiterVsRi_zrlEfD
 Added: _swift_continuation_createSplit
 Added: _swift_continuation_awaitSplit
 Added: _swift_continuation_destroySplit
 Added: _swift_continuation_resumeOnExecutors
+
+// CheckedContinuation.resumeSynchronously: the checked resume-once logic
+// shared by its inlinable overloads.
+Added: _$sScC20_resumeSynchronously8throwing__yq_n_BeBetF
+Added: _$sScC20_resumeSynchronously9returning__yxn_BeBetF

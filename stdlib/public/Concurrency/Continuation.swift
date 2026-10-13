@@ -211,19 +211,18 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable>(
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: ContinuationAwaiter
+// MARK: ContinuationWaiter
 
-/// The *await* half of a continuation, can be used by a task to suspend until
+/// The *wait* half of a continuation, can be used by a task to suspend until
 /// the continuation is resumed.
 ///
-/// It must be awaited exactly once and cannot leave the
-/// ``withContinuation(of:throwing:_:)`` scope it was vended in, and it traps
-/// if it is destroyed without being awaited.
-@_spi(SplitContinuation)
-@available(StdlibDeploymentTarget 6.5, *)
+/// It must be waited on exactly once and cannot leave the
+/// ``withContinuation(of:throwing:_:)`` scope it was passed into, and it traps
+/// if it is destroyed without being waited on.
+@available(SwiftStdlib 6.5, *)
 @safe
 @frozen
-public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable, ~Escapable {
+public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable, ~Escapable {
   @usableFromInline
   let context: Builtin.RawUnsafeContinuation
 
@@ -249,21 +248,15 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
   /// call does not suspend at all and returns the value immediately.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait() async throws(Failure) -> sending Success {
-    #if $SplitContinuations
-    do {
-      return try await Builtin.awaitSplitThrowingContinuation(_takeContext())
-    } catch {
-      // Matches the cast Continuation.resume uses.
-      throw error as! Failure
-    }
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
+    try await Self._wait(context: _takeContext())
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
   /// cancellation handler and a priority-escalation handler installed for the
   /// duration of the suspension.
+  ///
+  /// If the continuation was already resumed before `wait` is called, this
+  /// call does not suspend at all and returns the value immediately.
   ///
   /// If the current task is already cancelled, `onCancel` runs before this
   /// function suspends.
@@ -286,6 +279,63 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
       onEscalate: { handleEscalation(TaskPriority(rawValue: $0)) })
   }
 
+  /// Suspend until the paired ``Continuation`` is resumed, with a
+  /// cancellation handler installed for the duration of the suspension.
+  ///
+  /// If the continuation was already resumed before `wait` is called, this
+  /// call does not suspend at all and returns the value immediately.
+  ///
+  /// If the current task is already cancelled, `onCancel` runs before this
+  /// function suspends.
+  ///
+  /// - Parameters:
+  ///   - onCancel: Run when the task is cancelled while suspended
+  ///     here. It may run concurrently with the resumption, and on any thread.
+  @export(implementation)
+  public nonisolated(nonsending) consuming func wait(
+    onCancel handleCancellation: sending () -> Void
+  ) async throws(Failure) -> sending Success {
+    try await Self._wait(
+      context: _takeContext(),
+      onCancel: handleCancellation)
+  }
+
+  /// Suspend until the paired ``Continuation`` is resumed, with a
+  /// priority-escalation handler installed for the duration of the suspension.
+  ///
+  /// If the continuation was already resumed before `wait` is called, this
+  /// call does not suspend at all and returns the value immediately.
+  ///
+  /// - Parameters:
+  ///   - onEscalate: Run with the new priority when the task's priority is
+  ///     escalated while suspended here.
+  @export(implementation)
+  public nonisolated(nonsending) consuming func wait(
+    onEscalate handleEscalation: sending (TaskPriority) -> Void
+  ) async throws(Failure) -> sending Success {
+    // The escalation handler is wrapped so the runtime can hand it raw
+    // priorities.
+    try await Self._wait(
+      context: _takeContext(),
+      onEscalate: { handleEscalation(TaskPriority(rawValue: $0)) })
+  }
+
+  @export(implementation)
+  nonisolated(nonsending) static func _wait(
+    context: Builtin.RawUnsafeContinuation
+  ) async throws(Failure) -> sending Success {
+    #if $BuiltinSplitContinuations
+    do {
+      return try await Builtin.awaitSplitThrowingContinuation(context)
+    } catch {
+      // Matches the cast Continuation.resume uses.
+      throw error as! Failure
+    }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
+  }
+
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
@@ -301,19 +351,35 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
       handler: { _, newPriority in handleEscalation(newPriority) })
     defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
 
-    do {
-      #if $SplitContinuations
-      return try await Builtin.awaitSplitThrowingContinuation(context)
-      #else
-      fatalError("Swift compiler is incompatible with this SDK version")
-      #endif
-    } catch {
-      throw error as! Failure
-    }
+    return try await _wait(context: context)
+  }
+
+  @export(implementation)
+  nonisolated(nonsending) static func _wait(
+    context: Builtin.RawUnsafeContinuation,
+    onCancel handleCancellation: sending () -> Void
+  ) async throws(Failure) -> sending Success {
+    let cancellationRecord = unsafe _taskAddCancellationHandler(
+      handler: handleCancellation)
+    defer { unsafe _taskRemoveCancellationHandler(record: cancellationRecord) }
+
+    return try await _wait(context: context)
+  }
+
+  @export(implementation)
+  nonisolated(nonsending) static func _wait(
+    context: Builtin.RawUnsafeContinuation,
+    onEscalate handleEscalation: sending (UInt8) -> Void
+  ) async throws(Failure) -> sending Success {
+    let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
+      handler: { _, newPriority in handleEscalation(newPriority) })
+    defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
+
+    return try await _wait(context: context)
   }
 
   deinit {
-    fatalError("ContinuationAwaiter deinitialized without being awaited")
+    fatalError("ContinuationWaiter deinitialized without being waited on")
   }
 }
 
@@ -321,12 +387,12 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
 // MARK: withContinuation
 
 /// Creates a continuation and hands `body` both halves: the *resume* half
-/// (a ``Continuation``) to give to whoever performs the work, and the *await*
-/// half (a ``ContinuationAwaiter``) for the task to await.
+/// (a ``Continuation``) to give to whoever performs the work, and the *wait*
+/// half (a ``ContinuationWaiter``) for the task to wait on.
 ///
-/// The continuation must be resumed exactly once, and the awaiter awaited
+/// The continuation must be resumed exactly once, and the waiter waited on
 /// exactly once, before `body` returns. `body`'s own return and error types
-/// are independent of the continuation's: `body` might await the
+/// are independent of the continuation's: `body` might wait for the
 /// continuation's value and then transform it, or catch a thrown `Failure`
 /// and rethrow something else -- there's no requirement that what `body`
 /// returns or throws relates to `Success`/`Failure` at all.
@@ -337,8 +403,7 @@ public struct ContinuationAwaiter<Success: ~Copyable, Failure: Error>: ~Copyable
 ///     throwing.
 ///   - body: Receives both halves of the continuation. Its own result
 ///     becomes the result of this function.
-@_spi(SplitContinuation)
-@available(StdlibDeploymentTarget 6.5, *)
+@available(SwiftStdlib 6.5, *)
 @export(implementation)
 public nonisolated(nonsending) func withContinuation<
   Success: ~Copyable,
@@ -350,19 +415,19 @@ public nonisolated(nonsending) func withContinuation<
   throwing: Failure.Type,
   _ body: nonisolated(nonsending) (
     consuming Continuation<Success, Failure>,
-    consuming ContinuationAwaiter<Success, Failure>
+    consuming ContinuationWaiter<Success, Failure>
   ) async throws(BodyFailure) -> BodyResult
 ) async throws(BodyFailure) -> BodyResult {
-  #if $SplitContinuations
+  #if $BuiltinSplitContinuations
   // Create the split continuation once and vend both halves from it: the resume
-  // half (given to whoever performs the work) and the await half (awaited by
+  // half (given to whoever performs the work) and the wait half (waited on by
   // `body`). The continuation is destroyed when this scope exits, after the
-  // await has resolved and moved the value out.
+  // wait has resolved and moved the value out.
   let rawContinuation = Builtin.createSplitContinuation(Success.self)
   let continuation = Continuation<Success, Failure>(rawContinuation)
-  let awaiter = ContinuationAwaiter<Success, Failure>(context: rawContinuation)
+  let waiter = ContinuationWaiter<Success, Failure>(context: rawContinuation)
   do {
-    let result = try await body(consume continuation, consume awaiter)
+    let result = try await body(consume continuation, consume waiter)
     Builtin.destroySplitContinuation(rawContinuation)
     return result
   } catch {
@@ -375,174 +440,194 @@ public nonisolated(nonsending) func withContinuation<
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: Resuming on the resumer's own thread
+// MARK: Resuming synchronously on the resumer's executor
 
-@_spi(SplitContinuation)
-@available(StdlibDeploymentTarget 6.5, *)
+@available(SwiftStdlib 6.5, *)
 extension Continuation where Success: ~Copyable {
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// The offered execution context is used only if it belongs to the executors
+  /// the awaiting task resumes on. If the context doesn't match the task is
+  /// enqueued on its expected execution context.
+  /// from a point where that executor could run one of its own jobs.
+  ///
+  /// This overload names both a serial executor and a task executor, mirroring
+  /// ``ExecutorJob/runSynchronously(isolatedTo:taskExecutor:)``. Use
+  /// ``resumeSynchronously(returning:isolatedTo:)`` if only a serial executor
+  /// is known, or ``resumeSynchronously(returning:on:)`` if only a task
+  /// executor is known.
+  ///
+  /// - Parameters:
+  ///   - value: The value to return from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public consuming func resumeSynchronously(
+    returning value: consuming sending Success,
+    isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor
+  ) {
+    unsafe _resumeSynchronously(
+      returning: value, serialExecutor._executor, taskExecutor._executor)
+  }
+
+  /// Resume the task awaiting this continuation by having it throw the given
+  /// error, offering the current execution context to run the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - error: The error to throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public consuming func resumeSynchronously(
+    throwing error: __owned Failure,
+    isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor
+  ) {
+    unsafe _resumeSynchronously(
+      throwing: error, serialExecutor._executor, taskExecutor._executor)
+  }
+
+  /// Resume the task awaiting this continuation by having it either return or
+  /// throw based on the given `Result`, offering the current execution context
+  /// to run the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - result: A value to either return or throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public consuming func resumeSynchronously(
+    with result: consuming sending Result<Success, Failure>,
+    isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor
+  ) {
+    unsafe _resumeSynchronously(
+      with: result, serialExecutor._executor, taskExecutor._executor)
+  }
+
   /// Resume the task awaiting this continuation by having it return the given
   /// value, offering the current execution context to run the resumed task.
   ///
-  /// The offered execution context is used only if it belongs to the executor
-  /// the awaiting task resumes on. If the context doesn't match the task is
-  /// enqueued on its expected execution context. Which executor the awaiting
-  /// task resumes on is decided only when the continuation is awaited. So the
-  /// resumer cannot know in advance whether its thread will be usable so this
-  /// is a best effort to resume synchronously with a graceful fallback that
-  /// enqueues.
-  ///
-  /// The resumed task runs before this returns, nested in the caller, so only
-  /// offer an executor from a point where that executor could run one of its
-  /// own jobs: for example from a job it is running, or from a callback its
-  /// run loop makes between jobs. Never offer an actor's executor from code
-  /// that is isolated to that actor: the resumed task could then run code
-  /// isolated to the same actor in the middle of it, without a suspension
-  /// point in between.
-  ///
-  /// This overload names only a serial executor, asserting no task executor
-  /// preference of its own -- mirroring
-  /// ``ExecutorJob/runSynchronously(on:)-(UnownedSerialExecutor)``. Use
-  /// ``resume(returning:on:)`` if only a task executor is known, or
-  /// ``resume(returning:isolatedTo:taskExecutor:)`` if both serial and task
-  /// executor are known.
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - value: The value to return from the continuation.
   ///   - serialExecutor: The serial executor the resuming thread is running on.
   @export(implementation)
-  public consuming func resume(
+  public consuming func resumeSynchronously(
     returning value: consuming sending Success,
     isolatedTo serialExecutor: UnownedSerialExecutor
   ) {
-    unsafe _resume(returning: value, serialExecutor._executor, _getUndefinedTaskExecutor())
+    unsafe _resumeSynchronously(
+      returning: value, serialExecutor._executor, _getUndefinedTaskExecutor())
   }
 
   /// Resume the task awaiting this continuation by having it throw the given
-  /// error, offering the current thread to run the resumed task inline.
+  /// error, offering the current execution context to run the resumed task.
   ///
-  /// See ``resume(returning:isolatedTo:)`` for when calling thread is used
-  /// to execute the resumed continuation.
+  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
+  /// execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - error: The error to throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
   @export(implementation)
-  public consuming func resume(
+  public consuming func resumeSynchronously(
     throwing error: __owned Failure,
     isolatedTo serialExecutor: UnownedSerialExecutor
   ) {
-    unsafe _resume(throwing: error, serialExecutor._executor, _getUndefinedTaskExecutor())
+    unsafe _resumeSynchronously(
+      throwing: error, serialExecutor._executor, _getUndefinedTaskExecutor())
   }
 
   /// Resume the task awaiting this continuation by having it either return or
-  /// throw, based on the given `Result`, offering the current thread to run the
-  /// resumed task inline.
+  /// throw based on the given `Result`, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resume(returning:isolatedTo:)`` for when calling thread is used
-  /// to execute the resumed continuation.
+  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
+  /// execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - result: A value to either return or throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
   @export(implementation)
-  public consuming func resume(
+  public consuming func resumeSynchronously(
     with result: consuming sending Result<Success, Failure>,
     isolatedTo serialExecutor: UnownedSerialExecutor
   ) {
-    unsafe _resume(with: result, serialExecutor._executor, _getUndefinedTaskExecutor())
+    unsafe _resumeSynchronously(
+      with: result, serialExecutor._executor, _getUndefinedTaskExecutor())
   }
 
   /// Resume the task awaiting this continuation by having it return the given
-  /// value, offering the current thread to run the resumed task inline.
+  /// value, offering the current execution context to run the resumed task.
   ///
-  /// This overload names only a task executor, asserting no serial executor
-  /// (no actor isolation) of its own -- mirroring
-  /// ``ExecutorJob/runSynchronously(on:)-(UnownedTaskExecutor)``. The offer is
-  /// taken only if the awaiting task *also* resumes with no serial isolation
-  /// and the same task executor; any actor isolation on the awaiting task's
-  /// side makes this fall back to an enqueue, the same as a mismatch would.
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
   ///
-  /// See ``resume(returning:isolatedTo:)`` for the general explanation of the
-  /// best-effort fallback.
+  /// - Parameters:
+  ///   - value: The value to return from the continuation.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
   @export(implementation)
-  public consuming func resume(
+  public consuming func resumeSynchronously(
     returning value: consuming sending Success,
     on taskExecutor: UnownedTaskExecutor
   ) {
-    unsafe _resume(returning: value, _getGenericSerialExecutor(), taskExecutor._executor)
+    unsafe _resumeSynchronously(
+      returning: value, _getGenericSerialExecutor(), taskExecutor._executor)
   }
 
   /// Resume the task awaiting this continuation by having it throw the given
-  /// error, offering the current thread to run the resumed task inline.
+  /// error, offering the current execution context to run the resumed task.
   ///
-  /// See ``resume(returning:on:)`` for when calling thread is used to
-  /// execute the resumed continuation.
+  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
+  /// context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - error: The error to throw from the continuation.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
   @export(implementation)
-  public consuming func resume(
+  public consuming func resumeSynchronously(
     throwing error: __owned Failure,
     on taskExecutor: UnownedTaskExecutor
   ) {
-    unsafe _resume(throwing: error, _getGenericSerialExecutor(), taskExecutor._executor)
+    unsafe _resumeSynchronously(
+      throwing: error, _getGenericSerialExecutor(), taskExecutor._executor)
   }
 
   /// Resume the task awaiting this continuation by having it either return or
-  /// throw, based on the given `Result`, offering the current thread to run the
-  /// resumed task inline.
+  /// throw based on the given `Result`, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resume(returning:on:)`` for when calling thread is used to
-  /// execute the resumed continuation.
+  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
+  /// context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - result: A value to either return or throw from the continuation.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
   @export(implementation)
-  public consuming func resume(
+  public consuming func resumeSynchronously(
     with result: consuming sending Result<Success, Failure>,
     on taskExecutor: UnownedTaskExecutor
   ) {
-    unsafe _resume(with: result, _getGenericSerialExecutor(), taskExecutor._executor)
-  }
-
-  /// Resume the task awaiting this continuation by having it return the given
-  /// value, offering the current thread to run the resumed task inline.
-  ///
-  /// This overload names both a serial executor and a task executor, mirroring
-  /// ``ExecutorJob/runSynchronously(isolatedTo:taskExecutor:)``. Use this when
-  /// the resuming thread has a task executor preference in addition to its
-  /// serial executor; otherwise prefer ``resume(returning:isolatedTo:)``.
-  ///
-  /// See ``resume(returning:isolatedTo:)`` for the general explanation of the
-  /// best-effort fallback.
-  @export(implementation)
-  public consuming func resume(
-    returning value: consuming sending Success,
-    isolatedTo serialExecutor: UnownedSerialExecutor,
-    taskExecutor: UnownedTaskExecutor
-  ) {
-    unsafe _resume(returning: value, serialExecutor._executor, taskExecutor._executor)
-  }
-
-  /// Resume the task awaiting this continuation by having it throw the given
-  /// error, offering the current thread to run the resumed task inline.
-  ///
-  /// See ``resume(returning:isolatedTo:taskExecutor:)`` for when calling
-  /// thread is used to execute the resumed continuation.
-  @export(implementation)
-  public consuming func resume(
-    throwing error: __owned Failure,
-    isolatedTo serialExecutor: UnownedSerialExecutor,
-    taskExecutor: UnownedTaskExecutor
-  ) {
-    unsafe _resume(throwing: error, serialExecutor._executor, taskExecutor._executor)
-  }
-
-  /// Resume the task awaiting this continuation by having it either return or
-  /// throw, based on the given `Result`, offering the current thread to run the
-  /// resumed task inline.
-  ///
-  /// See ``resume(returning:isolatedTo:taskExecutor:)`` for when calling
-  /// thread is used to execute the resumed continuation.
-  @export(implementation)
-  public consuming func resume(
-    with result: consuming sending Result<Success, Failure>,
-    isolatedTo serialExecutor: UnownedSerialExecutor,
-    taskExecutor: UnownedTaskExecutor
-  ) {
-    unsafe _resume(with: result, serialExecutor._executor, taskExecutor._executor)
+    unsafe _resumeSynchronously(
+      with: result, _getGenericSerialExecutor(), taskExecutor._executor)
   }
 
   /// Resume by returning `value`, offering the given executors to run the
   /// resumed task.
   @export(implementation)
-  consuming func _resume(
+  consuming func _resumeSynchronously(
     returning value: consuming sending Success,
     _ serialExecutor: Builtin.Executor,
     _ taskExecutor: Builtin.Executor
@@ -554,7 +639,7 @@ extension Continuation where Success: ~Copyable {
   /// Resume by throwing `error`, offering the given executors to run the
   /// resumed task.
   @export(implementation)
-  consuming func _resume(
+  consuming func _resumeSynchronously(
     throwing error: __owned Failure,
     _ serialExecutor: Builtin.Executor,
     _ taskExecutor: Builtin.Executor
@@ -568,16 +653,16 @@ extension Continuation where Success: ~Copyable {
   /// Resume by returning or throwing, based on `result`, offering the given
   /// executors to run the resumed task.
   @export(implementation)
-  consuming func _resume(
+  consuming func _resumeSynchronously(
     with result: consuming sending Result<Success, Failure>,
     _ serialExecutor: Builtin.Executor,
     _ taskExecutor: Builtin.Executor
   ) {
     switch consume result {
     case .success(let value):
-      _resume(returning: value, serialExecutor, taskExecutor)
+      _resumeSynchronously(returning: value, serialExecutor, taskExecutor)
     case .failure(let error):
-      _resume(throwing: error, serialExecutor, taskExecutor)
+      _resumeSynchronously(throwing: error, serialExecutor, taskExecutor)
     }
   }
 }
@@ -589,7 +674,7 @@ extension Continuation where Success: ~Copyable {
 /// throwing `error` otherwise, offering the given executors to run the resumed
 /// task. Takes ownership of both `result` and `error`.
 @usableFromInline
-@available(StdlibDeploymentTarget 6.5, *)
+@available(SwiftStdlib 6.5, *)
 @_silgen_name("swift_continuation_resumeOnExecutors")
 internal func _continuationResumeOnExecutors<T: ~Copyable>(
   _ continuation: Builtin.RawUnsafeContinuation,
@@ -597,7 +682,6 @@ internal func _continuationResumeOnExecutors<T: ~Copyable>(
   _ error: __owned (any Error)?,
   _ serialExecutor: Builtin.Executor,
   _ taskExecutor: Builtin.Executor)
-
 
 
 // ==== -----------------------------------------------------------------------

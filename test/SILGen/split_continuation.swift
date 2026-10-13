@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5 -target %target-swift-5.1-abi-triple -parse-stdlib -sil-verify-all -enable-experimental-feature SplitContinuations | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5 -target %target-swift-5.1-abi-triple -parse-stdlib -sil-verify-all | %FileCheck %s
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_SplitContinuations
 
 import Swift
 import _Concurrency
