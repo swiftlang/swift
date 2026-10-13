@@ -758,6 +758,7 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
         ParamDecl(SourceLoc(), SourceLoc(), astCtx.getIdentifier(internalName),
                   SourceLoc(), astCtx.getIdentifier(internalName), declCtx);
     var->setSpecifier(ParamSpecifier::InOut);
+    var->setImplicit();
 
     SILFunctionArgument *funcArg =
         pass.function->begin()->insertFunctionArgument(
