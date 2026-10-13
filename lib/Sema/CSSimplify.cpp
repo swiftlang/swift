@@ -7961,12 +7961,33 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto nominal2 = cast<NominalType>(desugar2);
       if (nominal1->getDecl() == nominal2->getDecl()) {
         if (kind >= ConstraintKind::Subtype &&
-            nominal1->getDecl()->isOptionalDecl() &&
             getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::OptionalToOptional);
+          auto &ctx = getASTContext();
+          // Handle optional-to-optional conversions.
+          if (nominal1->getDecl() == ctx.getOptionalDecl()) {
+            conversionsOrFixes.push_back(ConversionRestrictionKind::OptionalToOptional);
+
+          // Handle array element conversions.
+          } else if (nominal1->getDecl() == ctx.getArrayDecl()) {
+            conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
+
+          // Handle dictionary key and value conversions.
+          } else if (nominal1->getDecl() == ctx.getDictionaryDecl()) {
+            conversionsOrFixes.push_back(ConversionRestrictionKind::DictionaryUpcast);
+
+          // Handle set element conversions.
+          } else if (nominal1->getDecl() == ctx.getSetDecl()) {
+            conversionsOrFixes.push_back(ConversionRestrictionKind::SetUpcast);
+
+          // All other generic types are invariant on their arguments.
+          } else {
+            conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+          }
         } else {
           conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
         }
+
+        break;
       }
 
       // Check for CF <-> ObjectiveC bridging.
@@ -8329,24 +8350,26 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     // Special implicit nominal conversions.
-    if (!type1->is<LValueType>()) {
-      if (desugar1->isArray() && desugar2->isArray()) {
-        // Array -> Array.
-        auto elementType = type1->getArrayElementType();
-        if (!elementType->isForeignReferenceType())
-          conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
-      } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
-        // Dictionary -> Dictionary.
-        auto keyValueTypes = *isDictionaryType(desugar1);
-        if (!keyValueTypes.first->isForeignReferenceType() &&
-            !keyValueTypes.second->isForeignReferenceType())
-          conversionsOrFixes.push_back(
-              ConversionRestrictionKind::DictionaryUpcast);
-      } else if (isSetType(desugar1) && isSetType(desugar2)) {
-        // Set -> Set.
-        auto elementType = *isSetType(desugar1);
-        if (!elementType->isForeignReferenceType())
-          conversionsOrFixes.push_back(ConversionRestrictionKind::SetUpcast);
+    if (!getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
+      if (!type1->is<LValueType>()) {
+        if (desugar1->isArray() && desugar2->isArray()) {
+          // Array -> Array.
+          auto elementType = type1->getArrayElementType();
+          if (!elementType->isForeignReferenceType())
+            conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
+        } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
+          // Dictionary -> Dictionary.
+          auto keyValueTypes = *isDictionaryType(desugar1);
+          if (!keyValueTypes.first->isForeignReferenceType() &&
+              !keyValueTypes.second->isForeignReferenceType())
+            conversionsOrFixes.push_back(
+                ConversionRestrictionKind::DictionaryUpcast);
+        } else if (isSetType(desugar1) && isSetType(desugar2)) {
+          // Set -> Set.
+          auto elementType = *isSetType(desugar1);
+          if (!elementType->isForeignReferenceType())
+            conversionsOrFixes.push_back(ConversionRestrictionKind::SetUpcast);
+        }
       }
     }
   }
@@ -14909,6 +14932,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
       increaseScore(SK_FunctionConversion, locator);
     }
+
+    if (locator.isCollectionUpcastConversion()) {
+      increaseScore(SK_CollectionUpcastConversion, locator);
+    }
   };
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
@@ -15348,7 +15375,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     Type baseType1 = type1->getArrayElementType();
     Type baseType2 = type2->getArrayElementType();
 
-    increaseScore(SK_CollectionUpcastConversion, locator);
+    if (!getASTContext().TypeCheckerOpts.SolverEnableShortConversions)
+      increaseScore(SK_CollectionUpcastConversion, locator);
+
     return matchTypes(baseType1,
                       baseType2,
                       matchKind,
@@ -15369,7 +15398,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     std::tie(key2, value2) = *isDictionaryType(t2);
 
     auto subMatchKind = matchKind; // TODO: Restrict this?
-    increaseScore(SK_CollectionUpcastConversion, locator);
+
+    if (!getASTContext().TypeCheckerOpts.SolverEnableShortConversions)
+      increaseScore(SK_CollectionUpcastConversion, locator);
+
     // The source key and value types must be subtypes of the destination
     // key and value types, respectively.
     auto result =
@@ -15397,7 +15429,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     Type baseType1 = *isSetType(type1);
     Type baseType2 = *isSetType(type2);
 
-    increaseScore(SK_CollectionUpcastConversion, locator);
+    if (!getASTContext().TypeCheckerOpts.SolverEnableShortConversions)
+      increaseScore(SK_CollectionUpcastConversion, locator);
+
     return matchTypes(baseType1,
                       baseType2,
                       matchKind,

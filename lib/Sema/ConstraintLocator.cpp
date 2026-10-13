@@ -66,7 +66,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::OpenedOpaqueArchetype:
   case ConstraintLocator::WrappedValue:
   case ConstraintLocator::GenericParameter:
-  case ConstraintLocator::GenericArgument:
   case ConstraintLocator::TupleType:
   case ConstraintLocator::GenericType:
   case ConstraintLocator::NamedTupleElement:
@@ -120,6 +119,9 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::FunctionYield:
   case ConstraintLocator::FunctionResult:
     return IsFunctionConversion;
+
+  case ConstraintLocator::GenericArgument:
+    return IsCollectionUpcastConversion;
 
   case ConstraintLocator::ApplyArgToParam: {
     auto flags = castTo<LocatorPathElt::ApplyArgToParam>().getParameterFlags();

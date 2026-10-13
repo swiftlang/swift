@@ -124,6 +124,10 @@ public:
     /// Does this path involve an argument being applied to a non-ephemeral
     /// parameter?
     IsNonEphemeralParam = 0x2,
+
+    /// Does this path involve a collection conversion, i.e. a
+    /// GenericArgument node?
+    IsCollectionUpcastConversion = 0x4,
   };
 
   /// One element in the path of a locator, which can include both
@@ -216,6 +220,12 @@ public:
   /// conversion.
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
+  }
+
+  /// Determines whether this locator is part of a function
+  /// conversion.
+  bool isCollectionUpcastConversion() const {
+    return (getSummaryFlags() & IsCollectionUpcastConversion);
   }
 
   /// Checks whether this locator is describing an argument application for a
@@ -1248,6 +1258,10 @@ public:
 
   bool isFunctionConversion() const {
     return (getSummaryFlags() & ConstraintLocator::IsFunctionConversion);
+  }
+
+  bool isCollectionUpcastConversion() const {
+    return (getSummaryFlags() & ConstraintLocator::IsCollectionUpcastConversion);
   }
 
   bool isForAutoclosureResult() const {
