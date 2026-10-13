@@ -61,6 +61,13 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
         acceptAny(value as any P)     // okay, passes the existential itself
       }
 
+* `dynamic` declarations and `@_dynamicReplacement`, because Embedded Swift does not include the runtime support for replacing the implementation of a declaration. Both are ignored, so calls always use the original implementation, and a replacement is an ordinary declaration. For example:
+
+      dynamic func greet() { }        // warning: global function 'greet()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored
+
+      @_dynamicReplacement(for: greet())
+      func greetDifferently() { }     // warning: global function 'greetDifferently()' cannot be a dynamic replacement in Embedded Swift; '@_dynamicReplacement' will be ignored
+
 ## See Also
 
 - [A Vision for Embedded Swift](https://github.com/swiftlang/swift-evolution/blob/main/visions/embedded-swift.md)
