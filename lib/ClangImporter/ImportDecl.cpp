@@ -3220,20 +3220,24 @@ namespace {
             markReturnsUnsafeNonescapable(valueCtor);
           ctors.push_back(valueCtor);
 
-          if (cArrayAttr)
+          if (cArrayAttr) {
             addInlineArrayAvailability(valueCtor);
 
-          if (cArrayAttr && cArrayAttr->getCounterpart()) {
-            auto legacyMember = cast<VarDecl>(cArrayAttr->getCounterpart());
-            auto legacyCtor = synthesizer.createValueConstructor(
-                result, legacyMember,
-                {ValueConstructorFlags::WantParamNames,
-                 ValueConstructorFlags::WantBody},
-                Impl.getMaxAccessLevel(CArrayProjection::Legacy, cArrayAttr));
+            // If the field has no legacy projection, its initializer doesn't
+            // either.
+            ConstructorDecl *legacyCtor = nullptr;
+            if (cArrayAttr->getCounterpart()) {
+              auto legacyMember = cast<VarDecl>(cArrayAttr->getCounterpart());
+              legacyCtor = synthesizer.createValueConstructor(
+                  result, legacyMember,
+                  {ValueConstructorFlags::WantParamNames,
+                   ValueConstructorFlags::WantBody},
+                  Impl.getMaxAccessLevel(CArrayProjection::Legacy, cArrayAttr));
 
-            if (isNonEscapable)
-              markReturnsUnsafeNonescapable(legacyCtor);
-            ctors.push_back(legacyCtor);
+              if (isNonEscapable)
+                markReturnsUnsafeNonescapable(legacyCtor);
+              ctors.push_back(legacyCtor);
+            }
 
             synthesizer.registerCArrayProjections(valueCtor, legacyCtor);
           }
@@ -3343,24 +3347,31 @@ namespace {
 
         ctors.push_back(valueCtor);
 
-        if (hasInlineArrayMember)
+        if (hasInlineArrayMember) {
           addInlineArrayAvailability(valueCtor);
 
-        if (needsLegacyMemberwiseCtor) {
-          if (hasModernOnlyMember)
-            valueCtorOptions |= { ValueConstructorFlags::WantBody,
-                                  ValueConstructorFlags::WantZeroInitPrologue };
-          auto legacyCtor = synthesizer.createValueConstructor(
-              result, legacyMembers, valueCtorOptions,
-              Impl.getMaxAccessLevel(CArrayProjection::Legacy,
-                                     /*needsBoth=*/true));
-          if (!hasUnreferenceableStorage && !hasModernOnlyMember)
-            legacyCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+          // If none of the members has a legacy projection, the initializer
+          // doesn't either.
+          ConstructorDecl *legacyCtor = nullptr;
+          if (needsLegacyMemberwiseCtor) {
+            if (hasModernOnlyMember)
+              valueCtorOptions |=
+                  {ValueConstructorFlags::WantBody,
+                   ValueConstructorFlags::WantZeroInitPrologue};
+            legacyCtor = synthesizer.createValueConstructor(
+                result, legacyMembers, valueCtorOptions,
+                Impl.getMaxAccessLevel(CArrayProjection::Legacy,
+                                       /*needsBoth=*/true));
+            if (!hasUnreferenceableStorage && !hasModernOnlyMember)
+              legacyCtor->setIsMemberwiseInitializer(
+                  MemberwiseInitKind::Regular);
 
-          if (isNonEscapable)
-            markReturnsUnsafeNonescapable(legacyCtor);
+            if (isNonEscapable)
+              markReturnsUnsafeNonescapable(legacyCtor);
 
-          ctors.push_back(legacyCtor);
+            ctors.push_back(legacyCtor);
+          }
+
           synthesizer.registerCArrayProjections(valueCtor, legacyCtor);
         }
       }
