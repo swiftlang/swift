@@ -263,6 +263,16 @@ union _GLKVector4 {
 } __attribute__((aligned(16)));
 typedef union _GLKVector4 GLKVector4;
 
+struct StructWithAnonymousArrays {
+  union {
+    // We don't care whether these fields are the same size, only that they're
+    // `clang::IndirectFieldDecl`s.
+    char bytes[8];
+    int words[2];
+  };
+  int tag;
+};
+
 typedef union IntOrFloat {
   int i;
   float f;

@@ -81,3 +81,19 @@ func useStructWithUnnamedUnion(_ u: UnnamedUnion) {
   u.u.i = 100
   u.u.f = 1.0
 }
+
+func useAnonymousUnionArrays(_ s: StructWithAnonymousArrays) {
+  var s = s
+  let _: CInt = s.tag
+#if MODERN_C_ARRAYS
+  let _: CChar = s.bytes[0]
+  let _: CInt = s.words[1]
+  s.bytes = [0, 0, 0, 0, 0, 0, 0, 0]
+  s.words = [0, 0]
+#else
+  let _: CChar = s.bytes.0
+  let _: CInt = s.words.1
+  s.bytes = (0, 0, 0, 0, 0, 0, 0, 0)
+  s.words = (0, 0)
+#endif
+}
