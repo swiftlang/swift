@@ -6,7 +6,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     target_include_directories(SwiftReflectionTests BEFORE PRIVATE
       ${SWIFT_SOURCE_DIR}/stdlib/include)
     target_compile_definitions(SwiftReflectionTests PRIVATE
-      SWIFT_INLINE_NAMESPACE=__runtime)
+      SWIFT_INLINE_NAMESPACE=__runtime
+      GTEST_NO_LLVM_SUPPORT)
     target_link_libraries(SwiftReflectionTests
       PRIVATE
       swiftRemoteInspection${SWIFT_PRIMARY_VARIANT_SUFFIX})
