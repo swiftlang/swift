@@ -426,7 +426,7 @@ protected:
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, NumTypeKindBits +
-                             RecursiveTypeProperties::BitWidth + 1 + 3,
+                             RecursiveTypeProperties::BitWidth + 1 + 4,
     /// Kind - The discriminator that indicates what subclass of type this is.
     Kind : NumTypeKindBits,
 
@@ -437,7 +437,8 @@ protected:
 
     ComputedInvertibleConformances : 1,
     IsCopyable : 1,
-    IsEscapable : 1
+    IsEscapable : 1,
+    IsDeinitable : 1
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -468,11 +469,11 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+26,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+25,
     /// Type variable options.
     Options : 7,
     /// The unique number assigned to this type variable.
-    ID : 26
+    ID : 25
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
@@ -498,13 +499,13 @@ protected:
     Representation : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+32,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+31,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     HasExplicitAnyObject : 1,
 
     /// The number of protocols being composed.
-    Count : 32;
+    Count : 31;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
@@ -515,42 +516,42 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
-    : NumPadBits,
-
     /// The number of elements of the tuple.
-    Count : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
-    : NumPadBits,
-
-    /// The number of elements of the pack.
-    Count : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+32,
-    /// Whether elements of the pack are addresses.
-    ElementIsAddress : 1,
-
-    /// The number of elements of the pack
     Count : 32;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
-    : NumPadBits,
+  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
+    /// The number of elements of the pack.
+    Count : 32;
 
-    /// The number of generic arguments.
-    GenericArgCount : 32
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+31,
+  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+31,
+    /// Whether elements of the pack are addresses.
+    ElementIsAddress : 1,
+
+    /// The number of elements of the pack
+    Count : 31;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
+    /// The number of generic arguments.
+    GenericArgCount : 32;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+30,
     /// Whether we have a parent type.
     HasParent : 1,
 
     /// The number of generic arguments.
-    GenericArgCount : 31;
+    GenericArgCount : 30;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
@@ -579,6 +580,7 @@ protected:
     Bits.TypeBase.ComputedInvertibleConformances = false;
     Bits.TypeBase.IsCopyable = false;
     Bits.TypeBase.IsEscapable = false;
+    Bits.TypeBase.IsDeinitable = false;
 
     setRecursiveProperties(properties);
   }
@@ -8099,7 +8101,7 @@ TypeVariableType : public TypeBase {
       : TypeBase(TypeKind::TypeVariable, &C,
                  RecursiveTypeProperties::HasTypeVariable |
                      RecursiveTypeProperties::SolverAllocated) {
-    // Note: the ID may overflow (current limit is 2^26 - 1).
+    // Note: the ID may overflow (current limit is 2^25 - 1).
     Bits.TypeVariableType.ID = ID;
     if (Bits.TypeVariableType.ID != ID) {
       ABORT("Type variable id overflow");
