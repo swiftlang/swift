@@ -4760,8 +4760,7 @@ namespace {
           IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
 
       // Emit data + bit.
-      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-      data = llvm::ConstantExpr::getAdd(data, bit);
+      data = llvm::ConstantExpr::getGetElementPtr(IGM.Int8Ty, data, bit);
 
       B.add(data);
     }

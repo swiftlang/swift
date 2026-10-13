@@ -1440,8 +1440,6 @@ namespace {
         IGM.addGenericROData(dataPtr);
       }
 
-      dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
-
       llvm::Constant *fields[] = {
         rootPtr,
         superPtr,

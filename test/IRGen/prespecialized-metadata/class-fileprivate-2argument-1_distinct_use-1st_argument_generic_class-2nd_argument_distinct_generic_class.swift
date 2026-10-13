@@ -16,7 +16,7 @@
 // CHECK-unknown-SAME:   ptr, 
 //   CHECK-apple-SAME:   ptr, 
 //   CHECK-apple-SAME:   ptr, 
-//   CHECK-apple-SAME:   [[INT]], 
+//   CHECK-apple-SAME:   ptr, 
 //         CHECK-SAME:   i32, 
 //         CHECK-SAME:   i32, 
 //         CHECK-SAME:   i32, 
@@ -39,10 +39,11 @@
 //   CHECK-apple-SAME:   OBJC_CLASS_$__TtCs12_SwiftObject
 //   CHECK-apple-SAME:   _objc_empty_cache
 //   CHECK-apple-SAME:   ptr null, 
-//   CHECK-apple-SAME:   [[INT]] add (
-//   CHECK-apple-SAME:     ptr {{[^@]*}}@"_DATA_$s4main5Value[[UNIQUE_ID_1]]LLCyAA9Argument1ACLLCySiGAA9Argument2ACLLCySSGGMf"{{[^,]*}} to [[INT]]
+//   CHECK-apple-SAME:   ptr getelementptr (
+//   CHECK-apple-SAME:     i8,
+//   CHECK-apple-SAME:     ptr @"_DATA_$s4main5Value[[UNIQUE_ID_1]]LLCyAA9Argument1ACLLCySiGAA9Argument2ACLLCySSGGMf",
 //   CHECK-apple-SAME:     [[INT]] 2
-//   CHECK-apple-SAME:   ), 
+//   CHECK-apple-SAME:   ),
 // CHECK-unknown-SAME:  [[INT]] 0, 
 // CHECK-unknown-SAME:  ptr null, 
 //         CHECK-SAME:   i32 26, 
