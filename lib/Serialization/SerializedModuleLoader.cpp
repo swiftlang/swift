@@ -741,6 +741,9 @@ bool SerializedModuleLoaderBase::findModule(
   // and a source file has 'import Foo', a module called Bar (real name)
   // should be searched.
   StringRef moduleNameRef = Ctx.getRealModuleName(moduleID.Item).str();
+  if (!Ctx.LangOpts.useCxxStdlibOverlay() &&
+      moduleNameRef == Ctx.Id_CxxStdlib.str())
+    return false;
   SmallString<32> moduleName(moduleNameRef);
   SerializedModuleBaseName genericBaseName(moduleName);
 
@@ -933,6 +936,14 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     bool isFramework) {
   assert(moduleInputBuffer);
 
+  // A source import of CxxStdlib resolves to the raw Clang module in strict
+  // mode. An explicitly supplied Swift overlay still must not be loaded.
+  if (!Ctx.LangOpts.useCxxStdlibOverlay() && M.getName() == Ctx.Id_CxxStdlib) {
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::cxx_exception_mode_stdlib_overlay);
+    return nullptr;
+  }
+
   // The buffers are moved into the shared core, so grab their IDs now in case
   // they're needed for diagnostics later.
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
@@ -962,6 +973,45 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   SerializedASTFile *fileUnit = nullptr;
 
   if (loadInfo.status == serialization::Status::Valid) {
+    // Reject before importing dependencies or deserializing declarations, whose
+    // imported C++ signatures depend on exception bridging being enabled.
+    if (loadedModuleFileCore->requiresCxxExceptionBridging() &&
+        !Ctx.LangOpts.hasFeature(Feature::CxxExceptionBridging)) {
+      if (diagLoc)
+        Ctx.Diags.diagnose(*diagLoc,
+                           diag::need_cxx_exception_bridging_to_import_module,
+                           M.getName());
+      return nullptr;
+    }
+    // Reconstructing a serialized bridge also needs C++ import support,
+    // regardless of the ordinary advisory interoperability requirement.
+    if (loadedModuleFileCore->requiresCxxExceptionBridging() &&
+        !Ctx.LangOpts.EnableCXXInterop) {
+      if (diagLoc) {
+        Ctx.Diags.diagnose(*diagLoc, diag::need_cxx_interop_to_import_module,
+                           M.getName());
+        Ctx.Diags.diagnose(*diagLoc, diag::enable_cxx_interop_docs);
+      }
+      return nullptr;
+    }
+
+    // Strict C++ exception mode changes imported function types, including
+    // references in serialized bodies, so a module built with C++ interop can
+    // only be used in the mode it was built in. Only strict modules record
+    // their mode. Cxx contains compiler support APIs that don't depend on it.
+    bool isStrictModule = loadedModuleFileCore->isCxxExceptionBridgingStrict();
+    bool isStrictClient =
+        Ctx.LangOpts.hasFeature(Feature::CxxExceptionBridgingStrict);
+    if (Ctx.LangOpts.EnableCXXInterop && M.getName() != Ctx.Id_Cxx &&
+        isStrictModule != isStrictClient &&
+        (isStrictModule || loadedModuleFileCore->isBuiltWithCxxInterop())) {
+      if (diagLoc)
+        Ctx.Diags.diagnose(*diagLoc,
+                           diag::cxx_exception_bridging_strict_mismatch,
+                           M.getName(), isStrictModule);
+      return nullptr;
+    }
+
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
     M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());

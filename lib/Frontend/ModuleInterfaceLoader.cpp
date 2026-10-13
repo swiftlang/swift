@@ -2051,6 +2051,19 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
       GenericArgs.push_back("-Xcc");
       GenericArgs.push_back("-stdlib=libc++");
     }
+
+    // A module records the C++ exception mode it was built with, and a strict
+    // consumer only accepts strict modules. Rebuild the interface in strict
+    // mode too, so that its inlinable code is checked against the throwing
+    // imports it will be used with.
+    if (langOpts.hasFeature(Feature::CxxExceptionBridgingStrict)) {
+      for (auto feature : {Feature::CxxExceptionBridging,
+                           Feature::CxxExceptionBridgingStrict}) {
+        genericSubInvocation.getLangOptions().enableFeature(feature);
+        GenericArgs.push_back("-enable-experimental-feature");
+        GenericArgs.push_back(ArgSaver.save(feature.getName()));
+      }
+    }
   }
 
   // Inherit Embedded Swift
@@ -3004,6 +3017,10 @@ static std::string getContextHash(const CompilerInvocation &CI,
       // COM model conditions can select different declarations from the same
       // textual interface.
       getCOMInteropCacheState(CI.getLangOptions()));
+
+  // Strict C++ exception mode changes imported C++ function types.
+  if (CI.getLangOptions().hasFeature(Feature::CxxExceptionBridgingStrict))
+    H = llvm::hash_combine(H, StringRef("CxxExceptionBridgingStrict"));
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

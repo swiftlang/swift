@@ -28,7 +28,19 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
 }
 
-bool importer::hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+bool importer::hasCxxThrowsAttr(const clang::FunctionDecl *decl) {
+  if (hasSwiftAttributeOnAnyRedecl(decl, {"import_throws"}))
+    return true;
+  // Clang models an inherited constructor with a new implicit declaration.
+  // Preserve the base constructor's annotation on this route to calling it.
+  if (auto *constructor = dyn_cast<clang::CXXConstructorDecl>(decl);
+      constructor && constructor->isInheritingConstructor())
+    return hasCxxThrowsAttr(
+        constructor->getInheritedConstructor().getConstructor());
+  return false;
+}
+
+bool importer::hasSwiftAttributeOnAnyRedecl(const clang::Decl *decl,
                                             ArrayRef<StringRef> attrs) {
   return llvm::any_of(decl->redecls(), [&](const clang::Decl *redecl) {
     return hasSwiftAttribute(redecl, attrs);
