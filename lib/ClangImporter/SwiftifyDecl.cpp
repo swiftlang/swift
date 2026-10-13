@@ -950,12 +950,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   }
 
   auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
-  auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
-  if (!ClangFuncDecl && !ClangObjCMethodDecl)
-    return;
-  ASSERT(!ClangFuncDecl || !ClangObjCMethodDecl);
-
-  if (isa<ProtocolDecl>(MappedDecl->getParent()))
+  if (!ClangFuncDecl)
     return;
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
@@ -1018,10 +1013,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
         typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
-    bool foundInfo = ClangFuncDecl ?
-      swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
-      swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
-    if (!foundInfo) {
+    if (!swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl)) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
