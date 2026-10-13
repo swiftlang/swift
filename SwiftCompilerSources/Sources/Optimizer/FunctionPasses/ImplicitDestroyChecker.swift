@@ -62,8 +62,7 @@ let implicitDestroyChecker = FunctionPass(name: "implicit-destroy-checker") {
   // Group the destroys by the variable or stored property that they destroy, so that each one gets one error with a
   // note for each path.
   var groups: [(variable: DestroyedVariable, destroys: [Instruction])] = []
-  var endsInUnreachable = BlocksThatEndInUnreachable(in: function, context)
-  defer { endsInUnreachable.deinitialize() }
+  let endsInUnreachable = BlocksThatEndInUnreachable(in: function, context)
   for destroy in destroys where !endsInUnreachable.contains(destroy.instruction.parentBlock) {
     let variable = DestroyedVariable(destroy)
     if let index = groups.firstIndex(where: { $0.variable == variable }) {
@@ -81,7 +80,7 @@ let implicitDestroyChecker = FunctionPass(name: "implicit-destroy-checker") {
 /// The blocks from which every path ends in `unreachable`, for example by calling `fatalError()`.
 ///
 /// A destroy in any other block runs, even in a block that can't reach the function's exit because it loops forever.
-private struct BlocksThatEndInUnreachable {
+private struct BlocksThatEndInUnreachable : ~Copyable {
   private var blocks: BasicBlockSet
 
   init(in function: Function, _ context: FunctionPassContext) {
@@ -103,7 +102,10 @@ private struct BlocksThatEndInUnreachable {
 
   func contains(_ block: BasicBlock) -> Bool { blocks.contains(block) }
 
-  mutating func deinitialize() { blocks.deinitialize() }
+  deinit {
+    var blocks = blocks
+    blocks.deinitialize()
+  }
 }
 
 /// A destroy of a value that can't be destroyed implicitly.

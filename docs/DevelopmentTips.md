@@ -23,7 +23,7 @@ Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/publi
 ### Choosing the bootstrapping mode
 By default, the compiler builds with the `bootstrapping-with-hostlibs` (macOS) or `bootstrapping` (Linux) bootstrapping mode. To speed up local development it's recommended to build with the `hosttools` mode: `utils/build-script --bootstrapping=hosttools`.
 
-It requires a recently new swift toolchain to be installed on your build machine. You might need to download and install a nightly Swift toolchain to build the Swift project in `hosttools` mode.
+It requires a Swift 6.2 (or newer) toolchain to be installed on your build machine. You might need to download and install a nightly Swift toolchain to build the Swift project in `hosttools` mode.
 
 Not that changing the bootstrapping mode needs a reconfiguration.
 
