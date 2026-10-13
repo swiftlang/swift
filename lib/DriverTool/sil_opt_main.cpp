@@ -587,7 +587,8 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
       "enable-address-dependencies",
-      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."),
+      llvm::cl::init(true));
 
   llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
       "disable-aggressive-reg2mem",
