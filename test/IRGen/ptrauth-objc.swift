@@ -15,6 +15,8 @@
 // CHECK: [[A_META_RO]] = private constant { ptr, i32, i64, i64 } { ptr @_METACLASS_DATA__TtC4test1A, i32 2, i64 ptrtoint (ptr getelementptr inbounds (%objc_class, ptr @"OBJC_METACLASS_$__TtC4test1A", i32 0, i32 4) to i64), i64 25080 }, section "llvm.ptrauth"
 
 // CHECK: @"$s4test1AC3fooyyFTo.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1AC3fooyyFTo", i32 0, i64 ptrtoint (ptr getelementptr inbounds ({ i32, i32, [1 x { ptr, ptr, ptr }] }, ptr @_INSTANCE_METHODS__TtC4test1A, i32 0, i32 2, i32 0, i32 2) to i64), i64 0 }, section "llvm.ptrauth"
+// CHECK: @_INSTANCE_METHODS__TtC4test1A.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @_INSTANCE_METHODS__TtC4test1A, i32 2, i64 ptrtoint (ptr getelementptr inbounds ({{.*}}, ptr @_DATA__TtC4test1A, i32 0, i32 6) to i64), i64 49936 }, section "llvm.ptrauth"
+// CHECK: @_DATA__TtC4test1A = internal constant {{.*}}, ptr @_INSTANCE_METHODS__TtC4test1A.ptrauth,
 
 // CHECK: [[A_RO:@[^ ]+]] = private constant { ptr, i32, i64, i64 } { ptr getelementptr (i8, ptr @_DATA__TtC4test1A, i64 {{1|2}}), i32 2, i64 ptrtoint (ptr getelementptr inbounds ({{.*}}, ptr @"$s4test1ACMf", i32 0, i32 7) to i64), i64 25080 }, section "llvm.ptrauth"
 // CHECK: @"$s4test1ACMf" = internal global <{ {{.*}} }> <{ ptr null, ptr {{@[^,]+}}, ptr {{@[^,]+}}, ptr [[A_ISA]], ptr [[A_SUPER]], ptr @_objc_empty_cache, ptr null, ptr [[A_RO]],
@@ -36,4 +38,13 @@ class D : C<S> {}
 @objc class B : P {
   func bar() {}
 }
+// Protocol method lists are not signed.
+// CHECK: @_PROTOCOL__TtP4test1P_ = weak hidden constant {{.*}}, ptr @_PROTOCOL_INSTANCE_METHODS__TtP4test1P_,
+
+extension A {
+  @objc func baz() {}
+}
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC4test1A_$_test.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"_CATEGORY_INSTANCE_METHODS__TtC4test1A_$_test", i32 2, i64 ptrtoint (ptr getelementptr inbounds ({{.*}}, ptr @"_CATEGORY__TtC4test1A_$_test", i32 0, i32 2) to i64), i64 49936 }, section "llvm.ptrauth"
+// CHECK: @"_CATEGORY__TtC4test1A_$_test" = internal constant {{.*}}, ptr @"_CATEGORY_INSTANCE_METHODS__TtC4test1A_$_test.ptrauth", ptr null,
+
 // CHECK: @_PROTOCOL_INSTANCE_METHODS__TtP4test1P_ = {{.*}} [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(bar)", ptr {{@.*}}, ptr null }]

@@ -1973,7 +1973,13 @@ namespace {
       }
       llvm::Constant *methodListPtr =
           buildMethodList(methods, namePrefix, linkage);
-      builder.add(methodListPtr);
+      // Like Clang, only class and category method lists are signed.
+      if (isBuildingProtocol() || methodListPtr->isNullValue())
+        builder.add(methodListPtr);
+      else
+        builder.addSignedPointer(
+            methodListPtr, IGM.getOptions().PointerAuth.ObjCMethodListPointer,
+            PointerAuthEntity());
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
