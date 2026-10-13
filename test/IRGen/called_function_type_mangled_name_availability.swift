@@ -20,4 +20,4 @@ public func test() {
 // OLD-NOT: __swift_instantiateConcreteTypeFromMangledName{{.*}}XOo
 // OLD: call swiftcc %swift.metadata_response @"$s{{.*}}1GVyyyXOoGMa"
 
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s{{.*}}1GVyyyXOoGMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName{{.*}}(ptr @"$s{{.*}}1GVyyyXOoGM{{.*}}"
