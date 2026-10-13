@@ -4776,6 +4776,12 @@ namespace {
         if (isolatedActor) {
           refKind = isolatedActor->kind;
           refGlobalActor = isolatedActor->globalActor;
+          // If getIsolatedActor fell back to the base not being potentially
+          // isolated but the member is GA isolated, the base doesn't matter and
+          // this is a reference between different actors.
+          if (refKind == ReferencedActor::NonIsolatedParameter &&
+              !result.isolation.isActorInstanceIsolated())
+            refKind = ReferencedActor::Isolated;
         } else {
           auto contextIsolation = getInnermostIsolatedContext(
               getDeclContext(), getClosureActorIsolation);

@@ -40,7 +40,7 @@ actor MyActor {
 
   func readsGlobalActorStatic() {
     _ = GlobalActorStatics.value
-    // expected-error@-1:28 {{global actor 'MyActor'-isolated static property 'value' can not be referenced on a nonisolated actor instance}}
+    // expected-error@-1:28 {{global actor 'MyActor'-isolated static property 'value' can not be referenced on a different actor instance}}
     // expected-note@-2:28 {{'self' may be a different instance of 'MyActor' than global actor 'MyActor'}}
   }
 
