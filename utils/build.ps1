@@ -183,6 +183,7 @@ param
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $PythonVersion = "3.10.1",
+  [switch] $DependenciesOnly = $False,
 
   # Toolchain Version Info
   [string] $ProductVersion = "0.0.0",
@@ -5896,6 +5897,10 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
 try {
 
 Get-Dependencies
+
+if ($DependenciesOnly) {
+  exit 0;
+}
 
 if ($Clean) {
   # Fail instead of leaving a partially-cleaned tree behind.
