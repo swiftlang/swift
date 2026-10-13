@@ -38,6 +38,7 @@ add_swift_host_library(swiftAST STATIC
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
+  ClientDeclarationRequirements.cpp
   Concurrency.cpp
   ConcreteDeclRef.cpp
   ConformanceLookup.cpp

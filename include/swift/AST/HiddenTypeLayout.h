@@ -13,7 +13,7 @@
 #ifndef SWIFT_AST_HIDDENTYPELAYOUT_H
 #define SWIFT_AST_HIDDENTYPELAYOUT_H
 
-#include "swift/AST/Type.h"
+#include "swift/AST/ClientDeclarationRequirements.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -24,12 +24,6 @@ class FileUnit;
 class ModuleDecl;
 class NominalTypeDecl;
 class ValueDecl;
-
-enum class HiddenTypeLayoutOrigin {
-  ImplementationOnly,
-  InternalBridgingHeader,
-  RecoveredHiddenType,
-};
 
 struct HiddenTypeLayoutRequirement {
   const Decl *LayoutDecl;

@@ -19,10 +19,13 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ActorIsolation.h"
+#include <memory>
 #include <variant>
 
 namespace swift {
 
+class ClientDeclarationRequirements;
+class ModuleDecl;
 class NormalProtocolConformance;
 class ValueDecl;
 
@@ -69,6 +72,12 @@ using ConformanceIsolationError = std::variant<
 /// as a way to keep sparse information out of the AST nodes themselves and
 /// not require one to touch ASTContext.h to add such information.
 struct ASTContext::GlobalCache {
+  /// Client declaration requirements, computed once for each consuming module.
+  llvm::DenseMap<
+      const ModuleDecl *,
+      std::shared_ptr<const ClientDeclarationRequirements>>
+      clientDeclarationRequirements;
+
   /// Mapping from normal protocol conformances to the explicitly-specified
   /// global actor isolations, e.g., when the conformance was spelled
   /// `@MainActor P` or similar.
