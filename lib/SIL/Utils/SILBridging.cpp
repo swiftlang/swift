@@ -18,21 +18,24 @@
 #endif
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/SIL/SILContext.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/Test.h"
-#include <string>
+#include "swift/SIL/TypeSubstCloner.h"
 #include <cstring>
 #include <stdio.h>
+#include <string>
 
 using namespace swift;
 
@@ -207,6 +210,37 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   getFunction()->print(os);
   str.pop_back(); // Remove trailing newline.
   return BridgedOwnedString(str);
+}
+
+/// Returns the source range of the body of \p fn, if it has one.
+static SourceRange getBodySourceRange(const SILFunction *fn) {
+  auto loc = fn->getLocation();
+  if (auto *afd = loc.getAsASTNode<AbstractFunctionDecl>())
+    return afd->getBodySourceRange();
+  if (auto *closure = loc.getAsASTNode<AbstractClosureExpr>())
+    if (auto *body = closure->getBody())
+      return body->getSourceRange();
+  return loc.getSourceRange();
+}
+
+static bool isInRange(const SILFunction *fn, SourceRange range, SourceLoc loc) {
+  return loc.isValid() &&
+         (range.isInvalid() ||
+          fn->getASTContext().SourceMgr.containsLoc(range, loc));
+}
+
+bool BridgedFunction::isInSourceRange(swift::SourceLoc loc) const {
+  auto *fn = getFunction();
+  return isInRange(fn, fn->getLocation().getSourceRange(), loc);
+}
+
+bool BridgedFunction::isInBodySourceRange(swift::SourceLoc loc) const {
+  auto *fn = getFunction();
+  return isInRange(fn, getBodySourceRange(fn), loc);
+}
+
+swift::SourceLoc BridgedFunction::getBodyEndLoc() const {
+  return getBodySourceRange(getFunction()).End;
 }
 
 BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubstitutions,
@@ -558,6 +592,11 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
 
 static_assert(sizeof(BridgedLocation) >= sizeof(swift::SILDebugLocation),
               "BridgedLocation has wrong size");
+
+bool BridgedLocation::isReturnOrThrowStatement() const {
+  auto *stmt = getLoc().getLocation().getAsASTNode<Stmt>();
+  return stmt && isa<ReturnStmt, ThrowStmt>(stmt);
+}
 
 BridgedOwnedString BridgedLocation::getDebugDescription() const {
   std::string str;
