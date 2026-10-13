@@ -76,3 +76,13 @@ struct SPIAvailableExample {
 
 // CHECK: @_spi_available(macOS 10.15, *)
 // CHECK: public nonisolated static let $spiAvailableVar: TaskLocal<Int?>
+
+@available(SwiftStdlib 5.1, *)
+public struct UsableFromInlineImplicitAccess {
+  @TaskLocal
+  @usableFromInline
+  static var implicitVar: Int?
+}
+
+// CHECK: @usableFromInline
+// CHECK-NEXT: {{ *}}nonisolated static let $implicitVar: TaskLocal<Int?>
