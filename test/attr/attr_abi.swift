@@ -76,16 +76,16 @@ func param11_generic10(_: Int) -> Int { fatalError() }
 
 
 
-@abi(func param00_generic01() -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+@abi(func param00_generic01() -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
 func param00_generic01<T>() -> T { fatalError() }
 
-@abi(func param10_generic01(_: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+@abi(func param10_generic01(_: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
 func param10_generic01<T>() -> T { fatalError() }
 
-@abi(func param01_generic01() -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+@abi(func param01_generic01() -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
 func param01_generic01<T>(_: Int) -> T { fatalError() }
 
-@abi(func param11_generic01(_: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+@abi(func param11_generic01(_: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
 func param11_generic01<T>(_: Int) -> T { fatalError() }
 
 
@@ -129,16 +129,16 @@ struct SubscriptArity {
   @abi(subscript<T>(param22_generic10 _: T, _: Int) -> Int) // expected-error {{declaration in '@abi' should not have generic signature because 'subscript(param22_generic10:_:)' is not generic}}
   subscript(param22_generic10 _: Int, _: Int) -> Int { 0 }
 
-  @abi(subscript(param11_generic01 _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  @abi(subscript(param11_generic01 _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
   subscript<T>(param11_generic01 _: T) -> Int { 0 }
 
-  @abi(subscript(param21_generic01 _: Int, _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  @abi(subscript(param21_generic01 _: Int, _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
   subscript<T>(param21_generic01 _: T) -> Int { 0 }
 
-  @abi(subscript(param12_generic01 _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  @abi(subscript(param12_generic01 _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
   subscript<T>(param12_generic01 _: T, _: Int) -> Int { 0 }
 
-  @abi(subscript(param22_generic01 _: Int, _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  @abi(subscript(param22_generic01 _: Int, _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable, T : Transferable>'}}
   subscript<T>(param22_generic01 _: T, _: Int) -> Int { 0 }
 
   @abi(subscript<T>(param11_generic11 _: T) -> Int)
@@ -1014,7 +1014,7 @@ func testNormalProtocols(
 ) {}
 
 @abi(
-  func testNormalProtocolsGeneric<A, B: CustomStringConvertible>( // expected-error {{generic signature '<A, B where A : Copyable, A : Escapable, B : CustomStringConvertible>' in '@abi' is not compatible with '<A, B where A : CustomStringConvertible, B : Copyable, B : Escapable>'}}
+  func testNormalProtocolsGeneric<A, B: CustomStringConvertible>( // expected-error {{generic signature '<A, B where A : Copyable, A : Escapable, A : Transferable, B : CustomStringConvertible>' in '@abi' is not compatible with '<A, B where A : CustomStringConvertible, B : Copyable, B : Escapable, B : Transferable>'}}
     _: A, _: B
   )
 )

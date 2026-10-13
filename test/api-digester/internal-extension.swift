@@ -53,6 +53,14 @@ internal extension S1 {
 // CHECK-NEXT:   "mangledName": "$ss9EscapableP",
 // CHECK-NEXT:   "isMarkerProtocol": true
 // CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT:   "kind": "Conformance",
+// CHECK-NEXT:   "name": "Transferable",
+// CHECK-NEXT:   "printedName": "Transferable",
+// CHECK-NEXT:   "usr": "s:s12TransferableP",
+// CHECK-NEXT:   "mangledName": "$ss12TransferableP",
+// CHECK-NEXT:   "isMarkerProtocol": true
+// CHECK-NEXT: },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "kind": "Conformance",
 // CHECK-NEXT:     "name": "PublicProto",

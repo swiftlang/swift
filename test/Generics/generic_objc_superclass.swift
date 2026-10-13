@@ -16,9 +16,11 @@ func foo<T : Generic<U>, U>(_: T, _: U) {
 // CHECK-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
 // CHECK-NEXT: - [Copyable].[Deinitable] => [Copyable] [explicit]
 // CHECK-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
+// CHECK-NEXT: - [Transferable].[Transferable] => [Transferable] [permanent]
 // CHECK-NEXT: - [Deinitable].[Deinitable] => [Deinitable] [permanent]
 // CHECK-NEXT: - τ_0_1.[Copyable] => τ_0_1 [explicit]
 // CHECK-NEXT: - τ_0_1.[Escapable] => τ_0_1 [explicit]
+// CHECK-NEXT: - τ_0_1.[Transferable] => τ_0_1 [explicit]
 // CHECK-NEXT: - τ_0_0.[superclass: Generic<τ_0_1>] => τ_0_0
 // CHECK-NEXT: - τ_0_1.[Deinitable] => τ_0_1
 // CHECK-NEXT: - τ_0_0.[layout: AnyObject] => τ_0_0
@@ -26,7 +28,8 @@ func foo<T : Generic<U>, U>(_: T, _: U) {
 // CHECK: Property map: {
 // CHECK-NEXT:   [Copyable] => { conforms_to: [Copyable Deinitable] }
 // CHECK-NEXT:   [Escapable] => { conforms_to: [Escapable] }
+// CHECK-NEXT:   [Transferable] => { conforms_to: [Transferable] }
 // CHECK-NEXT:   [Deinitable] => { conforms_to: [Deinitable] }
-// CHECK-NEXT:   τ_0_1 => { conforms_to: [Copyable Escapable Deinitable] }
+// CHECK-NEXT:   τ_0_1 => { conforms_to: [Copyable Escapable Transferable Deinitable] }
 // CHECK-NEXT:   τ_0_0 => { layout: AnyObject superclass: [superclass: Generic<τ_0_1>] }
 // CHECK-NEXT: }

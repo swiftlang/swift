@@ -22,13 +22,16 @@ extension G where X : Base, X : P, X == Derived {}
 // RULE-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
 // RULE-NEXT: - [Copyable].[Deinitable] => [Copyable] [explicit]
 // RULE-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
+// RULE-NEXT: - [Transferable].[Transferable] => [Transferable] [permanent]
 // RULE-NEXT: - [P].[P] => [P] [permanent]
 // RULE-NEXT: - [P].[Copyable] => [P] [explicit]
 // RULE-NEXT: - [P].[Escapable] => [P] [explicit]
+// RULE-NEXT: - [P].[Transferable] => [P] [explicit]
 // RULE-NEXT: - [P].[Deinitable] => [P]
 // RULE-NEXT: - [Deinitable].[Deinitable] => [Deinitable] [permanent]
 // RULE-NEXT: - τ_0_0.[Copyable] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[Escapable] => τ_0_0 [explicit]
+// RULE-NEXT: - τ_0_0.[Transferable] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[superclass: Base] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[P] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[concrete: Derived] => τ_0_0 [explicit]
@@ -37,10 +40,12 @@ extension G where X : Base, X : P, X == Derived {}
 // RULE-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Derived : Copyable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Derived : Escapable] => τ_0_0
+// RULE-NEXT: - τ_0_0.[concrete: Derived : Transferable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Derived : P] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Derived : Deinitable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Base : Copyable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Base : Escapable] => τ_0_0
+// RULE-NEXT: - τ_0_0.[concrete: Base : Transferable] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Base : P] => τ_0_0
 // RULE-NEXT: - τ_0_0.[concrete: Base : Deinitable] => τ_0_0
 // RULE-NEXT: }

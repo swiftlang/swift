@@ -24,10 +24,17 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 
+// Compilers without the Transferable protocol don't see it.
+// CHECK-NEXT: #if compiler(>=5.3) && $TransferableProtocol
+// CHECK-NEXT: @_marker public protocol Transferable {
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
 // This test verifies that:
 //   1. When omitted, the an invertible protocol decl gets automatically
 //      synthesized into a module named Swift
 //   2. These protocol decls do not specify inverses in their inheritance clause
 //      when emitted into the interface file. Copyable inherits Deinitable.
+//   3. Protocols that older compilers don't know about are hidden from them.
 
 @_marker public protocol Escapable { }

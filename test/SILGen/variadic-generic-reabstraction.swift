@@ -168,7 +168,7 @@ func testOptionalSingleInnerParamReabstraction() {
   takesVariadicFunction(function: takeOptNoArgsClosure)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_SgSiIggd_xRi_zRi1_zRi0_zlyytIsegr_Sg_QSiSiIegpd_TR :
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_SgSiIggd_xRi_zRi1_zRi0_zRi2_zlyytIsegr_Sg_QSiSiIegpd_TR :
 // CHECK-SAME: $@convention(thin) (@pack_guaranteed Pack{Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>}, @guaranteed @noescape @callee_guaranteed (@guaranteed Optional<@callee_guaranteed () -> ()>) -> Int) -> Int {
 // CHECK:       bb0(%0 : $*Pack{Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>}, %1 : @guaranteed $@noescape @callee_guaranteed (@guaranteed Optional<@callee_guaranteed () -> ()>) -> Int):
 // CHECK-NEXT:    [[ARG_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Optional<() -> ()>}
@@ -193,4 +193,4 @@ func testOptionalSingleInnerParamReabstraction() {
 // CHECK-NEXT:    destroy_value [[OPT_THUNKED]] : $Optional<@callee_guaranteed () -> ()>
 // CHECK-NEXT:    end_borrow [[OPT_CLOSURE]] : $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
 // CHECK-NEXT:    return [[RESULT]] : $Int
-// CHECK-LABEL: } // end sil function '$sIeg_SgSiIggd_xRi_zRi1_zRi0_zlyytIsegr_Sg_QSiSiIegpd_TR'
+// CHECK-LABEL: } // end sil function '$sIeg_SgSiIggd_xRi_zRi1_zRi0_zRi2_zlyytIsegr_Sg_QSiSiIegpd_TR'
