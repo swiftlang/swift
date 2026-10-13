@@ -20,7 +20,7 @@
 // CHECK-INDIRECT-SAME:   ptr null,
 // CHECK-SAME:   ptr @_objc_empty_cache,
 // CHECK-SAME:   ptr null,
-// CHECK-SAME:   i64 add (i64 ptrtoint (ptr @_DATA__TtC8subclass1A to i64), i64 [[IS_SWIFT_BIT:1|2]]),
+// CHECK-SAME:   ptr getelementptr (i8, ptr @_DATA__TtC8subclass1A, i64 [[IS_SWIFT_BIT:1|2]]),
 // CHECK-SAME:   ptr @"$s8subclass1AC1fSiyF",
 // CHECK-SAME:   ptr @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
@@ -34,7 +34,7 @@
 // CHECK-INDIRECT-SAME:   ptr null,
 // CHECK-SAME:   ptr @_objc_empty_cache,
 // CHECK-SAME:   ptr null,
-// CHECK-SAME:   i64 add (i64 ptrtoint (ptr @_DATA__TtC8subclass1B to i64), i64 [[IS_SWIFT_BIT]]),
+// CHECK-SAME:   ptr getelementptr (i8, ptr @_DATA__TtC8subclass1B, i64 [[IS_SWIFT_BIT]]),
 // CHECK-SAME:   ptr @"$s8subclass1BC1fSiyF",
 // CHECK-SAME:   ptr @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>

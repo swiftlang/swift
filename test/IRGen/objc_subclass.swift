@@ -17,7 +17,7 @@
 // CHECK-32: @"$s13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i32 4, align [[WORD_SIZE_IN_BYTES:4]]
 // CHECK-64: @"$s13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i64 8, align [[WORD_SIZE_IN_BYTES:8]]
 
-// CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { ptr @"OBJC_METACLASS_$_NSObject", ptr @"OBJC_METACLASS_$_Gizmo", ptr @_objc_empty_cache, ptr null, [[LLVM_PTRSIZE_INT]] ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to [[LLVM_PTRSIZE_INT]]) }
+// CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { ptr @"OBJC_METACLASS_$_NSObject", ptr @"OBJC_METACLASS_$_Gizmo", ptr @_objc_empty_cache, ptr null, ptr @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo }
 
 // CHECK-32: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = internal constant { {{.*}}ptr } {
 // CHECK-32:   i32 129,

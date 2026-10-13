@@ -18,7 +18,7 @@
 // CHECK-unknown-SAME:   ptr,
 //   CHECK-apple-SAME:   ptr,
 //   CHECK-apple-SAME:   ptr,
-//   CHECK-apple-SAME:   [[INT]],
+//   CHECK-apple-SAME:   ptr,
 //         CHECK-SAME:   i32,
 //         CHECK-SAME:   i32,
 //         CHECK-SAME:   i32,
@@ -40,9 +40,9 @@
 // CHECK-unknown-SAME:   ptr null,
 //   CHECK-apple-SAME:   _objc_empty_cache
 //   CHECK-apple-SAME:   ptr null,
-//   CHECK-apple-SAME:   [[INT]] add (
-//   CHECK-apple-SAME:     [[INT]] ptrtoint (
-//   CHECK-apple-SAME:      _DATA_$s4main5Value[[UNIQUE_ID_1]]LLCyAA3BoxACLLCySiGGMf"{{[^)]*}})
+//   CHECK-apple-SAME:   ptr getelementptr (
+//   CHECK-apple-SAME:     i8,
+//   CHECK-apple-SAME:     _DATA_$s4main5Value[[UNIQUE_ID_1]]LLCyAA3BoxACLLCySiGGMf",
 //   CHECK-apple-SAME:     [[INT]] 2
 //   CHECK-apple-SAME:   ),
 //         CHECK-SAME:   i32 26,

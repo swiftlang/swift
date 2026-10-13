@@ -17,7 +17,7 @@
 // CHECK-SAME:   ptr @"OBJC_METACLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-SAME:   ptr @_objc_empty_cache,
 // CHECK-SAME:   ptr null,
-// CHECK-SAME:   i64 ptrtoint (ptr @_METACLASS_DATA__TtC17objc_class_export3Foo to i64)
+// CHECK-SAME:   ptr @_METACLASS_DATA__TtC17objc_class_export3Foo
 // CHECK-SAME: }
 // CHECK: [[FOO_NAME:@.*]] = private unnamed_addr constant [28 x i8] c"_TtC17objc_class_export3Foo\00"
 // CHECK: @_METACLASS_DATA__TtC17objc_class_export3Foo = internal constant { {{.*ptr}} } {
@@ -53,7 +53,7 @@
 // CHECK-SAME:   ptr @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-SAME:   ptr @_objc_empty_cache,
 // CHECK-SAME:   ptr null,
-// CHECK-SAME:   i64 add (i64 ptrtoint (ptr @_DATA__TtC17objc_class_export3Foo to i64), i64 {{1|2}}),
+// CHECK-SAME:   ptr getelementptr (i8, ptr @_DATA__TtC17objc_class_export3Foo, i64 {{1|2}}),
 // CHECK-SAME:   ptr @"$s17objc_class_export3FooC6createACyFZ",
 // CHECK-SAME:   ptr @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tF"
 // CHECK-SAME: }>, section "__DATA,__objc_data, regular"
