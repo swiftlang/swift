@@ -1520,7 +1520,8 @@ SwiftDeclSynthesizer::makeLegacyCArrayAccessors(DeclContext *dc,
 }
 
 void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
-                                                     Decl *legacy) {
+                                                     Decl *legacy,
+                                                     bool addAlternate) {
   auto &ctx = ImporterImpl.SwiftContext;
   auto addAttrs = [&](ValueDecl *current, CArrayProjection projection,
                       ValueDecl *counterpart) {
@@ -1546,7 +1547,8 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
 
   addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
 
-  ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+  if (addAlternate)
+    ImporterImpl.addAlternateDecl(modernVD, legacyVD);
 
   // If we imported a stored property or global, we need to create
   // accessors for the legacy decl to forward to the modern decl.

@@ -2311,6 +2311,45 @@ bool hasImportableLegacyCArrayType(clang::QualType type);
 /// when \c Feature::ModernImportedCArrays is not enabled.
 ImportedType computeLegacyCArrayType(ImportedType modernType);
 
+/// The other C array projection of \p decl, or null if \p decl has none (or
+/// has no projections at all). To tell a declaration with no projections apart
+/// from one with a modern projection only, check for a \c CArrayProjectionAttr.
+template <typename DeclTy>
+DeclTy *getDeclForCounterpartCArrayProjection(const DeclTy *decl) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  return attr ? dyn_cast_or_null<DeclTy>(attr->getCounterpart()) : nullptr;
+}
+
+/// Switch to the C array projection of \p decl that is \p projection.
+///
+/// \returns \p decl if it has no C array projections or is already the
+///          requested one; otherwise its counterpart, which is null if the
+///          requested projection doesn't exist.
+template <typename DeclTy>
+DeclTy *getDeclForCArrayProjection(DeclTy *decl, CArrayProjection projection) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || attr->getProjection() == projection)
+    return decl;
+  return getDeclForCounterpartCArrayProjection(decl);
+}
+
+/// Switch to the C array projection of \p decl that is the same as the
+/// projection of \p reference.
+///
+/// \returns \p decl if \p reference has no C array projections; otherwise the
+///          same thing as \c getDeclForCArrayProjection() .
+template <typename DeclTy>
+DeclTy *getDeclForCArrayProjectionMatching(DeclTy *decl,
+                                           const ValueDecl *reference) {
+  auto *attr = reference->getAttrs().getAttribute<CArrayProjectionAttr>();
+  return attr ? getDeclForCArrayProjection(decl, attr->getProjection())
+              : decl;
+}
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 

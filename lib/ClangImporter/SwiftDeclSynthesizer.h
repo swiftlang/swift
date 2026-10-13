@@ -270,7 +270,12 @@ public:
   /// the same declaration for the purposes of
   /// \c Feature::ModernImportedCArrays , synthesizing forwarding accessors
   /// between them if needed.
-  void registerCArrayProjections(Decl *modern, Decl *legacy);
+  ///
+  /// \param addAlternate Whether to also record \p legacy as an alternate
+  ///        declaration of \p modern . This should be \c false if the caller
+  ///        takes care of adding the legacy projection itself.
+  void registerCArrayProjections(Decl *modern, Decl *legacy,
+                                 bool addAlternate = true);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///

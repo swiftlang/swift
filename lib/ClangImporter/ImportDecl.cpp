@@ -5747,8 +5747,20 @@ namespace {
         // hide or override (rather than conflict with) the member that is
         // introduced from the base class. Need to check this.
 
+        // The clone needs a legacy projection if the base method does.
+        willImportType(targetMethod->getReturnType());
+        for (auto *param : targetMethod->parameters())
+          willImportType(param->getType());
+
         auto importedBaseMethod = dyn_cast_or_null<FuncDecl>(
             Impl.importDecl(targetMethod, getActiveSwiftVersion()));
+        if (!importedBaseMethod)
+          return nullptr;
+
+        // Clone the projection of the base method that matches the one we're
+        // importing.
+        importedBaseMethod = importer::getDeclForCArrayProjection(
+            importedBaseMethod, currentCArrayProjection);
         if (!importedBaseMethod)
           return nullptr;
 
@@ -11561,6 +11573,17 @@ static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl) {
   return 0;
 }
 
+/// Whether \p existingMember is a clone of the other C array projection of
+/// \p baseMember.
+static bool isCloneOfCArrayCounterpart(ClangImporter::Implementation &impl,
+                                      const ValueDecl *baseMember,
+                                      const ValueDecl *existingMember) {
+  auto *counterpart =
+      importer::getDeclForCounterpartCArrayProjection(baseMember);
+  return counterpart &&
+         impl.getOriginalForClonedMember(existingMember) == counterpart;
+}
+
 void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
                                    ClangInheritanceInfo inheritance) {
 
@@ -11652,16 +11675,16 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
-      // name and arity.
+      // name and arity for the same C array projection.
       auto memberArity = getImportedBaseMemberDeclArity(baseMember);
       bool shouldAddBaseMember = true;
       for (const auto *currentMember : swiftDecl->getMembers()) {
         auto vd = dyn_cast<ValueDecl>(currentMember);
-        if (vd->getName() == baseMember->getName()) {
-          if (memberArity == getImportedBaseMemberDeclArity(vd)) {
-            shouldAddBaseMember = false;
-            break;
-          }
+        if (vd->getName() == baseMember->getName() &&
+            memberArity == getImportedBaseMemberDeclArity(vd) &&
+            !isCloneOfCArrayCounterpart(Impl, baseMember, vd)) {
+          shouldAddBaseMember = false;
+          break;
         }
       }
       if (!shouldAddBaseMember)
