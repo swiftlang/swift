@@ -1858,12 +1858,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
-  assert(!baseType->isPlaceholder() &&
-         "Base type must not be a type placeholder");
+  assert(!baseType->is<HoleType>() && "Base type must not be a type hole");
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
-  assert(!unwrappedType->isPlaceholder() &&
-         "Unwrapped type must not be a type placeholder");
+  assert(!unwrappedType->is<HoleType>() &&
+         "Unwrapped type must not be a type hole");
 
   if (!baseType->getOptionalObjectType())
     return false;

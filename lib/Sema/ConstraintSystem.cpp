@@ -1508,10 +1508,10 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
   assert(!ty->is<InOutType>());
   auto rvalueTy = ty->getWithoutSpecifierType();
 
-  // If the type to bind is a placeholder, we can propagate it, as we don't know
+  // If the type to bind is a hole, we can propagate it, as we don't know
   // whether it can be optional or non-optional, and we would have already
   // recorded a fix for it.
-  if (rvalueTy->isPlaceholder()) {
+  if (rvalueTy->is<HoleType>()) {
     addConstraint(ConstraintKind::Bind, boundTy, ty, locator);
     return;
   }
@@ -1704,9 +1704,8 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       // Simplify the base.
       Type newBase = simplify(depMemTy->getBase());
 
-      if (newBase->isPlaceholder()) {
-        return PlaceholderType::get(CS.getASTContext(), depMemTy);
-      }
+      if (newBase->is<HoleType>())
+        return HoleType::get(depMemTy);
 
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
@@ -1747,7 +1746,7 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
           // order to continue solving.
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
           if (CS.inSalvageMode())
-            return PlaceholderType::get(CS.getASTContext(), memberTy);
+            return HoleType::get(memberTy);
 
           return memberTy;
         }
@@ -1842,8 +1841,8 @@ getGenericParamForHoleTypeVar(TypeVariableType *tv, const Solution &S) {
   // class. Handle this by looking through all the bindings to see if we have
   // the same hole bound to a generic parameter type variable.
   for (auto &binding : S.typeBindings) {
-    if (auto *hole = binding.second->getAs<PlaceholderType>()) {
-      if (hole->getOriginator().dyn_cast<TypeVariableType *>() == tv) {
+    if (auto *hole = binding.second->getAs<HoleType>()) {
+      if (hole->getOriginator()->getAs<TypeVariableType>() == tv) {
         if (auto *gp = getGenericParam(binding.first))
           return gp;
       }
@@ -1852,21 +1851,10 @@ getGenericParamForHoleTypeVar(TypeVariableType *tv, const Solution &S) {
   return nullptr;
 }
 
-static Type replacePlaceholderType(PlaceholderType *placeholder,
-                                   const Solution &S, bool forCompletion) {
-  auto &ctx = S.getConstraintSystem().getASTContext();
-  auto origTy = [&]() -> Type {
-    auto orig = placeholder->getOriginator();
-    if (auto *tv = orig.dyn_cast<TypeVariableType *>())
-      return tv;
-    if (auto *dmt = orig.dyn_cast<DependentMemberType *>())
-      return dmt;
-    return Type();
-  }();
-  if (!origTy)
-    return ErrorType::get(ctx);
-
+static Type replaceHoleType(HoleType *hole, const Solution &S,
+                            bool forCompletion) {
   // Try replace the type variable with its original generic parameter type.
+  auto origTy = hole->getOriginator();
   auto replacement = origTy.transformRec([&](Type ty) -> std::optional<Type> {
     auto *tv = dyn_cast<TypeVariableType>(ty.getPointer());
     if (!tv)
@@ -1900,7 +1888,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
   if (wantInterfaceType)
     type = type->mapTypeOutOfEnvironment();
 
-  if (!type->hasTypeVariableOrPlaceholder())
+  if (!type->hasTypeVariableOrHole())
     return type;
 
   // Map type variables to fixed types from bindings.
@@ -1918,23 +1906,23 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
       });
   ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
-  // We may have type variables and placeholders left over. These are solver
+  // We may have type variables and holes left over. These are solver
   // allocated so cannot escape this function. Turn them into ErrorType.
   // - Type variables may still be present from unresolved pack expansions where
   //   e.g the count type is a hole, so the pattern may never become a
   //   concrete type.
-  // - Placeholders may be present for any holes.
-  if (resolvedType->hasTypeVariableOrPlaceholder()) {
+  // - Holes may be present for any types that could not be inferred.
+  if (resolvedType->hasTypeVariableOrHole()) {
     auto &ctx = cs.getASTContext();
     resolvedType =
         resolvedType.transformRec([&](Type type) -> std::optional<Type> {
-          if (!type->hasTypeVariableOrPlaceholder())
+          if (!type->hasTypeVariableOrHole())
             return type;
 
           auto *typePtr = type.getPointer();
 
-          if (auto *placeholder = dyn_cast<PlaceholderType>(typePtr))
-            return replacePlaceholderType(placeholder, *this, forCompletion);
+          if (auto *hole = dyn_cast<HoleType>(typePtr))
+            return replaceHoleType(hole, *this, forCompletion);
 
           if (isa<TypeVariableType>(typePtr))
             return ErrorType::get(ctx);
@@ -2421,7 +2409,7 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     // If there are any substitutions that are not fully resolved
     // solutions cannot be considered conflicting for the given parameter.
     if (llvm::any_of(conflictingArguments,
-                     [](const auto &arg) { return arg->hasPlaceholder(); }))
+                     [](const auto &arg) { return arg->hasHole(); }))
       continue;
 
     llvm::SmallString<64> arguments;
@@ -5150,7 +5138,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   // are resolvable and key path is not viable.
   auto rootTy =
       getFixedTypeRecursive(getKeyPathRootType(keyPath), /*wantRValue=*/false);
-  if (rootTy->isPlaceholder())
+  if (rootTy->is<HoleType>())
     return fail();
 
   auto isKnownSendability =

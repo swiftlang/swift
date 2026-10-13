@@ -592,7 +592,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
     llvm::FoldingSet<ErrorUnionType> ErrorUnionTypes;
-    llvm::DenseMap<void *, PlaceholderType *> PlaceholderTypes;
+    llvm::DenseMap<Type, HoleType *> HoleTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
     llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
@@ -666,6 +666,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
   llvm::FoldingSet<HiddenType> HiddenTypes;
+  llvm::DenseMap<PlaceholderTypeRepr *, PlaceholderType *> PlaceholderTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -951,6 +952,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(SILBlockStorageTypes);
   SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
   SIZE_AND_BYTES(BuiltinIntegerTypes);
+  SIZE_AND_BYTES(PlaceholderTypes);
   SIZE_AND_BYTES(OpenedElementEnvironments);
   SIZE(NormalConformances);
   SIZE(SelfConformances);
@@ -3732,6 +3734,7 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().SILFunctionTypes ?
     llvm::capacity_in_bytes(getImpl().SILBlockStorageTypes) +
     llvm::capacity_in_bytes(getImpl().BuiltinIntegerTypes) +
+    llvm::capacity_in_bytes(getImpl().PlaceholderTypes) +
     // getImpl().ProtocolCompositionTypes ?
     // getImpl().BuiltinVectorTypes ?
     // getImpl().GenericSignatures ?
@@ -3742,9 +3745,9 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().AvailabilityContexts
     getImpl().Permanent.getTotalMemory();
 
-    Size += getSolverMemory();
+  Size += getSolverMemory();
 
-    return Size;
+  return Size;
 }
 
 size_t ASTContext::getSolverMemory() const {
@@ -3768,6 +3771,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(OptionalTypes) +
     llvm::capacity_in_bytes(VariadicSequenceTypes) +
     llvm::capacity_in_bytes(ReferenceStorageTypes) +
+    llvm::capacity_in_bytes(HoleTypes) +
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
@@ -3810,7 +3814,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(InOutTypes);
     SIZE_AND_BYTES(DependentMemberTypes);
     SIZE(ErrorUnionTypes);
-    SIZE_AND_BYTES(PlaceholderTypes);
+    SIZE_AND_BYTES(HoleTypes);
     SIZE_AND_BYTES(DynamicSelfTypes);
     SIZE_AND_BYTES(EnumTypes);
     SIZE_AND_BYTES(StructTypes);
@@ -4030,10 +4034,9 @@ Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
-  // solver-allocated ErrorTypes. As such, fold any type variables and
-  // placeholders into ErrorTypes. If we have a top-level one, we can return
-  // that directly.
-  originalType = originalType->replaceTypeVariablesAndPlaceholdersWithErrors();
+  // solver-allocated ErrorTypes. As such, fold any type variables and holes
+  // into ErrorTypes. If we have a top-level one, we can return that directly.
+  originalType = originalType->replaceTypeVariablesAndHolesWithErrors();
   if (isa<ErrorType>(originalType.getPointer()))
     return originalType;
 
@@ -4097,36 +4100,34 @@ Type ErrorUnionType::get(const ASTContext &ctx, ArrayRef<Type> terms) {
   return unionTy;
 }
 
-Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
-  assert(originator);
-
-  auto originatorProps = [&]() -> RecursiveTypeProperties {
-    if (auto *tv = originator.dyn_cast<TypeVariableType *>())
-      return tv->getRecursiveProperties();
-
-    if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
-      return depTy->getRecursiveProperties();
-
-    if (auto *errTy = originator.dyn_cast<ErrorType *>())
-      return errTy->getRecursiveProperties();
-
-    return RecursiveTypeProperties();
-  }();
-  auto arena = getArena(originatorProps);
-
-  auto &cache = ctx.getImpl().getArena(arena).PlaceholderTypes;
-  auto &entry = cache[originator.getOpaqueValue()];
+Type PlaceholderType::get(ASTContext &ctx, PlaceholderTypeRepr *repr) {
+  auto &entry = ctx.getImpl().PlaceholderTypes[repr];
   if (entry)
     return entry;
 
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasPlaceholder;
+  entry = new (ctx) PlaceholderType(ctx, repr);
+  return entry;
+}
+
+Type HoleType::get(Type origTy) {
+  ASSERT(origTy);
+
+  auto originatorProps = origTy->getRecursiveProperties();
+  auto arena = getArena(originatorProps);
+
+  auto &ctx = origTy->getASTContext();
+  auto &entry = ctx.getImpl().getArena(arena).HoleTypes[origTy];
+  if (entry)
+    return entry;
+
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasHole;
 
   // We need to preserve the solver allocated bit, to ensure any wrapping
   // types are solver allocated too.
   if (originatorProps.isSolverAllocated())
     properties |= RecursiveTypeProperties::SolverAllocated;
 
-  entry = new (ctx, arena) PlaceholderType(ctx, originator, properties);
+  entry = new (ctx, arena) HoleType(ctx, origTy, properties);
   return entry;
 }
 
@@ -4986,8 +4987,7 @@ ParameterizedProtocolType *ParameterizedProtocolType::get(const ASTContext &C,
 ReferenceStorageType *ReferenceStorageType::get(Type T,
                                                 ReferenceOwnership ownership,
                                                 const ASTContext &C) {
-  assert(!T->hasTypeVariable()); // not meaningful in type-checker
-  assert(!T->hasPlaceholder());
+  assert(!T->hasTypeVariableOrHole()); // not meaningful in type-checker
   switch (optionalityOf(ownership)) {
   case ReferenceOwnershipOptionality::Disallowed:
     assert(!T->getOptionalObjectType() && "optional type is disallowed");
@@ -5188,7 +5188,7 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       ArrayRef<AnyFunctionType::Yield> yields,
                                       Type result, Type globalActor,
                                       Type thrownError) {
-  static_assert(RecursiveTypeProperties::BitWidth == 19,
+  static_assert(RecursiveTypeProperties::BitWidth == 20,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -5554,16 +5554,16 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Yield> yields,
                                               Type result,
                                               std::optional<ExtInfo> info) {
-  assert(sig && "no generic signature for generic function type?!");
+  ASSERT(sig && "no generic signature for generic function type?!");
 
   // We do not allow type variables in GenericFunctionTypes. Note that if this
   // ever changes, we'll need to setup arena-specific allocation for
   // GenericFunctionTypes.
-  assert(llvm::none_of(params, [](Param param) {
-    return param.getPlainType()->hasTypeVariable();
+  ASSERT(llvm::none_of(params, [](Param param) {
+    return param.getPlainType()->hasTypeVariableOrHole();
   }));
-  assert(!result->hasTypeVariable());
-  assert(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
+  ASSERT(!result->hasTypeVariableOrHole());
+  ASSERT(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, yields, result, info);
@@ -6091,7 +6091,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 19,
+  static_assert(RecursiveTypeProperties::BitWidth == 20,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
@@ -6457,6 +6457,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
   case TypeKind::DependentMember:
   case TypeKind::Error:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::PrimaryArchetype:
   case TypeKind::PackArchetype:
   case TypeKind::OpaqueTypeArchetype:
