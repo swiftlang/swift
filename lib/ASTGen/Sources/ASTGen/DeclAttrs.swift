@@ -2102,7 +2102,7 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
-  ///   @specialized(T == Int)
+  ///   @specialized(exported: true, where T == Int)
   ///   ```
   func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
     guard
@@ -2111,7 +2111,15 @@ extension ASTGenVisitor {
       // TODO: Diagnose
       return nil
     }
-    let exported: Bool? = nil
+    let exported: Bool? = arg.exportedArgument.map {
+      // The argument reuses '@_specialize's labeled argument node, but the
+      // parser only builds it with the 'exported' label.
+      precondition(
+        $0.label.rawText == "exported",
+        "(compiler bug) '@specialized' argument should only be parsed with the 'exported' label"
+      )
+      return $0.value.rawText == "true"
+    }
     let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
     let targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)? = nil

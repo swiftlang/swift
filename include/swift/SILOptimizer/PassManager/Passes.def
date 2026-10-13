@@ -318,6 +318,9 @@ LEGACY_PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
 LEGACY_PASS(OnonePrespecializations, "onone-prespecializer",
      "Pre specialization via @_specialize")
+LEGACY_PASS(EmbeddedExportedPrespecializations,
+     "embedded-exported-prespecializer",
+     "Pre specialization via @specialized(exported: true) in Embedded Swift")
 LEGACY_PASS(EarlyCodeMotion, "early-codemotion",
      "Early Code Motion without Release Hoisting")
 LEGACY_PASS(EarlyPerfInliner, "early-inline",

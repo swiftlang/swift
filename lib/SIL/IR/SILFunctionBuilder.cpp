@@ -103,12 +103,14 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, targetFunction, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       } else {
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, nullptr, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       }
     }
   }
