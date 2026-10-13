@@ -675,6 +675,10 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
   if (type->is<PlaceholderType>())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
+  // Same goes for HoleType.
+  if (type->is<HoleType>())
+    return ProtocolConformanceRef::forAbstract(type, protocol);
+
   // Pack types can conform to protocols.
   if (auto packType = type->getAs<PackType>()) {
     return getPackTypeConformance(packType, protocol);

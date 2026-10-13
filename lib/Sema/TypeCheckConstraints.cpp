@@ -890,7 +890,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
                                          bool openArchetypes,
                                          ConstraintKind kind, DeclContext *dc) {
   // Don't allow any type variables to leak into the nested ConstraintSystem
-  // (including as originator types for placeholders). This also ensure that we
+  // (including as originator types for holes). This also ensure that we
   // avoid lifetime issues for e.g cases where we lazily populate the
   // `ContextSubMap` on `NominalOrBoundGenericNominalType` in the nested arena,
   // since it will be destroyed on leaving.

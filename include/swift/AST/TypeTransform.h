@@ -113,6 +113,7 @@ case TypeKind::Id:
     case TypeKind::Error:
     case TypeKind::TypeVariable:
     case TypeKind::Placeholder:
+    case TypeKind::Hole:
     case TypeKind::SILToken:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:

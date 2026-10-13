@@ -50,6 +50,8 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 }
 
 static bool isAdmissibleType(Type type) {
+  // FIXME: We should also reject placeholders here but they can currently leak
+  // into constraint system.
   return !type->hasUnboundGenericType() && !type->hasTypeParameter();
 }
 
