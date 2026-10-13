@@ -138,6 +138,10 @@ Build and include the no-assert toolchain variant in the output.
 Display a build time summary at the end of the build, with the average CPU
 utilization of each step. Helpful for performance analysis.
 
+.PARAMETER Branch
+For internal use by Invoke-BuildBranches: the build steps to run instead of the
+build.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -232,7 +236,8 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [string] $Branch = ""
 )
 
 ## Prepare the build environment.
@@ -964,6 +969,75 @@ function Invoke-BuildStep {
 
   Record-OperationTime $Platform $Name {
     & $Name $Platform @SplatArgs
+  }
+}
+
+# Numbers the branches of all forks, since nested forks run at the same time.
+$BuildBranchCount = 0
+
+# Runs each block as a branch of the build and returns once they are all done.
+# The first block runs here. The others run at the same time, each in a new
+# instance of this script with the same parameters, at below normal priority so
+# that they only use the processors that the first block leaves idle. They
+# cannot use the caller's local variables, and their output is printed when
+# they end.
+function Invoke-BuildBranches {
+  param
+  (
+    [Parameter(ValueFromRemainingArguments)]
+    [ScriptBlock[]] $Branches
+  )
+
+  $Parameters = @{}
+  foreach ($Parameter in $script:PSBoundParameters.GetEnumerator()) {
+    $Value = $Parameter.Value
+    if ($Value -is [IO.FileSystemInfo]) { $Value = $Value.ToString() }
+    if ($Value -is [switch]) { $Value = $Value.IsPresent }
+    $Parameters[$Parameter.Key] = $Value
+  }
+
+  New-Item -ItemType Directory -Force -Path "$BinaryCache\branches" | Out-Null
+  $Others = @(for ($Index = 1; $Index -lt $Branches.Count; $Index++) {
+    $script:BuildBranchCount++
+    $Name = $script:BuildBranchCount
+    $Log = "$BinaryCache\branches\$PID-$Name"
+    $Parameters.Branch = $Branches[$Index].ToString()
+    $Parameters | Export-Clixml -Path "$Log.xml"
+    $Command = "`$ErrorActionPreference = 'Stop'; `$Parameters = Import-Clixml '$Log.xml'; & '$PSCommandPath' @Parameters; exit `$LASTEXITCODE"
+    $Process = Start-Process -PassThru -NoNewWindow -FilePath (Get-Process -Id $PID).Path `
+      -ArgumentList "-NoProfile -ExecutionPolicy $(Get-ExecutionPolicy) -Command $Command" `
+      -RedirectStandardOutput "$Log.out" -RedirectStandardError "$Log.err"
+    # Windows PowerShell only reports the exit code of a process whose handle
+    # was opened before it exited.
+    $null = $Process.Handle
+    $Process.PriorityClass = [Diagnostics.ProcessPriorityClass]::BelowNormal
+    @{ Name = $Name; Process = $Process; Log = $Log }
+  })
+
+  try {
+    & $Branches[0]
+  } catch {
+    foreach ($Other in $Others) {
+      if (-not $Other.Process.HasExited) {
+        & taskkill /T /F /PID $Other.Process.Id | Out-Null
+      }
+    }
+    throw
+  } finally {
+    Record-OperationTime $BuildPlatform "Wait-BuildBranches" {
+      foreach ($Other in $Others) { $Other.Process.WaitForExit() }
+    }
+    foreach ($Other in $Others) {
+      Write-Host -ForegroundColor Cyan "----- Output of build branch $($Other.Name) -----"
+      Get-Content -ErrorAction Ignore "$($Other.Log).out", "$($Other.Log).err" | Write-Host
+      Remove-Item -ErrorAction Ignore "$($Other.Log).*"
+    }
+  }
+
+  foreach ($Other in $Others) {
+    if ($Other.Process.ExitCode -ne 0) {
+      throw "Build branch $($Other.Name) failed with exit code $($Other.Process.ExitCode)."
+    }
   }
 }
 
@@ -5937,6 +6011,11 @@ try {
 
 Get-Dependencies
 
+if ($Branch) {
+  & ([ScriptBlock]::Create($Branch))
+  exit 0
+}
+
 if ($Clean) {
   # Fail instead of leaving a partially-cleaned tree behind.
   function Clean-Path([string] $Path) {
@@ -6019,48 +6098,105 @@ if ($Toolchain) {
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
-  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
-    Assembler       = $Assemblers.Stage1;
-    CCompiler       = $Compilers.Stage1.C;
-    CXXCompiler     = $Compilers.Stage1.CXX;
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
-  }
-  Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
-  Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
 
-  # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
-  Get-SelectedSDKBuilds | ForEach-Object {
-    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+  # The tools are built with the Stage1 compilers, so those that do not need
+  # Stage2 build alongside it.
+  Invoke-BuildBranches {
+    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+      Assembler       = $Assemblers.Stage1;
+      CCompiler       = $Compilers.Stage1.C;
+      CXXCompiler     = $Compilers.Stage1.CXX;
+      SwiftCompiler   = $Compilers.Stage1.Swift;
+      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+      DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+    }
+    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
+    Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
+
+    # ── Stage2 Compiler Runtimes ────────────────────────────────────────────
+    Get-SelectedSDKBuilds | ForEach-Object {
+      Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+    }
+
+    # ── Stage2 Compiler Macros ──────────────────────────────────────────────
+    Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
+      SwiftCompiler   = $Compilers.Stage1.Swift;
+      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+      SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+    }
+    Invoke-BuildStep Build-TestingMacros $HostPlatform @{
+      SwiftCompiler   = $Compilers.Stage1.Swift;
+      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+      SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+    }
+  } {
+    # ── Stage2 Toolchain ────────────────────────────────────────────────────
+    Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
+    Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-LLBuild $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ASN1 $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Crypto $HostPlatform @{
+      Assembler = $Assemblers.Stage1;
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Collections $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Certificates $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-System $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Subprocess $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Markdown $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
+    Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-SymbolKit $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-DocC $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
+    Invoke-BuildStep Build-Inspect $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
   }
 
-  # ── Stage2 Compiler Macros ────────────────────────────────────────────────
-  Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-TestingMacros $HostPlatform @{
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-
-  # ── Stage2 Toolchain ──────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
-  Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-LLBuild $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-ArgumentParser $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
+  # The tools that need Stage2.
   Invoke-BuildStep Build-Driver $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
@@ -6068,35 +6204,6 @@ if ($Toolchain) {
     LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
     Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
     Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
-  }
-  Invoke-BuildStep Build-ASN1 $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Crypto $HostPlatform @{
-    Assembler = $Assemblers.Stage1;
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Collections $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Certificates $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-System $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Subprocess $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-ToolsProtocols $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
   Invoke-BuildStep Build-Build $HostPlatform @{
     Compilers = $Compilers.Stage1;
@@ -6107,36 +6214,15 @@ if ($Toolchain) {
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-Markdown $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
   Invoke-BuildStep Build-Format $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
-  Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-SymbolKit $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-DocC $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-Inspect $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
 
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
