@@ -1671,7 +1671,7 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
 
   // Otherwise, use a subtype constraint for classes to cope with
   // inheritance.
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
                      cs.getConstraintLocator(locator),
                      /*isFavored=*/false, preparedOverload);

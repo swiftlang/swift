@@ -278,7 +278,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SILType loweredTy = IGF.IGM.getLoweredType(boundTy);
     std::optional<uint64_t> descriptor;
-    if (boundTy->getClassOrBoundGenericClass()) {
+    if (boundTy->getClassDecl()) {
       // For a class, describe the heap object.
       auto &classTI = IGF.IGM.getTypeInfo(loweredTy).as<ClassTypeInfo>();
       auto &classLayout = classTI.getClassLayout(
@@ -1661,7 +1661,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // strategy for it. Just call the vwt function. Otherwise, we know that this
     // is at least an enum and can optimize away some of the cost of getEnumTag.
     if (!ty.is<ArchetypeType>()) {
-      assert(ty.getEnumOrBoundGenericEnum() && "expected enum type in "
+      assert(ty.getEnumDecl() && "expected enum type in "
              "getEnumTag builtin!");
 
       auto &strategy = getEnumImplStrategy(IGF.IGM, ty);

@@ -479,12 +479,12 @@ BridgedStringRef BridgedType::getFieldName(SwiftInt idx) const {
 }
 
 BridgedType::EnumElementIterator BridgedType::getFirstEnumCaseIterator() const {
-  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = unbridged().getEnumDecl();
   return bridge(enumDecl->getAllElements().begin());
 }
 
 bool BridgedType::isEndCaseIterator(EnumElementIterator i) const {
-  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = unbridged().getEnumDecl();
   return unbridge(i) == enumDecl->getAllElements().end();
 }
 
@@ -1765,6 +1765,15 @@ bool BridgedInstruction::PartialApplyInst_isOnStack() const {
 bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
   return getAs<swift::PartialApplyInst>()->getResultIsolation() ==
          swift::SILFunctionTypeIsolation::forUnknown();
+}
+
+OptionalBridgedInstruction
+BridgedInstruction::PartialApplyInst_getNonEscapingClosureConversion() const {
+  auto *cvt =
+      swift::getNonEscapingClosureConversion(getAs<swift::PartialApplyInst>());
+  if (!cvt)
+    return {nullptr};
+  return {cvt->asSILNode()};
 }
 
 bool BridgedInstruction::PartialApplyInst_isStackAllocationNested() const {
@@ -3780,7 +3789,7 @@ BridgedVTable BridgedContext::createSpecializedVTable(BridgedType classType,
   }
   swift::SILType classTy = classType.unbridged();
   return {swift::SILVTable::create(*context->getModule(),
-                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   classTy.getClassDecl(), classTy,
                                    serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                    entries)};
 }

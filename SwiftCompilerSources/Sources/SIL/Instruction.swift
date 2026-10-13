@@ -1692,6 +1692,13 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   /// non-escaping prior to ClosureLifetimeFixup.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
 
+  /// Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping partial_apply converted by
+  /// convert_escape_to_noescape [not_guaranteed]. If ClosureLifetimeFixup will promote this closure to
+  /// partial_apply [on_stack], return that conversion.
+  public var nonEscapingClosureConversion: ConvertEscapeToNoEscapeInst? {
+    bridged.PartialApplyInst_getNonEscapingClosureConversion().instruction as! ConvertEscapeToNoEscapeInst?
+  }
+
   // Warning: ClosureLifetimeFixup does not promote all non-escaping closures to on-stack. When that promotion fails, it
   // creates a fake destroy of the closure after the captured values that the closure depends on. This is invalid OSSA,
   // so OSSA utilities need to bail-out when isOnStack is false even if hasNoescapeCapture is true to avoid encoutering

@@ -1471,6 +1471,25 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
       Diags.diagnose(SourceLoc(), diag::serialization_load_failed, "Swift");
   }
 
+  auto identifier = getIdentifier(getProtocolName(getKnownProtocolKind(ip)));
+
+  // A stdlib that was built from source serializes the protocols that were
+  // synthesized into it. Use the deserialized protocol instead of synthesizing
+  // a duplicate, so that references to the protocol in the Builtin module
+  // (from modules built without the stdlib) and in the stdlib resolve to the
+  // same declaration.
+  if (stdlib) {
+    SmallVector<ValueDecl *, 1> results;
+    stdlib->lookupValue(identifier, NLKind::QualifiedLookup,
+                        ModuleLookupFlags::ExcludeMacroExpansions, results);
+    for (auto *result : results) {
+      if (auto *protocol = dyn_cast<ProtocolDecl>(result)) {
+        getImpl().InvertibleProtocolDecls[index] = protocol;
+        return protocol;
+      }
+    }
+  }
+
   FileUnit *file = nullptr;
   if (stdlib) {
     file = &stdlib->getFiles()[0]->getOrCreateSynthesizedFile();
@@ -1487,7 +1506,6 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
     inherited = AllocateCopy(llvm::ArrayRef(entry));
   }
 
-  auto identifier = getIdentifier(getProtocolName(getKnownProtocolKind(ip)));
   ProtocolDecl *protocol =
       new (*this) ProtocolDecl(file, SourceLoc(), SourceLoc(), identifier,
                                /*primaryAssocTypes=*/{}, inherited,
@@ -2584,7 +2602,7 @@ void ASTContext::loadObjCMethods(
 
 ConstructorDecl *ASTContext::getOptionalTanInitDecl(CanType optionalTanType) {
   if (!getImpl().OptionalTanInitDecl) {
-    auto *optionalTanDecl = optionalTanType.getNominalOrBoundGenericNominal();
+    auto *optionalTanDecl = optionalTanType.getNominalDecl();
     // Look up the `Optional<T>.TangentVector.init` declaration.
     auto initLookup =
       optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
@@ -2612,14 +2630,14 @@ VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
   if (!getImpl().OptionalTanValueDecl) {
     // TODO: Maybe it would be better to have getters / setters here that we
     // can call and hide this implementation detail?
-    StructDecl *optStructDecl = optionalTanType.getStructOrBoundGenericStruct();
+    StructDecl *optStructDecl = optionalTanType.getStructDecl();
     assert(optStructDecl && "Unexpected type of Optional.TangentVector");
 
     ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
     assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
     VarDecl *wrappedValueVar = properties[0];
 
-    assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
+    assert(wrappedValueVar->getTypeInContext()->getEnumDecl() ==
            getOptionalDecl() && "Unexpected type of Optional.TangentVector");
 
     getImpl().OptionalTanValueDecl = wrappedValueVar;
@@ -4594,7 +4612,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // evaluator cycle to determine the init kind for actors, which are final.
     if (Ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
       if (wantDynamicSelf)
-        if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
+        if (auto *classDecl = selfTy->getClassDecl())
           if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
             isDynamicSelf = true;
     }
@@ -5580,7 +5598,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
 
-    // Generic functions can't currently have Sendable or @called(atMostOnce)
+    // Generic functions can't currently have Sendable or execution semantics
     // dependence.
     ASSERT(!info->getSendableDependentType());
     ASSERT(!info->getExecutionSemanticsDependentType());
@@ -7126,7 +7144,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
 }
 
 bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
-  auto clazz = t->getClassOrBoundGenericClass();
+  auto clazz = t->getClassDecl();
   if (!clazz)
     return false;
 

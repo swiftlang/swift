@@ -15,7 +15,7 @@ import Foo
 // HAS_NO_COMPILED-NOT: "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
 
 // Step 1: build swift interface and swift module side by side
-// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name
+// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name -disable-implicit-string-processing-module-import
 
 // Step 2: build module from interface and put it in a location separate from the interface file
 // RUN: %target-swift-frontend -compile-module-from-interface -o %t/binaryModuleOnly/Foo.swiftmodule -module-name Foo -disable-interface-lock %t/Foo.swiftmodule/%target-swiftinterface-name

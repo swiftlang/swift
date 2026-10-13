@@ -2214,7 +2214,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
 
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
-      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal())
+      if (auto typeDecl = parentType->getNominalDecl())
         diagnose(typeDecl, diag::decl_declared_here, typeDecl);
     }
   }
@@ -2284,6 +2284,37 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
              declaredType)
         .fixItReplace(repr->getNameLoc().getSourceRange(),
                       declaredType.getString());
+  }
+}
+
+static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
+                                           const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  auto nameString = typeDecl->getName().str();
+  auto diag = [&](StringRef featureName) {
+    // Don't require this in the standard library or _Concurrency library.
+    auto module = dc->getParentModule();
+    if (module->isStdlibModule() || module->isConcurrencyModule())
+      return;
+  
+    ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature, nameString,
+                       featureName);
+  };
+
+  if (nameString == "Cell" ||
+      nameString == "ConstCell" ||
+      nameString == "Volatile") {
+    if (ctx.LangOpts.hasFeature(Feature::Cells))
+      return;
+
+    diag(Feature::Cells.getName());
   }
 }
 
@@ -2420,6 +2451,8 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseExperimentalStdlibTypes(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -4308,7 +4341,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
       // types.
-      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+      if (auto SD = ty->getStructDecl()) {
         if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
             ownership == ParamSpecifier::InOut) {
           diagnose(eltTypeRepr->getLoc(),
@@ -5075,9 +5108,19 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  // Function values with execution semantics own their context, so they must
+  // be thick.
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto *called = claim<CalledTypeAttr>(attrs))
-    executionSemantics = called->getExecutionSemantics();
+  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+    if (representation != SILFunctionType::Representation::Thick) {
+      assert(conventionAttr);
+      diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                      diag::invalid_called_and_attr_attributes, conventionAttr);
+      hasError = true;
+    } else {
+      executionSemantics = called->getExecutionSemantics();
+    }
+  }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,

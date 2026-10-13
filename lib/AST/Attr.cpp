@@ -1208,7 +1208,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
             D->getResolvedCustomAttrType(const_cast<CustomAttr *>(attr))) {
       // Print custom attributes only if the attribute decl is accessible.
       // FIXME: rdar://85477478 They should be rejected.
-      if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
+      if (auto attrDecl = type->getNominalDecl()) {
         if (attrDecl->getFormalAccess() < Options.AccessFilter) {
           return false;
         }

@@ -1110,3 +1110,72 @@ bb0(%0 : $*Agg<T>):
   %37 = tuple ()
   return %37
 }
+
+sil @getNEOut : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @out NE
+sil @closureNE : $@convention(thin) (@guaranteed NE) -> ()
+sil @closureNEAddr : $@convention(thin) (@in_guaranteed NE) -> ()
+sil @runClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// rdar://189095063 (non-escaping closure capture of a value that borrows a getter temporary)
+//
+// Prior to ClosureLifetimeFixup, the non-escaping closure is an escaping partial_apply converted by
+// convert_escape_to_noescape. The closure captures a temporary copy of a local variable. Extend the temporary owner to
+// cover the closure's application.
+//
+// CHECK-LABEL: sil [ossa] @testNonEscapingClosureAddressCapture : $@convention(thin) () -> () {
+// CHECK:   [[HOLDER:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned Holder
+// CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed]
+// CHECK:   apply %{{.*}}([[CVT]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   destroy_value [[HOLDER]]
+// CHECK-LABEL: } // end sil function 'testNonEscapingClosureAddressCapture'
+sil [ossa] @testNonEscapingClosureAddressCapture : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $NE, let, name "d"
+  %1 = function_ref @getHolder : $@convention(thin) () -> @owned Holder
+  %2 = apply %1() : $@convention(thin) () -> @owned Holder
+  %3 = function_ref @getNEOut : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @out NE
+  %4 = apply %3(%0, %2) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @out NE
+  mark_dependence_addr [unresolved] %0 on %2
+  destroy_value %2
+  %7 = function_ref @closureNEAddr : $@convention(thin) (@in_guaranteed NE) -> ()
+  %8 = alloc_stack $NE
+  copy_addr %0 to [init] %8
+  %10 = partial_apply [callee_guaranteed] %7(%8) : $@convention(thin) (@in_guaranteed NE) -> ()
+  %11 = convert_escape_to_noescape [not_guaranteed] %10 to $@noescape @callee_guaranteed () -> ()
+  %12 = function_ref @runClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %13 = apply %12(%11) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %11
+  destroy_value %10
+  dealloc_stack %8
+  destroy_addr %0
+  dealloc_stack %0
+  %19 = tuple ()
+  return %19
+}
+
+// Same as above, but the closure directly captures the dependent value.
+//
+// CHECK-LABEL: sil [ossa] @testNonEscapingClosureValueCapture : $@convention(thin) () -> () {
+// CHECK:   [[HOLDER:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned Holder
+// CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed]
+// CHECK:   apply %{{.*}}([[CVT]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   destroy_value [[HOLDER]]
+// CHECK-LABEL: } // end sil function 'testNonEscapingClosureValueCapture'
+sil [ossa] @testNonEscapingClosureValueCapture : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @getHolder : $@convention(thin) () -> @owned Holder
+  %2 = apply %1() : $@convention(thin) () -> @owned Holder
+  %3 = function_ref @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  destroy_value %2
+  %7 = function_ref @closureNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = partial_apply [callee_guaranteed] %7(%5) : $@convention(thin) (@guaranteed NE) -> ()
+  %9 = convert_escape_to_noescape [not_guaranteed] %8 to $@noescape @callee_guaranteed () -> ()
+  %10 = function_ref @runClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %9
+  destroy_value %8
+  %14 = tuple ()
+  return %14
+}

@@ -652,7 +652,7 @@ SILModule::lookUpMoveOnlyDeinitForType(SILType nominalType,
   if (auto *specialized = lookUpSpecializedMoveOnlyDeinit(nominalType))
     return specialized;
 
-  return lookUpMoveOnlyDeinit(nominalType.getNominalOrBoundGenericNominal(),
+  return lookUpMoveOnlyDeinit(nominalType.getNominalDecl(),
                               deserializeLazily);
 }
 

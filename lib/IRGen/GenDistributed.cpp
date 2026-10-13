@@ -1140,7 +1140,7 @@ void DistributedAccessor::emit() {
   }
 
   // Parameters to skip in decoding:
-  auto numLeadingParamsToSkip =
+  unsigned numLeadingParamsToSkip =
       1 + // self
       (Target.hasIsolatedActorParameter() ? 1 : 0); // implicit leading isolation
   if (targetTy->getNumParameters() > numLeadingParamsToSkip) {

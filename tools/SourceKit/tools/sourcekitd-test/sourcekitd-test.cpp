@@ -1359,7 +1359,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_release(files);
   }
 
-  int64_t BeforeInstructions;
+  int64_t BeforeInstructions = 0;
   if (Opts.measureInstructions)
     BeforeInstructions = getSourceKitInstructionCount();
 

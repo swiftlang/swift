@@ -128,6 +128,7 @@ final class NonsendingSystem: DistributedActorSystem, @unchecked Sendable {
     where Act: DistributedActor, Act.ID == ActorID, Err: Error {}
 }
 
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 struct NopEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
   mutating func recordGenericSubstitution<T>(_ t: T.Type) throws {}
@@ -136,6 +137,7 @@ struct NopEncoder: DistributedTargetInvocationEncoder {
   mutating func recordErrorType<E: Error>(_ t: E.Type) throws {}
   mutating func doneRecording() throws {}
 }
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 struct NopDecoder: DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
   mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
@@ -143,6 +145,7 @@ struct NopDecoder: DistributedTargetInvocationDecoder {
   mutating func decodeReturnType() throws -> Any.Type? { nil }
   mutating func decodeErrorType() throws -> Any.Type? { nil }
 }
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 struct NopResultHandler: DistributedTargetInvocationResultHandler {
   typealias SerializationRequirement = Codable
   func onReturn<S: Codable>(value: S) async throws {}

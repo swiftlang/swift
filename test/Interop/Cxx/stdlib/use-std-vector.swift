@@ -229,5 +229,37 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
     expectEqual(getNumber(v[2]), 3)
 }
 
+StdVectorTestSuite.test("VectorOfInt.underestimatedCount via existential") {
+    var v = Vector()
+    fill(vector: &v)
+
+    let s: any Sequence = v
+    expectEqual(s.underestimatedCount, 3)
+
+    let z = zip(v, [4, 5, 6])
+    expectEqual(z.underestimatedCount, 3)
+    expectEqual(z.map { $0.0 + CInt($0.1) }, [5, 7, 9])
+}
+
+@inline(never)
+func genericUnderestimatedCount<S: Sequence>(_ s: S) -> Int {
+    return s.underestimatedCount
+}
+
+@inline(never)
+func genericContains<S: Sequence>(_ s: S, _ e: S.Element) -> Bool
+    where S.Element: Equatable {
+    return s.contains(e)
+}
+
+StdVectorTestSuite.test("VectorOfInt.contains") {
+    var v = Vector()
+    fill(vector: &v)
+
+    expectEqual(genericUnderestimatedCount(v), 3)
+
+    expectTrue(genericContains(v, 2))
+    expectFalse(genericContains(v, 4))
+}
 
 runAllTests()

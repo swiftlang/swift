@@ -605,7 +605,7 @@ PrintTests.test("Printable_Float") {
   // Standard special numbers:
   expectDescription("inf", Float.infinity)
   expectDescription("-inf", -Float.infinity)
-  expectDescription("3.1415925", Float.pi)
+  expectDescription("3.1415927", Float.pi)
   expectDescription("3.4028235e+38", Float.greatestFiniteMagnitude)
 #if !arch(arm)
   expectDescription("1e-45", Float.leastNonzeroMagnitude)

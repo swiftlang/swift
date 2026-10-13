@@ -1937,13 +1937,13 @@ namespace {
         if (BaseFormalType) {
           auto selfTy = base.getType().getASTType();
           auto metatypeTy = MetatypeType::get(selfTy);
-          if (selfTy->getClassOrBoundGenericClass()) {
+          if (selfTy->getClassDecl()) {
             selfMetatype = SGF.B
                                .createValueMetatype(
                                    loc, SGF.getLoweredType(metatypeTy), base)
                                .getValue();
           } else {
-            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            assert(BaseFormalType->getStructDecl());
             selfMetatype =
                 SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy));
           }
@@ -3602,14 +3602,11 @@ namespace {
           strategy.getKind() == AccessStrategy::DispatchToAccessor) {
         auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
         if (protocol && protocol->isCOMInterface()) {
-          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
-          if (selfType->is<ExistentialArchetypeType>()) {
-            strategy = AccessStrategy::getMaterializeToTemporary(
-                AccessStrategy::getAccessor(AccessorKind::Get,
-                                            /*dispatched=*/true),
-                AccessStrategy::getAccessor(AccessorKind::Set,
-                                            /*dispatched=*/true));
-          }
+          strategy = AccessStrategy::getMaterializeToTemporary(
+              AccessStrategy::getAccessor(AccessorKind::Get,
+                                          /*dispatched=*/true),
+              AccessStrategy::getAccessor(AccessorKind::Set,
+                                          /*dispatched=*/true));
         }
       }
 
@@ -4560,7 +4557,7 @@ void LValue::addMemberVarComponent(
         LV.add<RefElementComponent>(Storage, Options, varStorageType,
                                     typeData, ActorIso);
       } else {
-        assert(BaseFormalType->getStructOrBoundGenericStruct());
+        assert(BaseFormalType->getStructDecl());
         LV.add<StructElementComponent>(Storage, varStorageType, typeData,
                                        ActorIso);
       }

@@ -651,7 +651,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     assert(txt.starts_with("false") || txt.starts_with("true"));
     return txt.starts_with("true");
   };
-  SDKNodeKind Kind;
+  std::optional<SDKNodeKind> Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
   NodeVector Conformances;
@@ -787,7 +787,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
   if (Result)
     return Result;
-  Result = Info.createSDKNode(Kind);
+  Result = Info.createSDKNode(Kind.value());
   for (auto C : Children) {
     Result->addChild(C);
   }
@@ -1578,7 +1578,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     IsEnumExhaustive = ED->isFormallyExhaustive(nullptr) &&
                        !ED->getAttrs().hasAttribute<NonexhaustiveAttr>();
     if (auto RT = ED->getRawType()) {
-      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+      if (auto *D = RT->getNominalDecl()) {
         EnumRawTypeName = D->getName().str();
       }
     }

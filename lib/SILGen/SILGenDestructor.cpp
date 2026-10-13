@@ -161,7 +161,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
     Type superclassTy =
       dd->mapTypeIntoEnvironment(cd->getSuperclass());
-    ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
+    ClassDecl *superclass = superclassTy->getClassDecl();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =
       SILDeclRef(superclassDtorDecl, SILDeclRef::Kind::Destroyer);
@@ -791,7 +791,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Form a reference to the superclass -dealloc.
   Type superclassTy = dd->mapTypeIntoEnvironment(cd->getSuperclass());
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
-  ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
+  ClassDecl *superclass = superclassTy->getClassDecl();
   auto superclassDtorDecl = superclass->getDestructor();
   auto superclassDtor = SILDeclRef(superclassDtorDecl,
                                    SILDeclRef::Kind::Deallocator)

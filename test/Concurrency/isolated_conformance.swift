@@ -172,6 +172,13 @@ class RMismatchedIsolation: R {
   // expected-note@-1{{mark instance method 'f()' 'nonisolated'}}{{3-3=nonisolated }}
 }
 
+// expected-error@+2:8{{cannot form main actor-isolated conformance of 'IsolatedGlobalActor' to SendableMetatype-inheriting protocol 'GlobalActor'}}
+@globalActor
+struct IsolatedGlobalActor: @MainActor GlobalActor {
+  @MainActor static let shared = SomeActor()
+  @MainActor static var sharedUnownedExecutor: UnownedSerialExecutor { shared.unownedExecutor }
+}
+
 // ----------------------------------------------------------------------------
 // Use checking of isolated conformances.
 // ----------------------------------------------------------------------------

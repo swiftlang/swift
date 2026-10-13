@@ -115,7 +115,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       continue;
 
     // If we found a class, return it.
-    if (result->getClassOrBoundGenericClass()) {
+    if (result->getClassDecl()) {
       return result;
     }
 
@@ -123,7 +123,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
     if (result->isExistentialType()) {
       if (auto superclassType =
             result->getExistentialLayout().explicitSuperclass) {
-        if (superclassType->getClassOrBoundGenericClass()) {
+        if (superclassType->getClassDecl()) {
           return superclassType;
         }
       }

@@ -795,7 +795,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
       IEAI->getElement(), IEAI->getFunction());
-  auto *structDecl = elemType.getStructOrBoundGenericStruct();
+  auto *structDecl = elemType.getStructDecl();
 
   // We cannot create a struct when it has unreferenceable storage.
   if (elemType.isEmpty(*IEAI->getFunction()) && structDecl &&
@@ -1285,7 +1285,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
     return std::nullopt;
 
   auto ty = genericArgs[0]->getCanonicalType();
-  if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
+  if (!ty->getClassDecl() && !ty->isObjCExistentialType())
     return std::nullopt;
   // C++ foreign reference types have custom release/retain operations and are
   // not AnyObjects.
@@ -1333,7 +1333,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
       InstanceTy = SelfTy.getSelfType();
     auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
-    if (!SILInstanceTy.getClassOrBoundGenericClass())
+    if (!SILInstanceTy.getClassDecl())
       return nullptr;
 
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
@@ -1361,7 +1361,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
         InstanceTy = SelfTy.getSelfType();
       auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
-      if (!SILInstanceTy.getClassOrBoundGenericClass())
+      if (!SILInstanceTy.getClassDecl())
         return nullptr;
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), ARDI->canAllocOnStack(),

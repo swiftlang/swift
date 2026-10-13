@@ -17,6 +17,7 @@ target_compile_options(swiftCRT PRIVATE
 target_link_libraries(swiftCRT PUBLIC
   ClangModules)
 target_link_libraries(swiftCRT PRIVATE
+  swift_Builtin_float
   swiftCore)
 
 # FIXME: Why is this not implicitly in the interface flags?

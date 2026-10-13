@@ -286,6 +286,9 @@ private func specializeWitnessTable(for conformance: Conformance,
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
+            // The witness is not generic if all generic parameters of the conformance are
+            // bound to concrete types, e.g. `extension Array: P where Element == UInt8`.
+            methodSubs.hasAnySubstitutableParams,
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
                                                        convertIndirectToDirect: false, isMandatory: true)
       else {

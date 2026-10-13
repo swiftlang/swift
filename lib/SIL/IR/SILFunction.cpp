@@ -1111,7 +1111,7 @@ bool SILFunction::hasDynamicSelfMetadata() const {
   if (selfTy.isForeignReferenceType())
     return false;
 
-  return !!selfTy.getClassOrBoundGenericClass();
+  return !!selfTy.getClassDecl();
 }
 
 bool SILFunction::hasName(const char *Name) const {

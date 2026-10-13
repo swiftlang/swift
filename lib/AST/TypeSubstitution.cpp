@@ -546,7 +546,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
   if (CONDITIONAL_ASSERT_enabled()) {
     auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
-        ->getClassOrBoundGenericClass();
+        ->getClassDecl();
     ASSERT(baseClass->isSuperclassOf(currentClass) &&
            "no inheritance relationship between given classes");
   }

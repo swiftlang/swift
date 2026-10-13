@@ -3288,7 +3288,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isUnsafeMutableBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeRawBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeMutableRawBufferPointerType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalDecl() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;

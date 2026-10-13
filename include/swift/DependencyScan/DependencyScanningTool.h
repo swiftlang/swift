@@ -34,7 +34,7 @@ struct ScanQueryContext {
   std::unique_ptr<DepScanInMemoryDiagnosticCollector> InMemoryDiagnosticCollector;
   /// A thread-safe serialized diagnostics consumer.
   /// Note, although type-erased, this must be an instance of
-  /// 'ThreadSafeSerializedDiagnosticConsumer'
+  /// 'ThreadSafeSerializedDiagnosticConsumer' or its SARIF counterpart.
   std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer;
 
   ScanQueryContext(

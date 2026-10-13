@@ -347,39 +347,46 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   fixupSILForLifetimeExtension(optionalSome, optionalNone);
 }
 
+static SILInstruction *getSingleNonDebugNonRefCountUser(SILValue v) {
+  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
+  for (auto *use : getNonDebugUses(v)) {
+    auto *user = use->getUser();
+    if (onlyAffectsRefCount(user))
+      continue;
+    if (isa<EndBorrowInst>(user))
+      continue;
+    if (singleNonDebugNonRefCountUser) {
+      return nullptr;
+    }
+    singleNonDebugNonRefCountUser = user;
+  }
+  return singleNonDebugNonRefCountUser;
+}
+
+/// Look through closure conversions and reabstractions of \p inst
+/// (convert_function, convert_escape_to_noescape, partial_apply, and
+/// begin_borrow) to find the instruction that ultimately uses the closure.
+///
+/// \p memoized optionally caches results across queries.
 static SILInstruction *lookThroughRebastractionUsers(
     SILInstruction *inst,
-    llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized) {
+    llvm::DenseMap<SILInstruction *, SILInstruction *> *memoized) {
   if (inst == nullptr)
     return nullptr;
 
   // Try a cached lookup.
-  auto res = memoized.find(inst);
-  if (res != memoized.end())
-    return res->second;
+  if (memoized) {
+    auto res = memoized->find(inst);
+    if (res != memoized->end())
+      return res->second;
+  }
 
   // Cache recursive results.
   auto memoizeResult = [&](SILInstruction *from, SILInstruction *toResult) {
-    memoized[from] = toResult;
+    if (memoized)
+      (*memoized)[from] = toResult;
     return toResult;
   };
-  
-  auto getSingleNonDebugNonRefCountUser =
-    [](SILValue v) -> SILInstruction* {
-      SILInstruction *singleNonDebugNonRefCountUser = nullptr;
-      for (auto *use : getNonDebugUses(v)) {
-        auto *user = use->getUser();
-        if (onlyAffectsRefCount(user))
-          continue;
-        if (isa<EndBorrowInst>(user))
-          continue;
-        if (singleNonDebugNonRefCountUser) {
-          return nullptr;
-        }
-        singleNonDebugNonRefCountUser = user;
-      }
-      return singleNonDebugNonRefCountUser;
-    };
 
   // If we have a convert_function, just look at its user.
   if (auto *cvt = dyn_cast<ConvertFunctionInst>(inst))
@@ -405,6 +412,82 @@ static SILInstruction *lookThroughRebastractionUsers(
   }
 
   return inst;
+}
+
+/// If the closure converted by \p cvt has a single user that allows promotion
+/// to a partial_apply [on_stack], return that user: a full apply (other than
+/// begin_apply), a StartAsyncLetWithLocalBuffer builtin, or a begin_borrow.
+static SILInstruction *getStackPromotableClosureUser(
+    ConvertEscapeToNoEscapeInst *cvt,
+    llvm::DenseMap<SILInstruction *, SILInstruction *> *memoized) {
+  auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
+  if (!singleUser)
+    return nullptr;
+
+  if (FullApplySite::isa(singleUser)) {
+    // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
+    if (isa<BeginApplyInst>(singleUser))
+      return nullptr;
+    return singleUser;
+  }
+  if (isBuiltinInst(singleUser, BuiltinValueKind::StartAsyncLetWithLocalBuffer))
+    return singleUser;
+  if (isa<BeginBorrowInst>(singleUser))
+    return singleUser;
+  return nullptr;
+}
+
+/// If the operand of \p cvt is a partial_apply, possibly through a
+/// convert_function, and the converted closure has no other non-debug,
+/// non-ref-count users, return the partial_apply.
+static PartialApplyInst *
+getStackPromotablePartialApply(ConvertEscapeToNoEscapeInst *cvt) {
+  SILValue closure = cvt->getOperand();
+  auto *pai = dyn_cast<PartialApplyInst>(closure);
+  if (auto *convert = dyn_cast<ConvertFunctionInst>(closure)) {
+    pai = dyn_cast<PartialApplyInst>(convert->getOperand());
+    if (pai && !pai->hasOneUse())
+      return nullptr;
+  }
+  if (!pai)
+    return nullptr;
+
+  // The convert_escape_to_noescape must be the only non ref count user of the
+  // closure.
+  for (auto *use : getNonDebugUses(closure)) {
+    auto *user = use->getUser();
+    if (!onlyAffectsRefCount(user) && user != cvt)
+      return nullptr;
+  }
+  return pai;
+}
+
+ConvertEscapeToNoEscapeInst *
+swift::getNonEscapingClosureConversion(PartialApplyInst *pai) {
+  if (pai->isOnStack())
+    return nullptr;
+
+  auto *user = getSingleNonDebugNonRefCountUser(pai);
+  if (auto *convert = dyn_cast_or_null<ConvertFunctionInst>(user))
+    user = getSingleNonDebugNonRefCountUser(convert);
+
+  auto *cvt = dyn_cast_or_null<ConvertEscapeToNoEscapeInst>(user);
+  if (!cvt)
+    return nullptr;
+
+  // Only a [not_guaranteed] conversion is promoted unless the closure is
+  // @called(atMostOnce). See fixupClosureLifetimes.
+  if (cvt->isLifetimeGuaranteed() &&
+      !cvt->getType().hasCalledAtMostOnceSemantics())
+    return nullptr;
+
+  if (getStackPromotablePartialApply(cvt) != pai)
+    return nullptr;
+
+  if (!getStackPromotableClosureUser(cvt, /*memoized*/ nullptr))
+    return nullptr;
+
+  return cvt;
 }
 
 /// Insert a mark_dependence for any non-trivial argument of a partial_apply.
@@ -476,16 +559,6 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
   fas.insertAfterApplication(insertFn);
-}
-
-static SILValue skipConvert(SILValue v) {
-  auto *cvt = dyn_cast<ConvertFunctionInst>(v);
-  if (!cvt)
-    return v;
-  auto *pa = dyn_cast<PartialApplyInst>(cvt->getOperand());
-  if (!pa || !pa->hasOneUse())
-    return v;
-  return pa;
 }
 
 static SILAnalysis::InvalidationKind
@@ -594,7 +667,7 @@ static SILValue tryRewriteToPartialApplyStack(
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
     ReachableBlocks const &reachableBlocks, const bool &modifiedCFG) {
 
-  auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
+  auto *origPA = getStackPromotablePartialApply(cvt);
   if (!origPA)
     return SILValue();
 
@@ -609,20 +682,15 @@ static SILValue tryRewriteToPartialApplyStack(
     deleter.forceDelete(i);
   };
 
-  // Look for a single non ref count user of the partial_apply.
+  // getStackPromotablePartialApply checked that the closure has a single non
+  // ref count user.
   SmallVector<SILInstruction *, 8> refCountInsts;
-  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
   for (auto *use : getNonDebugUses(convertOrPartialApply)) {
     auto *user = use->getUser();
-    if (onlyAffectsRefCount(user)) {
+    if (onlyAffectsRefCount(user))
       refCountInsts.push_back(user);
-      continue;
-    }
-    if (singleNonDebugNonRefCountUser)
-      return SILValue();
-    singleNonDebugNonRefCountUser = user;
   }
-  
+
   SILBuilderWithScope b(cvt);
 
   // Remove the original destroy of the partial_apply, if any, since the
@@ -1046,22 +1114,14 @@ static bool tryExtendLifetimeToLastUse(
     const bool &modifiedCFG) {
   // If there is a single user, this is simple: extend the
   // lifetime of the operand until the use ends.
-  auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
+  //
+  // Handle apply instructions, startAsyncLet, and begin_borrow.
+  auto *singleUser = getStackPromotableClosureUser(cvt, &memoized);
   if (!singleUser)
     return false;
 
-  // Handle apply instructions and startAsyncLet.
-  BuiltinInst *startAsyncLet = nullptr;
-  if (FullApplySite::isa(singleUser)) {
-    // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
-    if (isa<BeginApplyInst>(singleUser))
-      return false;
-  } else if ((startAsyncLet = isBuiltinInst(singleUser,
-                            BuiltinValueKind::StartAsyncLetWithLocalBuffer))) {
-    // continue
-  } else if (!isa<BeginBorrowInst>(singleUser)) {
-    return false;
-  }
+  BuiltinInst *startAsyncLet =
+      isBuiltinInst(singleUser, BuiltinValueKind::StartAsyncLetWithLocalBuffer);
 
   if (SILValue closureOp = tryRewriteToPartialApplyStack(
           cvt, singleUser, dominanceAnalysis, deleter, memoized,

@@ -3382,14 +3382,14 @@ TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
 
 /// createNominalType - Create a new nominal type.
 llvm::StructType *IRGenModule::createNominalType(CanType type) {
-  assert(type.getNominalOrBoundGenericNominal());
+  assert(type.getNominalDecl());
 
   // We share type infos for different instantiations of a generic type
   // when the archetypes have the same exemplars.  We cannot mangle
   // archetypes, and the mangling does not have to be unique, so we just
   // mangle the unbound generic form of the type.
   if (type->hasArchetype())
-    type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
+    type = type.getNominalDecl()->getDeclaredType()
                                                  ->getCanonicalType();
 
   IRGenMangler Mangler(Context);
@@ -3456,7 +3456,7 @@ void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
                                            IRGenFunction::DynamicSelfKind kind) {
   assert(!SelfValue && "already have local self metadata");
   SelfValue = value;
-  assert(selfClass->getClassOrBoundGenericClass()
+  assert(selfClass->getClassDecl()
          && "self type not a class?");
   SelfTypeIsExact = isExactSelfClass;
   SelfType = selfClass;
@@ -3487,7 +3487,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     if (tuple->getNumElements() == 1)
       return t.getTupleElementType(0);
 
-  if (auto structDecl = t.getStructOrBoundGenericStruct()) {
+  if (auto structDecl = t.getStructDecl()) {
     // If the struct has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (IGM.isResilient(structDecl, expansion))
@@ -3523,7 +3523,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     return SILType();
   }
 
-  if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = t.getEnumDecl()) {
     // If the enum has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (IGM.isResilient(enumDecl, expansion))

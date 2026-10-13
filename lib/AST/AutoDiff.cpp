@@ -494,7 +494,7 @@ CanType TangentSpace::getCanonicalType() const {
 
 NominalTypeDecl *TangentSpace::getNominal() const {
   assert(isTangentVector());
-  return getTangentVector()->getNominalOrBoundGenericNominal();
+  return getTangentVector()->getNominalDecl();
 }
 
 const char DerivativeFunctionTypeError::ID = '\0';
@@ -618,7 +618,7 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   auto parentTanType =
       baseType->getAutoDiffTangentSpace(LookUpConformanceInModule())
           ->getType();
-  auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
+  auto *parentTanStruct = parentTanType->getStructDecl();
   // Error if parent `TangentVector` is not a struct.
   if (!parentTanStruct) {
     return TangentPropertyInfo(

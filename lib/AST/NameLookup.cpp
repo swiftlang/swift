@@ -2638,7 +2638,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
 
     // Look into the superclasses of this archetype.
     if (auto superclass = archetypeTy->getSuperclass()) {
-      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
+      if (auto superclassDecl = superclass->getClassDecl())
         decls.push_back(superclassDecl);
     }
 
@@ -2653,7 +2653,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      auto *superclassDecl = superclass->getClassDecl();
       if (superclassDecl)
         decls.push_back(superclassDecl);
     }
@@ -3889,7 +3889,7 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   return llvm::any_of(decls, [&](const TypeDecl *decl) {
     if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
       auto ty = alias->getUnderlyingType();
-      decl = ty->getNominalOrBoundGenericNominal();
+      decl = ty->getNominalDecl();
       if (decl == nullptr || ty->is<ExistentialType>())
         return false;
     }

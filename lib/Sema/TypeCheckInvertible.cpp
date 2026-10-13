@@ -219,10 +219,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
   }
   assert(!conformance.isPack() && "not handled");
 
-  if (!isa<ClassDecl>(nominalDecl) ||
-      ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)) {
-    // If the inheritance clause contains ~Copyable, reject an unconditional
-    // conformance to Copyable.
+  auto *classDecl = dyn_cast<ClassDecl>(nominalDecl);
+  if (!classDecl || classDecl->canSuppressInvertible(ip)) {
+    // If the inheritance clause contains ~IP, reject an unconditional
+    // conformance to IP.
     if (hasExplicitInverse && hasUnconditionalConformance) {
       ctx.Diags.diagnose(conformanceLoc,
                          diag::inverse_but_also_conforms,
@@ -232,7 +232,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
 
   // All classes can store noncopyable/nonescaping values, but a class destroys
   // its stored properties implicitly, so they must be Deinitable.
-  if (isa<ClassDecl>(nominalDecl) && ip != InvertibleProtocolKind::Deinitable)
+  if (classDecl && ip != InvertibleProtocolKind::Deinitable)
     return;
 
   // Nothing can suppress Deinitable yet.

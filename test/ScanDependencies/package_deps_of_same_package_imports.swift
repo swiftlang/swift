@@ -7,10 +7,10 @@
 // RUN: split-file %s %t
 
 // Step 1: build Bar swift interface and swift module side by side
-// RUN: %target-swift-frontend -emit-module %t/Bar.swift -emit-module-path %t/Bar.swiftmodule/%target-swiftmodule-name -module-name Bar -emit-module-interface-path %t/Bar.swiftmodule/%target-swiftinterface-name -I %S/Inputs/CHeaders -I %S/Inputs/Swift
+// RUN: %target-swift-frontend -emit-module %t/Bar.swift -emit-module-path %t/Bar.swiftmodule/%target-swiftmodule-name -module-name Bar -emit-module-interface-path %t/Bar.swiftmodule/%target-swiftinterface-name -I %S/Inputs/CHeaders -I %S/Inputs/Swift -disable-implicit-string-processing-module-import
 
 // Step 2: build Foo swift interface and swift module side by side belonging to package 'Test'
-// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name -I %S/Inputs/CHeaders -I %S/Inputs/Swift -I %t -package-name Test
+// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name -I %S/Inputs/CHeaders -I %S/Inputs/Swift -I %t -package-name Test -disable-implicit-string-processing-module-import
 
 // Step 3: scan dependencies with '-no-scanner-module-validation' and '-package-name Test'
 // RUN: %target-swift-frontend -scan-dependencies %t/Client.swift -o %t/deps.json -no-scanner-module-validation -I %t -sdk %t -prebuilt-module-cache-path %t/clang-module-cache -I %S/Inputs/CHeaders -I %S/Inputs/Swift -package-name Test -disable-implicit-string-processing-module-import

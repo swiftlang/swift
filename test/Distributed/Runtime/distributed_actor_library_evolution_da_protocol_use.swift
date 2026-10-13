@@ -14,6 +14,13 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %t/%target-library-name(Library) | %FileCheck %s
 
+// RUN: %empty-directory(%t/opaque-values)
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -target %target-swift-5.9-abi-triple -parse-as-library -emit-library -Xlinker -install_name -Xlinker @executable_path/%target-library-name(Library) -emit-module-path %t/opaque-values/Library.swiftmodule -module-name Library %t/library.swift -o %t/opaque-values/%target-library-name(Library)
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -Xfrontend -validate-tbd-against-ir=all -target %target-swift-5.9-abi-triple -parse-as-library -lLibrary -module-name main -I %t/opaque-values -L %t/opaque-values %t/main.swift -o %t/opaque-values/a.out
+
+// RUN: %target-codesign %t/opaque-values/a.out
+// RUN: %target-run %t/opaque-values/a.out %t/opaque-values/%target-library-name(Library) | %FileCheck %s
+
 //--- library.swift
 import Distributed
 

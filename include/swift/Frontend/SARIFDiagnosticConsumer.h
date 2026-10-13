@@ -36,6 +36,16 @@ namespace sarif_diagnostics {
 /// \returns A new diagnostic consumer that serializes diagnostics.
 std::unique_ptr<DiagnosticConsumer>
 createConsumer(StringRef outputPath, bool emitMacroExpansionFiles);
+
+/// Create a thread-safe DiagnosticConsumer that serializes diagnostics to a
+/// file in SARIF format, for clients such as the dependency scanner that
+/// report diagnostics from several threads.
+///
+/// \param outputPath the file path to write the diagnostics to.
+///
+/// \returns A new diagnostic consumer that serializes diagnostics.
+std::unique_ptr<DiagnosticConsumer>
+createThreadSafeConsumer(StringRef outputPath, bool emitMacroExpansionFiles);
 #endif
 
 } // namespace sarif_diagnostics

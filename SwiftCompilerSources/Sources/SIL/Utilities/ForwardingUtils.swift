@@ -361,7 +361,7 @@ public struct NonEscapingClosureDefUseWalker {
   }
 
   public mutating func walkDown(closure: PartialApplyInst) -> WalkResult {
-    assert(!closure.mayEscape)
+    assert(!closure.mayEscape || closure.nonEscapingClosureConversion != nil)
     return walkDownUses(of: closure, using: nil)
   }
 

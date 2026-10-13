@@ -9,7 +9,6 @@
 // RUN: %target-interop-build-swift \
 // RUN:   -Xcc -std=c++23 \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -Xfrontend -disable-availability-checking \
 // RUN:   -module-name OperatorsCxx23ExecutionMain \
 // RUN:   -parse-as-library \
 // RUN:   -I %S/Inputs \

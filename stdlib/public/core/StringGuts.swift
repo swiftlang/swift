@@ -154,12 +154,28 @@ extension _StringGuts {
   // Whether we can provide fast access to contiguous UTF-8 code units
   @_transparent
   @inlinable
-  internal var isFastUTF8: Bool { return _fastPath(_object.providesFastUTF8) }
+  internal var isFastUTF8: Bool {
+#if _runtime(_ObjC)
+    return _fastPath(_object.providesFastUTF8)
+#else
+    // A `String` is only ever foreign (non-fast) when it wraps a UTF-16
+    // `NSString`, which requires the Objective-C runtime. Without it every
+    // `String` is small, native, or shared -- all fast UTF-8 -- so folding this
+    // to a compile-time `true` lets the optimizer discard the foreign
+    // fallbacks (and the UTF-16 breadcrumb machinery they reference).
+    return true
+#endif
+  }
 
   // A String which does not provide fast access to contiguous UTF-8 code units
   @inlinable @inline(__always)
   internal var isForeign: Bool {
-     return _slowPath(_object.isForeign)
+#if _runtime(_ObjC)
+    return _slowPath(_object.isForeign)
+#else
+    // See `isFastUTF8`: no Objective-C runtime means no foreign strings.
+    return false
+#endif
   }
 
   @export(implementation) @inline(__always)
@@ -459,6 +475,14 @@ extension _StringGuts {
     // Attempt to recover from mismatched encodings between a string and its
     // index.
 
+#if !_runtime(_ObjC)
+    // Without the Objective-C runtime there is no verbatim `NSString`
+    // bridging, so a `String` is always UTF-8 and an index can never carry a
+    // genuine UTF-16 offset. The transcoding recovery below -- and the UTF-16
+    // `_StringBreadcrumbs` machinery it references -- is therefore unreachable.
+    // Just re-stamp the index's encoding to match `self`.
+    return markEncoding(i)
+#else
     if isUTF8 {
       // Attempt to use an UTF-16 index on a UTF-8 string.
       //
@@ -498,6 +522,7 @@ extension _StringGuts {
       r = r._copyingAlignment(from: i)
     }
     return r._knownUTF16
+#endif
   }
 }
 

@@ -261,7 +261,7 @@ struct ObjCTypeWalker : TypeWalker {
   const ASTContext &ctx;
   ObjCTypeWalker(const ASTContext &ctx) : ctx(ctx) {}
   Action walkToTypePre(Type ty) override {
-    if (auto *nominal = ty->getNominalOrBoundGenericNominal()) {
+    if (auto *nominal = ty->getNominalDecl()) {
       if (auto clangDecl = nominal->getClangDecl()) {
         if (cxx_translation::isObjCxxOnly(clangDecl, ctx)) {
           hadObjCType = true;
@@ -328,7 +328,7 @@ bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(
 }
 
 bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(Type type) {
-  const auto *nominal = type->getNominalOrBoundGenericNominal();
+  const auto *nominal = type->getNominalDecl();
   return nominal && isNoncopyableValueTypeExposableToCxx(nominal);
 }
 
@@ -406,7 +406,7 @@ swift::cxx_translation::getDeclRepresentation(
           for (const auto *param : *params) {
             auto paramType = param->getInterfaceType();
             if (!paramType->is<GenericTypeParamType>()) {
-              auto *nominal = paramType->getNominalOrBoundGenericNominal();
+              auto *nominal = paramType->getNominalDecl();
               if (!nominal || isa<ProtocolDecl>(nominal))
                 return {Unsupported, UnrepresentableEnumCaseType};
             }

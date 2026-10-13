@@ -162,13 +162,13 @@ bb0:
 
 // thin_to_thick_function can't produce a @called(atMostOnce) function type.
 // CHECK-LABEL: sil @test_called_at_most_once_partial_apply_without_args
-// CHECK:         partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK:         partial_apply [callee_guaranteed] [on_stack] [called_at_most_once]
 // CHECK-NOT:     thin_to_thick_function
 // CHECK:       } // end sil function 'test_called_at_most_once_partial_apply_without_args'
 sil @test_called_at_most_once_partial_apply_without_args : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
-  %1 = partial_apply [callee_guaranteed] [on_stack] [called_once] %0() : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %0() : $@convention(thin) () -> ()
   %2 = function_ref @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
   %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
   dealloc_stack %1 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()

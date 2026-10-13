@@ -82,7 +82,7 @@ static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
 /// If this type has a CXXDestructorDecl, find it and return it. Otherwise,
 /// return nullptr.
 static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
-  auto *structDecl = type.getStructOrBoundGenericStruct();
+  auto *structDecl = type.getStructDecl();
   if (!structDecl || !structDecl->getClangDecl())
     return nullptr;
   const clang::CXXRecordDecl *cxxRecordDecl =
@@ -348,6 +348,25 @@ namespace {
         super::destroy(IGF, address, T, isOutlined);
       }
       super::fillWithZerosIfSensitive(IGF, address, T);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
+      // The code below checks the AST to call a deinit method
+      // which we don't support from hidden representations yet
+      assertNotDeserialized("StructTypeInfoBase::assignWithTake");
+
+      // Assignment overwrites an existing value, which must be destroyed
+      // first. If the struct has a deinit, elementwise take-assignment would
+      // skip it, so run a full destroy (which invokes the deinit) and then
+      // take-initialize the destination.
+      if (tryEmitDestroyUsingDeinit(IGF, dest, T)) {
+        super::fillWithZerosIfSensitive(IGF, dest, T);
+        asImpl().initializeWithTake(IGF, dest, src, T, isOutlined,
+                                    /*zeroizeIfSensitive=*/T.isSensitive());
+        return;
+      }
+      super::assignWithTake(IGF, dest, src, T, isOutlined);
     }
 
     void verify(IRGenTypeVerifierFunction &IGF,
@@ -1284,12 +1303,12 @@ namespace {
     SILType TheStruct;
   public:
     StructNonFixedOffsets(SILType type) : TheStruct(type) {
-      assert(TheStruct.getStructOrBoundGenericStruct());
+      assert(TheStruct.getStructDecl());
     }
 
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
       auto &layout =
-          IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
+          IGF.IGM.getMetadataLayout(TheStruct.getStructDecl());
       auto offset = layout.getFieldOffset(
           IGF, layout.getDecl()->getStoredProperties()[index]);
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
@@ -1301,7 +1320,7 @@ namespace {
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
                                                 unsigned nonFixedIndex) {
       auto start =
-        IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct())
+        IGM.getMetadataLayout(TheStruct.getStructDecl())
           .getFieldOffsetVectorOffset();
 
       // FIXME: Handle resilience
@@ -1377,7 +1396,7 @@ namespace {
 
         // If there's a deinit, use it to destroy instead of the like
         // type's destroy
-        if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
+        if (T.getStructDecl()->hasValueTypeDestructor()) {
           return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
               {likeTypeLayout}, T, getBestKnownAlignment().getValue(), *this);
         }
@@ -1607,14 +1626,14 @@ public:
 
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
-    if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
+    if (SwiftType.getStructDecl()->isCxxNonTrivial()) {
       return AddressOnlyCXXClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment,
           (SwiftDecl && !SwiftDecl->canBeCopyable())
             ? IsNotCopyable : IsCopyable,
           ClangDecl);
     }
-    if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
+    if (SwiftType.getStructDecl()->isNonTrivialPtrAuth()) {
       return AddressOnlyPointerAuthRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment,
           (SwiftDecl && !SwiftDecl->canBeCopyable())
@@ -1759,7 +1778,7 @@ private:
       if (fieldTy->isAnyClassReferenceType() &&
           fieldTy->getReferenceCounting() != ReferenceCounting::None)
         hasReferenceField = true;
-      else if (auto structDecl = fieldTy->getStructOrBoundGenericStruct();
+      else if (auto structDecl = fieldTy->getStructDecl();
                structDecl && structDecl->hasClangNode() &&
                getStructTypeInfoKind(fieldTI) ==
                    StructTypeInfoKind::LoadableClangRecordTypeInfo)

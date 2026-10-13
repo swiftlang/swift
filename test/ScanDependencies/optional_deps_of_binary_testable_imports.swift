@@ -8,7 +8,7 @@
 @testable import Foo
 
 // Step 1: build a binary swift module for `Foo`, make it testable
-// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -I %S/Inputs/CHeaders -I %S/Inputs/Swift -enable-testing
+// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -I %S/Inputs/CHeaders -I %S/Inputs/Swift -enable-testing -disable-implicit-string-processing-module-import
 
 // Step 2: scan dependencies
 // RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -sdk %t -prebuilt-module-cache-path %t/clang-module-cache -I %S/Inputs/CHeaders -I %S/Inputs/Swift -disable-implicit-string-processing-module-import

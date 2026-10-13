@@ -1514,7 +1514,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (!elementObj)
     return Type();
 
-  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  auto elementClass = elementObj->getClassDecl();
   if (!elementClass)
     return Type();
 
@@ -3893,8 +3893,8 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum()) {
+  if (type->getStructDecl() ||
+      type->getEnumDecl()) {
     auto nominal = type->getAnyNominal();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;

@@ -266,7 +266,7 @@ SILFunctionType::getWitnessMethodClass(SILModule &M,
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto superclass = genericSig->getSuperclassBound(paramTy);
     if (superclass)
-      return superclass->getClassOrBoundGenericClass();
+      return superclass->getClassDecl();
   }
 
   return nullptr;
@@ -1768,7 +1768,7 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
       // Foreign reference types
-      if (substTy->getClassOrBoundGenericClass()) {
+      if (substTy->getClassDecl()) {
         return false;
       }
     }
@@ -1807,7 +1807,7 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
   // as indirect.
   if (origType.isClangType()) {
     if (auto *classDecl = substType->lookThroughAllOptionalTypes()
-                              ->getClassOrBoundGenericClass()) {
+                              ->getClassDecl()) {
       if (!classDecl->isForeignReferenceType()) {
         if (origType.getClangType()
                 ->getUnqualifiedDesugaredType()
@@ -2204,7 +2204,7 @@ private:
       assert(isIndirectFormalParameter(convention));
     } else if (substTL.isTrivial() ||
                // Foreign reference types are passed trivially.
-               (substType->getClassOrBoundGenericClass() &&
+               (substType->getClassDecl() &&
                 substType->isForeignReferenceType())) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
@@ -4193,7 +4193,7 @@ public:
         auto t = substTL.getLoweredType().getASTType();
         if (auto *classDecl = t.getPointer()
                                   ->lookThroughAllOptionalTypes()
-                                  ->getClassOrBoundGenericClass()) {
+                                  ->getClassDecl()) {
           if (!classDecl->isForeignReferenceType()) {
             assert(!classDecl->hasClangNode() &&
                    "unexpected imported class type in C function");
@@ -4875,7 +4875,7 @@ static bool isObjCMethod(ValueDecl *vd) {
   if (!contextType)
     return false;
 
-  bool isRefCountedClass = contextType->getClassOrBoundGenericClass() &&
+  bool isRefCountedClass = contextType->getClassDecl() &&
                            !contextType->isForeignReferenceType();
   return isRefCountedClass || contextType->isClassExistentialType();
 }

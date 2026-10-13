@@ -2192,7 +2192,7 @@ CaseBlocks::CaseBlocks(
   CaseInfos.reserve(rows.size());
   CaseCounts.reserve(rows.size());
 
-  auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+  auto enumDecl = sourceType.getEnumDecl();
 
   llvm::SmallDenseMap<EnumElementDecl *, unsigned, 16> caseToIndex;
   for (auto &row : rows) {
@@ -2420,8 +2420,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
     if (src.getType().isAddressOnly(SGF.F) &&
-        src.getOwnershipKind() == OwnershipKind::Guaranteed) {
-      // If it's an opaque value with guaranteed ownership, we need to copy.
+        src.getOwnershipKind() == OwnershipKind::Guaranteed &&
+        !src.getType().isMoveOnly()) {
+      // A noncopyable subject cannot be copied, so switch on the borrow.
       src = src.copy(SGF, PatternMatchStmt);
     }
 
@@ -3909,7 +3910,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         getLoweredType(AbstractionPattern::getOpaque(), metatypeType);
     ManagedValue value = subject.getFinalManagedValue();
 
-    if (auto *singleEnumDecl = canSubjectTy->getEnumOrBoundGenericEnum()) {
+    if (auto *singleEnumDecl = canSubjectTy->getEnumDecl()) {
       if (singleEnumDecl->isObjC()) {
         auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
             B.createMetatype(loc, loweredMetatypeType));

@@ -247,48 +247,52 @@ namespace {
 #undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
 #undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  class Name##ReferenceTypeInfo \
-      : public PODSingleScalarTypeInfo<Name##ReferenceTypeInfo, \
-                                       LoadableTypeInfo> { \
-    bool IsOptional; \
-  public: \
-    Name##ReferenceTypeInfo(llvm::Type *type, \
-                            const SpareBitVector &spareBits, \
-                            Size size, Alignment alignment, bool isOptional) \
-      : PODSingleScalarTypeInfo(type, size, spareBits, alignment), \
-        IsOptional(isOptional) {} \
-    /* Static types have the same spare bits as managed heap objects. */ \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      return getHeapObjectExtraInhabitantCount(IGM) - IsOptional; \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, \
-                                                    index + IsOptional, 0); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T, bool isOutlined) \
-    const override { \
-      return getHeapObjectExtraInhabitantIndex(IGF, src); \
-    } \
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T, bool isOutlined) \
-    const override { \
-      return storeHeapObjectExtraInhabitant(IGF, index, dest); \
-    } \
-    void printForAbstractTypeLayoutInfo( \
-        IRGenModule &IGM, llvm::raw_ostream &OS, \
-        unsigned indentation) const override { \
-      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
-    } \
-    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
-    createSerializableHiddenTypeInfoRepresentation( \
-        IRGenModule &) const override { \
-      unsupportedSerializableHiddenTypeInfoRepresentation(); \
-    } \
-  };
+#define UNCHECKED_REF_STORAGE(Name, ...)                                     \
+    class Name##ReferenceTypeInfo                                              \
+        : public PODSingleScalarTypeInfo<Name##ReferenceTypeInfo,              \
+                                         LoadableTypeInfo> {                   \
+      bool IsOptional;                                                         \
+                                                                               \
+    public:                                                                    \
+      Name##ReferenceTypeInfo(llvm::Type *type,                                \
+                              const SpareBitVector &spareBits, Size size,      \
+                              Alignment alignment, bool isOptional)            \
+          : PODSingleScalarTypeInfo(type, size, spareBits, alignment),         \
+            IsOptional(isOptional) {}                                          \
+      /* Static types have the same spare bits as managed heap objects. */     \
+      unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
+        return getHeapObjectExtraInhabitantCount(IGM) - IsOptional;            \
+      }                                                                        \
+      APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,      \
+                                         unsigned index) const override {      \
+        return getHeapObjectFixedExtraInhabitantValue(IGM, bits,               \
+                                                      index + IsOptional, 0);  \
+      }                                                                        \
+      llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,    \
+                                           SILType T,                          \
+                                           bool isOutlined) const override {   \
+        return PointerInfo::forHeapObject(IGF.IGM)                             \
+            .withNullable(IsNullable_t(IsOptional))                            \
+            .getExtraInhabitantIndex(IGF, src);                                \
+      }                                                                        \
+      void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,        \
+                                Address dest, SILType T,                       \
+                                bool isOutlined) const override {              \
+        return PointerInfo::forHeapObject(IGF.IGM)                             \
+            .withNullable(IsNullable_t(IsOptional))                            \
+            .storeExtraInhabitant(IGF, index, dest);                           \
+      }                                                                        \
+      void                                                                     \
+      printForAbstractTypeLayoutInfo(IRGenModule &IGM, llvm::raw_ostream &OS,  \
+                                     unsigned indentation) const override {    \
+        printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);        \
+      }                                                                        \
+      std::unique_ptr<SerializableHiddenTypeInfoRepresentation>                \
+      createSerializableHiddenTypeInfoRepresentation(                          \
+          IRGenModule &) const override {                                      \
+        unsupportedSerializableHiddenTypeInfoRepresentation();                 \
+      }                                                                        \
+    };
 #include "swift/AST/ReferenceStorage.def"
 } // end anonymous namespace
 
@@ -2237,7 +2241,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
                                                      bool suppressCast) {
-  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassDecl();
   if ((theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) ||
       !IGF.IGM.ObjCInterop) {
     auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType);
@@ -2354,7 +2358,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
 
-  if (auto theClass = type->getClassOrBoundGenericClass()) {
+  if (auto theClass = type->getClassDecl()) {
     // We can access the isas of pure Swift classes directly.
     if (!theClass->checkAncestry(AncestryFlags::ClangImported))
       return IsaEncoding::Pointer;

@@ -981,7 +981,7 @@ inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {
 /// Whether \p type is an imported C++ class that C++ cannot pass in registers
 /// (a non-trivial copy or move constructor, or a non-trivial destructor).
 inline bool isNonTrivialCxxRecord(Type type) {
-  const auto *structDecl = type->getStructOrBoundGenericStruct();
+  const auto *structDecl = type->getStructDecl();
   if (!structDecl)
     return false;
   const auto *record =

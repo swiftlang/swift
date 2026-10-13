@@ -484,7 +484,7 @@ $PythonModules = @{
   "psutil" = @{
     Version = "6.1.0";
     SHA256 = @{
-      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      AMD64 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
       ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     };
     Dependencies = @();
@@ -1568,6 +1568,7 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
     $env:WindowsSDKLibVersion = "$WinSDKVersion\"
     $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+    $env:WindowsSdkDir = $CustomWinSDKRoot
     $env:WindowsSDKVersion = "$WinSDKVersion\"
 
     $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
@@ -2596,13 +2597,14 @@ function Build-CMakeProject {
     Write-Host "$CMakeBin $cmakeGenerateArgs"
     Invoke-Program $CMakeBin @cmakeGenerateArgs
 
-    # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
-      }
+    # Build all requested targets in one invocation. Test targets such as
+    # ExperimentalTest do not depend on the default target, so build it first.
+    if ($BuildTargets -contains "default") {
+      Invoke-Program $CMakeBin --build $Bin
+    }
+    $Targets = @($BuildTargets | Where-Object { $_ -ne "default" })
+    if ($Targets.Length -gt 0) {
+      Invoke-Program $CMakeBin --build $Bin --target @Targets
     }
 
     if ($BuildTargets.Length -eq 0 -and $InstallTo) {
@@ -3408,7 +3410,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
-      $Targets += @("SwiftCompilerPlugin", "check-swift")
+      # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
+      # need it, so it is built before check-swift starts.
+      $Targets += @("SwiftCompilerPlugin")
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
@@ -3424,6 +3428,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       $LLDBSitePackages = "$CompilerCache\lib\site-packages\lldb"
       New-Item -ItemType Directory -Force $LLDBSitePackages | Out-Null
       foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
+        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+      }
+      $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
+      $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
+      foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
         Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
       }
 
@@ -3543,8 +3552,13 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
+    if ($Targets) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    }
+    if ($TestSwift) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+    }
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {

@@ -157,10 +157,10 @@ void swift::constraints::getTypeVariablesWithVariance(
 
 /// Determine whether the candidate type is a subclass of the superclass type.
 bool swift::constraints::isSubclassOf(Type candidateType, Type superclassType) {
-  if (!superclassType->getClassOrBoundGenericClass())
+  if (!superclassType->getClassDecl())
     return false;
 
-  if (!candidateType->getClassOrBoundGenericClass()) {
+  if (!candidateType->getClassDecl()) {
     candidateType = candidateType->getSuperclass();
     if (!candidateType)
       return false;
@@ -459,7 +459,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
     if (type->is<DynamicSelfType>())
       return true;
 
-    auto *classDecl = type->getClassOrBoundGenericClass();
+    auto *classDecl = type->getClassDecl();
     return classDecl->getSuperclassDecl();
   }
   case ConversionBehavior::AnyHashable:
@@ -493,8 +493,8 @@ static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
 }
 
 static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
-  auto *lhsDecl = lhs->getClassOrBoundGenericClass();
-  auto *rhsDecl = rhs->getClassOrBoundGenericClass();
+  auto *lhsDecl = lhs->getClassDecl();
+  auto *rhsDecl = rhs->getClassDecl();
 
   if (lhsDecl == nullptr || rhsDecl == nullptr)
     return;
@@ -518,7 +518,7 @@ static void unwrapTollFreeBridging(Type &lhs, Type &rhs) {
 }
 
 static bool isCovariantInstanceType(Type t) {
-  return t->getClassOrBoundGenericClass() ||
+  return t->getClassDecl() ||
          t->is<ArchetypeType>();
 }
 
@@ -1005,7 +1005,7 @@ static void decomposeConstraintType(Type t,
 
     anyObject |= compositionTy->hasExplicitAnyObject();
     invertible |= compositionTy->getInverses();
-  } else if (t->getClassOrBoundGenericClass()) {
+  } else if (t->getClassDecl()) {
     superclass = t;
   } else {
     ABORT([&](auto &out) {
@@ -1195,23 +1195,31 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() && rhsInfo.isSendable();
     }
 
+    // The join has the more restrictive execution semantics.
     if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
-      // Form a tuple; its @called(atMostOnce) iff both components are
-      // @called(atMostOnce).
+      // Form a tuple; it's noncopyable iff either component is noncopyable.
       SmallVector<TupleTypeElt, 2> elts;
       elts.push_back(lhsExecutionSemanticsDep);
       elts.push_back(rhsExecutionSemanticsDep);
       executionSemanticsDep =
-          TupleType::get(elts, lhsSendableDep->getASTContext());
+          TupleType::get(elts, lhsExecutionSemanticsDep->getASTContext());
     } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
       if (rhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = rhsInfo.getExecutionSemantics();
+      else
         executionSemanticsDep = lhsExecutionSemanticsDep;
     } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
       if (lhsInfo.hasCalledAtMostOnceSemantics())
+        executionSemantics = lhsInfo.getExecutionSemantics();
+      else
         executionSemanticsDep = rhsExecutionSemanticsDep;
-    } else if (lhsInfo.hasCalledAtMostOnceSemantics() &&
-               rhsInfo.hasCalledAtMostOnceSemantics()) {
-      executionSemantics = lhsInfo.getExecutionSemantics();
+    } else {
+      // The join suppresses the invertible protocols that either side does.
+      auto inverses =
+          getSuppressedInvertibleProtocols(lhsInfo.getExecutionSemantics());
+      inverses.insertAll(
+          getSuppressedInvertibleProtocols(rhsInfo.getExecutionSemantics()));
+      executionSemantics = getExecutionSemanticsSuppressing(inverses);
     }
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
@@ -1220,7 +1228,7 @@ extInfoJoinMeetImpl(Operation op,
       auto lhsThrownError = lhsInfo.getThrownError();
       auto rhsThrownError = rhsInfo.getThrownError();
       if (lhsThrownError && rhsThrownError) {
-        auto result = isLikelyExactMatch(thrownError, rhsThrownError);
+        auto result = isLikelyExactMatch(lhsThrownError, rhsThrownError);
         if (result && *result)
           thrownError = lhsThrownError;
       }
@@ -1250,24 +1258,24 @@ extInfoJoinMeetImpl(Operation op,
       sendable = lhsInfo.isSendable() || rhsInfo.isSendable();
     }
 
+    // The meet has the less restrictive execution semantics.
     if (lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
-      // We cannot represent the meet of two @called(atMostOnce)-dependent
+      // We cannot represent the meet of two execution semantics dependent
       // types.
       return std::nullopt;
     } else if (lhsExecutionSemanticsDep && !rhsExecutionSemanticsDep) {
       if (rhsInfo.hasCalledAtMostOnceSemantics())
-        executionSemantics = rhsInfo.getExecutionSemantics();
-      else
         executionSemanticsDep = lhsExecutionSemanticsDep;
     } else if (!lhsExecutionSemanticsDep && rhsExecutionSemanticsDep) {
       if (lhsInfo.hasCalledAtMostOnceSemantics())
-        executionSemantics = lhsInfo.getExecutionSemantics();
-      else
         executionSemanticsDep = rhsExecutionSemanticsDep;
-    } else if (lhsInfo.hasCalledAtMostOnceSemantics()) {
-      executionSemantics = lhsInfo.getExecutionSemantics();
     } else {
-      executionSemantics = rhsInfo.getExecutionSemantics();
+      // The meet suppresses the invertible protocols that both sides do.
+      auto inverses =
+          getSuppressedInvertibleProtocols(lhsInfo.getExecutionSemantics());
+      inverses.intersect(
+          getSuppressedInvertibleProtocols(rhsInfo.getExecutionSemantics()));
+      executionSemantics = getExecutionSemanticsSuppressing(inverses);
     }
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
@@ -1577,7 +1585,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto result = existentialConstraintJoinMeetImpl(op, lhs, rhs);
       if (!result)
         return fail();
-      if (result->getClassOrBoundGenericClass())
+      if (result->getClassDecl())
         return result;
       ASSERT(!result->is<ExistentialType>());
       return ExistentialType::get(result);
@@ -1590,7 +1598,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
           op, lhsConstraint, rhsConstraint);
       if (!result)
         return fail();
-      if (result->getClassOrBoundGenericClass())
+      if (result->getClassDecl())
         return MetatypeType::get(result);
       ASSERT(!result->is<ExistentialType>());
       return ExistentialMetatypeType::get(result);

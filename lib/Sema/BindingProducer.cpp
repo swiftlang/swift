@@ -46,7 +46,7 @@ static Type getOptionalSuperclass(Type type) {
       // This is especially important for Sendable key paths because
       // to reserve sendability of the original type.
       for (auto member : compositionTy->getMembers()) {
-        if (member->getClassOrBoundGenericClass()) {
+        if (member->getClassDecl()) {
           member = member->getSuperclass();
           if (!member)
             return Type();

@@ -31,6 +31,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -129,6 +130,32 @@ public:
   }
 };
 
+/// A thread-safe version of SARIFDiagnosticConsumer which serializes access to
+/// all public API of the consumer for the dependency scanner.
+class ThreadSafeSARIFDiagnosticConsumer : public SARIFDiagnosticConsumer {
+  llvm::sys::SmartMutex<true> DiagnosticConsumerStateLock;
+
+public:
+  explicit ThreadSafeSARIFDiagnosticConsumer(StringRef outputPath)
+      : SARIFDiagnosticConsumer(outputPath) {}
+
+  bool finishProcessing() override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    return SARIFDiagnosticConsumer::finishProcessing();
+  }
+
+  void informDriverOfIncompleteBatchModeCompilation() override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    SARIFDiagnosticConsumer::informDriverOfIncompleteBatchModeCompilation();
+  }
+
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    SARIFDiagnosticConsumer::handleDiagnostic(SM, Info);
+  }
+};
+
 } // end anonymous namespace
 
 std::unique_ptr<DiagnosticConsumer>
@@ -140,6 +167,15 @@ sarif_diagnostics::createConsumer(StringRef outputPath,
   (void)emitMacroExpansionFiles;
 
   return std::make_unique<SARIFDiagnosticConsumer>(outputPath);
+}
+
+std::unique_ptr<DiagnosticConsumer>
+sarif_diagnostics::createThreadSafeConsumer(StringRef outputPath,
+                                            bool emitMacroExpansionFiles) {
+  // Accepted for signature parity, as in createConsumer().
+  (void)emitMacroExpansionFiles;
+
+  return std::make_unique<ThreadSafeSARIFDiagnosticConsumer>(outputPath);
 }
 
 #endif // SWIFT_BUILD_SARIF

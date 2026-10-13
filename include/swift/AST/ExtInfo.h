@@ -20,6 +20,7 @@
 #ifndef SWIFT_EXTINFO_H
 #define SWIFT_EXTINFO_H
 
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -570,6 +571,47 @@ decodeExecutionSemantics(unsigned rawValue) {
 
 static_assert(unsigned(ExecutionSemantics::Last_ExecutionSemantics) + 1 <= 0x3,
               "execution semantics don't fit in two bits");
+
+/// Returns the invertible protocols that a function type with the execution
+/// semantics \p semantics suppresses. An at-most-once function value
+/// can't be copied, and an exactly-once value can't be destroyed implicitly
+/// either.
+constexpr InvertibleProtocolSet
+getSuppressedInvertibleProtocols(std::optional<ExecutionSemantics> semantics) {
+  InvertibleProtocolSet inverses;
+  if (semantics) {
+    inverses.insert(InvertibleProtocolKind::Copyable);
+    if (*semantics == ExecutionSemantics::Once)
+      inverses.insert(InvertibleProtocolKind::Deinitable);
+  }
+  return inverses;
+}
+
+/// Returns the execution semantics of a function type that suppresses the
+/// invertible protocols \p inverses. See
+/// \c getSuppressedInvertibleProtocols().
+constexpr std::optional<ExecutionSemantics>
+getExecutionSemanticsSuppressing(InvertibleProtocolSet inverses) {
+  if (!inverses.contains(InvertibleProtocolKind::Copyable))
+    return std::nullopt;
+  if (inverses.contains(InvertibleProtocolKind::Deinitable))
+    return ExecutionSemantics::Once;
+  return ExecutionSemantics::AtMostOnce;
+}
+
+/// Returns true if a function value with the execution semantics \p from can
+/// be converted to a function type with the execution semantics \p to.
+///
+/// A conversion can suppress more invertible protocols, but never fewer. So a
+/// plain function can become `@called(atMostOnce)`, and either one can become
+/// `@called(exactlyOnce)`.
+constexpr bool
+canConvertExecutionSemantics(std::optional<ExecutionSemantics> from,
+                             std::optional<ExecutionSemantics> to) {
+  return (getSuppressedInvertibleProtocols(from) -
+          getSuppressedInvertibleProtocols(to))
+      .empty();
+}
 
 // MARK: - ASTExtInfoBuilder
 /// A builder type for creating an \c ASTExtInfo.
