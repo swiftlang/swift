@@ -300,6 +300,7 @@ struct SwiftifyInfoPrinter {
   bool firstParam = true;
   llvm::StringMap<std::string> &typeMapping;
   bool &DiagnosedMissingNullableAsEmptySpanParam;
+  bool &DiagnosedMissingLegacyNonconsumingLifetimeboundParam;
   bool hasNullableCountedBy = false;
 
 protected:
@@ -307,11 +308,14 @@ protected:
                       llvm::raw_svector_ostream &out,
                       MacroDecl &SwiftifyImportDecl,
                       llvm::StringMap<std::string> &typeMapping,
-                      bool &DiagnosedMissingNullableAsEmptySpanParam)
+                      bool &DiagnosedMissingNullableAsEmptySpanParam,
+                      bool &DiagnosedMissingLegacyNonconsumingLifetimeboundParam)
       : ctx(ctx), SwiftContext(SwiftContext), out(out),
         SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping),
         DiagnosedMissingNullableAsEmptySpanParam(
-            DiagnosedMissingNullableAsEmptySpanParam) {}
+            DiagnosedMissingNullableAsEmptySpanParam),
+        DiagnosedMissingLegacyNonconsumingLifetimeboundParam(
+            DiagnosedMissingLegacyNonconsumingLifetimeboundParam) {}
 
 public:
   void printTypeMapping() {
@@ -374,10 +378,12 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
                               llvm::raw_svector_ostream &out,
                               MacroDecl &SwiftifyImportDecl,
                               llvm::StringMap<std::string> &typeMapping,
-                              bool &DiagnosedMissingNullableAsEmptySpanParam)
+                              bool &DiagnosedMissingNullableAsEmptySpanParam,
+                              bool &DiagnosedMissingLegacyNonconsumingLifetimeboundParam)
       : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl,
                             typeMapping,
-                            DiagnosedMissingNullableAsEmptySpanParam) {}
+                            DiagnosedMissingNullableAsEmptySpanParam,
+                            DiagnosedMissingLegacyNonconsumingLifetimeboundParam) {}
 
   bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
                       ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
@@ -447,6 +453,31 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     }
     printSeparator();
     out << "nullableAsEmptySpan: true";
+  }
+
+  // Emits the __lifetimebound Mutable[Raw]Span ownership convention. By default
+  // such parameters are passed 'consuming'; `legacyNonconsumingRequested` opts
+  // back into the historical 'inout' convention.
+  void printLifetimeboundMutableSpanConvention(bool legacyNonconsumingRequested) {
+    if (legacyNonconsumingRequested) {
+      // Older macro plugins already default to 'inout', so when the parameter
+      // is missing there is nothing to emit and the behavior is already legacy.
+      if (!hasMacroParameter("legacyNonconsumingLifetimebound"))
+        return;
+      printSeparator();
+      out << "legacyNonconsumingLifetimebound: true";
+      return;
+    }
+    // Default 'consuming' convention. A macro plugin that predates the parameter
+    // still defaults to 'inout', so warn that the convention can't be honored.
+    if (!hasMacroParameter("legacyNonconsumingLifetimebound")) {
+      if (DiagnosedMissingLegacyNonconsumingLifetimeboundParam)
+        return;
+      DiagnosedMissingLegacyNonconsumingLifetimeboundParam = true;
+      SwiftContext.Diags.diagnose(
+          SourceLoc(),
+          diag::swiftify_legacy_nonconsuming_lifetimebound_param_missing);
+    }
   }
 
 private:
@@ -1009,6 +1040,13 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       !SwiftContext.LangOpts.hasFeature(
           Feature::SafeInteropWrappersNullAsEmptySpan);
 
+  // __lifetimebound Mutable[Raw]Span parameters are passed 'consuming' by
+  // default. Projects can opt back into the historical 'inout' convention.
+  const bool LegacyNonconsumingRequested =
+      SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) &&
+      SwiftContext.LangOpts.hasFeature(
+          Feature::SafeInteropWrappersLegacyNonconsumingLifetimebound);
+
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
@@ -1017,7 +1055,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     llvm::StringMap<std::string> typeMapping;
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
-        typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
+        typeMapping, DiagnosedMissingNullableAsEmptySpanParam,
+        DiagnosedMissingLegacyNonconsumingLifetimeboundParam);
     bool foundInfo = ClangFuncDecl ?
       swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
       swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
@@ -1030,6 +1069,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     if (!LegacyOptionalRequested) {
       printer.printNullableAsEmptySpan();
     }
+    printer.printLifetimeboundMutableSpanConvention(LegacyNonconsumingRequested);
     out << ")";
   }
 

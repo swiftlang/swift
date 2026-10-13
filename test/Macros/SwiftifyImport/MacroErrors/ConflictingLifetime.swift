@@ -15,8 +15,8 @@ public struct Esc { var x: CInt = 0 }
 // The generated dependence can't be combined with 'immortal'.
 // expected-expansion@+19:90{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_lifetime(immortal, copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
-//   expected-remark@3{{macro content: |public func immortalConflict(_ p: inout MutableSpan<CInt>) -> NE {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_lifetime(immortal, copy p) @_disfavoredOverload|}}
+//   expected-remark@3{{macro content: |public func immortalConflict(_ p: consuming MutableSpan<CInt>) -> NE {|}}
 //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@6{{macro content: |        unsafe $0|}}

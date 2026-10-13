@@ -75,8 +75,8 @@ public func myFunc3(_ ptr: inout MutableRawSpan, _ ptr2: inout MutableRawSpan) {
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-public func myFunc4(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_disfavoredOverload
+public func myFunc4(_ ptr: consuming MutableRawSpan) -> MutableRawSpan {
     let len = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeMutableBytes {
         unsafe $0

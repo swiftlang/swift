@@ -153,8 +153,8 @@ public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
 @__swiftmacro_4test19mutReturnDependence15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_disfavoredOverload
+public func mutReturnDependence(_ ptr: consuming MutableRawSpan) -> MutableRawSpan {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeMutableBytes {
         unsafe $0
