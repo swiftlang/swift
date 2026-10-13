@@ -6509,7 +6509,7 @@ public:
       protocols.push_back(S.addTypeRef(proto));
 
     bool inverseCopyable = false, inverseEscapable = false,
-         inverseDeinitable = false;
+         inverseDeinitable = false, inverseTransferable = false;
     for (auto ip : composition->getInverses()) {
       switch (ip) {
       case InvertibleProtocolKind::Copyable:
@@ -6521,6 +6521,9 @@ public:
       case InvertibleProtocolKind::Deinitable:
         inverseDeinitable = true;
         break;
+      case InvertibleProtocolKind::Transferable:
+        inverseTransferable = true;
+        break;
       };
     }
 
@@ -6528,7 +6531,8 @@ public:
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, composition->hasExplicitAnyObject(),
-        inverseCopyable, inverseEscapable, inverseDeinitable, protocols);
+        inverseCopyable, inverseEscapable, inverseDeinitable,
+        inverseTransferable, protocols);
   }
 
   void
