@@ -5643,6 +5643,12 @@ bool ConstraintSystem::repairFailures(
     if (!rawValue)
       return false;
 
+
+    // FIXME: There is currently no easy way to avoid attempting
+    // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
+    llvm::SaveAndRestore<ConstraintSystemOptions> options(
+        Options, Options - ConstraintSystemFlags::AllowFixes);
+
     auto result = matchTypes(valueType, rawValue, ConstraintKind::Conversion,
                              TMF_ApplyingFix, locator);
     return result != SolutionKind::Error;
