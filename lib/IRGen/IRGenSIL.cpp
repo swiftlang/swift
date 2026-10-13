@@ -7390,6 +7390,22 @@ static ExclusivityFlags getExclusivityFlags(BeginAccessInst *i) {
                              i->hasNoNestedConflict());
 }
 
+/// The signing of the value that Swift code sees for an imported C struct field
+/// qualified with __ptrauth. A C function pointer is signed with the C function
+/// pointer schema; a data pointer is not signed.
+static PointerAuthInfo getImportedPtrAuthFieldValueAuthInfo(
+    IRGenFunction &IGF, SILType fieldType, llvm::Value *storageAddress) {
+  // ClangImporter imports a nullable pointer as an optional type.
+  if (auto objectType = fieldType.getOptionalObjectType())
+    fieldType = objectType;
+  auto fnType = fieldType.getAs<SILFunctionType>();
+  if (!fnType)
+    return PointerAuthInfo();
+  return PointerAuthInfo::emit(IGF,
+                               IGF.IGM.getOptions().PointerAuth.FunctionPointers,
+                               storageAddress, PointerAuthEntity(fnType));
+}
+
 void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
   Address addr = getLoweredAddress(access->getOperand());
   switch (getEffectiveEnforcement(*this, access)) {
@@ -7450,12 +7466,8 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       Builder.emitBlock(resignNonNull);
       auto oldAuthInfo =
           PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
-      // ClangImporter imports the c function pointer as an optional type.
-      PointerAuthEntity entity(
-          sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
-      auto newAuthInfo = PointerAuthInfo::emit(
-          *this, IGM.getOptions().PointerAuth.FunctionPointers,
-          pointerToSignedFptr, entity);
+      auto newAuthInfo = getImportedPtrAuthFieldValueAuthInfo(
+          *this, sea->getType(), pointerToSignedFptr);
       auto *resignedFptr =
           emitPointerAuthResign(*this, signedFptr, oldAuthInfo, newAuthInfo);
       Builder.CreateStore(resignedFptr, tempAddressToIntPtr,
@@ -7602,12 +7614,8 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     Builder.emitBlock(resignNonNull);
 
     // If non-null, resign
-    // ClangImporter imports the c function pointer as an optional type.
-    PointerAuthEntity entity(
-        sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
-    auto oldAuthInfo = PointerAuthInfo::emit(
-        *this, IGM.getOptions().PointerAuth.FunctionPointers,
-        tempAddress, entity);
+    auto oldAuthInfo =
+        getImportedPtrAuthFieldValueAuthInfo(*this, sea->getType(), tempAddress);
     auto newAuthInfo =
         PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
     auto *signedFptr = emitPointerAuthResign(*this, tempAddressValue,
