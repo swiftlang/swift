@@ -559,3 +559,166 @@ bb0(%0 : @guaranteed $C):
 bb1:
   return %1
 }
+
+sil @use_c : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil [ossa] @sink_copy_into_successor :
+// CHECK:       bb0(%0 : @guaranteed $C, %1 : $Builtin.Int1):
+// CHECK-NEXT:    debug_value %0
+// CHECK-NEXT:    cond_br %1, bb1, bb2
+// CHECK:       bb1:
+// CHECK-NEXT:    enum $Optional<C>, #Optional.none!enumelt
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    enum $Optional<C>, #Optional.some!enumelt, [[C]]
+// CHECK:       } // end sil function 'sink_copy_into_successor'
+sil [ossa] @sink_copy_into_successor : $@convention(thin) (@guaranteed C, Builtin.Int1) -> @owned Optional<C> {
+bb0(%0 : @guaranteed $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  debug_value %2, let, name "x"
+  cond_br %1, bb1, bb2
+
+bb1:
+  destroy_value %2
+  %4 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%4)
+
+bb2:
+  %6 = enum $Optional<C>, #Optional.some!enumelt, %2
+  br bb3(%6)
+
+bb3(%8 : @owned $Optional<C>):
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @sink_load_copy_into_successor :
+// CHECK:       bb0(%0 : $*C, %1 : $Builtin.Int1):
+// CHECK-NEXT:    [[L:%.*]] = load_borrow %0
+// CHECK-NEXT:    debug_value [[L]]
+// CHECK-NEXT:    cond_br %1, bb1, bb2
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow [[L]]
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[L]]
+// CHECK-NEXT:    end_borrow [[L]]
+// CHECK-NEXT:    alloc_ref
+// CHECK-NEXT:    store %{{[0-9]+}} to [assign] %0
+// CHECK:         apply %{{[0-9]+}}([[C]])
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb4
+// CHECK:       } // end sil function 'sink_load_copy_into_successor'
+sil [ossa] @sink_load_copy_into_successor : $@convention(thin) (@inout C, Builtin.Int1) -> () {
+bb0(%0 : $*C, %1 : $Builtin.Int1):
+  %2 = load [copy] %0
+  debug_value %2, let, name "x"
+  cond_br %1, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %5 = alloc_ref $C
+  store %5 to [assign] %0
+  %f = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %f(%2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %2
+  br bb4
+
+bb3:
+  destroy_value %2
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_sink_load_copy_if_memory_is_written :
+// CHECK:         load [copy] %0
+// CHECK:       } // end sil function 'dont_sink_load_copy_if_memory_is_written'
+sil [ossa] @dont_sink_load_copy_if_memory_is_written : $@convention(thin) (@inout C, @owned C, Builtin.Int1) -> @owned Optional<C> {
+bb0(%0 : $*C, %1 : @owned $C, %2 : $Builtin.Int1):
+  %3 = load [copy] %0
+  store %1 to [assign] %0
+  cond_br %2, bb1, bb2
+
+bb1:
+  destroy_value %3
+  %4 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%4)
+
+bb2:
+  %6 = enum $Optional<C>, #Optional.some!enumelt, %3
+  br bb3(%6)
+
+bb3(%8 : @owned $Optional<C>):
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @dont_sink_copy_if_used_after_merge :
+// CHECK:       bb0(%0 : @guaranteed $C, %1 : $Builtin.Int1):
+// CHECK-NEXT:    copy_value %0
+// CHECK-NEXT:    cond_br %1, bb1, bb2
+// CHECK:       } // end sil function 'dont_sink_copy_if_used_after_merge'
+sil [ossa] @dont_sink_copy_if_used_after_merge : $@convention(thin) (@guaranteed C, Builtin.Int1) -> @owned C {
+bb0(%0 : @guaranteed $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @dont_sink_copy_if_used_in_both_successors :
+// CHECK:       bb0(%0 : @guaranteed $C, %1 : $Builtin.Int1):
+// CHECK-NEXT:    copy_value %0
+// CHECK-NEXT:    cond_br %1, bb1, bb2
+// CHECK:       } // end sil function 'dont_sink_copy_if_used_in_both_successors'
+sil [ossa] @dont_sink_copy_if_used_in_both_successors : $@convention(thin) (@guaranteed C, Builtin.Int1) -> @owned C {
+bb0(%0 : @guaranteed $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  br bb3(%2)
+
+bb2:
+  br bb3(%2)
+
+bb3(%5 : @owned $C):
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @dont_sink_copy_of_owned_value :
+// CHECK:       bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+// CHECK-NEXT:    copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    cond_br %1, bb1, bb2
+// CHECK:       } // end sil function 'dont_sink_copy_of_owned_value'
+sil [ossa] @dont_sink_copy_of_owned_value : $@convention(thin) (@owned C, Builtin.Int1) -> @owned Optional<C> {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  destroy_value %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  destroy_value %2
+  %4 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%4)
+
+bb2:
+  %6 = enum $Optional<C>, #Optional.some!enumelt, %2
+  br bb3(%6)
+
+bb3(%8 : @owned $Optional<C>):
+  return %8
+}

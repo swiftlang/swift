@@ -123,6 +123,32 @@ import SIL
 /// other instructions. It results in better LLVM code, for example LLVM's LICM can hoist loop
 /// invariant calls, like witness table accessors, over instructions which are not retains.
 ///
+/// 6. Sinks a copy into the successor block where it's actually used, if on the other control flow
+///    paths the copy is only destroyed:
+///
+/// ```
+///   %1 = load [copy] %addr        // or `copy_value` of a guaranteed value
+///   cond_br %c, bb1, bb2
+///   bb1:
+///     destroy_value %1
+///   bb2:
+///     // uses of %1
+/// ```
+/// ->
+/// ```
+///   %1 = load_borrow %addr
+///   cond_br %c, bb1, bb2
+///   bb1:
+///     end_borrow %1
+///   bb2:
+///     %2 = copy_value %1
+///     end_borrow %1
+///     // uses of %2
+/// ```
+///
+/// Like the non-OSSA RetainSinking pass, this avoids a retain/release pair on the paths where
+/// the copy is not needed.
+///
 /// The optimization can be done if:
 /// * The `copy_value` or `load [copy]` has a single use.
 /// * The source operand has guaranteed ownership. In case 2 the source is a phi of the same block
@@ -164,6 +190,9 @@ let copySinking = FunctionPass(name: "copy-sinking") {
     if sinkCopiesToTheirUses(in: block, context) {
       changed = true
     }
+    if sinkCopiesIntoSuccessors(of: block, context) {
+      changed = true
+    }
     switch block.terminator {
     case let switchEnum as SwitchEnumInst:
       if trySinkCopiesOver(terminator: switchEnum, context) {
@@ -201,6 +230,130 @@ private func sinkCopiesToTheirUses(in block: BasicBlock, _ context: FunctionPass
     }
   }
   return changed
+}
+
+/// Sinks `copy_value`s of guaranteed values and `load [copy]`s in `block` into the successor block
+/// which dominates all their uses, if on the paths through the other successors the copy is only
+/// destroyed (case 6 in the pass description).
+private func sinkCopiesIntoSuccessors(of block: BasicBlock, _ context: FunctionPassContext) -> Bool {
+  guard block.successors.count >= 2 else {
+    return false
+  }
+  var changed = false
+  // Iterate in reverse order, so that erasing a `load [copy]` doesn't affect the iteration.
+  for inst in block.instructions.reversed() {
+    switch inst {
+    case let copy as CopyValueInst:
+      if trySinkIntoSuccessor(copy: copy, context) {
+        changed = true
+      }
+    case let load as LoadInst where load.loadOwnership == .copy:
+      if trySinkIntoSuccessor(load: load, context) {
+        changed = true
+      }
+    default:
+      break
+    }
+  }
+  return changed
+}
+
+private func trySinkIntoSuccessor(copy: CopyValueInst, _ context: FunctionPassContext) -> Bool {
+  let copyBlock = copy.parentBlock
+  guard copy.fromValue.ownership == .guaranteed,
+        let successorOfUses = getSuccessorWhichDominatesUses(of: copy, context),
+        copy.hasDestroys(notDominatedBy: successorOfUses, context),
+        extendBorrowScope(of: copy.fromValue, from: copy, to: copyBlock.terminator, context)
+  else {
+    return false
+  }
+  // `getSuccessorWhichDominatesUses` only allows `debug_value`s as uses in the copy's block.
+  // Those can take the guaranteed source as operand.
+  copy.uses.filter({ $0.instruction.parentBlock == copyBlock }).replaceAll(with: copy.fromValue, context)
+  removeUses(of: copy, outsideOf: successorOfUses, context)
+
+  let newCopy = Builder(atBeginOf: successorOfUses, context).createCopyValue(operand: copy.fromValue)
+  copy.replace(with: newCopy, context)
+  return true
+}
+
+private func trySinkIntoSuccessor(load: LoadInst, _ context: FunctionPassContext) -> Bool {
+  let loadBlock = load.parentBlock
+  guard let successorOfUses = getSuccessorWhichDominatesUses(of: load, context),
+        load.hasDestroys(notDominatedBy: successorOfUses, context),
+        !mayWriteOrEndAccess(toAddressOf: load, before: loadBlock.terminator, context)
+  else {
+    return false
+  }
+  // If the loaded address is a projection of a borrowed reference, the borrow scope of that reference
+  // must enclose the new `load_borrow`.
+  if let baseBorrow = load.address.beginBorrowOfAddress {
+    guard extendBorrowScope(of: baseBorrow.value, from: load, to: loadBlock.terminator, context) else {
+      return false
+    }
+  }
+  let loadBorrow = Builder(before: load, context).createLoadBorrow(fromAddress: load.address)
+  // `getSuccessorWhichDominatesUses` only allows `debug_value`s as uses in the load's block.
+  // Those can take the guaranteed `load_borrow` as operand.
+  load.uses.filter({ $0.instruction.parentBlock == loadBlock }).replaceAll(with: loadBorrow, context)
+  removeUses(of: load, outsideOf: successorOfUses, context)
+
+  for succ in loadBlock.successors {
+    Builder(atBeginOf: succ, context).createEndBorrow(of: loadBorrow)
+  }
+  let newCopy = Builder(atBeginOf: successorOfUses, context).createCopyValue(operand: loadBorrow)
+  load.replace(with: newCopy, context)
+  return true
+}
+
+private func getSuccessorWhichDominatesUses(of copy: SingleValueInstruction,
+                                            _ context: FunctionPassContext) -> BasicBlock?
+{
+  let block = copy.parentBlock
+  let domTree = context.dominatorTree
+  var successor: BasicBlock? = nil
+
+  for use in copy.uses {
+    let useBlock = use.instruction.parentBlock
+    if useBlock == block {
+      // Debug values in the copy's block will use the copy's source.
+      guard use.instruction is DebugValueInst else {
+        return nil
+      }
+      continue
+    }
+    // A use which is not dominated by a single-predecessor successor of the copy's block is
+    // located after a control flow merge of several paths from the copy.
+    guard let useSucc = block.successors.first(where: { $0.dominates(useBlock, domTree) }) else {
+      return nil
+    }
+    if use.instruction is DestroyValueInst || use.instruction is DebugValueInst {
+      continue
+    }
+    if let successor, successor != useSucc {
+      return nil
+    }
+    successor = useSucc
+  }
+  return successor
+}
+
+private extension Value {
+  func hasDestroys(notDominatedBy successor: BasicBlock, _ context: FunctionPassContext) -> Bool {
+    let domTree = context.dominatorTree
+    return uses.users(ofType: DestroyValueInst.self).contains { !successor.dominates($0.parentBlock, domTree) }
+  }
+}
+
+/// Erases the destroys and debug_values on paths which don't go through `successor`.
+private func removeUses(of copy: SingleValueInstruction,
+                        outsideOf successor: BasicBlock,
+                        _ context: FunctionPassContext)
+{
+  let domTree = context.dominatorTree
+  context.erase(instructions: copy.users.filter {
+    $0.parentBlock != copy.parentBlock && !successor.dominates($0.parentBlock, domTree)
+  })
 }
 
 /// Returns true if the source of `copy` is still alive at `endInstruction` which is located
@@ -315,7 +468,7 @@ private func trySinkCopiesOver(terminator: ForwardingInstruction & UnaryInstruct
   case let copy as CopyValueInst:
     guard copy.uses.isSingleUse,
           copy.fromValue.ownership == .guaranteed,
-          extendBorrowScope(from: copy, to: terminator, context)
+          extendBorrowScope(of: copy.fromValue, from: copy, to: terminator, context)
     else {
       return false
     }
@@ -372,7 +525,8 @@ private func isContainedInBorrowScope(from copy: CopyValueInst,
 }
 
 
-private func extendBorrowScope(from copy: CopyValueInst,
+private func extendBorrowScope(of value: Value,
+                               from copy: SingleValueInstruction,
                                to terminator: TermInst,
                                _ context: FunctionPassContext) -> Bool
 {
@@ -381,7 +535,7 @@ private func extendBorrowScope(from copy: CopyValueInst,
 
   liveRange.insert(contentsOf: terminator.successors.map { $0.instructions.first! })
 
-  return extendBorrowScope(of: copy.fromValue, toOverlap: liveRange, context)
+  return extendBorrowScope(of: value, toOverlap: liveRange, context)
 }
 
 /// Returns true if the loaded memory may be written, or its access scope ends, before `endInstruction`. Either way,

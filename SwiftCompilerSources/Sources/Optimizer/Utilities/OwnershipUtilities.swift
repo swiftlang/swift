@@ -192,6 +192,16 @@ private func getInsertionPoints(for loadBorrow: LoadBorrowInst,
 }
 
 extension Value {
+  /// If this address is a projection of a borrowed reference, the `begin_borrow`/`load_borrow` which
+  /// introduces that reference's borrow scope. That scope must enclose the lifetime of anything
+  /// loaded from this address.
+  var beginBorrowOfAddress: BeginBorrowValue? {
+    if let baseReference = accessBase.reference {
+      return BeginBorrowValue(baseReference.lookThroughForwardingInstructions)
+    }
+    return nil
+  }
+
   /// Looks through forwarding instructions in the use-def chain and returns the original forwarded value.
   /// It looks through phi-arguments, terminator instructions and all kind of forwarding instructions
   /// which forward exactly one (non-trivial) operand.
