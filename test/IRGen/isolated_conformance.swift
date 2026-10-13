@@ -1,12 +1,14 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -swift-version 6 | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -swift-version 6 | %IRGenFileCheck %s
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: concurrency
-// UNSUPPORTED: CPU=arm64e
 
 protocol P {
   func f()
 }
+
+// CHECK-arm64e: @"got.$sScMs11GlobalActorsMc" = private unnamed_addr constant ptr @"$sScMs11GlobalActorsMc.ptrauth"
+// CHECK-arm64e: @"$sScMs11GlobalActorsMc.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$sScMs11GlobalActorsMc", i32 2, i64 ptrtoint (ptr @"got.$sScMs11GlobalActorsMc" to i64), i64 50923 }, section "llvm.ptrauth"
 
 // CHECK-LABEL: @"$s20isolated_conformance1XVyxGAA1PAAMc" =
 // CHECK-SAME: ptr @"$s20isolated_conformance1PMp"

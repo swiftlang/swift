@@ -1763,6 +1763,9 @@ public:
     return getKind() == Kind::DynamicallyReplaceableFunctionKey ||
       getKind() == Kind::OpaqueTypeDescriptorAccessorKey;
   }
+  bool isProtocolConformanceDescriptor() const {
+    return getKind() == Kind::ProtocolConformanceDescriptor;
+  }
   bool isOpaqueTypeDescriptorAccessor() const {
     return getKind() == Kind::OpaqueTypeDescriptorAccessor ||
            getKind() == Kind::OpaqueTypeDescriptorAccessorImpl ||
