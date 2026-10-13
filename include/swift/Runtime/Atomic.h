@@ -24,7 +24,8 @@
 #if defined(_WIN64)
 #include <intrin.h>
 #endif
-#if (defined(__x86_64__) || defined(_M_X64)) && defined(__clang__)
+#if (defined(__x86_64__) || defined(_M_X64)) && defined(__clang__) &&        \
+    !defined(__AVX__)
 #include <cpuid.h>
 #endif
 
@@ -52,6 +53,29 @@ namespace impl {
 
 #if (defined(__x86_64__) || defined(_M_X64)) && defined(__clang__)
 #define SWIFT_ATOMIC_VECTOR_LOAD16 1
+#if !defined(__AVX__)
+/// Whether this processor has atomic 16-byte vector loads (see
+/// has16ByteAtomicVectorLoads): unknown until the first 16-byte load asks
+/// CPUID. A single byte, so the common path is one load with no
+/// initialization guard; threads that race to set it agree on the value.
+enum : unsigned char {
+  VectorLoad16Unknown,
+  VectorLoad16Unsupported,
+  VectorLoad16Supported,
+};
+inline std::atomic<unsigned char> vectorLoad16Support{VectorLoad16Unknown};
+
+__attribute__((noinline, cold))
+inline bool detect16ByteAtomicVectorLoads() {
+  unsigned a, b, c, d;
+  bool supported = __get_cpuid(1, &a, &b, &c, &d) && (c & bit_AVX) != 0;
+  vectorLoad16Support.store(supported ? VectorLoad16Supported
+                                      : VectorLoad16Unsupported,
+                            std::memory_order_relaxed);
+  return supported;
+}
+#endif
+
 /// Intel and AMD guarantee that aligned 16-byte SSE loads (MOVDQA and
 /// friends) are atomic on every processor that enumerates AVX (Intel SDM
 /// vol. 3A 9.1.1, AMD APM vol. 2 7.3.2); libatomic relies on the same rule.
@@ -59,11 +83,17 @@ namespace impl {
 /// the cache line exclusive like a store and costs as much as one: it was
 /// most of the time spent reading a task's status.
 inline bool has16ByteAtomicVectorLoads() {
-  static const bool value = [] {
-    unsigned a, b, c, d;
-    return __get_cpuid(1, &a, &b, &c, &d) && (c & bit_AVX) != 0;
-  }();
-  return value;
+#if defined(__AVX__)
+  // Built for AVX: every processor this code runs on has them.
+  return true;
+#else
+  auto support = vectorLoad16Support.load(std::memory_order_relaxed);
+  if (__builtin_expect(support == VectorLoad16Supported, true))
+    return true;
+  if (support == VectorLoad16Unsupported)
+    return false;
+  return detect16ByteAtomicVectorLoads();
+#endif
 }
 
 template <class Value>
