@@ -2905,17 +2905,22 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       updateLinkageForDefinition(*this, gvar, entity);
     }
     if (forDefinition && !gvar->hasInitializer())
-      initVal = getGlobalInitValue(var, storageType, fixedAlignment);
+      initVal = getGlobalInitValue(var, storageType, fixedAlignment, gvar);
   } else {
     // The global doesn't exist yet. Create it.
 
-    initVal = getGlobalInitValue(var, storageType, fixedAlignment);
+    initVal = getGlobalInitValue(var, storageType, fixedAlignment,
+                                 /*global*/ nullptr);
     llvm::Type *globalTy = initVal ? initVal->getType() : storageType;
 
     if (var->isInitializedObject()) {
       // An initialized object is always a compiler-generated "outlined"
       // variable. Therefore we don't generate debug info for it.
       gvar = createVariable(*this, link, globalTy, fixedAlignment);
+      // The object header can depend on the address of the object, which
+      // only exists now.
+      if (initVal && forDefinition)
+        initVal = getGlobalInitValue(var, storageType, fixedAlignment, gvar);
     } else {
       // Create a global variable with debug info.
       StringRef name;
@@ -2990,11 +2995,17 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
 llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
                                                 llvm::Type *storageType,
-                                                Alignment alignment) {
+                                                Alignment alignment,
+                                                llvm::GlobalVariable *global) {
   if (var->isInitializedObject()) {
     StructLayout *layout = StaticObjectLayouts[var].layout.get();
     ObjectInst *oi = cast<ObjectInst>(var->getStaticInitializerValue());
-    llvm::Constant *initVal = emitConstantObject(*this, oi, layout);
+    // A read-only object is the whole global; any other object is inside a
+    // container, but its header is initialized at runtime anyway.
+    llvm::Constant *objectAddress =
+        canMakeStaticObjectReadOnly(var->getLoweredType()) ? global : nullptr;
+    llvm::Constant *initVal =
+        emitConstantObject(*this, oi, layout, objectAddress);
     if (!canMakeStaticObjectReadOnly(var->getLoweredType())) {
       // A statically initialized object must be placed into a container struct
       // because the swift_initStaticObject needs a swift_once_t at offset -1:
