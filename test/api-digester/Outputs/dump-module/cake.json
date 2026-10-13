@@ -85,6 +85,14 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Deinitable",
             "printedName": "Deinitable",
             "usr": "s:s10DeinitableP",
@@ -118,6 +126,14 @@
         "mangledName": "$s4cake2P2P",
         "moduleName": "cake",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Deinitable",
@@ -154,6 +170,14 @@
         "moduleName": "cake",
         "genericSig": "<Self : cake.P1, Self : cake.P2>",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Deinitable",
@@ -317,6 +341,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "P1",
             "printedName": "P1",
             "usr": "s:4cake2P1P",
@@ -404,6 +436,14 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
             "isMarkerProtocol": true
           }
         ]
@@ -667,6 +707,14 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
             "isMarkerProtocol": true
           }
         ]
@@ -936,6 +984,14 @@
             ],
             "usr": "s:SY",
             "mangledName": "$sSY"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1110,6 +1166,14 @@
             "usr": "s:s16SendableMetatypeP",
             "mangledName": "$ss16SendableMetatypeP",
             "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1230,6 +1294,14 @@
         "mangledName": "$s4cake21ProWithAssociatedTypeP",
         "moduleName": "cake",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Deinitable",
@@ -1409,6 +1481,14 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Deinitable",
             "printedName": "Deinitable",
             "usr": "s:s10DeinitableP",
@@ -1495,6 +1575,14 @@
         "conformances": [
           {
             "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "Deinitable",
             "printedName": "Deinitable",
             "usr": "s:s10DeinitableP",
@@ -1565,6 +1653,14 @@
         "moduleName": "cake",
         "genericSig": "<Self : cake.PSuper>",
         "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
           {
             "kind": "Conformance",
             "name": "Deinitable",
@@ -1717,6 +1813,14 @@
           },
           {
             "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
             "name": "P1",
             "printedName": "P1",
             "usr": "s:4cake2P1P",
@@ -1774,6 +1878,14 @@
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP",
             "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1813,6 +1925,14 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
             "isMarkerProtocol": true
           }
         ]
@@ -1894,6 +2014,14 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
             "isMarkerProtocol": true
           }
         ]
@@ -2004,6 +2132,14 @@
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
             "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
             "isMarkerProtocol": true
           }
         ]
@@ -2505,6 +2641,14 @@
             ],
             "usr": "s:Sx",
             "mangledName": "$sSx"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Transferable",
+            "printedName": "Transferable",
+            "usr": "s:s12TransferableP",
+            "mangledName": "$ss12TransferableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",

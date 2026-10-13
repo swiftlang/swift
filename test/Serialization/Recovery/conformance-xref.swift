@@ -62,7 +62,7 @@ extension Counter: SimpleProto {}
 public protocol ProtoUser {
   associatedtype Element
 #if DROP_REQUIREMENT
-// CHECK-REMARK-REQUIREMENT: MiddleLib.swiftmodule:1:1: error: Listed conformances of 'OneToAThousand' do not match current requirement signature of 'ProtoUser'; 5 conformances for 6 requirements
+// CHECK-REMARK-REQUIREMENT: MiddleLib.swiftmodule:1:1: error: Listed conformances of 'OneToAThousand' do not match current requirement signature of 'ProtoUser'; 7 conformances for 9 requirements
 // CHECK-REMARK-REQUIREMENT: Requirements seen by this invocation:
 // Skipping implicits.
 // CHECK-REMARK-REQUIREMENT: Conformances written in the swiftmodule:

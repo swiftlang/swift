@@ -22,34 +22,34 @@ struct ProtocolSubstitution: P {
   typealias A = Int
 
   // CHECK: var_decl{{.*}}x1
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> ProtocolSubstitution.A)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> ProtocolSubstitution.A)
   var x1: [S] { S() }
 
   // CHECK: var_decl{{.*}}x2
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> ProtocolSubstitution)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> ProtocolSubstitution)
   var x2: [S] { S() }
 }
 
 // CHECK: struct_decl{{.*}}ArchetypeSubstitution
 struct ArchetypeSubstitution<A>: P {
   // CHECK: var_decl{{.*}}x1
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> A)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> A)
   var x1: [S] { S() }
 
   // CHECK: var_decl{{.*}}x2
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> ArchetypeSubstitution<A>)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> ArchetypeSubstitution<A>)
   var x2: [S] { S() }
 }
 
 // CHECK-LABEL: struct_decl{{.*}}ExplicitGenericAttribute
 struct ExplicitGenericAttribute<T: P> {
   // CHECK: var_decl{{.*}}x1
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> T)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> T)
   @Builder<T>
   var x1: [S] { S() }
 
   // CHECK: var_decl{{.*}}x2
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> T.A)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> T.A)
   @Builder<T.A>
   var x2: [S] { S() }
 }
@@ -61,10 +61,10 @@ extension ConcreteTypeSubstitution: P where Value == Int {
   typealias A = Value
 
   // CHECK: var_decl{{.*}}x1
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> ConcreteTypeSubstitution<Int>.A)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> ConcreteTypeSubstitution<Int>.A)
   var x1: [S] { S() }
 
   // CHECK: var_decl{{.*}}x2
-  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> ConcreteTypeSubstitution<Int>)
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable, T : Transferable> T -> ConcreteTypeSubstitution<Int>)
   var x2: [S] { S() }
 }
