@@ -1989,6 +1989,64 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
   }
 }
 
+/// Emit a note when an instance of \p instanceActor could be a different
+/// instance than \p globalActor's shared instance. This comes up when code
+/// isolated to one of them uses the other without 'await'.
+///
+/// \param globalActor The global actor on one side of the mismatch.
+/// \param instanceActor The actor type of the instance on the other side.
+/// \param instance The variable storing the instance, if any.
+static void diagnoseActorInstanceMayNotBeGlobalActor(
+    Type globalActor, NominalTypeDecl *instanceActor, const VarDecl *instance,
+    SourceLoc loc) {
+  auto *shared = globalActor->getAnyNominal()->getGlobalActorInstance();
+  if (!shared || !instanceActor ||
+      instanceActor != shared->getInterfaceType()->getAnyActor())
+    return;
+
+  // We don't want to emit this diagnostic for MainActor (which is truly a
+  // singleton and just lacks special casing) or `.shared` since `.shared` will
+  // actually be the same instance by the GlobalActor protocol req, we just
+  // don't special case that assumption.
+  // TODO: Emit a diagnostic explaining this situation, special case `.shared`
+  // expressions, or forbid multiple GlobalActor.ActorType instances to exist.
+  if (instance == shared || instanceActor->isMainActor())
+    return;
+
+  // TODO: Write a userdoc about actor instance isolation vs global
+  // actor isolation and add this diagnostic to it, since we can have groups for
+  // notes now.
+  shared->getASTContext().Diags.diagnose(
+      loc, diag::actor_instance_may_not_be_global_actor,
+      /*named=*/instance != nullptr, instance, instanceActor, globalActor);
+}
+
+void swift::noteActorInstanceMayNotBeGlobalActor(
+    SourceLoc loc, const ActorIsolation &contextIsolation,
+    const ActorIsolation &requiredIsolation, const Expr *selfArgument) {
+  if (contextIsolation.isActorInstanceIsolated() &&
+      requiredIsolation.isGlobalActor())
+    return diagnoseActorInstanceMayNotBeGlobalActor(
+        requiredIsolation.getGlobalActor(), contextIsolation.getActor(),
+        contextIsolation.getActorInstance(), loc);
+
+  if (!contextIsolation.isGlobalActor() ||
+      !requiredIsolation.isActorInstanceIsolated())
+    return;
+
+  const Expr *instance = requiredIsolation.getActorInstanceExpr();
+  if (requiredIsolation.isActorInstanceForSelfParameter())
+    instance = selfArgument;
+  if (!instance)
+    return;
+
+  diagnoseActorInstanceMayNotBeGlobalActor(
+      contextIsolation.getGlobalActor(),
+      instance->getType()->lookThroughAllOptionalTypes()->getAnyActor(),
+      dyn_cast_or_null<VarDecl>(instance->getReferencedDecl().getDecl()),
+      instance->getStartLoc());
+}
+
 /// Get the actor isolation of the innermost relevant context.
 static ActorIsolation getInnermostIsolatedContext(
     const DeclContext *dc,
@@ -4213,6 +4271,10 @@ namespace {
           }
         }
 
+        noteActorInstanceMayNotBeGlobalActor(
+            apply->getLoc(), getContextIsolation(), *unsatisfiedIsolation,
+            argForIsolatedParam);
+
         if (unsatisfiedIsolation->isGlobalActor()) {
           missingGlobalActorOnContext(
               const_cast<DeclContext *>(getDeclContext()),
@@ -4714,6 +4776,12 @@ namespace {
         if (isolatedActor) {
           refKind = isolatedActor->kind;
           refGlobalActor = isolatedActor->globalActor;
+          // If getIsolatedActor fell back to the base not being potentially
+          // isolated but the member is GA isolated, the base doesn't matter and
+          // this is a reference between different actors.
+          if (refKind == ReferencedActor::NonIsolatedParameter &&
+              !result.isolation.isActorInstanceIsolated())
+            refKind = ReferencedActor::Isolated;
         } else {
           auto contextIsolation = getInnermostIsolatedContext(
               getDeclContext(), getClosureActorIsolation);
@@ -4791,6 +4859,11 @@ namespace {
         }
 
         noteIsolatedActorMember(decl, context);
+        noteActorInstanceMayNotBeGlobalActor(
+            loc,
+            getInnermostIsolatedContext(getDeclContext(),
+                                        getClosureActorIsolation),
+            result.isolation, base);
         if (result.isolation.isGlobalActor()) {
           missingGlobalActorOnContext(
               const_cast<DeclContext *>(getDeclContext()),

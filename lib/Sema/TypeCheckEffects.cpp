@@ -3645,10 +3645,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
                    PotentialEffectReason reason,
-                   bool downgradeToWarning) :
+                   bool downgradeToWarning,
+                   ActorIsolation contextIsolation) :
       reason(reason),
       expr(failingExpr),
-      downgradeToWarning(downgradeToWarning) {}
+      downgradeToWarning(downgradeToWarning),
+      contextIsolation(contextIsolation) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
@@ -3658,6 +3660,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     /// Whether the error should be downgraded to a warning.
     bool downgradeToWarning;
+
+    /// The isolation of the failing expression's context.
+    ActorIsolation contextIsolation;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -4399,7 +4404,8 @@ private:
           errorOrder.push_back(anchor);
         uncoveredAsync[anchor].emplace_back(
             *expr, classification.getAsyncReason(),
-            classification.shouldDowngradeToWarning());
+            classification.shouldDowngradeToWarning(),
+            getActorIsolationOfContext(CurContext.getDeclContext()));
       }
     }
 
@@ -4854,7 +4860,7 @@ private:
               if (var->isAsyncLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
                                    diag::async_let_without_await, var);
-                continue;
+                break;
               }
             }
           }
@@ -4862,12 +4868,12 @@ private:
         case PotentialEffectReason::Kind::PropertyAccess:
           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                              diag::async_access_without_await, 1);
-          continue;
+          break;
 
         case PotentialEffectReason::Kind::SubscriptAccess:
           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                              diag::async_access_without_await, 2);
-          continue;
+          break;
 
         case PotentialEffectReason::Kind::ByClosure:
         case PotentialEffectReason::Kind::ByDefaultClosure:
@@ -4889,7 +4895,7 @@ private:
                                   diag::async_access_without_await, 0);
                break;
            }
-          continue;
+          break;
          }
 
          auto *call = dyn_cast<ApplyExpr>(&diag.expr);
@@ -4917,10 +4923,34 @@ private:
                               diag::async_access_without_await, 0);
          }
 
-         continue;
+         break;
         }
       }
+
+      noteActorInstanceMayNotBeGlobalActor(diag);
     }
+  }
+
+  /// Note when the isolation crossing that made an expression implicitly
+  /// 'async' is between a global actor and an instance of its actor type.
+  static void noteActorInstanceMayNotBeGlobalActor(const DiagnosticInfo &info) {
+    std::optional<ActorIsolation> target;
+    const Expr *selfArgument = nullptr;
+    if (auto *apply = dyn_cast<ApplyExpr>(&info.expr)) {
+      target = apply->isImplicitlyAsync();
+      if (auto *selfApply =
+              dyn_cast<SelfApplyExpr>(apply->getFn()->getValueProvidingExpr()))
+        selfArgument = selfApply->getBase();
+    } else if (auto *lookup = dyn_cast<LookupExpr>(&info.expr)) {
+      target = lookup->isImplicitlyAsync();
+      selfArgument = lookup->getBase();
+    } else if (auto *declRef = dyn_cast<DeclRefExpr>(&info.expr)) {
+      target = declRef->isImplicitlyAsync();
+    }
+
+    if (target)
+      swift::noteActorInstanceMayNotBeGlobalActor(
+          info.expr.getLoc(), info.contextIsolation, *target, selfArgument);
   }
 
   /// Check whether the given error points to an attempt to access
@@ -4949,6 +4979,7 @@ private:
                                    LanguageMode::v6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
+      noteActorInstanceMayNotBeGlobalActor(errorInfo);
       return true;
     };
 
