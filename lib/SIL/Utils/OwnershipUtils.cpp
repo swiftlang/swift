@@ -18,7 +18,6 @@
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
 
 using namespace swift;
@@ -1292,14 +1291,14 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   for (unsigned idx = 0; idx < worklist.size(); idx++) {
     SILValue value = worklist[idx];
 
-    // First check if v is an introducer. If so, stash it and continue.
+    // First check if value is an introducer. If so, stash it and continue.
     if (auto scopeIntroducer = BorrowedValue(value)) {
       out.push_back(scopeIntroducer);
       continue;
     }
 
-    // If the introducer is a ScopedAddressValue, bailout.
-    if (auto scopedAddress = ScopedAddressValue(value)) {
+    // If we encounter an address, bailout.
+    if (value->getType().isAddress()) {
       return false;
     }
 

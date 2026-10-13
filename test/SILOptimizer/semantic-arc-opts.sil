@@ -59,6 +59,10 @@ struct Wrapper {
   let _k: Klass
 }
 
+class WrapperBox {
+  @_hasStorage var w: Wrapper
+}
+
 extension Klass : MyFakeAnyObject {
   func myFakeMethod()
 }
@@ -1689,6 +1693,47 @@ bb0(%0 : @guaranteed $Wrapper):
   return %r
 }
 
+// rdar://189932577
+// The copy keeps the borrow accessor result alive past destroy_addr of self.
+// CHECK-LABEL: sil [ossa] @call_borrow_accessor_owned_self_address :
+// CHECK:         apply
+// CHECK-NEXT:    copy_value
+// CHECK-NEXT:    destroy_addr %0
+// CHECK:       } // end sil function 'call_borrow_accessor_owned_self_address'
+sil [ossa] @call_borrow_accessor_owned_self_address : $@convention(thin) (@in Wrapper) -> () {
+bb0(%0 : $*Wrapper):
+  %func = function_ref @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %k = apply %func(%0) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %copy = copy_value %k
+  destroy_addr %0
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %copy
+  %r = tuple ()
+  return %r
+}
+
+// rdar://189932577
+// A class field address can be reassigned while the borrow accessor result is
+// still in use; the copy must stay.
+// CHECK-LABEL: sil [ossa] @call_borrow_accessor_ref_element_addr_self :
+// CHECK:         apply
+// CHECK-NEXT:    copy_value
+// CHECK-NEXT:    store %1 to [assign]
+// CHECK:       } // end sil function 'call_borrow_accessor_ref_element_addr_self'
+sil [ossa] @call_borrow_accessor_ref_element_addr_self : $@convention(thin) (@guaranteed WrapperBox, @owned Wrapper) -> () {
+bb0(%0 : @guaranteed $WrapperBox, %1 : @owned $Wrapper):
+  %addr = ref_element_addr %0, #WrapperBox.w
+  %func = function_ref @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %k = apply %func(%addr) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %copy = copy_value %k
+  store %1 to [assign] %addr
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %copy
+  %r = tuple ()
+  return %r
+}
 
 //
 // CHECK-LABEL: sil [ossa] @debug_value_past_consume_availability :
