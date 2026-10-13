@@ -4160,6 +4160,16 @@ createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
 
     llvm::Value *descriptor =
       IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
+
+    // Sign the descriptor.
+    auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+    if (schema) {
+      auto authInfo = PointerAuthInfo::emit(
+          IGF, schema, nullptr,
+          PointerAuthEntity::Special::TypeDescriptorAsArgument);
+      descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+    }
+
     auto responsePair =
         IGF.Builder.CreateCall(IGF.IGM.getGetSingletonMetadataFunctionPointer(),
                                {request.get(IGF), descriptor});
