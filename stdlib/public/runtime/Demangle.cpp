@@ -691,7 +691,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         kind = Node::Kind::NoEscapeFunctionType;
       else if (func->hasExtendedFlags())
         kind = getEscapingSwiftFunctionNodeKind(
-            func->getExtendedFlags().getInvertedProtocols());
+            func->getExtendedFlags().getExecutionSemantics());
       else
         kind = Node::Kind::FunctionType;
       break;

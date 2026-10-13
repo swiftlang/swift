@@ -1159,6 +1159,14 @@ struct TargetFunctionMetadataDifferentiabilityKind {
 using FunctionMetadataDifferentiabilityKind =
     TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
+/// Execution semantics for function type metadata.
+/// Duplicates `ExecutionSemantics` in AST/AttrKind.h, plus `None`.
+enum class FunctionMetadataExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce = 1,
+  Once = 2,
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -1308,9 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    /// A InvertibleProtocolSet in the high bits. An at-most-once function
-    /// type suppresses Copyable, and an exactly-once function type also
-    /// suppresses Deinitable.
+    // Values for the enumerated execution semantics.
+    ExecutionSemanticsMask = 0x000000E0U, // three bits
+    ExecutionSemanticsShift = 5,
+
     InvertedProtocolshift = 16,
     InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
@@ -1351,6 +1360,13 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withExecutionSemantics(FunctionMetadataExecutionSemantics semantics) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~ExecutionSemanticsMask) |
+        (int_type(semantics) << ExecutionSemanticsShift));
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withInvertedProtocols(InvertibleProtocolSet inverted) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~InvertedProtocolMask) |
@@ -1373,6 +1389,11 @@ public:
 
   int_type getIntValue() const {
     return Data;
+  }
+
+  FunctionMetadataExecutionSemantics getExecutionSemantics() const {
+    return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
+                                              ExecutionSemanticsShift);
   }
 
   InvertibleProtocolSet getInvertedProtocols() const {
