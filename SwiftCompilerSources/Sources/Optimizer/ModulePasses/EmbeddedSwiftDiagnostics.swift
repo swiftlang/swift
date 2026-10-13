@@ -346,7 +346,7 @@ private struct FunctionChecker {
       switch entry {
       case .invalid, .associatedType:
         break
-      case .method(_, let witness):
+      case .method(_, let witness, _):
         // Witnesses that are not valid for embedded aren't actually put into
         // the witness table. Ignore them.
         if let witness = witness, witness.hasValidSignatureForEmbedded {

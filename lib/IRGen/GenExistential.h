@@ -41,6 +41,11 @@ namespace irgen {
   /// and archetypes opened from them.
   const TypeInfo *createCOMInterfaceTypeInfo(IRGenModule &IGM);
 
+  /// Bind the local type data required by an archetype opened from a COM
+  /// existential.
+  void bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                         CanArchetypeType archetype);
+
   /// Emit the metadata and witness table initialization for an allocated
   /// opaque existential container.
   Address emitOpaqueExistentialContainerInit(IRGenFunction &IGF,

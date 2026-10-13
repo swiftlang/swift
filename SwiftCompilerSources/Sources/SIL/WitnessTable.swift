@@ -25,7 +25,8 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
     /// A witness table entry describing the witness for a method.
     /// The witness can be nil in case dead function elimination has removed the method
     /// or if the method was not serialized (for de-serialized witness tables).
-    case method(requirement: DeclRef, witness: Function?)
+    /// The interface is the entry exposed through a native COM vtable.
+    case method(requirement: DeclRef, witness: Function?, interface: Function?)
 
     /// A witness table entry describing the witness for an associated type.
     case associatedType(requirement: AssociatedTypeDecl, witness: CanonicalType)
@@ -41,8 +42,11 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
       case .invalid:
         self = .invalid
       case .method:
-        self = .method(requirement: DeclRef(bridged: bridged.getMethodRequirement()),
-                       witness: bridged.getMethodWitness().function)
+        self = .method(
+          requirement: DeclRef(bridged: bridged.getMethodRequirement()),
+          witness: bridged.getMethodWitness().function,
+          interface: bridged.getMethodInterface().function
+        )
       case .associatedType:
         self = .associatedType(requirement: bridged.getAssociatedTypeRequirement().getAs(AssociatedTypeDecl.self),
                                witness: CanonicalType(bridged: bridged.getAssociatedTypeWitness()))
@@ -65,9 +69,10 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
       switch self {
       case .invalid:
         return BridgedWitnessTableEntry.createInvalid()
-      case .method(let requirement, let witness):
+      case .method(let requirement, let witness, let interface):
         return BridgedWitnessTableEntry.createMethod(requirement.bridged,
-                                                     OptionalBridgedFunction(obj: witness?.bridged.obj))
+          OptionalBridgedFunction(obj: witness?.bridged.obj),
+          OptionalBridgedFunction(obj: interface?.bridged.obj))
       case .associatedType(let requirement, let witness):
         return BridgedWitnessTableEntry.createAssociatedType(requirement.bridged, witness.bridged)
       case .associatedConformance(let requirement, let witness):
@@ -100,7 +105,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   /// A lookup for a specific method with O(n) complexity.
   public func lookup(method: DeclRef) -> Function? {
     for entry in entries {
-      if case .method(let req, let impl) = entry, req == method {
+      if case .method(let req, let impl, _) = entry, req == method {
         return impl
       }
     }

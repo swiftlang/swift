@@ -48,6 +48,11 @@ namespace irgen {
                                             CanArchetypeType archetype,
                                             ProtocolDecl *protocol);
 
+  /// Emit a witness table reference for a metatype of an archetype.
+  llvm::Value *
+  emitArchetypeMetatypeWitnessTableRef(IRGenFunction &IGF, CanType metatype,
+                                       ProtocolDecl *protocol);
+
   /// Emit a metadata reference for an associated type of an archetype.
   MetadataResponse emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                  CanArchetypeType origin,

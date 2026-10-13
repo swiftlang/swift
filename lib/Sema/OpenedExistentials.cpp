@@ -728,6 +728,20 @@ bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
 
   auto &ctx = callee->getASTContext();
 
+  // A `T.Type: COMInterface` requirement deliberately binds `T` to the exact
+  // interface existential. Opening that existential would replace its
+  // statically selected interface identity with an opened archetype.
+  Type metatypeParam = MetatypeType::get(genericParam);
+  for (auto *proto : genericSig->getRequiredProtocols(metatypeParam)) {
+    if (!proto->isSpecificProtocol(KnownProtocolKind::COMInterface))
+      continue;
+
+    Type existentialMetatype = MetatypeType::get(existentialTy);
+    auto conformance = lookupConformance(existentialMetatype, proto);
+    if (conformance && !conformance.hasMissingConformance())
+      return false;
+  }
+
   // If all of the conformance requirements on the formal parameter's type are
   // self-conforming, the argument can be passed without opening it, so don't
   // open unless ImplicitOpenExistentials is enabled.
