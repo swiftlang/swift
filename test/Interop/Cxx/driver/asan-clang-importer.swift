@@ -3,7 +3,7 @@
 
 // XFAIL: OS=windows-msvc
 
-// RUN: %target-swiftc_driver %s -sanitize=address -import-objc-header %S/sanitizer-detect.h -o %t_asan -cxx-interoperability-mode=default
+// RUN: %target-swiftc_driver %s -v -sanitize=address -import-objc-header %S/sanitizer-detect.h -o %t_asan -cxx-interoperability-mode=default
 // RUN: %target-codesign %t_asan
 // RUN: %target-run %t_asan
 

@@ -68,6 +68,44 @@ static void addRedirectedDirectory(
                                 std::string(*dir.realPath));
 }
 
+// DNM: diagnostic output for CI only; drop before merging.
+//
+// Some Linux CI jobs that build the 'std' PCM from the scanner's -emit-pcm
+// command fail to read the injected libstdc++ module map. Report why the
+// injection was skipped, or where it went, so the CI log shows it.
+static bool isDirectCC1StdPCMJob(const ASTContext &ctx) {
+  const auto &opts = ctx.ClangImporterOpts;
+  return opts.DirectClangCC1ModuleBuild &&
+         llvm::is_contained(opts.ExtraArgs, "-fmodule-name=std");
+}
+
+static void traceStdPCMInjection(const ASTContext &ctx, const Twine &outcome) {
+  if (!isDirectCC1StdPCMJob(ctx))
+    return;
+  auto &os = llvm::errs();
+  const auto &opts = ctx.ClangImporterOpts;
+  const auto &searchPaths = ctx.SearchPathOpts;
+  os << "[DNM std-pcm-injection] " << outcome << "\n";
+  os << "[DNM std-pcm-injection]   triple=" << ctx.LangOpts.Target.str()
+     << " cxx-stdlib=" << static_cast<int>(ctx.LangOpts.CXXStdlib)
+     << " sdk='" << searchPaths.getSDKPath() << "' sysroot='"
+     << searchPaths.getSysRoot().value_or("") << "' resource-dir='"
+     << searchPaths.RuntimeResourcePath << "'\n";
+  os << "[DNM std-pcm-injection]   direct-cc1-driver-args:";
+  for (const auto &arg : opts.DirectCC1DriverArgs)
+    os << " '" << arg << "'";
+  os << "\n";
+}
+
+static std::string describeIncludeDir(const IncludeDir &dir) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  os << "path='" << dir.path << "' realPath='"
+     << (dir.realPath ? StringRef(*dir.realPath) : StringRef("<none>"))
+     << "'";
+  return result;
+}
+
 static std::optional<Path> getActualModuleMapPath(
     StringRef name, SearchPathOptions &Opts, const LangOptions &LangOpts,
     const llvm::Triple &triple, bool isArchSpecific,
@@ -374,8 +412,10 @@ static void getLibStdCxxFileMapping(
     return;
   // Make sure we are building with libstdc++. On platforms where libstdc++ is
   // the default C++ stdlib, users can still compile with `-Xcc -stdlib=libc++`.
-  if (ctx.LangOpts.CXXStdlib != CXXStdlibKind::Libstdcxx)
+  if (ctx.LangOpts.CXXStdlib != CXXStdlibKind::Libstdcxx) {
+    traceStdPCMInjection(ctx, "skipped: the C++ stdlib is not libstdc++");
     return;
+  }
 
   // Extract the libstdc++ installation path from Clang driver.
   auto [clangDriver, clangDiagEngine, clangDiagOpts] =
@@ -394,8 +434,11 @@ static void getLibStdCxxFileMapping(
   // If we were explicitly asked to not bring in the C++ stdlib, bail.
   if (parsedStdlibArgs.hasArg(clang::options::OPT_nostdinc,
                               clang::options::OPT_nostdincxx,
-                              clang::options::OPT_nostdlibinc))
+                              clang::options::OPT_nostdlibinc)) {
+    traceStdPCMInjection(ctx, "skipped: -nostdinc, -nostdinc++, or "
+                              "-nostdlibinc");
     return;
+  }
 
   IncludeDir cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
@@ -404,6 +447,12 @@ static void getLibStdCxxFileMapping(
   } else {
     if (!suppressDiagnostic)
       ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
+    std::string includeArgs;
+    for (const char *arg : stdlibArgStrings)
+      includeArgs += " '" + std::string(arg) + "'";
+    traceStdPCMInjection(ctx, "skipped: no include path has cstdlib, string, "
+                              "and vector; C++ stdlib include args:" +
+                                  includeArgs);
     return;
   }
 
@@ -411,14 +460,20 @@ static void getLibStdCxxFileMapping(
   if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, ctx.LangOpts,
                                             triple, vfs))
     actualModuleMapPath = path.value();
-  else
+  else {
+    traceStdPCMInjection(ctx, "skipped: no libstdcxx.modulemap in the "
+                              "resource directory or the SDK");
     return;
+  }
   // Only inject the module map if it actually exists. It may not, for example
   // if `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
   // a Swift compiler not built for Linux targets.
-  if (!vfs->exists(actualModuleMapPath))
+  if (!vfs->exists(actualModuleMapPath)) {
     // FIXME: emit a warning of some kind.
+    traceStdPCMInjection(ctx, "skipped: '" + actualModuleMapPath +
+                                  "' does not exist");
     return;
+  }
   // TODO: remove the libstdcxx.h header and reference all libstdc++ headers
   // directly from the modulemap.
   Path actualHeaderPath = actualModuleMapPath;
@@ -431,8 +486,18 @@ static void getLibStdCxxFileMapping(
   Path injectedModuleMapPath;
   if (auto path = getInjectedModuleMapPath(cxxStdlibDir, vfs))
     injectedModuleMapPath = path.value();
-  else
+  else {
+    traceStdPCMInjection(ctx, "skipped: a module map already exists in '" +
+                                  cxxStdlibDir.pathOnDisk() + "'; " +
+                                  describeIncludeDir(cxxStdlibDir));
     return;
+  }
+  if (!llvm::is_contained(ctx.ClangImporterOpts.ExtraArgs,
+                          injectedModuleMapPath.str().str()))
+    traceStdPCMInjection(ctx, "injecting at '" + injectedModuleMapPath +
+                                  "', which this job's arguments do not "
+                                  "name; " +
+                                  describeIncludeDir(cxxStdlibDir));
 
   Path injectedHeaderPath(cxxStdlibDir.path);
   llvm::sys::path::append(injectedHeaderPath, "libstdcxx.h");
@@ -886,6 +951,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, redirectedDirs, ctx, vfs,
                             suppressDiagnostic);
+  else if (triple.isOSLinux())
+    traceStdPCMInjection(ctx, "skipped: C++ interop is disabled");
 
   GetWindowsFileMappings(result, ctx, vfs);
 
