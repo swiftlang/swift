@@ -1016,6 +1016,8 @@ static Lazy<SingletonTypeMetadataCache> SingletonMetadata;
 MetadataResponse
 swift::swift_getSingletonMetadata(MetadataRequest request,
                                   const TypeContextDescriptor *description) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   auto result = SingletonMetadata.get().getOrInsert(description, request,
                                                     description);
 
