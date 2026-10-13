@@ -7962,19 +7962,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloat() || nominal2->isCGFloat()) &&
            (nominal1->isDouble() || nominal2->isDouble()))) {
-        ConstraintLocatorBuilder location{locator};
-
-        SmallVector<LocatorPathElt, 4> path;
-        auto anchor = location.getLocatorParts(path);
-
         // Try implicit CGFloat conversion only if this is not:
         //     - an explicit call to a CGFloat initializer;
         //     - an explicit coercion;
         //     - a runtime type check (via `is` expression);
         //     - a checked or conditional cast;
 
-        auto isCGFloatInit = [&](ASTNode location) {
-          if (auto *call = getAsExpr<CallExpr>(location)) {
+        auto isCGFloatInit = [&]() {
+          auto *expr = locator.trySimplifyToExpr();
+
+          if (auto *call = dyn_cast_or_null<CallExpr>(expr)) {
             if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
               return getInstanceType(typeExpr)->isCGFloat();
             }
@@ -7982,12 +7979,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           return false;
         };
 
-        auto isCoercionOrCast = [](ASTNode anchor,
-                                   ArrayRef<LocatorPathElt> path) {
+        auto anchor = locator.getAnchor();
+
+        auto isCoercionOrCast = [&]() {
           // E.g. contextual conversion from coercion/cast
           // to some other type.
-          if (!(path.empty() ||
-                path.back().is<LocatorPathElt::CoercionOperand>()))
+          if (!locator.endsWith<LocatorPathElt::CoercionOperand>())
             return false;
 
           return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
@@ -7995,7 +7992,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                  isExpr<ForcedCheckedCastExpr>(anchor);
         };
 
-        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path)) {
+        if (!isCGFloatInit() && !isCoercionOrCast()) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
