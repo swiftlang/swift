@@ -1772,6 +1772,9 @@ public:
     return SecondaryPointer != nullptr;
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
+  bool isValueWitnessTable() const {
+    return getKind() == Kind::ValueWitnessTable;
+  }
   bool isContextDescriptor() const;
   /// Whether this is the descriptor of a requirement of a protocol.
   bool isProtocolRequirementDescriptor() const;

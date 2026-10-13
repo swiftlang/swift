@@ -3954,6 +3954,14 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
           /*storageAddress*/ gotEquivalent);
       gotEquivalent->setInitializer(signedValue);
     }
+  } else if (entity.isValueWitnessTable()) {
+    auto &schema = IGM.getOptions().PointerAuth.ValueWitnessTable;
+    if (schema) {
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema, PointerAuthEntity(),
+          /*storageAddress*/ gotEquivalent);
+      gotEquivalent->setInitializer(signedValue);
+    }
   }
 
   return gotEquivalent;

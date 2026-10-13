@@ -1,5 +1,6 @@
 // RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=CHECK
 // RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=GOT
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
@@ -7,6 +8,14 @@
 import Builtin
 
 struct S { var a, b, c: Builtin.NativeObject }
+
+// The layout of G<T> does not depend on T, so its metadata pattern refers to
+// the value witness table of Builtin.Int64 through a GOT equivalent, which is
+// signed like the value witness table pointer in metadata.
+struct G<T> { var x: Builtin.Int64 }
+
+// GOT: @"got.$sBi64_WV" = private unnamed_addr constant ptr @"$sBi64_WV.ptrauth"
+// GOT: @"$sBi64_WV.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$sBi64_WV", i32 2, i64 ptrtoint (ptr @"got.$sBi64_WV" to i64), i64 11839 }, section "llvm.ptrauth"
 
 // Check the constant discriminators for all value witnesses.
 
