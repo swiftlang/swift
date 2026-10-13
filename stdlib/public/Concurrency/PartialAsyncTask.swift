@@ -881,6 +881,208 @@ extension UnsafeContinuation {
   }
 }
 
+@available(SwiftStdlib 6.5, *)
+extension UnsafeContinuation {
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// The offered execution context is used only if it belongs to the executors
+  /// the awaiting task resumes on. If the context doesn't match the task is
+  /// enqueued on its expected execution context.
+  /// from a point where that executor could run one of its own jobs.
+  ///
+  /// A continuation must be resumed exactly once.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
+  ///
+  /// - Parameters:
+  ///   - value: The value to return from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    returning value: sending T,
+    isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor
+  ) {
+    unsafe _continuationResumeOnExecutors(
+      context, value, nil, serialExecutor._executor, taskExecutor._executor)
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - error: The error to throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    throwing error: consuming E,
+    isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor
+  ) {
+    // There is no value to return, so pass an empty one for the runtime to
+    // destroy.
+    unsafe _continuationResumeOnExecutors(
+      context, (), error, serialExecutor._executor, taskExecutor._executor)
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - result: A value to either return or throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    with result: sending Result<T, E>,
+    isolatedTo serialExecutor: UnownedSerialExecutor,
+    taskExecutor: UnownedTaskExecutor
+  ) {
+    switch result {
+      case .success(let val):
+        unsafe self.resumeSynchronously(
+          returning: val, isolatedTo: serialExecutor, taskExecutor: taskExecutor)
+      case .failure(let err):
+        unsafe self.resumeSynchronously(
+          throwing: err, isolatedTo: serialExecutor, taskExecutor: taskExecutor)
+    }
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - value: The value to return from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    returning value: sending T,
+    isolatedTo serialExecutor: UnownedSerialExecutor
+  ) {
+    unsafe _continuationResumeOnExecutors(
+      context, value, nil, serialExecutor._executor, _getUndefinedTaskExecutor())
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
+  /// execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - error: The error to throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    throwing error: consuming E,
+    isolatedTo serialExecutor: UnownedSerialExecutor
+  ) {
+    unsafe _continuationResumeOnExecutors(
+      context, (), error, serialExecutor._executor, _getUndefinedTaskExecutor())
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
+  /// execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - result: A value to either return or throw from the continuation.
+  ///   - serialExecutor: The serial executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    with result: sending Result<T, E>,
+    isolatedTo serialExecutor: UnownedSerialExecutor
+  ) {
+    switch result {
+      case .success(let val):
+        unsafe self.resumeSynchronously(returning: val, isolatedTo: serialExecutor)
+      case .failure(let err):
+        unsafe self.resumeSynchronously(throwing: err, isolatedTo: serialExecutor)
+    }
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
+  /// the offered execution context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - value: The value to return from the continuation.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    returning value: sending T,
+    on taskExecutor: UnownedTaskExecutor
+  ) {
+    unsafe _continuationResumeOnExecutors(
+      context, value, nil, _getGenericSerialExecutor(), taskExecutor._executor)
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
+  /// context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - error: The error to throw from the continuation.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    throwing error: consuming E,
+    on taskExecutor: UnownedTaskExecutor
+  ) {
+    unsafe _continuationResumeOnExecutors(
+      context, (), error, _getGenericSerialExecutor(), taskExecutor._executor)
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point, offering the current execution context to run
+  /// the resumed task.
+  ///
+  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
+  /// context is used to run the resumed task.
+  ///
+  /// - Parameters:
+  ///   - result: A value to either return or throw from the continuation.
+  ///   - taskExecutor: The task executor the resuming thread is running on.
+  @export(implementation)
+  public func resumeSynchronously(
+    with result: sending Result<T, E>,
+    on taskExecutor: UnownedTaskExecutor
+  ) {
+    switch result {
+      case .success(let val):
+        unsafe self.resumeSynchronously(returning: val, on: taskExecutor)
+      case .failure(let err):
+        unsafe self.resumeSynchronously(throwing: err, on: taskExecutor)
+    }
+  }
+}
+
 #if _runtime(_ObjC)
 
 // Intrinsics used by SILGen to resume or fail continuations.
