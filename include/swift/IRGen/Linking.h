@@ -1783,6 +1783,10 @@ public:
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
   bool isContextDescriptor() const;
+  /// Whether this is the descriptor of a requirement of a protocol.
+  bool isProtocolRequirementDescriptor() const;
+  /// Whether this is the descriptor of a method of a class.
+  bool isClassMethodDescriptor() const;
   CanType getType() const {
     assert(isTypeKind(getKind()));
     return CanType(reinterpret_cast<TypeBase*>(Pointer));

@@ -80,6 +80,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/SipHash.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -1101,6 +1102,19 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolConformanceDescriptorsAsArguments =
       PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.ProtocolRequirementDescriptors = PointerAuthSchema(
+      dataKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ProtocolRequirement);
+  opts.ClassMethodDescriptors = PointerAuthSchema(
+      dataKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
+  // The runtime in this repository does not authenticate these pointers, so
+  // check that the discriminators are the hashes of their names.
+  assert(SpecialPointerAuthDiscriminators::ProtocolRequirement ==
+             llvm::getPointerAuthStableSipHash("ProtocolRequirement") &&
+         SpecialPointerAuthDiscriminators::ClassMethodDescriptor ==
+             llvm::getPointerAuthStableSipHash("ClassMethodDescriptor"));
 
   opts.ProtocolDescriptorsAsArguments =
       PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
