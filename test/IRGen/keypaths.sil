@@ -59,7 +59,7 @@ sil_vtable C2 {}
 // CHECK: %TSi = type <{ [[WORD:i.*]] }>
 
 // -- %a: S.x
-// CHECK: [[KP_A:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_A:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1SV"
 // CHECK-SAME: @"symbolic Si
@@ -69,7 +69,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %b: S.y
-// CHECK: [[KP_B:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_B:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1SV
 // CHECK-SAME: @"symbolic SS
@@ -80,7 +80,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0100_0008> }>
 
 // -- %c: S.z
-// CHECK: [[KP_C:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_C:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1SV
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1CC
@@ -91,7 +91,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0180_0018> }>
 
 // -- %d: C.x
-// CHECK: [[KP_D:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_D:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -102,7 +102,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %d1: C1.x
-// CHECK: [[KP_D1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_D1:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -113,7 +113,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %e: C.y
-// CHECK: [[KP_E:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_E:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -124,7 +124,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0300_0018> }>
 
 // -- %f: C.z
-// CHECK: [[KP_F:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_F:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -135,7 +135,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0028> }>
 
 // -- %g: S.z.x
-// CHECK: [[KP_G:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_G:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -150,7 +150,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %h: C.z.x
-// CHECK: [[KP_H:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_H:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -163,7 +163,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %k: computed
-// CHECK: [[KP_K:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_K:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -175,7 +175,7 @@ sil_vtable C2 {}
 // CHECK-SAME: ptr {{.*}}@k_get{{.*}}
 
 // -- %l: computed
-// CHECK: [[KP_L:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_L:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -188,7 +188,7 @@ sil_vtable C2 {}
 // CHECK-SAME: ptr @l_set{{.*}}
 
 // -- %m: computed
-// CHECK: [[KP_M:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_M:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -203,10 +203,10 @@ sil_vtable C2 {}
 // -- %m2: reabstracted
 // Note: the contents here aren't interesting. The test triggered infinite
 // looping in the compiler at one point.
-// CHECK: [[KP_M:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_M:@keypath.*]] = private constant <{ {{.*}} }> <{
 
 // -- %t0: T.a.0
-// CHECK: [[KP_T0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_T0:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -219,7 +219,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %t1: T.b.g
-// CHECK: [[KP_T1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_T1:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -234,7 +234,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0180_0010> }>
 
 // -- %i: Gen<A>.x
-// CHECK: [[KP_I:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_I:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
 // CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"symbolic{{[^"]*}}8keypaths3GenV{{[^"]*}}"
@@ -247,7 +247,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 32 }>
 
 // -- %j: Gen<A>.y
-// CHECK: [[KP_J:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_J:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
 // CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"symbolic{{[^"]*}}8keypaths3GenV{{[^"]*}}"
@@ -260,7 +260,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 36 }>
 
 // -- %tg0: TG<T,U,V>.a.0
-// CHECK: [[KP_TG0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_TG0:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment r1_l"
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -275,7 +275,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %tg1: TG<T,U,V>.a.2
-// CHECK: [[KP_TG1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_TG1:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment r1_l"
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -292,7 +292,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 64 }>
 
 // -- %tg2: TGA<T,U>.1
-// CHECK: [[KP_TG2:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_TG2:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment r0_l"
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -303,7 +303,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 48 }>
 
 // -- %gcx: GC<T>.x
-// CHECK: [[KP_GCX:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_GCX:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"symbolic{{[^"]*}}8keypaths2GCC{{[^"]*}}"
 // CHECK-SAME: @"symbolic x"
