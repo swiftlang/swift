@@ -6927,6 +6927,107 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   }
 }
 
+/// Diagnose each implicit force unwrap, which occurs when referencing an
+/// implicitly unwrapped optional or the result of a dynamic lookup in a
+/// context that requires a non-optional value.
+static void diagnoseImplicitForceUnwrap(const Expr *E, const DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  auto *sf = DC->getParentSourceFile();
+  if (!sf ||
+      !ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ImplicitForceUnwrap))
+    return;
+
+  class ImplicitForceUnwrapFinder : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    ImplicitForceUnwrapFinder(ASTContext &ctx) : Ctx(ctx) {}
+
+    void diagnoseForce(ForceValueExpr *force) {
+      auto *subExpr = force->getSubExpr();
+      SourceLoc endLoc = subExpr->getEndLoc();
+      if (endLoc.isInvalid())
+        return;
+
+      auto optionalTy = subExpr->getType()->getWithoutSpecifierType();
+
+      // Look through the implicit opening of an AnyObject base, which wraps
+      // the force of a dynamic lookup result.
+      while (auto *open = dyn_cast<OpenExistentialExpr>(subExpr)) {
+        if (!open->isImplicit())
+          break;
+        subExpr = open->getSubExpr();
+      }
+
+      auto *semanticSubExpr = subExpr->getSemanticsProvidingExpr();
+      bool isDynamicLookup = isa<DynamicMemberRefExpr>(semanticSubExpr) ||
+                             isa<DynamicSubscriptExpr>(semanticSubExpr);
+      auto diag = Ctx.Diags.diagnose(endLoc, diag::implicit_force_unwrap,
+                                     isDynamicLookup, optionalTy);
+      diag.highlight(subExpr->getSourceRange());
+      SourceLoc startLoc = subExpr->getStartLoc();
+      if (subExpr->canAppendPostfixExpression(
+              /*appendingPostfixOperator=*/true)) {
+        diag.fixItInsertAfter(endLoc, "!");
+      } else if (startLoc.isValid()) {
+        diag.fixItInsert(startLoc, "(").fixItInsertAfter(endLoc, ")!");
+      }
+    }
+
+    void diagnoseKeyPath(KeyPathExpr *keyPath) {
+      // An implicit force in a key path is an optional-force component that
+      // shares the location of the component it unwraps, whereas an explicit
+      // force has the location of its '!'.
+      auto components = keyPath->getComponents();
+      for (unsigned i = 1, n = components.size(); i != n; ++i) {
+        const auto &component = components[i];
+        if (component.getKind() != KeyPathExpr::Component::Kind::OptionalForce)
+          continue;
+
+        SourceLoc loc = component.getLoc();
+        if (loc.isInvalid() || loc != components[i - 1].getLoc())
+          continue;
+
+        // Find the component being unwrapped, skipping over any other
+        // implicit forces.
+        unsigned unwrappedIdx = i - 1;
+        while (unwrappedIdx > 0 &&
+               components[unwrappedIdx].getKind() ==
+                   KeyPathExpr::Component::Kind::OptionalForce &&
+               components[unwrappedIdx - 1].getLoc() == loc)
+          --unwrappedIdx;
+
+        auto optionalTy =
+            components[i - 1].getComponentType()->getWithoutSpecifierType();
+        SourceRange range = components[unwrappedIdx].getSourceRange();
+        Ctx.Diags
+            .diagnose(range.End, diag::implicit_force_unwrap,
+                      /*isDynamicLookup=*/false, optionalTy)
+            .highlight(range)
+            .fixItInsertAfter(range.End, "!");
+      }
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return Action::SkipNode(E);
+
+      if (auto *force = dyn_cast<ForceValueExpr>(E)) {
+        if (force->isImplicit() &&
+            force->isForceOfImplicitlyUnwrappedOptional())
+          diagnoseForce(force);
+      } else if (auto *keyPath = dyn_cast<KeyPathExpr>(E)) {
+        diagnoseKeyPath(keyPath);
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  ImplicitForceUnwrapFinder walker(ctx);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -6961,6 +7062,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseCxxFunctionCalls(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
   diagnoseNondeinitableCaptureListEntries(E, DC);
+  diagnoseImplicitForceUnwrap(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

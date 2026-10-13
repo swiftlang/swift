@@ -5277,7 +5277,8 @@ namespace {
             resolvedComponents.push_back(
                 KeyPathExpr::Component::forOptionalForce(objectTy, loc));
           } else {
-            buildKeyPathOptionalForceComponent(resolvedComponents);
+            buildKeyPathOptionalForceComponent(resolvedComponents,
+                                               origComponent.getLoc());
           }
           break;
         }
@@ -5428,8 +5429,14 @@ namespace {
       return coerceToType(captureExpr, exprType, cs.getConstraintLocator(E));
     }
 
+    /// Add an optional-force component that unwraps the last component.
+    ///
+    /// \param bangLoc The location of an explicit '!'. Implicit forces of
+    /// implicitly unwrapped optionals take the location of the component they
+    /// unwrap.
     void buildKeyPathOptionalForceComponent(
-        SmallVectorImpl<KeyPathExpr::Component> &components) {
+        SmallVectorImpl<KeyPathExpr::Component> &components,
+        SourceLoc bangLoc = SourceLoc()) {
       assert(!components.empty());
 
       // Unwrap the last component type, preserving @lvalue-ness.
@@ -5443,7 +5450,7 @@ namespace {
       }
       assert(objectTy);
 
-      auto loc = components.back().getLoc();
+      auto loc = bangLoc.isValid() ? bangLoc : components.back().getLoc();
       components.push_back(
           KeyPathExpr::Component::forOptionalForce(objectTy, loc));
     }

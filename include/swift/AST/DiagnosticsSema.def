@@ -5548,6 +5548,10 @@ NOTE(iuo_to_any_coercion_note,none,
 NOTE(iuo_to_any_coercion_note_func_result,none,
      "%kind0 with implicitly unwrapped result type is declared here",
      (const ValueDecl *))
+GROUPED_WARNING(implicit_force_unwrap,ImplicitForceUnwrap,none,
+        "implicit force unwrap of %select{implicitly unwrapped optional|"
+        "dynamic lookup result}0 of type %1",
+        (bool, Type))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(default_optional_parameter,none,
