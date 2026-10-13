@@ -136,6 +136,7 @@ bb0:
 // ... dealloc_ref also does the same thing.
 
 // CHECK-NEXT: [[META:%.*]] = load ptr, ptr [[ALLOC]]
+// CHECK-ptrauth: [[META:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-32-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, ptr [[META]], i32 28
 // CHECK-64-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, ptr [[META]], i32 48
 // CHECK-32-NEXT: [[SIZE:%.*]] = load i32, ptr [[SIZE_ADDR]]

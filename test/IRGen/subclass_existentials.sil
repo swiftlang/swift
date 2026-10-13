@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK --check-prefix=CHECK-%target-ptrauth -DINT=i%target-ptrsize
 
 sil_stage canonical
 
@@ -80,6 +80,7 @@ sil [ossa] @checkExistentialDowncast : $@convention(thin) (@owned C, @owned C & 
 bb0(%0 : @owned $C, %1 : @owned $C & P):
 
 // CHECK:  [[METATYPE:%.*]] = load ptr, ptr %0, align {{4|8}}
+// CHECK-ptrauth: [[METATYPE:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s21subclass_existentials1DCMa"([[INT]] 0)
 // CHECK-NEXT:  [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT:  [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_superclass_unconditional(ptr %0, ptr [[METATYPE]], ptr [[SUPERCLASS]], {{.*}} @"$s21subclass_existentials1RMp"
@@ -126,6 +127,7 @@ sil [ossa] @checkExistentialSameClassDowncast : $@convention(thin) (@owned C) ->
 bb0(%0 : @owned $C):
 
 // CHECK:  [[METATYPE:%.*]] = load ptr, ptr %0, align {{4|8}}
+// CHECK-ptrauth: [[METATYPE:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT:  [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %0, ptr [[METATYPE]], {{.*}} @"$s21subclass_existentials1PMp"
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 1

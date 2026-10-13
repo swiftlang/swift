@@ -1,4 +1,5 @@
-// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=CHECK
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefixes=CHECK,STRIP
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios14.5 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefixes=CHECK,AUTH
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
@@ -54,7 +55,16 @@ bb0(%0 : $A):
   return %2 : $()
 }
 // CHECK-LABEL: define swiftcc void @test_call_a(ptr %0)
-// CHECK: [[META:%.*]] = load ptr, ptr %0, align
+// CHECK: [[ISA:%.*]] = load ptr, ptr %0, align
+//   Before iOS 14.5 the signature of the isa is stripped, not authenticated.
+// STRIP-NEXT: [[ISA_INT:%.*]] = ptrtoint ptr [[ISA]] to i64
+// STRIP-NEXT: [[STRIPPED:%.*]] = call i64 @llvm.ptrauth.strip(i64 [[ISA_INT]], i32 2)
+// STRIP-NEXT: [[META:%.*]] = inttoptr i64 [[STRIPPED]] to ptr
+// AUTH-NEXT: [[ADDR:%.*]] = ptrtoint ptr %0 to i64
+// AUTH-NEXT: [[ISA_DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ADDR]], i64 27361)
+// AUTH-NEXT: [[ISA_INT:%.*]] = ptrtoint ptr [[ISA]] to i64
+// AUTH-NEXT: [[AUTHED:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[ISA_INT]], i32 2, i64 [[ISA_DISC]])
+// AUTH-NEXT: [[META:%.*]] = inttoptr i64 [[AUTHED]] to ptr
 // CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[META]], i64 {{.*}}
 // CHECK-NEXT: [[FN:%.*]] = load ptr, ptr [[SLOT]]
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint ptr [[SLOT]] to i64
@@ -70,7 +80,16 @@ bb0(%0 : $B):
   return %2 : $()
 }
 // CHECK-LABEL: define swiftcc void @test_call_b(ptr %0)
-// CHECK: [[META:%.*]] = load ptr, ptr %0, align
+// CHECK: [[ISA:%.*]] = load ptr, ptr %0, align
+//   Before iOS 14.5 the signature of the isa is stripped, not authenticated.
+// STRIP-NEXT: [[ISA_INT:%.*]] = ptrtoint ptr [[ISA]] to i64
+// STRIP-NEXT: [[STRIPPED:%.*]] = call i64 @llvm.ptrauth.strip(i64 [[ISA_INT]], i32 2)
+// STRIP-NEXT: [[META:%.*]] = inttoptr i64 [[STRIPPED]] to ptr
+// AUTH-NEXT: [[ADDR:%.*]] = ptrtoint ptr %0 to i64
+// AUTH-NEXT: [[ISA_DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ADDR]], i64 27361)
+// AUTH-NEXT: [[ISA_INT:%.*]] = ptrtoint ptr [[ISA]] to i64
+// AUTH-NEXT: [[AUTHED:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[ISA_INT]], i32 2, i64 [[ISA_DISC]])
+// AUTH-NEXT: [[META:%.*]] = inttoptr i64 [[AUTHED]] to ptr
 // CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[META]], i64 {{.*}}
 // CHECK-NEXT: [[FN:%.*]] = load ptr, ptr [[SLOT]]
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint ptr [[SLOT]] to i64
@@ -87,7 +106,16 @@ bb0(%0 : $G<T>):
 }
 // CHECK-LABEL: define swiftcc void @test_call_g(ptr %0)
 // CHECK: load
-// CHECK: [[META:%.*]] = load ptr, ptr %0, align
+// CHECK: [[ISA:%.*]] = load ptr, ptr %0, align
+//   Before iOS 14.5 the signature of the isa is stripped, not authenticated.
+// STRIP-NEXT: [[ISA_INT:%.*]] = ptrtoint ptr [[ISA]] to i64
+// STRIP-NEXT: [[STRIPPED:%.*]] = call i64 @llvm.ptrauth.strip(i64 [[ISA_INT]], i32 2)
+// STRIP-NEXT: [[META:%.*]] = inttoptr i64 [[STRIPPED]] to ptr
+// AUTH-NEXT: [[ADDR:%.*]] = ptrtoint ptr %0 to i64
+// AUTH-NEXT: [[ISA_DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ADDR]], i64 27361)
+// AUTH-NEXT: [[ISA_INT:%.*]] = ptrtoint ptr [[ISA]] to i64
+// AUTH-NEXT: [[AUTHED:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[ISA_INT]], i32 2, i64 [[ISA_DISC]])
+// AUTH-NEXT: [[META:%.*]] = inttoptr i64 [[AUTHED]] to ptr
 // CHECK-NEXT: [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[META]], i64 {{.*}}
 // CHECK-NEXT: [[FN:%.*]] = load ptr, ptr [[SLOT]]
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint ptr [[SLOT]] to i64
