@@ -15039,6 +15039,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
         return true;
 
+      if (restriction == ConversionRestrictionKind::OptionalToOptional) {
+        auto *fix = GenericArgumentsMismatch::create(
+          *this, fromType, toType, {0}, loc);
+        return !recordFix(fix, impact);
+      }
+
       if (restriction == ConversionRestrictionKind::ValueToOptional) {
         // If this is an optional injection we can drop optional from
         // "to" type since it's not significant for the diagnostic.

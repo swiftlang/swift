@@ -48,6 +48,7 @@ func h2(x: (any P<Int>)?) -> (any P)? {
 
 func h3(x: (any P<Int>)?) -> (any P<String>)? {
   return x // expected-error {{cannot convert return expression of type '(any P<Int>)?' to return type '(any P<String>)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any P<Int>' and 'any P<String>') are expected to be equal}}
 }
 
 func generic1<T>(x: any P<T>) -> T {
