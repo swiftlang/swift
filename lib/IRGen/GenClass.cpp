@@ -1502,15 +1502,6 @@ namespace {
         IGM.addGenericROData(dataPtr);
       }
 
-      llvm::Constant *fields[] = {
-        rootPtr,
-        superPtr,
-        IGM.getObjCEmptyCachePtr(),
-        IGM.getObjCEmptyVTablePtr(),
-        dataPtr
-      };
-      auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
-                                            llvm::ArrayRef(fields));
       llvm::Constant *uncastMetaclass;
       if (specializedGenericType) {
         uncastMetaclass =
@@ -1521,7 +1512,23 @@ namespace {
             IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
       }
       auto metaclass = cast<llvm::GlobalVariable>(uncastMetaclass);
-      metaclass->setInitializer(init);
+
+      auto &options = IGM.getOptions().PointerAuth;
+      ConstantInitBuilder builder(IGM);
+      auto fields = builder.beginStruct(IGM.ObjCClassStructTy);
+      auto addClassPointer = [&](llvm::Constant *pointer,
+                                 const PointerAuthSchema &schema) {
+        if (pointer->isNullValue())
+          fields.add(pointer);
+        else
+          fields.addSignedPointer(pointer, schema, PointerAuthEntity());
+      };
+      addClassPointer(rootPtr, options.ObjCIsaPointers);
+      addClassPointer(superPtr, options.ObjCSuperPointers);
+      fields.add(IGM.getObjCEmptyCachePtr());
+      fields.add(IGM.getObjCEmptyVTablePtr());
+      addClassPointer(dataPtr, options.ObjCClassROPointers);
+      fields.finishAndSetAsInitializer(metaclass);
     }
     
   private:

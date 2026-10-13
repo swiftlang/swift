@@ -4489,11 +4489,15 @@ namespace {
                     "class metadata kind is non-zero?");
 
       if (IGM.ObjCInterop) {
-        // Get the metaclass pointer as an intptr_t.
         auto metaclass = asImpl().getAddrOfMetaclassObject(NotForDefinition);
-        auto flags =
-          llvm::ConstantExpr::getPtrToInt(metaclass, IGM.MetadataKindTy);
-        B.add(flags);
+        if (auto &schema = IGM.getOptions().PointerAuth.ObjCIsaPointers) {
+          B.addSignedPointer(metaclass, schema, PointerAuthEntity());
+        } else {
+          // Get the metaclass pointer as an intptr_t.
+          auto flags =
+              llvm::ConstantExpr::getPtrToInt(metaclass, IGM.MetadataKindTy);
+          B.add(flags);
+        }
       } else {
         // On non-objc platforms just fill it with a null, there
         // is no Objective-C metaclass.
@@ -4557,9 +4561,11 @@ namespace {
         // We have to do getAddrOfObjCClass ourselves here because
         // the ObjC runtime base needs to be ObjC-mangled but isn't
         // actually imported from a clang module.
-        B.add(IGM.getAddrOfObjCClass(
+        B.addSignedPointer(IGM.getAddrOfObjCClass(
                                IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
-                               NotForDefinition));
+                               NotForDefinition),
+                           IGM.getOptions().PointerAuth.ObjCSuperPointers,
+                           PointerAuthEntity());
         return;
       }
 
@@ -4567,7 +4573,9 @@ namespace {
       // lead to shouldAddNullSuperclass returning true above.
       auto metadata = asImpl().getSuperclassMetadata(superclass);
       assert(metadata);
-      B.add(metadata);
+      B.addSignedPointer(metadata,
+                         IGM.getOptions().PointerAuth.ObjCSuperPointers,
+                         PointerAuthEntity());
     }
 
     llvm::Constant *emitLayoutString() {
@@ -4771,7 +4779,8 @@ namespace {
       // Emit data + bit.
       data = llvm::ConstantExpr::getGetElementPtr(IGM.Int8Ty, data, bit);
 
-      B.add(data);
+      B.addSignedPointer(data, IGM.getOptions().PointerAuth.ObjCClassROPointers,
+                         PointerAuthEntity());
     }
 
     void addDefaultActorStorageFieldOffset() {
@@ -5228,7 +5237,8 @@ namespace {
       // isa
       ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
       auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
-      B.add(isa);
+      B.addSignedPointer(isa, IGM.getOptions().PointerAuth.ObjCIsaPointers,
+                         PointerAuthEntity());
       // super, which is dependent if the superclass is generic
       B.addNullPointer(IGM.ObjCClassPtrTy);
       // cache
