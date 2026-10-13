@@ -3922,6 +3922,15 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
           /*storageAddress*/ gotEquivalent);
       gotEquivalent->setInitializer(signedValue);
     }
+  } else if (entity.isProtocolConformanceDescriptor()) {
+    auto schema = IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
+    if (schema) {
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema,
+          PointerAuthEntity::Special::ProtocolConformanceDescriptor,
+          /*storageAddress*/ gotEquivalent);
+      gotEquivalent->setInitializer(signedValue);
+    }
   }
 
   return gotEquivalent;
