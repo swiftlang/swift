@@ -7008,7 +7008,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     return;
 
   if (Decl) {
-    Type Ty = Decl->getTypeInContext();
+    // 'self' in a convenience initializer has dynamic Self type and remains
+    // uninitialized until the delegated initializer returns.
+    Type Ty = Decl->getTypeInContext()->eraseDynamicSelfType();
     if (Ty->getClassDecl() ||
         Ty->getStructDecl())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));
