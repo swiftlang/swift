@@ -1440,7 +1440,10 @@ Type ASTBuilder::createIntegerType(intptr_t value) {
 }
 
 Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
-  return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
+  // `value` is the signed (negative) value, but IntegerType stores the sign
+  // separately from the digits, so pass only the magnitude as text.
+  auto magnitude = -static_cast<uintptr_t>(value);
+  return IntegerType::get(std::to_string(magnitude), /*isNegative*/ true, Ctx);
 }
 
 Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
