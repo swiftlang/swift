@@ -1042,10 +1042,12 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
                       SpecialPointerAuthDiscriminators::ValueWitnessTable);
   opts.ProtocolWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  // Associated type and associated conformance witnesses are data pointers:
+  // a mangled name or metadata, and a witness table.
   opts.ProtocolAssociatedTypeAccessFunctions =
-    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolAssociatedTypeWitnessTableAccessFunctions =
-    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethods =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethodPointers =

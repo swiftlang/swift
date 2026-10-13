@@ -58,6 +58,9 @@ sil_witness_table B : Q module test {
   associated_type Assoc: A
   method #Q.init!allocator: @B_init
 }
+//   Associated type and associated conformance witnesses are data pointers.
+// CHECK: @"associated conformance 4test1BVAA1QAA5AssocAaDP_AA1P.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr getelementptr inbounds (i8, ptr @"associated conformance 4test1BVAA1QAA5AssocAaDP_AA1P", i64 1), i32 2, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 1) to i64), i64 31334 }, section "llvm.ptrauth"
+// CHECK: @"symbolic _____ 4test1AV.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr getelementptr inbounds (i8, ptr @"symbolic _____ 4test1AV", i64 1), i32 2, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 2) to i64), i64 35760 }, section "llvm.ptrauth"
 // CHECK: @B_init.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @B_init, i32 0, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 3) to i64), i64 33208 }, section "llvm.ptrauth"
 // CHECK: @"$s4test1BVAA1QAAWP" = hidden global [4 x ptr] [
 // CHECK-SAME: ptr @"$s4test1BVAA1QAAMc.ptrauth",
