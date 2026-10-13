@@ -108,6 +108,26 @@ _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
   return _CFStringHashCString(bytes, length);
 }
 
+static decltype(&CFStringGetCStringPtr) _CFStringGetCStringPtr;
+static swift_once_t lookUpCFStringGetCStringPtrOnce;
+
+static void lookUpCFStringGetCStringPtr(void *) {
+  // Avoid a link-time dependency on CF in both lazy-link configurations.
+  _CFStringGetCStringPtr = reinterpret_cast<decltype(_CFStringGetCStringPtr)>(
+      dlsym(RTLD_DEFAULT, "CFStringGetCStringPtr"));
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+const __swift_uint8_t *
+swift_stdlib_NSStringASCIIPointer(id _Nonnull string) {
+  swift_once(&lookUpCFStringGetCStringPtrOnce,
+             lookUpCFStringGetCStringPtr, nullptr);
+  if (!_CFStringGetCStringPtr) return nullptr;
+  // Request ASCII explicitly, independently of the system encoding.
+  return reinterpret_cast<const __swift_uint8_t *>(
+      _CFStringGetCStringPtr((CFStringRef)string, kCFStringEncodingASCII));
+}
+
 const __swift_uint8_t *
 _swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
                                                   unsigned long encoding) {
