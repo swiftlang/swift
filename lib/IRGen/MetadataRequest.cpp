@@ -272,8 +272,11 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     if (!shouldSetLowBit)
       return addr;
 
+    // Inbounds, so that relative references to the tagged string are still
+    // recognized as link-time constants (see getMangledAssociatedConformance).
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
+    return llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, addr,
+                                                        bitConstant);
   };
 
   // Check whether we already have an entry with this name.
