@@ -4,11 +4,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/typecheck.swift -I %t/include -cxx-interoperability-mode=default -verify-additional-prefix legacy-c-array-
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -cxx-interoperability-mode=default -verify-additional-prefix legacy-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -cxx-interoperability-mode=default -o /dev/null
-// RUN: %target-swift-ide-test -print-module -module-to-print=CArrays -source-filename=x -I %t/include -cxx-interoperability-mode=default --access-filter-private | %FileCheck %s --check-prefixes=MEMBERS,MEMBERS-LEGACY --implicit-check-not='[4 of CInt]'
+// RUN: %target-swift-ide-test -print-module -module-to-print=CArrays -source-filename=x -I %t/include -cxx-interoperability-mode=default --access-filter-private | %FileCheck %s --check-prefixes=MEMBERS,MEMBERS-LEGACY --implicit-check-not='[4 of CInt]' --implicit-check-not=takesHugeArray
 
-// RUN: %target-swift-frontend -typecheck -verify %t/typecheck.swift -I %t/include -cxx-interoperability-mode=default -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array-
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -cxx-interoperability-mode=default -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -cxx-interoperability-mode=default -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -o /dev/null
 // RUN: %target-swift-ide-test -print-module -module-to-print=CArrays -source-filename=x -I %t/include -cxx-interoperability-mode=default --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly | %FileCheck %s --check-prefixes=MEMBERS,MEMBERS-MODERN --implicit-check-not='(CInt, CInt, CInt, CInt)'
 
@@ -30,12 +30,16 @@ struct Base {
   // MEMBERS-LEGACY: func takesArrayPointer(_ array: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>!)
   // MEMBERS-MODERN: func takesArrayPointer(_ array: UnsafeMutablePointer<[4 of CInt]>!)
   void takesArrayPointer(int (*array)[4]) const;
+
+  // MEMBERS-MODERN: func takesHugeArray(_ array: inout [5000 of CInt])
+  void takesHugeArray(int (&array)[5000]);
 };
 
 // MEMBERS-LABEL: struct PublicDerived {
 struct PublicDerived : Base {
   // MEMBERS-LEGACY: func takesArrayPointer(_ array: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>!)
   // MEMBERS-MODERN: func takesArrayPointer(_ array: UnsafeMutablePointer<[4 of CInt]>!)
+  // MEMBERS-MODERN: func takesHugeArray(_ array: inout [5000 of CInt])
 };
 
 // MEMBERS-LABEL: struct UsingDerived {
@@ -43,6 +47,8 @@ struct UsingDerived : private Base {
   // MEMBERS-LEGACY: func takesArrayPointer(_ array: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>!)
   // MEMBERS-MODERN: func takesArrayPointer(_ array: UnsafeMutablePointer<[4 of CInt]>!)
   using Base::takesArrayPointer;
+  // MEMBERS-MODERN: func takesHugeArray(_ array: inout [5000 of CInt])
+  using Base::takesHugeArray;
 };
 
 // MEMBERS-LABEL: struct CtorBase {
@@ -102,6 +108,16 @@ func test(
   _ = CtorDerived(array)
   // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  var huge = InlineArray<5000, Int32>(repeating: 0)
+  var mutableBase = base, mutablePublicDerived = publicDerived
+  var mutableUsingDerived = usingDerived
+  mutableBase.takesHugeArray(&huge)
+  // expected-legacy-c-array-error@-1 {{instance method 'takesHugeArray' was not imported because its C array type could not be represented as a tuple}}
+  mutablePublicDerived.takesHugeArray(&huge)
+  // expected-legacy-c-array-error@-1 {{instance method 'takesHugeArray' was not imported because its C array type could not be represented as a tuple}}
+  mutableUsingDerived.takesHugeArray(&huge)
+  // expected-legacy-c-array-error@-1 {{instance method 'takesHugeArray' was not imported because its C array type could not be represented as a tuple}}
 }
 
 //--- codegen.swift
@@ -125,3 +141,16 @@ func test(
   _ = CtorBase(pointer)
   _ = CtorDerived(pointer)
 }
+
+#if MODERN_C_ARRAYS
+@available(anyAppleOS 26, *)
+func testHuge(
+    _ huge: inout InlineArray<5000, Int32>,
+    _ base: inout Base, _ publicDerived: inout PublicDerived,
+    _ usingDerived: inout UsingDerived
+) {
+  base.takesHugeArray(&huge)
+  publicDerived.takesHugeArray(&huge)
+  usingDerived.takesHugeArray(&huge)
+}
+#endif

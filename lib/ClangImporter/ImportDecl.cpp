@@ -1327,8 +1327,13 @@ namespace {
         for (auto param : **params) {
           auto newParamType = importer::computeLegacyCArrayType(
                                   { param->getInterfaceType(), false });
-          if (!newParamType)
+          if (!newParamType) {
+            // Don't leave the caller with a parameter list that still
+            // mentions InlineArray; it would be mistaken for a legacy
+            // projection that can be (partially) imported.
+            *params = nullptr;
             return ImportedType();
+          }
 
           param->setInterfaceType(newParamType.getType());
         }
