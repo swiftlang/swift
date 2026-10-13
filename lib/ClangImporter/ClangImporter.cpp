@@ -8540,6 +8540,11 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
     if (match != alternates.end())
       newDecl = *match;
   }
+
+  // Hop over to the right projection.
+  if (auto *matching =
+          importer::getDeclForCArrayProjectionMatching(newDecl, decl))
+    newDecl = matching;
   auto *specialization = newDecl;
 
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
