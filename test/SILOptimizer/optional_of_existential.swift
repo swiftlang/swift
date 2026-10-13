@@ -19,6 +19,7 @@ struct X : Q {
 // CHECK:      bb0(%0 : $X):
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   debug_value
+// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   integer_literal ${{.*}}, 0
 // CHECK-NEXT:   struct $Int
 // CHECK-NEXT:   %[[ENUM:[0-9]+]] = enum $Optional<Int>, #Optional.some!enumelt
