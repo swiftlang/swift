@@ -1,6 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true -enable-experimental-feature SplitContinuations %s | %target-sil-opt -sil-print-types -enable-sil-verify-all=true -enable-experimental-feature SplitContinuations | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all=true %s | %target-sil-opt -sil-print-types -enable-sil-verify-all=true | %FileCheck %s
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_SplitContinuations
 
 import Builtin
 import Swift

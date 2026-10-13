@@ -1,14 +1,13 @@
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -enable-experimental-feature SplitContinuations)
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O -enable-experimental-feature SplitContinuations)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: libdispatch
-// REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 
-@_spi(Concurrency) @_spi(SplitContinuation) import _Concurrency
+@_spi(Concurrency) import _Concurrency
 import StdlibUnittest
 
 @main struct Main {
@@ -19,19 +18,19 @@ import StdlibUnittest
       expectCrashLater()
       _ = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         _ = consume continuation
-        return await awaiter.wait()
+        return await waiter.wait()
       }
     }
 
-    tests.test("dropping the awaiter without awaiting traps") {
+    tests.test("dropping the waiter without awaiting traps") {
       expectCrashLater()
       _ = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 1)
-        _ = consume awaiter
+        _ = consume waiter
         return 1
       }
     }

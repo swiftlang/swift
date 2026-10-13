@@ -1,10 +1,9 @@
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -enable-experimental-feature SplitContinuations)
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O -enable-experimental-feature SplitContinuations)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
@@ -12,7 +11,6 @@
 
 @_spi(Concurrency) import _Concurrency
 @_spi(ExperimentalCustomExecutors) import _Concurrency
-@_spi(SplitContinuation) import _Concurrency
 import StdlibUnittest
 import Synchronization
 
@@ -44,34 +42,14 @@ final class ManualExecutor: SerialExecutor, TaskExecutor, Sendable {
   }
 }
 
+// The default executor, which runs jobs as soon as they are enqueued.
 final class ManualDefaultExecutor: TaskExecutor, Sendable {
-  private let jobs = Mutex<[UnownedJob]>([])
-  private let held = Mutex<Bool>(false)
-
   func enqueue(_ job: UnownedJob) {
-    if held.withLock({ $0 }) {
-      jobs.withLock { $0.append(job) }
-    } else {
-      unsafe job.runSynchronously(on: asUnownedTaskExecutor())
-    }
+    unsafe job.runSynchronously(on: asUnownedTaskExecutor())
   }
 
   func asUnownedTaskExecutor() -> UnownedTaskExecutor {
     UnownedTaskExecutor(ordinary: self)
-  }
-
-  private func popJob() -> UnownedJob? {
-    jobs.withLock { $0.isEmpty ? nil : $0.removeFirst() }
-  }
-
-  func hold() { held.withLock { $0 = true } }
-  func release() { held.withLock { $0 = false } }
-
-  func runNextJob() {
-    guard let job = popJob() else {
-      preconditionFailure("runNextJob() called with no job enqueued")
-    }
-    unsafe job.runSynchronously(on: asUnownedTaskExecutor())
   }
 }
 
@@ -124,10 +102,10 @@ actor IsolatedActor {
       let task = Task.immediate {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           Task.detached(executorPreference: executor) { holder.take().resume(returning: 17) }
-          return await awaiter.wait()
+          return await waiter.wait()
         }
       }
       executor.runNextJob()
@@ -138,9 +116,9 @@ actor IsolatedActor {
       let task = Task.immediate {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           continuation.resume(returning: 18)
-          return await awaiter.wait()
+          return await waiter.wait()
         }
       }
       expectEqual(18, await task.value)
@@ -151,48 +129,14 @@ actor IsolatedActor {
       let task = Task.immediate {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           Task.detached(executorPreference: executor) { holder.take().resume(returning: 19) }
-          return await awaiter.wait(onCancel: {}, onEscalate: { _ in })
+          return await waiter.wait(onCancel: {}, onEscalate: { _ in })
         }
       }
       executor.runNextJob()
       expectEqual(19, await task.value)
-    }
-
-    tests.test("immediate task from a nonisolated caller enqueues when the offer isn't the default") {
-      let executor = ManualExecutor()
-      let task = Task.immediate {
-        await withContinuation(of: Int.self, throwing: Never.self) {
-          (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
-          let holder = ContinuationHolder(continuation)
-          Task.detached(executorPreference: executor) {
-            holder.take().resume(returning: 20, isolatedTo: executor.asUnownedSerialExecutor())
-          }
-          return await awaiter.wait()
-        }
-      }
-      executor.runNextJob()
-      expectEqual(20, await task.value)
-    }
-
-    tests.test("immediate task from a nonisolated caller donates when the offer is the default") {
-      let executor = ManualExecutor()
-      let task = Task.immediate {
-        await withContinuation(of: Int.self, throwing: Never.self) {
-          (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
-          let holder = ContinuationHolder(continuation)
-          Task.detached(executorPreference: executor) {
-            holder.take().resume(returning: 22, on: globalConcurrentExecutor.asUnownedTaskExecutor())
-          }
-          return await awaiter.wait()
-        }
-      }
-      executor.runNextJob()
-      expectEqual(22, await task.value)
     }
 
     tests.test("immediate task from an isolated caller enqueues") {
@@ -204,13 +148,13 @@ actor IsolatedActor {
           let task = Task.immediate {
             await withContinuation(of: Int.self, throwing: Never.self) {
               (continuation: consuming Continuation<Int, Never>,
-               awaiter: consuming ContinuationAwaiter<Int, Never>) in
+               waiter: consuming ContinuationWaiter<Int, Never>) in
               let holder = ContinuationHolder(continuation)
               Task.detached(executorPreference: unrelated) {
-                holder.take().resume(
+                holder.take().resumeSynchronously(
                   returning: 21, isolatedTo: unrelated.asUnownedSerialExecutor())
               }
-              return await awaiter.wait()
+              return await waiter.wait()
             }
           }
           return await task.value

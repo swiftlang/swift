@@ -1,10 +1,9 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature SplitContinuations %s -emit-sib -o %t/tmp.sib -module-name split
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature SplitContinuations %t/tmp.sib -module-name split | %FileCheck %s --check-prefix=CHECK-NOTHROW
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature SplitContinuations %t/tmp.sib -module-name split | %FileCheck %s --check-prefix=CHECK-THROW
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name split
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name split | %FileCheck %s --check-prefix=CHECK-NOTHROW
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name split | %FileCheck %s --check-prefix=CHECK-THROW
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_SplitContinuations
 
 import Builtin
 import Swift

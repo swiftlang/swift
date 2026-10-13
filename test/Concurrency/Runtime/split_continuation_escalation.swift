@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/split_continuation_escalation -swift-version 6 -enable-experimental-feature SplitContinuations
+// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/split_continuation_escalation -swift-version 6
 // RUN: %target-codesign %t/split_continuation_escalation
 // RUN: %target-run %t/split_continuation_escalation | %FileCheck %s
 
@@ -7,7 +7,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 
@@ -17,7 +16,7 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=tvos
 
-@_spi(Concurrency) @_spi(SplitContinuation) import _Concurrency
+@_spi(Concurrency) import _Concurrency
 import Synchronization
 
 // A task executor that queues jobs instead of running them, so tests can
@@ -94,9 +93,9 @@ final class Box<Value: Sendable>: Sendable {
     let task = Task(executorPreference: executor, priority: .background) { () -> Int in
       await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         let holder = ContinuationHolder(continuation)
-        return await awaiter.wait(
+        return await waiter.wait(
           onCancel: { holder.resumeFromDetachedTask(returning: 7, executorPreference: executor) },
           onEscalate: { newPriority in observedPriority.value = newPriority })
       }
@@ -120,6 +119,33 @@ final class Box<Value: Sendable>: Sendable {
     precondition(result == 7, "continuation did not resume: \(result)")
     precondition(observedPriority.value == .medium,
                  "escalation handler saw \(String(describing: observedPriority.value))")
+
+    // The same with only an escalation handler installed.
+    let escalationOnlyExecutor = ManualExecutor()
+    let escalationOnlyPriority = Box<TaskPriority?>(nil)
+    let handOff = Mutex<Continuation<Int, Never>?>(nil)
+
+    let escalationOnlyTask = Task(executorPreference: escalationOnlyExecutor, priority: .background) { () -> Int in
+      await withContinuation(of: Int.self, throwing: Never.self) {
+        (continuation: consuming Continuation<Int, Never>,
+         waiter: consuming ContinuationWaiter<Int, Never>) in
+        var continuation = Optional(continuation)
+        handOff.withLock { $0 = continuation.take() }
+        return await waiter.wait(
+          onEscalate: { newPriority in escalationOnlyPriority.value = newPriority })
+      }
+    }
+
+    escalationOnlyExecutor.runNextJob() // Runs the task to its suspension.
+    escalationOnlyTask.escalatePriority(to: .medium)
+    handOff.withLock { $0.take()! }.resume(returning: 8)
+    escalationOnlyExecutor.runNextJob()
+
+    let escalationOnlyResult = await escalationOnlyTask.value
+    precondition(escalationOnlyResult == 8,
+                 "continuation did not resume: \(escalationOnlyResult)")
+    precondition(escalationOnlyPriority.value == .medium,
+                 "escalation handler saw \(String(describing: escalationOnlyPriority.value))")
     // CHECK: OK
     print("OK")
   }

@@ -1,13 +1,12 @@
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -enable-experimental-feature SplitContinuations) 2>&1 | %FileCheck %s
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O -enable-experimental-feature SplitContinuations) 2>&1 | %FileCheck %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6) 2>&1 | %FileCheck %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -disable-availability-checking -swift-version 6 -O) 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_SplitContinuations
 // UNSUPPORTED: back_deployment_runtime
 
-@_spi(Concurrency) @_spi(SplitContinuation) import _Concurrency
+@_spi(Concurrency) import _Concurrency
 import StdlibUnittest
 import Synchronization
 
@@ -93,13 +92,6 @@ final class Box<Value: Sendable>: Sendable {
 
 func one() async -> Int { 1 }
 
-final class Shared: Sendable {
-  let id: Int
-  init(id: Int) { self.id = id }
-  func cancel() {}
-  func escalate(to priority: TaskPriority) {}
-}
-
 // Raised alignment; 16 is the max a Swift type can request.
 @_alignment(16)
 struct OverAligned {
@@ -121,16 +113,16 @@ struct Boxed<Payload> {
 func roundTripGenerically<T>(_ value: T) async -> T where T: Sendable {
   await withContinuation(of: T.self, throwing: Never.self) {
     (continuation: consuming Continuation<T, Never>,
-     awaiter: consuming ContinuationAwaiter<T, Never>) in
+     waiter: consuming ContinuationWaiter<T, Never>) in
     continuation.resume(returning: value)
-    return await awaiter.wait()
+    return await waiter.wait()
   }
 }
 
 // A separate isolation domain.
 actor Elsewhere {
-  func awaitIt(_ awaiter: consuming ContinuationAwaiter<Int, Never>) async -> Int {
-    await awaiter.wait()
+  func awaitIt(_ waiter: consuming ContinuationWaiter<Int, Never>) async -> Int {
+    await waiter.wait()
   }
 }
 
@@ -143,9 +135,9 @@ actor Elsewhere {
     tests.test("resume before await, returning") {
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 42)
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(42, value)
     }
@@ -153,9 +145,9 @@ actor Elsewhere {
     tests.test("resume before await, Void") {
       await withContinuation(of: Void.self, throwing: Never.self) {
         (continuation: consuming Continuation<Void, Never>,
-         awaiter: consuming ContinuationAwaiter<Void, Never>) in
+         waiter: consuming ContinuationWaiter<Void, Never>) in
         continuation.resume(returning: ())
-        return await awaiter.wait()
+        return await waiter.wait()
       }
     }
 
@@ -163,9 +155,9 @@ actor Elsewhere {
       do {
         let value = try await withContinuation(of: Int.self, throwing: (any Error).self) {
           (continuation: consuming Continuation<Int, any Error>,
-           awaiter: consuming ContinuationAwaiter<Int, any Error>) in
+           waiter: consuming ContinuationWaiter<Int, any Error>) in
           continuation.resume(returning: 17)
-          return try await awaiter.wait()
+          return try await waiter.wait()
         }
         expectEqual(17, value)
       } catch {
@@ -177,9 +169,9 @@ actor Elsewhere {
       do {
         _ = try await withContinuation(of: Int.self, throwing: (any Error).self) {
           (continuation: consuming Continuation<Int, any Error>,
-           awaiter: consuming ContinuationAwaiter<Int, any Error>) in
+           waiter: consuming ContinuationWaiter<Int, any Error>) in
           continuation.resume(throwing: TestError())
-          return try await awaiter.wait()
+          return try await waiter.wait()
         }
         expectUnreachable("wait() should have thrown")
       } catch {
@@ -190,9 +182,9 @@ actor Elsewhere {
     tests.test("resume before await, with Result") {
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(with: .success(7))
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(7, value)
     }
@@ -200,9 +192,9 @@ actor Elsewhere {
     tests.test("resume before await, ~Copyable Success round-trips") {
       let resource = await withContinuation(of: UniqueResource.self, throwing: Never.self) {
         (continuation: consuming Continuation<UniqueResource, Never>,
-         awaiter: consuming ContinuationAwaiter<UniqueResource, Never>) in
+         waiter: consuming ContinuationWaiter<UniqueResource, Never>) in
         continuation.resume(returning: UniqueResource(99))
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(99, resource.value)
       _ = consume resource
@@ -216,14 +208,14 @@ actor Elsewhere {
       let task = Task(executorPreference: executor) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           // Enqueued on the same executor as the awaiting task, so nothing
           // runs this until the task above has genuinely suspended.
           Task.detached(executorPreference: executor) {
             holder.take().resume(returning: 314)
           }
-          return await awaiter.wait()
+          return await waiter.wait()
         }
       }
       executor.runNextJobs(count: 3)
@@ -235,12 +227,12 @@ actor Elsewhere {
       let task = Task(executorPreference: executor) {
         try await withContinuation(of: Int.self, throwing: (any Error).self) {
           (continuation: consuming Continuation<Int, any Error>,
-           awaiter: consuming ContinuationAwaiter<Int, any Error>) in
+           waiter: consuming ContinuationWaiter<Int, any Error>) in
           let holder = ContinuationHolder(continuation)
           Task.detached(executorPreference: executor) {
             holder.take().resume(throwing: TestError())
           }
-          return try await awaiter.wait()
+          return try await waiter.wait()
         }
       }
       executor.runNextJobs(count: 3)
@@ -259,9 +251,9 @@ actor Elsewhere {
       let escalated = Box(false)
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 5)
-        return await awaiter.wait(
+        return await waiter.wait(
           onCancel: { cancelled.value = true },
           onEscalate: { _ in escalated.value = true })
       }
@@ -270,23 +262,33 @@ actor Elsewhere {
       expectFalse(escalated.value)
     }
 
-    tests.test("cancellation handler runs while suspended and can resume") {
+    tests.test("cancellation handler runs once while suspended and can resume") {
       // Only possible because the handler is installed on the await.
+      let runs = Box(0)
       let executor = ManualExecutor()
-      let task = Task(executorPreference: executor) {
-        await withContinuation(of: Int.self, throwing: Never.self) {
+      let task = Task(executorPreference: executor) { () -> (Int, Bool) in
+        let value = await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
-          return await awaiter.wait(
-            onCancel: { holder.resumeFromDetachedTask(returning: -1, executorPreference: executor) },
+          return await waiter.wait(
+            onCancel: {
+              runs.modify { $0 += 1 }
+              holder.resumeFromDetachedTask(returning: -1, executorPreference: executor)
+            },
             onEscalate: { _ in })
         }
+        return (value, Task.isCancelled)
       }
       executor.runNextJob() // The one job: runs the task to its suspension.
       task.cancel()
+      task.cancel()
       executor.runNextJobs(count: 2) // Runs the cancellation handler's resume.
-      expectEqual(-1, await task.value)
+      let (value, isCancelled) = await task.value
+      expectEqual(-1, value)
+      expectEqual(1, runs.value)
+      // The awaiting task observes its own cancellation.
+      expectTrue(isCancelled)
     }
 
     tests.test("cancellation handler runs when the task is already cancelled") {
@@ -297,9 +299,9 @@ actor Elsewhere {
         expectTrue(Task.isCancelled)
         return await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
-          return await awaiter.wait(
+          return await waiter.wait(
             onCancel: { holder.resumeFromDetachedTask(returning: -2, executorPreference: executor) },
             onEscalate: { _ in })
         }
@@ -309,49 +311,21 @@ actor Elsewhere {
       expectEqual(-2, await task.value)
     }
 
-    tests.test("cancellation handler runs at most once") {
-      let runs = Box(0)
+    tests.test("cancellation-only handler runs while suspended and can resume") {
       let executor = ManualExecutor()
       let task = Task(executorPreference: executor) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
-          return await awaiter.wait(
-            onCancel: {
-              runs.modify { $0 += 1 }
-              holder.resumeFromDetachedTask(returning: -3, executorPreference: executor)
-            },
-            onEscalate: { _ in })
+          return await waiter.wait(
+            onCancel: { holder.resumeFromDetachedTask(returning: -20, executorPreference: executor) })
         }
       }
-      executor.runNextJob()
+      executor.runNextJob() // The one job: runs the task to its suspension.
       task.cancel()
-      task.cancel()
-      executor.runNextJobs(count: 2)
-      expectEqual(-3, await task.value)
-      expectEqual(1, runs.value)
-    }
-
-    tests.test("the awaiting task observes its own cancellation") {
-      let executor = ManualExecutor()
-      let task = Task(executorPreference: executor) { () -> (Int, Bool) in
-        let value = await withContinuation(of: Int.self, throwing: Never.self) {
-          (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
-          let holder = ContinuationHolder(continuation)
-          return await awaiter.wait(
-            onCancel: { holder.resumeFromDetachedTask(returning: -4, executorPreference: executor) },
-            onEscalate: { _ in })
-        }
-        return (value, Task.isCancelled)
-      }
-      executor.runNextJob()
-      task.cancel()
-      executor.runNextJobs(count: 2)
-      let (value, isCancelled) = await task.value
-      expectEqual(-4, value)
-      expectTrue(isCancelled)
+      executor.runNextJobs(count: 2) // Runs the cancellation handler's resume.
+      expectEqual(-20, await task.value)
     }
 
     tests.test("handlers are uninstalled once the await resolves") {
@@ -361,9 +335,9 @@ actor Elsewhere {
       let task = Task(executorPreference: executor) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           continuation.resume(returning: 1)
-          let value = await awaiter.wait(
+          let value = await waiter.wait(
             onCancel: { runs.modify { $0 += 1 } },
             onEscalate: { _ in })
           await withTaskCancellationHandler {
@@ -384,7 +358,7 @@ actor Elsewhere {
     tests.test("the body may suspend and task-allocate before awaiting") {
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         let holder = ContinuationHolder(continuation)
 
         await Task.yield()
@@ -399,13 +373,13 @@ actor Elsewhere {
 
         let inner = await withContinuation(of: Int.self, throwing: Never.self) {
           (c: consuming Continuation<Int, Never>,
-           a: consuming ContinuationAwaiter<Int, Never>) in
+           a: consuming ContinuationWaiter<Int, Never>) in
           c.resume(returning: 6)
           return await a.wait()
         }
 
         Task.detached { holder.take().resume(returning: inner + 1) }
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(7, value)
     }
@@ -425,10 +399,10 @@ actor Elsewhere {
       // Same Continuation type, so existing conversions still work.
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         let unsafeContinuation = UnsafeContinuation(continuation)
         unsafeContinuation.resume(returning: 13)
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(13, value)
     }
@@ -436,25 +410,12 @@ actor Elsewhere {
     tests.test("a split continuation converts to a CheckedContinuation") {
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         let checked = CheckedContinuation(continuation)
         checked.resume(returning: 14)
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(14, value)
-    }
-
-    tests.test("handlers may capture a shared value") {
-      let value = await withContinuation(of: Int.self, throwing: Never.self) {
-        (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
-        let shared = Shared(id: 4)
-        continuation.resume(returning: shared.id)
-        return await awaiter.wait(
-          onCancel: { shared.cancel() },
-          onEscalate: { shared.escalate(to: $0) })
-      }
-      expectEqual(4, value)
     }
 
     // MARK: - The body's own result and error type are independent.
@@ -462,9 +423,9 @@ actor Elsewhere {
     tests.test("the body can return a different type than Success") {
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 42)
-        let n = await awaiter.wait()
+        let n = await waiter.wait()
         return "value: \(n)"
       }
       expectEqual("value: 42", value)
@@ -474,10 +435,10 @@ actor Elsewhere {
       do {
         _ = try await withContinuation(of: Int.self, throwing: TestError.self) {
           (continuation: consuming Continuation<Int, TestError>,
-           awaiter: consuming ContinuationAwaiter<Int, TestError>) in
+           waiter: consuming ContinuationWaiter<Int, TestError>) in
           continuation.resume(throwing: TestError())
           do {
-            return try await awaiter.wait()
+            return try await waiter.wait()
           } catch {
             throw DifferentError()
           }
@@ -497,9 +458,9 @@ actor Elsewhere {
         await __withTaskCancellationScope { _ in
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
-             awaiter: consuming ContinuationAwaiter<Int, Never>) in
+             waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
-            return await awaiter.wait(
+            return await waiter.wait(
               onCancel: { holder.resumeFromDetachedTask(returning: -10, executorPreference: executor) },
               onEscalate: { _ in })
           }
@@ -518,9 +479,9 @@ actor Elsewhere {
           expectTrue(Task.isCancelled)
           return await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
-             awaiter: consuming ContinuationAwaiter<Int, Never>) in
+             waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
-            return await awaiter.wait(
+            return await waiter.wait(
               onCancel: { holder.resumeFromDetachedTask(returning: -11, executorPreference: nil) },
               onEscalate: { _ in })
           }
@@ -536,10 +497,10 @@ actor Elsewhere {
         await withTaskCancellationShield {
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
-             awaiter: consuming ContinuationAwaiter<Int, Never>) in
+             waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
             holder.resumeFromDetachedTask(returning: 42, executorPreference: executor)
-            return await awaiter.wait(
+            return await waiter.wait(
               onCancel: { expectUnreachable("shielded onCancel must not run") },
               onEscalate: { _ in })
           }
@@ -559,9 +520,9 @@ actor Elsewhere {
       do {
         _ = try await withContinuation(of: Int.self, throwing: (any Error).self) {
           (continuation: consuming Continuation<Int, any Error>,
-           awaiter: consuming ContinuationAwaiter<Int, any Error>) in
+           waiter: consuming ContinuationWaiter<Int, any Error>) in
           continuation.resume(returning: 1)
-          _ = try await awaiter.wait(
+          _ = try await waiter.wait(
             onCancel: {}, onEscalate: { _ in })
           throw TestError()
         }
@@ -574,9 +535,9 @@ actor Elsewhere {
       // consistent.
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
-         awaiter: consuming ContinuationAwaiter<Int, Never>) in
+         waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 2)
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(2, value)
     }
@@ -586,9 +547,9 @@ actor Elsewhere {
     tests.test("an over-aligned result round-trips") {
       let value = await withContinuation(of: OverAligned.self, throwing: Never.self) {
         (continuation: consuming Continuation<OverAligned, Never>,
-         awaiter: consuming ContinuationAwaiter<OverAligned, Never>) in
+         waiter: consuming ContinuationWaiter<OverAligned, Never>) in
         continuation.resume(returning: OverAligned(a: 1, b: 2))
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(1, value.a)
       expectEqual(2, value.b)
@@ -602,9 +563,9 @@ actor Elsewhere {
     tests.test("a large result round-trips") {
       let value = await withContinuation(of: Large.self, throwing: Never.self) {
         (continuation: consuming Continuation<Large, Never>,
-         awaiter: consuming ContinuationAwaiter<Large, Never>) in
+         waiter: consuming ContinuationWaiter<Large, Never>) in
         continuation.resume(returning: Large(head: 7, tail: 8))
-        return await awaiter.wait()
+        return await waiter.wait()
       }
       expectEqual(7, value.head)
       expectEqual(8, value.tail)
@@ -618,9 +579,9 @@ actor Elsewhere {
       let task = Task(executorPreference: executor, priority: .background) { () -> Int in
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           continuation.resume(returning: 1)
-          return await awaiter.wait(
+          return await waiter.wait(
             onCancel: {},
             onEscalate: { _ in escalations.modify { $0 += 1 } })
         }
@@ -639,34 +600,16 @@ actor Elsewhere {
       let task = Task(executorPreference: executor) {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
+           waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           Task.detached(executorPreference: executor) {
             holder.take().resume(returning: 21)
           }
-          return await other.awaitIt(awaiter)
+          return await other.awaitIt(waiter)
         }
       }
       executor.runNextJobs(count: 4)
       expectEqual(21, await task.value)
-    }
-
-    // MARK: - Nesting.
-
-    tests.test("split continuations nest") {
-      let value = await withContinuation(of: Int.self, throwing: Never.self) {
-        (outerContinuation: consuming Continuation<Int, Never>,
-         outerAwaiter: consuming ContinuationAwaiter<Int, Never>) in
-        let inner = await withContinuation(of: Int.self, throwing: Never.self) {
-          (continuation: consuming Continuation<Int, Never>,
-           awaiter: consuming ContinuationAwaiter<Int, Never>) in
-          continuation.resume(returning: 20)
-          return await awaiter.wait()
-        }
-        outerContinuation.resume(returning: inner + 2)
-        return await outerAwaiter.wait()
-      }
-      expectEqual(22, value)
     }
 
     await runAllTestsAsync()
