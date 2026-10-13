@@ -1238,6 +1238,10 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
   checkOverrideAccessControl(baseDecl, decl, ctx);
 
+  if (!isa<AccessorDecl>(decl))
+    diagnoseImplicitForceUnwrapOfIUOParams(decl, baseDecl,
+                                           /*isWitness=*/false);
+
   bool mayHaveMismatchedOptionals =
       (attempt == OverrideCheckingAttempt::MismatchedOptional ||
        attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);

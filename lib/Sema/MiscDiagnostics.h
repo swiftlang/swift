@@ -59,6 +59,18 @@ namespace swift {
                    AccessLevel desiredAccess, bool isForSetter = false,
                    bool shouldUseDefaultAccess = false, bool updateAttr = true);
 
+  /// Diagnose (as part of the opt-in ImplicitForceUnwrap group) places where
+  /// \p decl, which overrides or witnesses \p baseDecl, uses a non-optional
+  /// type for a value that \p baseDecl declares as an implicitly unwrapped
+  /// optional, so that a 'nil' passed by a caller of \p baseDecl will be
+  /// implicitly force-unwrapped.
+  ///
+  /// \param isWitness Whether \p decl is a witness for the protocol
+  /// requirement \p baseDecl, rather than an override of it.
+  void diagnoseImplicitForceUnwrapOfIUOParams(const ValueDecl *decl,
+                                              const ValueDecl *baseDecl,
+                                              bool isWitness);
+
   /// Compute the location of the 'var' keyword for a 'var'-to-'let' Fix-It.
   SourceLoc getFixItLocForVarToLet(VarDecl *var);
 
