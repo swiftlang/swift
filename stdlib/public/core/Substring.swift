@@ -174,6 +174,9 @@ extension Substring {
   ///
   /// Note that if the start of the substring isn't `Character`-aligned in its
   /// base string, then the substring and the base may not share valid indices.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func _isValidIndex(_ i: Index) -> Bool {
     guard
       _wholeGuts.hasMatchingEncoding(i),
@@ -1245,6 +1248,9 @@ extension Substring.UnicodeScalarView {
   @export(implementation) @inline(__always)
   internal var _wholeGuts: _StringGuts { _slice._base._guts }
 
+#if hasFeature(Embedded)
+  @inlinable
+#endif
   @inline(__always)
   internal var _offsetRange: Range<Int> { _slice._bounds._encodedOffsetRange }
 

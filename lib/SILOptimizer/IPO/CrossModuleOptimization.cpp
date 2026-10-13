@@ -71,6 +71,10 @@ class CrossModuleOptimization {
   typedef llvm::DenseMap<SILFunction *, bool> FunctionFlags;
   FunctionFlags canSerializeFlags;
 
+  /// In Embedded Swift, the functions that were already serialized, such as
+  /// witness thunks, whose callees have been visited.
+  llvm::DenseSet<SILFunction *> visitedSerializedFunctions;
+
 public:
   CrossModuleOptimization(SILModule &M, bool conservative, bool everything)
       : M(M), conservative(conservative), everything(everything) {}
@@ -129,6 +133,8 @@ private:
   void keepMethodAlive(SILDeclRef method);
 
   void makeFunctionUsableFromInline(SILFunction *F);
+
+  void makeClassMethodWitnessesUsableFromInline(SILFunction *thunk);
 
   void makeDeclUsableFromInline(ValueDecl *decl);
 
@@ -457,41 +463,22 @@ bool CrossModuleOptimization::hasInterfaceModel(const Decl *decl) {
          CodeGenerationModel::Interface;
 }
 
-/// In Embedded Swift, determine whether the code for the given function is
-/// emitted into clients, so they need its body. Code with the "interface"
-/// model has a unique definition in this module, which clients refer to by
-/// symbol.
+/// In Embedded Swift, determine whether the given function should be
+/// serialized because clients emit their own copies of it.
 bool CrossModuleOptimization::isEmittedIntoClients(SILFunction *function) {
   assert(isEmbedded());
-
-  if (function->isNeverEmitIntoClient())
-    return false;
-
-  // Any module that uses a generic function can create the same
-  // specialization of it.
-  if (function->isSpecialization())
-    return true;
-
-  // A closure is emitted wherever the declaration containing it is.
-  if (auto declRef = function->getDeclRef()) {
-    if (auto *closure = declRef.getAbstractClosureExpr()) {
-      const DeclContext *dc = closure;
-      while (dc->getParent() && dc->getParent()->isLocalContext())
-        dc = dc->getParent();
-      if (auto *decl = dc->getAsDecl())
-        return !hasInterfaceModel(decl);
-      return true;
-    }
-  }
 
   // A global's one-time initializer is only called from its addressor, which
   // is serialized if clients need it.
   if (function->isGlobalInitOnceFunction())
     return false;
 
-  // Other functions, such as witness thunks, can be reached from serialized
-  // witness tables, and clients need their bodies to specialize them.
-  return true;
+  // Clients create their own specializations from the serialized generic
+  // code. A specialization is only serialized if serialized code refers to it.
+  if (function->isSpecialization())
+    return false;
+
+  return function->isEmittedIntoClients();
 }
 
 /// Select functions in the module which should be serialized.
@@ -531,6 +518,12 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
     if (!hasPublicOrPackageVisibility(wt.getLinkage(), /*includePackage*/ true) && !everything)
       continue;
 
+    // In Embedded Swift, clients only need the witness tables of conformances
+    // they can use.
+    if (isEmbedded() && !SILWitnessTable::isUsableByEmbeddedClients(
+                            wt.getConformance()->getRootConformance()))
+      continue;
+
     bool containsInternal = false;
 
     for (const SILWitnessTable::Entry &entry : wt.getEntries()) {
@@ -543,6 +536,8 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 
       if (everything) {
         makeFunctionUsableFromInline(witness);
+        if (isEmbedded())
+          makeClassMethodWitnessesUsableFromInline(witness);
       } else {
         assert(isPackageCMOEnabled(M.getSwiftModule()));
 
@@ -575,7 +570,8 @@ void CrossModuleOptimization::serializeVTablesInModule() {
   if (everything) {
     for (SILVTable *vt : M.getVTables()) {
       // In Embedded Swift, a class with the "interface" model has unique
-      // metadata in this module, which clients refer to by symbol.
+      // metadata in this module, which clients refer to by symbol. Generic
+      // classes cannot use the "interface" model.
       if (isEmbedded() && hasInterfaceModel(vt->getClass()))
         continue;
 
@@ -1065,8 +1061,20 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 /// marked in \p canSerializeFlags.
 void CrossModuleOptimization::serializeFunction(
     SILFunction *function, FunctionFlags &canSerializeFlags) {
-  if (isSerializedWithRightKind(M, function))
+  if (isSerializedWithRightKind(M, function)) {
+    // In Embedded Swift, a function that was serialized before this pass,
+    // such as a witness thunk, can refer to functions that the optimizer
+    // created since, such as specializations. Those have to be serialized
+    // too.
+    if (everything && isEmbedded() &&
+        visitedSerializedFunctions.insert(function).second) {
+      for (SILBasicBlock &block : *function) {
+        for (SILInstruction &inst : block)
+          serializeInstruction(&inst, canSerializeFlags);
+      }
+    }
     return;
+  }
 
   if (!canSerializeFlags.lookup(function))
     return;
@@ -1190,6 +1198,33 @@ void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
   // Prevent the method from dead-method elimination.
   auto *methodDecl = cast<AbstractFunctionDecl>(method.getDecl());
   M.addExternallyVisibleDecl(getBaseMethod(methodDecl));
+}
+
+/// In Embedded Swift, a witness thunk can dispatch to a class method through
+/// the vtable, unless the optimizer devirtualized the call. Make the vtable
+/// implementation public either way, so that the symbols of this module don't
+/// depend on whether the call was devirtualized.
+void CrossModuleOptimization::makeClassMethodWitnessesUsableFromInline(
+    SILFunction *thunk) {
+  for (SILBasicBlock &block : *thunk) {
+    for (SILInstruction &inst : block) {
+      auto *cmi = dyn_cast<ClassMethodInst>(&inst);
+      if (!cmi)
+        continue;
+
+      auto *classDecl = cmi->getOperand()
+                            ->getType()
+                            .getASTType()
+                            ->getMetatypeInstanceType()
+                            ->getClassOrBoundGenericClass();
+      if (!classDecl)
+        continue;
+
+      SILFunction *impl = M.lookUpFunctionInVTable(classDecl, cmi->getMember());
+      if (impl && impl->isDefinition() && !impl->hasNonUniqueDefinition())
+        makeFunctionUsableFromInline(impl);
+    }
+  }
 }
 
 void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function) {

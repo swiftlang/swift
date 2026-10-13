@@ -159,7 +159,7 @@ public func makeIntClass() -> any Greeter { MyGenericClass(7) }
 
 // Default-argument generators are synthesized helpers are always
 // `[export_implementation]`.
-// ROOT-IR-DAG: define {{(linkonce_odr hidden |hidden |protected )?}}swiftcc {{.*}} @"$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_"
+// ROOT-IR-DAG: define {{(linkonce_odr hidden |linkonce_odr |hidden |protected )?}}swiftcc {{.*}} @"$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_"
 // ROOT-IR-NOT: @"$e4Root15funcWithDefault_3msgySi_s12StaticStringVtFfA0_"{{[^"]*}} = available_externally
 #if EXPLICIT_EXPORT
 @export(interface)

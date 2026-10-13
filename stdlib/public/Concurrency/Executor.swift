@@ -663,6 +663,9 @@ extension MainActor {
 #endif // os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
 extension Task where Success == Never, Failure == Never {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @available(StdlibDeploymentTarget 6.3, *)
   static var _defaultExecutor: (any TaskExecutor)? = nil
 

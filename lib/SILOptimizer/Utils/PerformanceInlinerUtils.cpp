@@ -870,6 +870,11 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
+  // In Embedded Swift, don't inline a body that clients can't see into code
+  // that they emit themselves.
+  if (Callee->wouldExposeBodyToClients(Caller))
+    return nullptr;
+
   // Inlining self-recursive functions into other functions can result
   // in excessive code duplication since we run the inliner multiple
   // times in our pipeline.

@@ -325,6 +325,9 @@ extension String.UTF16View: BidirectionalCollection {
     return _nativeGetOffset(for: endIndex)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func _indexRange(
     for offsets: Range<Int>,
     from start: Index
@@ -357,6 +360,9 @@ extension String.UTF16View: BidirectionalCollection {
     return unsafe Range(uncheckedBounds: (lower, upper))
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func _offsetRange(
     for range: Range<Index>,
     from start: Index

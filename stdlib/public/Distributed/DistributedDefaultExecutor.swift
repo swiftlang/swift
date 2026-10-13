@@ -17,6 +17,9 @@ import _Concurrency
 @usableFromInline
 internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   static let _shared: DistributedRemoteActorReferenceExecutor = DistributedRemoteActorReferenceExecutor()
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   static var sharedUnownedExecutor: UnownedSerialExecutor {
     unsafe UnownedSerialExecutor(ordinary: _shared)
   }

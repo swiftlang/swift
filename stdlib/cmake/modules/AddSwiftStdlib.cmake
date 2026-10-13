@@ -1106,6 +1106,9 @@ function(add_swift_target_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
+  # The TBD file describing the library's exported symbols, if any.
+  set(_emblib_tbd_path)
+
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
       # Flags required to build embedded libraries
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
@@ -1143,6 +1146,14 @@ function(add_swift_target_library_single target name)
       if(_emblib_interface_cgm)
         list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
           -enable-experimental-feature;CodeGenerationModel=interface)
+
+        # The library's symbols are predictable, so emit a TBD file listing
+        # them. It describes the static archive, so it goes next to it. An
+        # empty object file has no symbols to list.
+        if(NOT "-emit-empty-object-file" IN_LIST
+           SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS)
+          set(_emblib_tbd_path "${SWIFTLIB_DIR}/${output_sub_dir}/lib${name}.tbd")
+        endif()
       else()
         # Embedded Swift libraries default to producing an empty object
         # file: they only serve as a swiftmodule for client compilation,
@@ -1298,6 +1309,7 @@ function(add_swift_target_library_single target name)
       ARCHITECTURE_SUBDIR_NAME ${SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME}
       MODULE_NAME ${module_name}
       MODULE_DIR ${SWIFTLIB_SINGLE_MODULE_DIR}
+      TBD_PATH "${_emblib_tbd_path}"
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
@@ -1476,6 +1488,13 @@ function(add_swift_target_library_single target name)
   set_target_properties("${target}" PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${swiftlib_prefix}/${output_sub_dir}
     ARCHIVE_OUTPUT_DIRECTORY ${swiftlib_prefix}/${output_sub_dir})
+
+  # Record the TBD file, so it can be installed alongside the library. Only
+  # the compilation of Swift sources produces one.
+  if(_emblib_tbd_path AND SWIFTLIB_SINGLE_EXTERNAL_SOURCES)
+    set_property(TARGET "${target}"
+      PROPERTY SWIFT_EMBEDDED_TBD_PATH "${_emblib_tbd_path}")
+  endif()
   if(SWIFTLIB_SINGLE_SDK STREQUAL "WINDOWS" AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
       AND libkind STREQUAL "SHARED")
     add_custom_command(TARGET ${target} POST_BUILD
@@ -4020,6 +4039,17 @@ function(add_embedded_swift_target_library prefix library_name)
                   GROUP_READ GROUP_EXECUTE
                   WORLD_READ WORLD_EXECUTE
     )
+
+    # The TBD file, if any, describes the archive's symbols, so install it
+    # alongside the archive.
+    get_target_property(_emblib_tbd ${prefix}-${mod} SWIFT_EMBEDDED_TBD_PATH)
+    if(_emblib_tbd)
+      swift_install_in_component(
+        FILES "${_emblib_tbd}"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+      )
+    endif()
 
     # When building the per-target archive on macOS, point CMake at the
     # specific architecture so it doesn't try to build a fat archive.

@@ -1105,6 +1105,10 @@ bool BridgedFunction::canBeInlinedIntoCaller(SerializedKind kind) const {
   return getFunction()->canBeInlinedIntoCaller(swift::SerializedKind_t(kind));
 }
 
+bool BridgedFunction::wouldExposeBodyToClients(BridgedFunction caller) const {
+  return getFunction()->wouldExposeBodyToClients(caller.getFunction());
+}
+
 bool BridgedFunction::hasValidLinkageForFragileRef(SerializedKind kind) const {
   return getFunction()->hasValidLinkageForFragileRef(swift::SerializedKind_t(kind));
 }

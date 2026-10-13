@@ -102,6 +102,9 @@ extension Unicode {
   /// boundary. The normalizer state has value semantics, so it is possible
   /// to copy and store and is inherently thread-safe.
   ///
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal struct _NFCNormalizer: Sendable {
 
     internal enum State {
@@ -123,12 +126,18 @@ extension Unicode {
     // we continue to try and compose following scalars with this composee.
     internal var composee = Optional<Unicode.Scalar>.none
 
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal init(sourceString: borrowing _StringGuts) {
       sourceIsAlreadyNFC = sourceString.isNFC
     }
 
     /// Creates a new normalizer.
     ///
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal init() { }
 
     /// Resume normalizing the text stream.
@@ -179,6 +188,9 @@ extension Unicode {
 
     // Intended ABI barrier for resume(consuming: inout some IteratorProtocol<Unicode.Scalar>).
     // when it becomes public.
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func resume(
       consuming nextFromSource: () -> Unicode.Scalar?
     ) -> Unicode.Scalar? {
@@ -221,6 +233,9 @@ extension Unicode {
     /// }
     /// ```
     ///
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func flush() -> Unicode.Scalar? {
 
       isTerminated = true

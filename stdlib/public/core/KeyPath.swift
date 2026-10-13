@@ -97,6 +97,9 @@ public class AnyKeyPath: _AppendKeyPath {
 #endif
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   final func getOffsetFromStorage() -> Int? {
     let maximumOffsetOn32BitArchitecture = 4094
     guard unsafe _kvcKeyPathStringPtr != nil else {
@@ -1053,10 +1056,16 @@ internal enum KeyPathComponentKind {
   case optionalWrap
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal struct ComputedPropertyID: Hashable {
   internal var value: Int
   internal var kind: KeyPathComputedIDKind
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func ==(
     x: ComputedPropertyID, y: ComputedPropertyID
   ) -> Bool {
@@ -1064,12 +1073,18 @@ internal struct ComputedPropertyID: Hashable {
       && x.kind == y.kind
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func hash(into hasher: inout Hasher) {
     hasher.combine(value)
     hasher.combine(kind)
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @safe
 internal struct ComputedAccessorsPtr {
 #if INTERNAL_CHECKS_ENABLED
@@ -1104,6 +1119,9 @@ internal struct ComputedAccessorsPtr {
   internal typealias MutatingSetter<CurValue, NewValue> = @convention(thin)
     (NewValue, inout CurValue, UnsafeRawPointer, Int) -> ()
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var getterPtr: UnsafeRawPointer {
 #if INTERNAL_CHECKS_ENABLED
     _internalInvariant(header.kind == .computed,
@@ -1111,6 +1129,9 @@ internal struct ComputedAccessorsPtr {
 #endif
     return unsafe _value
   }
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var setterPtr: UnsafeRawPointer {
 #if INTERNAL_CHECKS_ENABLED
     _internalInvariant(header.isComputedSettable,
@@ -1136,6 +1157,9 @@ internal struct ComputedAccessorsPtr {
   /// multi-component read walker, which can't express the getter's
   /// generic `(CurValue, NewValue)` types statically and calls it via a
   /// type-erased C shim instead.
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var getterRaw: UnsafeRawPointer {
     let signedAddr = unsafe getterPtr
     let signed = unsafe signedAddr.load(as: UnsafeRawPointer.self)
@@ -1195,6 +1219,9 @@ internal struct ComputedAccessorsPtr {
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @unsafe
 internal struct ComputedArgumentWitnessesPtr {
   internal let _value: UnsafeRawPointer
@@ -1271,8 +1298,14 @@ internal struct ComputedArgumentWitnessesPtr {
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @safe
 internal enum KeyPathComponent {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @unsafe
   internal struct ArgumentRef {
     internal var data: UnsafeRawBufferPointer
@@ -1321,6 +1354,9 @@ internal enum KeyPathComponent {
 }
 
 extension KeyPathComponent: @unsafe Hashable {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
     switch (a, b) {
     case (.struct(offset: let a), .struct(offset: let b)),
@@ -1363,6 +1399,9 @@ extension KeyPathComponent: @unsafe Hashable {
     }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @_effects(releasenone)
   internal func hash(into hasher: inout Hasher) {
     func appendHashFromArgument(
@@ -1585,6 +1624,9 @@ internal final class _EmbeddedWritebackBuffer {
 /// whose *first* component installs a writeback, which needs `parentPtr`
 /// pointing at stable storage for the setter's `@inout` or
 /// `@in_guaranteed` base.
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @unsafe
 internal final class _EmbeddedRootHolder {
   internal let previous: AnyObject?
@@ -1593,6 +1635,9 @@ internal final class _EmbeddedRootHolder {
   internal let size: Int
   internal let alignMask: Int
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal init(previous: AnyObject?,
                 storage: UnsafeMutableRawPointer,
                 metadata: UnsafeRawPointer,
@@ -1614,6 +1659,9 @@ internal final class _EmbeddedRootHolder {
 /// intermediate value type, call the getter to populate it, chain a new
 /// `_EmbeddedWritebackBuffer` onto `keepAlive`, and return a raw pointer to the
 /// scratch so the walker can continue past it. 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @inline(__always)
 internal func _embeddedInstallWriteback(
   basePtr: UnsafeMutableRawPointer,
@@ -1818,6 +1866,9 @@ internal struct ComputedArgumentSize {
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @safe
 internal struct RawKeyPathComponent {
   @safe internal var header: Header
@@ -1833,6 +1884,9 @@ internal struct RawKeyPathComponent {
     return UInt64(_SwiftKeyPath_ptrauth_MetadataAccessor)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal struct Header {
     internal var _value: UInt32
 
@@ -1975,6 +2029,9 @@ internal struct RawKeyPathComponent {
     internal static var computedMutatingFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
     }
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal var isComputedMutating: Bool {
       _internalInvariant(kind == .computed)
       return _value & Header.computedMutatingFlag != 0
@@ -1983,6 +2040,9 @@ internal struct RawKeyPathComponent {
     internal static var computedSettableFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedSettableFlag
     }
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal var isComputedSettable: Bool {
       _internalInvariant(kind == .computed)
       return _value & Header.computedSettableFlag != 0
@@ -2327,6 +2387,9 @@ internal struct RawKeyPathComponent {
     return 0
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var value: KeyPathComponent {
     switch header.kind {
     case .struct:
@@ -2773,6 +2836,16 @@ internal func _pop<T : BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
   return unsafe result
 }
   
+#if hasFeature(Embedded)
+// '@usableFromInline' types don't get an implicit 'BitwiseCopyable'
+// conformance.
+extension RawKeyPathComponent.Header: BitwiseCopyable {}
+extension ComputedArgumentWitnessesPtr: BitwiseCopyable {}
+#endif
+
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @unsafe
 internal struct KeyPathBuffer {
   internal var data: UnsafeRawBufferPointer
@@ -2780,6 +2853,9 @@ internal struct KeyPathBuffer {
   internal var hasReferencePrefix: Bool
   internal var isSingleComponent: Bool
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal init(base: UnsafeRawPointer) {
     let header = unsafe base.load(as: Header.self)
     unsafe data = unsafe UnsafeRawBufferPointer(
@@ -2804,6 +2880,9 @@ internal struct KeyPathBuffer {
     return unsafe UnsafeMutableRawBufferPointer(mutating: data)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var maxSize: Int {
     let bufferPtr = unsafe data.baseAddress._unsafelyUnwrappedUnchecked
     let endOfBuffer = unsafe MemoryLayout<Int>._roundingUpToAlignment(
@@ -2813,12 +2892,18 @@ internal struct KeyPathBuffer {
     return unsafe endOfBuffer.load(as: Int.self)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @unsafe
   internal struct Builder {
     internal var buffer: UnsafeMutableRawBufferPointer
     internal init(_ buffer: UnsafeMutableRawBufferPointer) {
       unsafe self.buffer = unsafe buffer
     }
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func pushRaw(size: Int, alignment: Int)
         -> UnsafeMutableRawBufferPointer {
       var baseAddress = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked
@@ -2920,6 +3005,9 @@ internal struct KeyPathBuffer {
     }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal func destroy() {
     // Short-circuit if nothing in the object requires destruction.
     if unsafe trivial { return }
@@ -2932,6 +3020,9 @@ internal struct KeyPathBuffer {
     }
   }
   
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @inline(never)
   internal mutating func next() -> (RawKeyPathComponent, Any.Type?) {
     let header = unsafe _pop(from: &data, as: RawKeyPathComponent.Header.self)
@@ -4055,6 +4146,9 @@ internal protocol KeyPathPatternVisitor {
   mutating func finish()
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func _resolveRelativeAddress(_ base: UnsafeRawPointer,
                                       _ offset: Int32) -> UnsafeRawPointer {
   // Sign-extend the offset to pointer width and add with wrap on overflow.

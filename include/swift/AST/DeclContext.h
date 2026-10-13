@@ -44,6 +44,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  enum class CodeGenerationModel : uint8_t;
   class GenericEnvironment;
   class ASTContext;
   class ASTWalker;
@@ -628,6 +629,21 @@ public:
   /// Get the fragile function kind for the code in this context, which
   /// is used for diagnostics.
   FragileFunctionKind getFragileFunctionKind() const;
+
+  /// Get the effective code generation model for the code in this context.
+  ///
+  /// Code in a local context, such as a closure or local function, is emitted
+  /// along with the outermost declaration whose body contains it, and code in
+  /// an initializer expression along with its variable. Default arguments are
+  /// always emitted into clients. If \p decl is non-null, it is set to the
+  /// declaration whose model applies.
+  CodeGenerationModel
+  getCodeGenerationModelOfCode(const ValueDecl **decl = nullptr) const;
+
+  /// Determine whether the code in this context has no unique definition, so
+  /// that every module that uses it emits its own copy, as for a closure in a
+  /// generic function in Embedded Swift.
+  bool hasNonUniqueCode() const;
 
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.

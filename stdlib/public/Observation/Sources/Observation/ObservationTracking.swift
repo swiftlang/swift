@@ -17,11 +17,17 @@ public struct ObservationTracking: Sendable {
     var `deinit`: Int?
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   struct Entry: @unchecked Sendable {
     let context: ObservationRegistrar.Context
     
     var properties: Set<AnyKeyPath>
     
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     init(_ context: ObservationRegistrar.Context, properties: Set<AnyKeyPath> = []) {
       self.context = context
       self.properties = properties
@@ -43,6 +49,9 @@ public struct ObservationTracking: Sendable {
       context.cancel(token)
     }
     
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     mutating func insert(_ keyPath: AnyKeyPath) {
       properties.insert(keyPath)
     }
@@ -56,6 +65,9 @@ public struct ObservationTracking: Sendable {
   public struct _AccessList: Sendable {
     internal var entries = [ObjectIdentifier : Entry]()
 
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal init() { }
     
     internal mutating func addAccess<Subject: Observable>(
@@ -65,6 +77,9 @@ public struct ObservationTracking: Sendable {
       entries[context.id, default: Entry(context)].insert(keyPath)
     }
     
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     internal mutating func merge(_ other: _AccessList) {
       entries.merge(other.entries) { existing, entry in
         existing.union(entry)
@@ -72,6 +87,9 @@ public struct ObservationTracking: Sendable {
     }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   @available(SwiftStdlib 6.4, *)
   static func _installTracking(
     options: ObservationTracking.Options,
@@ -201,6 +219,9 @@ public struct ObservationTracking: Sendable {
       state.withCriticalRegion { $0.changed }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   static func deactivateAccessList(_ ptr: UnsafeMutablePointer<_AccessList?>) {
     if let entries = ptr.pointee?.entries.values {
       for entry in entries {
@@ -211,9 +232,18 @@ public struct ObservationTracking: Sendable {
 
   @available(SwiftStdlib 6.4, *)
   public struct Options {
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     struct RawValue: OptionSet {
+#if hasFeature(Embedded)
+      @usableFromInline
+#endif
       var rawValue: Int
 
+#if hasFeature(Embedded)
+      @usableFromInline
+#endif
       init(rawValue: Int) {
         self.rawValue = rawValue
       }
@@ -221,6 +251,9 @@ public struct ObservationTracking: Sendable {
       static var willSet: RawValue { .init(rawValue: 1 << 0) }
       static var didSet: RawValue { .init(rawValue: 1 << 1) }
       static var `deinit`: RawValue { .init(rawValue: 1 << 2) }
+#if hasFeature(Embedded)
+      @usableFromInline
+#endif
       static var continuous: RawValue { .init(rawValue: 1 << 3) }
       static var updating: RawValue { .init(rawValue: 1 << 4) }
     }
@@ -277,6 +310,9 @@ public struct ObservationTracking: Sendable {
     var tracking: ObservationTracking?
     var continuousState: _ManagedCriticalState<ContinuousObservation.State>?
 
+#if hasFeature(Embedded)
+    @usableFromInline
+#endif
     init(_ tracking: ObservationTracking?, kind: Kind) {
       self.kind = kind
       self.tracking = tracking

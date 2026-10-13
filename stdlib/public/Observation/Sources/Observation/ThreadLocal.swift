@@ -26,7 +26,13 @@ internal func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer?
 @_extern(c, "_swift_tls_set")
 internal func _swift_tls_set(_ key: Int, _ value: UnsafeMutableRawPointer?)
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 struct _ThreadLocal {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   static var value: UnsafeMutableRawPointer? {
     get {
       return _swift_tls_get(_observationTransactionKey)
@@ -45,8 +51,14 @@ func _tlsGet() -> UnsafeMutableRawPointer?
 @_silgen_name("_swift_observation_tls_set")
 func _tlsSet(_ value: UnsafeMutableRawPointer?)
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 @available(SwiftStdlib 5.9, *)
 struct _ThreadLocal {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   static var value: UnsafeMutableRawPointer? {
     get {
       return _tlsGet()

@@ -30,6 +30,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -564,6 +565,15 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         case ExportedLevel::None:
           break;
         };
+
+        // In Embedded Swift, clients emit their own copies of a global or
+        // static variable's initializer unless it has a unique definition.
+        if (init->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+            (varDecl->getDeclContext()->isModuleScopeContext() ||
+             varDecl->isStatic()) &&
+            varDecl->getEffectiveCodeGenerationModel() !=
+                CodeGenerationModel::Interface)
+          return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
       }
 
       return {FragileFunctionKind::None};
@@ -642,6 +652,40 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
   }
 
   return {FragileFunctionKind::None};
+}
+
+CodeGenerationModel
+DeclContext::getCodeGenerationModelOfCode(const ValueDecl **decl) const {
+  // Find the outermost declaration whose body or initializer contains this
+  // context.
+  const DeclContext *dc = this;
+  while (dc->isLocalContext()) {
+    const ValueDecl *owner = nullptr;
+    if (auto *init = dyn_cast<DefaultArgumentInitializer>(dc)) {
+      // Default argument generators are always emitted into clients.
+      if (decl)
+        *decl = cast<ValueDecl>(init->getParent()->getAsDecl());
+      return CodeGenerationModel::Implementation;
+    } else if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
+      owner = init->getBinding()->getAnchoringVarDecl(init->getBindingIndex());
+    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+      owner = AFD;
+    }
+
+    if (owner && !owner->getDeclContext()->isLocalContext()) {
+      if (decl)
+        *decl = owner;
+      return owner->getEffectiveCodeGenerationModel();
+    }
+
+    dc = dc->getParent();
+  }
+
+  if (decl)
+    *decl = nullptr;
+  if (auto *contextDecl = dc->getAsDecl())
+    return contextDecl->getEffectiveCodeGenerationModel();
+  return dc->getParentModule()->codeGenerationModel();
 }
 
 /// Determine whether the innermost context is generic.

@@ -1029,6 +1029,11 @@ namespace swift {
     /// Controls the function bodies to skip during type-checking.
     FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
 
+    /// Whether a TBD file is being emitted, or validated against the IR.
+    /// Diagnostics that keep the set of symbols exported by the module
+    /// predictable are errors in that case, rather than warnings.
+    bool RequiresPredictableTBD = false;
+
     ///
     /// Flags for developers
     ///

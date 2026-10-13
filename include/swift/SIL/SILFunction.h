@@ -1541,6 +1541,20 @@ public:
   /// Whether this declaration is never emitted into the client.
   bool isNeverEmitIntoClient() const;
 
+  /// In Embedded Swift, whether clients can emit their own copy of this
+  /// function, so they need its body. Code with the "interface" model has a
+  /// unique definition in this module, which clients refer to by symbol.
+  bool isEmittedIntoClients() const;
+
+  /// In Embedded Swift, whether inlining this function into \p caller would
+  /// expose this function's body to clients. This happens when this function
+  /// has a unique definition and no serialized body, and \p caller will be
+  /// serialized because clients emit their own copies of it. Clients would
+  /// then keep using the inlined code after this function changes, and this
+  /// function's references to declarations that clients can't use would have
+  /// to be made public.
+  bool wouldExposeBodyToClients(const SILFunction *caller) const;
+
   /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }

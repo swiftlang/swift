@@ -12,6 +12,9 @@
 // String Creation Helpers
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   //--------------- Implementation building blocks ---------------------------//
 #if arch(arm64_32)
@@ -137,6 +140,9 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
 extension String {
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func _uncheckedFromASCII(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
@@ -156,6 +162,9 @@ extension String {
     return unsafe _uncheckedFromASCII(input)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func _fromASCIIValidating(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String? {
@@ -223,6 +232,9 @@ extension String {
     )
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>,
     precalculatedUTF16Count utf16Count: Int?
@@ -278,6 +290,9 @@ extension String {
     return storage.asString
   }
   
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func _fromUTF16(
     _ input: UnsafeBufferPointer<UInt16>,
     repairing: Bool = true

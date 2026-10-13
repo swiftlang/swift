@@ -75,11 +75,17 @@ extension _HashTable {
     @inline(__always) get { return 3 / 4 }
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func capacity(forScale scale: Int8) -> Int {
     let bucketCount = (1 as Int) &<< scale
     return Int(Double(bucketCount) * maxLoadFactor)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func scale(forCapacity capacity: Int) -> Int8 {
     let capacity = Swift.max(capacity, 1)
     // Calculate the minimum number of entries we need to allocate to satisfy
@@ -105,6 +111,9 @@ extension _HashTable {
     return Int32(truncatingIfNeeded: hash)
   }
 
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal static func hashSeed(
     for object: Builtin.NativeObject,
     scale: Int8

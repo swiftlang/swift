@@ -30,6 +30,9 @@ private func _isNotInvalid_ED(_ x: UInt8) -> Bool {
   return UTF8.isContinuation(x) && x <= 0x9F
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal struct UTF8ExtraInfo: Equatable {
   public var isASCII: Bool
 }
@@ -51,6 +54,9 @@ private func _diagnoseInvalidUTF8MultiByteLeading(
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal enum UTF8ValidationResult {
   case success(UTF8ExtraInfo)
   case error(
@@ -61,9 +67,15 @@ internal enum UTF8ValidationResult {
 // FIXME: refactor other parts of stdlib to avoid this dumb mirror enum
 //
 // Mirror of UTF8.ValidationError.Kind, available on 6.1
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal struct _UTF8EncodingErrorKind: Error, Sendable, Hashable
 // TODO: embedded?, Codable
   , RawRepresentable {
+#if hasFeature(Embedded)
+  @usableFromInline
+#endif
   internal var rawValue: UInt8
 
   @available(SwiftStdlib 6.2, *)
@@ -110,6 +122,9 @@ internal struct _UTF8EncodingErrorKind: Error, Sendable, Hashable
 
 extension UTF8ValidationResult: Equatable {}
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationResult {
   if unsafe _allASCII(buf) {
     return .success(UTF8ExtraInfo(isASCII: true))
@@ -268,6 +283,9 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
   }
 }
 
+#if hasFeature(Embedded)
+@usableFromInline
+#endif
 internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRange: Range<Int>) -> String {
   _internalInvariant(!input.isEmpty, "empty input doesn't need to be repaired")
   _internalInvariant(firstKnownBrokenRange.clamped(to: input.indices) == firstKnownBrokenRange)

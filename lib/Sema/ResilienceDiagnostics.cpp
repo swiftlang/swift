@@ -23,6 +23,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/CodeGenerationModel.h"
 
 using namespace swift;
 
@@ -45,6 +46,51 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   SF->addImplicitImportForModuleInterface(missingImport);
   ctx.Diags.diagnose(loc, diag::missing_import_inserted, M->getName());
   return true;
+}
+
+/// In Embedded Swift, return the declaration whose code clients can emit
+/// themselves, if the given context is part of its body. That's any code
+/// without the "interface" code generation model, which cross-module
+/// optimization serializes.
+static const ValueDecl *getClientEmittedDecl(const DeclContext *DC) {
+  const ValueDecl *decl = nullptr;
+  if (DC->getCodeGenerationModelOfCode(&decl) ==
+          CodeGenerationModel::Interface ||
+      !decl)
+    return nullptr;
+
+  return decl;
+}
+
+/// Whether code that clients emit can refer to the given declaration without
+/// a symbol.
+static bool isAccessedWithoutSymbol(const ValueDecl *decl) {
+  // Clients can emit their own copies of declarations without the
+  // "interface" code generation model, and their code is checked directly.
+  // Only an "interface" declaration has a unique definition that clients
+  // must refer to by symbol.
+  if (decl->getEffectiveCodeGenerationModel() != CodeGenerationModel::Interface)
+    return true;
+
+  // A function declared with '@_silgen_name' or '@_extern' and no body is
+  // defined elsewhere, such as in the runtime, so it isn't a symbol of this
+  // module.
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!func->hasBody() && (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
+                             func->getAttrs().hasAttribute<ExternAttr>()))
+      return true;
+  }
+
+  // Enum cases are formed and matched directly.
+  if (isa<EnumElementDecl>(decl))
+    return true;
+
+  // So are stored properties, unless they have observers. Their synthesized
+  // accessors don't have a unique definition either.
+  if (auto *var = dyn_cast<VarDecl>(decl))
+    return var->isInstanceMember() && var->getImplInfo().isSimpleStored();
+
+  return false;
 }
 
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
@@ -112,10 +158,33 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     return false;
   }
 
-  // Embedded functions can reference non-public decls as they are visible
-  // to clients.
-  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
-    return false;
+  // Embedded functions can reference non-public decls because their bodies
+  // can be serialized. However, a declaration with the "interface" code
+  // generation model, explicit or implied by its module, has a unique
+  // definition that clients refer to by symbol, so diagnose such references
+  // and require @usableFromInline (or similar). To accommodate existing
+  // clients, downgrade this to a warning unless we are also emitting a TBD
+  // file. There, we need to ensure that we know the full set of symbols
+  // ahead of time.
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
+    // Code that is unavailable, such as '@_unavailableInEmbedded' code, is
+    // never emitted.
+    if (where.getAvailability().isUnavailable())
+      return false;
+
+    auto *clientEmittedDecl = getClientEmittedDecl(DC);
+    if (!clientEmittedDecl || isAccessedWithoutSymbol(D))
+      return false;
+
+    bool isError = Context.TypeCheckerOpts.RequiresPredictableTBD;
+    Context.Diags
+        .diagnose(loc, diag::embedded_interface_decl_not_usable_from_inline, D,
+                  declAccessScope.accessLevelForDiagnostics(),
+                  clientEmittedDecl)
+        .limitBehaviorIf(!isError, DiagnosticBehavior::Warning);
+    Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
+    return isError;
+  }
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
