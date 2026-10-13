@@ -33,6 +33,7 @@ namespace {
 enum Actions {
   compute_cache_key,
   compute_cache_key_from_index,
+  compute_cache_keys_from_indices,
   cache_query,
   replay_result,
   scan_dependency,
@@ -58,6 +59,9 @@ llvm::cl::opt<unsigned> Threads("threads",
                                 llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
                                             llvm::cl::cat(Category));
+llvm::cl::list<std::string> InvalidatedPaths("invalidated-path",
+                                             llvm::cl::desc("<path>"),
+                                             llvm::cl::cat(Category));
 llvm::cl::opt<bool>
     NonRecursive("non-recursive",
                  llvm::cl::desc("avoid recursing when ingesting a directory"),
@@ -68,6 +72,8 @@ llvm::cl::opt<Actions>
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
                             clEnumVal(compute_cache_key_from_index,
                                       "compute cache key from index"),
+                            clEnumVal(compute_cache_keys_from_indices,
+                                      "compute cache keys from indices"),
                             clEnumVal(cache_query, "cache query"),
                             clEnumVal(replay_result, "replay result"),
                             clEnumVal(scan_dependency, "scan dependency"),
@@ -131,6 +137,37 @@ static int action_compute_cache_key_from_index(swiftscan_cas_t cas,
 
   os << toString(key) << "\n";
   swiftscan_string_dispose(key);
+
+  return EXIT_SUCCESS;
+}
+
+static int
+action_compute_cache_keys_from_indices(swiftscan_cas_t cas, StringRef indices,
+                                       std::vector<const char *> &Args,
+                                       llvm::raw_ostream &os) {
+  SmallVector<StringRef> indexStrs;
+  indices.split(indexStrs, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  std::vector<unsigned> inputIndices;
+  for (auto indexStr : indexStrs) {
+    unsigned inputIndex = 0;
+    if (!to_integer(indexStr, inputIndex)) {
+      llvm::errs() << "-input is not a list of numbers for "
+                      "compute_cache_keys_from_indices\n";
+      return EXIT_FAILURE;
+    }
+    inputIndices.push_back(inputIndex);
+  }
+
+  swiftscan_string_ref_t err_msg;
+  auto keys = swiftscan_cache_compute_keys_from_input_indices(
+      cas, Args.size(), Args.data(), inputIndices.data(), inputIndices.size(),
+      &err_msg);
+  if (!keys)
+    return printError(err_msg);
+
+  for (size_t i = 0; i < keys->count; ++i)
+    os << toString(keys->strings[i]) << "\n";
+  swiftscan_string_set_dispose(keys);
 
   return EXIT_SUCCESS;
 }
@@ -388,6 +425,19 @@ int main(int argc, char *argv[]) {
     if (scanner)
       swiftscan_scanner_dispose(scanner);
   };
+  if (scanner && !InvalidatedPaths.empty()) {
+    // Spell these like Clang's directory dependencies, which are matched
+    // textually.
+    std::vector<const char *> Paths;
+    for (const auto &Path : InvalidatedPaths) {
+      SmallString<256> Canonical(Path);
+      llvm::sys::fs::make_absolute(Canonical);
+      llvm::sys::path::remove_dots(Canonical, /*remove_dot_dot=*/true);
+      Paths.push_back(Saver.save(Canonical.str()).data());
+    }
+    swiftscan_scanner_add_invalidated_paths(scanner, Paths.data(),
+                                            Paths.size());
+  }
 
   std::atomic<int> Ret = 0;
   llvm::raw_null_ostream nullOS;
@@ -409,6 +459,9 @@ int main(int argc, char *argv[]) {
         break;
       case compute_cache_key_from_index:
         Ret += action_compute_cache_key_from_index(cas, Input, Args, os);
+        break;
+      case compute_cache_keys_from_indices:
+        Ret += action_compute_cache_keys_from_indices(cas, Input, Args, os);
         break;
       case cache_query:
         Ret += action_cache_query(cas, CASID.c_str(), os);
