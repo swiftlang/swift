@@ -1045,18 +1045,21 @@ static bool parseDeclSILOptional(
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    } else if (options.SpecAttrs && SP.P.Tok.getText() == "_specialize") {
+    } else if (options.SpecAttrs && (SP.P.Tok.getText() == "_specialize" ||
+                                     SP.P.Tok.getText() == "specialized")) {
       SourceLoc AtLoc = SP.P.Tok.getLoc();
       SourceLoc Loc(AtLoc);
 
-      // Parse a _specialized attribute, building a parsed substitution list
-      // and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
-      // cannot be generated until the function declaration is fully parsed so
-      // that the function's generic signature can be consulted.
+      // Parse a _specialize or specialized attribute, building a parsed
+      // substitution list and pushing a new ParsedSpecAttr on the SpecAttrs
+      // list. Conformances cannot be generated until the function declaration
+      // is fully parsed so that the function's generic signature can be
+      // consulted.
       ParsedSpecAttr SpecAttr;
       SpecAttr.requirements = {};
       SpecAttr.exported = false;
       SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
+      SpecAttr.specializedSpelling = SP.P.Tok.getText() == "specialized";
       AbstractSpecializeAttr *Attr;
       StringRef targetFunctionName;
       ModuleDecl *module = nullptr;
@@ -7993,7 +7996,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
                                                     DefaultRequirementOptions());
             FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
                 FunctionState.F->getModule(), genericSig, typeErasedParams, Attr.exported,
-                Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
+                Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability,
+                Attr.specializedSpelling));
           }
         }
 

@@ -1152,6 +1152,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     assert(kind == SIL_SPECIALIZE_ATTR && "Missing specialization attribute");
 
     unsigned exported;
+    unsigned specializedSpelling;
     unsigned specializationKindVal;
     GenericSignatureID specializedSigID;
     IdentifierID targetFunctionID;
@@ -1160,7 +1161,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     ArrayRef<uint64_t> typeErasedParamsIDs;
     unsigned LIST_VER_TUPLE_PIECES(available);
     SILSpecializeAttrLayout::readRecord(
-        scratch, exported, specializationKindVal, specializedSigID,
+        scratch, exported, specializedSpelling, specializationKindVal,
+        specializedSigID,
         targetFunctionID, spiGroupID, spiModuleID,
         LIST_VER_TUPLE_PIECES(available), typeErasedParamsIDs);
 
@@ -1197,7 +1199,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, typeErasedParams,
           exported != 0, specializationKind, target,
-          spiGroup, spiModule, availability));
+          spiGroup, spiModule, availability, specializedSpelling != 0));
     }
   }
 

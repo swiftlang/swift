@@ -4001,7 +4001,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_semantics \"" << Attr << "\"] ";
 
   for (auto *Attr : getSpecializeAttrs()) {
-    OS << "[_specialize "; Attr->print(OS); OS << "] ";
+    OS << (Attr->isSpecializedSpelling() ? "[specialized " : "[_specialize ");
+    Attr->print(OS);
+    OS << "] ";
   }
 
   if (markedAsUsed())

@@ -700,6 +700,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
     SILSpecializeAttrLayout::emitRecord(
         Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
+        (unsigned)SA->isSpecializedSpelling(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()),
         targetFunctionNameID, spiGroupID, spiModuleDeclID,
