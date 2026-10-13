@@ -76,7 +76,7 @@ sil_vtable SubclassOfClassWithResilientField {}
 // CHECK-OLD-SAME: ptr null,
 
 // Superclass field is filled in statically:
-// CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMf"
+// CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMf{{(\.ptrauth)?}}"
 
 // CHECK-SAME: }>
 

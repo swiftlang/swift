@@ -1,4 +1,4 @@
-// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment --check-prefix=CHECK --check-prefix=CHECK-%target-vendor
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment --check-prefix=CHECK --check-prefix=CHECK-%target-vendor --check-prefix=CHECK-%target-vendor-%target-ptrauth
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -39,11 +39,12 @@
 //         CHECK-SAME:  $s4main9Ancestor1[[UNIQUE_ID_1]]LLCMf
 //   CHECK-apple-SAME:  _objc_empty_cache
 //   CHECK-apple-SAME:  ptr null,
-//   CHECK-apple-SAME:  ptr getelementptr (
-//   CHECK-apple-SAME:    i8,
-//   CHECK-apple-SAME:    ptr @"_DATA_$s4main5Value[[UNIQUE_ID_1]]LLCySiGMf",
-//   CHECK-apple-SAME:    [[INT]] 2
-//   CHECK-apple-SAME:  ),
+// CHECK-apple-noptrauth-SAME:  ptr getelementptr (
+// CHECK-apple-noptrauth-SAME:    i8,
+// CHECK-apple-noptrauth-SAME:    ptr @"_DATA_$s4main5Value[[UNIQUE_ID_1]]LLCySiGMf",
+// CHECK-apple-noptrauth-SAME:    [[INT]] 2
+// CHECK-apple-noptrauth-SAME:  ),
+//   CHECK-apple-ptrauth-SAME:   ptr @"_DATA_$s4main5Value[[UNIQUE_ID_1]]LLCySiGMf.ptrauth",
 //         CHECK-SAME:  i32 26,
 //         CHECK-SAME:  i32 0,
 //         CHECK-SAME:  i32 {{(32|16)}},
