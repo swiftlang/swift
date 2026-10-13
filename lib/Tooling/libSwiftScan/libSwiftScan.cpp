@@ -196,7 +196,8 @@ swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
   // Execute the scan and bridge the result
   auto ScanResult = ScanningTool->getDependencies(
       Compilation,
-      swift::c_string_utils::get_C_string(invocation->working_directory));
+      swift::c_string_utils::get_C_string(invocation->working_directory),
+      swift::c_string_utils::get_C_string(invocation->main_executable_path));
   if (ScanResult.getError())
     return nullptr;
   auto DependencyGraph = std::move(*ScanResult);
@@ -215,7 +216,8 @@ swiftscan_import_set_create(swiftscan_scanner_t scanner,
   // Execute the scan and bridge the result
   auto PreScanResult = ScanningTool->getImports(
       Compilation,
-      swift::c_string_utils::get_C_string(invocation->working_directory));
+      swift::c_string_utils::get_C_string(invocation->working_directory),
+      swift::c_string_utils::get_C_string(invocation->main_executable_path));
   if (PreScanResult.getError())
     return nullptr;
   auto ImportSet = std::move(*PreScanResult);
@@ -531,7 +533,8 @@ swiftscan_import_set_get_diagnostics(swiftscan_import_set_t result) {
 //=== Scanner Invocation Functions ----------------------------------------===//
 
 swiftscan_scan_invocation_t swiftscan_scan_invocation_create() {
-  return new swiftscan_scan_invocation_s;
+  // Value-initialize: fields the client does not set stay null.
+  return new swiftscan_scan_invocation_s();
 }
 
 void swiftscan_scan_invocation_set_working_directory(
@@ -545,9 +548,21 @@ swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
   invocation->argv = swift::c_string_utils::create_set(argc, argv);
 }
 
+void swiftscan_scan_invocation_set_main_executable_path(
+    swiftscan_scan_invocation_t invocation, const char *main_executable_path) {
+  swiftscan_string_dispose(invocation->main_executable_path);
+  invocation->main_executable_path =
+      swift::c_string_utils::create_clone(main_executable_path);
+}
+
 swiftscan_string_ref_t swiftscan_scan_invocation_get_working_directory(
     swiftscan_scan_invocation_t invocation) {
   return invocation->working_directory;
+}
+
+swiftscan_string_ref_t swiftscan_scan_invocation_get_main_executable_path(
+    swiftscan_scan_invocation_t invocation) {
+  return invocation->main_executable_path;
 }
 
 int swiftscan_scan_invocation_get_argc(swiftscan_scan_invocation_t invocation) {
@@ -589,7 +604,9 @@ void swiftscan_import_set_dispose(swiftscan_import_set_t result) {
 
 void swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation) {
   swiftscan_string_dispose(invocation->working_directory);
-  swiftscan_string_set_dispose(invocation->argv);
+  swiftscan_string_dispose(invocation->main_executable_path);
+  if (invocation->argv)
+    swiftscan_string_set_dispose(invocation->argv);
   delete invocation;
 }
 
