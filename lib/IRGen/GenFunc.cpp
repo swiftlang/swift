@@ -3191,8 +3191,14 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
-  IGF.Builder.CreateStore(NSConcreteStackBlock,
-                          IGF.Builder.CreateStructGEP(headerAddr, 0, layout));
+  auto isaAddr = IGF.Builder.CreateStructGEP(headerAddr, 0, layout);
+  llvm::Value *isaVal = NSConcreteStackBlock;
+  if (auto &schema = IGF.getOptions().PointerAuth.ObjCIsaPointers) {
+    auto isaAuthInfo = PointerAuthInfo::emit(IGF, schema, isaAddr.getAddress(),
+                                             PointerAuthEntity());
+    isaVal = emitPointerAuthSign(IGF, isaVal, isaAuthInfo);
+  }
+  IGF.Builder.CreateStore(isaVal, isaAddr);
   IGF.Builder.CreateStore(flagsVal,
                           IGF.Builder.CreateStructGEP(headerAddr, 1, layout));
   IGF.Builder.CreateStore(reserved,
