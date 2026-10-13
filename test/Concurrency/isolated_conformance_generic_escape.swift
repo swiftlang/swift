@@ -185,3 +185,15 @@ func test() async {
   // @MainActor callee — same caller isolation, this is allowed
   await callDoSomethingFromMainActor(MyClass())
 }
+
+protocol DefaultInitProtocol {
+  init()
+}
+
+@MainActor
+func passthrough<T: DefaultInitProtocol>(_ t: T) -> T { t }
+
+@MainActor
+struct DefaultValueContainer<T: DefaultInitProtocol> {
+  let value = passthrough(T()) // ok, default-value initializer adopts the callee's @MainActor isolation
+}
