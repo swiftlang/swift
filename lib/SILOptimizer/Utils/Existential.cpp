@@ -216,6 +216,31 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     // through them so that the underlying init_existential_ref can be found by
     // ConcreteExistentialInfo.
     ExistentialValue = lookThroughOwnershipInsts(Open->getOperand());
+
+    // A `load_borrow` which RLE could not eliminate records the loaded value in
+    // its value hint, e.g.
+    //   %e = init_existential_ref %c : $C : $C, $P
+    //   %h = unchecked_ownership %e, forwarding: @none
+    //   store %e to [init] %a
+    //   %l = load_borrow %a, value_hint %h
+    //   %o = open_existential_ref %l
+    // Follow the value hint to find the init_existential_ref.
+    SILValue hinted = ExistentialValue;
+    while (true) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(hinted)) {
+        if (!lbi->hasValueHint())
+          break;
+        hinted = lookThroughOwnershipInsts(lbi->getValueHint());
+      } else if (auto *uoi = dyn_cast<UncheckedOwnershipInst>(hinted)) {
+        hinted = lookThroughOwnershipInsts(uoi->getOperand());
+      } else {
+        break;
+      }
+    }
+    if (hinted != ExistentialValue && isa<InitExistentialRefInst>(hinted)) {
+      ExistentialValue = hinted;
+      isExistentialValueFromValueHint = true;
+    }
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(openedVal)) {

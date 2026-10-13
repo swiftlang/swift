@@ -1001,11 +1001,13 @@ SILCombiner::buildConcreteOpenedExistentialInfo(Operand &ArgOperand) {
     bool concreteValueIsConsumed =
         COEI.CEI->ConcreteValue &&
         COEI.CEI->ConcreteValue->getOwnershipKind() == OwnershipKind::Owned;
-    if (concreteValueIsConsumed &&
+    if ((COEI.OAI.isExistentialValueFromValueHint || concreteValueIsConsumed) &&
         COEI.OAI.OpenedArchetypeValue->getOwnershipKind() !=
             OwnershipKind::Owned) {
-      // We know the concrete type and can just cast the opened value. An owned
-      // opened value is handled below.
+      // The init_existential_ref was found via the value hint of a
+      // `load_borrow` or its concrete operand is not available at the apply.
+      // But we know the concrete type and can just cast the opened value. An
+      // owned opened value is handled below.
       if (isa<ExistentialArchetypeType>(COEI.CEI->ConcreteType))
         return std::nullopt;
       SILBuilderWithScope b(ArgOperand.getUser(), Builder);
