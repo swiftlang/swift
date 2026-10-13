@@ -5552,6 +5552,11 @@ GROUPED_WARNING(implicit_force_unwrap,ImplicitForceUnwrap,none,
         "implicit force unwrap of %select{implicitly unwrapped optional|"
         "dynamic lookup result}0 of type %1",
         (bool, Type))
+GROUPED_WARNING(implicit_force_unwrap_of_iuo_param,ImplicitForceUnwrap,none,
+        "implicit force unwrap of implicitly unwrapped optional "
+        "%select{parameter|value}0 of type %1 %select{in override of|"
+        "in witness for}2 %kind3",
+        (bool, Type, bool, const ValueDecl *))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(default_optional_parameter,none,

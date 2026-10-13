@@ -7028,6 +7028,99 @@ static void diagnoseImplicitForceUnwrap(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
+/// Diagnose a value of non-optional type described by \p repr that receives
+/// a value of the implicitly unwrapped optional type \p iuoType.
+static void diagnoseImplicitForceUnwrapOfIUOValue(ASTContext &ctx,
+                                                  SourceLoc fallbackLoc,
+                                                  TypeRepr *repr, Type iuoType,
+                                                  bool isParam, bool isWitness,
+                                                  const ValueDecl *baseDecl) {
+  SourceLoc loc = repr ? repr->getStartLoc() : fallbackLoc;
+  if (loc.isInvalid())
+    return;
+
+  auto diag = ctx.Diags.diagnose(loc, diag::implicit_force_unwrap_of_iuo_param,
+                                 !isParam, iuoType, isWitness, baseDecl);
+  if (!repr)
+    return;
+
+  diag.highlight(repr->getSourceRange());
+
+  // Add the '!' to the type itself, after any specifiers like 'sending'.
+  while (auto *specifier = dyn_cast<SpecifierTypeRepr>(repr))
+    repr = specifier->getBase();
+
+  // Optional function types are implicitly escaping, so '@escaping' needs to
+  // be removed. Don't attempt to rewrite any other attributes.
+  SourceLoc startLoc = repr->getStartLoc();
+  if (auto *attributed = dyn_cast<AttributedTypeRepr>(repr)) {
+    if (attributed->getAttrs().size() != 1 ||
+        !attributed->has(TypeAttrKind::Escaping))
+      return;
+
+    repr = attributed->getTypeRepr();
+    diag.fixItReplaceChars(startLoc, repr->getStartLoc(), "(")
+        .fixItInsertAfter(repr->getEndLoc(), ")!");
+    return;
+  }
+
+  if (repr->isSimple()) {
+    diag.fixItInsertAfter(repr->getEndLoc(), "!");
+  } else {
+    diag.fixItInsert(startLoc, "(").fixItInsertAfter(repr->getEndLoc(), ")!");
+  }
+}
+
+void swift::diagnoseImplicitForceUnwrapOfIUOParams(const ValueDecl *decl,
+                                                   const ValueDecl *baseDecl,
+                                                   bool isWitness) {
+  auto &ctx = decl->getASTContext();
+  auto *sf = decl->getDeclContext()->getParentSourceFile();
+  if (!sf ||
+      !ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ImplicitForceUnwrap))
+    return;
+
+  // Check each parameter that is an implicitly unwrapped optional in the base
+  // declaration but non-optional in the derived one.
+  auto *params = decl->getParameterList();
+  auto *baseParams = baseDecl->getParameterList();
+  if (params && baseParams && params->size() == baseParams->size()) {
+    for (unsigned i : indices(*params)) {
+      auto *param = params->get(i);
+      auto *baseParam = baseParams->get(i);
+      if (!baseParam->isImplicitlyUnwrappedOptional() || param->isInOut() ||
+          param->isVariadic() ||
+          param->getInterfaceType()->getOptionalObjectType())
+        continue;
+
+      diagnoseImplicitForceUnwrapOfIUOValue(
+          ctx, param->getStartLoc(), param->getTypeRepr(),
+          baseParam->getInterfaceType(), /*isParam=*/true, isWitness, baseDecl);
+    }
+  }
+
+  // A settable property or subscript requirement passes its new value to
+  // the witness's setter. Overrides can't do this, because a mutable
+  // property or subscript can't be overridden with a covariant type.
+  if (!isWitness || !baseDecl->isImplicitlyUnwrappedOptional())
+    return;
+
+  auto *storage = dyn_cast<AbstractStorageDecl>(decl);
+  auto *baseStorage = dyn_cast<AbstractStorageDecl>(baseDecl);
+  if (!storage || !baseStorage || !baseStorage->supportsMutation() ||
+      storage->getValueInterfaceType()->getOptionalObjectType())
+    return;
+
+  TypeRepr *repr = nullptr;
+  if (auto *var = dyn_cast<VarDecl>(storage))
+    repr = var->getTypeReprOrParentPatternTypeRepr();
+  else if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
+    repr = subscript->getElementTypeRepr();
+  diagnoseImplicitForceUnwrapOfIUOValue(ctx, storage->getLoc(), repr,
+                                        baseStorage->getValueInterfaceType(),
+                                        /*isParam=*/false, isWitness, baseDecl);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: High-level entry points.
 //===----------------------------------------------------------------------===//

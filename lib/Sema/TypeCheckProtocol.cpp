@@ -4777,6 +4777,15 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       }
     }
 
+    if (requirement->isObjC()) {
+      getASTContext().addDelayedConformanceDiag(
+          Conformance, /*isError=*/false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            diagnoseImplicitForceUnwrapOfIUOParams(witness, requirement,
+                                                   /*isWitness=*/true);
+          });
+    }
+
     auto check = checkWitness(requirement, best);
 
     switch (check.getKind()) {
