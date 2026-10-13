@@ -98,7 +98,7 @@ public func single_concrete() {
 
 // CHECK-NEXT:    [[Single_P1:%.*]] = call ptr @swift_getWitnessTable(
 // CHECK-SAME:        ptr
-// CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlMc",
+// CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlMc{{(\.ptrauth(\.[0-9]+)?)?}}",
 // CHECK-SAME:      ptr getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:          ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf"
@@ -259,7 +259,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 
 // CHECK-NEXT:    [[Double_P1:%.*]] = call ptr @swift_getWitnessTable(
 // CHECK-SAME:        ptr
-// CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlMc"
+// CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlMc{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-SAME:      ptr %{{[0-9]+}},
 // CHECK-SAME:      ptr [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )
@@ -314,7 +314,7 @@ public func double_concrete_concrete() {
 
 // CHECK-NEXT:    [[Double_P1:%.*]] = call ptr @swift_getWitnessTable(
 // CHECK-SAME:        ptr
-// CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlMc"
+// CHECK-SAME:        @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlMc{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-SAME:      ptr getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr  @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMf"
