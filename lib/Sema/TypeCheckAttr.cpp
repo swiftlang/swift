@@ -797,8 +797,22 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
 
 void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
-  if (D->getAttrs().hasAttribute<TransparentAttr>())
+  if (D->getAttrs().hasAttribute<TransparentAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
+    return;
+  }
+
+  // Embedded Swift does not support dynamic replacement, so 'dynamic' is
+  // ignored (see IsDynamicRequest).
+  if (attr->isImplicit())
+    return;
+  auto *dc = isa<DeclContext>(D) ? cast<DeclContext>(D) : D->getDeclContext();
+  if (auto behavior =
+          shouldDiagnoseEmbeddedLimitations(dc, attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::dynamic_in_embedded_swift, D)
+        .limitBehavior(*behavior)
+        .fixItRemove(attr->getRange());
+  }
 }
 
 /// Replaces asynchronous IBActionAttr/IBSegueActionAttr function declarations
@@ -4451,6 +4465,21 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   assert(isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D));
   auto *replacement = cast<ValueDecl>(D);
 
+  // Embedded Swift does not support dynamic replacement, so the attribute is
+  // ignored (see DynamicallyReplacedDeclRequest).
+  auto *dc = isa<DeclContext>(D) ? cast<DeclContext>(D) : D->getDeclContext();
+  if (auto behavior =
+          shouldDiagnoseEmbeddedLimitations(dc, attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::dynamic_replacement_in_embedded_swift,
+             D)
+        .limitBehavior(*behavior)
+        .fixItRemove(attr->getRangeWithAt());
+  }
+  if (Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    attr->setInvalid();
+    return;
+  }
+
   if (!isa<ExtensionDecl>(replacement->getDeclContext()) &&
       !replacement->getDeclContext()->isModuleScopeContext()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_not_in_extension,
@@ -6342,6 +6371,10 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
   if (VD->isImplicit())
+    return nullptr;
+
+  // Embedded Swift does not support dynamic replacement.
+  if (VD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return nullptr;
 
   auto *attr = VD->getAttrs().getAttribute<DynamicReplacementAttr>();

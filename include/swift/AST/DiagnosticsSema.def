@@ -9430,6 +9430,16 @@ GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               "creating a circular metadata dependency",
               (Type, Type))
 
+GROUPED_WARNING(dynamic_in_embedded_swift, EmbeddedRestrictions, none,
+                "%kind0 cannot be 'dynamic' in Embedded Swift; 'dynamic' will "
+                "be ignored",
+                (const Decl *))
+GROUPED_WARNING(dynamic_replacement_in_embedded_swift, EmbeddedRestrictions,
+                none,
+                "%kind0 cannot be a dynamic replacement in Embedded Swift; "
+                "'@_dynamicReplacement' will be ignored",
+                (const Decl *))
+
 GROUPED_ERROR(export_interface_on_generic_in_embedded_swift,
               EmbeddedRestrictions, none,
               "'@export(interface)' cannot be applied to a "

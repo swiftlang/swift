@@ -968,6 +968,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
     return false;
 
+  // Embedded Swift does not support dynamic replacement, so nothing is
+  // 'dynamic'. An explicit 'dynamic' is diagnosed and ignored.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   // Add dynamic if -enable-implicit-dynamic was requested.
   TypeChecker::addImplicitDynamicAttribute(decl);
 
