@@ -4,11 +4,13 @@
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
-// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt %} %else %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// With the Embedded Swift platform abstraction layer, the dependencies on the
+// C library are replaced by the hooks in EmbeddedPlatform.h.
+// RUN: %if !swift_embedded_platform && OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if !swift_embedded_platform && !OS=linux-gnu %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if swift_embedded_platform && OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux_pal.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if swift_embedded_platform && !OS=linux-gnu %{ comm -13 %t/allowed-dependencies_macos_pal.txt %t/actual-dependencies.txt > %t/extra.txt %}
 // RUN: test ! -s %t/extra.txt
-
-// Expects the POSIX-based dependencies, not the Embedded Swift platform ones.
-// XFAIL: swift_embedded_platform
 
 //--- allowed-dependencies_macos.txt
 ___divti3
@@ -33,6 +35,24 @@ memmove
 memset
 putchar
 stdout
+//--- allowed-dependencies_macos_pal.txt
+___stack_chk_fail
+___stack_chk_guard
+__swift_lockStandardOutput
+__swift_reportErrorAt
+__swift_unlockStandardOutput
+__swift_writeToStandardOutput
+_memmove
+_memset
+//--- allowed-dependencies_linux_pal.txt
+__stack_chk_fail
+__stack_chk_guard
+_swift_lockStandardOutput
+_swift_reportErrorAt
+_swift_unlockStandardOutput
+_swift_writeToStandardOutput
+memmove
+memset
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-embedded-link %t/a.o %t/print.o -o %t/a.out
