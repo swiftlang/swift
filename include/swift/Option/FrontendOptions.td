@@ -286,6 +286,7 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
 def swift_module_file: Joined<["-"], "swift-module-file=">,
   MetaVarName<"<name>=<path>">,
   HelpText<"Specify Swift module input explicitly built from textual interface">;
@@ -308,6 +309,7 @@ def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
@@ -1684,18 +1686,22 @@ def always_compile_output_files :
   HelpText<"Always compile output files even it might not change the results">;
 
 // CAS/Caching related options.
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def input_file_key : Separate<["-"], "input-file-key">,
   HelpText<"Cache Key for input file">;
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
   HelpText<"Cache Key for bridging header pch">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
   HelpText<"Read the input files from disk and overlay them on the CAS file "
