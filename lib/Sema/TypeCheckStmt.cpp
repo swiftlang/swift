@@ -3558,6 +3558,16 @@ private:
     auto protoDecl = seqConformanceRef.getProtocol();
 
     auto domainAndRange = constraint.getDomainAndRange(ctx);
+
+    if (constraint.isUnavailable()) {
+      EncodedDiagnosticMessage encodedMessage(constraint.getAttr().getMessage());
+      ctx.Diags.diagnose(loc, diag::conformance_availability_unavailable,
+                         seqType, protoDecl->getDeclaredInterfaceType(),
+                         /*hideDomain=*/false, domainAndRange.getDomain(),
+                         encodedMessage.Message);
+      return;
+    }
+
     ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
                        seqType, protoDecl,
                        domainAndRange.getDomain().getNameForAttributePrinting(),
