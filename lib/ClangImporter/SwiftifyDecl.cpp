@@ -1427,7 +1427,7 @@ bool emitArgumentBindings(llvm::raw_ostream &os,
     const UnswiftifyParamInfo &info = infos[index];
     if (info.isElidedBoundsParam)
       continue;
-    if (!assertExpr(callArgIdx <= sourceParams->size()))
+    if (!assertExpr(callArgIdx < sourceParams->size()))
       return false;
     const ParamDecl *sourceParam = sourceParams->get(callArgIdx);
     bool isInout = sourceParam->isInOut();
