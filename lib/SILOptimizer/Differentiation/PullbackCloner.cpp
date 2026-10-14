@@ -1973,6 +1973,22 @@ public:
     }
   }
 
+  /// Handle `pointer_to_address` instruction.
+  ///   Original: y = pointer_to_address x
+  ///    Adjoint: nothing
+  void visitPointerToAddressInst(PointerToAddressInst *ptai) {
+    // Check for unsupported projections
+    auto *bb = ptai->getParent();
+    auto adjSrc = getAdjointProjection(bb, ptai->getOperand());
+    if (!adjSrc) {
+      getContext().emitNondifferentiabilityError(
+          ptai, getInvoker(),
+          diag::autodiff_cannot_differentiate_invalid_pointer_cast);
+      errorOccurred = true;
+      return;
+    }
+  }
+
   /// Handle `unconditional_checked_cast_addr` instruction.
   ///   Original: y = unconditional_checked_cast_addr x
   ///    Adjoint: adj[x] += unconditional_checked_cast_addr adj[y]
@@ -2200,9 +2216,6 @@ public:
   // Address projections.
   NO_ADJOINT(StructElementAddr)
   NO_ADJOINT(TupleElementAddr)
-
-  // Array literal initialization address projections.
-  NO_ADJOINT(PointerToAddress)
   NO_ADJOINT(IndexAddr)
   NO_ADJOINT(AddressToPointer)
 
@@ -3798,6 +3811,27 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
         getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, ai->getLoc());
     return eltAdjBuffer;
   }
+
+  // Pointer-to-address and address-to-pointer are projections to the original
+  // buffer.
+  if (auto *atp = dyn_cast<AddressToPointerInst>(originalProjection)) {
+    auto adjBase = getAdjointBuffer(origBB, atp->getOperand());
+    if (errorOccurred)
+      return (bufferMap[{origBB, originalProjection}] = SILValue());
+    // Return the base buffer's adjoint buffer.
+    return adjBase;
+  }
+  if (auto *pta = dyn_cast<PointerToAddressInst>(originalProjection)) {
+    // Note that we cannot directly call getAdjointBuffer() here as
+    // there is no tangent for raw pointer value. We only support
+    // no-op casts like pointer_to_address(address_to_pointer(x))
+    auto adjBase = getAdjointProjection(origBB, pta->getOperand());
+    if (!adjBase || errorOccurred)
+      return (bufferMap[{origBB, originalProjection}] = SILValue());
+    // Return the base buffer's adjoint buffer.
+    return adjBase;
+  }
+
   return SILValue();
 }
 

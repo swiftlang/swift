@@ -708,6 +708,8 @@ NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
      "cannot differentiate writes to global variables", ())
 NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
      "cannot differentiate writes to mutable captures", ())
+NOTE(autodiff_cannot_differentiate_invalid_pointer_cast,none,
+     "cannot differentiate non-projection raw pointer operations", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
