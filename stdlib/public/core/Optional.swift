@@ -399,6 +399,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   ///   postfix `!` operator.
   @inlinable
   @unsafe
+  @_owned
   @_preInverseGenerics
   public var unsafelyUnwrapped: Wrapped {
     @inline(__always)
@@ -419,6 +420,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// overhead for users, even in Debug builds.
   @inlinable
   @unsafe
+  @_owned
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
