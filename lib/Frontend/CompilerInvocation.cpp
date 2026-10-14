@@ -3622,10 +3622,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-  Opts.EnableAddressDependencies = Args.hasFlag(
-      OPT_enable_address_dependencies, OPT_disable_address_dependencies,
-      Opts.EnableAddressDependencies);
-
   if (LangOpts.Target.isOSDarwin() || LangOpts.Target.isOSLinux()) {
     // On Darwin and Linux, use yield_once_2 by default.
     Opts.CoroutineAccessorsUseYieldOnce2 = true;

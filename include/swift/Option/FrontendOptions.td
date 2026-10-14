@@ -1740,12 +1740,6 @@ def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
   HelpText<"Write generated output from scanner for debugging purpose">,
   Flags<[HelpHidden]>;
 
-def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
-  HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
-
-def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
-  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
-
 def gen_reproducer : Flag<["-"], "gen-reproducer">,
                      HelpText<"Generate a reproducer for current compilation.">;
 def gen_reproducer_dir
