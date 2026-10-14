@@ -64,11 +64,12 @@ void swift::forEachRequiredHiddenTypeLayout(
   // hidden from clients, schedule it to receive a hidden representation.
   // Otherwise, recurse into non-resilient structs and enums, or the public
   // class root, looking for hidden component types.
-  std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *)>
+  std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *,
+                       bool)>
       processTypeForHiddenLayouts =
           [&](Type type, DeclContext *useDC,
               NominalTypeDecl *abiExposedType,
-              ValueDecl *layoutAffectingStorage) {
+              ValueDecl *layoutAffectingStorage, bool inFunctionType) {
         if (auto *hiddenType = type->getAs<HiddenType>()) {
           if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
             reportHiddenType(layoutInfo, type,
@@ -80,8 +81,40 @@ void swift::forEachRequiredHiddenTypeLayout(
         if (auto *tupleType = type->getAs<TupleType>()) {
           for (auto elt : tupleType->getElements())
             processTypeForHiddenLayouts(elt.getType(), useDC, abiExposedType,
-                                        layoutAffectingStorage);
+                                        layoutAffectingStorage,
+                                        inFunctionType);
           return;
+        }
+
+        if (auto *fnType = type->getAs<AnyFunctionType>()) {
+          // A function value has fixed size, but clients can only use it
+          // when the signature resolves. Recurse so hidden signature types
+          // get serialized layouts.
+          for (auto param : fnType->getParams())
+            processTypeForHiddenLayouts(param.getPlainType(), useDC,
+                                        abiExposedType, layoutAffectingStorage,
+                                        /*inFunctionType=*/true);
+          processTypeForHiddenLayouts(fnType->getResult(), useDC,
+                                      abiExposedType, layoutAffectingStorage,
+                                      /*inFunctionType=*/true);
+          if (Type thrownError = fnType->getThrownError())
+            processTypeForHiddenLayouts(thrownError, useDC, abiExposedType,
+                                        layoutAffectingStorage,
+                                        /*inFunctionType=*/true);
+          return;
+        }
+
+        // Generic arguments named in a function signature are part of the
+        // signature. (Outside function types they are not walked: resilient
+        // wrappers have fixed size, and same-module generics resolve through
+        // substitution below.)
+        if (inFunctionType) {
+          if (auto *bgt = type->getAs<BoundGenericType>()) {
+            for (Type arg : bgt->getGenericArgs())
+              processTypeForHiddenLayouts(arg, useDC, abiExposedType,
+                                          layoutAffectingStorage,
+                                          /*inFunctionType=*/true);
+          }
         }
 
         NominalTypeDecl *nominal = nullptr;
@@ -166,8 +199,10 @@ void swift::forEachRequiredHiddenTypeLayout(
             auto *storage = prop->getModuleContext() == module
                                 ? prop
                                 : layoutAffectingStorage;
+            // Reset: nominal definitions resolve through the nominal itself.
             processTypeForHiddenLayouts(storedType, prop->getDeclContext(),
-                                        abiExposedType, storage);
+                                        abiExposedType, storage,
+                                        /*inFunctionType=*/false);
           }
         } else if (auto *innerEnum = dyn_cast<EnumDecl>(nominal)) {
           for (auto *elt : innerEnum->getAllElements()) {
@@ -179,7 +214,8 @@ void swift::forEachRequiredHiddenTypeLayout(
                                   : layoutAffectingStorage;
               processTypeForHiddenLayouts(payloadType.subst(substitutions),
                                           elt->getDeclContext(), abiExposedType,
-                                          storage);
+                                          storage,
+                                          /*inFunctionType=*/false);
             }
           }
         }
@@ -201,7 +237,7 @@ void swift::forEachRequiredHiddenTypeLayout(
       if (isABIAccessibleValueType || isPublicClass) {
         processTypeForHiddenLayouts(
             nominal->getDeclaredInterfaceType(), nominal, nominal,
-            /*layoutAffectingStorage=*/nullptr);
+            /*layoutAffectingStorage=*/nullptr, /*inFunctionType=*/false);
       }
     }
 
