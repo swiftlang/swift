@@ -152,20 +152,26 @@ extension _StringGuts {
 //
 extension _StringGuts {
   // Whether we can provide fast access to contiguous UTF-8 code units
+#if _runtime(_ObjC)
   @_transparent
   @inlinable
-  internal var isFastUTF8: Bool {
-#if _runtime(_ObjC)
-    return _fastPath(_object.providesFastUTF8)
+  internal var isFastUTF8: Bool { return _fastPath(_object.providesFastUTF8) }
 #else
-    // A `String` is only ever foreign (non-fast) when it wraps a UTF-16
-    // `NSString`, which requires the Objective-C runtime. Without it every
-    // `String` is small, native, or shared -- all fast UTF-8 -- so folding this
-    // to a compile-time `true` lets the optimizer discard the foreign
-    // fallbacks (and the UTF-16 breadcrumb machinery they reference).
-    return true
+  // A `String` is only ever foreign (non-fast) when it wraps a UTF-16
+  // `NSString`, which requires the Objective-C runtime. Without it every
+  // `String` is small, native, or shared -- all fast UTF-8 -- so folding this
+  // to a compile-time `true` lets the optimizer discard the foreign
+  // fallbacks (and the UTF-16 breadcrumb machinery they reference).
+  //
+  // Deliberately `@inline(always)` rather than `@_transparent`: transparent
+  // functions are inlined before the diagnostic unreachable-code pass, which
+  // would then see the literal `true` and warn "will never be executed" on the
+  // foreign fallback after every `if isFastUTF8 { ... }` in the stdlib.
+  // `@inline(always)` is still guaranteed to inline (even at -Onone), but runs
+  // at the end of the mandatory diagnostic pipeline, after that check.
+  @inlinable @inline(always)
+  internal var isFastUTF8: Bool { return true }
 #endif
-  }
 
   // A String which does not provide fast access to contiguous UTF-8 code units
   @inlinable @inline(__always)
