@@ -972,6 +972,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OptionalPayload>() ||
         last.is<LocatorPathElt::OpenedGeneric>() ||
         last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||

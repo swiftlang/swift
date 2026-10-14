@@ -1532,9 +1532,9 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
     // future optional, and add a constraint between `ty` and `underlyingType`
     // to model it.
     underlyingType = createTypeVariable(
-        getConstraintLocator(locator, LocatorPathElt::GenericArgument(0)),
+        getConstraintLocator(locator, ConstraintLocator::OptionalPayload),
         TVO_PrefersSubtypeBinding | TVO_CanBindToLValue |
-            TVO_CanBindToNoEscape);
+        TVO_CanBindToNoEscape);
 
     // Using a `typeVar` here because l-value is going to be applied
     // to the underlying type below.
@@ -3830,6 +3830,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ProtocolCompositionMemberType:
       break;
 
+    case ConstraintLocator::OptionalPayload:
     case ConstraintLocator::GenericArgument:
     case ConstraintLocator::FunctionArgument:
     case ConstraintLocator::SynthesizedArgument:
@@ -4450,6 +4451,7 @@ bool ConstraintSystem::isArgumentOfImportedDecl(
     // either value-to-optional promotion or optional-to-optional
     // conversion.
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OptionalPayload>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path.pop_back();
       continue;

@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000
-// This also fails with the default limit.
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000 -solver-enable-short-conversions
 
 // https://github.com/swiftlang/swift/issues/73885
 
@@ -49,7 +48,7 @@ extension Event {
     static func test1(foo: Foo) -> Event {
         // Invalid expression, because the dictionary literal has the
         // wrong type.
-        .init(properties: [  // expected-error {{reasonable time}}
+        .init(properties: [
             .dim1: foo.bar?.bar,
             .dim2: foo.bar?.baz,
             .dim3: foo.bar?.bad,
@@ -60,6 +59,10 @@ extension Event {
             .dim8: foo.bar?.isBar,
             .dim9: foo.bar?.bar,
             .dim10: foo.bar.str
+            // expected-error@-1 {{value of optional type 'Bar?' must be unwrapped to refer to member 'str' of wrapped base type 'Bar'}}
+            // expected-note@-2 {{chain the optional using '?' to access member 'str' only for non-'nil' base values}}
+            // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
         ].compactMapValues { $0 })
+        // expected-error@-1 {{cannot convert value of type 'Any' to closure result type 'String?'}}
     }
 }

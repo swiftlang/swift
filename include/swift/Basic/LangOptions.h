@@ -1113,8 +1113,12 @@ namespace swift {
     /// Enable type variable joins. This will be on by default eventually.
     bool SolverEnableTypeVariableJoins = false;
 
-    /// Enable type variable joins. This will be on by default eventually.
+    /// Enable supertype binding promotion. This will be on by default eventually.
     bool SolverEnablePromoteSupertypes = false;
+
+    /// Enable modeling optional conversions without disjunctions.
+    /// This will be on by default eventually.
+    bool SolverEnableShortConversions = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
