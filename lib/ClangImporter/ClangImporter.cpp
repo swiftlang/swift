@@ -31,6 +31,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -7083,6 +7084,22 @@ struct OrderDecls {
 };
 } // namespace
 
+static Decl *getUnswiftifyParent(Decl *decl) {
+  auto *sf = decl->getModuleContext()->getSourceFileContainingLocation(
+      decl->getLoc());
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  CustomAttr *attr = sf->getAttachedMacroAttribute();
+  MacroDecl *macro = attr ? attr->getResolvedMacro() : nullptr;
+  if (!macro)
+    return nullptr;
+  if (macro->getDefinition().kind == MacroDefinition::Kind::Internal &&
+      macro->getBaseName() ==
+          decl->getASTContext().getIdentifier("_Unswiftify"))
+    return sf->getMacroExpansion().dyn_cast<Decl *>();
+  return decl;
+}
+
 static ObjCInterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
                 llvm::TinyPtrVector<Decl *> &impls,
@@ -7091,15 +7108,13 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
     return ObjCInterfaceAndImplementation();
 
   if (impls.size() > 1) {
+    // Don't point to the _Unswiftify expansion in diagnostic: the real
+    // conflict is with the safe impl.
+    for (auto &impl : impls) {
+      if (Decl *parent = getUnswiftifyParent(impl))
+        impl = parent;
+    }
     llvm::sort(impls, OrderDecls());
-
-    // Drop `@_Unswiftify` generated peers to prevent them showing up as
-    // duplicate implementations.
-    llvm::SmallPtrSet<Decl *, 4> implSet(impls.begin(), impls.end());
-    llvm::erase_if(impls, [&](Decl *impl) {
-      Decl *anchor = impl->getMacroExpansionOriginatingDecl();
-      return anchor && anchor != impl && implSet.contains(anchor);
-    });
 
     auto &diags = interfaces.front()->getASTContext().Diags;
     for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
@@ -7395,7 +7410,9 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
       // happen when they have the same number of parameters.
       if (!llvm::is_contained(candidates, result))
         candidates.push_back(result);
-    } else if (resultFunc->isObjCImplementation())
+    } else if (resultFunc->isObjCImplementation() &&
+               (resultFunc->hasSafeInteropSignature() ==
+                   func->hasSafeInteropSignature()))
       impls.push_back(result);
   }
 

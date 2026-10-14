@@ -10367,6 +10367,8 @@ public:
     return D->getKind() == DeclKind::Macro;
   }
 
+  bool isInternalUnswiftify() const;
+
   using DeclContext::operator new;
   using DeclContext::operator delete;
   using Decl::getASTContext;
