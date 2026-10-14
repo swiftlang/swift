@@ -21,7 +21,7 @@ public func borrowNondeinitable<T: ~Copyable & ~Deinitable>(_ t: borrowing T) {}
 public func borrowNoncopyable<T: ~Copyable>(_ t: borrowing T) {}
 
 public struct Box<T: ~Copyable & ~Deinitable>: ~Copyable, ~Deinitable {
-  public var value: T
+  public let value: T
 }
 
 public protocol HasNondeinitable {
