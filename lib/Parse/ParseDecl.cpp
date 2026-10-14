@@ -7287,10 +7287,6 @@ Parser::parseDeclFileDefault(ParseDeclOptions Flags,
 
   SourceLoc DefaultLoc = consumeToken(tok::kw_default);
 
-  if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
-    diagnose(DefaultLoc, diag::experimental_file_default_disabled);
-  }
-
   if (!Attributes.isEmpty()) {
     diagnose((*Attributes.begin())->getStartLoc(),
              diag::file_default_rejects_attributes);

@@ -1,6 +1,5 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -8,13 +7,13 @@
 // Build the macro library
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
 
-// RUN: %target-swift-frontend -emit-sil -swift-version 5 -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main_actor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main_actor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main_actor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main_actor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main_actor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main_actor.swift | %FileCheck --check-prefix=MAIN %s
 
-// RUN: %target-swift-frontend -emit-sil -swift-version 5 -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/nonisolated_override.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/nonisolated_override.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -parse-as-library -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/nonisolated_override.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/nonisolated_override.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/nonisolated_override.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/nonisolated_override.swift | %FileCheck --check-prefix=NONISO %s
 
 //--- macro.swift
 import SwiftSyntax
