@@ -1356,10 +1356,10 @@ func assignGenericMismatch() {
   var a: [Int]?
   var b: [String]
 
-  a = b // expected-error {{cannot assign value of type '[String]' to type '[Int]'}}
+  a = b // expected-error {{cannot assign value of type '[String]' to type '[Int]?'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
 
-  b = a // expected-error {{cannot assign value of type '[Int]' to type '[String]'}}
+  b = a // expected-error {{cannot assign value of type '[Int]?' to type '[String]'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
   // expected-error@-2 {{value of optional type '[Int]?' must be unwrapped to a value of type '[Int]'}}
   // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
