@@ -30,3 +30,19 @@ func testAvailableGuardSequenceConformance(_ xs: S) {
     for _ in xs {}
   }
 }
+
+// Unconditionally unavailable conformances have no version to diagnose.
+
+struct U {}
+
+@available(*, unavailable)
+extension U: Sequence {
+  struct Iterator: IteratorProtocol {
+    func next() -> Int? { nil }
+  }
+  func makeIterator() -> Iterator {}
+}
+
+func testUnconditionallyUnavailableSequenceConformance(_ xs: U) {
+  for _ in xs {} // expected-error {{conformance of 'U' to 'Sequence' is unavailable}}
+}
