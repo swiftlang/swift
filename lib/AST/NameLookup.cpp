@@ -4340,6 +4340,10 @@ void swift::getDirectlyInheritedNominalTypeDecls(
           attributes.globalActorType = customAttrTypeExpr;
         }
       }
+    } else if (auto isolatedAttr = typeRepr->findIsolatedGlobalActorAttr()) {
+      // '@isolated(G)' is an alternative spelling of the '@G' global actor
+      attributes.globalActorAtLoc = isolatedAttr->getAtLoc();
+      attributes.globalActorType = isolatedAttr->getGlobalActorTypeExpr();
     }
   }
 

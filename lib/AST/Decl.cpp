@@ -2113,6 +2113,11 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
                 ProtocolConformanceFlags::GlobalActorIsolated);
         }
       }
+    } else if (auto isolatedAttr = typeRepr->findIsolatedGlobalActorAttr()) {
+      // '@isolated(G)' is an alternative spelling of the '@G' global actor
+      globalActorIsolationType = isolatedAttr->getGlobalActorTypeExpr();
+      RawOptions |= static_cast<unsigned>(
+            ProtocolConformanceFlags::GlobalActorIsolated);
     }
   }
 }

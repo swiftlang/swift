@@ -3047,6 +3047,17 @@ public:
     if (extInfo)
       extInfo = extInfo->withCoroutine(false);
 
+    // SIL function types don't carry global actor isolation, so a generic
+    // global actor (e.g. from '@isolated(G)') doesn't need to be abstracted;
+    // drop it rather than leaving a type parameter outside of the substituted
+    // generic signature
+    if (extInfo) {
+      if (Type globalActor = extInfo->getGlobalActor()) {
+        if (globalActor->hasTypeParameter() || globalActor->hasArchetype())
+          extInfo = extInfo->withIsolation(FunctionTypeIsolation::forNonIsolated());
+      }
+    }
+
     return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
                                 /* yields */ {}, newResultTy, extInfo);
   }

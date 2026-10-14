@@ -7266,11 +7266,21 @@ public:
     case FunctionTypeIsolation::Kind::Parameter:
       break;
 
-    case FunctionTypeIsolation::Kind::GlobalActor:
-      Printer << "@";
-      visit(isolation.getGlobalActorType());
-      Printer << " ";
+    case FunctionTypeIsolation::Kind::GlobalActor: {
+      // A generic global actor cannot be spelled as a custom attribute '@G',
+      // so it must use the '@isolated(G)' spelling
+      auto globalActorType = isolation.getGlobalActorType();
+      if (globalActorType->getAnyNominal()) {
+        Printer << "@";
+        visit(globalActorType);
+        Printer << " ";
+      } else {
+        Printer << "@isolated(";
+        visit(globalActorType);
+        Printer << ") ";
+      }
       break;
+    }
 
     case FunctionTypeIsolation::Kind::Erased:
       Printer << "@isolated(any) ";

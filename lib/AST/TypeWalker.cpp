@@ -127,6 +127,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
+    if (Type globalActor = ty->getGlobalActor()) {
+      if (doIt(globalActor))
+        return true;
+    }
+
     if (auto sendableDep = ty->getSendableDependentType()) {
       if (doIt(sendableDep))
         return true;

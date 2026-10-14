@@ -572,8 +572,14 @@ private:
 
   bool diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr);
 
+  /// Resolve the global actor of a function type or conformance, spelled as
+  /// a '@G' custom attribute or '@isolated(G)' (passed in as \p isolatedAttr).
   Type resolveGlobalActor(SourceLoc loc, TypeResolutionOptions options,
-                          CustomAttr *&attr, TypeAttrSet &attrs);
+                          CustomAttr *&attr, TypeAttrSet &attrs,
+                          IsolatedTypeAttr *isolatedAttr = nullptr);
+
+  Type resolveIsolatedGlobalActor(IsolatedTypeAttr *attr,
+                                  TypeResolutionOptions options);
 
   const clang::Type *tryParseClangType(ConventionTypeAttr *conv,
                                        bool hasConventionCOrBlock);
@@ -3688,27 +3694,112 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
 }
 
 Type TypeResolver::resolveGlobalActor(SourceLoc loc, TypeResolutionOptions options,
-                                      CustomAttr *&attr, TypeAttrSet &attrs) {
+                                      CustomAttr *&attr, TypeAttrSet &attrs,
+                                      IsolatedTypeAttr *isolatedAttr) {
+  assert((!isolatedAttr || isolatedAttr->getIsolationKind() ==
+                               IsolatedTypeAttr::IsolationKind::GlobalActor) &&
+         "expected '@isolated(G)'");
+
   auto foundGlobalActor =
       checkGlobalActorAttributes(loc, attrs.getCustomAttrs());
-  if (!foundGlobalActor)
+  if (foundGlobalActor) {
+    attr = foundGlobalActor->first;
+    attrs.claim(attr);
+
+    // Only one of '@G' and '@isolated(G)' may be used
+    if (isolatedAttr) {
+      diagnose(isolatedAttr->getAtLoc(),
+               diag::isolated_global_actor_with_custom_global_actor, attr);
+      isolatedAttr->setInvalid();
+      isolatedAttr = nullptr;
+    }
+  } else if (!isolatedAttr) {
     return Type();
+  }
 
-  attr = foundGlobalActor->first;
-  attrs.claim(attr);
-
-  Type result = resolveType(attr->getTypeRepr(), options);
+  Type result;
+  TypeRepr *globalActorRepr;
+  SourceLoc attrLoc;
+  bool isInvalid;
+  if (isolatedAttr) {
+    result = resolveIsolatedGlobalActor(isolatedAttr, options);
+    globalActorRepr = isolatedAttr->getGlobalActorTypeRepr();
+    attrLoc = isolatedAttr->getAtLoc();
+    isInvalid = isolatedAttr->isInvalid();
+  } else {
+    result = resolveType(attr->getTypeRepr(), options);
+    globalActorRepr = attr->getTypeRepr();
+    attrLoc = attr->getLocation();
+    isInvalid = attr->isInvalid();
+  }
 
   // Diagnose use of global actor attributes under the task-to-thread model.
-  if (!result->hasError() && !attr->isInvalid() &&
+  if (!result->hasError() && !isInvalid &&
       getASTContext().LangOpts.isConcurrencyModelTaskToThread()) {
     if (Decl *decl = getDeclContext()->getAsDecl()) {
       if (!decl->isUnavailable())
-        diagnose(attr->getLocation(),
+        diagnose(attrLoc,
                  diag::concurrency_task_to_thread_model_global_actor_annotation,
-                 attr->getTypeRepr(), "task-to-thread concurrency model");
+                 globalActorRepr, "task-to-thread concurrency model");
     }
   }
+
+  return result;
+}
+
+Type TypeResolver::resolveIsolatedGlobalActor(IsolatedTypeAttr *attr,
+                                              TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+  Type result =
+      resolveType(attr->getGlobalActorTypeRepr(), options.withoutContext());
+  if (result->hasError())
+    return result;
+
+  auto diagnoseNotGlobalActor = [&]() -> Type {
+    diagnoseInvalid(attr->getGlobalActorTypeRepr(),
+                    attr->getGlobalActorTypeRepr()->getLoc(),
+                    diag::isolated_global_actor_not_global_actor, result);
+    return ErrorType::get(ctx);
+  };
+
+  auto *globalActorProto = ctx.getProtocol(KnownProtocolKind::GlobalActor);
+  if (!globalActorProto) {
+    diagnoseInvalid(attr->getGlobalActorTypeRepr(), attr->getAtLoc(),
+                    diag::no_concurrency_module, "@isolated(...)");
+    return ErrorType::get(ctx);
+  }
+
+  // Only a type parameter itself can be a generic global actor; a type that
+  // merely contains one (e.g. 'G?') is checked like any other type below
+  if (result->isTypeParameter()) {
+    // The generic signature isn't available yet while it is being built; the
+    // requirement is checked once we resolve the interface type
+    if (inStage(TypeResolutionStage::Structural))
+      return result;
+
+    auto genericSig = resolution.getGenericSignature();
+    if (!genericSig)
+      return diagnoseNotGlobalActor();
+
+    // A same-type requirement can make the type parameter concrete, e.g.
+    // 'where G == MainActor'
+    if (genericSig->isConcreteType(result)) {
+      auto nominal = genericSig->getConcreteType(result)->getAnyNominal();
+      if (!nominal || !nominal->isGlobalActor())
+        return diagnoseNotGlobalActor();
+      return result;
+    }
+
+    if (!genericSig->requiresProtocol(result, globalActorProto))
+      return diagnoseNotGlobalActor();
+    return result;
+  }
+
+  // A concrete global actor must be spelled as a proper '@globalActor' type,
+  // same as when used as the '@G' custom attribute
+  auto nominal = result->getAnyNominal();
+  if (!nominal || !nominal->isGlobalActor())
+    return diagnoseNotGlobalActor();
 
   return result;
 }
@@ -3852,11 +3943,28 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     return false;
   };
 
-  // If we're in an inheritance clause, check for a global actor.
+  // If we're in an inheritance clause, check for a global actor, spelled
+  // either '@G' or '@isolated(G)'.
   if (options.is(TypeResolverContext::Inherited)) {
+    IsolatedTypeAttr *isolatedGlobalActorAttr = nullptr;
+    if (auto isolatedAttr = getWithoutClaiming<IsolatedTypeAttr>(attrs)) {
+      if (isolatedAttr->getIsolationKind() ==
+          IsolatedTypeAttr::IsolationKind::GlobalActor)
+        isolatedGlobalActorAttr = claim<IsolatedTypeAttr>(attrs);
+    }
+
     CustomAttr *customAttr = nullptr;
-    (void)resolveGlobalActor(repr->getLoc(), options,
-                             customAttr, attrs);
+    Type globalActor = resolveGlobalActor(repr->getLoc(), options, customAttr,
+                                          attrs, isolatedGlobalActorAttr);
+
+    // Isolated conformances to a generic global actor are not supported
+    if (isolatedGlobalActorAttr && !isolatedGlobalActorAttr->isInvalid() &&
+        globalActor && !globalActor->hasError() &&
+        !globalActor->getAnyNominal()) {
+      diagnoseInvalid(repr, isolatedGlobalActorAttr->getAtLoc(),
+                      diag::isolated_global_actor_generic_conformance,
+                      globalActor);
+    }
   }
 
   if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||
@@ -4530,9 +4638,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         }
       }
 
-      // Don't allow `@isolated` to be combined with non-default
-      // conventions.
+      // Don't allow `@isolated(any)` to be combined with non-default conventions.
       if (isolatedAttr &&
+          isolatedAttr->getIsolationKind() == IsolatedTypeAttr::IsolationKind::Dynamic &&
           representation != FunctionType::Representation::Swift) {
         diagnoseInvalid(repr, conventionAttr->getAtLoc(),
                         diag::invalid_isolated_and_convention_attributes,
@@ -4574,18 +4682,40 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   if (attrs) {
+    // '@isolated(G)' is an alternative spelling of '@G' global actor
+    // isolation, so it is resolved together with the custom attribute
+    IsolatedTypeAttr *isolatedGlobalActorAttr = nullptr;
+    if (isolatedAttr && isolatedAttr->getIsolationKind() ==
+                            IsolatedTypeAttr::IsolationKind::GlobalActor) {
+      isolatedGlobalActorAttr = isolatedAttr;
+      isolatedAttr = nullptr;
+    }
+
     CustomAttr *globalActorAttr = nullptr;
-    Type globalActor = resolveGlobalActor(repr->getLoc(), parentOptions,
-                                          globalActorAttr, *attrs);
-    if (globalActor && !globalActor->hasError() && !globalActorAttr->isInvalid()) {
+    Type globalActor =
+        resolveGlobalActor(repr->getLoc(), parentOptions, globalActorAttr,
+                           *attrs, isolatedGlobalActorAttr);
+    bool hasValidGlobalActor =
+        globalActor && !globalActor->hasError() &&
+        !(globalActorAttr ? globalActorAttr->isInvalid()
+                          : isolatedGlobalActorAttr->isInvalid());
+
+    auto setGlobalActorInvalid = [&] {
+      if (globalActorAttr)
+        globalActorAttr->setInvalid();
+      else
+        isolatedGlobalActorAttr->setInvalid();
+    };
+
+    if (hasValidGlobalActor) {
       if (numIsolatedParams != 0) {
         diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
             .warnUntilLanguageMode(LanguageMode::v6);
-        globalActorAttr->setInvalid();
+        setGlobalActorInvalid();
       } else if (isolatedAttr) {
         diagnose(repr->getLoc(), diag::isolated_attr_global_actor_type,
                  isolatedAttr->getIsolationKindName());
-        globalActorAttr->setInvalid();
+        setGlobalActorInvalid();
       } else {
         isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
 
@@ -4614,6 +4744,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           isolation = FunctionTypeIsolation::forErased();
         }
         break;
+      case IsolatedTypeAttr::IsolationKind::GlobalActor:
+        llvm_unreachable("handled as a global actor isolation above");
       }
     }
   }
@@ -4679,7 +4811,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   if (hasIsolatedParameter(params)) {
     isolation = FunctionTypeIsolation::forParameter();
 
-    if (isolatedAttr) {
+    if (isolatedAttr && isolatedAttr->getIsolationKind() ==
+                            IsolatedTypeAttr::IsolationKind::Dynamic) {
       diagnose(repr->getLoc(), diag::isolated_parameter_isolated_attr_type,
                isolatedAttr->getIsolationKindName());
       isolatedAttr->setInvalid();
@@ -5104,6 +5237,11 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       } else {
         isolation = SILFunctionTypeIsolation::forErased();
       }
+      break;
+    case IsolatedTypeAttr::IsolationKind::GlobalActor:
+      // SIL function types do not carry global actor isolation
+      diagnoseInvalid(repr, isolatedAttr->getAtLoc(),
+                      diag::isolated_global_actor_sil_function_type);
       break;
     }
   }

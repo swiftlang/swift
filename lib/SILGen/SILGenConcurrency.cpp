@@ -345,18 +345,45 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
 
 std::pair<ManagedValue, CanType>
 SILGenFunction::emitLoadOfGlobalActorShared(SILLocation loc, CanType actorType) {
-  NominalTypeDecl *nominal = actorType->getNominalDecl();
-  VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
-  assert(sharedInstanceDecl && "no shared actor field in global actor");
-  SubstitutionMap subs =
-    actorType->getContextSubstitutionMap();
-  Type instanceType =
-    actorType->getTypeOfMember(sharedInstanceDecl);
+  VarDecl *sharedInstanceDecl = nullptr;
+  SubstitutionMap subs;
+  Type instanceType;
+  auto metaRepr = MetatypeRepresentation::Thick;
 
-  auto metaRepr =
-    nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion())
-    ? MetatypeRepresentation::Thick
-    : MetatypeRepresentation::Thin;
+  if (NominalTypeDecl *nominal = actorType->getNominalDecl()) {
+    sharedInstanceDecl = nominal->getGlobalActorInstance();
+    assert(sharedInstanceDecl && "no shared actor field in global actor");
+    subs = actorType->getContextSubstitutionMap();
+    instanceType = actorType->getTypeOfMember(sharedInstanceDecl);
+
+    if (!nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion()))
+      metaRepr = MetatypeRepresentation::Thin;
+  } else {
+    // The global actor is a generic parameter (e.g. from '@isolated(G)'),
+    // so we load 'G.shared' through the 'GlobalActor' protocol requirement
+    if (actorType->hasTypeParameter())
+      actorType = F.mapTypeIntoEnvironment(actorType)->getCanonicalType();
+
+    auto &ctx = getASTContext();
+    auto *globalActorProto = ctx.getProtocol(KnownProtocolKind::GlobalActor);
+    assert(globalActorProto && "generic global actor without GlobalActor");
+
+    for (auto *member : globalActorProto->lookupDirect(ctx.Id_shared)) {
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        if (var->isStatic() && var->isProtocolRequirement()) {
+          sharedInstanceDecl = var;
+          break;
+        }
+      }
+    }
+    assert(sharedInstanceDecl && "no 'shared' requirement in GlobalActor");
+
+    auto conformance = lookupConformance(actorType, globalActorProto);
+    assert(!conformance.isInvalid() &&
+           "generic global actor does not conform to GlobalActor");
+    subs = SubstitutionMap::getProtocolSubstitutions(conformance);
+    instanceType = sharedInstanceDecl->getValueInterfaceType().subst(subs);
+  }
 
   CanType actorMetaType = CanMetatypeType::get(actorType, metaRepr);
   ManagedValue actorMetaTypeValue =

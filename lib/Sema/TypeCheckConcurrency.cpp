@@ -2423,6 +2423,11 @@ namespace {
             if (fn->getOverriddenDecl())
               return false;
 
+            // A declaration cannot be isolated to a generic global actor,
+            // so there is no '@G' attribute to suggest
+            if (!globalActor->getAnyNominal())
+              return false;
+
             fn->diagnose(diag::add_globalactor_to_decl,
                          globalActor->getString(), fn, globalActor)
                 .fixItInsert(fn->getAttributeInsertionLoc(false),
@@ -4879,8 +4884,11 @@ namespace {
       // Check whether the closure's type has a global actor already.
       if (Type closureType = getType(ACE)) {
         if (auto closureFnType = closureType->getAs<FunctionType>()) {
+          // Actor isolation stores interface types, but the type of a closure
+          // isolated to a generic global actor (e.g. through a contextual
+          // '@isolated(G)' type) refers to the contextual global actor type
           if (Type globalActor = closureFnType->getGlobalActor())
-            return globalActor;
+            return globalActor->mapTypeOutOfEnvironment();
         }
       }
 

@@ -6558,6 +6558,20 @@ ERROR(isolated_parameter_isolated_attr_type,none,
 ERROR(isolated_attr_global_actor_type,none,
       "function type cannot have both a global actor and '@isolated(%0)'",
       (StringRef))
+ERROR(isolated_global_actor_not_global_actor,none,
+      "type %0 in '@isolated' attribute is not a global actor",
+      (Type))
+ERROR(isolated_global_actor_with_custom_global_actor,none,
+      "function type cannot be isolated with '@isolated(...)' and "
+      "global actor attribute %0 at the same time",
+      (const CustomAttr *))
+ERROR(isolated_global_actor_generic_conformance,none,
+      "conformance cannot be isolated to generic global actor %0",
+      (Type))
+ERROR(isolated_global_actor_sil_function_type,none,
+      "'@isolated(...)' with a global actor type is not allowed on SIL "
+      "function types",
+      ())
 ERROR(isolated_attr_bad_convention,none,
       "'@isolated(%0)' function type cannot have %1 convention",
       (StringRef, StringRef))

@@ -457,6 +457,18 @@ UNINTERESTING_FEATURE(TrailingComma)
 UNINTERESTING_FEATURE(RawIdentifiers)
 UNINTERESTING_FEATURE(InferIsolatedConformances)
 
+static bool usesFeatureAllowIsolatedGlobalActorAttribute(Decl *decl) {
+  // Only global actor types that cannot be spelled as a custom attribute
+  // (i.e. `@G`) need the `@isolated(G)` syntax when printed
+  return usesTypeMatching(decl, [](Type type) {
+    if (auto fnType = type->getAs<AnyFunctionType>()) {
+      if (auto globalActor = fnType->getGlobalActor())
+        return !globalActor->getAnyNominal();
+    }
+    return false;
+  });
+}
+
 static ABIAttr *getABIAttr(Decl *decl) {
   if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
     for (auto i : range(pbd->getNumPatternEntries()))

@@ -350,9 +350,23 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+IsolatedTypeAttr::IsolatedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
+                                   SourceRange parensRange,
+                                   TypeExpr *globalActorType)
+    : SimpleTypeAttr(atLoc, kwLoc, parensRange),
+      KindLoc(globalActorType->getTypeRepr()->getStartLoc()),
+      GlobalActorType(globalActorType) {
+  Bits.IsolatedTypeAttr.Kind = uint8_t(IsolationKind::GlobalActor);
+}
+
+TypeRepr *IsolatedTypeAttr::getGlobalActorTypeRepr() const {
+  return getGlobalActorTypeExpr()->getTypeRepr();
+}
+
 const char *IsolatedTypeAttr::getIsolationKindName(IsolationKind kind) {
   switch (kind) {
   case IsolationKind::Dynamic: return "any";
+  case IsolationKind::GlobalActor: return "<global actor>";
   }
   llvm_unreachable("bad kind");
 }
@@ -361,7 +375,12 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
                                  const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
-  printer << "(" << getIsolationKindName() << ")";
+  printer << "(";
+  if (getIsolationKind() == IsolationKind::GlobalActor)
+    getGlobalActorTypeRepr()->print(printer, options);
+  else
+    printer << getIsolationKindName();
+  printer << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 

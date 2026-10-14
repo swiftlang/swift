@@ -174,6 +174,25 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   return SourceLoc();
 }
 
+IsolatedTypeAttr *TypeRepr::findIsolatedGlobalActorAttr() const {
+  auto typeRepr = this;
+  while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    for (auto attr : attrTypeRepr->getAttrs()) {
+      if (auto typeAttr = attr.dyn_cast<TypeAttribute *>()) {
+        if (auto isolatedAttr = dyn_cast<IsolatedTypeAttr>(typeAttr)) {
+          if (isolatedAttr->getIsolationKind() ==
+              IsolatedTypeAttr::IsolationKind::GlobalActor)
+            return isolatedAttr;
+        }
+      }
+    }
+
+    typeRepr = attrTypeRepr->getTypeRepr();
+  }
+
+  return nullptr;
+}
+
 CustomAttr *TypeRepr::findCustomAttr() const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {

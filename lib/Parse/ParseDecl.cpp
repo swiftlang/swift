@@ -5279,13 +5279,31 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
     bool invalid = false;
     std::optional<IsolatedTypeAttr::IsolationKind> kind;
-    if (isIdentifier(Tok, "any")) {
+    TypeRepr *globalActorType = nullptr;
+    if (isIdentifier(Tok, "any") && peekToken().is(tok::r_paren)) {
       kindLoc = consumeToken(tok::identifier);
       kind = IsolatedTypeAttr::IsolationKind::Dynamic;
 
     // Add new kinds of isolation here; be sure to update the text for
     // attr_isolated_expected_kind, and change the associated fix-it below.
 
+    } else if (Context.LangOpts.hasFeature(
+                   Feature::AllowIsolatedGlobalActorAttribute) ||
+               InInactiveClauseEnvironment) {
+      // Inactive '#if $AllowIsolatedGlobalActorAttribute' blocks are still
+      // parsed, so accept the syntax there even without the feature
+      // '@isolated(G)' where 'G' is a global actor type or generic parameter
+      kindLoc = Tok.getLoc();
+      kind = IsolatedTypeAttr::IsolationKind::GlobalActor;
+      if (justChecking) {
+        if (!canParseType())
+          return makeParserError();
+      } else {
+        auto globalActorTypeResult = parseType(diag::expected_type);
+        if (globalActorTypeResult.isNull())
+          return makeParserError();
+        globalActorType = globalActorTypeResult.get();
+      }
     } else {
       if (!justChecking) {
         diagnose(Tok, diag::attr_isolated_expected_kind)
@@ -5307,9 +5325,15 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     assert(kind);
 
     if (!justChecking) {
-      result = new (Context) IsolatedTypeAttr(AtLoc, attrLoc,
-                                              {lpLoc, rpLoc},
-                                              {*kind, kindLoc});
+      if (*kind == IsolatedTypeAttr::IsolationKind::GlobalActor) {
+        result = new (Context) IsolatedTypeAttr(
+            AtLoc, attrLoc, {lpLoc, rpLoc},
+            new (Context) TypeExpr(globalActorType));
+      } else {
+        result = new (Context) IsolatedTypeAttr(AtLoc, attrLoc,
+                                                {lpLoc, rpLoc},
+                                                {*kind, kindLoc});
+      }
     }
     return makeParserSuccess();
   }
