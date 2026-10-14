@@ -2797,6 +2797,26 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
 
 // MARK: C++ functional type constructors
 
+/// Looks up the `__SwiftFunctionWrapper` class template from the CxxStdlibShim
+/// module. Only the CxxStdlib overlay imports that module, so this returns null
+/// if the overlay is missing or was not loaded, e.g. because `std` is only
+/// imported by a Clang module that does not re-export it.
+static const clang::ClassTemplateDecl *
+lookupSwiftFunctionWrapperTemplate(ASTContext &ctx) {
+  auto cxxStdlibShimModule =
+      ctx.getLoadedModule(ctx.getIdentifier(CXX_STDLIB_SHIM_NAME));
+  if (!cxxStdlibShimModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> cxxStdlibShimLookupResults;
+  ctx.lookupInModule(cxxStdlibShimModule, "__SwiftFunctionWrapper",
+                     cxxStdlibShimLookupResults);
+  if (cxxStdlibShimLookupResults.size() != 1)
+    return nullptr;
+  return cast<clang::ClassTemplateDecl>(
+      cxxStdlibShimLookupResults.front()->getClangDecl());
+}
+
 /// Synthesizer callback for the constructor that takes a Swift closure.
 ///
 /// \code
@@ -2842,15 +2862,9 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   auto closureParamRefExr = createParamRefExpr(constructor, 0);
 
-  auto cxxStdlibShimModule =
-      ctx.getLoadedModule(ctx.getIdentifier(CXX_STDLIB_SHIM_NAME));
-  SmallVector<ValueDecl *, 1> cxxStdlibShimLookupResults;
-  ctx.lookupInModule(cxxStdlibShimModule, "__SwiftFunctionWrapper",
-                     cxxStdlibShimLookupResults);
-  ASSERT(cxxStdlibShimLookupResults.size() == 1 &&
-         "Must be one exactly __SwiftFunctionWrapper");
-  auto functionWrapperTemplate = cast<clang::ClassTemplateDecl>(
-      cxxStdlibShimLookupResults.front()->getClangDecl());
+  auto functionWrapperTemplate = lookupSwiftFunctionWrapperTemplate(ctx);
+  ASSERT(functionWrapperTemplate &&
+         "makeClosureConstructor checks that __SwiftFunctionWrapper exists");
 
   auto functionReturnType =
       desugarIfTemplateSubst(operatorCallDecl->getReturnType());
@@ -3011,7 +3025,12 @@ ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *d
   PrettyStackTraceDecl trace("creating a closure constructor", decl);
   assert(decl);
   ASTContext &ctx = decl->getASTContext();
-  
+
+  // The constructor body wraps the closure in a __SwiftFunctionWrapper, so skip
+  // the constructor if the wrapper template is not available.
+  if (!lookupSwiftFunctionWrapperTemplate(ctx))
+    return nullptr;
+
   auto callAsFunctionOverloads = decl->lookupDirect(ctx.Id_callAsFunction);
   if (callAsFunctionOverloads.size() != 1)
     return nullptr;
