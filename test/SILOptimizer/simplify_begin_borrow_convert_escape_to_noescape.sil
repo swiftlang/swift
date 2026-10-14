@@ -98,18 +98,20 @@ bb1:
   return %9
 }
 
-/// Rejection test cases prefixed with `keep_`: no transform performed
-
-// Change only the baseline borrow's lexical flag. A nonlexical owner cannot
-// preserve the constraint if this lexical borrow is removed.
-// CHECK-LABEL: {{^}}sil [ossa] @keep_borrowLexical :
+// CHECK-LABEL: {{^}}sil [ossa] @noConvert_ownerNoLexical_borrowLexical :
 // CHECK:         %[[#OWNER4:]] = partial_apply [callee_guaranteed] %[[#]](%0)
-// CHECK-NEXT:    %[[#BORROW4:]] = begin_borrow [lexical] %[[#OWNER4]]
-// CHECK-NEXT:    %[[#NOESCAPE4:]] = convert_escape_to_noescape %[[#BORROW4]] to $@noescape @callee_guaranteed () -> Int
-// CHECK:         destroy_value %[[#NOESCAPE4]]
-// CHECK-NEXT:    end_borrow %[[#BORROW4]]
+
+// ONONE-NEXT:    %[[#BORROW4:]] = begin_borrow [lexical] %[[#OWNER4]]
+// ONONE-NEXT:    %[[#NOESCAPE4:]] = convert_escape_to_noescape %[[#BORROW4]] to $@noescape @callee_guaranteed () -> Int
+// ONONE:         destroy_value %[[#NOESCAPE4]]
+// ONONE-NEXT:    end_borrow %[[#BORROW4]]
+
+// OPT-NEXT:      %[[#NOESCAPE4:]] = convert_escape_to_noescape %[[#OWNER4]] to $@noescape @callee_guaranteed () -> Int
+// OPT:           destroy_value %[[#NOESCAPE4]]
+
 // CHECK-NEXT:    destroy_value %[[#OWNER4]]
-sil [ossa] @keep_borrowLexical : $@convention(thin) (Int) -> Int {
+// CHECK-NEXT:    return %[[#]]
+sil [ossa] @noConvert_ownerNoLexical_borrowLexical : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
   %1 = function_ref @captureInt : $@convention(thin) (Int) -> Int
   %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
@@ -122,6 +124,8 @@ bb0(%0 : $Int):
   destroy_value %2
   return %6
 }
+
+/// Rejection test cases prefixed with `keep_`: no transform performed
 
 // CHECK-LABEL: {{^}}sil [ossa] @keep_unsupportedOwnerUseWithConvert :
 // CHECK:         %[[#OWNER5:]] = partial_apply [callee_guaranteed] %[[#]](%0)

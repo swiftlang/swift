@@ -41,9 +41,9 @@ extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
 }
 
 /// Remove a borrow used by a single chain of function conversions ending in
-/// `convert_escape_to_noescape`. This exposes the closure definition to
-/// closure specialization pass, which can look through conversions but cannot
-/// look through `begin_borrow`.
+/// `convert_escape_to_noescape` with a pointer-escaping operand. This exposes
+/// the closure definition to closure specialization, which can look through
+/// conversions but cannot look through `begin_borrow`.
 ///
 /// ```
 ///   %borrow = begin_borrow %owner
@@ -60,12 +60,8 @@ extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
 ///   // ... unchanged uses and cleanup of %noescape ...
 ///   destroy_value %converted
 /// ```
-private func tryReplaceBorrowOfNoEscapeConversion(beginBorrow: BeginBorrowInst,_ context: SimplifyContext) -> Bool {
+private func tryReplaceBorrowOfNoEscapeConversion(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
   let owner = beginBorrow.borrowedValue
-  // Only remove a lexical scope if the enclosing owner already preserves its lifetime constraints.
-  guard !beginBorrow.isLexical || owner.isLexical else {
-    return false
-  }
 
   // If owner has other uses, these might become outside of lifetime after transformation.
   let ownerHasOnlyBeginBorrowUse =
@@ -88,7 +84,10 @@ private func tryReplaceBorrowOfNoEscapeConversion(beginBorrow: BeginBorrowInst,_
       value = convertFunction
 
     case is ConvertEscapeToNoEscapeInst:
-      assert(use.ownership == .pointerEscape)
+      // Conversion to at-most-once function type has `.forwardingConsume` operand ownership.
+      guard use.ownership == .pointerEscape else {
+        return false
+      }
       convertAllUsesToOwned(of: beginBorrow, context)
       return true
 
@@ -102,7 +101,7 @@ private func tryReplaceBorrowOfNoEscapeConversion(beginBorrow: BeginBorrowInst,_
 // See comments of `tryReplaceCopy` and `convertAllUsesToOwned`
 private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
   // Run this before check against `findPointerEscapingUse` since
-  // `convert_escape_to_noescape` is a pointer-escaping use.
+  // `convert_escape_to_noescape` might be a pointer-escaping use.
   if tryReplaceBorrowOfNoEscapeConversion(beginBorrow: beginBorrow, context) {
     return true
   }
