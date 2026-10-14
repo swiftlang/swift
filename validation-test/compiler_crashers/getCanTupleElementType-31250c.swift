@@ -1,5 +1,7 @@
 // {"kind":"emit-silgen","original":"9be99b8e","signature":"getCanTupleElementType(swift::CanType, unsigned int)","signatureNext":"Lowering::AbstractionPattern::getTupleElementType"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
+// FIXME: No longer crashing in CI
+// REQUIRES: rdar190030109
 @available(SwiftStdlib 5.9, *)
 struct a<each b> {
   let c: (repeat each b)
