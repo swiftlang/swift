@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 
 namespace swift {
   static Lazy<ConcurrentReadableArray<swift::MetadataSections *>> registered;
@@ -105,6 +106,70 @@ void swift_enumerateAllMetadataSections(
     // Yield the pointer and (if the callback returns false) break the loop.
     if (!(* body)(sections, context)) {
       return;
+    }
+  }
+}
+
+/// Resolve one field of a SectionIndexEntry: a 32-bit offset relative to the
+/// field's own address.
+static const char *resolveSectionIndexField(const __swift_int32_t *field) {
+  return reinterpret_cast<const char *>(field) + *field;
+}
+
+SWIFT_RUNTIME_EXPORT
+void swift_enumerateCustomSections(const char *sectionName,
+                                   bool (*body)(const void *start, size_t size,
+                                                void *context),
+                                   void *context) {
+  if (!sectionName)
+    return;
+
+  // On COFF the attribute spelling carries a "$" group suffix (".myplugs$B")
+  // that the linker folds away; match on the part before it. Elsewhere this
+  // is the whole name.
+  size_t nameLength = strcspn(sectionName, "$");
+
+  auto snapshot = swift::registered->snapshot();
+  for (const swift::MetadataSections *sections : snapshot) {
+    // Images built by an older toolchain register a shorter structure that
+    // ends before the index field.
+    if (sections->version < 6)
+      continue;
+
+    const auto &index = sections->swift5_sections;
+    auto *entry =
+        reinterpret_cast<const swift::SectionIndexEntry *>(index.start);
+    auto *end = entry + index.length / sizeof(swift::SectionIndexEntry);
+    for (; entry < end; ++entry) {
+      const char *name = resolveSectionIndexField(&entry->name);
+      if (strncmp(name, sectionName, nameLength) != 0 ||
+          name[nameLength] != '\0')
+        continue;
+
+      const char *start = resolveSectionIndexField(&entry->start);
+      const char *stop = resolveSectionIndexField(&entry->stop);
+
+#if defined(_WIN32)
+      // On COFF the entry's start is a marker the compiler placed in the
+      // section's "$A" group; its first word is the marker's own size and the
+      // records begin right after it.
+      if (stop - start >= static_cast<ptrdiff_t>(sizeof(uintptr_t))) {
+        uintptr_t markerSize = *reinterpret_cast<const uintptr_t *>(start);
+        if (markerSize >= sizeof(uintptr_t) &&
+            markerSize <= static_cast<uintptr_t>(stop - start))
+          start += markerSize;
+        else
+          stop = start;
+      }
+#endif
+
+      // Every entry for one name in one image describes the same bounds (a
+      // linker that does not fold the COMDAT groups, such as wasm-ld, leaves
+      // duplicates), so the first one is this image's answer.
+      if (stop > start &&
+          !(*body)(start, static_cast<size_t>(stop - start), context))
+        return;
+      break;
     }
   }
 }

@@ -47,6 +47,7 @@
 #include "swift/Basic/WarningGroupBehavior.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/bit.h"
@@ -54,6 +55,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/TargetParser/Triple.h"
 #include <optional>
 
 namespace swift {
@@ -748,6 +750,48 @@ public:
   const std::optional<StringRef> Name;
 
   bool isDefault() const { return !Name.has_value(); }
+
+  /// Why a section name cannot be listed in the image's custom section index
+  /// (SE-0492) on a given object format, or \c None if it can.
+  enum class IndexProblem {
+    None,
+    /// ELF and Wasm: the linker defines `__start_`/`__stop_` bounds only for
+    /// sections whose name is a C identifier.
+    NotCIdentifier,
+    /// COFF: the index brackets the records with markers in the `$A` and `$Z`
+    /// groups, so the records need a `$` group that sorts between them.
+    NoCOFFGroup,
+  };
+
+  static IndexProblem indexProblem(StringRef name,
+                                   llvm::Triple::ObjectFormatType format) {
+    switch (format) {
+    case llvm::Triple::ELF:
+    case llvm::Triple::Wasm: {
+      if (name.empty() || !(name[0] == '_' || llvm::isAlpha(name[0])))
+        return IndexProblem::NotCIdentifier;
+      for (char c : name.drop_front())
+        if (!(c == '_' || llvm::isAlnum(c)))
+          return IndexProblem::NotCIdentifier;
+      return IndexProblem::None;
+    }
+    case llvm::Triple::COFF: {
+      auto dollar = name.find('$');
+      if (dollar == StringRef::npos || dollar == 0)
+        return IndexProblem::NoCOFFGroup;
+      // The linker orders a section's groups bytewise by the text after the
+      // "$"; the records must land after "$A" and before "$Z".
+      StringRef group = name.substr(dollar + 1);
+      if (group.compare("A") <= 0 || group.compare("Z") >= 0)
+        return IndexProblem::NoCOFFGroup;
+      return IndexProblem::None;
+    }
+    default:
+      // Mach-O carries section bounds in the image header; other formats get
+      // no index.
+      return IndexProblem::None;
+    }
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Section;

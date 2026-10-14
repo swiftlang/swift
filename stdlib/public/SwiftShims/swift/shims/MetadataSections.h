@@ -39,6 +39,25 @@ typedef struct MetadataSectionRange {
   __swift_size_t length;
 } MetadataSectionRange;
 
+/// One entry of the custom section index that the compiler emits on ELF,
+/// Wasm and COFF for every custom section that holds \c @section variables
+/// (SE-0492). Every field is a 32-bit offset relative to the field's own
+/// address, as in every other Swift metadata record, so the index carries no
+/// load-time relocations. Entries are \c linkonce_odr; a linked image normally
+/// holds one per distinct name, and the runtime uses the first it finds.
+///
+/// On ELF and Wasm, \c start and \c stop resolve to the linker-defined
+/// \c __start_<name> and \c __stop_<name> encapsulation symbols, which the
+/// compiler keeps defined with a zero-length retained anchor in the section.
+/// On COFF, \c name is the section name before its "$" group, \c start points
+/// at a compiler-emitted marker in the "$A" group whose first \c uintptr_t
+/// holds the marker's size (the records begin right after it), and \c stop
+/// points at a marker in the "$Z" group.
+typedef struct SectionIndexEntry {
+  __swift_int32_t name;
+  __swift_int32_t start;
+  __swift_int32_t stop;
+} SectionIndexEntry;
 
 /// Identifies the address space ranges for the Swift metadata required by the
 /// Swift runtime.
@@ -94,6 +113,11 @@ struct MetadataSections {
   MetadataSectionRange swift5_accessible_functions;
   MetadataSectionRange swift5_runtime_attributes;
   MetadataSectionRange swift5_tests;
+
+  /// The custom section index: an array of \c SectionIndexEntry describing
+  /// every custom section that holds Swift variables in this image. Only
+  /// present when \c version is at least 6.
+  MetadataSectionRange swift5_sections;
 };
 
 #ifdef __cplusplus

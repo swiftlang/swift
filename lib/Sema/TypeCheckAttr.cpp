@@ -2854,6 +2854,28 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   if (attr->Name && attr->Name->empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
 
+  // A name the image's section index cannot describe still works as a
+  // section; its records just cannot be found by name at run time. Say so for
+  // the records meant to be found: variables that are also '@used'. Embedded
+  // Swift has no index and no runtime to read one.
+  if (attr->Name && !attr->Name->empty() && isa<VarDecl>(D) &&
+      D->getAttrs().hasAttribute<UsedAttr>() &&
+      !Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    auto format = Ctx.LangOpts.Target.getObjectFormat();
+    switch (SectionAttr::indexProblem(*attr->Name, format)) {
+    case SectionAttr::IndexProblem::None:
+      break;
+    case SectionAttr::IndexProblem::NotCIdentifier:
+      diagnose(attr->getLocation(), diag::section_name_not_indexable_elf,
+               *attr->Name);
+      break;
+    case SectionAttr::IndexProblem::NoCOFFGroup:
+      diagnose(attr->getLocation(), diag::section_name_not_indexable_coff,
+               *attr->Name);
+      break;
+    }
+  }
+
   // All of the remaining restrictions apply only to variables. Functions can
   // have a '@section' anywhere, because all functions go into a text section.
   auto *VarD = dyn_cast<VarDecl>(D);

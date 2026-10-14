@@ -87,4 +87,18 @@ void swift::initializeAccessibleFunctionsLookup() {
   }
 }
 
+SWIFT_RUNTIME_EXPORT
+void swift_enumerateCustomSections(const char *sectionName,
+                                   bool (*body)(const void *start, size_t size,
+                                                void *context),
+                                   void *context) {
+  // A statically linked image has no dyld to report headers and may not have
+  // libmacho to look sections up by name. The runtime's own sections above are
+  // found through section$start$ symbols fixed at build time, which is not
+  // possible for a name supplied at run time. Lookup is unavailable here.
+  (void)sectionName;
+  (void)body;
+  (void)context;
+}
+
 #endif // defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

@@ -1384,3 +1384,7 @@ Added: _$ss4CellVMa
 Added: _$ss4CellVMn
 Added: _$ss9ConstCellVMa
 Added: _$ss9ConstCellVMn
+
+// customSectionContents(named:) (SE-0492 section index and runtime access to custom sections)
+Added: _swift_enumerateCustomSections
+Added: _$ss21customSectionContents5namedSaySWGs12StaticStringV_tF

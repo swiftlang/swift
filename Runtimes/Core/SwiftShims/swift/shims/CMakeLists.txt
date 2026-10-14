@@ -2,6 +2,7 @@
 install(FILES
   AssertionReporting.h
   CoreFoundationShims.h
+  CustomSectionsShims.h
   EmbeddedShims.h
   FoundationShims.h
   GlobalObjects.h
