@@ -56,8 +56,17 @@ final class ManualExecutor: TaskExecutor, Sendable {
 final class ContinuationHolder<Success: ~Copyable, Failure: Error>: Sendable {
   private let storage: Mutex<Continuation<Success, Failure>?>
 
+  init() {
+    storage = Mutex(nil)
+  }
+
   init(_ continuation: consuming Continuation<Success, Failure>) {
     storage = Mutex(continuation)
+  }
+
+  func store(_ continuation: consuming Continuation<Success, Failure>) {
+    var continuation = Optional(continuation)
+    storage.withLock { $0 = continuation.take() }
   }
 
   func take() -> Continuation<Success, Failure> {
@@ -123,14 +132,13 @@ final class Box<Value: Sendable>: Sendable {
     // The same with only an escalation handler installed.
     let escalationOnlyExecutor = ManualExecutor()
     let escalationOnlyPriority = Box<TaskPriority?>(nil)
-    let handOff = Mutex<Continuation<Int, Never>?>(nil)
+    let handOff = ContinuationHolder<Int, Never>()
 
     let escalationOnlyTask = Task(executorPreference: escalationOnlyExecutor, priority: .background) { () -> Int in
       await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
          waiter: consuming ContinuationWaiter<Int, Never>) in
-        var continuation = Optional(continuation)
-        handOff.withLock { $0 = continuation.take() }
+        handOff.store(continuation)
         return await waiter.wait(
           onEscalate: { newPriority in escalationOnlyPriority.value = newPriority })
       }
@@ -138,7 +146,7 @@ final class Box<Value: Sendable>: Sendable {
 
     escalationOnlyExecutor.runNextJob() // Runs the task to its suspension.
     escalationOnlyTask.escalatePriority(to: .medium)
-    handOff.withLock { $0.take()! }.resume(returning: 8)
+    handOff.take().resume(returning: 8)
     escalationOnlyExecutor.runNextJob()
 
     let escalationOnlyResult = await escalationOnlyTask.value
