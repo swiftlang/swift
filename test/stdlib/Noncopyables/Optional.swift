@@ -8,8 +8,8 @@ import StdlibUnittest
 
 let suite = TestSuite("Optional Noncopyable Additions")
 
-if #available(StdlibDeploymentTarget 6.4, *) {
-suite.test("Optional.ref") {
+suite.test("Optional.ref")
+.require(.minimumStdlib(.stdlib_6_4)) {
   var o = Optional<[Int]>.none
   do {
     let ref = o.ref
@@ -24,10 +24,9 @@ suite.test("Optional.ref") {
     }
   }
 }
-}
 
-if #available(StdlibDeploymentTarget 6.4, *) {
-suite.test("Optional.mutableRef") {
+suite.test("Optional.mutableRef")
+.require(.minimumStdlib(.stdlib_6_4)) {
   var o = Optional<[Int]>.none
   do {
     let ref = o.mutableRef
@@ -46,7 +45,6 @@ suite.test("Optional.mutableRef") {
   }
   expectEqual(o?.count, 1)
   expectEqual(o?.first, 100)
-}
 }
 
 runAllTests()
