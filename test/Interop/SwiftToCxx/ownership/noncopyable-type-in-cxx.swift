@@ -76,6 +76,50 @@ public struct BigMoveOnly: ~Copyable {
 public func makeBigMoveOnly(_ a: Int) -> BigMoveOnly { return BigMoveOnly(a: a) }
 public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 
+// The layout depends on 'T', so the value is boxed.
+public struct Unique<T>: ~Copyable {
+    public var value: T
+
+    public init(_ value: T) { self.value = value }
+
+    deinit { print("destroy Unique") }
+
+    public func get() -> T { return value }
+    public mutating func set(_ newValue: T) { value = newValue }
+}
+
+// The layout does not depend on 'T', so the value is stored inline.
+public struct Handle<T>: ~Copyable {
+    public let raw: Int
+
+    public init(raw: Int) { self.raw = raw }
+
+    deinit { print("destroy Handle(\(raw))") }
+
+    public func getRaw() -> Int { return raw }
+}
+
+public enum Slot<T>: ~Copyable {
+    case full(T)
+    case empty
+}
+
+public func makeUnique<T>(_ value: T) -> Unique<T> { return Unique(value) }
+public func borrowUnique<T>(_ u: borrowing Unique<T>) -> T { return u.get() }
+public func consumeUnique<T>(_ u: consuming Unique<T>) {}
+public func consumeHandle<T>(_ h: consuming Handle<T>) {}
+
+// A concrete specialization is passed directly.
+public func makeUniqueInt(_ x: Int) -> Unique<Int> { return Unique(x) }
+public func borrowUniqueInt(_ u: borrowing Unique<Int>) -> Int { return u.value }
+public func consumeUniqueInt(_ u: consuming Unique<Int>) {}
+
+// An enum whose layout does not depend on 'T' is stored inline too.
+public enum Flag<T>: ~Copyable {
+    case on(Int)
+    case off
+}
+
 // The checks below follow the order in which the types are emitted.
 
 // Copyable types are unaffected.
@@ -87,7 +131,22 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   friend class _impl::_impl_CopyableStruct;
 
-// A noncopyable type cannot be used as a Swift generic argument yet.
+// A generic noncopyable type is a move-only class template. Like any
+// noncopyable type, it cannot be used as a Swift generic argument yet.
+// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::Flag<T_0_0>> = false;
+// CHECK: class SWIFT_SYMBOL({{.*}}) Flag final {
+// CHECK:   Flag(const Flag &) = delete;
+// CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// CHECK-NEXT:   bool _isMovedFrom = false;
+
+// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::Handle<T_0_0>> = false;
+// CHECK: class SWIFT_SYMBOL({{.*}}) Handle final {
+// CHECK:   Handle(const Handle &) = delete;
+// CHECK-NEXT:   Handle &operator =(const Handle &) = delete;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK Handle(Handle &&other) noexcept {
+// CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// CHECK-NEXT:   bool _isMovedFrom = false;
+
 // CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::MoveOnlyEnum> = false;
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) MoveOnlyEnum final {
@@ -160,7 +219,30 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // BOXED:   swift::_impl::OpaqueStorage _storage;
 // BOXED-NEXT:   friend class _impl::_impl_MoveOnlyStruct;
 
+// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::Slot<T_0_0>> = false;
+// CHECK: class SWIFT_SYMBOL({{.*}}) Slot final {
+// CHECK:   SWIFT_INLINE_THUNK Slot(Slot &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// CHECK:   SWIFT_INLINE_THUNK bool isFull() const;
+// CHECK-NOT: getFull
+// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::Unique<T_0_0>> = false;
+// CHECK: class SWIFT_SYMBOL({{.*}}) Unique final {
+// CHECK:   Unique(const Unique &) = delete;
+// CHECK-NEXT:   Unique &operator =(const Unique &) = delete;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK Unique(Unique &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// CHECK:   swift::_impl::OpaqueStorage _storage;
+// CHECK-NEXT:   friend class _impl::_impl_Unique<T_0_0>;
+
 // A borrowing parameter is still taken by const reference.
 // CHECK: SWIFT_INLINE_THUNK swift::Int borrowMoveOnlyStruct(const MoveOnlyStruct& s) noexcept
+
+// CHECK: SWIFT_INLINE_THUNK void consumeUnique(Unique<T_0_0>&& u) noexcept
+
+// A concrete specialization is passed directly. Swift consumes the value, and
+// C++ only frees the box.
+// CHECK: SWIFT_INLINE_THUNK void consumeUniqueInt(Unique<swift::Int>&& u) noexcept
+// CHECK-NEXT:   alignas(alignof(Unique<swift::Int>)) char copyBuffer_consumedParamCopy_u[sizeof(Unique<swift::Int>)];
+// CHECK-NEXT:   auto &consumedParamCopy_u = *(new(copyBuffer_consumedParamCopy_u) Unique<swift::Int>(static_cast<Unique<swift::Int> &&>(u)));
+// CHECK-NEXT:   swift::_impl::ConsumedValueStorageDestroyer<Unique<swift::Int>> storageGuard_consumedParamCopy_u(consumedParamCopy_u);
+// CHECK-NEXT:   _impl::swift_interop_passDirect_Noncopyable_uint64_t_0_8(Noncopyable::_impl::_impl_Unique<swift::Int>::getOpaquePointer(consumedParamCopy_u))
 
 // CHECK: SWIFT_INLINE_THUNK MoveOnlyStruct makeMoveOnlyStruct(swift::Int x) noexcept
