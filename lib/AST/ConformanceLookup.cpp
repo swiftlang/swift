@@ -36,6 +36,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -1025,6 +1026,14 @@ void TypeBase::computeInvertibleConformances() {
       canType, InvertibleProtocolKind::Copyable);
   Bits.TypeBase.IsEscapable = conformsToInvertible(
       canType, InvertibleProtocolKind::Escapable);
+
+  // A Copyable type is Deinitable if the Copyable protocol inherits from
+  // Deinitable, so only look for the conformance of other types.
+  Bits.TypeBase.IsDeinitable =
+      (Bits.TypeBase.IsCopyable &&
+       InverseRequirement::copyableImpliesDeinitable(
+           canType->getASTContext())) ||
+      conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
@@ -1046,14 +1055,11 @@ bool TypeBase::isEscapable() {
   return Bits.TypeBase.IsEscapable;
 }
 
+/// \returns true iff this type conforms to Deinitable.
 bool TypeBase::isDeinitable() {
-  Type type(this);
-  if (auto *pet = type->getAs<PackExpansionType>())
-    type = pet->getPatternType();
-  auto canType = type->getReferenceStorageReferent()
-                     ->getWithoutSpecifierType()
-                     ->getCanonicalType();
-  return conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return Bits.TypeBase.IsDeinitable;
 }
 
 bool TypeBase::isEscapable(GenericSignature sig) {

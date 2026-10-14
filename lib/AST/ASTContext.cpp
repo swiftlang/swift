@@ -3923,6 +3923,8 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
   if (count > 0) {
     ASSERT(params->size() == count);
     Bits.TypeAliasType.GenericArgCount = count;
+    ASSERT(Bits.TypeAliasType.GenericArgCount == count &&
+           "Too many generic arguments");
     std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
                             getTrailingObjects() + (parent ? 1 : 0));
   } else {
