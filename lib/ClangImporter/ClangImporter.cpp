@@ -7128,10 +7128,13 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
       // conflicts, so we're only concerned with main class bodies and
       // non-category implementations here.
       if (categoryName.empty() || !isa<ExtensionDecl>(impls.front())) {
-        diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
-                       diagnoseOn)
-          .fixItRemove(attr->getRangeWithAt());
-        diags.diagnose(impls.front(), diag::previous_objc_implementation);
+        InFlightDiagnostic D =
+            diags.diagnose(attr->getLocation(),
+                           diag::objc_implementation_two_impls, diagnoseOn);
+        D.fixItRemove(attr->getRangeWithAt());
+        diags.diagnoseWithNotes(std::move(D), [&]() {
+          diags.diagnose(impls.front(), diag::previous_objc_implementation);
+        });
       }
     }
   }
