@@ -23,6 +23,7 @@
 #include "swift/IRGen/IRSymbolVisitor.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/TextAPI/InterfaceFile.h"
@@ -117,6 +118,14 @@ class TBDGenVisitor : public IRSymbolVisitor {
                  EncodeKind kind = EncodeKind::GlobalSymbol);
 
   bool addClassMetadata(ClassDecl *CD);
+
+  /// Imported types whose metadata accessor is exported for the generated C++
+  /// header.
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> ForeignTypeMetadataAccessorsForCxx;
+
+  void addForeignTypeMetadataAccessorsForCxx(CanType type,
+                                             bool onlyGenericArguments);
+  void addForeignTypeMetadataAccessorsForCxx(SILDeclRef declRef);
 
 public:
   TBDGenVisitor(const llvm::Triple &target, const StringRef dataLayoutString,

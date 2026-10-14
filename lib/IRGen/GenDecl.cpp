@@ -26,7 +26,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -5111,25 +5110,6 @@ llvm::StructType *IRGenModule::getTypeMetadataResponseTy() {
   return TypeMetadataResponseTy;
 }
 
-/// Whether the generated C++ header can call the metadata accessor of this
-/// imported type. The header declares a TypeMetadataTrait that calls the
-/// accessor for every C or C++ struct or enum it refers to.
-static bool mayCxxCallForeignTypeMetadataAccessor(IRGenModule &IGM,
-                                                  CanType type) {
-  auto &langOpts = IGM.Context.LangOpts;
-  if (!langOpts.EnableCXXInterop || langOpts.hasFeature(Feature::Embedded))
-    return false;
-  // Type metadata for foreign types is not yet supported on Windows. Bug
-  // #76168.
-  if (IGM.Triple.isOSWindows())
-    return false;
-  if (getTypeMetadataAccessStrategy(type) !=
-      MetadataAccessStrategy::ForeignAccessor)
-    return false;
-  return cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
-             type->getAnyNominal()->getClangDecl()) != nullptr;
-}
-
 /// Foreign type metadata accessors are emitted into every module that uses
 /// them, so they normally have hidden linkonce_odr linkage. C++ code that uses
 /// the generated header can call the accessor from another image, e.g. when
@@ -5140,7 +5120,7 @@ static void
 exposeForeignTypeMetadataAccessorToCxx(IRGenModule &IGM, CanType type,
                                        llvm::Function *fn,
                                        ForDefinition_t forDefinition) {
-  if (!mayCxxCallForeignTypeMetadataAccessor(IGM, type))
+  if (!mayCxxCallForeignTypeMetadataAccessor(IGM.Context.LangOpts, type))
     return;
   bool isELF = IGM.Triple.isOSBinFormatELF();
   if (forDefinition) {

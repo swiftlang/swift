@@ -45,6 +45,7 @@
 #include "llvm/TextAPI/TextAPIWriter.h"
 
 #include "APIGen.h"
+#include "GenMeta.h"
 #include "TBDGenVisitor.h"
 
 using namespace swift;
@@ -445,6 +446,17 @@ bool TBDGenVisitor::willVisitDecl(Decl *D) {
       return false;
 
   DeclStack.push_back(D);
+
+  // The generated C++ header can refer to the payload types of the cases, see
+  // IRGenModule::emitEnumDecl.
+  if (auto *ED = dyn_cast<EnumDecl>(D))
+    if (D->getASTContext().LangOpts.EnableCXXInterop &&
+        ED->getEffectiveAccess() >= AccessLevel::Public)
+      for (auto *element : ED->getAllElements())
+        if (auto payloadType = element->getPayloadInterfaceType())
+          addForeignTypeMetadataAccessorsForCxx(payloadType->getCanonicalType(),
+                                                /*onlyGenericArguments=*/false);
+
   return true;
 }
 
@@ -459,12 +471,69 @@ void TBDGenVisitor::addFunction(SILDeclRef declRef) {
   if (auto asmName = declRef.getAsmName()) {
     addSymbol(*asmName, SymbolSource::forSILDeclRef(declRef),
               SymbolFlags::Text);
+    addForeignTypeMetadataAccessorsForCxx(declRef);
     return;
   }
 
 
   addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef),
             SymbolFlags::Text);
+  addForeignTypeMetadataAccessorsForCxx(declRef);
+}
+
+void TBDGenVisitor::addForeignTypeMetadataAccessorsForCxx(
+    CanType type, bool onlyGenericArguments) {
+  auto &ctx = SwiftModule->getASTContext();
+  irgen::forEachForeignTypeUsedByCxx(
+      ctx.LangOpts, type, onlyGenericArguments, [&](NominalTypeDecl *decl) {
+        auto declaredType = decl->getDeclaredType()->getCanonicalType();
+        if (!irgen::mayCxxCallForeignTypeMetadataAccessor(ctx.LangOpts,
+                                                          declaredType) ||
+            !ForeignTypeMetadataAccessorsForCxx.insert(decl).second)
+          return;
+        // IRGen emits these as weak definitions that can be merged with the
+        // copies in other modules.
+        auto entity = LinkEntity::forTypeMetadataAccessFunction(declaredType);
+        addSymbol(entity.mangleAsString(ctx),
+                  SymbolSource::forIRLinkEntity(entity),
+                  SymbolFlags::Text | SymbolFlags::WeakDefined);
+      });
+}
+
+void TBDGenVisitor::addForeignTypeMetadataAccessorsForCxx(SILDeclRef declRef) {
+  if (!SwiftModule->getASTContext().LangOpts.EnableCXXInterop)
+    return;
+
+  // IRGen notes the types in the lowered signatures of public functions, see
+  // noteUseOfMetadataByCXXInterop. Only look at the kinds of functions whose
+  // interface type has the same parameters and results, so that this never
+  // lists an accessor that IRGen doesn't export.
+  switch (declRef.kind) {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::Allocator:
+  case SILDeclRef::Kind::Initializer:
+    break;
+  default:
+    return;
+  }
+  if (declRef.getLinkage(ForDefinition) != SILLinkage::Public)
+    return;
+  auto *decl = declRef.getAbstractFunctionDecl();
+  if (!decl)
+    return;
+
+  // Like IRGen, look at the parameters, the thrown error and the result, but
+  // not at the generic requirements.
+  bool onlyGenericArguments = irgen::isInExtensionOfImportedType(decl);
+  auto fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
+  for (const auto &param : fnType->getParams())
+    addForeignTypeMetadataAccessorsForCxx(
+        param.getOldType()->getCanonicalType(), onlyGenericArguments);
+  if (auto thrownError = fnType->getThrownError())
+    addForeignTypeMetadataAccessorsForCxx(thrownError->getCanonicalType(),
+                                          onlyGenericArguments);
+  addForeignTypeMetadataAccessorsForCxx(fnType->getResult()->getCanonicalType(),
+                                        onlyGenericArguments);
 }
 
 void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
@@ -494,6 +563,15 @@ void TBDGenVisitor::addLinkEntity(LinkEntity entity) {
 
   SymbolFlags flags = entity.isData() ? SymbolFlags::Data : SymbolFlags::Text;
   addSymbol(linkage.getName(), SymbolSource::forIRLinkEntity(entity), flags);
+
+  // The implementations of the methods of resilient classes are hidden, so
+  // the generated C++ header calls their dispatch thunks instead.
+  if (SwiftModule->getASTContext().LangOpts.EnableCXXInterop &&
+      entity.isDispatchThunk()) {
+    auto declRef = entity.getSILDeclRef();
+    if (declRef.getDecl()->getDeclContext()->getSelfClassDecl())
+      addForeignTypeMetadataAccessorsForCxx(declRef);
+  }
 }
 
 void TBDGenVisitor::addObjCInterface(ClassDecl *CD) {

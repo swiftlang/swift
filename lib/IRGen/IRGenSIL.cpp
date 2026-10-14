@@ -26,7 +26,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeExpansionContext.h"
 #include "swift/AST/Types.h"
@@ -2655,49 +2654,11 @@ static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
 
 void IRGenerator::noteForeignTypesUsedByCxx(CanType type,
                                             bool onlyGenericArguments) {
-  const auto &langOpts = SIL.getASTContext().LangOpts;
-  // Type metadata for foreign types is not yet supported on Windows. Bug
-  // #76168.
-  if (!langOpts.EnableCXXInterop || langOpts.hasFeature(Feature::Embedded) ||
-      langOpts.Target.isOSWindows())
-    return;
-
-  struct Walker : TypeWalker {
-    Walker(IRGenerator &IRGen, bool onlyGenericArguments)
-        : IRGen(IRGen), onlyGenericArguments(onlyGenericArguments) {}
-
-    Action walkToTypePre(Type ty) override {
-      if (ty->is<BoundGenericType>())
-        genericDepth++;
-      else if (auto *nominal = ty->getAs<NominalType>())
-        noteUseOfTypeMetadata(nominal->getDecl());
-      return Action::Continue;
-    }
-
-    Action walkToTypePost(Type ty) override {
-      if (ty->is<BoundGenericType>())
-        genericDepth--;
-
-      return Action::Continue;
-    }
-
-    void noteUseOfTypeMetadata(NominalTypeDecl *type) {
-      if (!IRGen.hasLazyMetadata(type) || !type->hasClangNode())
-        return;
-      // The generated header also lets C++ code use the C and C++ types that
-      // it refers to as generic arguments, e.g. in swift::Array.
-      if (genericDepth == 0 &&
-          (onlyGenericArguments ||
-           !cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
-               type->getClangDecl())))
-        return;
-      IRGen.noteUseOfForeignTypeMetadataByCxx(type);
-    }
-    IRGenerator &IRGen;
-    bool onlyGenericArguments;
-    int genericDepth = 0;
-  } walker{*this, onlyGenericArguments};
-  type.walk(walker);
+  forEachForeignTypeUsedByCxx(SIL.getASTContext().LangOpts, type,
+                              onlyGenericArguments, [&](NominalTypeDecl *decl) {
+                                if (hasLazyMetadata(decl))
+                                  noteUseOfForeignTypeMetadataByCxx(decl);
+                              });
 }
 
 /// C++ interop might refer to the type metadata in some scenarios.
@@ -2708,11 +2669,9 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
                                           const TypeExpansionContext &context) {
   // The generated header doesn't expose the members of extensions of imported
   // types, so only their generic arguments need metadata.
-  bool onlyGenericArguments = false;
-  if (auto declRef = f->getDeclRef(); declRef && declRef.hasDecl())
-    if (auto *nominal =
-            declRef.getDecl()->getDeclContext()->getSelfNominalTypeDecl())
-      onlyGenericArguments = nominal->hasClangNode();
+  auto declRef = f->getDeclRef();
+  bool onlyGenericArguments = declRef && declRef.hasDecl() &&
+                              isInExtensionOfImportedType(declRef.getDecl());
 
   auto type = f->getLoweredFunctionType();
   for (const auto &param : type->getParameters())
