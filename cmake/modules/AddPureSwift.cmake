@@ -3,7 +3,7 @@ include(macCatalystUtils)
 # Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_add_dependencies TARGET)
   foreach(DEPENDENCY ${ARGN})
-    string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
+    string(REGEX REPLACE "[<>:\"/\\|?*]" _ sanitized ${DEPENDENCY})
     set(depfile "${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift")
     add_custom_command(OUTPUT ${depfile}
       COMMAND ${CMAKE_COMMAND} -E touch ${depfile}
