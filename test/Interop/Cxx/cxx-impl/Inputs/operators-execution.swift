@@ -3,15 +3,15 @@ import Operators
 extension Vector {
   // bool Vector::operator==(const Vector &other) const;
   @unsafe @cxx(`operator==`) @implementation
-  public func equals(_ other: Vector) -> Bool { return x == other.x }
+  public func equals(_ other: borrowing Vector) -> Bool { return x == other.x }
 
   // bool Vector::operator<(const Vector &other) const;
   @unsafe @cxx(`operator<`) @implementation
-  public func less(_ other: Vector) -> Bool { return x < other.x }
+  public func less(_ other: borrowing Vector) -> Bool { return x < other.x }
 
   // Vector Vector::operator+(const Vector &other) const;
   @unsafe @cxx(`operator+`) @implementation
-  public func plus(_ other: Vector) -> Vector { return Vector(x: x + other.x) }
+  public func plus(_ other: borrowing Vector) -> Vector { return Vector(x: x + other.x) }
 
   // Vector Vector::operator+(int k) const;
   @cxx(`operator+`) @implementation
@@ -23,11 +23,11 @@ extension Vector {
 
   // Vector Vector::operator-(const Vector &other) const;
   @unsafe @cxx(`operator-`) @implementation
-  public func minus(_ other: Vector) -> Vector { return Vector(x: x - other.x) }
+  public func minus(_ other: borrowing Vector) -> Vector { return Vector(x: x - other.x) }
 
   // Vector &Vector::operator+=(const Vector &other);
   @unsafe @cxx(`operator+=`) @implementation
-  public mutating func plusEquals(_ other: Vector) -> UnsafeMutablePointer<Vector> {
+  public mutating func plusEquals(_ other: borrowing Vector) -> UnsafeMutablePointer<Vector> {
     x += other.x
     return withUnsafeMutablePointer(to: &self) { $0 }
   }
@@ -58,31 +58,31 @@ extension Vector {
 
 // bool operator!=(const Vector &a, const Vector &b);
 @unsafe @cxx @implementation
-public func != (a: Vector, b: Vector) -> Bool { return a.x != b.x }
+public func != (a: borrowing Vector, b: borrowing Vector) -> Bool { return a.x != b.x }
 
 // Vector operator*(const Vector &a, int k);
 @unsafe @cxx(`operator*`) @implementation
-public func times(_ a: Vector, _ k: Int32) -> Vector { return Vector(x: a.x * k) }
+public func times(_ a: borrowing Vector, _ k: Int32) -> Vector { return Vector(x: a.x * k) }
 
 // bool Outer::operator==(const Point &a, const Point &b);
 @unsafe @cxx @implementation
-public func == (a: Outer.Point, b: Outer.Point) -> Bool { return a.v == b.v }
+public func == (a: borrowing Outer.Point, b: borrowing Outer.Point) -> Bool { return a.v == b.v }
 
 extension Handle {
   // bool Handle::operator==(const Handle &other) const;
   @cxx(`operator==`) @implementation
-  public func equals(_ other: Handle) -> Bool { return value == other.value }
+  public func equals(_ other: borrowing Handle) -> Bool { return value == other.value }
 }
 
 // bool operator<(const Handle &a, const Handle &b);
 @cxx @implementation
-public func < (a: Handle, b: Handle) -> Bool { return a.value < b.value }
+public func < (a: borrowing Handle, b: borrowing Handle) -> Bool { return a.value < b.value }
 
 // int swiftCallsOperators(const Vector &a, const Vector &b);
 @unsafe @cxx @implementation
-public func swiftCallsOperators(_ a: Vector, _ b: Vector) -> Int32 {
-  var v = a
-  let w = b
+public func swiftCallsOperators(_ a: borrowing Vector, _ b: borrowing Vector) -> Int32 {
+  var v = copy a
+  let w = copy b
   var n: Int32 = 0
   if v == w { n += 1 }
   if v != w { n += 10 }

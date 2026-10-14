@@ -13,6 +13,11 @@ module Functions {
   requires cplusplus
 }
 
+module Lifetimes {
+  header "lifetimes.h"
+  requires cplusplus
+}
+
 module Matching {
   header "matching.h"
   requires cplusplus

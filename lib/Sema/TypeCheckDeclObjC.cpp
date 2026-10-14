@@ -400,28 +400,6 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    // The C++ ABI decides whether the callee owns a non-trivial class passed
-    // by value (it does not under Itanium, it does under Microsoft), so
-    // `borrowing` and `consuming` each contradict one ABI. Only the default
-    // ownership follows the ABI.
-    auto ownership = param->getValueOwnership();
-    if (language == ForeignLanguage::Cxx &&
-        (ownership == ValueOwnership::Shared ||
-         ownership == ValueOwnership::Owned) &&
-        importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
-      softenIfAccessNote(AFD, Reason.getAttr(),
-                         diags
-                             .diagnose(param->getStartLoc(),
-                                       diag::cxx_param_ownership_unsupported,
-                                       AFD, param,
-                                       ownership == ValueOwnership::Owned)
-                             .highlight(param->getSourceRange())
-                             .limitBehavior(behavior));
-      Reason.describe(AFD);
-
-      return false;
-    }
-
     if (param->getTypeInContext()->hasError())
       return false;
 
@@ -4439,14 +4417,53 @@ private:
       return true;
     }
 
-    // An lvalue reference parameter is implemented by an `inout` or a by-value
-    // parameter. C++ callers may pass aliasing references, which `inout` and
-    // by-value parameters let the optimizer assume away, so the implementation
+    auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+
+    // Check value ownership.
+    for (unsigned i = 0, n = params->size(); i != n; ++i) {
+      auto *param = params->get(i);
+      auto ownership = param->getValueOwnership();
+      clang::QualType clangType = clangFD->getParamDecl(i)->getType();
+
+      // A `const T &` parameter is borrowed for the call, so the implementation
+      // must spell it `borrowing`.
+      if (clangType->isLValueReferenceType() &&
+          clangType->getPointeeType().isConstQualified()) {
+        if (ownership == ValueOwnership::Shared)
+          continue;
+        auto diag = diagnose(param->getStartLoc(),
+                             diag::cxx_const_ref_param_requires_borrowing, cand,
+                             cxxName, param);
+        diag.highlight(param->getSourceRange());
+        if (const auto *repr = param->getTypeRepr()) {
+          if (const auto *ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr))
+            diag.fixItReplace(ownershipRepr->getSpecifierLoc(), "borrowing");
+          else
+            diag.fixItInsert(repr->getStartLoc(), "borrowing ");
+        }
+        return true;
+      }
+
+      // The C++ ABI decides whether the callee owns a non-trivial class passed
+      // by value (it does not under Itanium, it does under Microsoft), so
+      // `borrowing` and `consuming` each contradict one ABI.
+      if ((ownership == ValueOwnership::Shared ||
+           ownership == ValueOwnership::Owned) &&
+          importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
+        diagnose(param->getStartLoc(), diag::cxx_param_ownership_unsupported,
+                 cand, cxxName, param, ownership == ValueOwnership::Owned)
+            .highlight(param->getSourceRange());
+        return true;
+      }
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a
+    // `borrowing` parameter. C++ callers may pass aliasing references, which
+    // such parameters let the optimizer assume away, so the implementation
     // must be marked `@unsafe`. A reference to a foreign reference type is
     // exempt: the parameter carries the object, not the reference.
     if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
       auto *loader = cand->getASTContext().getClangModuleLoader();
-      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
       bool diagnosed = false;
       for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
         const auto *clangParam = clangFD->getParamDecl(i);
