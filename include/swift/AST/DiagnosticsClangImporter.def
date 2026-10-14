@@ -266,6 +266,14 @@ NOTE(cxx_unsafe_skipped_lifetime_no_borrowable_storage, none,
      "Swift cannot represent the lifetime annotation on "
      "%select{'self'|parameter '%1'}0, which has no borrowable storage",
      (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_captured_globally, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, which may be captured by a global or "
+     "unknown entity", (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_escapable_capture, none,
+     "Swift cannot represent the lifetime annotation on "
+     "%select{'self'|parameter '%1'}0, which is Escapable and imported by "
+     "value", (bool, StringRef))
 
 // Why a type's escapability could not be determined. Also emitted at the type,
 // which is why these do not name it either.
