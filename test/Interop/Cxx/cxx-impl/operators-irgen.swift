@@ -18,19 +18,19 @@ extension Vector {
   // CHECK-SYSV-LABEL: define{{.*}} i1 @_ZNK6VectoreqERKS_(ptr %0, ptr %1)
   // CHECK-WIN-LABEL: define{{.*}} i1 @"??8Vector@@QEBA_NAEBU0@@Z"(ptr %0, ptr %1)
   @unsafe @cxx(`operator==`) @implementation
-  public func equals(_ other: Vector) -> Bool { return x == other.x }
+  public func equals(_ other: borrowing Vector) -> Bool { return x == other.x }
 
   // bool Vector::operator<(const Vector &other) const;
   // CHECK-SYSV-LABEL: define{{.*}} i1 @_ZNK6VectorltERKS_(ptr %0, ptr %1)
   // CHECK-WIN-LABEL: define{{.*}} i1 @"??MVector@@QEBA_NAEBU0@@Z"(ptr %0, ptr %1)
   @unsafe @cxx(`operator<`) @implementation
-  public func less(_ other: Vector) -> Bool { return x < other.x }
+  public func less(_ other: borrowing Vector) -> Bool { return x < other.x }
 
   // Vector Vector::operator+(const Vector &other) const;
   // CHECK-SYSV-LABEL: define{{.*}} i32 @_ZNK6VectorplERKS_(ptr %0, ptr %1)
   // CHECK-WIN-LABEL: define{{.*}} @"??HVector@@QEBA?AU0@AEBU0@@Z"(ptr %0, ptr {{[^,]*}}sret
   @unsafe @cxx(`operator+`) @implementation
-  public func plus(_ other: Vector) -> Vector { return Vector(x: x + other.x) }
+  public func plus(_ other: borrowing Vector) -> Vector { return Vector(x: x + other.x) }
 
   // Vector Vector::operator+(int k) const;
   // CHECK-SYSV-LABEL: define{{.*}} i32 @_ZNK6VectorplEi(ptr %0, i32 %1)
@@ -48,13 +48,13 @@ extension Vector {
   // CHECK-SYSV-LABEL: define{{.*}} i32 @_ZNK6VectormiERKS_(ptr %0, ptr %1)
   // CHECK-WIN-LABEL: define{{.*}} @"??GVector@@QEBA?AU0@AEBU0@@Z"(ptr %0, ptr {{[^,]*}}sret
   @unsafe @cxx(`operator-`) @implementation
-  public func minus(_ other: Vector) -> Vector { return Vector(x: x - other.x) }
+  public func minus(_ other: borrowing Vector) -> Vector { return Vector(x: x - other.x) }
 
   // Vector &Vector::operator+=(const Vector &other);
   // CHECK-SYSV-LABEL: define{{.*}} ptr @_ZN6VectorpLERKS_(ptr %0, ptr %1)
   // CHECK-WIN-LABEL: define{{.*}} ptr @"??YVector@@QEAAAEAU0@AEBU0@@Z"(ptr %0, ptr %1)
   @unsafe @cxx(`operator+=`) @implementation
-  public mutating func plusEquals(_ other: Vector) -> UnsafeMutablePointer<Vector> {
+  public mutating func plusEquals(_ other: borrowing Vector) -> UnsafeMutablePointer<Vector> {
     x += other.x
     return withUnsafeMutablePointer(to: &self) { $0 }
   }
@@ -95,33 +95,33 @@ extension Vector {
 // CHECK-SYSV-LABEL: define{{.*}} i1 @_ZneRK6VectorS1_(ptr %0, ptr %1)
 // CHECK-WIN-LABEL: define{{.*}} i1 @"??9@YA_NAEBUVector@@0@Z"(ptr %0, ptr %1)
 @unsafe @cxx @implementation
-public func != (a: Vector, b: Vector) -> Bool { return a.x != b.x }
+public func != (a: borrowing Vector, b: borrowing Vector) -> Bool { return a.x != b.x }
 
 // Vector operator*(const Vector &a, int k);
 // CHECK-SYSV-LABEL: define{{.*}} i32 @_ZmlRK6Vectori(ptr %0, i32 %1)
 // CHECK-WIN-LABEL: define{{.*}} i32 @"??D@YA?AUVector@@AEBU0@H@Z"(ptr %0, i32 %1)
 @unsafe @cxx(`operator*`) @implementation
-public func times(_ a: Vector, _ k: Int32) -> Vector { return Vector(x: a.x * k) }
+public func times(_ a: borrowing Vector, _ k: Int32) -> Vector { return Vector(x: a.x * k) }
 
 // bool Outer::operator==(const Point &a, const Point &b);
 // CHECK-SYSV-LABEL: define{{.*}} i1 @_ZN5OutereqERKNS_5PointES2_(ptr %0, ptr %1)
 // CHECK-WIN-LABEL: define{{.*}} i1 @"??8Outer@@YA_NAEBUPoint@0@0@Z"(ptr %0, ptr %1)
 @unsafe @cxx @implementation
-public func == (a: Outer.Point, b: Outer.Point) -> Bool { return a.v == b.v }
+public func == (a: borrowing Outer.Point, b: borrowing Outer.Point) -> Bool { return a.v == b.v }
 
 extension Handle {
   // bool Handle::operator==(const Handle &other) const;
   // CHECK-SYSV-LABEL: define{{.*}} i1 @_ZNK6HandleeqERKS_(ptr %0, ptr %1)
   // CHECK-WIN-LABEL: define{{.*}} i1 @"??8Handle@@QEBA_NAEBU0@@Z"(ptr %0, ptr %1)
   @cxx(`operator==`) @implementation
-  public func equals(_ other: Handle) -> Bool { return value == other.value }
+  public func equals(_ other: borrowing Handle) -> Bool { return value == other.value }
 }
 
 // bool operator<(const Handle &a, const Handle &b);
 // CHECK-SYSV-LABEL: define{{.*}} i1 @_ZltRK6HandleS1_(ptr %0, ptr %1)
 // CHECK-WIN-LABEL: define{{.*}} i1 @"??M@YA_NAEBUHandle@@0@Z"(ptr %0, ptr %1)
 @cxx @implementation
-public func < (a: Handle, b: Handle) -> Bool { return a.value < b.value }
+public func < (a: borrowing Handle, b: borrowing Handle) -> Bool { return a.value < b.value }
 
 // Swift-side uses call the same entry points.
 // CHECK-LABEL: define{{.*}} @"$s{{.*}}13callOperators
