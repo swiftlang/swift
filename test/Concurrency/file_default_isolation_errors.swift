@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -parse-as-library -verify %s
+// RUN: %target-swift-frontend -typecheck -swift-version 6 -parse-as-library -verify %s
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 default nonisolated
 

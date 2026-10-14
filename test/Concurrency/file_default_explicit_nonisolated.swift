@@ -1,11 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify %t/protocols.swift %t/conformances.swift
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature NoExplicitNonIsolated -typecheck -swift-version 6 -verify -verify-additional-prefix no-explicit-nonisolated- %t/protocols.swift %t/conformances.swift
+// RUN: %target-swift-frontend -typecheck -swift-version 6 -verify %t/protocols.swift %t/conformances.swift
+// RUN: %target-swift-frontend -enable-experimental-feature NoExplicitNonIsolated -typecheck -swift-version 6 -verify -verify-additional-prefix no-explicit-nonisolated- %t/protocols.swift %t/conformances.swift
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 // REQUIRES: swift_feature_NoExplicitNonIsolated
 
 //--- protocols.swift

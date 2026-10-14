@@ -1,12 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify -disable-implicit-concurrency-module-import -enable-experimental-feature DefaultIsolationPerFile %t/module_absent.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-implicit-concurrency-module-import -enable-experimental-feature DefaultIsolationPerFile %t/module_absent_shadowed.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-feature DefaultIsolationPerFile %t/shadowed_by_type.swift
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-feature DefaultIsolationPerFile %t/shadowed_by_global_actor.swift
-
-// REQUIRES: swift_feature_DefaultIsolationPerFile
+// RUN: %target-swift-frontend -typecheck -verify -disable-implicit-concurrency-module-import %t/module_absent.swift
+// RUN: %target-swift-frontend -typecheck -verify -disable-implicit-concurrency-module-import %t/module_absent_shadowed.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/shadowed_by_type.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/shadowed_by_global_actor.swift
 
 //--- module_absent.swift
 
