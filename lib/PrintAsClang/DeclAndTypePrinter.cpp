@@ -3172,8 +3172,12 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
           // A noncopyable payload would have to be moved into the case
-          // constructor and consumed back out of the enum.
-          if (!paramType->hasTypeParameter() && paramType->isNoncopyable())
+          // constructor and consumed back out of the enum. Ask the declaration
+          // of a payload type that depends on a generic parameter.
+          if (paramType->hasTypeParameter()
+                  ? cxx_translation::isNoncopyableValueTypeExposableToCxx(
+                        paramType)
+                  : paramType->isNoncopyable())
             return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
