@@ -10,6 +10,7 @@
 
 // COMMON-LABEL: class SWIFT_SYMBOL("s:Sa") Array final {
 // COMMON: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// COMMON-NEXT: bool _isMovedFrom = false;
 // COMMON-NEXT: friend class _impl::_impl_Array<T_0_0>;
 // COMMON-LABEL: class SWIFT_SYMBOL("s:Sq") Optional final {
 // COMMON: swift::_impl::OpaqueStorage _storage;

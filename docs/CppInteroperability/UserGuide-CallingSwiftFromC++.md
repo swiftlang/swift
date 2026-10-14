@@ -212,7 +212,9 @@ arithmeticMean({ 1.0, 2.0 });
 
 ## Using Swift Structure Types
 
-Swift structures that are usable from C++ are available in their corresponding module namespace. They’re bridged over as a C++ `class` that has an opaque representation and layout whose size and alignment matches the size and alignment of the Swift structure.
+Swift structures that are usable from C++ are available in their corresponding module namespace. They’re bridged over as a C++ `class` that has an opaque representation and layout. It stores the Swift structure followed by a flag that records whether the value was moved out, so the class can be larger than the Swift structure.
+
+Moving such a C++ object takes the Swift value out of the source without copying it, and leaves the source empty. [Resilient Swift Structures](#resilient-swift-structures) describes what an empty object supports.
 
 You can construct an instance of a structure using the static `init` method in the C++ class:
 
@@ -358,7 +360,7 @@ The boxing implies that the following operations will allocate and store a new v
 
 **NOTE**: A fixed-layout structure that contains a resilient structure as a stored property is also boxed on the C++ side.
 
-Moving a boxed value with a C++ move constructor or move assignment transfers its heap allocation and leaves the source empty. The Swift value is not copied and no new allocation is made. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`. A copyable value with a fixed layout has no move operations yet, so moving it calls the copy constructor and the source keeps its value.
+Moving a boxed value with a C++ move constructor or move assignment transfers its heap allocation and leaves the source empty. The Swift value is not copied and no new allocation is made. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`.
 
 ```c++
 auto url = Foundation::URL::init("https://swift.org");
