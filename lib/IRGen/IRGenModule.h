@@ -294,7 +294,7 @@ private:
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyReemittedTypeContextDescriptors;
 
   /// Foreign types whose metadata the generated C++ header can request because
-  /// the public API uses them as generic arguments.
+  /// the public API refers to them.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> ForeignTypeMetadataUsedByCxx;
 
   /// The queue of metadata accessors to emit.
@@ -549,6 +549,13 @@ public:
   bool isForeignTypeMetadataUsedByCxx(NominalTypeDecl *type) const {
     return ForeignTypeMetadataUsedByCxx.count(type);
   }
+
+  /// Notes the foreign types in \p type whose metadata the generated C++
+  /// header can request when a public declaration refers to \p type: generic
+  /// arguments, and unless \p onlyGenericArguments is set, the C and C++ types
+  /// that the header can use as generic arguments itself.
+  void noteForeignTypesUsedByCxx(CanType type,
+                                 bool onlyGenericArguments = false);
 
   void noteUseOfTypeContextDescriptor(NominalTypeDecl *type,
                                       RequireMetadata_t requireMetadata) {

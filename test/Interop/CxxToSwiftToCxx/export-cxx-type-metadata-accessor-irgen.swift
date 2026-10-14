@@ -5,7 +5,8 @@
 // are exported for C++ code outside of the Swift module's image.
 // RUN: %target-swift-frontend -emit-ir %t/use-cxx-types.swift -module-name UseCxx -I %t \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-object-format
+// RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-object-format \
+// RUN:       --implicit-check-not='$sSo13ExtensionOnlyVMa'
 
 // RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -module-name UseCxx -I %t \
 // RUN:   -cxx-interoperability-mode=default -clang-header-expose-decls=all-public \
@@ -59,7 +60,19 @@ __attribute__((swift_attr("release:immortal"))) ImmortalRef {
   int x;
 };
 
+struct ParamOnly {
+  int x;
+};
+
+struct EnumPayload {
+  int x;
+};
+
 struct InternalOnly {
+  int x;
+};
+
+struct ExtensionOnly {
   int x;
 };
 
@@ -81,8 +94,21 @@ public func takeTmpl(_ x: [TmplInt]) {}
 @available(SwiftStdlib 5.8, *)
 public func takeImmortalRef(_ x: [ImmortalRef]) {}
 
+public func takeParamOnly(_ x: ParamOnly) {}
+
+public enum WithPayload {
+  case payload(EnumPayload)
+}
+
 public func makeAny() -> Any {
   return InternalOnly(x: 1)
+}
+
+// The header doesn't expose members of extensions of imported types.
+extension CStruct {
+  public func extensionOnly() -> ExtensionOnly {
+    return ExtensionOnly(x: x)
+  }
 }
 
 // CHECK-macho-DAG: define weak_odr swiftcc %swift.metadata_response @"$sSo7CStructVMa"(
@@ -93,21 +119,25 @@ public func makeAny() -> Any {
 // CHECK-DAG: define weak_odr {{(protected )?}}swiftcc %swift.metadata_response @"$sSo5ColorVMa"(
 // CHECK-DAG: define weak_odr {{(protected )?}}swiftcc %swift.metadata_response @"$sSo0016TmplCInt_vAJBbyaVMa"(
 // CHECK-DAG: define weak_odr {{(protected )?}}swiftcc %swift.metadata_response @"$sSo11ImmortalRefVMa"(
+// CHECK-DAG: define weak_odr {{(protected )?}}swiftcc %swift.metadata_response @"$sSo9ParamOnlyVMa"(
+// CHECK-DAG: define weak_odr {{(protected )?}}swiftcc %swift.metadata_response @"$sSo11EnumPayloadVMa"(
 
-// Only ELF exports the accessors of types that the public API doesn't use as
-// generic arguments.
+// Only ELF exports the accessors of types that the public API doesn't refer
+// to.
 // CHECK-macho-DAG: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo12InternalOnlyVMa"(
 // CHECK-elf-DAG: define weak_odr protected swiftcc %swift.metadata_response @"$sSo12InternalOnlyVMa"(
 
 // The header doesn't refer to namespaces.
 // CHECK-DAG: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo2nsOMa"(
 
+// HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo11EnumPayloadVMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo11AnonTypedefaMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo7CStructVMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo5ColorVMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo9CxxStructVMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo11ImmortalRefVMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO5InnerVMa(
+// HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo9ParamOnlyVMa(
 // HEADER: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo0016TmplCInt_vAJBbyaVMa(
 
 //--- other.swift

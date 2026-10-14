@@ -7698,6 +7698,12 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
 
   emitNestedTypeDecls(theEnum->getMembers());
 
+  // The generated C++ header can refer to the payload types of the cases.
+  if (theEnum->getEffectiveAccess() >= AccessLevel::Public)
+    for (auto *element : theEnum->getAllElements())
+      if (auto payloadType = element->getPayloadInterfaceType())
+        IRGen.noteForeignTypesUsedByCxx(payloadType->getCanonicalType());
+
   if (!isResilient(theEnum, ResilienceExpansion::Minimal))
     return;
 

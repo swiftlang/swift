@@ -26,6 +26,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -5112,8 +5113,7 @@ llvm::StructType *IRGenModule::getTypeMetadataResponseTy() {
 
 /// Whether the generated C++ header can call the metadata accessor of this
 /// imported type. The header declares a TypeMetadataTrait that calls the
-/// accessor for every C or C++ struct or enum it refers to (see
-/// emitReferencedClangTypeMetadata in PrintAsClang).
+/// accessor for every C or C++ struct or enum it refers to.
 static bool mayCxxCallForeignTypeMetadataAccessor(IRGenModule &IGM,
                                                   CanType type) {
   auto &langOpts = IGM.Context.LangOpts;
@@ -5126,13 +5126,8 @@ static bool mayCxxCallForeignTypeMetadataAccessor(IRGenModule &IGM,
   if (getTypeMetadataAccessStrategy(type) !=
       MetadataAccessStrategy::ForeignAccessor)
     return false;
-  auto *clangDecl =
-      dyn_cast_or_null<clang::TypeDecl>(type->getAnyNominal()->getClangDecl());
-  if (!clangDecl)
-    return false;
-  auto clangType =
-      clangDecl->getASTContext().getTypeDeclType(clangDecl).getCanonicalType();
-  return isa<clang::RecordType, clang::EnumType>(clangType.getTypePtr());
+  return cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
+             type->getAnyNominal()->getClangDecl()) != nullptr;
 }
 
 /// Foreign type metadata accessors are emitted into every module that uses
@@ -5153,8 +5148,8 @@ exposeForeignTypeMetadataAccessorToCxx(IRGenModule &IGM, CanType type,
     // visibility, so a single hidden copy in a shared object would hide the
     // accessor. Export every copy there. Other linkers use the least
     // constraining visibility, so only export the accessors of types that the
-    // public API uses as generic arguments. Foreign type metadata is emitted
-    // lazily, after all public functions noted their uses.
+    // public API refers to. Foreign type metadata is emitted lazily, after the
+    // public declarations noted their uses.
     if (!isELF &&
         !IGM.IRGen.isForeignTypeMetadataUsedByCxx(type->getAnyNominal()))
       return;

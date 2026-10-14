@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeExpansionContext.h"
 #include "swift/AST/Types.h"
@@ -2652,51 +2653,75 @@ static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
   IGF.setDynamicSelfMetadata(selfTy, isExact, value, selfKind);
 }
 
+void IRGenerator::noteForeignTypesUsedByCxx(CanType type,
+                                            bool onlyGenericArguments) {
+  const auto &langOpts = SIL.getASTContext().LangOpts;
+  // Type metadata for foreign types is not yet supported on Windows. Bug
+  // #76168.
+  if (!langOpts.EnableCXXInterop || langOpts.hasFeature(Feature::Embedded) ||
+      langOpts.Target.isOSWindows())
+    return;
+
+  struct Walker : TypeWalker {
+    Walker(IRGenerator &IRGen, bool onlyGenericArguments)
+        : IRGen(IRGen), onlyGenericArguments(onlyGenericArguments) {}
+
+    Action walkToTypePre(Type ty) override {
+      if (ty->is<BoundGenericType>())
+        genericDepth++;
+      else if (auto *nominal = ty->getAs<NominalType>())
+        noteUseOfTypeMetadata(nominal->getDecl());
+      return Action::Continue;
+    }
+
+    Action walkToTypePost(Type ty) override {
+      if (ty->is<BoundGenericType>())
+        genericDepth--;
+
+      return Action::Continue;
+    }
+
+    void noteUseOfTypeMetadata(NominalTypeDecl *type) {
+      if (!IRGen.hasLazyMetadata(type) || !type->hasClangNode())
+        return;
+      // The generated header also lets C++ code use the C and C++ types that
+      // it refers to as generic arguments, e.g. in swift::Array.
+      if (genericDepth == 0 &&
+          (onlyGenericArguments ||
+           !cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
+               type->getClangDecl())))
+        return;
+      IRGen.noteUseOfForeignTypeMetadataByCxx(type);
+    }
+    IRGenerator &IRGen;
+    bool onlyGenericArguments;
+    int genericDepth = 0;
+  } walker{*this, onlyGenericArguments};
+  type.walk(walker);
+}
+
 /// C++ interop might refer to the type metadata in some scenarios.
 /// This function covers those cases and makes sure metadata is emitted
 /// for the foreign types.
 static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
                                           const SILFunction *f,
                                           const TypeExpansionContext &context) {
+  // The generated header doesn't expose the members of extensions of imported
+  // types, so only their generic arguments need metadata.
+  bool onlyGenericArguments = false;
+  if (auto declRef = f->getDeclRef(); declRef && declRef.hasDecl())
+    if (auto *nominal =
+            declRef.getDecl()->getDeclContext()->getSelfNominalTypeDecl())
+      onlyGenericArguments = nominal->hasClangNode();
+
   auto type = f->getLoweredFunctionType();
-
-  // Notes the use of foreign types in generic arguments for C++ interop.
-  auto processType = [&](CanType type) {
-    struct Walker : TypeWalker {
-      Walker(IRGenerator &IRGen) : IRGen(IRGen) {}
-
-      Action walkToTypePre(Type ty) override {
-        if (ty->is<BoundGenericType>())
-          genericDepth++;
-        else if (auto *nominal = ty->getAs<NominalType>())
-          noteUseOfTypeMetadata(nominal->getDecl());
-        return Action::Continue;
-      }
-
-      Action walkToTypePost(Type ty) override {
-        if (ty->is<BoundGenericType>())
-          genericDepth--;
-
-        return Action::Continue;
-      }
-
-      void noteUseOfTypeMetadata(NominalTypeDecl *type) {
-        if (genericDepth == 0)
-          return;
-        if (!IRGen.hasLazyMetadata(type) || !type->hasClangNode())
-          return;
-        IRGen.noteUseOfForeignTypeMetadataByCxx(type);
-      }
-      IRGenerator &IRGen;
-      int genericDepth = 0;
-    } walker{IRGen};
-    type.walk(walker);
-  };
-
   for (const auto &param : type->getParameters())
-    processType(param.getArgumentType(IRGen.SIL, type, context));
+    IRGen.noteForeignTypesUsedByCxx(
+        param.getArgumentType(IRGen.SIL, type, context), onlyGenericArguments);
   for (const auto &result : type->getResultsWithError())
-    processType(result.getReturnValueType(IRGen.SIL, type, context));
+    IRGen.noteForeignTypesUsedByCxx(
+        result.getReturnValueType(IRGen.SIL, type, context),
+        onlyGenericArguments);
 }
 
 /// If \p f implements a C++ virtual method, emit the class's vtable (for a key
@@ -2733,10 +2758,8 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
       f->isAvailableExternally())
     return;
 
-  // Type metadata for foreign references is not yet supported on Windows. Bug #76168.
-  if (Context.LangOpts.EnableCXXInterop && !Context.LangOpts.hasFeature(Feature::Embedded) &&
-      f->getLinkage() == SILLinkage::Public &&
-      !Context.LangOpts.Target.isOSWindows())
+  if (Context.LangOpts.EnableCXXInterop &&
+      f->getLinkage() == SILLinkage::Public)
     noteUseOfMetadataByCXXInterop(IRGen, f, TypeExpansionContext(*f));
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);

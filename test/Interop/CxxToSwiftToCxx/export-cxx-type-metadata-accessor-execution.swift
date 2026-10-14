@@ -68,6 +68,14 @@ struct Inner {
 };
 } // namespace ns
 
+struct ParamOnly {
+  int x;
+};
+
+struct EnumPayload {
+  int x;
+};
+
 //--- module.modulemap
 module CxxTest {
   header "header.h"
@@ -94,6 +102,20 @@ public func unwrapC(_ value: CStruct?) -> Int32 {
 }
 
 public func count(_ values: [ns.Inner]) -> Int {
+  return values.count
+}
+
+// C++ can also use the types that the public API doesn't use as generic
+// arguments in generic contexts.
+public func takeParamOnly(_ value: ParamOnly) -> Int32 {
+  return value.x
+}
+
+public enum WithPayload {
+  case payload(EnumPayload)
+}
+
+public func genericCount<T>(_ values: [T]) -> Int {
   return values.count
 }
 
@@ -129,6 +151,17 @@ int main() {
   auto inner = swift::Array<ns::Inner>::init();
   inner.append(ns::Inner{3});
   std::printf("count: %d\n", static_cast<int>(UseCxx::count(inner)));
+
+  auto paramOnly = swift::Array<ParamOnly>::init();
+  paramOnly.append(ParamOnly{4});
+  std::printf("genericCount: %d\n",
+              static_cast<int>(UseCxx::genericCount(paramOnly)));
+
+  auto payloads = swift::Array<EnumPayload>::init();
+  payloads.append(EnumPayload{5});
+  payloads.append(EnumPayload{6});
+  std::printf("genericCount: %d\n",
+              static_cast<int>(UseCxx::genericCount(payloads)));
   return 0;
 }
 
@@ -137,3 +170,5 @@ int main() {
 // CHECK-NEXT: sum: 3
 // CHECK-NEXT: unwrapC: 7
 // CHECK-NEXT: count: 1
+// CHECK-NEXT: genericCount: 1
+// CHECK-NEXT: genericCount: 2
