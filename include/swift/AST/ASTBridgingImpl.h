@@ -568,6 +568,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasOpaqueArchetype() const {
+  return unbridged()->hasOpaqueArchetype();
+}
+
 bool BridgedASTType::hasExistentialArchetype() const {
   return unbridged()->hasOpenedExistential();
 }
