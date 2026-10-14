@@ -106,9 +106,6 @@ struct DeclRepresentation {
 class NominalTypeLayoutQueries {
 public:
   virtual bool isZeroSized(const NominalTypeDecl *decl) = 0;
-  /// Whether the size and alignment are not statically known, so that C++ has
-  /// to box the value instead of storing it inline.
-  virtual bool isOpaqueLayout(const NominalTypeDecl *decl) = 0;
 
 protected:
   ~NominalTypeLayoutQueries() = default;
@@ -130,9 +127,6 @@ inline bool isExposableToCxx(const ValueDecl *VD,
 
 /// Whether the given noncopyable Swift value type is exposed to C++ as a
 /// move-only C++ class.
-///
-/// This covers the part of "has a fixed layout" that the AST can answer on its
-/// own; see \c NominalTypeLayoutQueries::isOpaqueLayout for the rest.
 bool isNoncopyableValueTypeExposableToCxx(const NominalTypeDecl *typeDecl);
 
 /// \overload
