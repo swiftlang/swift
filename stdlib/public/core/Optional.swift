@@ -209,23 +209,6 @@ extension Optional where Wrapped: ~Copyable {
       return unsafe MutableRef(unsafeAddress: ptr, mutating: &self)
     }
   }
-
-  /// Sets the value of the optional to the passed in new value while returning
-  /// a mutable reference to that value inside the optional.
-  ///
-  /// If there's already a value within the optional, that value is destroyed.
-  ///
-  /// - Parameter new: The new payload value to put into the optional.
-  /// - Returns: A mutable reference inside the optional to its newly inserted
-  ///   payload.
-  @available(StdlibDeploymentTarget 6.4, *)
-  @export(implementation)
-  @_lifetime(&self)
-  @_transparent
-  public mutating func put(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
-    self = .some(new)
-    return unsafe mutableRef.unsafelyUnwrapped
-  }
 }
 
 extension Optional {

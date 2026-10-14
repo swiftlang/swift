@@ -49,19 +49,4 @@ suite.test("Optional.mutableRef") {
 }
 }
 
-if #available(StdlibDeploymentTarget 6.4, *) {
-suite.test("Optional.put") {
-  var o: Int? = nil
-  var oRef = o.put(123)
-
-  expectEqual(o, 123)
-  expectEqual(oRef.value, 123)
-
-  oRef.value = 67
-
-  expectEqual(o, 67)
-  expectEqual(oRef.value, 67)
-}
-}
-
 runAllTests()
