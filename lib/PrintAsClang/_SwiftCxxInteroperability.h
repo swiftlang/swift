@@ -19,8 +19,10 @@
 
 #ifdef __cplusplus
 
+#include <cstddef>
 #include <cstdint>
 #include <stdlib.h>
+#include <type_traits>
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
@@ -268,10 +270,62 @@ using UInt = size_t;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc++17-extensions"
 
+namespace _impl {
+
+/// The value of `isUsableInGenericContext` for types that do not specialize it:
+/// true for the C++ types of Swift's primitive types and for the standard
+/// library types declared below. The primitive types must match the ones that
+/// `printPrimitiveGenericTypeTraits` in the compiler doesn't specialize.
+template <class T>
+static inline const constexpr bool isUsableInGenericContextByDefault =
+    std::is_same<T, bool>::value || std::is_same<T, int8_t>::value ||
+    std::is_same<T, uint8_t>::value || std::is_same<T, int16_t>::value ||
+    std::is_same<T, uint16_t>::value || std::is_same<T, int32_t>::value ||
+    std::is_same<T, uint32_t>::value || std::is_same<T, int64_t>::value ||
+    std::is_same<T, uint64_t>::value || std::is_same<T, float>::value ||
+    std::is_same<T, double>::value || std::is_same<T, void *>::value ||
+    std::is_same<T, Int>::value || std::is_same<T, UInt>::value;
+
+} // namespace _impl
+
 /// True if the given type is a Swift type that can be used in a generic context
 /// in Swift.
 template <class T>
-static inline const constexpr bool isUsableInGenericContext = false;
+static inline const constexpr bool isUsableInGenericContext =
+    _impl::isUsableInGenericContextByDefault<T>;
+
+/// Standard library types that the generated header defines. Declaring them
+/// here, together with their `isUsableInGenericContext` value, lets a header
+/// that is included before the generated header name types like
+/// `swift::Optional<double>`.
+class SWIFT_SYMBOL_MODULE_USR("swift", "s:SS") String;
+
+template <class T_0_0>
+#ifdef __cpp_concepts
+  requires swift::isUsableInGenericContext<T_0_0>
+#endif // __cpp_concepts
+class SWIFT_SYMBOL_MODULE_USR("swift", "s:Sq") Optional;
+
+template <class T_0_0>
+#ifdef __cpp_concepts
+  requires swift::isUsableInGenericContext<T_0_0>
+#endif // __cpp_concepts
+class SWIFT_SYMBOL_MODULE_USR("swift", "s:Sa") Array;
+
+namespace _impl {
+
+template <>
+inline const constexpr bool isUsableInGenericContextByDefault<String> = true;
+
+template <class T_0_0>
+inline const constexpr bool isUsableInGenericContextByDefault<Optional<T_0_0>> =
+    isUsableInGenericContext<T_0_0>;
+
+template <class T_0_0>
+inline const constexpr bool isUsableInGenericContextByDefault<Array<T_0_0>> =
+    isUsableInGenericContext<T_0_0>;
+
+} // namespace _impl
 
 /// Returns the type metadata for the given Swift type T.
 template <class T> struct TypeMetadataTrait {

@@ -631,7 +631,15 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     const ModuleDecl *moduleContext) {
   assert(!typeDecl->hasClangNode());
-  ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
+  // _SwiftCxxInteroperability.h already declares these standard library types
+  // as usable in a generic context, so that a header included before this one
+  // can name them.
+  auto &ctx = typeDecl->getASTContext();
+  if (typeDecl == ctx.getStringDecl() || typeDecl == ctx.getOptionalDecl() ||
+      typeDecl == ctx.getArrayDecl())
+    return;
+
+  ClangSyntaxPrinter printer(ctx, os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
   os << "namespace swift SWIFT_PRIVATE_ATTR {\n";

@@ -187,6 +187,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
     supportedPrimitiveTypes.push_back(astContext.getUIntType());
   }
 
+  // _SwiftCxxInteroperability.h already marks the types above as usable in a
+  // generic context, so that a header included before this one can use them as
+  // generic arguments.
+  size_t numTypesUsableByDefault = supportedPrimitiveTypes.size();
+
   // The following Swift types bridge to C++ types that aren't available on
   // every target. Only emit trait specializations for them when the target
   // supports the underlying C++ type, so that the generated header remains
@@ -229,11 +234,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   if (clangTI.hasFloat16Type())
     addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "Float16"));
 
-  for (Type type : supportedPrimitiveTypes) {
+  for (auto [index, type] : llvm::enumerate(supportedPrimitiveTypes)) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
         type->getNominalDecl());
 
-    if (!isCForwardDefinition) {
+    if (!isCForwardDefinition && index >= numTypesUsableByDefault) {
       os << "template<>\n";
       os << "inline const constexpr bool isUsableInGenericContext<"
          << typeInfo.name << "> = true;\n\n";
