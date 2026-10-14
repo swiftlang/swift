@@ -3,6 +3,10 @@
 // RUN: %FileCheck %s < %t/noncopyable.h
 // RUN: %check-interop-cxx-header-in-clang(%t/noncopyable.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
+// RUN: %target-swift-frontend %s -module-name Noncopyable -enable-library-evolution -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/noncopyable-evo.h
+// RUN: %FileCheck --check-prefix=BOXED %s < %t/noncopyable-evo.h
+// RUN: %check-interop-cxx-header-in-clang(%t/noncopyable-evo.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+
 // REQUIRES: swift_feature_GenerateBindingsForNoncopyableTypesInCXX
 
 public struct MoveOnlyStruct: ~Copyable {
@@ -142,6 +146,19 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // the C++ object is still the address of the Swift value.
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   bool _isMovedFrom = false;
+
+// A boxed value has no moved-from flag. A move transfers the box, and a
+// moved-from object has none.
+// BOXED: class SWIFT_SYMBOL({{.*}}) MoveOnlyStruct final {
+// BOXED:   SWIFT_INLINE_THUNK ~MoveOnlyStruct() noexcept {
+// BOXED-NEXT:     if (!_storage.isAllocated()) return;
+// BOXED:   MoveOnlyStruct(const MoveOnlyStruct &) = delete;
+// BOXED-NEXT:   MoveOnlyStruct &operator =(const MoveOnlyStruct &) = delete;
+// BOXED-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct(MoveOnlyStruct &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// BOXED-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct &operator =(MoveOnlyStruct &&other) noexcept {
+// BOXED:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage.getOpaquePointer(); }
+// BOXED:   swift::_impl::OpaqueStorage _storage;
+// BOXED-NEXT:   friend class _impl::_impl_MoveOnlyStruct;
 
 // A borrowing parameter is still taken by const reference.
 // CHECK: SWIFT_INLINE_THUNK swift::Int borrowMoveOnlyStruct(const MoveOnlyStruct& s) noexcept

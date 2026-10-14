@@ -228,10 +228,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // A noncopyable type is exposed as a move-only C++ class. Because Swift's
   // moves are destructive and C++'s are not, such a class carries a flag that
   // records whether it was moved from, so that its destructor can be a no-op.
+  // A class with an opaque layout needs no flag, as a moved-from object has no
+  // allocation.
   bool isNoncopyable =
       cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
-  assert((!isNoncopyable || !isOpaqueLayout) &&
-         "noncopyable types with an opaque layout are not exposed to C++");
+  bool hasMovedFromFlag = isNoncopyable && !isOpaqueLayout;
 
   bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
                    interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
@@ -319,7 +320,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << " = default;\n";
     } else {
       os << " {\n";
-      if (isNoncopyable)
+      if (hasMovedFromFlag)
         os << "    if (_isMovedFrom) return;\n";
       // A moved-from object with an opaque layout has no allocation.
       if (isOpaqueLayout)
@@ -333,7 +334,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
       os << "  " << baseName << " &operator =(const " << baseName
          << " &) = delete;\n";
+    }
 
+    if (hasMovedFromFlag) {
       // move constructor.
       os << "  ";
       printer.printInlineForThunk();
@@ -372,7 +375,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "    other._isMovedFrom = true;\n";
       os << "  return *this;\n";
       os << "  }\n";
-    } else {
+    }
+
+    if (!isNoncopyable) {
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
@@ -496,8 +501,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the private accessors to the underlying Swift value storage.
     // Every use of a value by Swift goes through these, so they are where a
     // moved-from noncopyable value, which holds no Swift value, is caught.
+    // 'OpaqueStorage' checks its own allocation.
     StringRef movedFromCheck =
-        isNoncopyable ? "if (_isMovedFrom) abort(); " : "";
+        hasMovedFromFlag ? "if (_isMovedFrom) abort(); " : "";
     os << "  ";
     printer.printInlineForThunk();
     os << "const char * _Nonnull _getOpaquePointer() const noexcept { "
@@ -550,7 +556,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
     // The moved-from flag has to come after the Swift value, so that the
     // address of this class stays the address of the value itself.
-    if (isNoncopyable)
+    if (hasMovedFromFlag)
       os << "  bool _isMovedFrom = false;\n";
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
