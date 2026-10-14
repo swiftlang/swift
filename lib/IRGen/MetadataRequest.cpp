@@ -1468,9 +1468,22 @@ getFunctionTypeFlags(CanFunctionType type) {
 
   auto isolation = type->getIsolation();
 
+  auto executionSemantics = FunctionMetadataExecutionSemantics::None;
+  if (auto semantics = type->getExecutionSemantics()) {
+    switch (*semantics) {
+    case ExecutionSemantics::AtMostOnce:
+      executionSemantics = FunctionMetadataExecutionSemantics::AtMostOnce;
+      break;
+    case ExecutionSemantics::Once:
+      executionSemantics = FunctionMetadataExecutionSemantics::Once;
+      break;
+    }
+  }
+
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
                       .withSendingResult(type->hasSendingResult())
+                      .withExecutionSemantics(executionSemantics)
                       .withInvertedProtocols(InvertedProtocols);
 
   if (isolation.isErased())
