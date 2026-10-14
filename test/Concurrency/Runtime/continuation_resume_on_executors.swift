@@ -6,6 +6,12 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// The executors in this test run jobs inline from `enqueue`, so every test runs
+// nested inside the previous one. The WebAssembly runtimes are built without
+// tail calls, so each async return adds a frame, and the call stack is
+// exhausted before the suite finishes.
+// UNSUPPORTED: OS=wasip1 || OS=emscripten
+
 @_spi(Concurrency) import _Concurrency
 @_spi(ExperimentalCustomExecutors) import _Concurrency
 import StdlibUnittest
@@ -840,8 +846,6 @@ struct Main {
         expectEqual(13, await task.value)
       }
 
-      // WASI has no threads to drive the executor from.
-      #if !os(WASI)
       tests.test("\(kind): a resumer that isn't a task donates its thread") {
         let pool = ManualTaskExecutor()
         let log = EventLog()
@@ -864,7 +868,6 @@ struct Main {
         expectEqual(0, pool.pendingJobCount)
         expectEqual(14, await task.value)
       }
-      #endif
 
       tests.test("\(kind): a task cancelled while suspended is still resumed by a donated resume") {
         let pool = ManualTaskExecutor()
