@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Ownership.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/StorageImpl.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 
@@ -28,4 +30,22 @@ llvm::StringRef swift::getOwnershipSpelling(ValueOwnership ownership) {
     return "consuming";
   }
   llvm_unreachable("Invalid ValueOwnership");
+}
+
+ValueOwnership swift::getLoweredOwnership(ValueOwnership written,
+                                          const AbstractFunctionDecl *fn,
+                                          bool isSelf) {
+  if (written != ValueOwnership::Default)
+    return written;
+  if (isa_and_nonnull<ConstructorDecl>(fn))
+    return ValueOwnership::Owned;
+  if (auto *ad = dyn_cast_or_null<AccessorDecl>(fn)) {
+    if (ad->getAccessorKind() == AccessorKind::Set)
+      return isSelf ? ValueOwnership::InOut : ValueOwnership::Owned;
+    if (isYieldingMutableAccessor(ad->getAccessorKind())) {
+      assert(isSelf);
+      return ValueOwnership::InOut;
+    }
+  }
+  return ValueOwnership::Shared;
 }
