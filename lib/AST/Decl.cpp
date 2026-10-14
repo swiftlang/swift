@@ -14381,6 +14381,12 @@ std::optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
   return def.getBuiltinKind();
 }
 
+bool MacroDecl::isInternalUnswiftify() const {
+  return getDefinition() == MacroDefinition::Kind::Internal &&
+         getBaseName() ==
+             getASTContext().getIdentifier("_Unswiftify");
+}
+
 MacroDefinition MacroDefinition::forExpanded(
     ASTContext &ctx,
     StringRef expansionText,

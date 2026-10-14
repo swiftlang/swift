@@ -20,7 +20,6 @@ public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
 
 @c @implementation
 // expected-expansion@+10:47{{
-//   expected-error@1{{duplicate implementation of imported global function 'unsafe_impl_first'}}
 //   expected-remark@1{{macro content: |@c @implementation|}}
 //   expected-remark@2{{macro content: |public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {|}}
 //   expected-remark@3{{macro content: |    let _count0 = Int(size)|}}
@@ -29,11 +28,11 @@ public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
 //   expected-remark@6{{macro content: |    unsafe_impl_first(_safeArg0)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
+// expected-error@+1{{duplicate implementation of imported global function 'unsafe_impl_first'}}
 public func unsafe_impl_first(_ p: RawSpan) {}
 
 @c @implementation
 // expected-expansion@+10:45{{
-//   expected-error@1{{duplicate implementation of imported global function 'safe_impl_first'}}
 //   expected-remark@1{{macro content: |@c @implementation|}}
 //   expected-remark@2{{macro content: |public func safe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {|}}
 //   expected-remark@3{{macro content: |    let _count0 = Int(size)|}}
@@ -42,10 +41,11 @@ public func unsafe_impl_first(_ p: RawSpan) {}
 //   expected-remark@6{{macro content: |    safe_impl_first(_safeArg0)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
+// expected-note@+1{{previously implemented here}}
 public func safe_impl_first(_ p: RawSpan) {}
 
+// expected-error@+1{{duplicate implementation of imported global function 'safe_impl_first'}}
 @c @implementation
-// expected-note@+1{{previously implemented here}}
 public func safe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
 
 @c @implementation
@@ -63,7 +63,7 @@ public func compound(_ p: RawSpan, _ size: CInt, _ len: CInt) {}
 
 // expected-error@+1{{duplicate implementation of imported global function 'compound'}}
 @c @implementation
-public func compound(_ p: UnsafeRawPointer?, _ size: CInt, _ len: CInt) {}
+public func compound(_ p: UnsafeRawPointer, _ size: CInt, _ len: CInt) {}
 
 //--- test.h
 #define __sized_by(x) __attribute__((__sized_by__(x)))
