@@ -2207,8 +2207,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
                               AFD);
         return;
       }
-      auto *cdeclAttr =
-          AFD->getAttrs().getAttribute<CDeclAttr>(/*AllowInvalid=*/true);
+      auto *cdeclAttr = dyn_cast<CDeclAttr>(langAttr);
       if (!cdeclAttr || cdeclAttr->Underscored) {
         diagnoseAndRemoveAttr(attr, diag::implementation_safe_requires_c, AFD);
         return;
