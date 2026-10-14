@@ -1,0 +1,34 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -sil-move-only-object-checker %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+protocol P: ~Copyable {}
+
+sil @use : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> ()
+
+// Opening a borrowed noncopyable existential is a use of the whole existential:
+// the payload is not part of the existential's type tree, so the checker must
+// not try to destructure through the open.
+//
+// CHECK-LABEL: sil {{.*}}@borrowOpenedExistential :
+// CHECK:       bb0([[ARG:%.*]] : @guaranteed $any P & ~Copyable):
+// CHECK-NOT:     copy_value
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK:         [[OPENED:%.*]] = open_existential_value [[ARG]]
+// CHECK:         apply {{%.*}}<{{.*}}>([[OPENED]])
+// CHECK-LABEL: } // end sil function 'borrowOpenedExistential'
+sil [ossa] @borrowOpenedExistential : $@convention(thin) (@in_guaranteed any P & ~Copyable) -> () {
+bb0(%0 : @guaranteed $any P & ~Copyable):
+  %1 = copy_value %0
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
+  %3 = begin_borrow %2
+  %4 = open_existential_value %3 to $@opened(1, any P & ~Copyable) Self
+  %5 = function_ref @use : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> ()
+  %6 = apply %5<@opened(1, any P & ~Copyable) Self>(%4) : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> ()
+  end_borrow %3
+  destroy_value %2
+  %9 = tuple ()
+  return %9
+}
