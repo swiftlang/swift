@@ -1041,11 +1041,16 @@ func untaggedBridgeObject(_ object: Builtin.RawPointer) -> Builtin.RawPointer {
 @c
 @discardableResult
 public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
-  return swift_bridgeObjectRetain_n(object: object, n: 1)
+  return bridgeObjectRetain_n(object: object, n: 1)
 }
 
 @c
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  return bridgeObjectRetain_n(object: object, n: n)
+}
+
+@inline(__always)
+func bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   if !isImmortalBridgeObject(object) {
     _ = swift_retain_n(object: untaggedBridgeObject(object), n: n)
   }
@@ -1203,11 +1208,16 @@ public func swift_releaseBoxTyped(_ box: UnsafeMutableRawPointer, _ typeId: UInt
 
 @c
 public func swift_bridgeObjectRelease(object: Builtin.RawPointer) {
-  swift_bridgeObjectRelease_n(object: object, n: 1)
+  bridgeObjectRelease_n(object: object, n: 1)
 }
 
 @c
 public func swift_bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
+  bridgeObjectRelease_n(object: object, n: n)
+}
+
+@inline(__always)
+func bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
   if !isImmortalBridgeObject(object) {
     swift_release_n(object: untaggedBridgeObject(object), n: n)
   }
