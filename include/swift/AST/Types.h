@@ -229,7 +229,7 @@ protected:
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, NumTypeKindBits +
-                             RecursiveTypeProperties::BitWidth + 1 + 4,
+                             RecursiveTypeProperties::BitWidth + 1 + 5,
     /// Kind - The discriminator that indicates what subclass of type this is.
     Kind : NumTypeKindBits,
 
@@ -241,7 +241,8 @@ protected:
     ComputedInvertibleConformances : 1,
     IsCopyable : 1,
     IsEscapable : 1,
-    IsDeinitable : 1
+    IsDeinitable : 1,
+    IsTransferable : 1                             
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -271,16 +272,16 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+25,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+24,
     /// Type variable options.
     Options : 7,
     /// The unique number assigned to this type variable.
-    ID : 25
+    ID : 24
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
+  SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 31,
     // Number of terms in the union.
-    NumTerms : 32
+    NumTerms : 31
   );
     
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1+1,
@@ -301,52 +302,52 @@ protected:
     Representation : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+31,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+30,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     HasExplicitAnyObject : 1,
 
     /// The number of protocols being composed.
+    Count : 30
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 31,
+    /// The number of type arguments.
+    ArgCount : 31
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 31,
+    /// The number of elements of the tuple.
     Count : 31
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
-    /// The number of type arguments.
-    ArgCount : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
-    /// The number of elements of the tuple.
-    Count : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
+  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 31,
     /// The number of elements of the pack.
-    Count : 32
+    Count : 31
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+31,
+  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+30,
     /// Whether elements of the pack are addresses.
     ElementIsAddress : 1,
 
     /// The number of elements of the pack
-    Count : 31
+    Count : 30
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 16+16,
+  SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 16+15,
     /// The number of scope arguments.
     ScopeArgCount : 16,
 
     /// The number of generic arguments.
-    GenericArgCount : 16
+    GenericArgCount : 15
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+30,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+29,
     /// Whether we have a parent type.
     HasParent : 1,
 
     /// The number of generic arguments.
-    GenericArgCount : 30
+    GenericArgCount : 29
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,
@@ -374,6 +375,7 @@ protected:
     Bits.TypeBase.IsCopyable = false;
     Bits.TypeBase.IsEscapable = false;
     Bits.TypeBase.IsDeinitable = false;
+    Bits.TypeBase.IsTransferable = false;
 
     setRecursiveProperties(properties);
   }
