@@ -1269,6 +1269,9 @@ namespace {
 
     /// If necessary, modify an imported type (and optionally an imported
     /// parameter list) to use the legacy projection's types.
+    ///
+    /// \returns A null type if the type, or one of the parameters, cannot be
+    ///          represented in the legacy projection.
     ImportedType didImportType(ImportedType result,
                                ParameterList **params = nullptr) {
       if (currentCArrayProjection != CArrayProjection::Legacy)
@@ -1529,6 +1532,34 @@ namespace {
           parameterList, genericParams);
 
       return didImportType(result, &parameterList);
+    }
+
+    /// Import the parameters of the given function, without its return type.
+    ///
+    /// This wrapper adds logic for handling dual C array projections.
+    ///
+    /// \returns The parameters, or null if they cannot be imported.
+    ParameterList *importFunctionParameterList(
+        DeclContext *dc, const clang::FunctionDecl *clangDecl,
+        ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
+        bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
+        ArrayRef<GenericTypeParamDecl *> genericParams) {
+      for (auto param : params)
+        willImportType(param->getType());
+
+      auto *parameterList = Impl.importFunctionParameterList(
+          dc, clangDecl, params, isVariadic, allowNSUIntegerAsInt, argNames,
+          genericParams, /*resultType=*/nullptr);
+      if (!parameterList)
+        return nullptr;
+
+      // Use `Void` as a stand-in for the result type so we still convert the
+      // parameter list.
+      ImportedType placeholder(Impl.SwiftContext.getVoidType(), false);
+      if (!didImportType(placeholder, &parameterList))
+        return nullptr;
+
+      return parameterList;
     }
 
     /// Determines what the type of an effectful, computed read-only property
@@ -3984,9 +4015,9 @@ namespace {
           continue;
         nonSelfParams.push_back(param);
       }
-      return Impl.importFunctionParameterList(
+      return importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
-          argNames, genericParams, /*resultType=*/nullptr);
+          argNames, genericParams);
     }
 
     Decl *
@@ -7963,10 +7994,9 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
 
     parameterList = ParameterList::createWithoutLoc(paramDecl);
   } else {
-    parameterList = Impl.importFunctionParameterList(
+    parameterList = importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-        allowNSUIntegerAsInt, argNames, templateParams,
-        /*resultType=*/nullptr);
+        allowNSUIntegerAsInt, argNames, templateParams);
 
     if (name && parameterList && argNames.size() != parameterList->size()) {
       // Remember that the name has changed.
