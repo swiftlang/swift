@@ -1367,24 +1367,10 @@ protected:
   // the lowered value ownership. The supplied Param must be a member of
   // parameters or implicitSelfParamInfo.value().
   ValueOwnership getLoweredOwnership(Param const &param) const {
-    auto const ownership = param.getValueOwnership();
-    if (ownership != ValueOwnership::Default)
-      return ownership;
-    if (isLifetimeForDecl() && isa<ConstructorDecl>(afd)) {
-      return ValueOwnership::Owned;
-    }
-    if (auto *ad = dyn_cast_or_null<AccessorDecl>(afd)) {
-      auto const isSelfParameter = implicitSelfParamInfo.has_value() &&
-                                   &param == &(implicitSelfParamInfo->param);
-      if (ad->getAccessorKind() == AccessorKind::Set) {
-        return isSelfParameter ? ValueOwnership::InOut : ValueOwnership::Owned;
-      }
-      if (isYieldingMutableAccessor(ad->getAccessorKind())) {
-        assert(isSelfParameter);
-        return ValueOwnership::InOut;
-      }
-    }
-    return ValueOwnership::Shared;
+    auto const isSelfParameter = implicitSelfParamInfo.has_value() &&
+                                 &param == &(implicitSelfParamInfo->param);
+    return swift::getLoweredOwnership(param.getValueOwnership(), afd,
+                                      isSelfParameter);
   }
 
   // Initialize TargetDeps based on the function's @_lifetime attributes.
