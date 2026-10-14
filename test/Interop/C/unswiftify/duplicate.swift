@@ -15,11 +15,13 @@
 
 //--- test.swift
 @c @implementation
-// expected-note@+1{{previously implemented here}}
-public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
+public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {} // #unsafe_impl_first_unsafe
 
+// expected-error@+3{{duplicate implementation of imported global function 'unsafe_impl_first'}} {{children:
+//   expected-note@-3{{previously implemented here}}
+// }}
 @c @implementation
-// expected-expansion@+10:47{{
+// expected-expansion@+9:47{{
 //   expected-remark@1{{macro content: |@c @implementation|}}
 //   expected-remark@2{{macro content: |public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {|}}
 //   expected-remark@3{{macro content: |    let _count0 = Int(size)|}}
@@ -28,11 +30,10 @@ public func unsafe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
 //   expected-remark@6{{macro content: |    unsafe_impl_first(_safeArg0)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-// expected-error@+1{{duplicate implementation of imported global function 'unsafe_impl_first'}}
 public func unsafe_impl_first(_ p: RawSpan) {}
 
 @c @implementation
-// expected-expansion@+10:45{{
+// expected-expansion@+9:45{{
 //   expected-remark@1{{macro content: |@c @implementation|}}
 //   expected-remark@2{{macro content: |public func safe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {|}}
 //   expected-remark@3{{macro content: |    let _count0 = Int(size)|}}
@@ -41,15 +42,16 @@ public func unsafe_impl_first(_ p: RawSpan) {}
 //   expected-remark@6{{macro content: |    safe_impl_first(_safeArg0)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-// expected-note@+1{{previously implemented here}}
-public func safe_impl_first(_ p: RawSpan) {}
+public func safe_impl_first(_ p: RawSpan) {} // #safe_impl_first_safe
 
-// expected-error@+1{{duplicate implementation of imported global function 'safe_impl_first'}}
+// expected-error@+3{{duplicate implementation of imported global function 'safe_impl_first'}} {{children:
+//   expected-note@#safe_impl_first_safe{{previously implemented here}}
+// }}
 @c @implementation
 public func safe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
 
 @c @implementation
-// expected-expansion@+10:65{{
+// expected-expansion@+9:65{{
 //   expected-remark@1{{macro content: |@c @implementation|}}
 //   expected-remark@2{{macro content: |public func compound(_ p: UnsafeRawPointer, _ size: CInt, _ len: CInt) {|}}
 //   expected-remark@3{{macro content: |    let _count0 = Int((size * len))|}}
@@ -58,10 +60,11 @@ public func safe_impl_first(_ p: UnsafeRawPointer, _ size: CInt) {}
 //   expected-remark@6{{macro content: |    compound(_safeArg0, size, len)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-// expected-note@+1{{previously implemented here}}
-public func compound(_ p: RawSpan, _ size: CInt, _ len: CInt) {}
+public func compound(_ p: RawSpan, _ size: CInt, _ len: CInt) {} // #compound_safe
 
-// expected-error@+1{{duplicate implementation of imported global function 'compound'}}
+// expected-error@+3{{duplicate implementation of imported global function 'compound'}} {{children:
+//   expected-note@#compound_safe{{previously implemented here}}
+// }}
 @c @implementation
 public func compound(_ p: UnsafeRawPointer, _ size: CInt, _ len: CInt) {}
 
