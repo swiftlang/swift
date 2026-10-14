@@ -766,6 +766,14 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   if (current->isInvalid() || !current->hasName())
     return std::make_tuple<>();
 
+  // Unique macro names are mangled from their expansion context and
+  // discriminator, so they can't collide. Looking one up at module scope would
+  // also expand every top-level freestanding macro in the module, since any of
+  // them could introduce a unique name.
+  if (MacroDecl::isUniqueMacroName(current->getBaseName()) &&
+      current->isInMacroExpansionInContext())
+    return std::make_tuple<>();
+
   // If this declaration isn't from a source file, don't check it.
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
