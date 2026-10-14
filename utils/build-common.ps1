@@ -4140,6 +4140,20 @@ $SDKSupplementalRuntimes = @(
   "Runtime"
 )
 
+# Copies the standard library sources that Runtimes builds from.
+# TODO: remove this once the migration is completed.
+function Sync-Runtimes {
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $BuildPlatform
+
+    Push-Location "${SourceCache}\swift\Runtimes"
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
+    Pop-Location
+  }
+}
+
 function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $SDKIdentifier         = $Context.SDKIdentifier
   $Variant               = $Context.Variant
@@ -4165,16 +4179,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
   $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
-  # TODO: remove this once the migration is completed.
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $BuildPlatform
-
-    Push-Location "${SourceCache}\swift\Runtimes"
-    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
-    $CMakeBin = (Get-CMake).Path
-    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
-    Pop-Location
-  }
+  Sync-Runtimes
 
   Invoke-IsolatingEnvVars {
     # TODO(compnerd) build statically for static builds

@@ -262,6 +262,44 @@ function Build-WindowsSDK([Hashtable] $Platform, [string] $SDKIdentifier) {
   }
 }
 
+# Starts build-sdk.ps1 for the Windows SDK of one architecture, without waiting
+# for it.
+function Start-WindowsSDK([Hashtable] $Platform, [string] $SDKIdentifier) {
+  $Log = "$BinaryCache\build-sdk.$PID.$($Platform.Architecture.LLVMName)"
+  $BuildParameters | Export-Clixml -Path "$Log.xml"
+  $Arguments = "-NoProfile -ExecutionPolicy $(Get-ExecutionPolicy) -File `"$PSScriptRoot\build-sdk.ps1`" " +
+    "-ParametersPath `"$Log.xml`" -Architecture $($Platform.Architecture.LLVMName) -SDKIdentifier $SDKIdentifier"
+  $Process = Start-Process -PassThru -NoNewWindow -FilePath (Get-Process -Id $PID).Path -ArgumentList $Arguments `
+    -RedirectStandardOutput "$Log.out" -RedirectStandardError "$Log.err"
+  # Windows PowerShell only reports the exit code of a process whose handle was
+  # opened before it exited.
+  $null = $Process.Handle
+  # The toolchain build keeps priority over the SDK builds.
+  $Process.PriorityClass = [Diagnostics.ProcessPriorityClass]::BelowNormal
+  return @{ SDKIdentifier = $SDKIdentifier; Process = $Process; Log = $Log }
+}
+
+# Waits for the SDK builds that Start-WindowsSDK started and prints their output.
+function Wait-WindowsSDK([Hashtable[]] $Builds) {
+  Record-OperationTime $HostPlatform "Wait-WindowsSDK" {
+    foreach ($Build in $Builds) {
+      $Build.Process.WaitForExit()
+    }
+  }
+  foreach ($Build in $Builds) {
+    Write-Host -ForegroundColor Cyan "----- Output of build-sdk.ps1 for the $($Build.SDKIdentifier) SDK -----"
+    Get-Content -ErrorAction Ignore "$($Build.Log).out", "$($Build.Log).err" | Write-Host
+    Remove-Item -ErrorAction Ignore "$($Build.Log).*"
+  }
+  foreach ($Build in $Builds) {
+    if ($Build.Process.ExitCode -ne 0) {
+      throw "build-sdk.ps1 failed to build the $($Build.SDKIdentifier) SDK with exit code $($Build.Process.ExitCode)."
+    }
+  }
+}
+
+$WindowsSDKProcesses = @()
+
 #-------------------------------------------------------------------
 
 try {
@@ -337,7 +375,19 @@ if ($Toolchain) {
     SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
+}
 
+# The Windows SDKs of the other architectures only need the Stage1 compilers,
+# so they build alongside the rest of the toolchain, each into its own SDK, and
+# are merged into the Windows SDK below.
+if ($Windows) {
+  Sync-Runtimes
+  $WindowsSDKProcesses = @($WindowsSDKBuilds | Where-Object { $_ -ne $HostPlatform } | ForEach-Object {
+    Start-WindowsSDK $_ -SDKIdentifier "Windows-$($_.Architecture.LLVMName)"
+  })
+}
+
+if ($Toolchain) {
   Invoke-BuildStep Build-SDK $HostPlatform -Context @{
     SDKIdentifier        = $HostPlatform.OS.ToString();
     Variant              = "Dynamic";
@@ -523,8 +573,16 @@ if ($IncludeDS2) {
 
 if ($Windows) {
   $SDKROOT = Get-SwiftSDK -OS Windows
+  if ($WindowsSDKBuilds -contains $HostPlatform) {
+    Invoke-BuildStep Build-WindowsSDK $HostPlatform -SDKIdentifier "Windows"
+  }
+  Wait-WindowsSDK $WindowsSDKProcesses
   foreach ($Build in $WindowsSDKBuilds) {
-    Invoke-BuildStep Build-WindowsSDK $Build -SDKIdentifier "Windows"
+    if ($Build -ne $HostPlatform) {
+      $ArchitectureSDK = Get-SwiftSDK -OS Windows -Identifier "Windows-$($Build.Architecture.LLVMName)"
+      Copy-Directory "$ArchitectureSDK\*" $SDKROOT
+      Remove-Item -Force -Recurse $ArchitectureSDK
+    }
   }
 
   Install-SDK $WindowsSDKBuilds
@@ -720,6 +778,13 @@ if ($IncludeSBoM) {
 
 # Custom exception printing for more detailed exception information
 } catch {
+  # Stop the SDK builds that are still running.
+  foreach ($Build in $WindowsSDKProcesses) {
+    if (-not $Build.Process.HasExited) {
+      & taskkill /T /F /PID $Build.Process.Id | Out-Null
+    }
+  }
+
   function Write-ErrorLines($Text, $Indent = 0) {
     $IndentString = " " * $Indent
     $Text.Replace("`r", "") -split "`n" | ForEach-Object {
