@@ -6428,9 +6428,6 @@ ERROR(distributed_embedded_distributed_var_not_supported,none,
       "'distributed' computed properties are not supported in Embedded Swift; "
       "use a 'distributed func' instead",
       (DeclName))
-ERROR(distributed_embedded_requires_feature,none,
-      "'distributed actor' in Embedded Swift requires '-enable-experimental-feature EmbeddedDistributed'",
-      ())
 ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
       "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
       "ActorSystem (%5)",

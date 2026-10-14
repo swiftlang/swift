@@ -3,7 +3,7 @@
 // Build the ordinary-Swift (Codable/JSON) client and the Embedded server:
 // RUN: %target-build-swift -module-name main -target %target-swift-5.7-abi-triple -parse-as-library %s %S/Inputs/PortableRoundtripActorSystem.swift -o %t/client.out
 // RUN: %target-codesign %t/client.out
-// RUN: %target-swift-frontend -module-name main -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -enable-experimental-feature Extern -parse-as-library %s %S/Inputs/PortableRoundtripActorSystem.swift -c -o %t/embedded.o
+// RUN: %target-swift-frontend -module-name main -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library %s %S/Inputs/PortableRoundtripActorSystem.swift -c -o %t/embedded.o
 // RUN: %target-embedded-link %t/embedded.o %target-embedded-posix-shim -o %t/embedded.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency -lswiftDistributed %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 //
 // 1) Client sends a request (Codable):
@@ -21,7 +21,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: swift_feature_Extern
 
 // A truly cross-process, cross-mode distributed round-trip.
