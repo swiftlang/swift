@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift -DTOP
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift -DBOTTOM
-
-// REQUIRES: swift_feature_DefaultIsolationPerFile
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift -DTOP
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/caller.swift %t/defaulted.swift -DBOTTOM
 
 //--- defaulted.swift
 #if TOP

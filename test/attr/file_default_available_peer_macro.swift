@@ -1,5 +1,4 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -8,7 +7,7 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
 
 // Type check and verify
-// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-feature DefaultIsolationPerFile -load-plugin-library %t/%target-library-name(MacroDefinition) %t/defaulted.swift %t/caller.swift
+// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) %t/defaulted.swift %t/caller.swift
 
 // This test verifies two properties of `default @available(...)` file
 // defaults against peer macros:
