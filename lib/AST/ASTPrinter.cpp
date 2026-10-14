@@ -111,43 +111,76 @@ void PrintOptions::initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                       TypeTransformContext(D));
 }
 
-static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
+/// The most restrictive interface that a declaration or type can be printed in.
+/// The cases are ordered from least to most restrictive.
+enum class InterfaceVisibility {
+  /// Printed in every interface.
+  Public,
+  /// Printed in the private and package interfaces.
+  SPI,
+  /// Printed only in the package interface.
+  Package,
+  /// Not printed in any interface.
+  None,
+};
+
+static InterfaceVisibility getInterfaceVisibility(const ValueDecl *VD) {
   AccessScope scope =
       VD->getFormalAccessScope(/*useDC*/nullptr,
                                /*treatUsableFromInlineAsPublic*/true);
-  return scope.isPublic();
+  if (scope.isPublic())
+    return VD->isSPI() ? InterfaceVisibility::SPI : InterfaceVisibility::Public;
+  if (scope.isPackage())
+    return InterfaceVisibility::Package;
+  return InterfaceVisibility::None;
 }
 
-static bool isPublicOrUsableFromInline(Type ty) {
-  // Note the double negative here: we're looking for any referenced decls that
-  // are *not* public-or-usableFromInline.
-  return !ty.findIf([](Type typePart) -> bool {
+/// Returns the most restrictive visibility among all of the decls that the
+/// type references. A type that references no decls is public.
+static InterfaceVisibility getInterfaceVisibility(Type ty) {
+  auto visibility = InterfaceVisibility::Public;
+  ty.findIf([&](Type typePart) -> bool {
     // FIXME: If we have an internal typealias for a non-internal type, we ought
     // to be able to print it by desugaring.
+    const ValueDecl *VD = nullptr;
     if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
-      return !isPublicOrUsableFromInline(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
-      return !isPublicOrUsableFromInline(nominal);
-    return false;
+      VD = aliasTy->getDecl();
+    else if (auto *nominal = typePart->getAnyNominal())
+      VD = nominal;
+    if (VD)
+      visibility = std::max(visibility, getInterfaceVisibility(VD));
+
+    // Stop walking once the type can't get any more restricted.
+    return visibility == InterfaceVisibility::None;
   });
+  return visibility;
+}
+
+/// Whether something with the given visibility is printed in the interface
+/// described by \p options.
+static bool isPrinted(InterfaceVisibility visibility,
+                      const PrintOptions &options) {
+  switch (visibility) {
+  case InterfaceVisibility::Public:
+    return true;
+  case InterfaceVisibility::SPI:
+    return !options.printPublicInterface();
+  case InterfaceVisibility::Package:
+    return options.printPackageInterface();
+  case InterfaceVisibility::None:
+    return false;
+  }
+  llvm_unreachable("covered switch");
+}
+
+static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
+  auto visibility = getInterfaceVisibility(VD);
+  return visibility == InterfaceVisibility::Public ||
+         visibility == InterfaceVisibility::SPI;
 }
 
 static bool isPackage(const ValueDecl *VD) {
-  AccessScope scope =
-      VD->getFormalAccessScope(/*useDC*/nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  return scope.isPackage();
-}
-
-static bool isPackage(Type ty) {
-  // \see isPublicOrUsableFromInline(Type ty)
-  return !ty.findIf([](Type typePart) -> bool {
-    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
-      return !isPackage(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
-      return !isPackage(nominal);
-    return false;
-  });
+  return getInterfaceVisibility(VD) == InterfaceVisibility::Package;
 }
 
 static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
@@ -396,19 +429,16 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
 
         for (const Requirement &req : ED->getGenericRequirements()) {
-          if (!isPublicOrUsableFromInline(req.getFirstType())) {
-            if (!options.printPackageInterface() || !isPackage(req.getSecondType()))
-              return false;
-          }
+          if (!isPrinted(getInterfaceVisibility(req.getFirstType()), options))
+            return false;
 
           switch (req.getKind()) {
           case RequirementKind::Conformance:
           case RequirementKind::Superclass:
           case RequirementKind::SameType:
-            if (!isPublicOrUsableFromInline(req.getSecondType())) {
-              if (!options.printPackageInterface() || !isPackage(req.getSecondType()))
-                return false;
-            }
+            if (!isPrinted(getInterfaceVisibility(req.getSecondType()),
+                           options))
+              return false;
             break;
           case RequirementKind::SameShape:
           case RequirementKind::Layout:

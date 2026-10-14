@@ -289,6 +289,16 @@ extension PkgProto {
 // CHECK-PKG:   package func g3()
 // CHECK-PKG: }
 
+public enum PubOuter {
+  public enum PubMid {
+    package protocol NestedPkgProto: Sendable { static func n1() }
+  }
+}
+// CHECK-PKG: extension Bar::PubOuter.Bar::PubMid.Bar::NestedPkgProto {
+// CHECK-PKG:   package static func n1()
+// CHECK-PKG: }
+extension PubOuter.PubMid.NestedPkgProto { package static func n1() {} }
+
 public func pub(x: Int, y: String) { print("pub func") }
 // CHECK: public func pub(x: Swift::Int, y: Swift::String)
 
