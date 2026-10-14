@@ -119,8 +119,25 @@ struct SWIFT_NONESCAPABLE CaptureView {
        v = view; 
     }
 
+    // Several 'lifetime_capture_by' attributes on one parameter or on the
+    // implicit object parameter: all of them apply.
+    void captureIntoBoth(View &out, View v [[clang::lifetime_capture_by(out)]] [[clang::lifetime_capture_by_this]]) {
+        out = v;
+        view = v;
+    }
+
+    void handOutBoth(View &a, View &b) const [[clang::lifetime_capture_by(a)]] [[clang::lifetime_capture_by(b)]] {
+        a = view;
+        b = view;
+    }
+
     View view;
 };
+
+// The ignored 'global' capture comes first and must not hide the 'out' one.
+void captureGlobalAndOut(View v [[clang::lifetime_capture_by_global]] [[clang::lifetime_capture_by(out)]], View &out) {
+    out = v;
+}
 
 CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
     return CaptureView(View{&owner.data});
@@ -323,6 +340,9 @@ struct SWIFT_NONESCAPABLE IndependentCtor {
 // CHECK: sil {{.*}}[clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
 // CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.captureIntoBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, View, @lifetime(copy 1) @inout CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.handOutBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 2) @inout View, @lifetime(copy 2) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang captureGlobalAndOut] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
 // CHECK: sil {{.*}}[clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang ViewFromValue.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @out ViewFromValue
 // CHECK: sil {{.*}}[clang ViewFromFactory.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @owned ViewFromFactory
@@ -363,6 +383,9 @@ public func test() {
     var cv = getCaptureView(o)
     cv.captureView(v1)
     cv.handOut(&v1)
+    cv.captureIntoBoth(&out, v1)
+    cv.handOutBoth(&out, &v1)
+    captureGlobalAndOut(v2, &out)
     var _ = NS.getView(o)
 }
 
