@@ -840,6 +840,8 @@ struct Main {
         expectEqual(13, await task.value)
       }
 
+      // WASI has no threads to drive the executor from.
+      #if !os(WASI)
       tests.test("\(kind): a resumer that isn't a task donates its thread") {
         let pool = ManualTaskExecutor()
         let log = EventLog()
@@ -862,6 +864,7 @@ struct Main {
         expectEqual(0, pool.pendingJobCount)
         expectEqual(14, await task.value)
       }
+      #endif
 
       tests.test("\(kind): a task cancelled while suspended is still resumed by a donated resume") {
         let pool = ManualTaskExecutor()
