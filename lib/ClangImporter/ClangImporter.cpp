@@ -7391,7 +7391,8 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     if (resultFunc->hasClangNode()) {
       // The _SwiftifyImport remapping above can map a safe wrapper back to
       // the same C decl that is also reached directly, so avoid registering it
-      // as a candidate twice.
+      // as a candidate twice. Note: finding both at the same time will only
+      // happen when they have the same number of parameters.
       if (!llvm::is_contained(candidates, result))
         candidates.push_back(result);
     } else if (resultFunc->isObjCImplementation())
