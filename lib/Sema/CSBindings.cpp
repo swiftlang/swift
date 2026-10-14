@@ -274,9 +274,11 @@ void BindingSet::computeJoinsAndMeets() {
   MergedBinding subtypes;
   std::optional<unsigned> firstSubtype;
 
+  auto &ctx = CS.getASTContext();
+
   // FIXME: Remove this.
-  bool allowTypeVariableJoins =
-      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool allowTypeVariableJoins = ctx.TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool enableShortConversions = ctx.TypeCheckerOpts.SolverEnableShortConversions;
 
   for (unsigned i : indices(Bindings)) {
     auto binding = Bindings[i];
@@ -337,14 +339,16 @@ void BindingSet::computeJoinsAndMeets() {
       return;
     }
 
-    // Don't allow this for now, because it leads to infinite recursion
-    // in constraint simplification. Once optional conversions are no
-    // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSupertype->getOptionalObjectType()) {
-      if (objectType->is<JoinType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
-                                << commonSupertype << "\n");
-        return;
+    if (!enableShortConversions) {
+      // Don't allow this for now, because it leads to infinite recursion
+      // in constraint simplification. Once optional conversions are no
+      // longer presented as a disjunction, this case be removed.
+      if (auto objectType = commonSupertype->getOptionalObjectType()) {
+        if (objectType->is<JoinType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
+                                  << commonSupertype << "\n");
+          return;
+        }
       }
     }
 
@@ -403,7 +407,7 @@ void BindingSet::computeJoinsAndMeets() {
       newBindings.clear();
 
       // Add an exact binding. It should always fail when attempted.
-      newBindings.emplace_back(commonSubtype, AllowedBindingKind::Exact,
+      newBindings.emplace_back(subtypes.types[0], AllowedBindingKind::Exact,
                                subtypes.bindingSource,
                                subtypes.originator);
 
@@ -426,11 +430,13 @@ void BindingSet::computeJoinsAndMeets() {
     // Don't allow this for now, because it leads to infinite recursion
     // in constraint simplification. Once optional conversions are no
     // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSubtype->getOptionalObjectType()) {
-      if (objectType->is<MeetType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
-                                << commonSubtype << "\n");
-        return;
+    if (!enableShortConversions) {
+      if (auto objectType = commonSubtype->getOptionalObjectType()) {
+        if (objectType->is<MeetType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
+                                  << commonSubtype << "\n");
+          return;
+        }
       }
     }
 

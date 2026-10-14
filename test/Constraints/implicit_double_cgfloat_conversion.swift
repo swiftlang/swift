@@ -416,10 +416,6 @@ func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
 
 // Make sure that optimizer doesn't favor CGFloat -> Double conversion
 // in presence of CGFloat initializer, otherwise it could lead to ambiguities.
-//
-// FIXME: This regressed with the real CGFloat.init overload set from the
-// SDK, but this test file previously used the mock SDK which masked the
-// regression.
 func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   func test(_: CGFloat) -> CGFloat { 0 }
   func test(_: Double) -> Double { 0 }
@@ -428,6 +424,9 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
 
   let arr = [test(CGFloat(v))]
   hasCGFloatElement(arr) // Ok
+
+  var total = 0.0 // This is Double by default
+  total += test(CGFloat(v)) + CGFloat(v)
 }
 
 // rdar://99352676
