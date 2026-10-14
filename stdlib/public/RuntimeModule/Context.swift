@@ -30,12 +30,12 @@ internal import Musl
 #endif
 
 #if os(anyAppleOS)
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #elseif os(Windows)
-internal import BacktracingImpl.OS.Windows
+@_implementationOnly import BacktracingImpl.OS.Windows
 #endif
 
-internal import BacktracingImpl.FixedLayout
+@_implementationOnly import BacktracingImpl.FixedLayout
 
 typealias x86_64_gprs = swift.runtime.backtrace.x86_64_gprs
 typealias i386_gprs = swift.runtime.backtrace.i386_gprs

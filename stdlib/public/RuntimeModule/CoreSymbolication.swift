@@ -20,7 +20,7 @@
 import Swift
 
 internal import Darwin
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 
 // .. Dynamic binding ..........................................................
 

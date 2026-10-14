@@ -19,8 +19,8 @@
 import Swift
 
 internal import WinSDK
-internal import BacktracingImpl.ImageFormats.CodeView
-internal import BacktracingImpl.OS.Windows
+@_implementationOnly import BacktracingImpl.ImageFormats.CodeView
+@_implementationOnly import BacktracingImpl.OS.Windows
 
 typealias CV_PDB70_INFO = swift.runtime.CV_PDB70_INFO
 typealias RTL_GET_VERSION_FN = @convention(c) (UnsafeMutablePointer<RTL_OSVERSIONINFOW>) -> NTSTATUS

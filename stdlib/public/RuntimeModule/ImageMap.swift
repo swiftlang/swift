@@ -19,12 +19,12 @@ import Swift
 
 #if os(anyAppleOS)
 internal import Darwin
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
 #if os(Windows)
 internal import WinSDK
-internal import BacktracingImpl.OS.Windows
+@_implementationOnly import BacktracingImpl.OS.Windows
 #endif
 
 /// Holds a map of the process's address space.

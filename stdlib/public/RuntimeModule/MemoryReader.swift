@@ -29,7 +29,7 @@ internal import Musl
 #endif
 
 #if os(macOS)
-internal import BacktracingImpl.OS.Darwin
+@_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
 @_spi(MemoryReaders)

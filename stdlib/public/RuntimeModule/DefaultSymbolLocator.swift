@@ -16,7 +16,7 @@
 
 import Swift
 
-internal import BacktracingImpl.Runtime
+@_implementationOnly import BacktracingImpl.Runtime
 
 // We look for symbols at SWIFT_SYMBOL_PATH.  If that is not set,
 // then on UNIX systems we look in /usr/lib/debug/, while on Windows
