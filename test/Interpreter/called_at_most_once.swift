@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature CalledAttribute) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature CalledAttribute -O) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_CalledAttribute
@@ -25,6 +26,8 @@ func consumeEscaping(_ f: @escaping @called(atMostOnce) (Payload) -> Void, _ val
 }
 
 func dontConsume(_ f: @called(atMostOnce) (Payload) -> Void) { /* never called */ }
+
+func dontConsumeEscaping(_ f: @escaping @called(atMostOnce) (Payload) -> Void) { /* never called */ }
 
 func makeClosure(_ tag: String) -> @called(atMostOnce) () -> Void {
   return { print("called \(tag)") }
@@ -408,3 +411,129 @@ func testClosureSpecializationConsumingCapture() {
 // CHECK-NEXT: Resource(specialized) used
 // CHECK-NEXT: Resource(specialized) deinit
 testClosureSpecializationConsumingCapture()
+
+// A generic noncopyable value is address-only, so a closure that consumes it
+// captures it indirectly. The closure's context owns the value, which is
+// destroyed exactly once, whether or not the closure is called and whether or
+// not it escapes.
+struct GenericResource<T>: ~Copyable {
+  let value: T
+  let tag: String
+  init(_ value: T, _ tag: String) { self.value = value; self.tag = tag }
+  deinit { print("GenericResource(\(tag)) deinit") }
+  consuming func use() { print("GenericResource(\(tag)) used") }
+  mutating func mutate() { print("GenericResource(\(tag)) mutated") }
+}
+
+@inline(never)
+func testGenericConsumingCapture<T>(_ value: T) {
+  let r = GenericResource(value, "called")
+  callIt {
+    r.use()
+  }
+}
+
+// CHECK-NEXT: GenericResource(called) used
+// CHECK-NEXT: GenericResource(called) deinit
+testGenericConsumingCapture(1)
+
+@inline(never)
+func testGenericConsumingCaptureNeverCalled<T>(_ value: T) {
+  let r = GenericResource(value, "unused")
+  dontConsume { (_: Payload) in
+    r.use()
+  }
+}
+
+// CHECK-NEXT: GenericResource(unused) deinit
+testGenericConsumingCaptureNeverCalled(1)
+
+@inline(never)
+func testGenericConsumingCaptureEscaping<T>(_ value: T) {
+  let r = GenericResource(value, "escaping")
+  consumeEscaping({ (_: Payload) in r.use() }, Payload(tag: "x"))
+}
+
+// CHECK-NEXT: GenericResource(escaping) used
+// CHECK-NEXT: GenericResource(escaping) deinit
+testGenericConsumingCaptureEscaping(1)
+
+@inline(never)
+func testGenericConsumingCaptureEscapingNeverCalled<T>(_ value: T) {
+  let r = GenericResource(value, "escaping unused")
+  dontConsumeEscaping { (_: Payload) in r.use() }
+}
+
+// CHECK-NEXT: GenericResource(escaping unused) deinit
+testGenericConsumingCaptureEscapingNeverCalled(1)
+
+// A closure that mutates a generic noncopyable value captures it inout, so the
+// closure's context doesn't own the value. The caller still owns it, and
+// destroys it exactly once, whether or not the closure is called.
+@inline(never)
+func mutateGenericInoutCapture<T>(_ r: inout GenericResource<T>) {
+  callIt {
+    r.mutate()
+  }
+}
+
+@inline(never)
+func testGenericInoutCapture<T>(_ value: T) {
+  var r = GenericResource(value, "inout")
+  mutateGenericInoutCapture(&r)
+  r.use()
+}
+
+// CHECK-NEXT: GenericResource(inout) mutated
+// CHECK-NEXT: GenericResource(inout) used
+// CHECK-NEXT: GenericResource(inout) deinit
+testGenericInoutCapture(1)
+
+@inline(never)
+func testGenericInoutCaptureNeverCalled<T>(_ value: T) {
+  var r = GenericResource(value, "inout unused")
+  dontConsume { (_: Payload) in
+    r.mutate()
+  }
+  r.use()
+}
+
+// CHECK-NEXT: GenericResource(inout unused) used
+// CHECK-NEXT: GenericResource(inout unused) deinit
+testGenericInoutCaptureNeverCalled(1)
+
+// A closure that consumes one generic noncopyable value and mutates another
+// owns only the consumed value.
+@inline(never)
+func testGenericConsumingAndInoutCaptures<T>(_ value: T) {
+  let consumed = GenericResource(value, "mixed consumed")
+  var mutated = GenericResource(value, "mixed inout")
+  callIt {
+    consumed.use()
+    mutated.mutate()
+  }
+  mutated.use()
+}
+
+// CHECK-NEXT: GenericResource(mixed consumed) used
+// CHECK-NEXT: GenericResource(mixed consumed) deinit
+// CHECK-NEXT: GenericResource(mixed inout) mutated
+// CHECK-NEXT: GenericResource(mixed inout) used
+// CHECK-NEXT: GenericResource(mixed inout) deinit
+testGenericConsumingAndInoutCaptures(1)
+
+@inline(never)
+func testGenericConsumingAndInoutCapturesNeverCalled<T>(_ value: T) {
+  let consumed = GenericResource(value, "mixed consumed unused")
+  var mutated = GenericResource(value, "mixed inout unused")
+  dontConsume { (_: Payload) in
+    consumed.use()
+    mutated.mutate()
+  }
+  mutated.use()
+}
+
+// CHECK-NEXT: GenericResource(mixed consumed unused) deinit
+// CHECK-NEXT: GenericResource(mixed inout unused) used
+// CHECK-NEXT: GenericResource(mixed inout unused) deinit
+testGenericConsumingAndInoutCapturesNeverCalled(1)

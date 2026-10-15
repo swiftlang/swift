@@ -219,3 +219,85 @@ public func noncopyableBorrowedCaptureNeverCalled(_ x: Int) {
 // CHECK-NOT: call void @swift_release
 // CHECK-NOT: call void @swift_deallocObject
 // CHECK: ret void
+
+public struct GenericResource<T>: ~Copyable {
+  var x: T
+  public init(x: T) { self.x = x }
+  deinit { print("GenericResource") }
+  public consuming func use() { print("used") }
+  public mutating func mutate() { print("mutated") }
+}
+
+// A noncopyable address-only value that the closure consumes is owned by the
+// closure's context, even when the context is stack-allocated. The forwarder
+// moves the value out of the context into a temporary for the call, so the
+// context has nothing left to destroy or release.
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19genericOwnedCaptureyyx_AA15GenericResourceVyxGntlFyyXEfU_TA"(ptr swiftself %0)
+// CHECK:  [[FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK:  call ptr @"$s4test15GenericResourceVyxGlWOb"(ptr [[FIELD]], ptr %arg.temp, ptr %T, ptr {{%.*}})
+// CHECK-NOT: call void @swift_release
+// CHECK-NOT: call void @swift_deallocUninitializedObject
+// CHECK:  call swiftcc void @"$s4test19genericOwnedCaptureyyx_AA15GenericResourceVyxGntlFyyXEfU_"(ptr noalias %arg.temp, ptr %T)
+// CHECK-NEXT: ret void
+public func genericOwnedCapture<T>(_ x: T, _ r: consuming GenericResource<T>) {
+  callAtMostOnce { r.use() }
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test27genericOwnedCaptureEscapingyyx_AA15GenericResourceVyxGntlFyyXOofU_TA"(ptr swiftself %0)
+// CHECK:  [[FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK:  call ptr @"$s4test15GenericResourceVyxGlWOb"(ptr [[FIELD]], ptr %arg.temp, ptr %T, ptr {{%.*}})
+// CHECK:  call void @swift_deallocUninitializedObject(ptr %0,
+// CHECK:  call swiftcc void @"$s4test27genericOwnedCaptureEscapingyyx_AA15GenericResourceVyxGntlFyyXOofU_"(ptr noalias %arg.temp, ptr %T)
+public func genericOwnedCaptureEscaping<T>(_ x: T, _ r: consuming GenericResource<T>) {
+  callAtMostOnceEscaping { r.use() }
+}
+
+// A noncopyable address-only value that the closure mutates is captured inout,
+// so the context only holds its address. The forwarder passes that address
+// through without moving, copying, or destroying the value.
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19genericInoutCaptureyyAA15GenericResourceVyxGzlFyyXEfU_TA"(ptr swiftself %0)
+// CHECK:  [[FIELD:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, [8 x i8], ptr }>, ptr %0, i32 0, i32 2
+// CHECK:  [[ADDR:%.*]] = load ptr, ptr [[FIELD]]
+// CHECK-NOT: @"$s4test15GenericResourceVyxGlWO
+// CHECK:  call swiftcc void @"$s4test19genericInoutCaptureyyAA15GenericResourceVyxGzlFyyXEfU_"(ptr [[ADDR]], ptr %T)
+// CHECK-NEXT: ret void
+public func genericInoutCapture<T>(_ r: inout GenericResource<T>) {
+  callAtMostOnce { r.mutate() }
+}
+
+// The context owns the consumed value but only holds the address of the
+// mutated value. Neither the caller nor the context's destructor destroys the
+// mutated value, and the forwarder only moves the consumed value.
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test28genericOwnedAndInoutCapturesyyAA15GenericResourceVyxGn_AEztlF"(ptr noalias %0, ptr noalias %1, ptr %T)
+// CHECK:  [[CTX:%.*]] = call ptr @swift_initStackObject(
+// CHECK:  [[OWNED_FIELD:%.*]] = getelementptr inbounds i8, ptr [[CTX]], i64 {{%.*}}
+// CHECK:  call ptr @"$s4test15GenericResourceVyxGlWOb"(ptr {{%.*}}, ptr [[OWNED_FIELD]], ptr %T, ptr {{%.*}})
+// CHECK:  [[INOUT_FIELD:%.*]] = getelementptr inbounds i8, ptr [[CTX]], i64 {{%.*}}
+// CHECK:  store ptr %1, ptr [[INOUT_FIELD]]
+// CHECK:  call swiftcc void @"$s4test14callAtMostOnceyyyyXEnF"(ptr @"$s4test28genericOwnedAndInoutCapturesyyAA15GenericResourceVyxGn_AEztlFyyXEfU_TA{{(\.ptrauth)?}}", ptr [[CTX]])
+// CHECK-NOT: @"$s4test15GenericResourceV
+// CHECK:  ret void
+//
+// CHECK-LABEL: define{{.*}} void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
+// CHECK:  [[OWNED_FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK-NEXT: call swiftcc void @"$s4test15GenericResourceVfD"(ptr {{%.*}}, ptr noalias swiftself [[OWNED_FIELD]])
+// CHECK-NEXT: ret void
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test28genericOwnedAndInoutCapturesyyAA15GenericResourceVyxGn_AEztlFyyXEfU_TA"(ptr swiftself %0)
+// CHECK:  [[OWNED_FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK:  call ptr @"$s4test15GenericResourceVyxGlWOb"(ptr [[OWNED_FIELD]], ptr %arg.temp, ptr %T, ptr {{%.*}})
+// CHECK:  [[INOUT_FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK:  [[INOUT_ADDR:%.*]] = load ptr, ptr [[INOUT_FIELD]]
+// CHECK-NOT: call void @swift_release
+// CHECK-NOT: @"$s4test15GenericResourceVyxGlWO
+// CHECK:  call swiftcc void @"$s4test28genericOwnedAndInoutCapturesyyAA15GenericResourceVyxGn_AEztlFyyXEfU_"(ptr noalias %arg.temp, ptr [[INOUT_ADDR]], ptr %T)
+// CHECK-NEXT: ret void
+public func genericOwnedAndInoutCaptures<T>(_ c: consuming GenericResource<T>, _ r: inout GenericResource<T>) {
+  callAtMostOnce {
+    c.use()
+    r.mutate()
+  }
+}
