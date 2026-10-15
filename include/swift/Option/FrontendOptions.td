@@ -1167,6 +1167,9 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
 
+def enable_sil_verify_all : Flag<["-"], "enable-sil-verify-all">,
+  Alias<sil_verify_all>;
+
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
 
