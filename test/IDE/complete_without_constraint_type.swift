@@ -1,7 +1,7 @@
 // RUN: %batch-code-completion -filecheck-additional-suffix _DISABLED
-// RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED -enable-experimental-feature TransferableProtocol
+// RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED -enable-experimental-feature NontransferableTypes
 
-// REQUIRES: swift_feature_TransferableProtocol
+// REQUIRES: swift_feature_NontransferableTypes
 
 // rdar://139212286 - We should only suggest invertible types here.
 struct FileDescriptor: ~#^COMPLETE^# {}

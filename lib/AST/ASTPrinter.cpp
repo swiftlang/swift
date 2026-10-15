@@ -2371,18 +2371,24 @@ void PrintAST::printRequirementSignature(ProtocolDecl *owner,
                         sig.getRequirements().end());
   }
 
-  // Compilers without the Deinitable protocol can't parse requirements that
-  // mention it.
-  if (Options.SuppressDeinitableProtocol) {
-    llvm::erase_if(requirements, [](Requirement req) {
+  // Compilers without the Deinitable or Transferable protocol can't parse
+  // requirements that mention it.
+  auto suppressInvertible = [&](InvertibleProtocolKind ip) {
+    auto kp = getKnownProtocolKind(ip);
+    llvm::erase_if(requirements, [&](Requirement req) {
       return req.getKind() == RequirementKind::Conformance &&
-             req.getProtocolDecl()->isSpecificProtocol(
-                 KnownProtocolKind::Deinitable);
+             req.getProtocolDecl()->isSpecificProtocol(kp);
     });
-    llvm::erase_if(inverses, [](InverseRequirement inverse) {
-      return inverse.getKind() == InvertibleProtocolKind::Deinitable;
+    llvm::erase_if(inverses, [&](InverseRequirement inverse) {
+      return inverse.getKind() == ip;
     });
-  }
+  };
+
+  if (Options.SuppressDeinitableProtocol)
+    suppressInvertible(InvertibleProtocolKind::Deinitable);
+
+  if (Options.SuppressTransferableProtocol)
+    suppressInvertible(InvertibleProtocolKind::Transferable);
 
   if (attachingTo) {
     llvm::erase_if(requirements,
@@ -3742,6 +3748,13 @@ static void
 suppressingFeatureDeinitableProtocol(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressDeinitableProtocol, true);
+  action();
+}
+
+static void
+suppressingFeatureTransferableProtocol(PrintOptions &options,
+                                       llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressTransferableProtocol, true);
   action();
 }
 

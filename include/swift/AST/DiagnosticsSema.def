@@ -3111,7 +3111,7 @@ ERROR(deinitable_reserved,none,
       "'Deinitable' is reserved for use by the compiler", ())
 ERROR(transferable_protocol_requires_feature,none,
       "'Transferable' requires '-enable-experimental-feature "
-      "TransferableProtocol'", ())
+      "NontransferableTypes'", ())
 ERROR(deinitable_inverse_requires_noncopyable,none,
       "%0 cannot suppress 'Deinitable' without also suppressing 'Copyable'",
       (Type))
