@@ -5,8 +5,7 @@ protocol SomeProtocol {
 }
 
 extension SomeProtocol where T == Optional<T> { }
-// expected-error@-1 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is τ_0_0.[SomeProtocol:T].[concrete: Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<Optional<τ_0_0.[SomeProtocol:T]>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => τ_0_0.[SomeProtocol:T]}}
+// expected-error@-1 {{same-type constraint 'Self.T' == 'Optional<Optional<Self.T>>' is recursive}}
 
 // rdar://problem/19840527
 
