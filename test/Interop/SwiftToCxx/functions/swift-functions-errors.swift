@@ -106,9 +106,9 @@ public struct ThrowingAccessors {
 
 // ACCESSORS: class SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsV") ThrowingAccessors final {
 // ACCESSORS: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> getValue() const SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsV5valueSivp");
-// ACCESSORS-NEXT: SWIFT_INLINE_THUNK swift::ThrowingResult<bool> isReady() const SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsV7isReadySbvp");
-// ACCESSORS-NEXT: static SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> getStaticValue() SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsV11staticValueSivpZ");
-// ACCESSORS-NEXT: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> operator [](swift::Int index) const SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsVyS2icig");
+// ACCESSORS: SWIFT_INLINE_THUNK swift::ThrowingResult<bool> isReady() const SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsV7isReadySbvp");
+// ACCESSORS: static SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> getStaticValue() SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsV11staticValueSivpZ");
+// ACCESSORS: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> operator [](swift::Int index) const SWIFT_SYMBOL("s:9Functions17ThrowingAccessorsVyS2icig");
 
 // ACCESSORS: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> ThrowingAccessors::getValue() const {
 // ACCESSORS-NEXT: void* opaqueError = nullptr;
