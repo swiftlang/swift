@@ -5877,7 +5877,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     if (protoTy->getDecl()->isSpecificProtocol(
             KnownProtocolKind::Transferable) &&
         !isSILSourceFile() &&
-        !getASTContext().LangOpts.hasFeature(Feature::TransferableProtocol)) {
+        !getASTContext().LangOpts.hasFeature(Feature::NontransferableTypes)) {
       if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
         diagnose(repr->getNameLoc(),
                  diag::transferable_protocol_requires_feature);

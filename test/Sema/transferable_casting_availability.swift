@@ -2,10 +2,10 @@
 // conformance to it are gated at every deployment target, including ones that
 // already satisfy the Copyable and Escapable gates.
 
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12.0 -enable-experimental-feature TransferableProtocol -enable-experimental-feature NoncopyableCasting -verify-additional-prefix below60-
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx15.0 -enable-experimental-feature TransferableProtocol -enable-experimental-feature NoncopyableCasting
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12.0 -enable-experimental-feature NontransferableTypes -enable-experimental-feature NoncopyableCasting -verify-additional-prefix below60-
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx15.0 -enable-experimental-feature NontransferableTypes -enable-experimental-feature NoncopyableCasting
 
-// REQUIRES: swift_feature_TransferableProtocol
+// REQUIRES: swift_feature_NontransferableTypes
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: OS=macosx
 

@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-module -o %t %t/Lib.swift -enable-experimental-feature TransferableProtocol
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/main.swift -enable-experimental-feature TransferableProtocol
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/main.swift -enable-experimental-feature TransferableProtocol -enable-experimental-feature MoveOnlyClasses
+// RUN: %target-swift-frontend -emit-module -o %t %t/Lib.swift -enable-experimental-feature NontransferableTypes
+// RUN: %target-swift-frontend -typecheck -verify -I %t %t/main.swift -enable-experimental-feature NontransferableTypes
+// RUN: %target-swift-frontend -typecheck -verify -I %t %t/main.swift -enable-experimental-feature NontransferableTypes -enable-experimental-feature MoveOnlyClasses
 
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_TransferableProtocol
+// REQUIRES: swift_feature_NontransferableTypes
 // REQUIRES: swift_feature_MoveOnlyClasses
 
 //--- Lib.swift

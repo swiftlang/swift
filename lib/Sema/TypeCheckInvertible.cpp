@@ -262,7 +262,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
       ip != InvertibleProtocolKind::Deinitable &&
       !(ip == InvertibleProtocolKind::Transferable &&
         (isTransferableSubclass ||
-         !ctx.LangOpts.hasFeature(Feature::TransferableProtocol)));
+         !ctx.LangOpts.hasFeature(Feature::NontransferableTypes)));
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (ip == InvertibleProtocolKind::Copyable) {

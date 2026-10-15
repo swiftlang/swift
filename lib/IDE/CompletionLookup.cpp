@@ -2787,7 +2787,7 @@ void CompletionLookup::getInvertedTypeCompletions() {
       return;
 
     if (invertableKind == InvertibleProtocolKind::Transferable &&
-        !Ctx.LangOpts.hasFeature(Feature::TransferableProtocol))
+        !Ctx.LangOpts.hasFeature(Feature::NontransferableTypes))
       return;
 
     auto *P = Ctx.getProtocol(getKnownProtocolKind(invertableKind));

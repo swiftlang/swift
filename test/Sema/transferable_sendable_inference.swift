@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature TransferableProtocol -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature NontransferableTypes -verify-ignore-unrelated
 
-// REQUIRES: swift_feature_TransferableProtocol
+// REQUIRES: swift_feature_NontransferableTypes
 
 // Sendable implies Transferable, so ~Transferable types don't get an implicit
 // Sendable conformance.
