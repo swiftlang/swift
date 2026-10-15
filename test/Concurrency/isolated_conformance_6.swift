@@ -20,3 +20,30 @@ protocol Q: SendableMetatype {
 @MainActor struct QSendableSMainActor: @MainActor Q {
   func f() { }
 }
+
+protocol Proto {
+  func doThing()
+}
+
+actor OtherActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = OtherActor()
+}
+
+struct MainType: @MainActor Proto {
+  func doThing() { }
+}
+
+struct OtherType: @SomeGlobalActor Proto {
+  func doThing() { }
+}
+
+func acceptTwo<T: Proto, U: Proto>(_ v1: T, _ v2: U) { }
+
+@MainActor func testMultipleIsolatedGenericArgs() {
+  acceptTwo(MainType(), MainType()) // okay
+  acceptTwo(MainType(), OtherType()) // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'OtherType' to 'Proto' cannot be used in main actor-isolated context}}
+  acceptTwo(OtherType(), MainType()) // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'OtherType' to 'Proto' cannot be used in main actor-isolated context}}
+}
