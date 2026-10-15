@@ -88,8 +88,8 @@ func ownership2(_ t: ~ borrowing Int) {} // expected-error {{cannot find type 'b
 
 func ownership3(_ t: consuming some ~Clone) {}
 
-func what1(one: ~Copyable...,  // expected-error {{type '~Copyable' does not conform to protocol 'Copyable'}}
-                               // expected-note@-1 {{required because variadic parameter type must be stored inside an 'Array'}}
+func what1(one: ~Copyable...,  // expected-error@:17 {{type '~Copyable' does not conform to protocol 'Copyable'}}
+                               // expected-note@-1:26 {{required because variadic parameter type must be stored inside an 'Array'}}
            two: ~(Copyable...) // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
                                // expected-error@-1 {{parameter of noncopyable type '~Copyable' must specify ownership}}
               // expected-note@-2{{add 'borrowing' for an immutable reference}}
@@ -97,8 +97,8 @@ func what1(one: ~Copyable...,  // expected-error {{type '~Copyable' does not con
               // expected-note@-4{{add 'consuming' to take the value from the caller}}
           ) {}
 
-func what2(one: ~Escapable...,  // expected-error {{type '~Escapable' does not conform to protocol 'Escapable'}}
-                                // expected-note@-1 {{required because variadic parameter type must be stored inside an 'Array'}}
+func what2(one: ~Escapable...,  // expected-error@:17 {{type '~Escapable' does not conform to protocol 'Escapable'}}
+                                // expected-note@-1:27 {{required because variadic parameter type must be stored inside an 'Array'}}
            two: ~(Escapable...) // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
           ) {}
 
