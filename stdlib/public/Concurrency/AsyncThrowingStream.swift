@@ -448,12 +448,12 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///         print(error)
   ///     }
   ///
-  @preconcurrency
   @abi(
     init(
-      unfolding produce: @escaping @Sendable () async throws -> Element?
+      unfolding produce: @escaping () async throws -> Element?
     ) where Failure == Error
   )
+  @preconcurrency
   public init(
     unfolding produce: nonisolated(nonsending) @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
@@ -478,6 +478,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// - Parameters:
   ///   - produce: A closure that asynchronously produces elements for the
   ///    stream.
+  ///   - onCancel: A closure to execute when canceling the stream’s task.
   ///
   /// Use this convenience initializer when you have an asynchronous function
   /// that can produce elements for the stream, and don't want to invoke
@@ -512,7 +513,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   @available(SwiftStdlib 6.5, *)
   @preconcurrency
   public init(
-    unfolding produce: nonisolated(nonsending) @escaping @Sendable () async throws(Failure) -> Element?
+    unfolding produce: nonisolated(nonsending) @escaping @Sendable () async throws(Failure) -> Element?,
+    onCancel: (@Sendable () -> Void)? = nil
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<nonisolated(nonsending) @Sendable () async throws(Failure) -> Element?>>
       = .create(produce)
