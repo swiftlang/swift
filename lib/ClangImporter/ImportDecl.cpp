@@ -4200,7 +4200,7 @@ namespace {
             func->setSelfAccessKind(SelfAccessKind::Mutating);
           } else {
             if (selfIsBorrowing ||
-                getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+                getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
                     decl))
               func->setSelfAccessKind(SelfAccessKind::Borrowing);
             else
@@ -4497,7 +4497,7 @@ namespace {
              param->specific_attrs<clang::LifetimeCaptureByAttr>())
           processLifetimeCaptureBy(attr, idx, param->getType());
       }
-      if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
+      if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
         processLifetimeBound(
             result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),

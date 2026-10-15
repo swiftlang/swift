@@ -2526,8 +2526,7 @@ getImplicitObjectParamAnnotations(const clang::FunctionDecl *FD) {
 }
 
 template <typename T>
-const T *
-getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+const T *getFirstImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   auto attrs = getImplicitObjectParamAnnotations<T>(FD);
   return attrs.empty() ? nullptr : attrs.front();
 }
