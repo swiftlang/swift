@@ -129,3 +129,15 @@ TEST(TaskStatusTest, cancellation_simple) {
     swift_job_run(task, SerialExecutorRef::generic());
   });
 }
+
+TEST(TaskStatusTest, main_actor_simple) {
+    auto mainExecutor = swift_task_getMainExecutor();
+    bool hasRun = false;
+    
+    struct Storage { int value; };
+    withSimpleTask(Storage{47}, [&](ValueContext<Storage> *context) {
+        EXPECT_TRUE(swift_task_isCurrentExecutor(mainExecutor));
+    }, [&](AsyncTask *task) {
+        swift_job_run(task, mainExecutor);
+    });
+}
