@@ -61,6 +61,7 @@ add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   SWIFT_COMPILE_FLAGS
     ${swift_string_processing_compile_flags}
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+    -Xfrontend -enable-sil-opaque-values
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _RegexParser
