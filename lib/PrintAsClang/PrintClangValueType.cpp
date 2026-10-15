@@ -710,6 +710,17 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   if (objCxxOnly)
     os << "#if defined(__OBJC__)\n";
+  // The header of every module that uses an imported type in a generic context
+  // prints these specializations. Guard them by the name of the type's
+  // metadata accessor so that one translation unit can include several of
+  // these headers. Like the accessor itself, the name can contain '$'.
+  std::string traitsGuard;
+  if (typeDecl->hasClangNode()) {
+    traitsGuard =
+        ("SWIFT_GENERIC_TRAITS_" + typeMetadataFuncName.ltrim('$')).str();
+    os << "#ifndef " << traitsGuard << "\n";
+    os << "#define " << traitsGuard << "\n";
+  }
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
   if (const auto *clangDecl = typeDecl->getClangDecl()) {
@@ -807,6 +818,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
+  if (!traitsGuard.empty())
+    os << "#endif // " << traitsGuard << "\n";
   if (objCxxOnly)
     os << "#endif // defined(__OBJC__)\n";
   os << "} // namespace swift\n";

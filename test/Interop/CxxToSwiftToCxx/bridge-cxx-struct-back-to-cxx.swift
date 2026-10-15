@@ -213,6 +213,8 @@ public struct Strct {
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
+// CHECK-NEXT: #ifndef SWIFT_GENERIC_TRAITS_sSo2nsO0030NonTrivialTemplateCInt_hHAFhrbVMa
+// CHECK-NEXT: #define SWIFT_GENERIC_TRAITS_sSo2nsO0030NonTrivialTemplateCInt_hHAFhrbVMa
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
@@ -228,6 +230,7 @@ public struct Strct {
 // CHECK-NEXT: inline const constexpr bool isSwiftBridgedCxxRecord<ns::NonTrivialTemplateInt> = true;
 // CHECK-NEXT: } // namespace
 // CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #endif // SWIFT_GENERIC_TRAITS_sSo2nsO0030NonTrivialTemplateCInt_hHAFhrbVMa
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
@@ -252,6 +255,8 @@ public struct Strct {
 // CHECK-NEXT: } // end namespace
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
+// CHECK-NEXT: #ifndef SWIFT_GENERIC_TRAITS_sSo2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVMa
+// CHECK-NEXT: #define SWIFT_GENERIC_TRAITS_sSo2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVMa
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
@@ -267,6 +272,7 @@ public struct Strct {
 // CHECK-NEXT: inline const constexpr bool isSwiftBridgedCxxRecord<ns::NonTrivialTemplateTrivial> = true;
 // CHECK-NEXT: } // namespace
 // CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #endif // SWIFT_GENERIC_TRAITS_sSo2nsO0042NonTrivialTemplatensTrivialinNS_HlGFlenawcVMa
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
