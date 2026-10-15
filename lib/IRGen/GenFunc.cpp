@@ -890,8 +890,30 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         out);
 }
 
+/// Whether the context of the closure that \c outType describes captures an
+/// indirect argument with the given convention and type by address, instead of
+/// owning the value.
+static bool capturesIndirectArgumentByAddress(CanSILFunctionType outType,
+                                              ParameterConvention convention,
+                                              SILType argType) {
+  // The context of an escaping closure owns its indirect arguments.
+  if (!outType->isNoEscape())
+    return false;
+
+  // A closure that is called at most once is the exception for a noncopyable
+  // argument that it consumes. Like the other consumed captures of such a
+  // closure, its context owns the value.
+  if (convention == ParameterConvention::Indirect_In &&
+      outType->hasCalledAtMostOnceSemantics() && argType.isMoveOnly())
+    return false;
+
+  // A stack-promoted closure doesn't own most of its indirect arguments, so it
+  // captures their addresses.
+  return true;
+}
+
 CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
-                                       bool isNoEscape) {
+                                       bool capturesIndirectByAddress) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.
   case ParameterConvention::Direct_Owned:
@@ -906,12 +928,12 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
     return type;
 
   // Capture indirect parameters if the closure is not [onstack]. [onstack]
-  // closures don't take ownership of their arguments so we just capture the
-  // address.
+  // closures don't take ownership of most of their arguments so we just capture
+  // the address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
-    if (isNoEscape)
+    if (capturesIndirectByAddress)
       return CanInOutType::get(type);
     else
       return type;
@@ -2222,14 +2244,19 @@ static llvm::Value *emitPartialApplicationForwarder(
 
         auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
                               &subIGF](const TypeInfo &fieldTI, SILType fieldTy,
-                                       Address fieldAddr) {
-          // The +1 argument is passed indirectly, so we need to copy into a
-          // temporary.
+                                       Address fieldAddr, bool isTake) {
+          // The +1 argument is passed indirectly, so we need to copy or move
+          // into a temporary.
           needsAllocas = true;
           auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
           auto addressPointer = stackAddr.getAddress().getAddress();
-          fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
-                                     fieldTy, false);
+          if (isTake)
+            fieldTI.initializeWithTake(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false,
+                                       /*zeroizeIfSensitive=*/false);
+          else
+            fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false);
           param.add(addressPointer);
 
           // Remember to deallocate later.
@@ -2237,7 +2264,8 @@ static llvm::Value *emitPartialApplicationForwarder(
               AddressToDeallocate{fieldTy, fieldTI, stackAddr});
         };
 
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, fieldConvention,
+                                              fieldTy)) {
           // If the closure is [onstack] it only captured the address of the
           // value. Load that address from the context.
           Explosion addressExplosion;
@@ -2249,9 +2277,16 @@ static llvm::Value *emitPartialApplicationForwarder(
               subIGF.getTypeInfoForLowered(newFieldTy.getASTType());
           fieldAddr =
               newFieldTI.getAddressForPointer(addressExplosion.claimNext());
-          initStackCopy(newFieldTI, newFieldTy, fieldAddr);
+          initStackCopy(newFieldTI, newFieldTy, fieldAddr, /*isTake=*/false);
+        } else if (outType->hasCalledAtMostOnceSemantics() &&
+                   fieldConvention == ParameterConvention::Indirect_In &&
+                   fieldTy.isMoveOnly()) {
+          // The closure is called at most once, so move the value out of the
+          // context, which then must not destroy it.
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/true);
+          consumedFields.set(fieldIndex);
         } else {
-          initStackCopy(fieldTI, fieldTy, fieldAddr);
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/false);
         }
         break;
       }
@@ -2516,8 +2551,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     if (!isa<FixedTypeInfo>(ti)) {
@@ -2530,8 +2567,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
 
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
@@ -2844,7 +2883,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, argConventions[i],
+                                              argValTypes[i])) {
           cast<LoadableTypeInfo>(fieldLayout.getType())
               .initialize(IGF, args, fieldAddr, isOutlined);
         } else {

@@ -1164,7 +1164,8 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     if (pa->hasCalledAtMostOnceSemantics()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
-        if (!argOp.isConsuming())
+        if (!argOp.isConsuming() &&
+            !ApplySite(pa).hasContextOwnedAddressArgument(argOp))
           continue;
 
         SILBuilderWithScope builder(pa, builderCtxt);

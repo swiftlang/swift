@@ -75,6 +75,11 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     for (Operand &argOp : pai->getArgumentOperands()) {
       if (argOp.isConsuming())
         argsToHandle.push_back(&argOp);
+
+      // The closure owns a noncopyable address-only value, which can't be
+      // copied to extend its lifetime.
+      if (ApplySite(pai).hasContextOwnedAddressArgument(argOp))
+        return false;
     }
   }
 
