@@ -3852,11 +3852,25 @@ public:
     buildMakeIteratorVar();
     buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 3> stmts;
-    if (auto *sequenceBinding = buildSequenceBinding())
-      stmts.push_back(sequenceBinding);
+    // `buildMakeIterator` refers to the sequence binding, build it first.
+    auto *sequenceBinding = buildSequenceBinding();
+
+    SmallVector<ASTNode, 2> stmts;
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
+
+    // The iterator depends on the sequence binding, so it has to be destroyed
+    // before the binding's borrow ends. SILGen ends the local borrow accesses
+    // of a brace before it runs the brace's cleanups, so the iterator can't
+    // share a brace with the binding: nest it in an inner brace, which destroys
+    // the iterator when it is popped.
+    if (sequenceBinding) {
+      auto *loopBrace = BraceStmt::createImplicit(
+          ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+      stmts.clear();
+      stmts.push_back(sequenceBinding);
+      stmts.push_back(loopBrace);
+    }
 
     auto *braceStmt = BraceStmt::createImplicit(ctx, stmt->getStartLoc(), stmts,
                                                 stmt->getEndLoc());
