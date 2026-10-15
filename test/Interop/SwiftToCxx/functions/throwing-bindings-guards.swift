@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend %s -D RESILIENT_MODULE -module-name Resilient -emit-module -emit-module-path %t/Resilient.swiftmodule -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/resilient.h
 // RUN: %target-swift-frontend %s -I %t -module-name Guards -clang-header-expose-decls=all-public -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -typecheck -verify -emit-clang-header-path %t/guards.h
 // RUN: %FileCheck %s < %t/guards.h
+// RUN: %target-swift-frontend %s -I %t -module-name Guards -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/disabled.h
+// RUN: %FileCheck %s --check-prefix=DISABLED < %t/disabled.h
 
 // RUN: echo '#include "resilient.h"' > %t/resilient-guards.h
 // RUN: cat %t/guards.h >> %t/resilient-guards.h
@@ -11,6 +13,9 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/resilient-guards.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-function)
 // RUN: %check-interop-cxx-header-in-clang(%t/resilient-guards.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -Wno-unused-function -Wno-unused-variable)
 // RUN: %check-interop-cxx-header-in-clang(%t/resilient-guards.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -Wno-unused-function)
+// RUN: echo '#include "resilient.h"' > %t/resilient-disabled.h
+// RUN: cat %t/disabled.h >> %t/resilient-disabled.h
+// RUN: %check-interop-cxx-header-in-clang(%t/resilient-disabled.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-function)
 
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
@@ -52,6 +57,13 @@ public class Derived: BaseClass {
 }
 
 #endif
+
+// DISABLED-LABEL: namespace Guards SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Guards") {
+// DISABLED-NOT: swift::ThrowingResult
+// DISABLED: SWIFT_INLINE_THUNK swift::Int ordinary() noexcept
+// DISABLED-NOT: swift::ThrowingResult
+// DISABLED: SWIFT_INLINE_THUNK void Derived::ordinaryInDerived() noexcept
+// DISABLED-NOT: swift::ThrowingResult
 
 // The C declarations don't use the Swift error support types and stay
 // unguarded, including the class metadata base offset that is emitted once
