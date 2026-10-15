@@ -893,7 +893,7 @@ public:
   StringRef getCacheKey() const { return CacheKey; }
 
   bool isResilient() const {
-    return getResilienceStrategy() != ResilienceStrategy::Default;
+    return getResilienceStrategy() != ResilienceStrategy::Default && !getBypassResilience();
   }
 
   /// True if this module is resilient AND also does _not_ allow
