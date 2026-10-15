@@ -135,7 +135,7 @@ func consumeOfCopyableLetIntoBinding() {
 
 func inoutConsume_error(_ s: inout String) {
   if .random() {
-    _ = consume s  // expected-error {{'' used after consume}}  // expected-note {{consumed here}}
+    _ = consume s  // expected-error {{'s' used after consume}}  // expected-note {{consumed here}}
   }
 }
 func inoutConsume_fixed(_ s: inout String) {
@@ -300,7 +300,7 @@ func fieldUseAfterConsume() {
   var p: Pair
   p = Pair(a: C(), b: C())
   _ = consume p.a   // expected-note {{consumed here}}
-  use(p.a)          // expected-error {{'p' used after consume}}
+  use(p.a)          // expected-error {{'p.a' used after consume}}
   use(p.b)          // valid: distinct field
 }
 
@@ -308,14 +308,14 @@ func tupleElementUseAfterConsume() {
   var t: (C, C)
   t = (C(), C())
   _ = consume t.0   // expected-note {{consumed here}}
-  use(t.0)          // expected-error {{'t' used after consume}}
+  use(t.0)          // expected-error {{'t.0' used after consume}}
   use(t.1)          // valid: distinct element
 }
 
 func trivialUseBeforeInit() {
   var t: (Int, Int)  // expected-note {{variable defined here}}
   t.0 = 1
-  _ = t.1  // expected-error {{variable 't' used before being initialized}}
+  _ = t.1  // expected-error {{variable 't.1' used before being initialized}}
   _ = t.0
 
 
@@ -342,11 +342,7 @@ struct EmptyStruct {
 }
 
 enum EmptyEnum {
-  // FIXME: It is correct to emit an error here, but the message needs improving,
-  //        as it's actually considered a delegating initializer.
-  //        Here's what DI emits: 'self.init' isn't called on all paths before returning from initializer
-
-  init() {}  // expected-error {{variable 'self' used before being initialized}} // expected-note {{variable defined here}}
+  init() {}  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
 class EmptyClass {
@@ -383,9 +379,9 @@ func testEmpties_uac() {
 
 struct Point {
   var x: Int = 0
-  var y: Int
-  init(oops: ()) {} // expected-error {{variable 'self' used before being initialized}}  // expected-note {{variable defined here}}
-  init(stillOops: ()) { self.x = 0 }  // expected-error {{variable 'self' used before being initialized}}  // expected-note {{variable defined here}}
+  var y: Int // expected-note 2 {{'self.y' not initialized}}
+  init(oops: ()) {} // expected-error {{return from initializer without initializing all stored properties}}
+  init(stillOops: ()) { self.x = 0 }  // expected-error {{return from initializer without initializing all stored properties}}
   init(correct: ()) { self.y = 0 }
 }
 
@@ -433,5 +429,5 @@ func multiLeafUseBeforeInit() {
 
   var m: TrivialNested  // expected-note {{variable defined here}}
   m.p.a = 1
-  useNested(m)  // expected-error {{variable 'm' used before being initialized}}
+  useNested(m)  // expected-error {{variable 'm.p.b' used before being initialized}}
 }

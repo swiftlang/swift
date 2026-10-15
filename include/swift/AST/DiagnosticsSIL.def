@@ -285,6 +285,9 @@ ERROR(immutable_property_already_initialized,none,
       (StringRef))
 NOTE(initial_value_provided_in_let_decl,none,
      "initial value already provided in 'let' declaration", ())
+ERROR(definite_init_bug_unknown_storage,none,
+      "initialization of this value cannot be verified. This is a compiler bug. "
+      "Please file a bug with a small example of the bug", ())
 ERROR(mutation_of_property_of_immutable_value,none,
       "cannot mutate %select{property %0|subscript}1 of immutable value '%2'",
       (DeclBaseName, bool, StringRef))

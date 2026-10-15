@@ -18,6 +18,8 @@ class K {}
 
 sil @getK : $@convention(thin) () -> @owned K
 
+sil_global hidden @globalK : $K
+
 // A `load [copy]` tagged with `diagnose [unpermitted_copy]` is a consume that was
 // demoted to a copy because `%l2` still demanded the value below it. The error is
 // reported at that downstream use, with a note at the consume.
@@ -91,6 +93,16 @@ bb0:
 
   end_borrow %2
   destroy_value %1
+  %t = tuple ()
+  return %t
+}
+
+// Markers on storage that is not resolvable still produce an error.
+sil [ossa] @diagnose_unknown_storage : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalK : $*K
+  specify_test "lifetime_resolution_diagnose"
+  assign undef to [init] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
   %t = tuple ()
   return %t
 }
