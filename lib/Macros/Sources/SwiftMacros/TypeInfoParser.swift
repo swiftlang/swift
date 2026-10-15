@@ -634,6 +634,15 @@ extension EnumCaseInfo: TypeInfoProtocol {
   }
 }
 
+extension EnumCaseInfo {
+  public var rawName: String {
+    if name.starts(with: "`") {
+        return String(name.dropFirst().dropLast(1))
+    }
+    return name
+  }
+}
+
 extension AvailabilityQuery: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     let (domain, primaryRange, variantRange, isUnavailability, constantResult) =
