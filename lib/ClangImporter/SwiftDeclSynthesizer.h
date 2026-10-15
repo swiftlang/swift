@@ -44,7 +44,10 @@ inline MakeStructRawValuedOptions getDefaultMakeStructRawValuedOptions() {
 }
 
 inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
-  return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
+  if (auto *classDecl = dc->getSelfClassDecl())
+    if (!classDecl->isFinal())
+      return AccessLevel::Open;
+  return AccessLevel::Public;
 }
 
 enum class ReferenceReturnTypeBehaviorForBaseMethodSynthesis {
