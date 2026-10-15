@@ -232,7 +232,7 @@ func test_invalid_references() {
         }
 
         let x = c.lowercased()
-        // expected-error@-1 {{static member 'c' cannot be used on instance of type 'Test'}}
+        // expected-error@-1 {{static member 'c' can only be used on the type 'Test', not on the instance self}}
 
         print(Test.c.lowercased()) // Ok
 

@@ -45,7 +45,7 @@ struct S1 {
 func testStatic() {
   // static.
   S1.staticMethod()
-  S1().staticMethod() // expected-error {{static member 'staticMethod' cannot be used on instance of type 'S1'}}
+  S1().staticMethod() // expected-error {{static member 'staticMethod' can only be used on the type 'S1', not on the instance S1()}}
 }
 
 struct S2 {

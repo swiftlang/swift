@@ -34,7 +34,7 @@ struct S0 {
     _ = self.f2(_:`let`:) // expected-warning {{keyword 'let' does not need to be escaped in argument list}}{{19-20=}}{{23-24=}}
     _ = self.f3(_:`var`:) // expected-warning {{keyword 'var' does not need to be escaped in argument list}}{{19-20=}}{{23-24=}}
 
-    _ = f3(_:y:z:) // expected-error{{static member 'f3(_:y:z:)' cannot be used on instance of type 'S0'}}{{9-9=S0.}}
+    _ = f3(_:y:z:) // expected-error{{static member 'f3(_:y:z:)' can only be used on the type 'S0', not on the instance self}}{{9-9=S0.}}
   }
 
   static func testStaticS0() {
