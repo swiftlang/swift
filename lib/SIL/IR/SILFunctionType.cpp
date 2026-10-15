@@ -4236,9 +4236,19 @@ public:
       return ResultConvention::Owned;
     if (tl.getLoweredType().isForeignReferenceType())
       return ResultConvention::Unowned;
-    if (FnType->getReturnType()
-            ->getUnqualifiedDesugaredType()
-            ->getAsCXXRecordDecl()) {
+
+    auto clangResultType =
+        FnType->getReturnType()->getUnqualifiedDesugaredType();
+    if (auto *recordType = clangResultType->getAs<clang::RecordType>()) {
+      auto *record = recordType->getDecl();
+      if (!isa<clang::CXXRecordDecl>(record) &&
+          (record->isNonTrivialToPrimitiveCopy() ||
+           record->isNonTrivialToPrimitiveDestroy())) {
+        return ResultConvention::Owned;
+      }
+    }
+
+    if (clangResultType->getAsCXXRecordDecl()) {
       return ResultConvention::Owned;
     }
 

@@ -27,6 +27,24 @@ struct StrongsInAStructArc {
 void takeStrongArcStruct(struct StrongsInAStructArc s);
 struct StrongsInAStructArc returnStrongArcStruct(void);
 
+struct StrongPairArc {
+  __strong MYObject *_Nonnull first;
+  __strong MYObject *_Nonnull second;
+};
+
+struct StrongPairArc returnStrongPairArc(void);
+
+struct LargeStrongArcStruct {
+  __strong MYObject *_Nonnull first;
+  __strong MYObject *_Nonnull second;
+  __strong MYObject *_Nonnull third;
+};
+
+struct LargeStrongArcStruct returnLargeStrongArcStruct(void);
+
+typedef struct StrongPairArc (*_Nonnull StrongPairFactory)(void);
+typedef struct LargeStrongArcStruct (*_Nonnull LargeStrongArcFactory)(void);
+
 struct UnavailableArcStruct {
   __strong MYObject *_Nonnull myobj;
 } NS_SWIFT_UNAVAILABLE("Use MySwiftType instead");
@@ -43,6 +61,8 @@ struct OuterArcStruct {
   struct InnerArcStruct nested;
   int tag;
 };
+
+struct OuterArcStruct returnOuterArcStruct(void);
 
 // Struct with __weak fields should not be imported.
 struct WeakInAStructArc {

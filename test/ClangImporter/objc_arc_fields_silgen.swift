@@ -47,12 +47,54 @@ func testPassToCFunction() {
   takeStrongArcStruct(s)
 }
 
-// Receiving an ARC struct from a C function: the return is @autoreleased.
+// Receiving a non-trivial ARC struct from a C function produces an owned,
+// loadable SIL value when Clang returns the record directly.
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testReceiveFromCFunction
-// CHECK: [[FN:%[0-9]+]] = function_ref @$sSo21returnStrongArcStructSo016StrongsInAStructC0VyFTo : $@convention(c) () -> @autoreleased StrongsInAStructArc
-// CHECK: apply [[FN]]() : $@convention(c) () -> @autoreleased StrongsInAStructArc
+// CHECK: [[FN:%[0-9]+]] = function_ref @$sSo21returnStrongArcStructSo016StrongsInAStructC0VyFTo : $@convention(c) () -> @owned StrongsInAStructArc
+// CHECK: apply [[FN]]() : $@convention(c) () -> @owned StrongsInAStructArc
 // CHECK: } // end sil function
 func testReceiveFromCFunction() -> MYObject {
   let s = returnStrongArcStruct()
   return s.myobj
+}
+
+// Record size does not change the direct, owned SIL convention.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testReceiveStrongPairFromCFunction
+// CHECK: [[PAIR_FN:%[0-9]+]] = function_ref {{.*}} : $@convention(c) () -> @owned StrongPairArc
+// CHECK: apply [[PAIR_FN]]() : $@convention(c) () -> @owned StrongPairArc
+// CHECK: } // end sil function
+func testReceiveStrongPairFromCFunction() -> MYObject {
+  return returnStrongPairArc().first
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testReceiveLargeStrongStructFromCFunction
+// CHECK: [[LARGE_FN:%[0-9]+]] = function_ref {{.*}} : $@convention(c) () -> @owned LargeStrongArcStruct
+// CHECK: apply [[LARGE_FN]]() : $@convention(c) () -> @owned LargeStrongArcStruct
+// CHECK: } // end sil function
+func testReceiveLargeStrongStructFromCFunction() -> MYObject {
+  return returnLargeStrongArcStruct().first
+}
+
+// Nested records inherit the non-trivial, owned result convention.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testReceiveNestedStrongStructFromCFunction
+// CHECK: [[NESTED_FN:%[0-9]+]] = function_ref {{.*}} : $@convention(c) () -> @owned OuterArcStruct
+// CHECK: apply [[NESTED_FN]]() : $@convention(c) () -> @owned OuterArcStruct
+// CHECK: } // end sil function
+func testReceiveNestedStrongStructFromCFunction() -> MYObject {
+  return returnOuterArcStruct().nested.inner
+}
+
+// Imported C function pointer types use the same owned, loadable results.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testReceiveStrongPairFromFunctionPointer
+// CHECK: apply {{%[0-9]+}}() : $@convention(c) () -> @owned StrongPairArc
+// CHECK: } // end sil function
+func testReceiveStrongPairFromFunctionPointer(_ factory: StrongPairFactory) -> MYObject {
+  return factory().first
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testReceiveLargeStrongStructFromFunctionPointer
+// CHECK: apply {{%[0-9]+}}() : $@convention(c) () -> @owned LargeStrongArcStruct
+// CHECK: } // end sil function
+func testReceiveLargeStrongStructFromFunctionPointer(_ factory: LargeStrongArcFactory) -> MYObject {
+  return factory().first
 }
