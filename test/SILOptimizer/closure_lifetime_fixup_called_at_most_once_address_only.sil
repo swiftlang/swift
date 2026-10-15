@@ -71,3 +71,32 @@ bb0(%0 : $*CopyableValue<T>):
   %9 = tuple ()
   return %9
 }
+
+sil [ossa] @noncopyable_consuming_and_inout_closure : $@convention(thin) <T> (@in NoncopyableValue<T>, @inout_aliasable NoncopyableValue<T>) -> ()
+
+// The context owns the consumed value, and the caller owns the value that is
+// captured inout, so the caller destroys neither.
+//
+// CHECK-LABEL: sil [ossa] @test_noncopyable_consuming_and_inout_captures :
+// CHECK:         [[TEMP:%.*]] = alloc_stack $NoncopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_at_most_once] {{%.*}}<T>([[TEMP]], %1)
+// CHECK:         [[DEP1:%.*]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[TEMP]]
+// CHECK:         [[DEP2:%.*]] = mark_dependence [nonescaping] [[DEP1]] {{.*}} on %1
+// CHECK:         apply {{%.*}}([[DEP2]])
+// CHECK-NOT:     destroy_addr
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK:       } // end sil function 'test_noncopyable_consuming_and_inout_captures'
+sil [ossa] @test_noncopyable_consuming_and_inout_captures : $@convention(thin) <T> (@in NoncopyableValue<T>, @inout NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
+  %2 = function_ref @noncopyable_consuming_and_inout_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %3 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %3
+  %5 = partial_apply [called_at_most_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %6 = convert_escape_to_noescape %5 to $@noescape @called(atMostOnce) @callee_owned () -> ()
+  %7 = function_ref @use_called_at_most_once : $@convention(thin) (@owned @noescape @called(atMostOnce) @callee_owned () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned @noescape @called(atMostOnce) @callee_owned () -> ()) -> ()
+  dealloc_stack %3
+  %10 = tuple ()
+  return %10
+}

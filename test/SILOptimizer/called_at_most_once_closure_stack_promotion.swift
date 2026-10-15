@@ -68,6 +68,7 @@ func testConsumingCaptureIsPromoted() {
 struct GenericNC<T>: ~Copyable {
   var t: T
   consuming func take() {}
+  mutating func mutate() {}
 }
 
 // A noncopyable address-only value that the closure consumes is moved into the
@@ -87,5 +88,29 @@ struct GenericNC<T>: ~Copyable {
 func testGenericConsumingCapture<T>(_ nc: consuming GenericNC<T>) {
   calledAtMostOnce {
     nc.take()
+  }
+}
+
+// The closure's on-stack context owns the consumed value, but only holds the
+// address of the value that it captures inout. Nothing destroys either value
+// after the call.
+//
+// CHECK-LABEL: sil hidden @$s43called_at_most_once_closure_stack_promotion36testGenericConsumingAndInoutCapturesyyAA0I2NCVyxGn_AEztlF : $@convention(thin) <T> (@in GenericNC<T>, @inout GenericNC<T>) -> () {
+// CHECK: bb0({{%.*}} : $*GenericNC<T>, [[OTHER:%.*]] : $*GenericNC<T>):
+// CHECK: [[TEMP:%.*]] = alloc_stack $GenericNC<T>
+// CHECK: copy_addr [take] {{%.*}} to [init] [[TEMP]]
+// CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once] {{%.*}}<T>([[TEMP]], [[OTHER]]) : $@convention(thin) <τ_0_0> (@in GenericNC<τ_0_0>, @inout_aliasable GenericNC<τ_0_0>) -> ()
+// CHECK: [[DEP1:%.*]] = mark_dependence [nonescaping] [[PA]] on [[TEMP]]
+// CHECK: [[DEP2:%.*]] = mark_dependence [nonescaping] [[DEP1]] on [[OTHER]]
+// CHECK: [[CALLEE:%.*]] = function_ref @$s43called_at_most_once_closure_stack_promotion0A10AtMostOnceyyyyXEnF
+// CHECK: apply [[CALLEE]]([[DEP2]])
+// CHECK-NEXT: dealloc_stack [[PA]]
+// CHECK-NEXT: dealloc_stack [[TEMP]]
+// CHECK-NOT: destroy_addr
+// CHECK: } // end sil function '$s43called_at_most_once_closure_stack_promotion36testGenericConsumingAndInoutCapturesyyAA0I2NCVyxGn_AEztlF'
+func testGenericConsumingAndInoutCaptures<T>(_ nc: consuming GenericNC<T>, _ other: inout GenericNC<T>) {
+  calledAtMostOnce {
+    nc.take()
+    other.mutate()
   }
 }
