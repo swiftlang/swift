@@ -980,6 +980,10 @@ NOTE(sil_movechecking_nonconsuming_use_here, none,
      "used here", ())
 NOTE(sil_movechecking_consumed_in_loop_here, none,
      "consumed in loop here", ())
+NOTE(sil_movechecking_exit_without_reinit, none,
+     "%select{if this call throws, the function exits|the function exits here by throwing an error|"
+     "the function returns here}0 "
+     "without reinitializing '%1'", (unsigned, StringRef))
 NOTE(sil_movechecking_consumed_by_argument_here, none,
      "consumed here; %0 takes ownership of this argument", (DeclName))
 NOTE(sil_movechecking_consumed_by_method_here, none,

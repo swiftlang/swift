@@ -850,6 +850,7 @@ private struct Diagnoser {
       let isClosureCapture = (report.storage as? FunctionArgument)?.isClosureCapture ?? false
       diagnostics.diagnose(.sil_movechecking_not_reinitialized_before_end_of_function, report.name,
                            isClosureCapture ? 1 : 0, at: errorLocation)
+      noteExit(report.use!, report.name)
     }
 
     // Point out every consume that reaches the use, explaining why it consumes where possible.
@@ -870,6 +871,35 @@ private struct Diagnoser {
     }
     for consume in report.consumes {
       if suggestBorrowingParameter(for: consume) { break }
+    }
+  }
+
+  /// Points out where the function exits before `name` is reinitialized: by throwing an error, or by an
+  /// explicit `return`. Falling off the end of the function needs no explanation.
+  private func noteExit(_ use: OffendingUse, _ name: String) {
+    switch use.instruction {
+    case is ReturnInst:
+      if let returnLocation = explicitReturnLocation(of: use) {
+        diagnostics.diagnose(.sil_movechecking_exit_without_reinit, 2, name, at: returnLocation)
+      }
+
+    case is ThrowInst, is ThrowAddrInst:
+      // The last call on the path whose error leads to the exit, e.g. `try f()`.
+      let throwingCall = zip(use.path, use.path.dropFirst()).reversed().lazy.compactMap { predecessor, block in
+        (predecessor.terminator as? TryApplyInst).flatMap { $0.errorBlock == block ? $0 : nil }
+      }.first
+
+      if let throwingCall {
+        diagnostics.diagnose(.sil_movechecking_exit_without_reinit, 0, name, at: throwingCall.location)
+      } else {
+        // The `throw` is located at the end of its statement, so point at its start instead.
+        let location = use.instruction.location
+        diagnostics.diagnose(.sil_movechecking_exit_without_reinit, 1, name,
+                             at: location.startSourceLoc ?? sourceLoc(location))
+      }
+
+    default:
+      break
     }
   }
 

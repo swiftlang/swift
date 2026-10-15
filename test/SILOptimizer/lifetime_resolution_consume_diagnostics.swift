@@ -105,29 +105,30 @@ struct ArrayBuffer {
 
   mutating func flush(to sink: (consuming [UInt8]) throws -> Void) rethrows {
     let bytes = consume pending // expected-error {{missing reinitialization of inout parameter 'self.pending' after consume}}
-    try sink(bytes)
+    try sink(bytes) // expected-note@:9 {{if this call throws, the function exits without reinitializing 'self.pending'}}
     pending = []
   }
 }
 
 func inoutExplicitThrow(_ s: inout String, _ b: Bool) throws {
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
-  if b { throw E() }
+  if b { throw E() } // expected-note@:10 {{the function exits here by throwing an error without reinitializing 's'}}
   s = ""
 }
 
 func inoutTypedThrow(_ s: inout String, _ b: Bool) throws(E) {
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
   if b {
-    throw E()
+    throw E() // expected-note@:5 {{the function exits here by throwing an error without reinitializing 's'}}
   }
   s = ""
 }
 
+// Both calls share the block that throws, so the note points at the first call on the way there.
 func inoutSeveralThrowingCalls(_ s: inout String) throws {
   defer { _ = 0 }
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
-  try mayThrow()
+  try mayThrow() // expected-note {{if this call throws, the function exits without reinitializing 's'}}
   try mayThrow()
   s = ""
 }
@@ -135,7 +136,7 @@ func inoutSeveralThrowingCalls(_ s: inout String) throws {
 func inoutRethrowFromCatch(_ s: inout String) throws {
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
   do {
-    try mayThrow()
+    try mayThrow() // expected-note {{if this call throws, the function exits without reinitializing 's'}}
   } catch {
     throw E()
   }
@@ -158,7 +159,7 @@ func inoutReinitializedBeforeThrowing(_ s: inout String) throws {
 
 func inoutNoncopyableThrow(_ x: inout NC) throws { // expected-note {{'x' declared here with noncopyable type 'NC'}}
   _ = consume x // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
-  try mayThrow()
+  try mayThrow() // expected-note {{if this call throws, the function exits without reinitializing 'x'}}
   x = NC(c: C())
 }
 
@@ -167,7 +168,7 @@ func inoutNoncopyableThrow(_ x: inout NC) throws { // expected-note {{'x' declar
 extension ArrayBuffer {
   mutating func earlyReturn() {
     _ = consume pending // expected-error {{missing reinitialization of inout parameter 'self.pending' after consume}}
-    guard .random() else { return }
+    guard .random() else { return } // expected-note@:28 {{the function returns here without reinitializing 'self.pending'}}
     pending = []
   }
 }
@@ -175,7 +176,7 @@ extension ArrayBuffer {
 func inoutEarlyReturnValue(_ s: inout String, _ b: Bool) -> Int {
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
   if b {
-    return 1
+    return 1 // expected-note@:5 {{the function returns here without reinitializing 's'}}
   }
   s = ""
   return 0
@@ -184,10 +185,11 @@ func inoutEarlyReturnValue(_ s: inout String, _ b: Bool) -> Int {
 func inoutEarlyReturnWithDefer(_ s: inout String, _ b: Bool) {
   defer { _ = 0 }
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
-  if b { return }
+  if b { return } // expected-note {{the function returns here without reinitializing 's'}}
   s = ""
 }
 
+// Reaching the end of the function needs no note.
 func inoutFallsOffTheEnd(_ s: inout String, _ b: Bool) {
   _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
   if b { s = "" }
