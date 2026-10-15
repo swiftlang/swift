@@ -33,25 +33,25 @@ use(x) // expected-error{{cannot find 'x' in scope}}
 
 let nonOptional = nonOptionalStruct()
 
-if let x = nonOptionalStruct() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
-if let x = nonOptionalEnum() { _ = x} // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
+if let x = nonOptionalStruct() { _ = x} // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalStruct'}}
+if let x = nonOptionalEnum() { _ = x} // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalEnum'}}
 
-if let nonOptional { _ = nonOptional } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
-if var nonOptional { nonOptional = nonOptionalStruct(); _ = nonOptional } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+if let nonOptional { _ = nonOptional } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalStruct'}}
+if var nonOptional { nonOptional = nonOptionalStruct(); _ = nonOptional } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalStruct'}}
 
-guard let nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
-guard var nonOptional else { _ = nonOptional; fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
+guard let nonOptional else { _ = nonOptional; fatalError() } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalStruct'}}
+guard var nonOptional else { _ = nonOptional; fatalError() } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalStruct'}}
 
 if let nonOptional.property { }
 // expected-error@-1 {{unwrap condition requires a valid identifier}}
-// expected-error@-2 {{initializer for conditional binding must have Optional type, not 'Any'}}
+// expected-warning@-2 {{initializer for conditional binding has non-optional type 'Any'}}
 
 if var nonOptional.property { }
 // expected-error@-1 {{unwrap condition requires a valid identifier}}
-// expected-error@-2 {{initializer for conditional binding must have Optional type, not 'Any'}}
+// expected-warning@-2 {{initializer for conditional binding has non-optional type 'Any'}}
 
-guard let _ = nonOptionalStruct() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalStruct'}}
-guard let _ = nonOptionalEnum() else { fatalError() } // expected-error{{initializer for conditional binding must have Optional type, not 'NonOptionalEnum'}}
+guard let _ = nonOptionalStruct() else { fatalError() } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalStruct'}}
+guard let _ = nonOptionalEnum() else { fatalError() } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalEnum'}}
 
 let optional: String? = nil
 if case let optional? { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
@@ -74,9 +74,9 @@ class D : B {}// expected-note * {{did you mean 'D'?}}
 if let {}
 // expected-error@-1 {{expected '{' after 'if' condition}}
 // expected-error@-2 {{unwrap condition requires a valid identifier}}
-// expected-error@-3 {{initializer for conditional binding must have Optional type, not '() -> ()'}}
+// expected-warning@-3 {{initializer for conditional binding has non-optional type '() -> ()'}}
 
-if let x = { } // expected-error{{'{' after 'if'}} expected-error{{initializer for conditional binding must have Optional type, not '() -> ()'}}
+if let x = { } // expected-error{{'{' after 'if'}} expected-warning{{initializer for conditional binding has non-optional type '() -> ()'}}
 // expected-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
@@ -113,7 +113,7 @@ if var x = opt {} // expected-warning {{value 'x' was defined but never used; co
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
-if let y = someInteger { _ = y }  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+if let y = someInteger { _ = y } // expected-warning{{initializer for conditional binding has non-optional type 'Int'}}
 if case let y? = someInteger { _ = y }  // expected-error {{optional pattern '?' cannot match value of non-optional type 'Int'}}
 
 // Test multiple clauses on "if let".
@@ -305,5 +305,5 @@ class UsesPayload {
 do {
   let a = 1
   let b = Int?.none
-  if let c = b ?? a { _ = c } // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+  if let c = b ?? a { _ = c } // expected-warning{{initializer for conditional binding has non-optional type 'Int'}}
 }

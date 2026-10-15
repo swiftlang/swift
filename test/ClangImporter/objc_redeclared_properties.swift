@@ -19,7 +19,7 @@ import RedeclaredPropertiesSplit2
 #endif
 
 func test(obj: RPFoo) {
-  if let _ = obj.nonnullToNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
+  if let _ = obj.nonnullToNullable {} // expected-warning {{initializer for conditional binding has non-optional type}}
   obj.nonnullToNullable = obj // expected-error {{cannot assign to property: 'nonnullToNullable' is a get-only property}}
   // expected-error@-1 {{cannot assign value of type 'RPFoo' to type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
 
@@ -33,8 +33,8 @@ func test(obj: RPFoo) {
   let _: RPFoo = obj.typeChangeMoreGeneral
   obj.typeChangeMoreGeneral = obj // expected-error {{cannot assign to property: 'typeChangeMoreGeneral' is a get-only property}}
 
-  if let _ = obj.accessorRedeclaredAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
-  if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
+  if let _ = obj.accessorRedeclaredAsNullable {} // expected-warning {{initializer for conditional binding has non-optional type}}
+  if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-warning {{initializer for conditional binding has non-optional type}}
 
   obj.accessorInProto = nil // okay
 

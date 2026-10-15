@@ -5514,7 +5514,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
       ctx.Diags.diagnose(
           cond.getIntroducerLoc(),
           p->isImplicit()
-            ? diag::condition_optional_element_pattern_not_valid_type
+            ? diag::condition_binding_non_optional_type
             : diag::optional_element_pattern_not_valid_type,
          subExpr->getType())
             .highlight(subExpr->getSourceRange());
