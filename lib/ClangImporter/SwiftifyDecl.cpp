@@ -152,6 +152,9 @@ printSwiftIdentifier(Identifier name, llvm::raw_ostream &os,
 
 // Walks a clang `Expr` tree that appears as a `__counted_by` /
 // `__sized_by` count expression and emits an equivalent Swift expression.
+// FIXME: once we abort instead of ignoring untranslatable count expressions
+// we should be able to emit straight to the target ostream instead of
+// collecting it into a temporary string.
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
   ClangImporter::Implementation &CI;
@@ -1241,6 +1244,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
       } else if (bounds.CAT &&
+                 // FIXME: abort instead of ignoring unsupported count attrs
                  printer.printCountedBy(
                      bounds.CAT, swiftParamTy, mappedIndex,
                      swiftParam->isImplicitlyUnwrappedOptional())) {
