@@ -1852,10 +1852,8 @@ static void diagnoseParamTypeMismatches(ASTContext &ctx,
 }
 
 /// Walk the macro-expanded peers of \p importedAFD, find the
-/// `@_SwiftifyImport`-generated safe wrapper(s), compare their signatures
-/// against the user's safe `@implementation` function \p safeAFD, and
-/// mark the swiftify-generated peers universally unavailable so they don't
-/// compete in overload resolution with the user's safe implementation.
+/// `@_SwiftifyImport`-generated safe wrapper(s), and compare their signatures
+/// against the user's safe `@implementation` function \p safeAFD.
 ///
 /// `@_SwiftifyImport` may emit more than one safe overload for the same C
 /// function (e.g. an `UnsafeBufferPointer<T>`-typed overload when only
@@ -1868,11 +1866,10 @@ static void diagnoseParamTypeMismatches(ASTContext &ctx,
 /// Returns true (and the caller should stop) when a diagnostic was emitted:
 /// either the C function has no swiftify annotations at all (no peers), so
 /// `@implementation` has no effect, or the safe signature matches no
-/// generated overload. Returns false when a matching peer was found and
-/// disabled, meaning there is a genuine unsafe entry point to synthesize.
+/// generated overload. Returns false when a matching peer was found.
 [[nodiscard]] static bool
-diagnoseAndDisableSwiftifyPeerOverload(AbstractFunctionDecl *safeAFD,
-                                       AbstractFunctionDecl *importedAFD) {
+diagnoseSwiftifyPeerOverload(AbstractFunctionDecl *safeAFD,
+                             AbstractFunctionDecl *importedAFD) {
   ASTContext &ctx = safeAFD->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
 
@@ -1979,19 +1976,6 @@ diagnoseAndDisableSwiftifyPeerOverload(AbstractFunctionDecl *safeAFD,
     return true;
   }
 
-  // Mark every swiftify-generated peer universally unavailable so that
-  // overload resolution prefers the user's safe-interop `@implementation`
-  // function when their signatures collide.
-  for (auto *peer : swiftifyPeers) {
-    auto *unavailable = AvailableAttr::createUniversallyUnavailable(
-        ctx,
-        /*Message=*/
-        "replaced by a safe-interop '@c @implementation' "
-        "Swift implementation",
-        /*Rename=*/"");
-    peer->getAttrs().add(unavailable);
-  }
-
   return false;
 }
 
@@ -2043,13 +2027,10 @@ void swift::attachUnswiftifyMacroIfNeeded(Decl *decl) {
 
   // The imported clang decl normally has `@_SwiftifyImport` attached, which
   // synthesizes a peer that wraps the unsafe C function in safe Swift types.
-  // Now that the user has supplied their own `@implementation` wrapper,
-  // that synthesized peer is redundant and would compete in overload
-  // resolution. Walk the swiftify expansion, diagnose any structural
-  // signature mismatch against the safe original, and mark the synthesized
-  // peer as universally unavailable so callers pick up the user's safe
-  // implementation.
-  if (diagnoseAndDisableSwiftifyPeerOverload(AFD, importedAFD))
+  // Now that the user has supplied their own safe `@implementation`, walk
+  // the swiftify expansion and diagnose any structural signature mismatch
+  // against the safe wrapper.
+  if (diagnoseSwiftifyPeerOverload(AFD, importedAFD))
     return;
 
   // A matching `_SwiftifyImport` peer exists (verified above), so the C
