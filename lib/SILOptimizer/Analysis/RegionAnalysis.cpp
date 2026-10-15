@@ -4397,10 +4397,29 @@ PartitionOpTranslator::visitProjection(SingleValueInstruction *proj) {
 EMIT_PROJECTION(StructElementAddrInst)
 EMIT_PROJECTION(TupleElementAddrInst)
 EMIT_PROJECTION(UncheckedTakeEnumDataAddrInst)
-EMIT_PROJECTION(UncheckedBorrowEnumDataAddrInst)
 EMIT_PROJECTION(UncheckedInPlaceEnumDataAddrInst)
 
 #undef EMIT_PROJECTION
+
+TranslationSemantics
+PartitionOpTranslator::visitUncheckedBorrowEnumDataAddrInst(
+    UncheckedBorrowEnumDataAddrInst *proj) {
+  // The scratch operand is reachable only through the result.
+  // That's why we only check the enum operand.
+  SILValue enumAddr = proj->getEnum();
+
+  // If the payload is Sendable but the enum is not, require the enum.
+  if (SILIsolationInfo::isNonSendable(enumAddr) &&
+      !SILIsolationInfo::isNonSendable(proj)) {
+    translateSILRequire(proj);
+    return TranslationSemantics::Special;
+  }
+
+  // Otherwise, look through to the enum. If the enum is Sendable, the payload
+  // gets a fresh region.
+  translateSILLookThrough(SILValue(proj), enumAddr);
+  return TranslationSemantics::Special;
+}
 
 //===---
 // Custom Handling
