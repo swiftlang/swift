@@ -151,6 +151,10 @@ private:
     bool visitSILPackType(CanSILPackType firstPack, Type secondType,
                           Type sugaredFirstType) {
       if (auto secondPack = secondType->getAs<SILPackType>()) {
+        if (firstPack->isElementAddress() != secondPack->isElementAddress())
+          return mismatch(firstPack.getPointer(), secondPack,
+                          sugaredFirstType);
+
         if (firstPack->getNumElements() != secondPack->getNumElements())
           return mismatch(firstPack.getPointer(), secondPack,
                           sugaredFirstType);
@@ -223,6 +227,10 @@ private:
     bool visitPackElementType(CanPackElementType firstElement, Type secondType,
                               Type sugaredFirstType) {
       if (auto secondElement = secondType->getAs<PackElementType>()) {
+        if (firstElement->getLevel() != secondElement->getLevel())
+          return mismatch(firstElement.getPointer(), secondType,
+                          sugaredFirstType);
+
         return this->visit(firstElement.getPackType(),
                            secondElement->getPackType(),
                            sugaredFirstType->castTo<PackElementType>()
@@ -364,14 +372,47 @@ private:
     bool visitAnyFunctionType(CanAnyFunctionType firstFunc, Type secondType,
                               Type sugaredFirstType) {
       if (auto secondFunc = secondType->getAs<AnyFunctionType>()) {
-        // FIXME: Compare throws()? Both existing subclasses would prefer
-        // to mismatch on (!firstFunc->throws() && secondFunc->throws()), but
-        // embedding that non-commutativity in this general matcher is icky.
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
         if (!Matcher.asDerived().allowSendableFunctionMismatch() &&
             firstFunc->isSendable() != secondFunc->isSendable())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
+        if (!Matcher.asDerived().allowFunctionRepresentationMismatch() &&
+            firstFunc->getRepresentation() != secondFunc->getRepresentation())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
+        if (firstFunc->getClangTypeInfo() != secondFunc->getClangTypeInfo())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
+        if (!Matcher.asDerived().allowFunctionAsyncMismatch() &&
+            firstFunc->isAsync() != secondFunc->isAsync())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
+        if (!Matcher.asDerived().allowFunctionSendingResultMismatch() &&
+            firstFunc->hasSendingResult() != secondFunc->hasSendingResult())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
+        if (!Matcher.asDerived().allowFunctionIsolationMismatch()) {
+          auto firstIsolation = firstFunc->getIsolation();
+          auto secondIsolation = secondFunc->getIsolation();
+          if (firstIsolation.getKind() != secondIsolation.getKind())
+            return mismatch(firstFunc.getPointer(), secondFunc,
+                            sugaredFirstType);
+
+          if (firstIsolation.isGlobalActor()) {
+            auto firstActorTy = firstIsolation.getGlobalActorType();
+            if (!this->visit(firstActorTy->getCanonicalType(),
+                             secondIsolation.getGlobalActorType(),
+                             firstActorTy))
+              return false;
+          }
+        }
+
+        if (!Matcher.asDerived().allowFunctionDifferentiabilityMismatch() &&
+            firstFunc->getDifferentiabilityKind() !=
+            secondFunc->getDifferentiabilityKind())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
@@ -421,6 +462,12 @@ private:
       if (auto secondProtocolComposition = secondType->getAs<ProtocolCompositionType>()) {
         if (firstProtocolComposition->hasExplicitAnyObject() !=
             secondProtocolComposition->hasExplicitAnyObject()) {
+          return mismatch(firstProtocolComposition.getPointer(), secondType,
+                          sugaredFirstType);
+        }
+
+        if (firstProtocolComposition->getInverses() !=
+            secondProtocolComposition->getInverses()) {
           return mismatch(firstProtocolComposition.getPointer(), secondType,
                           sugaredFirstType);
         }
@@ -551,6 +598,11 @@ private:
   bool alwaysMismatchTypeParameters() const { return false; }
 
   bool allowSendableFunctionMismatch() const { return false; }
+  bool allowFunctionRepresentationMismatch() const { return false; }
+  bool allowFunctionAsyncMismatch() const { return false; }
+  bool allowFunctionSendingResultMismatch() const { return false; }
+  bool allowFunctionIsolationMismatch() const { return false; }
+  bool allowFunctionDifferentiabilityMismatch() const { return false; }
 
   void pushPosition(Position pos) {}
   void popPosition(Position pos) {}
