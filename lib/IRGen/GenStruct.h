@@ -36,6 +36,7 @@ namespace irgen {
   class Explosion;
   class IRGenFunction;
   class IRGenModule;
+  class LoadableTypeInfo;
   class MemberAccessStrategy;
   class TypeInfo;
 
@@ -85,6 +86,11 @@ namespace irgen {
   std::optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field);
+
+  /// If \p silType is a loadable C++ record,
+  /// return its LoadableTypeInfo.
+  const LoadableTypeInfo *getAsLoadableCXXRecord(IRGenModule &IGM,
+                                                 SILType silType);
 } // end namespace irgen
 } // end namespace swift
 
