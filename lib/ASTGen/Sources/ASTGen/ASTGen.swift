@@ -600,3 +600,98 @@ public func buildTopLevelASTNodes(
   // Diagnose any errors from evaluating #ifs.
   visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
 }
+
+/// Whether the given attribute list contains an '@main'-style attribute.
+private func hasMainTypeAttr(
+  _ attributes: AttributeListSyntax,
+  configuredRegions: ConfiguredRegions
+) -> Bool {
+  attributes.contains { element in
+    switch element {
+    case .ifConfigDecl(let ifConfigDecl):
+      guard let activeClause = configuredRegions.activeClause(for: ifConfigDecl),
+        let activeElements = activeClause.elements?._syntaxNode.as(AttributeListSyntax.self)
+      else {
+        return false
+      }
+      return hasMainTypeAttr(activeElements, configuredRegions: configuredRegions)
+
+    case .attribute(let attribute):
+      guard let identTy = attribute.attributeName.as(IdentifierTypeSyntax.self),
+        identTy.moduleSelector == nil
+      else {
+        return false
+      }
+      let kind = BridgedOptionalDeclAttrKind(from: identTy.name.rawText.bridged)
+      guard kind.hasValue else {
+        return false
+      }
+      switch kind.value {
+      case .MainType, .NSApplicationMain, .UIApplicationMain:
+        return true
+      default:
+        return false
+      }
+    }
+  }
+}
+
+private final class MainTypeDeclFinder: SyntaxAnyVisitor {
+  let configuredRegions: ConfiguredRegions
+  var foundMainTypeDecl = false
+
+  init(configuredRegions: ConfiguredRegions) {
+    self.configuredRegions = configuredRegions
+    super.init(viewMode: .sourceAccurate)
+  }
+
+  override func visitAny(_ node: Syntax) -> SyntaxVisitorContinueKind {
+    if foundMainTypeDecl {
+      return .skipChildren
+    }
+
+    if let ifConfigDecl = node.as(IfConfigDeclSyntax.self) {
+      if let activeElements = configuredRegions.activeClause(for: ifConfigDecl)?.elements {
+        self.walk(activeElements._syntaxNode)
+      }
+      return .skipChildren
+    }
+
+    if let declGroup = node.asProtocol(DeclGroupSyntax.self),
+      hasMainTypeAttr(declGroup.attributes, configuredRegions: configuredRegions)
+    {
+      foundMainTypeDecl = true
+      return .skipChildren
+    }
+
+    return .visitChildren
+  }
+}
+
+/// Whether the given code block items declare a type annotated with an
+/// '@main'-style attribute.
+private func hasMainTypeDecl(
+  _ items: CodeBlockItemListSyntax,
+  configuredRegions: ConfiguredRegions
+) -> Bool {
+  let finder = MainTypeDeclFinder(configuredRegions: configuredRegions)
+  finder.walk(items)
+  return finder.foundMainTypeDecl
+}
+
+/// Determine whether the given source file declares a top-level type annotated
+/// with an '@main'-style attribute.
+@_cdecl("swift_ASTGen_sourceFileHasMainTypeDecl")
+public func sourceFileHasMainTypeDecl(
+  astContext: BridgedASTContext,
+  sourceFilePtr: UnsafeMutableRawPointer
+) -> Bool {
+  let sourceFile = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+  guard case .sourceFile(let node) = sourceFile.pointee.syntax.as(SyntaxEnum.self) else {
+    return false
+  }
+  return hasMainTypeDecl(
+    node.statements,
+    configuredRegions: sourceFile.pointee.configuredRegions(astContext: astContext)
+  )
+}
