@@ -229,7 +229,7 @@ func testExistentialAlias(x: Existential, y: any Constraint) {}
 // Reject explicit existential types in inheritance clauses
 protocol Empty {}
 
-struct S : any Empty {} // expected-error {{inheritance from non-protocol type 'any Empty'}}
+struct S : any Empty {} // expected-error {{non-protocol type 'any Empty' cannot be used in a conformance list}}
 class C : any Empty {} // expected-error {{inheritance from non-protocol, non-class type 'any Empty'}}
 
 // FIXME: Diagnostics are not great in the enum case because we confuse this with a raw type
