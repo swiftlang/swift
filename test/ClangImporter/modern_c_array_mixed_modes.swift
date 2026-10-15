@@ -287,9 +287,7 @@ import CLib
 
 @export(implementation) public func modernHugeNewtypeFunc() {
   let nt = HugeNT(rawValue: InlineArray(repeating: 7))
-  withUnsafeBytes(of: nt.rawValue) {
-    print("HugeNT", $0.load(fromByteOffset: 4999 * MemoryLayout<Int32>.stride, as: Int32.self))
-  }
+  print("HugeNT", nt.rawValue[4999])
 }
 
 @export(implementation) public func modernNestedHugeFunc() {
@@ -298,18 +296,18 @@ import CLib
   print_nested_huge(&h)
 }
 
-// Reads through raw bytes to avoid InlineArray subscripts, which are badly
-// broken in optimize_none_with_opaque_values (this is covered by other tests).
 @c(print_huge) @implementation public func print_huge(_ ptr: UnsafePointer<HugeRow>!) {
-  withUnsafeBytes(of: ptr.pointee.values) {
-    print("Huge", $0.load(fromByteOffset: 4999 * MemoryLayout<Int32>.stride, as: Int32.self))
-  }
+  print("Huge", ptr.pointee.values[4999])
 }
 
 @c(print_nested_huge) @implementation public func print_nested_huge(_ ptr: UnsafePointer<NestedHugeRow>!) {
-  withUnsafeBytes(of: ptr.pointee.values) {
-    print("NestedHuge", $0.load(fromByteOffset: (5000 + 4999) * MemoryLayout<Int32>.stride, as: Int32.self))
-  }
+  print("NestedHuge", ptr.pointee.values[1][4999])
+}
+
+// FIXME: Workaround for optimize_none_with_opaque_values. Subscripting an
+// InlineArray fails SIL verification there (this is covered by other tests).
+@export(implementation) public func printNT(_ nt: NT) {
+  print("NT", nt.rawValue[0], nt.rawValue[1], nt.rawValue[2], nt.rawValue[3])
 }
 
 @inline(never) @usableFromInline internal func blackHole(_: some Any) {}
@@ -494,7 +492,7 @@ un.array[0] = 0
 print_u(&un)
 
 let nt = NT(rawValue: [.max, 1, 2, 3])
-print("NT", nt.rawValue[0], nt.rawValue[1], nt.rawValue[2], nt.rawValue[3])
+printNT(nt)
 
 var row: Row = [.max, 1, 2, 3]
 print_row(&row)

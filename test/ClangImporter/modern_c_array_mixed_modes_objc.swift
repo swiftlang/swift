@@ -134,6 +134,12 @@ import CLib
 @export(implementation) public func modernAsyncFunc() async {
   var array: InlineArray<4, Int32> = [1, 2, 3, 4]
   let result = await Svc().fetch(withBuf: &array)
+  printSvc(result)
+}
+
+// FIXME: Workaround for optimize_none_with_opaque_values. Subscripting an
+// InlineArray fails SIL verification there (this is covered by other tests).
+@export(implementation) public func printSvc(_ result: UnsafeMutablePointer<InlineArray<4, Int32>>) {
   print("Svc", result.pointee[0], result.pointee[1], result.pointee[2], result.pointee[3])
 }
 
@@ -209,7 +215,7 @@ await modernAsyncFunc()
 print("main async:")
 var asyncArray: InlineArray<4, Int32> = [1, 2, 3, 4]
 let asyncResult = await Svc().fetch(withBuf: &asyncArray)
-print("Svc", asyncResult.pointee[0], asyncResult.pointee[1], asyncResult.pointee[2], asyncResult.pointee[3])
+printSvc(asyncResult)
 
 //--- src/Output.txt
 
