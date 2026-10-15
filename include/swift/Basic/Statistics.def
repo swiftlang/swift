@@ -181,8 +181,9 @@ FRONTEND_STATISTIC(ClangImporter, LookupTableDeserializeCumulativeUsec)
 /// Clang declarations first materialized from a lookup table during lookup.
 FRONTEND_STATISTIC(ClangImporter, LookupTableDeclResolved)
 
-/// Lookup-table hits for declarations already materialized.
-FRONTEND_STATISTIC(ClangImporter, LookupTableDeclCached)
+/// Existing declaration entries compared against when checking a new
+/// lookup-table entry for duplicates.
+FRONTEND_STATISTIC(ClangImporter, LookupTableDuplicateCheckComparisons)
 
 /// Declarations considered as candidate members during qualified record lookup.
 FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupCandidates)

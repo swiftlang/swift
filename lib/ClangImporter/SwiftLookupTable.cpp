@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -516,11 +517,19 @@ bool SwiftLookupTable::addLocalEntry(
   auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
   auto moduleMacro = newEntry.dyn_cast<clang::ModuleMacro *>();
 
+  int64_t declComparisons = 0;
+  SWIFT_DEFER {
+    bumpCounter(SwiftCtx, &Counters::LookupTableDuplicateCheckComparisons,
+                declComparisons);
+  };
+
   for (auto &existingEntry : entries) {
     // If it matches an existing declaration, there's nothing to do.
-    if (decl && existingEntry.isDeclEntry() &&
-        matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
-      return false;
+    if (decl && existingEntry.isDeclEntry()) {
+      ++declComparisons;
+      if (matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
+        return false;
+    }
 
     // If a textual macro matches an existing macro, just drop the new
     // definition.
@@ -1607,16 +1616,9 @@ namespace {
 
 } // end anonymous namespace
 
-clang::NamedDecl *SwiftLookupTable::mapStoredDecl(StoredSingleEntry &entry) {
-  assert(entry.isDeclEntry() && "Not a declaration entry");
-
-  // If we have an AST node here, just cast it.
-  if (entry.isASTNodeEntry()) {
-    bumpCounter(SwiftCtx, &Counters::LookupTableDeclCached);
-    return static_cast<clang::NamedDecl *>(entry.getASTNode());
-  }
-
-  // Otherwise, resolve the declaration.
+clang::NamedDecl *
+SwiftLookupTable::resolveStoredDecl(StoredSingleEntry &entry) {
+  assert(entry.isSerializationIDEntry() && "Already resolved");
   bumpCounter(SwiftCtx, &Counters::LookupTableDeclResolved);
   assert(Reader && "Cannot resolve the declaration without a reader");
   auto declID = entry.getSerializationID();
