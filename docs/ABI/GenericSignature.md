@@ -66,7 +66,7 @@ A generic signature is *canonical* when each of its constraints is [canonical](#
    is always a type parameter (call it `T`).
    Constraints are ordered as follows:
    1. A superclass constraint `T: C`, where `C` is a class.
-   2. A layout constraint (e.g., `T: some-layout`), where the right-hand
+   2. A layout constraint (for example, `T: some-layout`), where the right-hand
       side is `AnyObject` or one of the non-user-visible layout constraints
       like `_Trivial`.
    3. Conformance constraints `T: P`, where `P` is a protocol. The
@@ -111,9 +111,9 @@ Given two protocols `P1` and `P2`, protocol `P1` precedes `P2` in the canonical 
 
 ### Canonical constraints
 
-A given constraint can be described in multiple ways. In our running example, the conformance constraint for the element type can be expressed as either `C1.Element: Equatable` or `C2.Element: Equatable`, because `C1.Element` and `C2.Element` name the same type. There might be an infinite number of ways to name the same type (e.g., `C1.SubSequence.SubSequence.Iterator.Element` is also equivalent to `C1.Element`). All of the spellings that refer to the same time comprise the *equivalence class* of that type.
+A given constraint can be described in multiple ways. In our running example, the conformance constraint for the element type can be expressed as either `C1.Element: Equatable` or `C2.Element: Equatable`, because `C1.Element` and `C2.Element` name the same type. There might be an infinite number of ways to name the same type (for example, `C1.SubSequence.SubSequence.Iterator.Element` is also equivalent to `C1.Element`). All of the spellings that refer to the same time comprise the *equivalence class* of that type.
 
-Each equivalence class has a corresponding *anchor*, which is a type parameter that is the least type according to the [type parameter ordering](#type-parameter-ordering). Anchors are used to describe requirements canonically. A concrete type (i.e., a type that is not a type parameter) is canonical when each type parameter within it has either been replaced with its equivalent (canonical) concrete type (when such a constraint exists in the generic signature) or is the anchor of its equivalence class.
+Each equivalence class has a corresponding *anchor*, which is a type parameter that is the least type according to the [type parameter ordering](#type-parameter-ordering). Anchors are used to describe requirements canonically. A concrete type (that is, a type that is not a type parameter) is canonical when each type parameter within it has either been replaced with its equivalent (canonical) concrete type (when such a constraint exists in the generic signature) or is the anchor of its equivalence class.
 
 A layout or conformance constraint is canonical when its left-hand side is the anchor of its equivalence class. A superclass constraint is canonical when its left-hand side is the anchor of its equivalence class and its right-hand side is a canonical concrete (class) type. Same-type constraint canonicalization is discussed in detail in the following section, but some basic rules apply: the left-hand side is always a type parameter, and the right-hand side is either a type parameter that follows the left-hand side (according to the [type parameter ordering](#type-parameter-ordering)) or is a canonical concrete type.
 
@@ -126,7 +126,7 @@ The canonical form of superclass, layout, and conformance constraints are direct
  C1.Element: Equatable, C1.Element == C2.Element, C1.Element == C3.Element>
 ```
 
-All of `C1.Element`, `C2.Element`, and `C3.Element` are in the same equivalence class, which can be formed by different sets of same-type constraints, e.g.,
+All of `C1.Element`, `C2.Element`, and `C3.Element` are in the same equivalence class, which can be formed by different sets of same-type constraints, for example,
 
 ```swift
 C1.Element == C2.Element, C1.Element == C3.Element
@@ -144,9 +144,9 @@ or
 C1.Element == C3.Element, C2.Element == C3.Element
 ```
 
-All of these sets of constraints have the same effect (i.e., form the same equivalence class), but the second one happens to be the canonical form.
+All of these sets of constraints have the same effect (that is, form the same equivalence class), but the second one happens to be the canonical form.
 
-The canonical form is determined by first dividing all of the types in the same equivalence class into distinct components. Two types `T1` and `T2` are in the same component if the same type constraint `T1 == T2` can be proven true based on other known constraints in the generic signature (i.e., if `T1 == T2` would be redundant). For example, `C1.Element` and `C1.SubSequence.Element` are in the same component, because `C1: Collection` and the `Collection` protocol contains the constraint `Element == SubSequence.Element`. However, `C1.Element` and `C2.Element` are in different components.
+The canonical form is determined by first dividing all of the types in the same equivalence class into distinct components. Two types `T1` and `T2` are in the same component if the same type constraint `T1 == T2` can be proven true based on other known constraints in the generic signature (that is, if `T1 == T2` would be redundant). For example, `C1.Element` and `C1.SubSequence.Element` are in the same component, because `C1: Collection` and the `Collection` protocol contains the constraint `Element == SubSequence.Element`. However, `C1.Element` and `C2.Element` are in different components.
 
 Each component has a *local anchor*, which is a type parameter that is the least type within that component, according to the [type parameter ordering](#type-parameter-ordering). The local anchors are then sorted (again, using [type parameter ordering](#type-parameter-ordering)); call the anchors `A1`, `A2`, ..., `An` where `Ai < Aj` for `i < j`. The canonical set of constraints depends on whether the equivalence class has been constrained to a concrete type:
 
