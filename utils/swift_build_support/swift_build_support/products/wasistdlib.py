@@ -23,6 +23,7 @@ from ..helpers import wasmstdlibhelpers
 class WASIStdlib(cmake_product.CMakeProduct):
     _os_environment = 'wasip1'
     _max_memory_bytes = None
+    _test_linker_flags = ()
 
     # Clang's multiarch triple names the sysroot and resource-dir layout,
     # Swift's `-target` triple names module directories, and the short triple
@@ -97,15 +98,12 @@ class WASIStdlib(cmake_product.CMakeProduct):
             '-resource-dir=' + self._wasi_resource_dir_path(
                 self.multiarch_triple()),
         ]
-        if self._max_memory_bytes is not None:
-            test_driver_options += [
-                '-Xclang-linker',
-                '-Wl,--max-memory=%d' % self._max_memory_bytes]
+        link_flags = self._wasi_test_link_flags()
+        for flag in link_flags:
+            test_driver_options += ['-Xclang-linker', flag]
         # Read by test/embedded/lit.local.cfg for the embedded suite's link line.
-        cmake_options.define(
-            'SWIFT_WASI_MAX_MEMORY:STRING',
-            '' if self._max_memory_bytes is None
-            else str(self._max_memory_bytes))
+        cmake_options.define('SWIFT_WASI_TEST_LINKER_FLAGS:STRING',
+                             ' '.join(link_flags))
         # Leading space is needed to separate from other options
         cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
                              ' ' + ' '.join(test_driver_options))
@@ -127,6 +125,13 @@ class WASIStdlib(cmake_product.CMakeProduct):
                                  ';'.join(extra_c_flags))
 
         self._append_threading_options(cmake_options)
+
+    def _wasi_test_link_flags(self):
+        flags = []
+        if self._max_memory_bytes is not None:
+            flags.append('-Wl,--max-memory=%d' % self._max_memory_bytes)
+        flags.extend(self._test_linker_flags)
+        return flags
 
     @classmethod
     def threading_compile_flags(cls):
@@ -212,6 +217,10 @@ class WASIThreadsStdlib(WASIStdlib):
     # maximum is given, which leaves the guest heap unable to grow. Matches the
     # maximum the shipped Swift SDK's threads toolset sets.
     _max_memory_bytes = 1073741824
+
+    # WASI-threads requires the shared memory imported, WASI requires it
+    # exported. Dropping the import aborts the guest with no diagnostic.
+    _test_linker_flags = ('-Wl,--import-memory,--export-memory',)
 
     @classmethod
     def threading_compile_flags(cls):

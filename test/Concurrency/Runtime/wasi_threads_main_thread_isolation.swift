@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: not --crash %target-run %t/a.out 2>&1 | %FileCheck %s
+// RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -27,5 +27,5 @@ func worker(_: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? {
 }
 
 // CHECK: main
-// CHECK: Incorrect actor executor assumption
+// CHECK: Fatal error: Unexpected isolation context, expected to be executing on CooperativeExecutor
 // CHECK-NOT: OK

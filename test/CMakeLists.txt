@@ -3,10 +3,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 include(SwiftTestUtils)
 
 if(SWIFT_ENABLE_WASI_THREADS AND "WASI" IN_LIST SWIFT_SDKS
-   AND NOT SWIFT_WASI_MAX_MEMORY)
+   AND NOT SWIFT_WASI_TEST_LINKER_FLAGS)
   message(FATAL_ERROR
-    "SWIFT_WASI_MAX_MEMORY must be a positive byte count for a WASI threads "
-    "build, or wasm-ld pins the shared memory maximum to its initial size.")
+    "SWIFT_WASI_TEST_LINKER_FLAGS must carry the WASI threads test link flags: "
+    "--import-memory and --export-memory, without which every guest aborts "
+    "with no diagnostic, and --max-memory, without which wasm-ld pins the "
+    "shared memory maximum to its initial size.")
 endif()
 
 function(swift_configure_lit_site_cfg source_path destination_path installed_name)
