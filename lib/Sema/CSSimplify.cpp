@@ -7323,11 +7323,7 @@ bool ConstraintSystem::repairFailures(
 
 static bool isTupleWithUnresolvedPackExpansion(Type type) {
   if (auto *tuple = type->getAs<TupleType>()) {
-    return llvm::any_of(tuple->getElements(), [&](const TupleTypeElt &elt) {
-      if (auto typeVar = elt.getType()->getAs<TypeVariableType>())
-        return typeVar->getImpl().isPackExpansion();
-      return false;
-    });
+    return tuple->hasTypeVariable() && containsPackExpansionType(tuple);
   }
   return false;
 }
@@ -7657,6 +7653,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return formUnsolvedResult();
   }
 
+  std::optional<std::pair<Type, Type>> tuplePackMatch;
+
   // If the original type on one side consisted of a tuple type with
   // unresolved pack expansion(s), let's make sure that both sides are
   // tuples to enable proper pack matching for situations like:
@@ -7673,9 +7671,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // that under substitution that element would disappear and the type
   // would be just `(Int)`.
   //
+  // Record this tuple pack match as a candidate rather than applying it
+  // immediately, so conversions of the entire result, such as optional
+  // injection, can be considered as alternatives.
+  //
   // Notable exceptions here are: `Any` which doesn't require wrapping and
   // would be handled by an existential promotion in cases where it's allowed,
-  // and `Optional<T>` which would be handled by optional injection.
+  // and `Optional<T>` with an unresolved object type, which would be handled
+  // by optional injection.
   //
   // This logic is intended for concrete types, so `PackExpansionType` must be
   // avoided to not tuple-wrap pack arguments.
@@ -7684,8 +7687,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // them. If they
   //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is
   //  converted.
+  //
+  // Also check the fixed types: a type variable can be bound to a tuple with
+  // an unresolved pack expansion, for example when matching the root and value
+  // of an identity key path to its contextual type.
+  // Recognize actual pack expansion types as well as pack expansion type
+  // variables, but only while the tuple contains type variables.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
-      isTupleWithUnresolvedPackExpansion(origType2)) {
+      isTupleWithUnresolvedPackExpansion(origType2) ||
+      isTupleWithUnresolvedPackExpansion(type1) ||
+      isTupleWithUnresolvedPackExpansion(type2)) {
     auto isTypeVariableWrappedInOptional = [](Type type) {
       if (type->getOptionalObjectType()) {
         return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
@@ -7701,12 +7712,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         !isTypeVariableWrappedInOptional(desugar2) &&
         !desugar1->isAny() &&
         !desugar2->isAny()) {
-      return matchTypes(
+      tuplePackMatch.emplace(
           desugar1->is<TupleType>() ? type1
                                     : TupleType::get({type1}, getASTContext()),
           desugar2->is<TupleType>() ? type2
-                                    : TupleType::get({type2}, getASTContext()),
-          kind, flags, locator);
+                                    : TupleType::get({type2}, getASTContext()));
     }
   }
 
@@ -8641,7 +8651,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
-  if (shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix)) {
+  // If tuple pack matching is a candidate, attempt repairs after decomposing
+  // that candidate.
+  // FIXME: Consider repair candidates alongside tuple pack matching and handle
+  // competing repaired solutions without losing diagnostics. Currently,
+  // ignoring the contextual type here can compete with repairing an element
+  // mismatch after tuple pack matching and cause diagnostic generation to fail.
+  if (!tuplePackMatch && shouldAttemptFixes() &&
+      !flags.contains(TMF_ApplyingFix)) {
     if (repairFailures(type1, type2, kind, flags, conversionsOrFixes,
                        locator)) {
       if (conversionsOrFixes.empty())
@@ -8649,14 +8666,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (conversionsOrFixes.empty())
+  if (conversionsOrFixes.empty() && !tuplePackMatch)
     return SolutionKind::Error;
 
   // Where there is more than one potential conversion, create a disjunction
-  // so that we'll explore all of the options.
-  if (conversionsOrFixes.size() > 1) {
+  // so that we'll explore all of the options, including tuple pack matching.
+  if (conversionsOrFixes.size() + tuplePackMatch.has_value() > 1) {
     auto fixedLocator = getConstraintLocator(locator);
     SmallVector<Constraint *, 2> constraints;
+    if (tuplePackMatch) {
+      constraints.push_back(Constraint::create(
+          *this, kind, tuplePackMatch->first, tuplePackMatch->second,
+          fixedLocator));
+    }
 
     for (auto potential : conversionsOrFixes) {
       auto constraintKind = kind;
@@ -8698,6 +8720,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // For a single potential conversion, directly recurse, so that we
   // don't allocate a new constraint or constraint locator.
+
+  // Handle tuple pack matching.
+  if (tuplePackMatch) {
+    return matchTypes(tuplePackMatch->first, tuplePackMatch->second,
+                      kind, flags, locator);
+  }
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
