@@ -5432,8 +5432,6 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
 
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
-  auto *importer =
-      static_cast<ClangImporter *>(SwiftContext.getClangModuleLoader());
 
   bool declFound = false;
 
@@ -5458,11 +5456,22 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
           if (auto func = dyn_cast_or_null<FuncDecl>(
                   importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
             if (auto synthesizedOperator =
-                    importer->getCXXSynthesizedOperatorFunc(func)) {
+                    getCXXSynthesizedOperatorFunc(func)) {
               consumer.foundDecl(synthesizedOperator,
                                  DeclVisibilityKind::VisibleAtTopLevel);
               declFound = true;
             }
+
+            // The other C array projection of the function has an operator
+            // of its own.
+            if (auto *legacyFunc =
+                    importer::getDeclForCounterpartCArrayProjection(func))
+              if (auto legacyOperator =
+                      getCXXSynthesizedOperatorFunc(legacyFunc)) {
+                consumer.foundDecl(legacyOperator,
+                                   DeclVisibilityKind::VisibleAtTopLevel);
+                declFound = true;
+              }
           }
         }
       }
@@ -8586,24 +8595,27 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
 }
 
 FuncDecl *ClangImporter::getCXXSynthesizedOperatorFunc(FuncDecl *decl) {
+  return Impl.getCXXSynthesizedOperatorFunc(decl);
+}
+
+FuncDecl *ClangImporter::Implementation::getCXXSynthesizedOperatorFunc(
+    const ValueDecl *decl) {
   // `decl` is not an operator, it is a regular function which has a
   // name that starts with `__operator`. We were asked for a
   // corresponding synthesized Swift operator, so let's retrieve it.
 
   // The synthesized Swift operator was added as an alternative decl
-  // for `func`.
-  auto alternateDecls = Impl.getAlternateDecls(decl);
-  // Did we actually synthesize an operator for `func`?
-  if (alternateDecls.empty())
-    return nullptr;
-  // If we did, then we should have only synthesized one.
-  assert(alternateDecls.size() == 1 &&
-         "expected only the synthesized operator as an alternative");
-
-  auto synthesizedOperator = alternateDecls.front();
-  assert(synthesizedOperator->isOperator() &&
-         "expected the alternative to be a synthesized operator");
-  return cast<FuncDecl>(synthesizedOperator);
+  // for `decl`. There may be other alternatives, but there should only be one
+  // operator.
+  FuncDecl *synthesizedOperator = nullptr;
+  for (auto *alternate : getAlternateDecls(const_cast<ValueDecl *>(decl))) {
+    if (!alternate->isOperator())
+      continue;
+    assert(!synthesizedOperator &&
+           "expected only one synthesized operator as an alternative");
+    synthesizedOperator = cast<FuncDecl>(alternate);
+  }
+  return synthesizedOperator;
 }
 
 bool ClangImporter::isSynthesizedAndVisibleFromAllModules(

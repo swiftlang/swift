@@ -926,6 +926,11 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inherit);
 
+  /// Returns the operator that was synthesized from \p decl , a function
+  /// imported from a C++ operator (so its name starts with `__operator`), or
+  /// \c nullptr if there is none.
+  FuncDecl *getCXXSynthesizedOperatorFunc(const ValueDecl *decl);
+
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
 

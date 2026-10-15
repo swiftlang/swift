@@ -1542,31 +1542,41 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
   // it the right availability.
   addAttrs(modernVD, CArrayProjection::Modern, legacyVD);
 
-  if (!legacyVD)
-    return;
+  if (legacyVD) {
+    addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
 
-  addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
+    if (addAlternate)
+      ImporterImpl.addAlternateDecl(modernVD, legacyVD);
 
-  if (addAlternate)
-    ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+    // If we imported a stored property or global, we need to create
+    // accessors for the legacy decl to forward to the modern decl.
+    if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
+      auto legacyVar = cast<VarDecl>(legacyVD);
+      if (modernVar->hasStorage()) {
+        makeLegacyCArrayAccessors(legacyVar->getDeclContext(), legacyVar,
+                                  modernVar);
+      }
+    }
 
-  // If we imported a stored property or global, we need to create
-  // accessors for the legacy decl to forward to the modern decl.
-  if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
-    auto legacyVar = cast<VarDecl>(legacyVD);
-    if (modernVar->hasStorage()) {
-      makeLegacyCArrayAccessors(legacyVar->getDeclContext(), legacyVar,
-                                modernVar);
+    // If we're using (computed) storage decls, register the accessors too.
+    if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
+      auto legacyASD = cast<AbstractStorageDecl>(legacyVD);
+
+      for (auto modernAD : modernASD->getAllAccessors()) {
+        auto legacyAD = legacyASD->getAccessor(modernAD->getAccessorKind());
+        registerCArrayProjections(modernAD, legacyAD);
+      }
     }
   }
 
-  // If we're using (computed) storage decls, register the accessors too.
-  if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
-    auto legacyASD = cast<AbstractStorageDecl>(legacyVD);
-
-    for (auto modernAD : modernASD->getAllAccessors()) {
-      auto legacyAD = legacyASD->getAccessor(modernAD->getAccessorKind());
-      registerCArrayProjections(modernAD, legacyAD);
+  // If an operator was synthesized from a function, there is one for each
+  // projection and they are projections of each other too.
+  if (auto *modernFunc = dyn_cast<FuncDecl>(modernVD)) {
+    if (auto *op = ImporterImpl.getCXXSynthesizedOperatorFunc(modernFunc)) {
+      auto *legacyOp =
+          legacyVD ? ImporterImpl.getCXXSynthesizedOperatorFunc(legacyVD)
+                   : nullptr;
+      registerCArrayProjections(op, legacyOp, /*addAlternate=*/false);
     }
   }
 }
