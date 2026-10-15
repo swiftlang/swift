@@ -86,10 +86,16 @@ extension StoreBorrowInst : Simplifiable, SILCombineSimplifiable {
     }
 
     let originalAddress = loadBorrow.address
+    let allocStack = self.allocStack
 
     context.erase(instructions: uses.users(ofType: EndBorrowInst.self))
     uses.replaceAll(with: originalAddress, context)
-    context.erase(instructionIncludingAllUsers: allocStack)
+    context.erase(instruction: self)
+
+    // The alloc_stack may still be used by other instructions, e.g. by another `store_borrow`.
+    if allocStack.uses.ignoreDebugUses.users.allSatisfy({ $0 is DeallocStackInst }) {
+      context.erase(instructionIncludingAllUsers: allocStack)
+    }
     return true
   }
 }
