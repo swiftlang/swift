@@ -980,6 +980,15 @@ NOTE(sil_movechecking_nonconsuming_use_here, none,
      "used here", ())
 NOTE(sil_movechecking_consumed_in_loop_here, none,
      "consumed in loop here", ())
+NOTE(sil_movechecking_consumed_by_argument_here, none,
+     "consumed here; %0 takes ownership of this argument", (DeclName))
+NOTE(sil_movechecking_consumed_by_method_here, none,
+     "consumed here by call to consuming method %0", (DeclName))
+NOTE(sil_movechecking_consider_borrowing_parameter, none,
+     "consider making this parameter 'borrowing' if %0 does not need "
+     "ownership of it", (DeclName))
+NOTE(sil_movechecking_noncopyable_declared_here, none,
+     "'%0' declared here with noncopyable type %1", (StringRef, Type))
 NOTE(sil_movechecking_deinit_here, none,
      "deinitializer declared here", ())
 

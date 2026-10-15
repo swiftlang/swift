@@ -10,7 +10,7 @@ func take(_ c: __owned C) {}
 // A loadable noncopyable type: it just wraps a class reference.
 struct NC: ~Copyable { let c: C }
 func useNC(_ x: borrowing NC) {}
-func takeNC(_ x: consuming NC) {}
+func takeNC(_ x: consuming NC) {} // expected-note 5 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}}
 
 func useBeforeInitOnOnePath(_ b: Bool) {
   let x: C // expected-note {{constant defined here}}
@@ -149,9 +149,9 @@ func inoutConsume_fixed(_ s: inout String) {
 // --- simple ~Copyable (loadable), backed by alloc_box ---
 
 func ncUseAfterConsume() {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
-  takeNC(x)  // expected-note {{consumed here}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   useNC(x)   // expected-error {{'x' used after consume}}
 }
 
@@ -177,10 +177,10 @@ func ncVarReinitAfterConsume() {
 }
 
 func ncConsumeOnOneBranchUninitOnOther(_ b: Bool) {
-  let x: NC // expected-note {{constant defined here}}
+  let x: NC // expected-note {{constant defined here}} expected-note {{'x' declared here with noncopyable type 'NC'}}
   if b {
     x = NC(c: C())
-    takeNC(x)  // expected-note {{consumed here}}
+    takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
     useNC(x)   // expected-error {{'x' used after consume}}
   } else {
     useNC(x)   // expected-error {{constant 'x' used before being initialized}}
@@ -189,10 +189,10 @@ func ncConsumeOnOneBranchUninitOnOther(_ b: Bool) {
 
 // Consumed on only one path, then used at the merge: an error on the `b` path.
 func ncConditionalConsumeThenUse(_ b: Bool) {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
   if b {
-    takeNC(x)  // expected-note {{consumed here}}
+    takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   }
   useNC(x)     // expected-error {{'x' used after consume}}
 }
@@ -213,7 +213,7 @@ func ncConsumePerBranch(_ b: Bool) {
 
 // `consume x` ends x's lifetime; using it afterwards is an error.
 func ncConsumeOperatorThenUse() {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
   _ = consume x       // expected-note {{consumed here}}
   useNC(x)            // expected-error {{'x' used after consume}}
@@ -221,7 +221,7 @@ func ncConsumeOperatorThenUse() {
 
 // Binding the consumed value: still a use-after-consume of x; the new binding is fine.
 func ncConsumeOperatorLetBinding() {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
   let y = consume x   // expected-note {{consumed here}}
   useNC(x)            // expected-error {{'x' used after consume}}
@@ -251,21 +251,21 @@ func ncConsumeOperatorLastUse() {
 // initial `store [init]` and no `mark_uninitialized`); the double consume must
 // still be diagnosed.
 func ncInitializedLetDoubleConsume() {
-  let x = NC(c: C())
-  takeNC(x)  // expected-note {{consumed here}}
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   takeNC(x)  // expected-error {{'x' consumed more than once}}
 }
 
 func ncInitializedLetConsumeOperator() {
-  let x = NC(c: C())
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   _ = consume x       // expected-note {{consumed here}}
   useNC(x)            // expected-error {{'x' used after consume}}
 }
 
 // A `consuming` parameter is likewise backed by an `alloc_box` initialized with
 // the incoming argument, with no `mark_uninitialized`.
-func ncConsumingParamDoubleConsume(_ x: consuming NC) {
-  takeNC(x)  // expected-note {{consumed here}}
+func ncConsumingParamDoubleConsume(_ x: consuming NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   takeNC(x)  // expected-error {{'x' consumed more than once}}
 }
 

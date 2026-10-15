@@ -98,6 +98,37 @@ bb0:
   return %t
 }
 
+// Consumes on either branch that reach the same use are reported as one error,
+// with a note at each consume.
+sil [ossa] @diagnose_grouped_consumes : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, let, name "x"
+  specify_test "lifetime_resolution_diagnose"
+  %v = apply %getFn() : $@convention(thin) () -> @owned K
+  store %v to [init] %0 : $*K
+  cond_br undef, bb1, bb2
+
+bb1:
+  %c1 = load [copy] %0 : $*K // expected-note {{consumed here}}
+  diagnose [unpermitted_copy] %c1 : $K
+  destroy_value %c1 : $K
+  br bb3
+
+bb2:
+  %c2 = load [copy] %0 : $*K // expected-note {{consumed here}}
+  diagnose [unpermitted_copy] %c2 : $K
+  destroy_value %c2 : $K
+  br bb3
+
+bb3:
+  %l = load [take] %0 : $*K // expected-error {{used after consume}}
+  destroy_value %l : $K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
 // A `diagnose [let_reinit]` marks a store to immutable storage that may already be initialized.
 sil [ossa] @diagnose_let_reinit : $@convention(thin) () -> () {
 bb0:

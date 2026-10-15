@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify %s
 
 // Use-after-consume diagnostics from LifetimeResolution. Each error is reported at
-// the offending use, with a note at the consume.
+// the offending use, with notes at every consume that reaches it explaining why it
+// consumes, and suggestions for how to avoid consuming.
 
 class C {}
 func use(_ c: C) {}
@@ -12,63 +13,74 @@ struct NC: ~Copyable {
   consuming func eat() {}
   borrowing func look() {}
 }
-func takeNC(_ x: consuming NC) {}
+func takeNC(_ x: consuming NC) {} // expected-note 8 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
 func useNC(_ x: borrowing NC) {}
-func takeAndUse(_ a: consuming NC, _ b: borrowing NC) {}
-func takeGeneric<T: ~Copyable>(_ t: consuming T) {}
+func takeAndUse(_ a: consuming NC, _ b: borrowing NC) {} // expected-note {{consider making this parameter 'borrowing' if 'takeAndUse' does not need ownership of it}} {{22-31=borrowing}}
+func takeGeneric<T: ~Copyable>(_ t: consuming T) {} // expected-note {{consider making this parameter 'borrowing' if 'takeGeneric' does not need ownership of it}}
 func useGeneric<T: ~Copyable>(_ t: borrowing T) {}
 
 func usedAfterConsume() {
-  let x = NC(c: C())
-  takeNC(x) // expected-note {{consumed here}}
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   useNC(x) // expected-error {{'x' used after consume}}
 }
 
 func consumedTwice() {
-  let x = NC(c: C())
-  takeNC(x) // expected-note {{consumed here}}
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   takeNC(x) // expected-error {{'x' consumed more than once}}
 }
 
 func consumedInLoop(_ b: Bool) {
-  let x = NC(c: C())
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   while b {
     takeNC(x) // expected-error {{'x' consumed in a loop}}
   }
 }
 
 func consumedAndUsedAtOnce() {
-  let x = NC(c: C())
-  takeAndUse(x, x) // expected-note {{consumed here}}
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeAndUse(x, x) // expected-note {{consumed here; 'takeAndUse' takes ownership of this argument}}
                    // expected-error@-1 {{'x' consumed and used at the same time}}
 }
 
-func consumedOnOneBranch(_ b: Bool) {
-  let x = NC(c: C())
+// A use reached by several consumes is reported once, noting each consume.
+func consumedOnEitherBranch(_ b: Bool) {
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   if b {
-    takeNC(x) // expected-note {{consumed here}}
+    takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  } else {
+    takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  }
+  useNC(x) // expected-error {{'x' used after consume}}
+}
+
+func consumedOnOneBranch(_ b: Bool) {
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  if b {
+    takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   }
   useNC(x) // expected-error {{'x' used after consume}}
 }
 
 func consumedByMethod() {
-  let x = NC(c: C())
-  x.eat() // expected-note {{consumed here}}
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  x.eat() // expected-note {{consumed here by call to consuming method 'eat()'}}
   x.look() // expected-error {{'x' used after consume}}
 }
 
 func consumeOperator() {
-  let x = NC(c: C())
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   _ = consume x // expected-note {{consumed here}}
   useNC(x) // expected-error {{'x' used after consume}}
 }
 
-func consumedGeneric<T: ~Copyable>(_ t: consuming T) {
-  takeGeneric(t) // expected-note {{consumed here}}
+func consumedGeneric<T: ~Copyable>(_ t: consuming T) { // expected-note {{'t' declared here with noncopyable type 'T'}}
+  takeGeneric(t) // expected-note {{consumed here; 'takeGeneric' takes ownership of this argument}}
   useGeneric(t) // expected-error {{'t' used after consume}}
 }
 
-func inoutNotReinitialized(_ x: inout NC) {
+func inoutNotReinitialized(_ x: inout NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
   takeNC(x) // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
 }
 
@@ -144,7 +156,7 @@ func inoutReinitializedBeforeThrowing(_ s: inout String) throws {
   try mayThrow()
 }
 
-func inoutNoncopyableThrow(_ x: inout NC) throws {
+func inoutNoncopyableThrow(_ x: inout NC) throws { // expected-note {{'x' declared here with noncopyable type 'NC'}}
   _ = consume x // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
   try mayThrow()
   x = NC(c: C())
@@ -256,6 +268,11 @@ func ncConsumeOneFieldUseOther(_ p: consuming NCPair) {
   useNC(p.b)
 }
 
+func ncFieldUsedAfterConsume(_ p: consuming NCPair) { // expected-note {{'p' declared here with noncopyable type 'NCPair'}}
+  takeNC(p.a) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  useNC(p.a) // expected-error {{'p.a' used after consume}}
+}
+
 // --- consumes into other bindings ---
 
 func copyableConsumedIntoBindingTwice() {
@@ -264,4 +281,14 @@ func copyableConsumedIntoBindingTwice() {
   let b = consume x // expected-error {{'x' consumed more than once}}
   use(a)
   use(b)
+}
+
+// --- the explanatory notes appear once per variable and parameter ---
+
+func severalErrors(_ b: Bool) {
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  takeNC(x) // expected-error {{'x' consumed more than once}}
+            // expected-note@-1 {{consumed here; 'takeNC' takes ownership of this argument}}
+  useNC(x) // expected-error {{'x' used after consume}}
 }

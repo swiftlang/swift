@@ -76,8 +76,11 @@ private struct Storage {
     }
   }
 
+  /// `self` of a method or initializer.
+  var isSelf: Bool { initSelfKind != nil || ((allocation as? FunctionArgument)?.isSelf ?? false) }
+
   var rootName: String {
-    if initSelfKind != nil {
+    if isSelf {
       return "self"
     }
     return root.varDecl?.userFacingName.string ?? ""
@@ -468,6 +471,14 @@ private enum ConsumeViolation: Equatable {
   case consumedAndUsedAtOnce
   case notReinitialized
   case unknownUse
+
+  /// Whether the error is located at the consume, rather than at a use shared by several consumes.
+  var isReportedAtConsume: Bool {
+    switch self {
+    case .consumedInLoop, .notReinitialized, .unknownUse: true
+    default: false
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -490,6 +501,10 @@ private struct Diagnoser {
 
   /// Like DefiniteInitialization, report at most one error per storage and source location.
   private var emittedErrors: [(storage: Value, location: Location)] = []
+
+  /// Explanatory notes that are only worth seeing once: per variable, or per callee parameter.
+  private var explainedStorage: [Value] = []
+  private var suggestedParameters: Set<ParamDecl> = []
 
   init(_ function: Function, unpermittedCopies: [DiagnoseInst], _ context: FunctionPassContext) {
     self.function = function
@@ -724,7 +739,9 @@ private struct Diagnoser {
     let use: OffendingUse?
     let name: String
     let storage: Value
-    let consume: ConsumeSite
+    let consumedType: Type
+    let declaration: (name: String, type: Type, location: SourceLoc?)?
+    var consumes: [ConsumeSite]
   }
 
   /// `diagnose [unpermitted_copy] %x`: a consume was demoted to a copy, because the value is used afterwards.
@@ -733,29 +750,44 @@ private struct Diagnoser {
       diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
     }
 
+    // Each use is reported once, noting every consume that reaches it.
+    var reports: [UseAfterConsume] = []
     for consume in consumes {
       guard let report = analyze(consume) else {
         diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: consume.marker.location)
         continue
       }
+      if !report.violation.isReportedAtConsume,
+         let i = reports.firstIndex(where: { $0.violation == report.violation && $0.storage == report.storage &&
+                                             $0.use?.instruction == report.use?.instruction }) {
+        reports[i].consumes.append(consume)
+      } else {
+        reports.append(report)
+      }
+    }
+
+    for report in reports {
       emit(report)
     }
   }
 
   private mutating func analyze(_ consume: ConsumeSite) -> UseAfterConsume? {
     let storageValue: Value
+    let consumedType: Type
     var storage: Storage? = nil
     var consumedPath: AccessPath? = nil
     let uses: UseMap
 
     if let copy = consume.instruction as? CopyValueInst {
       storageValue = copy.fromValue
+      consumedType = copy.fromValue.type
       uses = self.uses(of: copy.fromValue)
     } else {
       let address = (consume.instruction as? LoadInst)?.address ?? (consume.instruction as! CopyAddrInst).source
       guard let s = self.storage(backing: address) else { return nil }
       storage = s
       storageValue = s.allocation
+      consumedType = address.type.objectType
       consumedPath = address.accessPath
       uses = self.uses(of: s)
     }
@@ -782,24 +814,24 @@ private struct Diagnoser {
 
     // Name what was consumed, or for a partial consume, what was used.
     let name: String
+    let declaration: (name: String, type: Type, location: SourceLoc?)?
     if let storage {
       let path = violation == .usedAfterPartialConsume ? use!.accessPath! : consumedPath!
       name = storage.name(of: path.projectionPath)
+      declaration = storage.isSelf ? nil : storage.root.varDecl.map { (storage.rootName, storage.type, $0.nameLoc) }
     } else {
-      name = storageValue.findVarDecl()?.userFacingName.string ?? ""
+      let varDecl = storageValue.findVarDecl()
+      name = varDecl?.userFacingName.string ?? ""
+      declaration = varDecl.map { ($0.userFacingName.string, storageValue.type, $0.nameLoc) }
     }
 
-    return UseAfterConsume(violation: violation, use: use, name: name, storage: storageValue, consume: consume)
+    return UseAfterConsume(violation: violation, use: use, name: name, storage: storageValue,
+                           consumedType: consumedType, declaration: declaration, consumes: [consume])
   }
 
   private mutating func emit(_ report: UseAfterConsume) {
-    let errorLocation: Location
-    switch report.violation {
-    case .consumedInLoop, .notReinitialized, .unknownUse:
-      errorLocation = report.consume.location
-    default:
-      errorLocation = report.use!.instruction.location
-    }
+    let first = report.consumes[0]
+    let errorLocation = report.violation.isReportedAtConsume ? first.location : report.use!.instruction.location
     guard shouldEmitError(for: report.storage, at: errorLocation) else { return }
 
     switch report.violation {
@@ -820,14 +852,70 @@ private struct Diagnoser {
                            isClosureCapture ? 1 : 0, at: errorLocation)
     }
 
-    let consume = report.consume
-    if !consume.location.hasSameSourceLocation(as: errorLocation) {
+    // Point out every consume that reaches the use, explaining why it consumes where possible.
+    for consume in report.consumes where !consume.location.hasSameSourceLocation(as: errorLocation) {
       if report.violation == .usedAfterPartialConsume {
         diagnostics.diagnose(.sil_movechecking_partial_consume_here, at: consume.location)
       } else {
-        diagnostics.diagnose(.sil_movechecking_consuming_use_here, at: consume.location)
+        noteConsume(consume)
       }
     }
+
+    // Explain that the value cannot be implicitly copied, and suggest borrowing instead.
+    guard report.consumedType.isMoveOnly else { return }
+    if let declaration = report.declaration, let loc = declaration.location,
+       !explainedStorage.contains(where: { $0 == report.storage }) {
+      explainedStorage.append(report.storage)
+      diagnostics.diagnose(.sil_movechecking_noncopyable_declared_here, declaration.name, declaration.type, at: loc)
+    }
+    for consume in report.consumes {
+      if suggestBorrowingParameter(for: consume) { break }
+    }
+  }
+
+  /// The parameter of a call's callee that receives `operand`, if it is a parameter written in source.
+  private func calleeParameter(of operand: Operand) -> (callee: AbstractFunctionDecl, param: ParamDecl?, isSelf: Bool)? {
+    guard let apply = operand.instruction as? FullApplySite,
+          let callee = apply.referencedFunction?.location.decl as? AbstractFunctionDecl,
+          let argIndex = apply.calleeArgumentIndex(of: operand) else {
+      return nil
+    }
+    let conventions = apply.calleeArgumentConventions
+    if argIndex == conventions.selfIndex {
+      return (callee, nil, true)
+    }
+    let paramIndex = argIndex - conventions.firstParameterIndex
+    let params = callee.parameterList
+    guard paramIndex >= 0 && paramIndex < params.count else {
+      return (callee, nil, false)
+    }
+    return (callee, params[paramIndex], false)
+  }
+
+  private func noteConsume(_ consume: ConsumeSite) {
+    let location = consume.location
+    if let consumer = consume.consumer, let (callee, _, isSelf) = calleeParameter(of: consumer) {
+      if isSelf {
+        diagnostics.diagnose(.sil_movechecking_consumed_by_method_here, callee, at: location)
+      } else {
+        diagnostics.diagnose(.sil_movechecking_consumed_by_argument_here, callee, at: location)
+      }
+      return
+    }
+    diagnostics.diagnose(.sil_movechecking_consuming_use_here, at: location)
+  }
+
+  /// Suggests changing an explicitly `consuming` parameter to `borrowing`. Returns true if a suggestion was made.
+  private mutating func suggestBorrowingParameter(for consume: ConsumeSite) -> Bool {
+    guard let consumer = consume.consumer,
+          let (callee, param, _) = calleeParameter(of: consumer),
+          let param, let specifierLoc = param.consumingSpecifierLoc else {
+      return false
+    }
+    guard suggestedParameters.insert(param).inserted else { return true }
+    diagnostics.diagnose(.sil_movechecking_consider_borrowing_parameter, [callee], at: specifierLoc,
+      fixIts: [DiagnosticFixIt(start: specifierLoc, byteLength: "consuming".utf8.count, replacement: "borrowing")])
+    return true
   }
 }
 
