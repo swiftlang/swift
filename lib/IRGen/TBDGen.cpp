@@ -720,6 +720,14 @@ class APIGenRecorder final : public APIRecorder {
     if (module->getLibraryLevel() < swift::LibraryLevel::API)
       return true;
 
+    // Symbols that belong to an extension itself are SPI if the extended
+    // nominal type is SPI, e.g. the conformance descriptors, witness tables
+    // and witness thunks of the conformances it declares.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+      if (auto *nominal = ext->getExtendedNominal())
+        if (isSPI(nominal))
+          return true;
+
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       auto accessScope =
           value->getFormalAccessScope(/*useDC=*/nullptr,

@@ -375,6 +375,10 @@ bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
 
+bool BridgedType::isImplicitlyDestroyable(BridgedFunction f) const {
+  return unbridged().isImplicitlyDestroyable(*f.getFunction());
+}
+
 bool BridgedType::isNonTrivialOnlyBecauseNonEscapable(BridgedFunction f) const {
   return unbridged().isNonTrivialOnlyBecauseNonEscapable(*f.getFunction());
 }

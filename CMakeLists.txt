@@ -1842,7 +1842,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
-        add_dependencies("${stdlib_target}-core" swift-frontend)
+        add_dependencies("${stdlib_target}-core" swift-frontend libSwiftScan)
       endif()
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)

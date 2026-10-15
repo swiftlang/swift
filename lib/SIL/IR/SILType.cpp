@@ -1076,6 +1076,18 @@ bool SILType::hasCalledAtMostOnceSemantics() const {
   return false;
 }
 
+bool SILType::isImplicitlyDestroyable(const SILFunction &fn) const {
+  auto type = removingMoveOnlyWrapper();
+
+  // A box that isn't promoted to the stack is captured by an escaping closure.
+  // The move-only checker doesn't let anything consume its contents, so
+  // destroying the box destroys them.
+  if (type.is<SILBoxType>())
+    return type.getSILBoxFieldType(&fn).isImplicitlyDestroyable(fn);
+
+  return type.getASTType()->isDeinitable();
+}
+
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
   return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {

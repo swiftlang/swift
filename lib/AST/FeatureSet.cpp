@@ -620,10 +620,6 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
-  return isa<FileDefaultDecl>(D);
-}
-
 UNINTERESTING_FEATURE(BuiltinSelect)
 UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)

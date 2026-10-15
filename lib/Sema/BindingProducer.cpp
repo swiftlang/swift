@@ -323,7 +323,10 @@ bool TypeVarBindingProducer::computeNext() {
         // attempt conversions as part of the join between results rather than
         // between the expression and its context.
         auto *loc = TypeVar->getImpl().getLocator();
-        if (!(TypeVar->getImpl().isClosureResultType() && !objTy->isVoid() &&
+        if (!objTy->is<JoinType>() &&
+            !objTy->is<MeetType>() &&
+            !(TypeVar->getImpl().isClosureResultType() &&
+              !objTy->isVoid() &&
               !objTy->isTypeVariableOrMember()) &&
             !loc->directlyAt<SingleValueStmtExpr>()) {
           // If T is a type variable, only attempt this if both the

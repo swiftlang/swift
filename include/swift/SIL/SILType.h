@@ -911,6 +911,12 @@ public:
   /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
   bool hasCalledAtMostOnceSemantics() const;
 
+  /// Returns true if the type conforms to Deinitable, which means its values
+  /// may be destroyed implicitly. Otherwise, its values must instead be
+  /// consumed on every path that doesn't end in `unreachable`. A box is
+  /// implicitly destroyable if its contents are.
+  bool isImplicitlyDestroyable(const SILFunction &fn) const;
+
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {
     auto sd = getStructDecl();

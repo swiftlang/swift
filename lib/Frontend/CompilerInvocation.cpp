@@ -2255,6 +2255,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_promote_supertypes,
                    Opts.SolverEnablePromoteSupertypes);
 
+  Opts.SolverEnableShortConversions =
+      Args.hasFlag(OPT_solver_enable_short_conversions,
+                   OPT_solver_disable_short_conversions,
+                   Opts.SolverEnableShortConversions);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
