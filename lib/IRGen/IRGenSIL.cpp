@@ -8331,8 +8331,9 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     // copy the template over it, and store the captures into the argument
     // areas the template reserved.
     SmallVector<uint32_t, 2> argDataOffsets;
+    SmallVector<IRGenModule::StaticKeyPathSignedField, 2> signedFields;
     llvm::Constant *templateInstance =
-        IGM.emitStaticKeyPathInstance(I, &argDataOffsets);
+        IGM.emitStaticKeyPathInstance(I, &argDataOffsets, &signedFields);
     assert(!argDataOffsets.empty() &&
            "a capturing key path must reserve argument space");
 
@@ -8365,6 +8366,18 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     Builder.CreateMemCpy(dst, llvm::MaybeAlign(ptrSize.getValue()),
                          src, llvm::MaybeAlign(ptrSize.getValue()),
                          totalSize.getValue() - headerSize.getValue());
+
+    // The copied accessor fields were signed against the template's
+    // addresses, so re-sign them for where they live now.
+    for (auto &field : signedFields) {
+      llvm::Value *fieldPtr = Builder.CreateConstInBoundsGEP1_32(
+          IGM.Int8Ty, instanceBytes, field.offset);
+      auto authInfo = PointerAuthInfo::emit(
+          *this, IGM.getOptions().PointerAuth.KeyPaths, fieldPtr,
+          field.discriminator);
+      Builder.CreateStore(emitPointerAuthSign(*this, field.pointer, authInfo),
+                          Address(fieldPtr, IGM.PtrTy, IGM.getPointerAlignment()));
+    }
 
     // Initialize each captured operand into its slot. The operands appear in
     // component order, matching the offsets the template reported.
