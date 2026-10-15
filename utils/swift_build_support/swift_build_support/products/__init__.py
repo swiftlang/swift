@@ -38,6 +38,7 @@ from .stdlib_docs import StdlibDocs
 from .swift import Swift
 from .swift_testing import SwiftTesting
 from .swift_testing_macros import SwiftTestingMacros
+from .swift_testing_harness import SwiftTestingHarness
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
@@ -79,6 +80,7 @@ __all__ = [
     'SwiftDriver',
     'SwiftTesting',
     'SwiftTestingMacros',
+    'SwiftTestingHarness',
     'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',
