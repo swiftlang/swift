@@ -3993,6 +3993,7 @@ CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenCOMExistentialInst, AssignDirect)
+CONSTANT_TRANSLATION(InitCOMExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(TailAddrInst, AssignDirect)
 CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, AssignDirect)
 CONSTANT_TRANSLATION(ThinToThickFunctionInst, AssignDirect)
@@ -4808,6 +4809,28 @@ PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *i
     return TranslationSemantics::Special;
   }
 
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics PartitionOpTranslator::visitInitCOMExistentialAddrInst(
+    InitCOMExistentialAddrInst *ieri) {
+  if (ieri->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(ieri->getResults(), ArrayRef<Operand *>(),
+                            makeOperandRefRange(ieri->getAllOperands()),
+                            RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics PartitionOpTranslator::visitInitCOMExistentialValueInst(
+    InitCOMExistentialValueInst *ieri) {
+  if (ieri->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(ieri->getResults(), ArrayRef<Operand *>(),
+                            makeOperandRefRange(ieri->getAllOperands()),
+                            RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
   return TranslationSemantics::AssignDirect;
 }
 

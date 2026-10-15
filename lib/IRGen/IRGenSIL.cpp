@@ -19,6 +19,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -1411,10 +1412,15 @@ public:
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitOpenCOMExistentialInst(OpenCOMExistentialInst *i);
+  void visitInitCOMExistentialRefInst(InitCOMExistentialRefInst *i);
   void visitOpenExistentialValueInst(OpenExistentialValueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialValueInst(InitExistentialValueInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
+  void emitInitCOMExistential(SingleValueInstruction *inst, llvm::Value *object,
+                              CanType concreteType);
+  void visitInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *inst);
+  void visitInitCOMExistentialValueInst(InitCOMExistentialValueInst *inst);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
   void visitDeinitExistentialValueInst(DeinitExistentialValueInst *i);
@@ -8579,6 +8585,42 @@ void IRGenSILFunction::visitInitExistentialMetatypeInst(
                                    i->getOperand()->getType(),
                                    i->getConformances());
   setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::emitInitCOMExistential(SingleValueInstruction *inst,
+                                              llvm::Value *object,
+                                              CanType concreteType) {
+  auto *interface =
+      inst->getType().getASTType().getExistentialLayout().getCOMInterface();
+  auto *projected =
+      emitGenericCOMInterfaceProjection(*this, object, concreteType, interface);
+
+  Explosion borrowed;
+  borrowed.add(projected);
+  Explosion result;
+  cast<LoadableTypeInfo>(getTypeInfo(inst->getType()))
+      .copy(*this, borrowed, result, getDefaultAtomicity());
+  setLoweredExplosion(inst, result);
+}
+
+void IRGenSILFunction::visitInitCOMExistentialAddrInst(
+    InitCOMExistentialAddrInst *inst) {
+  Address storage(getLoweredAddress(inst->getOperand()).getAddress(),
+                  IGM.Int8PtrTy, IGM.getPointerAlignment());
+  auto *object = Builder.CreateLoad(storage, "com.object");
+  emitInitCOMExistential(inst, object, inst->getFormalConcreteType());
+}
+
+void IRGenSILFunction::visitInitCOMExistentialValueInst(
+    InitCOMExistentialValueInst *inst) {
+  auto *object = getLoweredSingletonExplosion(inst->getOperand());
+  emitInitCOMExistential(inst, object, inst->getFormalConcreteType());
+}
+
+void IRGenSILFunction::visitInitCOMExistentialRefInst(
+    InitCOMExistentialRefInst *inst) {
+  Explosion instance = getLoweredExplosion(inst->getOperand());
+  setLoweredExplosion(inst, instance);
 }
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {

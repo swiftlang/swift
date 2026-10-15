@@ -2245,6 +2245,20 @@ public:
     return insert(instruction);
   }
 
+  InitCOMExistentialRefInst *
+  createInitCOMExistentialRef(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createInitCOMExistentialRef(Loc, Operand, Ty,
+                                       Operand->getOwnershipKind());
+  }
+
+  InitCOMExistentialRefInst *
+  createInitCOMExistentialRef(SILLocation Loc, SILValue Operand, SILType Ty,
+                              ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(InitCOMExistentialRefInst::create(getSILDebugLocation(Loc),
+                                                    Operand, Ty, &getFunction(),
+                                                    forwardingOwnershipKind));
+  }
+
   OpenExistentialBoxInst *
   createOpenExistentialBox(SILLocation Loc, SILValue Operand, SILType Ty) {
     return insert(new (getModule()) OpenExistentialBoxInst(
@@ -2290,6 +2304,24 @@ public:
     return insert(InitExistentialMetatypeInst::create(
         getSILDebugLocation(Loc), existentialType, metatype, conformances,
         &getFunction()));
+  }
+
+  InitCOMExistentialAddrInst *
+  createInitCOMExistentialAddr(SILLocation loc, SILType existentialType,
+                               CanType formalConcreteType, SILValue concrete,
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+    return insert(InitCOMExistentialAddrInst::create(
+        getSILDebugLocation(loc), existentialType, formalConcreteType, concrete,
+        conformances, &getFunction()));
+  }
+
+  InitCOMExistentialValueInst *
+  createInitCOMExistentialValue(SILLocation loc, SILType existentialType,
+                                CanType formalConcreteType, SILValue concrete,
+                                ArrayRef<ProtocolConformanceRef> conformances) {
+    return insert(InitCOMExistentialValueInst::create(
+        getSILDebugLocation(loc), existentialType, formalConcreteType, concrete,
+        conformances, &getFunction()));
   }
 
   InitExistentialRefInst *

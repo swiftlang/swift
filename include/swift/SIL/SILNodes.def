@@ -647,10 +647,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                             SingleValueInstruction, MayWrite, DoesNotRelease)
   SINGLE_VALUE_INST(OpenExistentialAddrInst, open_existential_addr,
                             SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(InitCOMExistentialAddrInst, init_com_existential_addr,
+                            SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  SINGLE_VALUE_INST(InitCOMExistentialValueInst, init_com_existential_value,
+                            SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(InitExistentialRefInst, init_existential_ref,
                             SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(OpenExistentialRefInst, open_existential_ref,
                             SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(InitCOMExistentialRefInst, init_com_existential_ref,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(OpenCOMExistentialInst, open_com_existential,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(InitExistentialMetatypeInst, init_existential_metatype,

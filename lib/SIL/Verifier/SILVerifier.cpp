@@ -5145,6 +5145,10 @@ public:
             "init_existential_value must not be used on addresses");
     require(!IEI->getType().isAddress(),
             "init_existential_value result must not be an address");
+    require(
+        IEI->getType().canUseExistentialRepresentation(
+            ExistentialRepresentation::Opaque, IEI->getFormalConcreteType()),
+        "init_existential_value must be used with an opaque existential type");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
     auto archetype = ExistentialArchetypeType::get(exType.getASTType());
@@ -5166,13 +5170,83 @@ public:
     verifyLocalArchetype(IEI, IEI->getFormalConcreteType());
   }
 
+  void checkInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *inst) {
+    auto sourceType = inst->getOperand()->getType();
+    auto *archetype = sourceType.getASTType()->getAs<ArchetypeType>();
+    require(archetype && archetype->hasCOMInterfaceConstraint(),
+            "init_com_existential_addr operand must be a COM-constrained "
+            "archetype");
+    require(inst->getType().isObject() &&
+                inst->getType().getASTType().isCOMExistentialType(),
+            "init_com_existential_addr result must be a COM existential value");
+    require(
+        isLoweringOf(sourceType, inst->getFormalConcreteType()),
+        "init_com_existential_addr operand must be a lowering of the formal "
+        "concrete type");
+    require(sourceType.isAddress(),
+            "init_com_existential_addr operand must be an address");
+    checkExistentialProtocolConformances(inst->getType().getASTType(),
+                                         inst->getFormalConcreteType(),
+                                         inst->getConformances());
+    verifyLocalArchetype(inst, inst->getFormalConcreteType());
+  }
+
+  void checkInitCOMExistentialValueInst(InitCOMExistentialValueInst *inst) {
+    auto sourceType = inst->getOperand()->getType();
+    auto *archetype = sourceType.getASTType()->getAs<ArchetypeType>();
+    require(archetype && archetype->hasCOMInterfaceConstraint(),
+            "init_com_existential_value operand must be a COM-constrained "
+            "archetype");
+    require(
+        inst->getType().isObject() &&
+            inst->getType().getASTType().isCOMExistentialType(),
+        "init_com_existential_value result must be a COM existential value");
+    require(
+        isLoweringOf(sourceType, inst->getFormalConcreteType()),
+        "init_com_existential_value operand must be a lowering of the formal "
+        "concrete type");
+    require(sourceType.isObject(),
+            "init_com_existential_value operand must be a value");
+    require(!fnConv.useLoweredAddresses() ||
+                F.getTypeLowering(sourceType).isLoadable(),
+            "init_com_existential_value requires a loadable operand in "
+            "lowered-address SIL");
+    checkExistentialProtocolConformances(inst->getType().getASTType(),
+                                         inst->getFormalConcreteType(),
+                                         inst->getConformances());
+    verifyLocalArchetype(inst, inst->getFormalConcreteType());
+  }
+
+  void checkInitCOMExistentialRefInst(InitCOMExistentialRefInst *inst) {
+    auto sourceType = inst->getOperand()->getType();
+    auto *opened = sourceType.getASTType()->getAs<ExistentialArchetypeType>();
+    require(sourceType.isObject() && opened &&
+                opened->hasCOMInterfaceConstraint(),
+            "init_com_existential_ref operand must be an opened COM interface "
+            "value");
+    require(inst->getType().isObject() &&
+                inst->getType().getASTType().isCOMExistentialType(),
+            "init_com_existential_ref result must be a COM existential value");
+    auto layout = inst->getType().getASTType().getExistentialLayout();
+    for (auto protocolType : layout.getProtocols()) {
+      auto *protocol = cast<ProtocolDecl>(protocolType->getDecl());
+      require(llvm::any_of(opened->getConformsTo(),
+                           [&](ProtocolDecl *constraint) {
+                             return constraint == protocol ||
+                                    constraint->inheritsFrom(protocol);
+                           }),
+              "init_com_existential_ref destination must be implied by the "
+              "opened interface");
+    }
+    verifyLocalArchetype(inst, sourceType.getASTType());
+  }
+
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getASTType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().canUseExistentialRepresentation(
-                                     ExistentialRepresentation::Class,
-                                     IEI->getFormalConcreteType()),
+                ExistentialRepresentation::Class, IEI->getFormalConcreteType()),
             "init_existential_ref must be used with a class existential type");
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");

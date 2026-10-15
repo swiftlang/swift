@@ -789,6 +789,10 @@ namespace {
       return true;
     }
 
+    bool visitInitCOMExistentialRefInst(InitCOMExistentialRefInst *RHS) {
+      return true;
+    }
+
     bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
       auto *lhs = cast<AddressToPointerInst>(LHS);
       return lhs->needsStackProtection() == RHS->needsStackProtection();
@@ -1228,6 +1232,8 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::AwaitAsyncContinuationInst:
     return false;
 
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::BeginApplyInst:

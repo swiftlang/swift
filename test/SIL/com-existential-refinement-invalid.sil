@@ -1,0 +1,106 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -enable-sil-opaque-values -I %t %t/generic.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=GENERIC
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/unrelated.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=UNRELATED
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/address.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=ADDRESS
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/result.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=RESULT
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/ordinary.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=ORDINARY
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/ordinary-address.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=ORDINARY-ADDRESS
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t %t/ordinary-value.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=ORDINARY-VALUE
+// REQUIRES: asserts
+
+// Generic values require a borrowing projection with a conformance adjustment.
+// GENERIC: init_com_existential_ref operand must be an opened COM interface value
+//--- generic.sil
+sil_stage raw
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil [ossa] [opaque] @invalid : $@convention(thin) <T: IItem> (@in_guaranteed T) -> @owned IItem {
+bb0(%value : @guaranteed $T):
+  %result = init_com_existential_ref %value : $T to $IItem
+  %copy = copy_value %result : $IItem
+  return %copy : $IItem
+}
+
+// Unrelated interfaces need a dynamic cast, not an unchanged pointer.
+// UNRELATED: init_com_existential_ref destination must be implied by the opened interface
+//--- unrelated.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol IOther {}
+sil [ossa] @invalid : $@convention(thin) (@owned IItem) -> @owned IOther {
+bb0(%value : @owned $IItem):
+  %open = open_com_existential %value : $IItem to $@opened(1, IItem) Self
+  %result = init_com_existential_ref %open : $@opened(1, IItem) Self to $IOther
+  return %result : $IOther
+}
+
+// ADDRESS: init_com_existential_ref operand must be an opened COM interface value
+//--- address.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil @invalid : $@convention(thin) <T: IItem> () -> @owned IItem {
+bb0:
+  %result = init_com_existential_ref undef : $*T to $IItem
+  return %result : $IItem
+}
+
+// RESULT: init_com_existential_ref result must be a COM existential value
+//--- result.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil [ossa] @invalid : $@convention(thin) (@owned IItem) -> @owned AnyObject {
+bb0(%value : @owned $IItem):
+  %open = open_com_existential %value : $IItem to $@opened(1, IItem) Self
+  %result = init_com_existential_ref %open : $@opened(1, IItem) Self to $AnyObject
+  return %result : $AnyObject
+}
+
+// Ordinary init_existential_ref must reject COM even with AnyObject.
+// ORDINARY: init_existential_ref must be used with a class existential type
+//--- ordinary.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem: AnyObject {}
+sil [ossa] @invalid : $@convention(thin) (@owned IItem) -> @owned IItem {
+bb0(%value : @owned $IItem):
+  %open = open_com_existential %value : $IItem to $@opened(1, IItem) Self
+  %result = init_existential_ref %open : $@opened(1, IItem) Self : $@opened(1, IItem) Self, $IItem
+  return %result : $IItem
+}
+
+// ORDINARY-ADDRESS: init_existential_addr must be used with an opaque existential type
+//--- ordinary-address.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+sil @invalid : $@convention(thin) <T: IItem> (@inout IItem) -> () {
+bb0(%value : $*IItem):
+  %storage = init_existential_addr %value : $*IItem, $T
+  %result = tuple ()
+  return %result : $()
+}
+
+// ORDINARY-VALUE: init_existential_value must be used with an opaque existential type
+//--- ordinary-value.sil
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+public class Native: IItem {}
+sil [ossa] @invalid : $@convention(thin) (@owned Native) -> @owned IItem {
+bb0(%value : @owned $Native):
+  %result = init_existential_value %value : $Native, $Native, $IItem
+  return %result : $IItem
+}

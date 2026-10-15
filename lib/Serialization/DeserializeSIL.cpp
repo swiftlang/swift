@@ -2323,6 +2323,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::AllocExistentialBoxInst: {
 
@@ -2358,6 +2360,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     case SILInstructionKind::InitExistentialMetatypeInst:
       ResultInst = Builder.createInitExistentialMetatype(Loc, operand, Ty,
                                                          ctxConformances);
+      break;
+    case SILInstructionKind::InitCOMExistentialAddrInst:
+      ResultInst = Builder.createInitCOMExistentialAddr(
+          Loc, Ty, ConcreteTy, operand, ctxConformances);
+      break;
+    case SILInstructionKind::InitCOMExistentialValueInst:
+      ResultInst = Builder.createInitCOMExistentialValue(
+          Loc, Ty, ConcreteTy, operand, ctxConformances);
       break;
     case SILInstructionKind::InitExistentialRefInst:
       ResultInst = Builder.createInitExistentialRef(Loc, Ty, ConcreteTy,
@@ -4018,6 +4028,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
     ResultInst = Builder.createOpenCOMExistential(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        decodeValueOwnership(Attr));
+    break;
+  }
+  case SILInstructionKind::InitCOMExistentialRefInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createInitCOMExistentialRef(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,

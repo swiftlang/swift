@@ -397,6 +397,16 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 
 #undef OPERAND_OWNERSHIP
 
+OperandOwnership OperandOwnershipClassifier::visitInitCOMExistentialAddrInst(
+    InitCOMExistentialAddrInst *inst) {
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipClassifier::visitInitCOMExistentialValueInst(
+    InitCOMExistentialValueInst *inst) {
+  return OperandOwnership::InstantaneousUse;
+}
+
 // Forwarding operations are conditionally either ForwardingConsumes or
 // GuaranteedForwarding, depending on the instruction's constant ownership
 // attribute.
@@ -408,6 +418,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
   }
 FORWARDING_OWNERSHIP(OpenExistentialRef)
 FORWARDING_OWNERSHIP(OpenCOMExistential)
+FORWARDING_OWNERSHIP(InitCOMExistentialRef)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
 FORWARDING_OWNERSHIP(BridgeObjectToRef)

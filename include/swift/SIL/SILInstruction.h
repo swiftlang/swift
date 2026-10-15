@@ -8439,6 +8439,28 @@ public:
   }
 };
 
+/// Erase an opened COM interface to an existential in its refinement chain.
+/// This preserves the interface pointer and forwards ownership unchanged.
+class InitCOMExistentialRefInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitCOMExistentialRefInst,
+          InitCOMExistentialRefInst,
+          OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  InitCOMExistentialRefInst(SILDebugLocation loc, SILValue operand,
+                            SILType type,
+                            ArrayRef<SILValue> typeDependentOperands,
+                            ValueOwnershipKind ownership)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            loc, operand, typeDependentOperands, type, ownership) {}
+
+  static InitCOMExistentialRefInst *create(SILDebugLocation loc,
+                                           SILValue operand, SILType type,
+                                           SILFunction *parent,
+                                           ValueOwnershipKind ownership);
+};
+
 /// Given an existential metatype,
 /// "opens" the existential by returning a pointer to a fresh
 /// archetype metatype T.Type, which also captures the (dynamic)
@@ -8568,6 +8590,73 @@ class InitExistentialValueInst final
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialValueInst *
+  create(SILDebugLocation DebugLoc, SILType ExistentialType,
+         CanType ConcreteType, SILValue Instance,
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
+
+public:
+  CanType getFormalConcreteType() const { return ConcreteType; }
+
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
+    return Conformances;
+  }
+};
+
+/// Project a COM interface from a borrowed generic value and retain the result.
+/// The source is an address. The result has independent ownership and need
+/// not have the same pointer as the source.
+class InitCOMExistentialAddrInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitCOMExistentialAddrInst,
+          InitCOMExistentialAddrInst, SingleValueInstruction> {
+  friend SILBuilder;
+
+  CanType ConcreteType;
+  ArrayRef<ProtocolConformanceRef> Conformances;
+
+  InitCOMExistentialAddrInst(SILDebugLocation DebugLoc, SILType ExistentialType,
+                             CanType FormalConcreteType, SILValue Instance,
+                             ArrayRef<SILValue> TypeDependentOperands,
+                             ArrayRef<ProtocolConformanceRef> Conformances)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
+        ConcreteType(FormalConcreteType), Conformances(Conformances) {}
+
+  static InitCOMExistentialAddrInst *
+  create(SILDebugLocation DebugLoc, SILType ExistentialType,
+         CanType ConcreteType, SILValue Instance,
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
+
+public:
+  CanType getFormalConcreteType() const { return ConcreteType; }
+
+  ArrayRef<ProtocolConformanceRef> getConformances() const {
+    return Conformances;
+  }
+};
+
+/// Project a COM interface from a borrowed SSA value and retain the result.
+/// AddressLowering replaces this with InitCOMExistentialAddrInst when the
+/// operand is address-only.
+class InitCOMExistentialValueInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitCOMExistentialValueInst,
+          InitCOMExistentialValueInst, SingleValueInstruction> {
+  friend SILBuilder;
+
+  CanType ConcreteType;
+  ArrayRef<ProtocolConformanceRef> Conformances;
+
+  InitCOMExistentialValueInst(SILDebugLocation DebugLoc,
+                              SILType ExistentialType,
+                              CanType FormalConcreteType, SILValue Instance,
+                              ArrayRef<SILValue> TypeDependentOperands,
+                              ArrayRef<ProtocolConformanceRef> Conformances)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType),
+        ConcreteType(FormalConcreteType), Conformances(Conformances) {}
+
+  static InitCOMExistentialValueInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILValue Instance,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
@@ -12166,6 +12255,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenCOMExistentialInst:
+  case SILInstructionKind::InitCOMExistentialRefInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:

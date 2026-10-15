@@ -354,6 +354,8 @@ extension ValueDefUseWalker {
       }
     case let ier as InitExistentialRefInst:
       return walkDownUses(ofValue: ier, path: path.push(.existential, index: 0))
+    case let ier as InitCOMExistentialRefInst:
+      return walkDownUses(ofValue: ier, path: path.push(.existential, index: 0))
     case let oer as OpenExistentialRefInst:
       if let path = path.popIfMatches(.existential, index: 0) {
         return walkDownUses(ofValue: oer, path: path)
@@ -732,6 +734,12 @@ extension ValueUseDefWalker {
         return rootDef(value: mvr, path: path)
       }
     case let ier as InitExistentialRefInst:
+      if let path = path.popIfMatches(.existential, index: 0) {
+        return walkUp(value: ier.instance, path: path)
+      } else {
+        return unmatchedPath(value: ier, path: path)
+      }
+    case let ier as InitCOMExistentialRefInst:
       if let path = path.popIfMatches(.existential, index: 0) {
         return walkUp(value: ier.instance, path: path)
       } else {

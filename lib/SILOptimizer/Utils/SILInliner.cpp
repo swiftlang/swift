@@ -1347,6 +1347,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::LoadInst:
@@ -1357,6 +1359,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenCOMExistentialInst:
+  case SILInstructionKind::InitCOMExistentialRefInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::OpenPackElementInst:
   case SILInstructionKind::PartialApplyInst:

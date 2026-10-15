@@ -312,6 +312,18 @@ public:
       SGM.useConformance(IEMI, conformance);
   }
 
+  void visitInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *IERI) {
+    SGM.useConformancesFromType(IERI, IERI->getFormalConcreteType());
+    for (auto conformance : IERI->getConformances())
+      SGM.useConformance(IERI, conformance);
+  }
+
+  void visitInitCOMExistentialValueInst(InitCOMExistentialValueInst *IERI) {
+    SGM.useConformancesFromType(IERI, IERI->getFormalConcreteType());
+    for (auto conformance : IERI->getConformances())
+      SGM.useConformance(IERI, conformance);
+  }
+
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI) {
     SGM.useConformancesFromType(IERI, IERI->getFormalConcreteType());
     SGM.useConformancesFromObjectiveCType(IERI, IERI->getFormalConcreteType());

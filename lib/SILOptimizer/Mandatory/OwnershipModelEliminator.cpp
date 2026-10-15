@@ -259,6 +259,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(UncheckedEnumData)
   HANDLE_FORWARDING_INST(OpenExistentialRef)
   HANDLE_FORWARDING_INST(OpenCOMExistential)
+  HANDLE_FORWARDING_INST(InitCOMExistentialRef)
   HANDLE_FORWARDING_INST(InitExistentialRef)
   HANDLE_FORWARDING_INST(MarkDependence)
   HANDLE_FORWARDING_INST(DifferentiableFunction)

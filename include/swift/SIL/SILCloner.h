@@ -2089,6 +2089,19 @@ SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
                     : ValueOwnershipKind(OwnershipKind::None)));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitCOMExistentialRefInst(
+    InitCOMExistentialRefInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createInitCOMExistentialRef(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAddressToPointerInst(AddressToPointerInst *Inst) {
@@ -3195,6 +3208,34 @@ visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *Inst) {
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
                                     getOpType(Inst->getType()), conformances));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitCOMExistentialAddrInst(
+    InitCOMExistentialAddrInst *Inst) {
+  CanType origFormalType = Inst->getFormalConcreteType();
+  auto conformances = getOpConformances(Inst->getConformances());
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createInitCOMExistentialAddr(
+                getOpLocation(Inst->getLoc()), getOpType(Inst->getType()),
+                getOpASTType(origFormalType), getOpValue(Inst->getOperand()),
+                conformances));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitCOMExistentialValueInst(
+    InitCOMExistentialValueInst *Inst) {
+  CanType origFormalType = Inst->getFormalConcreteType();
+  auto conformances = getOpConformances(Inst->getConformances());
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createInitCOMExistentialValue(
+                getOpLocation(Inst->getLoc()), getOpType(Inst->getType()),
+                getOpASTType(origFormalType), getOpValue(Inst->getOperand()),
+                conformances));
 }
 
 template<typename ImplClass>

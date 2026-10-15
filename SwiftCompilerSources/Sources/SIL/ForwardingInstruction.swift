@@ -404,6 +404,13 @@ extension OpenCOMExistentialInst : ForwardingInstruction {
   public var canForwardOwnedValues: Bool { true }
 }
 
+extension InitCOMExistentialRefInst : ForwardingInstruction {
+  public var preservesIdentity: Bool { false }
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
 extension OpenExistentialValueInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
   public var preservesRepresentation: Bool { true }
