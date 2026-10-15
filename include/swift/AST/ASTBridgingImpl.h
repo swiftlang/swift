@@ -228,6 +228,18 @@ bool BridgedDeclObj::AbstractStorage_isConst() const {
   return getAs<swift::AbstractStorageDecl>()->isConstValue();
 }
 
+bool BridgedDeclObj::Var_isLet() const {
+  return getAs<swift::VarDecl>()->isLet();
+}
+
+bool BridgedDeclObj::Var_hasInitialValue() const {
+  return getAs<swift::VarDecl>()->getParentExecutableInitializer() != nullptr;
+}
+
+void BridgedDeclObj::Var_emitLetToVarNoteIfSimple() const {
+  getAs<swift::VarDecl>()->emitLetToVarNoteIfSimple(nullptr);
+}
+
 bool BridgedDeclObj::GenericType_isGenericAtAnyLevel() const {
   return getAs<swift::GenericTypeDecl>()->isGenericContext();
 }
@@ -310,8 +322,16 @@ bool BridgedDeclObj::AbstractFunction_isDistributedWitnessWithAdHocSerialization
       ->isDistributedWitnessWithAdHocSerializationRequirement();
 }
 
+BridgedParameterList BridgedDeclObj::AbstractFunction_getParameterList() const {
+  return getAs<swift::AbstractFunctionDecl>()->getParameters();
+}
+
 bool BridgedDeclObj::Constructor_isInheritable() const {
   return getAs<swift::ConstructorDecl>()->isInheritable();
+}
+
+bool BridgedDeclObj::Constructor_isFailable() const {
+  return getAs<swift::ConstructorDecl>()->isFailable();
 }
 
 bool BridgedDeclObj::Destructor_isIsolated() const {
@@ -413,6 +433,10 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(const swift::DiagnosticArgu
 
 const swift::DiagnosticArgument &BridgedDiagnosticArgument::unbridged() const {
   return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
+}
+
+BridgedDiagnosticArgument BridgedDeclObj::Value_asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(getAs<swift::ValueDecl>()->getName());
 }
 
 //===----------------------------------------------------------------------===//

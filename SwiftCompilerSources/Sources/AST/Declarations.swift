@@ -255,9 +255,20 @@ public class AbstractStorageDecl: ValueDecl {
   final public var isConst: Bool { bridged.AbstractStorage_isConst() }
 }
 
-public class VarDecl: AbstractStorageDecl {}
+public class VarDecl: AbstractStorageDecl {
+  final public var isLet: Bool { bridged.Var_isLet() }
+
+  /// True if the binding's declaration provides an initial value, e.g. `let x = 0`.
+  final public var hasInitialValue: Bool { bridged.Var_hasInitialValue() }
+
+  /// Emits a "change 'let' to 'var'" note with fix-it, if this is a simple `let` binding.
+  final public func emitLetToVarNoteIfSimple() { bridged.Var_emitLetToVarNoteIfSimple() }
+}
 
 final public class ParamDecl: VarDecl {
+  /// The location of an explicit `consuming` specifier on this parameter, if present.
+  public var consumingSpecifierLoc: SourceLoc? { SourceLoc(bridged: bridged.Param_getConsumingSpecifierLoc()) }
+
   public func cloneWithoutType() -> ParamDecl {
     BridgedParamDecl(raw: bridged.obj).cloneWithoutType().asDecl.declObj.getAs(ParamDecl.self)
   }
@@ -272,6 +283,10 @@ final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 public class AbstractFunctionDecl: ValueDecl, GenericContext {
   final public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
 
+  final public var parameterList: ParameterList {
+    ParameterList(bridged: bridged.AbstractFunction_getParameterList())
+  }
+
   /// True if this function is a witness to a distributed protocol requirement
   /// with an ad-hoc `SerializationRequirement` conformance (e.g. `remoteCall` or
   /// `recordArgument`). Such witnesses have generic parameters that cannot be class-bound,
@@ -283,6 +298,7 @@ public class AbstractFunctionDecl: ValueDecl, GenericContext {
 
 final public class ConstructorDecl: AbstractFunctionDecl {
   public var isInheritable: Bool { bridged.Constructor_isInheritable() }
+  public var isFailable: Bool { bridged.Constructor_isFailable() }
 }
 
 final public class DestructorDecl: AbstractFunctionDecl {

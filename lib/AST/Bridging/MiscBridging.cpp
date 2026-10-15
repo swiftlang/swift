@@ -98,6 +98,14 @@ BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
+swift::SourceLoc BridgedDeclObj::Param_getConsumingSpecifierLoc() const {
+  auto *ownership =
+      dyn_cast_or_null<OwnershipTypeRepr>(getAs<ParamDecl>()->getTypeRepr());
+  if (!ownership || ownership->getSpecifier() != ParamSpecifier::Consuming)
+    return SourceLoc();
+  return ownership->getSpecifierLoc();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTType
 //===----------------------------------------------------------------------===//
