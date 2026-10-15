@@ -2965,6 +2965,9 @@ public:
     case DiagnoseKind::UnpermittedCopy:
       *this << "[unpermitted_copy] ";
       break;
+    case DiagnoseKind::LetReinit:
+      *this << "[let_reinit] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
