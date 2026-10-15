@@ -473,8 +473,8 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   }
 
   return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
-                                      source, /*keyConversion*/ nullptr,
-                                      /*valueConversion*/ nullptr, C);
+                                      source, /*keyConversion*/ ManagedValue(),
+                                      /*valueConversion*/ ManagedValue(), C);
 }
 
 static ManagedValue

@@ -3040,6 +3040,15 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       switch (nextChar()) {
       case 'I':
         return createWithChild(Node::Kind::SILThunkIdentity, popNode(isEntity));
+      case 'v': {
+        NodePointer Thunk = createNode(Node::Kind::ValueConversionThunk);
+        if (NodePointer GenSig =
+                popNode(Node::Kind::DependentGenericSignature))
+          addChild(Thunk, GenSig);
+        addChild(Thunk, popNode(Node::Kind::Type));
+        addChild(Thunk, popNode(Node::Kind::Type));
+        return Thunk;
+      }
       default:
         return nullptr;
       }

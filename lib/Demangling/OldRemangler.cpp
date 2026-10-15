@@ -1018,6 +1018,12 @@ ManglingError Remangler::mangleReabstractionThunk(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleValueConversionThunk(Node *node,
+                                                    unsigned depth) {
+  Buffer << "<value-conversion-thunk>";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node,
                                                          unsigned depth) {

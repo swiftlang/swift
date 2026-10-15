@@ -539,8 +539,6 @@ namespace {
     RValue visitCollectionUpcastConversionExpr(
              CollectionUpcastConversionExpr *E,
              SGFContext C);
-    ClosureExpr *synthesizeConversionClosure(
-        CollectionUpcastConversionExpr::ConversionPair pair);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
@@ -1590,7 +1588,7 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
 
 RValue SILGenFunction::emitCollectionConversion(
     SILLocation loc, FuncDecl *fn, CanType fromCollection, CanType toCollection,
-    ManagedValue mv, ClosureExpr *keyConversion, ClosureExpr *valueConversion,
+    ManagedValue mv, ManagedValue keyConversion, ManagedValue valueConversion,
     SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
@@ -1609,10 +1607,9 @@ RValue SILGenFunction::emitCollectionConversion(
 
   SmallVector<ManagedValue, 3> args = { mv };
   unsigned argIndex = 1;
-  for (ClosureExpr *closure : {keyConversion, valueConversion}) {
-    if (!closure) {
+  for (ManagedValue thunk : {keyConversion, valueConversion}) {
+    if (!thunk)
       continue;
-    }
 
     CanType origParamType = fn->getParameters()
                                 ->get(argIndex)
@@ -1620,15 +1617,12 @@ RValue SILGenFunction::emitCollectionConversion(
                                 ->getCanonicalType();
     CanType substParamType = origParamType.subst(subMap)->getCanonicalType();
 
-    // Ensure that the closure has the appropriate type.
+    // Reabstract the thunk to the stdlib function's expected abstraction
+    // pattern.
     AbstractionPattern origParam(
         fn->getGenericSignature().getCanonicalSignature(), origParamType);
 
-    auto paramConversion = Conversion::getSubstToOrig(
-        origParam, substParamType, getLoweredType(closure->getType()),
-        getLoweredType(origParam, substParamType));
-
-    auto value = emitConvertedRValue(closure, paramConversion);
+    auto value = emitSubstToOrigValue(loc, thunk, origParam, substParamType);
     args.push_back(value);
     argIndex++;
   }
@@ -1636,94 +1630,279 @@ RValue SILGenFunction::emitCollectionConversion(
   return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, C);
 }
 
-static bool
-needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pair) {
-  assert(pair);
-  
-  if (pair.Conversion == pair.OrigValue) {
+/// Check whether the conversion between two types involves a function type
+/// change at any nesting level that swift_dynamicCast cannot handle.
+static bool elementConversionNeedsThunk(CanType fromType, CanType toType) {
+  if (fromType == toType)
     return false;
-  }
 
-  if (auto conv = dyn_cast<ImplicitConversionExpr>(pair.Conversion)) {
-    if (isa<ForeignObjectConversionExpr>(conv)) {
-      if (auto B2O = dyn_cast<BridgeToObjCExpr>(conv->getSubExpr())) {
-        conv = B2O;
-      }
-    }
-    if (conv->getSubExpr() == pair.OrigValue) {
-      switch (conv->getKind()) {
-        case ExprKind::Erasure:
-        case ExprKind::DerivedToBase:
-        case ExprKind::ArchetypeToSuper:
-        case ExprKind::AnyHashableErasure:
-        case ExprKind::MetatypeConversion:
-        case ExprKind::BridgeFromObjC:
-        case ExprKind::BridgeToObjC:
-        case ExprKind::InjectIntoOptional:
-          return false;
-        case ExprKind::FunctionConversion:
+  // Function type conversions cannot be performed by the runtime.
+  if (isa<AnyFunctionType>(fromType) && isa<AnyFunctionType>(toType))
+    return true;
+
+  // Check tuple elements.
+  if (auto fromTuple = dyn_cast<TupleType>(fromType)) {
+    if (auto toTuple = dyn_cast<TupleType>(toType)) {
+      for (unsigned i = 0, n = fromTuple->getNumElements(); i != n; ++i) {
+        if (elementConversionNeedsThunk(
+                fromTuple.getElementType(i),
+                toTuple.getElementType(i)))
           return true;
-        case ExprKind::CollectionUpcastConversion: {
-          auto upcast = cast<CollectionUpcastConversionExpr>(conv);
-          if (upcast->getKeyConversion() && needsCustomConversion(upcast->getKeyConversion())) {
-            return true;
-          }
-          return needsCustomConversion(upcast->getValueConversion());
-        }
-        case ExprKind::DestructureTuple: {
-          return false;
-        }
-        default: {
-          llvm_unreachable("unsupported collection element conversion");
-        }
       }
-    }
-  }
-  if (auto OE = dyn_cast<OpenExistentialExpr>(pair.Conversion)) {
-    if (OE->getExistentialValue() == pair.OrigValue) {
       return false;
     }
   }
-  return true;
+
+  // Check optional wrapped type.
+  if (auto fromObj = fromType.getOptionalObjectType()) {
+    if (auto toObj = toType.getOptionalObjectType())
+      return elementConversionNeedsThunk(fromObj, toObj);
+  }
+
+  // Check nested collection element types.
+  if (auto fromNom = dyn_cast<NominalType>(fromType)) {
+    if (auto toNom = dyn_cast<NominalType>(toType)) {
+      if (fromNom->getDecl() == toNom->getDecl()) {
+        auto fromArgs = fromNom->getGenericArgs();
+        auto toArgs = toNom->getGenericArgs();
+        for (unsigned i = 0, n = fromArgs.size(); i != n; ++i) {
+          if (elementConversionNeedsThunk(
+                  fromArgs[i]->getCanonicalType(),
+                  toArgs[i]->getCanonicalType()))
+            return true;
+        }
+        return false;
+      }
+    }
+  }
+
+  return false;
+}
+
+static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  ManagedValue source,
+                                            CanAnyFunctionType sourceFormalTy,
+                                            CanAnyFunctionType resultFormalTy);
+
+/// Build the body of a value conversion thunk that converts a value of
+/// fromType to toType using emitTransformedValue.
+static void buildValueConversionThunkBody(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          CanType fromType,
+                                          CanType toType) {
+  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
+
+  SmallVector<ManagedValue, 1> params;
+  SmallVector<ManagedValue, 1> indirectResults;
+  SGF.collectThunkParams(loc, params, &indirectResults);
+
+  ManagedValue input = params[0];
+
+  ManagedValue output;
+  auto fromFnType = dyn_cast<AnyFunctionType>(fromType);
+  auto toFnType = dyn_cast<AnyFunctionType>(toType);
+
+  if (fromFnType && toFnType &&
+      fromFnType->getRepresentation() != toFnType->getRepresentation()) {
+    // Cross-representation function conversion: decompose into signature
+    // change + representation bridge, mirroring visitFunctionConversionExpr.
+    switch (fromFnType->getRepresentation()) {
+    case AnyFunctionType::Representation::Swift:
+    case AnyFunctionType::Representation::Thin: {
+      // Native source: adjust signature first, then bridge representation.
+      auto adjustedDestType = Lowering::adjustFunctionType(
+          toFnType, fromFnType->getRepresentation(),
+          fromFnType->getClangTypeInfo());
+      if (fromFnType != adjustedDestType)
+        input = SGF.emitTransformedValue(loc, input, fromType,
+                                         adjustedDestType);
+      output = convertFunctionRepresentation(SGF, loc, input,
+                                             adjustedDestType, toFnType);
+      break;
+    }
+    case AnyFunctionType::Representation::Block:
+    case AnyFunctionType::Representation::CFunctionPointer: {
+      // Foreign source: bridge representation first, then adjust signature.
+      auto adjustedSrcType = Lowering::adjustFunctionType(
+          fromFnType, toFnType->getRepresentation(),
+          toFnType->getClangTypeInfo());
+      if (fromFnType != adjustedSrcType)
+        input = convertFunctionRepresentation(SGF, loc, input,
+                                              fromFnType, adjustedSrcType);
+      output = SGF.emitTransformedValue(loc, input, adjustedSrcType, toType);
+      break;
+    }
+    }
+  } else {
+    output = SGF.emitTransformedValue(loc, input, fromType, toType);
+  }
+
+  if (!indirectResults.empty()) {
+    output.forwardInto(SGF, loc, indirectResults[0].getLValueAddress());
+    scope.pop();
+    SGF.B.createReturn(loc, SGF.emitEmptyTuple(loc));
+  } else {
+    SILValue result = output.forward(SGF);
+    scope.pop();
+    SGF.B.createReturn(loc, result);
+  }
+}
+
+/// Create a SIL thunk that converts a value of fromType to toType and
+/// return a ManagedValue for a thick function reference to it.
+static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               CanType fromType,
+                                               CanType toType) {
+  auto &SGM = SGF.SGM;
+  auto &ctx = SGF.getASTContext();
+
+  auto loweredFromTy = SGF.getLoweredType(fromType);
+  auto loweredToTy = SGF.getLoweredType(toType);
+
+  // Build parameter info. Use owned convention because the thunk body
+  // may consume the input (e.g., when creating a function conversion thunk).
+  auto paramConvention = loweredFromTy.isAddressOnly(SGF.F)
+    ? ParameterConvention::Indirect_In
+    : ParameterConvention::Direct_Owned;
+  SILParameterInfo param(loweredFromTy.getASTType(), paramConvention);
+
+  // Build result info.
+  SmallVector<SILResultInfo, 1> results;
+  auto resultConvention = loweredToTy.isAddressOnly(SGF.F)
+    ? ResultConvention::Indirect
+    : ResultConvention::Owned;
+  results.push_back({loweredToTy.getASTType(), resultConvention});
+
+  // Build the thin noescape function type for the thunk.
+  auto extInfo = SILFunctionType::ExtInfo::getThin();
+
+  // Handle generic signature if types involve archetypes.
+  CanGenericSignature genericSig;
+  GenericEnvironment *genericEnv = nullptr;
+  SubstitutionMap interfaceSubs;
+
+  bool hasArchetypes = fromType->hasArchetype() || toType->hasArchetype();
+  if (hasArchetypes) {
+    genericSig = SGF.F.getLoweredFunctionType()
+        ->getInvocationGenericSignature();
+    genericEnv = SGF.F.getGenericEnvironment();
+    interfaceSubs = SGF.F.getForwardingSubstitutionMap();
+
+    // Map types to interface types for the thunk signature.
+    auto interfaceFromTy = SGF.getLoweredType(
+        AbstractionPattern(genericSig, fromType->mapTypeOutOfEnvironment()
+                                           ->getCanonicalType()),
+        fromType);
+    auto interfaceToTy = SGF.getLoweredType(
+        AbstractionPattern(genericSig, toType->mapTypeOutOfEnvironment()
+                                           ->getCanonicalType()),
+        toType);
+
+    param = {interfaceFromTy.getASTType(),
+             interfaceFromTy.isAddressOnly(SGF.F)
+                 ? ParameterConvention::Indirect_In
+                 : ParameterConvention::Direct_Owned};
+    auto resConv = interfaceToTy.isAddressOnly(SGF.F)
+        ? ResultConvention::Indirect
+        : ResultConvention::Owned;
+    results.clear();
+    results.push_back({interfaceToTy.getASTType(), resConv});
+  }
+
+  auto thunkType = SILFunctionType::get(
+      genericSig, extInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, {param}, /*yields*/ {},
+      results, /*errorResult*/ std::nullopt,
+      SubstitutionMap(), SubstitutionMap(), ctx);
+
+  // Get or create the thunk SIL function.
+  SILFunction *thunk = SGM.getOrCreateConversionThunk(
+      thunkType, fromType, toType);
+
+  // Fill the body if it's newly created.
+  if (thunk->empty()) {
+    if (genericEnv)
+      thunk->setGenericEnvironment(genericEnv);
+
+    SILGenFunction thunkSGF(SGM, *thunk, SGF.FunctionDC);
+    auto thunkLoc = RegularLocation::getAutoGeneratedLocation();
+    buildValueConversionThunkBody(thunkSGF, thunkLoc, fromType, toType);
+    SGM.emitLazyConformancesForFunction(thunk);
+  }
+
+  // Create a reference to the thunk.
+  auto thunkRef = SGF.B.createFunctionRef(loc, thunk);
+
+  if (hasArchetypes) {
+    // For generic thunks, partial_apply to capture type metadata.
+    return SGF.B.createPartialApply(
+        loc, thunkRef, interfaceSubs, ArrayRef<ManagedValue>{},
+        ParameterConvention::Direct_Guaranteed);
+  }
+
+  // For non-generic thunks, thin_to_thick_function to get a thick escaping
+  // function, then convert_escape_to_noescape.
+  auto escapingThickType = thunkType->getWithExtInfo(
+      thunkType->getExtInfo()
+          .withRepresentation(SILFunctionTypeRepresentation::Thick));
+  auto thickRef = SGF.B.createThinToThickFunction(
+      loc, thunkRef, SILType::getPrimitiveObjectType(escapingThickType));
+  auto escapingMV = SGF.emitManagedRValueWithCleanup(thickRef);
+
+  auto noescapeType = escapingThickType->getWithExtInfo(
+      escapingThickType->getExtInfo().withNoEscape());
+  return SGF.B.createConvertEscapeToNoEscape(
+      loc, escapingMV, SILType::getPrimitiveObjectType(noescapeType));
 }
 
 RValue RValueEmitter::
 visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
                                     SGFContext C) {
-  
+
   SILLocation loc = RegularLocation(E);
-  
-  // Get the sub expression argument as a managed value
+
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  
-  // Compute substitutions for the intrinsic call.
+
   auto fromCollection = E->getSubExpr()->getType()->getCanonicalType();
   auto toCollection = E->getType()->getCanonicalType();
 
-  // Get the intrinsic function.
+  auto fromArgs = cast<NominalType>(fromCollection)->getGenericArgs();
+  auto toArgs = cast<NominalType>(toCollection)->getGenericArgs();
+
   FuncDecl *fn = nullptr;
-  ClosureExpr *keyConversion = nullptr;
-  ClosureExpr *valueConversion = nullptr;
+  ManagedValue keyConversion;
+  ManagedValue valueConversion;
+
   if (fromCollection->isArray()) {
-    if (needsCustomConversion(E->getValueConversion())) {
+    CanType fromElem = fromArgs[0]->getCanonicalType();
+    CanType toElem = toArgs[0]->getCanonicalType();
+    if (elementConversionNeedsThunk(fromElem, toElem)) {
       fn = SGF.SGM.getArrayWitnessCast(loc);
-      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+      valueConversion = createValueConversionThunk(SGF, loc, fromElem, toElem);
     } else {
       fn = SGF.SGM.getArrayForceCast(loc);
     }
   } else if (fromCollection->isDictionary()) {
-    if (needsCustomConversion(E->getKeyConversion()) ||
-        needsCustomConversion(E->getValueConversion())) {
+    CanType fromKey = fromArgs[0]->getCanonicalType();
+    CanType toKey = toArgs[0]->getCanonicalType();
+    CanType fromVal = fromArgs[1]->getCanonicalType();
+    CanType toVal = toArgs[1]->getCanonicalType();
+    if (elementConversionNeedsThunk(fromKey, toKey) ||
+        elementConversionNeedsThunk(fromVal, toVal)) {
       fn = SGF.SGM.getDictionaryWitnessCast(loc);
-      keyConversion = synthesizeConversionClosure(E->getKeyConversion());
-      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+      keyConversion = createValueConversionThunk(SGF, loc, fromKey, toKey);
+      valueConversion = createValueConversionThunk(SGF, loc, fromVal, toVal);
     } else {
       fn = SGF.SGM.getDictionaryUpCast(loc);
     }
   } else if (fromCollection->isSet()) {
-    if (needsCustomConversion(E->getValueConversion())) {
+    CanType fromElem = fromArgs[0]->getCanonicalType();
+    CanType toElem = toArgs[0]->getCanonicalType();
+    if (elementConversionNeedsThunk(fromElem, toElem)) {
       fn = SGF.SGM.getSetWitnessCast(loc);
-      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+      valueConversion = createValueConversionThunk(SGF, loc, fromElem, toElem);
     } else {
       fn = SGF.SGM.getSetUpCast(loc);
     }
@@ -1733,282 +1912,6 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 
   return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection, mv,
                                       keyConversion, valueConversion, C);
-}
-
-namespace {
-class ConversionClosureEmitter: public Lowering::ExprVisitor<ConversionClosureEmitter, Expr*> {
-  ASTContext &Context;
-  OpaqueValueExpr *OrigValue;
-  ParamDecl *Param;
-public:
-  ConversionClosureEmitter(ASTContext &Context, OpaqueValueExpr *origValue, ParamDecl *param)
-    : Context(Context), OrigValue(origValue), Param(param)
-  {}
-
-  /*
-   case ExprKind:::
-     return false;
-   case ExprKind::FunctionConversion:
-   */
-
-  Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) {
-    if (E == OrigValue) {
-      return new (Context) DeclRefExpr(Param, DeclNameLoc(E->getStartLoc()), true, AccessSemantics::Ordinary, OrigValue->getType());
-    }
-    // Other opaque values are possible, e.g. intrudced by the OpenExistentialExpr
-    return nullptr;
-  }
-
-  Expr *visitErasureExpr(ErasureExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return ErasureExpr::create(Context, subExpr, E->getType(),
-                               E->getConformances(),
-                               E->getArgumentConversions());
-  }
-
-  Expr *visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) DerivedToBaseExpr(subExpr, E->getType());
-  }
-
-  Expr *visitAnyHashableErasureExpr(AnyHashableErasureExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) AnyHashableErasureExpr(subExpr, E->getType(), E->getConformance());
-  }
-
-  Expr *visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) MetatypeConversionExpr(subExpr, E->getType());
-  }
-
-  Expr *visitBridgeToObjCExpr(BridgeToObjCExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) BridgeToObjCExpr(subExpr, E->getType());
-  }
-
-  Expr *visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) InjectIntoOptionalExpr(subExpr, E->getType());
-  }
-
-  Expr *visitFunctionConversionExpr(FunctionConversionExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) FunctionConversionExpr(subExpr, E->getType());
-  }
-
-  Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) CollectionUpcastConversionExpr(subExpr, E->getType(), E->getKeyConversion(), E->getValueConversion());
-  }
-
-  Expr *visitOpenExistentialExpr(OpenExistentialExpr *E) {
-    Expr* existential = visit(E->getExistentialValue());
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!existential && !subExpr) return E;
-    return new (Context) OpenExistentialExpr(
-      existential ? existential : E->getExistentialValue(),
-      E->getOpaqueValue(),
-      subExpr ? subExpr : E->getSubExpr(),
-      subExpr->getType());
-  }
-  
-  Expr *visitBridgeFromObjCExpr(BridgeFromObjCExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) BridgeFromObjCExpr(subExpr, E->getType());
-  }
-  
-  Expr *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
-    Expr* subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) OptionalEvaluationExpr(subExpr, E->getType());
-  }
-  
-  Expr *visitTupleExpr(TupleExpr *E) {
-    SmallVector<Expr *, 4> elements;
-    bool changed = false;
-    for (unsigned i = 0, n = E->getNumElements(); i != n; ++i) {
-      Expr *elem = visit(E->getElement(i));
-      if (elem) {
-        changed = true;
-      } else {
-        elem = E->getElement(i);
-      }
-      elements.push_back(elem);
-    }
-    if (!changed) return E;
-    return TupleExpr::create(Context, E->getLParenLoc(), elements,
-                             E->getElementNames(),
-                             E->getElementNameLocs(),
-                             E->getRParenLoc(), E->isImplicit(),
-                             E->getType());
-  }
-
-  Expr *visitBindOptionalExpr(BindOptionalExpr *E) {
-    Expr *subExpr = visit(E->getSubExpr());
-    if (!subExpr) return E;
-    return new (Context) BindOptionalExpr(subExpr, E->getQuestionLoc(),
-                                          E->getDepth(), E->getType());
-  }
-
-  Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
-    Expr *srcExpr = visit(E->getSubExpr());
-    Expr *dstExpr = visit(E->getResultExpr());
-    if (!srcExpr && !dstExpr) return E;
-    return DestructureTupleExpr::create(Context,
-      E->getDestructuredElements(),
-      srcExpr ? srcExpr : E->getSubExpr(),
-      dstExpr ? dstExpr : E->getResultExpr(),
-      E->getType());
-  }
-
-  Expr *visitExpr(Expr *E) {
-    E->dump(llvm::errs());
-    llvm::errs() << "\n";
-    llvm_unreachable("unimplemented conversion expr");
-  }
-};
-} // namespace
-
-static void computeConversionClosureCaptures(ClosureExpr *closure) {
-  ASTContext &ctx = closure->getASTContext();
-
-  bool hasGenericParamCaptures = false;
-  llvm::SetVector<GenericEnvironment *> capturedEnvironments;
-  SmallVector<CapturedType, 4> capturedTypes;
-  llvm::SmallDenseMap<CanType, unsigned, 4> capturedTypeEntryNumber;
-
-  auto recordUseOfGenericType = [&](Type type) {
-    hasGenericParamCaptures = true;
-
-    auto [insertionPos, inserted] = capturedTypeEntryNumber.insert(
-        {type->getCanonicalType(), capturedTypes.size()});
-    if (inserted) {
-      capturedTypes.push_back(CapturedType(type, SourceLoc()));
-    }
-  };
-
-  class TypeCaptureWalker : public TypeWalker {
-    llvm::SetVector<GenericEnvironment *> &CapturedEnvironments;
-    std::function<void(Type)> RecordUseOfGenericType;
-
-  public:
-    TypeCaptureWalker(
-        llvm::SetVector<GenericEnvironment *> &capturedEnvironments,
-        std::function<void(Type)> recordUseOfGenericType)
-        : CapturedEnvironments(capturedEnvironments),
-          RecordUseOfGenericType(std::move(recordUseOfGenericType)) {}
-
-    Action walkToTypePre(Type t) override {
-      if (auto *element = t->getAs<ElementArchetypeType>()) {
-        auto *env = element->getGenericEnvironment();
-        CapturedEnvironments.insert(env);
-      } else if (auto *openedExistential =
-                     t->getAs<ExistentialArchetypeType>()) {
-        auto *env = openedExistential->getGenericEnvironment();
-        CapturedEnvironments.insert(env);
-        RecordUseOfGenericType(t);
-      } else if (t->is<PrimaryArchetypeType>() ||
-                 t->is<PackArchetypeType>() ||
-                 t->is<GenericTypeParamType>()) {
-        RecordUseOfGenericType(t);
-      }
-      return Action::Continue;
-    }
-  };
-
-  auto checkType = [&](Type type) {
-    if (!type)
-      return;
-
-    type = type->getCanonicalType();
-
-    if (type->hasArchetype() || type->hasTypeParameter()) {
-      TypeCaptureWalker walker(capturedEnvironments, recordUseOfGenericType);
-      type.walk(walker);
-    }
-  };
-
-  auto fnType = closure->getType()->castTo<FunctionType>();
-  for (const auto &param : fnType->getParams())
-    checkType(param.getPlainType());
-  checkType(fnType->getResult());
-
-  closure->setCaptureInfo(CaptureInfo(ctx, /*captures=*/{},
-                                      /*dynamicSelf=*/nullptr,
-                                      /*opaqueValue=*/nullptr,
-                                      hasGenericParamCaptures,
-                                      capturedEnvironments.getArrayRef(),
-                                      capturedTypes));
-}
-
-ClosureExpr *RValueEmitter::synthesizeConversionClosure(
-    CollectionUpcastConversionExpr::ConversionPair pair) {
-  ASTContext &Context = SGF.getASTContext();
-  DeclContext *declContext = SGF.FunctionDC;
-
-  DeclAttributes attributes;
-  SourceRange bracketRange;
-  SmallVector<CaptureListEntry, 2> captureList;
-  VarDecl *capturedSelfDecl = nullptr;
-  SourceLoc asyncLoc;
-  SourceLoc throwsLoc;
-  TypeExpr *thrownType = nullptr;
-  SourceLoc arrowLoc;
-  TypeExpr *explicitResultType = nullptr;
-  SourceLoc inLoc;
-
-  ClosureExpr *closure = new (Context) ClosureExpr(
-    attributes, bracketRange, capturedSelfDecl, nullptr, asyncLoc, throwsLoc,
-    thrownType, arrowLoc, inLoc, explicitResultType, declContext
-  );
-
-
-  Identifier ident = Context.getDollarIdentifier(0);
-  ParamDecl* param = new (Context) ParamDecl(SourceLoc(), SourceLoc(),
-            Identifier(), SourceLoc(), ident, closure);
-
-  param->setSpecifier(ParamSpecifier::Default);
-  auto paramTy = pair.OrigValue->getType();
-  param->setInterfaceType(paramTy->hasArchetype()
-                              ? paramTy->mapTypeOutOfEnvironment()
-                              : paramTy);
-  param->setImplicit();
-
-  ParameterList *params = ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
-  closure->setParameterList(params);
-
-  ConversionClosureEmitter emitter(Context, pair.OrigValue, param);
-  Expr *result = emitter.visit(pair.Conversion);
-  auto *RS = ReturnStmt::createImplicit(Context, result);
-  ASTNode bodyNode(RS);
-  auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
-  closure->setBody(BS);
-
-  auto closureParam = AnyFunctionType::Param(pair.OrigValue->getType());
-  auto extInfo = FunctionType::ExtInfo()
-    .withNoEscape()
-    .withSendable()
-    .withoutIsolation();
-  auto *fnTy = FunctionType::get(ArrayRef(closureParam), /* yields */ {},
-                                 pair.Conversion->getType(), extInfo);
-  closure->setType(fnTy);
-
-  auto discriminator = Context.getNextDiscriminator(declContext);
-  closure->setDiscriminator(discriminator++);
-  Context.setMaxAssignedDiscriminator(declContext, discriminator);
-
-  computeConversionClosureCaptures(closure);
-
-  return closure;
 }
 
 RValue

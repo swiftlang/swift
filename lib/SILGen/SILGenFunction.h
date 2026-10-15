@@ -1826,8 +1826,8 @@ public:
 
   RValue emitCollectionConversion(SILLocation loc, FuncDecl *fn,
                                   CanType fromCollection, CanType toCollection,
-                                  ManagedValue mv, ClosureExpr *keyConversion,
-                                  ClosureExpr *valueConversion, SGFContext C);
+                                  ManagedValue mv, ManagedValue keyConversion,
+                                  ManagedValue valueConversion, SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points

@@ -540,3 +540,5 @@ async_MainTQ0_ ---> (1) await resume partial function for async main entry point
 async_MainTu ---> async function pointer to async main entry point
 _async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
 $s1AyycfcySiGfD1BV ---> $s1AyycfcySiGfD1BV
+$sSiSSIegyd_SiSSIeghyd_TTv ---> value conversion thunk from @escaping @callee_guaranteed (@unowned Swift.Int) -> (@unowned Swift.String) to @escaping @callee_guaranteed @Sendable (@unowned Swift.Int) -> (@unowned Swift.String)
+$sxIegn_xIeAgn_lTTv ---> value conversion thunk <A> from @escaping @callee_guaranteed (@in_guaranteed A) -> () to @escaping @isolated(any) @callee_guaranteed (@in_guaranteed A) -> ()

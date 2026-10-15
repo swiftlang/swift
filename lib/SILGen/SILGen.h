@@ -169,6 +169,11 @@ public:
                                            CanType dynamicSelfType,
                                            CanType fromGlobalActor);
   
+  /// Get or create the declaration of a conversion thunk with the given signature.
+  SILFunction *getOrCreateConversionThunk(CanSILFunctionType thunkType,
+                                          Type fromType,
+                                          Type toType);
+  
   /// Get or create the declaration of a completion handler block
   /// implementation function for an ObjC API that was imported
   /// as `async` in Swift.

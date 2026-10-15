@@ -644,8 +644,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
       return SGF
           .emitCollectionConversion(Loc, fn, inputSubstType, outputSubstType, v,
-                                    /*keyConversion*/ nullptr,
-                                    /*valueConversion*/ nullptr, ctxt)
+                                    /*keyConversion*/ ManagedValue(),
+                                    /*valueConversion*/ ManagedValue(), ctxt)
           .getScalarValue();
     }
   }
