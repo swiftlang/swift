@@ -2419,14 +2419,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
     // be passed take_on_success if src is an address only type.
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
-    if (src.getType().isAddressOnly(SGF.F) &&
-        src.getOwnershipKind() == OwnershipKind::Guaranteed &&
-        !src.getType().isMoveOnly()) {
-      // A noncopyable subject cannot be copied, so switch on the borrow.
-      src = src.copy(SGF, PatternMatchStmt);
-    }
 
-    // Finally perform the enum element dispatch.
+    // Perform the enum element dispatch.
     return emitEnumElementObjectDispatch(rows, src, handleCase, outerFailure,
                                          defaultCaseCount);
   }
