@@ -452,7 +452,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
-    let storage: _AsyncStreamCriticalStorage = .create(produce)
+    let storage: _AsyncStreamCriticalStorage<Optional<@Sendable () async throws -> Element?>>
+      = .create(produce)
     self.context = _Context {
       return try await withTaskCancellationHandler {
         guard let result = try await storage.value?() else {
@@ -508,7 +509,8 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: nonisolated(nonsending) @escaping @Sendable () async throws(Failure) -> Element?
   ) {
-    let storage: _AsyncStreamCriticalStorage = .create(produce)
+    let storage: _AsyncStreamCriticalStorage<Optional<nonisolated(nonsending) @Sendable () async throws(Failure) -> Element?>>
+      = .create(produce)
     self.context = _Context { () throws(Failure) in
       return try await withTaskCancellationHandler { () throws(Failure) in
         guard let result = try await storage.value?() else {

@@ -239,9 +239,12 @@ public struct AsyncStream<Element> {
 
   final class _Context {
     let storage: _Storage?
-    let produce: () async -> Element?
+    let produce: nonisolated(nonsending) () async -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
+    init(
+      storage: _Storage? = nil,
+      produce: nonisolated(nonsending) @escaping () async -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
@@ -342,75 +345,21 @@ public struct AsyncStream<Element> {
   /// part of task cancellation, it's subject to the same considerations for
   /// avoiding deadlock as outlined in the documentation for
   /// ``withTaskCancellationHandler(operation:onCancel:)``.
-  @_silgen_name("$sScS9unfolding8onCancelScSyxGxSgyYac_yyYbcSgtcfC")
-  @preconcurrency // Original API had `@Sendable` only on `onCancel`
-  public init(
-    unfolding produce: @escaping @Sendable () async -> Element?,
-    onCancel: (@Sendable () -> Void)? = nil
-  ) {
-    let storage: _AsyncStreamCriticalStorage = .create(produce)
-    self.context = _Context {
-      return await withTaskCancellationHandler {
-        guard let result = await storage.value?() else {
-          storage.value = nil
-          return nil
-        }
-        return result
-      } onCancel: {
-        // This handler also runs immediately for every next() on an
-        // already-cancelled task; call `onCancel` at most once, and not at all
-        // if the stream already finished.
-        if storage.take() != nil {
-          onCancel?()
-        }
-      }
-    }
-  }
-
-  /// Constructs an asynchronous stream from a given element-producing
-  /// closure, with an optional closure to handle cancellation.
-  ///
-  /// - Parameters:
-  ///   - produce: A closure that asynchronously produces elements for the
-  ///     stream.
-  ///   - onCancel: A closure to execute when canceling the stream's task.
-  ///
-  /// Use this convenience initializer when you have an asynchronous function
-  /// that can produce elements for the stream, and don't want to invoke
-  /// a continuation manually. This initializer "unfolds" your closure into
-  /// an asynchronous stream. The created stream handles conformance
-  /// to the `AsyncSequence` protocol automatically, including termination
-  /// (either by cancellation or by returning `nil` from the closure to finish
-  /// iteration).
-  ///
-  /// The following example shows an `AsyncStream` created with this
-  /// initializer that produces random numbers on a one-second interval. This
-  /// example uses the Swift multiple trailing closure syntax, which omits
-  /// the `unfolding` parameter label.
-  ///
-  ///     let stream = AsyncStream<Int> {
-  ///         await Task.sleep(1 * 1_000_000_000)
-  ///         return Int.random(in: 1...10)
-  ///     } onCancel: { @Sendable () in print("Canceled.") }
-  ///
-  ///     // Call point:
-  ///     for await random in stream {
-  ///         print(random)
-  ///     }
-  ///
-  /// - Note: Because the system might call the `onCancel` callback as
-  /// part of task cancellation, it's subject to the same considerations for
-  /// avoiding deadlock as outlined in the documentation for
-  /// ``withTaskCancellationHandler(operation:onCancel:)``.
-  @available(SwiftStdlib 6.5, *)
+  @abi(
+    init(
+      unfolding produce: @escaping () async -> Element?,
+      onCancel: (@Sendable () -> Void)?
+    )
+  )
   @preconcurrency // Original API had `@Sendable` only on `onCancel`
   public init(
     unfolding produce: nonisolated(nonsending) @escaping @Sendable () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
-    let storage: _AsyncStreamCriticalStorage = .create(produce)
+    let storage: _AsyncStreamCriticalStorage<Optional<nonisolated(nonsending) @Sendable () async -> Element?>>
+      = .create(produce)
     self.context = _Context {
-      return await withTaskCancellationHandler {
+      return await withTaskCancellationHandler() {
         guard let result = await storage.value?() else {
           storage.value = nil
           return nil

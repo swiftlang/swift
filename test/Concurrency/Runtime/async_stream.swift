@@ -954,6 +954,32 @@ class NotSendable {}
 
       // MARK: - Unfolding Initializer
 
+      /*
+       tests.test("unfolding nonisolated(nonsending)") {
+         let stream = AsyncStream<Void>(unfolding: {
+           let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor(),
+           let currentExecutor = currentExecutor.unownedExecutor.asSerialExecutor()
+           expectTrue(mainExecutor === currentExecutor)
+           return nil
+         })
+         for await _ in stream {}
+       }
+
+       tests.test("unfolding nonisolated(nonsending) throwing") {
+         let stream = AsyncThrowingStream<Void, Error>(unfolding: {
+           let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor()
+           let currentExecutor = #isolation.unownedExecutor.asSerialExecutor()
+           expectTrue(mainExecutor === currentExecutor)
+           return nil
+         })
+         do {
+           for try await _ in stream {}
+         } catch {
+
+         }
+       }
+       */
+
       tests.test("unfolding basic") {
         nonisolated(unsafe) var counter = 0
         let stream = AsyncStream<Int>(unfolding: {
