@@ -52,6 +52,11 @@ bool swiftModulesInitialized() {
   return nodeMetatypesInitialized;
 }
 
+bool SubstitutionMap_isGrowing(BridgedSubstitutionMap subs,
+                               BridgedSubstitutionMap comparedTo) {
+  return growingSubstitutions(comparedTo.unbridged(), subs.unbridged());
+}
+
 // Does return null if initializeSwiftModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];

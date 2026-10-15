@@ -267,6 +267,9 @@ BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType);
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfoArray
 SILFunctionType_getLifetimeDependencies(BridgedCanType);
 
+bool SubstitutionMap_isGrowing(BridgedSubstitutionMap subs,
+                               BridgedSubstitutionMap comparedTo);
+
 
 struct BridgedType {
   void * _Nullable opaqueValue;

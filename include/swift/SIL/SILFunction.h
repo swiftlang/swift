@@ -511,6 +511,11 @@ private:
   unsigned NeedBreakInfiniteLoops : 1;
   unsigned NeedCompleteLifetimes : 1;
 
+  /// Set by mandatory generic specialization if specializations of this
+  /// generic function form an infinitely growing loop.
+  /// Note that this flag is not serialized.
+  unsigned HasInfiniteSpecializationLoop : 1;
+
   /// Set when this function's arguments and instructions have been lowered to
   /// address form by the AddressLowering function pass.
   unsigned HasLoweredAddresses : 1;
@@ -1192,6 +1197,15 @@ public:
 
   void setIsPerformanceConstraint(bool flag = true) {
     IsPerformanceConstraint = flag;
+  }
+
+  // see `HasInfiniteSpecializationLoop`
+  bool hasInfiniteSpecializationLoop() const {
+    return HasInfiniteSpecializationLoop;
+  }
+
+  void setHasInfiniteSpecializationLoop(bool flag = true) {
+    HasInfiniteSpecializationLoop = flag;
   }
 
   /// True if the current pass has deleted any basic blocks.
