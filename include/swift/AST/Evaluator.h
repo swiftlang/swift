@@ -75,6 +75,12 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request) { }
 
+/// Report that a request of the given kind returned a cached result, so it
+/// can be recorded by the stats reporter.
+template<typename Request>
+void reportCachedRequest(UnifiedStatsReporter &stats,
+                         const Request &request) { }
+
 /// Evaluation engine that evaluates and caches "requests", checking for cyclic
 /// dependencies along the way.
 ///
@@ -384,6 +390,8 @@ private:
   getResultCached(const Request &request, Fn defaultValueFn) {
     // If there is a cached result, return it.
     if (auto cached = request.getCachedResult()) {
+      if (stats)
+        reportCachedRequest(*stats, request);
       recorder.replayCachedRequest(request);
       handleDependencySinkRequest<Request>(request, *cached);
       return *cached;
@@ -410,6 +418,8 @@ private:
     auto known = cache.find_as<Request>(request);
     if (known != cache.end<Request>()) {
       auto result = known->second;
+      if (stats)
+        reportCachedRequest(*stats, request);
       recorder.replayCachedRequest(request);
       handleDependencySinkRequest<Request>(request, result);
       return result;
