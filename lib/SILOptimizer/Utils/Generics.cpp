@@ -269,7 +269,10 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply, bool isMandatory)
 
   // If there is a specialization loop and it is not infinite, we should allow this in embedded swift.
   // Still, there is a hard coded limit, but 10 should be good enough for real world scenarios.
-  int numAcceptedCycles = isMandatory ? 10 : 1;
+  // The limit applies to each call chain separately. If a function contains multiple growing call
+  // sites, the number of specializations grows exponentially with the limit. Therefore, once the
+  // limit is reached for a function, no more growing specializations of it are accepted at all.
+  int numAcceptedCycles = isMandatory ? (Callee->hasInfiniteSpecializationLoop() ? 0 : 10) : 1;
 
   // Name of the function to be specialized.
   auto GenericFunc = Callee;
@@ -321,8 +324,11 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply, bool isMandatory)
         // Accept a cycles up to a limit. This is necessary to generate
         // efficient code for some library functions, like compactMap, which
         // contain small specialization cycles.
-        if (numAcceptedCycles == 0)
+        if (numAcceptedCycles == 0) {
+          if (isMandatory)
+            Callee->setHasInfiniteSpecializationLoop();
           return true;
+        }
         --numAcceptedCycles;
       }
     }
