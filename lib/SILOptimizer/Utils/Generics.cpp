@@ -20,7 +20,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -138,50 +137,6 @@ static bool isTypeTooComplex(Type t) {
 
 namespace {
 
-/// A helper class used to check whether one type is structurally contained
-/// the other type either completely or partially.
-class TypeComparator : public TypeMatcher<TypeComparator> {
-  bool IsContained = false;
-
-public:
-  bool isEqual(CanType T1, CanType T2) { return T1 == T2; }
-  /// Check whether the type T1 is different from T2 and contained in the type
-  /// T2.
-  bool isStrictlyContainedIn(CanType T1, CanType T2) {
-    if (isEqual(T1, T2))
-      return false;
-    return T2.findIf([&T1, this](Type T) -> bool {
-      return isEqual(T->getCanonicalType(), T1);
-    });
-  }
-
-  /// Check whether the type T1 is strictly or partially contained in the type
-  /// T2.
-  /// Partially contained means that if you drop the common structural "prefix"
-  /// of T1 and T2 and get T1' and T2' then T1' is strictly contained in T2'.
-  bool isPartiallyContainedIn(CanType T1, CanType T2) {
-    if (isStrictlyContainedIn(T1, T2))
-      return true;
-    match(T1, T2);
-    return IsContained;
-  }
-
-  /// This method is invoked aftre skipping a common prefix of two types,
-  /// when a structural difference is found.
-  bool mismatch(TypeBase *firstType, TypeBase *secondType,
-                Type sugaredFirstType) {
-    auto firstCanType = firstType->getCanonicalType();
-    auto secondCanType = secondType->getCanonicalType();
-    if (isEqual(firstCanType, secondCanType))
-      return false;
-    if (isStrictlyContainedIn(firstCanType, secondCanType)) {
-      IsContained = true;
-      return false;
-    }
-    return false;
-  }
-};
-
 class SpecializedFunction {
 private:
   SILFunction *fn;
@@ -296,44 +251,6 @@ void SpecializedFunction::computeTypeReplacements(const ApplySite &apply) {
       setResultType(apply.getType().getObjectType());
     }
   }
-}
-
-/// Checks if a second substitution map is an expanded version of
-/// the first substitution map.
-/// This is the case if at least one of the substitution type in Subs2 is
-/// "bigger" than the corresponding substitution type in Subs1.
-/// Type T2 is "smaller" than type T1 if T2 is structurally contained in T1.
-static bool growingSubstitutions(SubstitutionMap Subs1,
-                                 SubstitutionMap Subs2) {
-  auto Replacements1 = Subs1.getReplacementTypes();
-  auto Replacements2 = Subs2.getReplacementTypes();
-  assert(Replacements1.size() == Replacements2.size());
-  TypeComparator TypeCmp;
-  // Perform component-wise comparisons for substitutions.
-  for (unsigned idx : indices(Replacements1)) {
-    auto Type1 = Replacements1[idx]->getCanonicalType();
-    auto Type2 = Replacements2[idx]->getCanonicalType();
-    // If types are the same, the substitution type does not grow.
-    if (TypeCmp.isEqual(Type2, Type1))
-      continue;
-    // If the new substitution type is getting smaller, the
-    // substitution type does not grow.
-    if (TypeCmp.isPartiallyContainedIn(Type2, Type1))
-      continue;
-    if (TypeCmp.isPartiallyContainedIn(Type1, Type2)) {
-      LLVM_DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump(llvm::dbgs());
-                 llvm::dbgs() << "is (partially) contained in type:\n";
-                 Type2.dump(llvm::dbgs());
-                 llvm::dbgs() << "Replacements[" << idx
-                              << "] has got bigger since last time.\n");
-      return true;
-    }
-    // None of the types is contained in the other type.
-    // They are not comparable in this sense.
-  }
-
-  // The substitution list is not growing.
-  return false;
 }
 
 /// Checks whether specializing a given generic apply would create an infinite
