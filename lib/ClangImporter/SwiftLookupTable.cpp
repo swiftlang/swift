@@ -690,6 +690,7 @@ SwiftLookupTable::lookup(SerializedSwiftName baseName,
   if (known == LookupTable.end()) return result;
 
   // Walk each of the entries.
+  int64_t mapped = 0;
   for (auto &entry : known->second) {
     // If we're looking in a particular context and it doesn't match the
     // entry context, we're done.
@@ -697,11 +698,13 @@ SwiftLookupTable::lookup(SerializedSwiftName baseName,
       continue;
 
     // Map each of the declarations.
+    mapped += entry.DeclsOrMacros.size();
     for (auto &stored : entry.DeclsOrMacros)
       if (auto entry = mapStored(stored))
         result.push_back(entry);
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, mapped);
   return result;
 }
 
@@ -719,6 +722,7 @@ SwiftLookupTable::lookupGlobalsAsMembersImpl(
 
 
   // Walk each of the entries.
+  int64_t mapped = 0;
   for (auto &entry : known->second) {
     // If we're looking in a particular context and it doesn't match the
     // entry context, we're done.
@@ -726,11 +730,13 @@ SwiftLookupTable::lookupGlobalsAsMembersImpl(
       continue;
 
     // Map each of the declarations.
+    mapped += entry.DeclsOrMacros.size();
     for (auto &stored : entry.DeclsOrMacros)
       if (auto entry = mapStored(stored))
         result.push_back(entry);
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, mapped);
   return result;
 }
 
@@ -760,6 +766,7 @@ SwiftLookupTable::allGlobalsAsMembersInContext(StoredContext context) {
     result.push_back(mapStored(entry));
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, result.size());
   return result;
 }
 
@@ -808,6 +815,7 @@ SwiftLookupTable::allGlobalsAsMembers() {
     for (auto &entry : GlobalsAsMembersIndex[context])
       results.push_back(mapStored(entry));
   }
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, results.size());
   return results;
 }
 
@@ -869,6 +877,7 @@ SwiftLookupTable::lookupObjCMembers(SerializedSwiftName baseName) {
     }
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, result.size());
   return result;
 }
 
@@ -898,6 +907,7 @@ SwiftLookupTable::lookupMemberOperators(SerializedSwiftName baseName) {
     }
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, result.size());
   return result;
 }
 

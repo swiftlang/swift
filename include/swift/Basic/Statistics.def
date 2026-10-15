@@ -185,6 +185,10 @@ FRONTEND_STATISTIC(ClangImporter, LookupTableDeclResolved)
 /// lookup-table entry for duplicates.
 FRONTEND_STATISTIC(ClangImporter, LookupTableDuplicateCheckComparisons)
 
+/// Stored entries mapped to Clang declarations or macros to answer
+/// lookup-table queries.
+FRONTEND_STATISTIC(ClangImporter, LookupTableEntriesMapped)
+
 /// Declarations considered as candidate members during qualified record lookup.
 FRONTEND_STATISTIC(ClangImporter, ClangRecordMemberLookupCandidates)
 
