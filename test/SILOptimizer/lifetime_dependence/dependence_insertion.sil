@@ -339,3 +339,63 @@ bb0(%0 : $UnsafeMutablePointer<AddressableHolder>):
   %19 = tuple ()
   return %19
 }
+
+sil @getObject : $@convention(thin) () -> @owned AnyObject
+sil @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+
+// rdar://189111544 (Non-escapable result of a protocol extension method can't outlive its declaration when the
+// receiver is a temporary)
+//
+// The store consumes the temporary owned value, so the dependence must be on the stack location, not the stored value.
+//
+// CHECK-LABEL: sil [ossa] @testConsumedTemporary : $@convention(thin) () -> () {
+// CHECK:   [[OBJ:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   [[TEMP:%.*]] = alloc_stack $AnyObject
+// CHECK:   store [[OBJ]] to [init] [[TEMP]]
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[TEMP]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on [[TEMP]]
+// CHECK-LABEL: } // end sil function 'testConsumedTemporary'
+sil [ossa] @testConsumedTemporary : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  %1 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %2 = alloc_stack $AnyObject
+  store %1 to [init] %2
+  %4 = function_ref @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  destroy_addr %2
+  dealloc_stack %2
+  %8 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %9 = apply %8(%5) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %5
+  %11 = tuple ()
+  return %11
+}
+
+// The temporary holds a copy, so the dependence is on the copied variable.
+//
+// CHECK-LABEL: sil [ossa] @testCopiedTemporary : $@convention(thin) () -> () {
+// CHECK:   [[VAR:%.*]] = move_value [var_decl]
+// CHECK:   [[TEMP:%.*]] = alloc_stack $AnyObject
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[TEMP]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on [[VAR]]
+// CHECK-LABEL: } // end sil function 'testCopiedTemporary'
+sil [ossa] @testCopiedTemporary : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  %1 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %2 = move_value [var_decl] %1
+  %3 = alloc_stack $AnyObject
+  %4 = copy_value %2
+  store %4 to [init] %3
+  %6 = function_ref @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  destroy_addr %3
+  dealloc_stack %3
+  %10 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %11 = apply %10(%7) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %7
+  destroy_value %2
+  %14 = tuple ()
+  return %14
+}
