@@ -84,5 +84,26 @@ int main() {
 // CHECK-NEXT: breakpoint 9
 // CHECK-NEXT: destroy RefCountedClass
 // CHECK-NEXT: breakpoint 10
+  {
+    auto value = returnNewReferenceAfterTrivial(42);
+    auto copy = value;
+    assert(getCount(copy) == 42);
+    auto other = returnNewReferenceAfterTrivial(7);
+    other = value;
+    assert(getCount(other) == 42);
+    auto &alias = other;
+    other = alias;
+    assert(getCount(other) == 42);
+    auto roundTripped = identity(other);
+    assert(getCount(roundTripped) == 42);
+    printBreak(11);
+  }
+  printBreak(12);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 11
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 12
   return 0;
 }

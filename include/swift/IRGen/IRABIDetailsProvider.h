@@ -217,9 +217,23 @@ public:
       const NominalTypeDecl *TD,
       ResilienceExpansion expansion = ResilienceExpansion::Maximal);
 
-  /// Whether the type has the representation and ownership operations of a
-  /// single native Swift reference, even outside its resilience domain.
-  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD);
+  /// The one strong reference that a value's copy and destroy operations
+  /// retain and release.
+  struct SingleReference {
+    enum class Kind {
+      /// A native Swift reference, retained with `swift_retain`.
+      Native,
+      /// A `Builtin.BridgeObject`, retained with `swift_bridgeObjectRetain`.
+      Bridge,
+    };
+    /// The byte offset of the reference in the value.
+    SizeType offset;
+    Kind kind;
+  };
+
+  /// Returns the type's only strong reference if every other part of its
+  /// layout is trivial, even outside its resilience domain.
+  std::optional<SingleReference> getSingleReference(const NominalTypeDecl *TD);
 
   /// Returns the abstract layout for a hidden nominal type.
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD);
