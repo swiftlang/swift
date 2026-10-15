@@ -96,6 +96,10 @@ foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
 
+# ExecutorImpl.h includes ExecutorTypes.h from its own directory.
+copy_files("public/EmbeddedPlatform/swift" "Core/Concurrency"
+  FILES "ExecutorTypes.h")
+
 # copying Core/core separately, so we can specify the case of the target folder
 # correctly on case sensitive file systems
 copy_library_sources("" "public/core" "Core/Core")

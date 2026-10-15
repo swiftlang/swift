@@ -12,19 +12,7 @@
 ///
 /// The implementation of the cooperative global executor.
 ///
-/// This file is included into GlobalExecutor.cpp only when
-/// the cooperative global executor is enabled.  It is expected to
-/// declare the following functions:
-///   swift_task_asyncMainDrainQueueImpl
-///   swift_task_checkIsolatedImpl
-///   swift_task_donateThreadToGlobalExecutorUntilImpl
-///   swift_task_enqueueGlobalImpl
-///   swift_task_enqueueGlobalWithDeadlineImpl
-///   swift_task_enqueueGlobalWithDelayImpl
-///   swift_task_enqueueMainExecutorImpl
-///   swift_task_getMainExecutorImpl
-///   swift_task_isMainExecutorImpl
-/// as well as any cooperative-executor-specific functions in the runtime.
+/// It defines the executor entrypoints declared in EmbeddedPlatform.h.
 ///
 ///===------------------------------------------------------------------===///
 
@@ -34,14 +22,11 @@
 
 #include "swift/Basic/PriorityQueue.h"
 #include "swift/EmbeddedPlatform.h"
-#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Heap.h"
 
 #ifndef NSEC_PER_SEC
 # define NSEC_PER_SEC 1000000000ull
 #endif
-
-#include "ExecutorImpl.h"
 
 using namespace swift;
 
@@ -60,7 +45,7 @@ struct JobQueueTraits {
   }
   enum { prioritiesCount = SwiftJobPriorityBucketCount };
   static int getPriorityIndex(SwiftJob *job) {
-    return swift_priority_getBucketIndex(swift_job_getPriority(job));
+    return swift_priority_getBucketIndex(swift_job_getPriorityFromFlags(job));
   }
 };
 using JobPriorityQueue = PriorityQueue<SwiftJob*, JobQueueTraits>;
@@ -70,12 +55,17 @@ using JobPriorityQueue = PriorityQueue<SwiftJob*, JobQueueTraits>;
 /// reports.
 using JobDeadline = long long;
 
+static JobDeadline toNanos(__swift_int64_t seconds,
+                           __swift_int64_t nanoseconds) {
+  return seconds * static_cast<JobDeadline>(NSEC_PER_SEC) + nanoseconds;
+}
+
 /// Read the current time on the suspending clock and return it as a
 /// nanosecond count.
 static JobDeadline currentSuspendingNanos() {
   __swift_int64_t seconds, nanoseconds;
   _swift_clockSuspending_getTime(&seconds, &nanoseconds);
-  return seconds * static_cast<JobDeadline>(NSEC_PER_SEC) + nanoseconds;
+  return toNanos(seconds, nanoseconds);
 }
 
 template <bool = (sizeof(JobDeadline) <= sizeof(void*) &&
@@ -122,18 +112,16 @@ static JobPriorityQueue JobQueue;
 static SwiftJob *DelayedJobQueue = nullptr;
 
 /// Insert a job into the cooperative global queue.
-SWIFT_CC(swift)
-void swift_task_enqueueGlobalImpl(SwiftJob *job) {
+void _swift_task_enqueueGlobalImpl(SwiftJob *job) {
   assert(job && "no job provided");
   JobQueue.enqueue(job);
 }
 
 /// Enqueues a task on the main executor.
-SWIFT_CC(swift)
-void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
+void _swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
   // The cooperative executor does not distinguish between the main
   // queue and the global queue.
-  swift_task_enqueueGlobalImpl(job);
+  _swift_task_enqueueGlobalImpl(job);
 }
 
 static void insertDelayedJob(SwiftJob *newJob, JobDeadline deadline) {
@@ -154,20 +142,17 @@ static void insertDelayedJob(SwiftJob *newJob, JobDeadline deadline) {
   *position = newJob;
 }
 
-SWIFT_CC(swift)
-void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
+void _swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
   swift_executor_invokeSwiftCheckIsolated(executor);
 }
 
-SWIFT_CC(swift)
-int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+int8_t _swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
   return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
 }
 
 /// Insert a job into the cooperative global queue with a delay.
-SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
-                                           SwiftJob *newJob) {
+void _swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+                                            SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
   auto deadline = currentSuspendingNanos() + static_cast<JobDeadline>(delay);
@@ -176,24 +161,29 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
   insertDelayedJob(newJob, deadline);
 }
 
-SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                              long long nsec,
-                                              long long tsec,
-                                              long long tnsec,
-                                              int clock, SwiftJob *newJob) {
+void _swift_task_enqueueGlobalWithContinuousDeadlineImpl(
+    __swift_int64_t sec, __swift_int64_t nsec, __swift_int64_t tsec,
+    __swift_int64_t tnsec, SwiftJob *newJob) {
   assert(newJob && "no job provided");
 
-  // Compute how far away the caller-supplied deadline is in the caller's
-  // clock, then re-anchor it to our internal suspending-clock timebase.
-  long long nowSec, nowNsec;
-  swift_get_time(&nowSec, &nowNsec, static_cast<swift_clock_id>(clock));
+  // Compute how far away the deadline is on the continuous clock, then
+  // re-anchor it to our internal suspending-clock timebase.
+  __swift_int64_t nowSec, nowNsec;
+  _swift_clockContinuous_getTime(&nowSec, &nowNsec);
 
-  long long delta =
-      (sec - nowSec) * static_cast<JobDeadline>(NSEC_PER_SEC) +
-      (nsec - nowNsec);
+  auto deadline = currentSuspendingNanos() + toNanos(sec, nsec) -
+                  toNanos(nowSec, nowNsec);
+  JobDeadlineStorage<>::set(newJob, deadline);
 
-  auto deadline = currentSuspendingNanos() + delta;
+  insertDelayedJob(newJob, deadline);
+}
+
+void _swift_task_enqueueGlobalWithSuspendingDeadlineImpl(
+    __swift_int64_t sec, __swift_int64_t nsec, __swift_int64_t tsec,
+    __swift_int64_t tnsec, SwiftJob *newJob) {
+  assert(newJob && "no job provided");
+
+  auto deadline = toNanos(sec, nsec);
   JobDeadlineStorage<>::set(newJob, deadline);
 
   insertDelayedJob(newJob, deadline);
@@ -255,31 +245,27 @@ static SwiftJob *claimNextFromCooperativeGlobalQueue() {
   }
 }
 
-SWIFT_CC(swift) void
-swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
-                                                 void *conditionContext) {
+void _swift_task_donateThreadToGlobalExecutorUntilImpl(
+    bool (*condition)(void *), void *conditionContext) {
   while (!condition(conditionContext)) {
     auto job = claimNextFromCooperativeGlobalQueue();
     if (!job) return;
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
 }
 
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
-void swift_task_asyncMainDrainQueueImpl() {
+void _swift_task_asyncMainDrainQueueImpl(void) {
   while (true) {
     auto job = claimNextFromCooperativeGlobalQueue();
     assert(job && "We should never run out of jobs on the async main queue.");
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
 }
 
-SWIFT_CC(swift)
-SwiftExecutorRef swift_task_getMainExecutorImpl() {
+SwiftExecutorRef _swift_task_getMainExecutorImpl(void) {
   return swift_executor_generic();
 }
 
-SWIFT_CC(swift)
-bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+bool _swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
   return swift_executor_isGeneric(executor);
 }

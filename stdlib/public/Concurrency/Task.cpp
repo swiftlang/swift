@@ -39,6 +39,10 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/EmbeddedPlatform.h"
+#endif
 #include <atomic>
 #include <new>
 
@@ -2693,8 +2697,15 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 // This has moved; the implementation is now in the executor; the declaration
 // needs to be here because unlike other things implemented by the executor,
 // this function is a compatibility override hook.
+#if SWIFT_CONCURRENCY_EMBEDDED
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
+static void swift_task_asyncMainDrainQueueImpl() {
+  _swift_task_asyncMainDrainQueueImpl();
+}
+#else
 extern "C" SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueueImpl();
+#endif
 
 SWIFT_CC(swift)
 void (*__ptrauth_swift_concurrency_hook

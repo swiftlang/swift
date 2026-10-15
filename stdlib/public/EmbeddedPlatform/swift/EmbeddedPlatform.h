@@ -26,6 +26,10 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_H
 #define EMBEDDED_SWIFT_PLATFORM_H
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 #if defined(__SIZE_TYPE__) && defined(__PTRDIFF_TYPE__)
 typedef __SIZE_TYPE__ __swift_size_t;
 typedef __PTRDIFF_TYPE__ __swift_ptrdiff_t;
@@ -68,13 +72,7 @@ typedef __swift_ptrdiff_t __swift_tls_key_t;
  */
 #define SWIFT_TLS_KEY_COUNT 8
 
-#if __has_feature(nullability)
-#define EMBEDDED_SWIFT_NONNULL _Nonnull
-#define EMBEDDED_SWIFT_NULLABLE _Nullable
-#else
-#define EMBEDDED_SWIFT_NONNULL
-#define EMBEDDED_SWIFT_NULLABLE
-#endif
+#include "ExecutorTypes.h"
 
 /**
  * A function called with a non-NULL TLS value when the execution context that
@@ -146,7 +144,7 @@ typedef void * EMBEDDED_SWIFT_NULLABLE (*__swift_thread_start_t)(
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 4
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 5
 
 #if defined(__cplusplus)
 extern "C" {
@@ -789,6 +787,98 @@ void _swift_clockSuspending_getResolution(
  * when a signal interrupts it.
  */
 void _swift_clock_sleep(__swift_int64_t seconds, __swift_int64_t nanoseconds);
+
+/**
+ * Enqueues a job on the global executor.
+ *
+ * The `_swift_task_*Impl` functions are the global executor that runs the
+ * jobs of Swift Concurrency. `libswift_ConcurrencyDefaultExecutor.a` defines
+ * all of them with a single-threaded executor. When the program is linked with
+ * dead stripping, each of them is required only by code that reaches it.
+ */
+void _swift_task_enqueueGlobalImpl(SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Enqueues a job on the global executor, to run once `delay` nanoseconds have
+ * passed on the continuous clock.
+ */
+void _swift_task_enqueueGlobalWithDelayImpl(
+    SwiftJobDelay delay, SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Enqueues a job on the global executor, to run once the continuous clock
+ * reaches the given deadline.
+ *
+ * - Parameters:
+ *   - nanoseconds: The remaining nanoseconds of the deadline.
+ *   - leewaySeconds: The whole seconds of how late the job may run.
+ *   - leewayNanoseconds: The remaining nanoseconds of how late the job may
+ *     run, or -1 when the caller gave no leeway.
+ */
+void _swift_task_enqueueGlobalWithContinuousDeadlineImpl(
+    __swift_int64_t seconds, __swift_int64_t nanoseconds,
+    __swift_int64_t leewaySeconds, __swift_int64_t leewayNanoseconds,
+    SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Enqueues a job on the global executor, to run once the suspending clock
+ * reaches the given deadline.
+ *
+ * The parameters are those of
+ * `_swift_task_enqueueGlobalWithContinuousDeadlineImpl`.
+ */
+void _swift_task_enqueueGlobalWithSuspendingDeadlineImpl(
+    __swift_int64_t seconds, __swift_int64_t nanoseconds,
+    __swift_int64_t leewaySeconds, __swift_int64_t leewayNanoseconds,
+    SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Enqueues a job on the main executor, which may be the global executor.
+ */
+void _swift_task_enqueueMainExecutorImpl(SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+SwiftExecutorRef _swift_task_getMainExecutorImpl(void);
+
+/**
+ * Returns whether the given executor is the main executor.
+ *
+ * This function must not call `swift_executor_isMain`, which calls it.
+ */
+bool _swift_task_isMainExecutorImpl(SwiftExecutorRef executor);
+
+/**
+ * Stops the program unless the current context is isolated to the given
+ * executor.
+ *
+ * This function can be implemented as a call to
+ * `swift_executor_invokeSwiftCheckIsolated`.
+ */
+void _swift_task_checkIsolatedImpl(SwiftExecutorRef executor);
+
+/**
+ * Reports whether the current context is isolated to the given executor: 1
+ * when it is, 0 when it is not, and -1 when that cannot be determined.
+ *
+ * This function can be implemented as a call to
+ * `swift_executor_invokeSwiftIsIsolatingCurrentContext`.
+ */
+__INT8_TYPE__ _swift_task_isIsolatingCurrentContextImpl(
+    SwiftExecutorRef executor);
+
+/**
+ * Runs the jobs enqueued on the main executor.
+ *
+ * This function is required by an `async` main function.
+ */
+void _swift_task_asyncMainDrainQueueImpl(void) EMBEDDED_SWIFT_NORETURN;
+
+/**
+ * Runs jobs from the global executor on the calling thread until
+ * `condition(conditionContext)` returns `true`, or until no job is left.
+ */
+void _swift_task_donateThreadToGlobalExecutorUntilImpl(
+    bool (* EMBEDDED_SWIFT_NONNULL condition)(void * EMBEDDED_SWIFT_NULLABLE),
+    void * EMBEDDED_SWIFT_NULLABLE conditionContext);
 
 /**
  * Exit the program.
