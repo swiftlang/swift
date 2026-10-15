@@ -500,3 +500,17 @@ func testSelfRefs(
   _: X.SelfRef2<Int, Int>, // no-error
   _: X.SelfRef3<Int, Int> // no-error
 ) {}
+
+//
+// Generic type alias in protocol request cycle
+//
+do {
+  struct S<T> {}
+
+  protocol P {
+    typealias X<T> = S<T>
+    typealias Y = X<Int>
+
+    func f(_: Y)
+  }
+}

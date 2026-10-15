@@ -1706,12 +1706,31 @@ Type TypeResolution::applyUnboundGenericArguments(
          "and collect arguments to pack generic parameters");
 
   auto &ctx = getASTContext();
-  TypeSubstitutionMap subs;
 
   // Get the interface type for the declaration. We will be substituting
   // type parameters that appear inside this type with the provided
   // generic arguments.
-  auto resultType = decl->getDeclaredInterfaceType();
+  Type resultType;
+
+  auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl);
+  if (typeAliasDecl) {
+    if (stage == TypeResolutionStage::Structural) {
+      // Use the structural type if possible, to avoid requesting generic
+      // signatures.
+      resultType = typeAliasDecl->getStructuralType();
+
+      // However, fall back to the interface type if the structural type
+      // contains unbound dependent member types. We cannot substitute
+      // those.
+      if (resultType->findUnresolvedDependentMemberType() != nullptr)
+        resultType = typeAliasDecl->getUnderlyingType();
+
+    } else {
+      resultType = typeAliasDecl->getUnderlyingType();
+    }
+  } else {
+    resultType = decl->getDeclaredInterfaceType();
+  }
 
   // If types involved in requirements check have either type variables
   // or unbound generics, let's skip the check here, and let the solver
@@ -1726,6 +1745,8 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
+  TypeSubstitutionMap subs;
+
   // Get the substitutions for outer generic parameters from the parent
   // type.
   if (parentTy) {
@@ -1736,24 +1757,25 @@ Type TypeResolution::applyUnboundGenericArguments(
         return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
       }
 
-      // We have a generic type alias referenced with an unbound generic
-      // base, which is only valid if all of the unbound generic type's
-      // generic parameters are fixed to concrete types by the generic
-      // signature of the type alias, eg:
-      //
-      // struct G<T> {
-      //   typealias A<U> = Int where T == String
-      // }
-      if (!resultType->hasTypeParameter())
-        return resultType;
-
-      auto genericSig = decl->getGenericSignature();
-      auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      for (auto gp : parentSig.getGenericParams()) {
-        ASSERT(genericSig->isConcreteType(gp));
-        subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-            genericSig->getConcreteType(gp);
+      if (resultType->hasTypeParameter()) {
+        // We have a generic type alias referenced with an unbound generic
+        // base, which is only valid if all of the unbound generic type's
+        // generic parameters are fixed to concrete types by the generic
+        // signature of the type alias, eg:
+        //
+        // struct G<T> {
+        //   typealias A<U> = Int where T == String
+        // }
+        auto genericSig = decl->getGenericSignature();
+        auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
+        for (auto gp : parentSig.getGenericParams()) {
+          ASSERT(genericSig->isConcreteType(gp));
+          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+              genericSig->getConcreteType(gp);
+        }
       }
+
+      skipRequirementsCheck = true;
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
@@ -1770,7 +1792,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  // Realize the types of the generic arguments and add them to the
+  // Next, resolve the types of the generic arguments and add them to the
   // substitution map.
   auto innerParams = decl->getGenericParams()->getParams();
   for (unsigned i : indices(innerParams)) {
@@ -1806,28 +1828,28 @@ Type TypeResolution::applyUnboundGenericArguments(
     skipRequirementsCheck |= substTy->hasUnboundGenericType();
   }
 
-  const auto substitutions = [&](SubstitutableType *type) -> Type {
-    auto result = QueryTypeSubstitutionMap{subs}(type);
-    if (result->hasTypeParameter()) {
-      if (const auto contextSig = getGenericSignature()) {
-        auto *genericEnv = contextSig.getGenericEnvironment();
-        // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
-        // because we sometimes have type parameters here that are invalid for
-        // our generic signature. This can happen if the type parameter was
-        // found via unqualified lookup, but the current context's
-        // generic signature failed to build because of circularity or
-        // completion failure.
-        return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
-                            LookUpConformanceInModule(),
-                            SubstFlags::PreservePackExpansionLevel);
-      }
-    }
-    return result;
-  };
-
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
+    const auto substitutions = [&](SubstitutableType *type) -> Type {
+      auto result = QueryTypeSubstitutionMap{subs}(type);
+      if (result->hasTypeParameter()) {
+        if (const auto contextSig = getGenericSignature()) {
+          auto *genericEnv = contextSig.getGenericEnvironment();
+          // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
+          // because we sometimes have type parameters here that are invalid for
+          // our generic signature. This can happen if the type parameter was
+          // found via unqualified lookup, but the current context's
+          // generic signature failed to build because of circularity or
+          // completion failure.
+          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                              LookUpConformanceInModule(),
+                              SubstFlags::PreservePackExpansionLevel);
+        }
+      }
+      return result;
+    };
+
     if (hasTypeVariables) {
       ASSERT(requirementOpener && "Must have requirement opener for type vars");
       requirementOpener(decl, substitutions);
@@ -1860,20 +1882,15 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  // For a typealias, use the underlying type. We'll wrap up the result
-  // later.
-  auto typealias = dyn_cast<TypeAliasDecl>(decl);
-  if (typealias) {
-    resultType = typealias->getUnderlyingType();
+  // Apply the substitution map to the interface type of the declaration.
+  if (resultType->hasTypeParameter()) {
+    resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
+                                  LookUpConformanceInModule());
   }
 
-  // Apply the substitution map to the interface type of the declaration.
-  resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule());
-
-  // Form a sugared typealias reference.
-  if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
-    resultType = TypeAliasType::get(typealias, parentTy, genericArgs,
+  // Form a sugared typealias reference if necessary.
+  if (typeAliasDecl && (!parentTy || !parentTy->isAnyExistentialType())) {
+    resultType = TypeAliasType::get(typeAliasDecl, parentTy, genericArgs,
                                     resultType);
   }
 
