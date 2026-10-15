@@ -1980,7 +1980,7 @@ public:
     // Check for unsupported projections
     auto *bb = ptai->getParent();
     auto adjSrc = getAdjointProjection(bb, ptai->getOperand());
-    if (!adjSrc) {
+    if (!adjSrc || adjSrc->getType() != ptai->getType()) {
       getContext().emitNondifferentiabilityError(
           ptai, getInvoker(),
           diag::autodiff_cannot_differentiate_invalid_pointer_cast);
