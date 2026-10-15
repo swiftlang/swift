@@ -894,3 +894,14 @@ do {
     S { x }.foo() // Make sure we can pick the right 'foo' here.
   }
 }
+
+// rdar://90195 - inout parameter cannot be passed to parameter pack closure
+do {
+  func hi<each T>(_: (repeat each T) -> Void) {}
+  func foo(_: inout Int) {}
+  hi(foo) // expected-error {{cannot convert value of type '(inout Int) -> Void' to expected argument type '(repeat each T) -> Void'}}
+
+  // Valid: non-inout function should still work with pack closure
+  func bar(_: Int) {}
+  hi(bar) // okay
+}
