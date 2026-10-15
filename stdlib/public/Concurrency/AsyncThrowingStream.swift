@@ -449,10 +449,15 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///     }
   ///
   @preconcurrency
+  @abi(
+    init(
+      unfolding produce: @escaping @Sendable () async throws -> Element?
+    ) where Failure == Error
+  )
   public init(
-    unfolding produce: @escaping @Sendable () async throws -> Element?
+    unfolding produce: nonisolated(nonsending) @escaping @Sendable () async throws -> Element?
   ) where Failure == Error {
-    let storage: _AsyncStreamCriticalStorage<Optional<@Sendable () async throws -> Element?>>
+    let storage: _AsyncStreamCriticalStorage<Optional<nonisolated(nonsending) @Sendable () async throws -> Element?>>
       = .create(produce)
     self.context = _Context {
       return try await withTaskCancellationHandler {

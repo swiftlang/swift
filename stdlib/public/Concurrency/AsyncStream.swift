@@ -354,7 +354,7 @@ public struct AsyncStream<Element> {
     let storage: _AsyncStreamCriticalStorage<Optional<nonisolated(nonsending) @Sendable () async -> Element?>>
       = .create(produce)
     self.context = _Context {
-      return await withTaskCancellationHandler() {
+      return await withTaskCancellationHandler {
         guard let result = await storage.value?() else {
           storage.value = nil
           return nil
