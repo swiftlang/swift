@@ -147,10 +147,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // that is only needed by TransferNonSendable().
   P.addLowerTupleAddrConstructor();
 
-  // Automatic differentiation: canonicalize all differentiability witnesses
-  // and `differentiable_function` instructions.
-  P.addDifferentiation();
-
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
 
@@ -183,6 +179,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // until we can audit the later part of the pipeline. Eventually, this should
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
+
+  // Automatic differentiation: canonicalize all differentiability witnesses
+  // and `differentiable_function` instructions.
+  P.addDifferentiation();
 
   //
   // End Ownership Optimizations
