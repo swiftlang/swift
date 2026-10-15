@@ -71,11 +71,11 @@ void swift::initializeDynamicReplacementLookup() {
   void *start2;
   uintptr_t size2;
   GET_SECTION_START_AND_SIZE(start2, size2, MachOTextSegment,
-                             MachODynamicReplacementSection);
+                             MachODynamicReplacementSomeSection);
   if (start2 == nullptr || size2 == 0)
     return;
-  addImageDynamicReplacementBlockCallback(__dso_handle,
-                                          start1, size1, start2, size2);
+  addImageDynamicReplacementBlockCallback(__dso_handle, start1, size1, start2,
+                                          size2);
 }
 void swift::initializeAccessibleFunctionsLookup() {
   void *start;
