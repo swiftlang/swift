@@ -2720,6 +2720,13 @@ public:
   SubstitutionMap getSubstitutions() const { return Subs; }
 };
 
+/// Checks if \p Subs2 is an expanded version of \p Subs1, i.e. if at least one
+/// replacement type in \p Subs2 (partially) contains the corresponding
+/// replacement type of \p Subs1. Both substitution maps must have the same
+/// generic signature.
+/// This is used to detect infinitely growing specialization loops.
+bool growingSubstitutions(SubstitutionMap Subs1, SubstitutionMap Subs2);
+
 class PartialApplyInst;
 
 // There's no good reason for the OverloadToken type to be internal
