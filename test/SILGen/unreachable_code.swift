@@ -103,7 +103,7 @@ func testUnreachableCase4(a : Tree) {
 
 func testUnreachableCase5(a : Tree) {
   switch a {
-  case _:
+  case _: // expected-note {{a 'default' case is equivalent to a catch-all case; remove one}}
     break
   default:  // expected-warning {{default will never be executed}}
     return
