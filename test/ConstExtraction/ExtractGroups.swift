@@ -64,14 +64,20 @@ extension String: Foo {}
 // CHECK-NEXT:        "valueKind": "Array",
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 10,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "1"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 10,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "2"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 10,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "3"
 // CHECK-NEXT:          }
@@ -88,6 +94,8 @@ extension String: Foo {}
 // CHECK-NEXT:        "valueKind": "Array",
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 11,
 // CHECK-NEXT:            "valueKind": "InitCall",
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "type": "ExtractGroups.Bar",
@@ -95,10 +103,14 @@ extension String: Foo {}
 // CHECK-NEXT:            }
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 11,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "1"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 11,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "hi"
 // CHECK-NEXT:          }
@@ -115,6 +127,8 @@ extension String: Foo {}
 // CHECK-NEXT:        "valueKind": "Array",
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 12,
 // CHECK-NEXT:            "valueKind": "InitCall",
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "type": "ExtractGroups.Bar",
@@ -154,30 +168,42 @@ extension String: Foo {}
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "One"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "1"
 // CHECK-NEXT:            }
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "Two"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "2"
 // CHECK-NEXT:            }
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "Three"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 16,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "3"
 // CHECK-NEXT:            }
@@ -196,21 +222,31 @@ extension String: Foo {}
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 18,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "1"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 18,
 // CHECK-NEXT:              "valueKind": "Array",
 // CHECK-NEXT:              "value": [
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:                  "line": 18,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "a"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:                  "line": 18,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "b"
 // CHECK-NEXT:                },
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:                  "line": 18,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "c"
 // CHECK-NEXT:                }
@@ -219,13 +255,19 @@ extension String: Foo {}
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 19,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "2"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 19,
 // CHECK-NEXT:              "valueKind": "Array",
 // CHECK-NEXT:              "value": [
 // CHECK-NEXT:                {
+// CHECK-NEXT:                  "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:                  "line": 19,
 // CHECK-NEXT:                  "valueKind": "RawLiteral",
 // CHECK-NEXT:                  "value": "z"
 // CHECK-NEXT:                }
@@ -246,10 +288,14 @@ extension String: Foo {}
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 22,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "Bar"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 22,
 // CHECK-NEXT:              "valueKind": "InitCall",
 // CHECK-NEXT:              "value": {
 // CHECK-NEXT:                "type": "ExtractGroups.Bar",
@@ -259,10 +305,14 @@ extension String: Foo {}
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "key": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 23,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "Int"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            "value": {
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:              "line": 23,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "42"
 // CHECK-NEXT:            }
@@ -300,11 +350,15 @@ extension String: Foo {}
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "Swift.String",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 28,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "foo"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "type": "ExtractGroups.Bar",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 28,
 // CHECK-NEXT:            "valueKind": "InitCall",
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "type": "ExtractGroups.Bar",
@@ -326,12 +380,16 @@ extension String: Foo {}
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "label": "lat",
 // CHECK-NEXT:            "type": "Swift.Float",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 29,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "42.7"
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "label": "lng",
 // CHECK-NEXT:            "type": "Swift.Float",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
+// CHECK-NEXT:            "line": 29,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "-73.9"
 // CHECK-NEXT:          }

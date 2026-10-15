@@ -24,6 +24,8 @@ extension MyType {
 // CHECK-NEXT:          {
 // CHECK-NEXT:            "label": "",
 // CHECK-NEXT:            "type": "Swift.String",
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractFromExtension.swift",
+// CHECK-NEXT:            "line": 8,
 // CHECK-NEXT:            "valueKind": "RawLiteral",
 // CHECK-NEXT:            "value": "it is doable"
 // CHECK-NEXT:          }

@@ -89,11 +89,15 @@ public class Hux: Bat {}
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "buz",
 // CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 37
 // CHECK-NEXT:              "valueKind": "NilLiteral"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 37
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "0"
 // CHECK-NEXT:            }
@@ -115,12 +119,16 @@ public class Hux: Bat {}
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "buz",
 // CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 12
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "hello"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 12
 // CHECK-NEXT:              "valueKind": "FunctionCall",
 // CHECK-NEXT:              "value": {
 // CHECK-NEXT:              "name": "adder",
@@ -128,12 +136,16 @@ public class Hux: Bat {}
 // CHECK-NEXT:                {
 // CHECK-NEXT:                   "label": "",
 // CHECK-NEXT:                   "type": "Swift.Int",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:                   "line": 12,
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "2"
 // CHECK-NEXT:                 },
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "label": "",
 // CHECK-NEXT:                   "type": "Swift.Int",
+// CHECK-NEXT:                   "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:                   "line": 12,
 // CHECK-NEXT:                   "valueKind": "RawLiteral",
 // CHECK-NEXT:                   "value": "3"
 // CHECK-NEXT:                 }
@@ -158,11 +170,15 @@ public class Hux: Bat {}
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "buz",
 // CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 15
 // CHECK-NEXT:              "valueKind": "NilLiteral"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 37
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "0"
 // CHECK-NEXT:            }
@@ -184,11 +200,15 @@ public class Hux: Bat {}
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "buz",
 // CHECK-NEXT:              "type": "Swift.Optional<Swift.String>",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 16
 // CHECK-NEXT:              "valueKind": "NilLiteral"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "fuz",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 16
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "42"
 // CHECK-NEXT:            }
@@ -210,12 +230,16 @@ public class Hux: Bat {}
 // CHECK-NEXT:            {
 // CHECK-NEXT:               "label": "",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 18
 // CHECK-NEXT:               "valueKind": "RawLiteral",
 // CHECK-NEXT:               "value": "2"
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "label": "",
 // CHECK-NEXT:               "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractCalls.swift",
+// CHECK-NEXT:              "line": 18
 // CHECK-NEXT:               "valueKind": "RawLiteral",
 // CHECK-NEXT:               "value": "3"
 // CHECK-NEXT:             }

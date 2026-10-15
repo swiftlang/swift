@@ -239,14 +239,15 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
       if (rawLiteral.has_value()) {
-        return std::make_shared<RawLiteralValue>(rawLiteral.value());
+        return std::make_shared<RawLiteralValue>(rawLiteral.value(),
+                                                 expr->getStartLoc());
       }
 
       break;
     }
 
     case ExprKind::NilLiteral: {
-      return std::make_shared<NilLiteralValue>();
+      return std::make_shared<NilLiteralValue>(expr->getStartLoc());
     }
 
     case ExprKind::Array: {
@@ -256,7 +257,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         elementValues.push_back(
             extractCompileTimeValue(elementExpr, declContext));
       }
-      return std::make_shared<ArrayValue>(elementValues);
+      return std::make_shared<ArrayValue>(elementValues, expr->getStartLoc());
     }
 
     case ExprKind::Dictionary: {
@@ -268,7 +269,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
           tuples.push_back(std::static_pointer_cast<TupleValue>(elementValue));
         }
       }
-      return std::make_shared<DictionaryValue>(tuples);
+      return std::make_shared<DictionaryValue>(tuples, expr->getStartLoc());
     }
 
     case ExprKind::Tuple: {
@@ -297,7 +298,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
                extractCompileTimeValue(elementExpr, declContext)});
         }
       }
-      return std::make_shared<TupleValue>(elements);
+      return std::make_shared<TupleValue>(elements, expr->getStartLoc());
     }
 
     case ExprKind::Call: {
@@ -309,13 +310,15 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs(), declContext);
-        return std::make_shared<FunctionCallValue>(identifier, parameters);
+        return std::make_shared<FunctionCallValue>(identifier, parameters,
+                                                   expr->getStartLoc());
       }
 
       if (isa<ConstructorRefCallExpr>(callExpr->getFn())) {
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs(), declContext);
-        return std::make_shared<InitCallValue>(callExpr->getType(), parameters);
+        return std::make_shared<InitCallValue>(callExpr->getType(), parameters,
+                                               expr->getStartLoc());
       }
 
       if (auto dotSyntaxCallExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getFn())) {
@@ -330,21 +333,23 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
           auto declRef = dotSyntaxCallExpr->getFn()->getReferencedDecl();
           switch (declRef.getDecl()->getKind()) {
           case DeclKind::EnumElement: {
-            return std::make_shared<EnumValue>(baseIdentifierName, parameters);
+            return std::make_shared<EnumValue>(baseIdentifierName, parameters,
+                                               expr->getStartLoc());
           }
 
           case DeclKind::Func: {
             auto funcDecl = cast<FuncDecl>(declRef.getDecl());
             if (funcDecl->isStatic()) {
               return std::make_shared<StaticFunctionCallValue>(
-                  baseIdentifierName, callExpr->getType(), parameters);
+                  baseIdentifierName, callExpr->getType(), parameters,
+                  callExpr->getStartLoc());
             }
 
             return std::make_shared<MemberFunctionCallValue>(
                 baseIdentifierName,
                 extractCompileTimeValue(dotSyntaxCallExpr->getBase(),
                                         declContext),
-                parameters);
+                parameters, dotSyntaxCallExpr->getStartLoc());
           }
 
           default: {
@@ -361,7 +366,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
           std::vector<FunctionParameter> parameters =
               extractFunctionArguments(callExpr->getArgs(), declContext);
-          return std::make_shared<FunctionCallValue>(identifier, parameters);
+          return std::make_shared<FunctionCallValue>(identifier, parameters,
+                                                     expr->getStartLoc());
         }
       }
 
@@ -374,7 +380,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
         auto caseName =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
-        return std::make_shared<EnumValue>(caseName, std::nullopt);
+        return std::make_shared<EnumValue>(caseName, std::nullopt,
+                                           expr->getStartLoc());
       }
 
       break;
@@ -405,7 +412,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto dotSelfExpr = cast<DotSelfExpr>(expr);
       auto dotSelfMetaType = dotSelfExpr->getType()->getAs<AnyMetatypeType>();
       if (dotSelfMetaType)
-        return std::make_shared<TypeValue>(dotSelfMetaType->getInstanceType());
+        return std::make_shared<TypeValue>(dotSelfMetaType->getInstanceType(),
+                                           expr->getStartLoc());
       else
         break;
     }
@@ -423,13 +431,14 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       assert(!decl->hasDefaultExpr());
       switch (decl->getDefaultArgumentKind()) {
       case DefaultArgumentKind::NilLiteral:
-        return std::make_shared<NilLiteralValue>();
+        return std::make_shared<NilLiteralValue>(expr->getStartLoc());
       case DefaultArgumentKind::EmptyArray:
         return std::make_shared<ArrayValue>(
-            std::vector<std::shared_ptr<CompileTimeValue>>());
+            std::vector<std::shared_ptr<CompileTimeValue>>(),
+            expr->getStartLoc());
       case DefaultArgumentKind::EmptyDictionary:
         return std::make_shared<DictionaryValue>(
-            std::vector<std::shared_ptr<TupleValue>>());
+            std::vector<std::shared_ptr<TupleValue>>(), expr->getStartLoc());
       default:
         break;
       }
@@ -459,7 +468,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             path += components[i].Label;
         }
 
-        return std::make_shared<KeyPathValue>(path, rootType, components);
+        return std::make_shared<KeyPathValue>(path, rootType, components,
+                                              expr->getStartLoc());
     }
 
     case ExprKind::InjectIntoOptional: {
@@ -479,7 +489,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         auto baseTypeExpr = cast<TypeExpr>(memberExpr->getBase());
         auto label = memberExpr->getDecl().getDecl()->getBaseIdentifier().str();
         return std::make_shared<MemberReferenceValue>(
-            baseTypeExpr->getInstanceType(), label.str());
+            baseTypeExpr->getInstanceType(), label.str(), expr->getStartLoc());
       }
       break;
     }
@@ -497,7 +507,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             segments.push_back(extractCompileTimeValue(expr, declContext));
           });
 
-      return std::make_shared<InterpolatedStringLiteralValue>(segments);
+      return std::make_shared<InterpolatedStringLiteralValue>(
+          segments, expr->getStartLoc());
     }
 
     case ExprKind::Closure: {
@@ -737,11 +748,17 @@ void writeLocationInformation(llvm::json::OStream &JSON, SourceLoc Loc,
 
 // Take BuilderValue, which is a representation of a result builder
 // and write the values
-void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value);
+void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value,
+                       const ASTContext &ctx);
 
 void writeValue(llvm::json::OStream &JSON,
-                std::shared_ptr<CompileTimeValue> Value) {
+                std::shared_ptr<CompileTimeValue> Value, const ASTContext &ctx,
+                SourceLoc FallbackLoc = {}) {
   auto value = Value.get();
+  auto valueLoc = value->getLoc();
+  if (valueLoc.isInvalid())
+    valueLoc = FallbackLoc;
+  writeLocationInformation(JSON, valueLoc, ctx);
   switch (value->getKind()) {
   case CompileTimeValue::ValueKind::RawLiteral: {
     JSON.attribute("valueKind", "RawLiteral");
@@ -766,7 +783,7 @@ void writeValue(llvm::json::OStream &JSON,
           JSON.object([&] {
             JSON.attribute("label", FP.Label);
             JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
-            writeValue(JSON, FP.Value);
+            writeValue(JSON, FP.Value, ctx);
           });
         }
       });
@@ -785,7 +802,7 @@ void writeValue(llvm::json::OStream &JSON,
             JSON.attribute("label", Label);
           }
           JSON.attribute("type", toFullyQualifiedTypeNameString(TV.Type));
-          writeValue(JSON, TV.Value);
+          writeValue(JSON, TV.Value, ctx);
         });
       }
     });
@@ -794,7 +811,7 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Builder: {
     auto builderValue = cast<BuilderValue>(value);
-    writeBuilderValue(JSON, builderValue);
+    writeBuilderValue(JSON, builderValue, ctx);
     break;
   }
 
@@ -805,9 +822,9 @@ void writeValue(llvm::json::OStream &JSON,
         auto tupleElements = tupleValue.get()->getElements();
         JSON.object([&] {
           JSON.attributeObject(
-              "key", [&] { writeValue(JSON, tupleElements[0].Value); });
+              "key", [&] { writeValue(JSON, tupleElements[0].Value, ctx); });
           JSON.attributeObject(
-              "value", [&] { writeValue(JSON, tupleElements[1].Value); });
+              "value", [&] { writeValue(JSON, tupleElements[1].Value, ctx); });
         });
       }
     });
@@ -820,7 +837,7 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "Array");
     JSON.attributeArray("value", [&] {
       for (auto CTP : arrayValue->getElements()) {
-        JSON.object([&] { writeValue(JSON, CTP); });
+        JSON.object([&] { writeValue(JSON, CTP, ctx); });
       }
     });
     break;
@@ -838,7 +855,7 @@ void writeValue(llvm::json::OStream &JSON,
             JSON.object([&] {
               JSON.attribute("label", FP.Label);
               JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
-              writeValue(JSON, FP.Value);
+              writeValue(JSON, FP.Value, ctx);
             });
           }
         });
@@ -892,7 +909,7 @@ void writeValue(llvm::json::OStream &JSON,
             JSON.object([&] {
               JSON.attribute("label", FP.Label);
               JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
-              writeValue(JSON, FP.Value);
+              writeValue(JSON, FP.Value, ctx);
             });
           }
         });
@@ -914,7 +931,7 @@ void writeValue(llvm::json::OStream &JSON,
           JSON.object([&] {
             JSON.attribute("label", FP.Label);
             JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
-            writeValue(JSON, FP.Value);
+            writeValue(JSON, FP.Value, ctx);
           });
         }
       });
@@ -943,7 +960,7 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "MemberFunctionCall");
     JSON.attributeObject("value", [&]() {
       // Write the root (non-MemberFunctionCall) base once
-      JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor); });
+      JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor, ctx); });
       // Flat list of call steps in order
       JSON.attributeArray("calls", [&] {
         for (auto &step : chain) {
@@ -955,7 +972,7 @@ void writeValue(llvm::json::OStream &JSON,
                   JSON.attribute("label", FP.Label);
                   JSON.attribute("type",
                                  toFullyQualifiedTypeNameString(FP.Type));
-                  writeValue(JSON, FP.Value);
+                  writeValue(JSON, FP.Value, ctx);
                 });
               }
             });
@@ -984,7 +1001,7 @@ void writeValue(llvm::json::OStream &JSON,
       JSON.attributeArray("segments", [&] {
         auto segments = interpolatedStringValue->getSegments();
         for (auto s : segments) {
-          JSON.object([&] { writeValue(JSON, s); });
+          JSON.object([&] { writeValue(JSON, s, ctx); });
         }
       });
     });
@@ -999,7 +1016,7 @@ void writeValue(llvm::json::OStream &JSON,
 }
 
 void writeAttributeInfo(llvm::json::OStream &JSON,
-                        const CustomAttrValue &AttrVal,
+                        const CustomAttrValue &AttrVal, const Decl &decl,
                         const ASTContext &ctx) {
   JSON.object([&] {
     JSON.attribute("type",
@@ -1010,7 +1027,7 @@ void writeAttributeInfo(llvm::json::OStream &JSON,
         JSON.object([&] {
           JSON.attribute("label", FP.Label);
           JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
-          writeValue(JSON, FP.Value);
+          writeValue(JSON, FP.Value, ctx);
         });
       }
     });
@@ -1019,14 +1036,14 @@ void writeAttributeInfo(llvm::json::OStream &JSON,
 
 void writePropertyWrapperAttributes(
     llvm::json::OStream &JSON, std::optional<AttrValueVector> PropertyWrappers,
-    const ASTContext &ctx) {
+    const Decl &decl, const ASTContext &ctx) {
   if (!PropertyWrappers.has_value()) {
     return;
   }
 
   JSON.attributeArray("propertyWrappers", [&] {
     for (auto PW : PropertyWrappers.value())
-      writeAttributeInfo(JSON, PW, ctx);
+      writeAttributeInfo(JSON, PW, decl, ctx);
   });
 }
 
@@ -1197,20 +1214,21 @@ createBuilderCompileTimeValue(CustomAttr *AttachedResultBuilder,
                                         ResultBuilderMembers);
 }
 
-void writeSingleBuilderMemberElement(
-    llvm::json::OStream &JSON, std::shared_ptr<CompileTimeValue> Element) {
+void writeSingleBuilderMemberElement(llvm::json::OStream &JSON,
+                                     std::shared_ptr<CompileTimeValue> Element,
+                                     const ASTContext &ctx) {
   switch (Element.get()->getKind()) {
   case CompileTimeValue::ValueKind::StaticFunctionCall: {
     auto staticFunctionCallValue = cast<StaticFunctionCallValue>(Element.get());
     if (staticFunctionCallValue->getLabel() == "buildExpression") {
       for (auto FP : staticFunctionCallValue->getParameters()) {
-        writeValue(JSON, FP.Value);
+        writeValue(JSON, FP.Value, ctx);
       }
     }
     break;
   }
   default: {
-    writeValue(JSON, Element);
+    writeValue(JSON, Element, ctx);
     break;
   }
   }
@@ -1218,13 +1236,14 @@ void writeSingleBuilderMemberElement(
 
 void writeBuilderMember(
     llvm::json::OStream &JSON,
-    std::shared_ptr<BuilderValue::BuilderMember> BuilderMember) {
+    std::shared_ptr<BuilderValue::BuilderMember> BuilderMember,
+    const ASTContext &ctx) {
   auto Member = BuilderMember.get();
   switch (Member->getKind()) {
   case BuilderValue::Expression: {
     auto member = cast<BuilderValue::SingleMember>(Member);
     JSON.attributeObject("element", [&] {
-      writeSingleBuilderMemberElement(JSON, member->getElement());
+      writeSingleBuilderMemberElement(JSON, member->getElement(), ctx);
     });
 
     break;
@@ -1234,7 +1253,7 @@ void writeBuilderMember(
     auto member = cast<BuilderValue::ArrayMember>(Member);
     JSON.attributeArray("elements", [&] {
       for (auto elem : member->getElements()) {
-        JSON.object([&] { writeBuilderMember(JSON, elem); });
+        JSON.object([&] { writeBuilderMember(JSON, elem, ctx); });
       }
     });
     break;
@@ -1256,12 +1275,12 @@ void writeBuilderMember(
     }
     JSON.attributeArray("ifElements", [&] {
       for (auto elem : member->getIfElements()) {
-        JSON.object([&] { writeBuilderMember(JSON, elem); });
+        JSON.object([&] { writeBuilderMember(JSON, elem, ctx); });
       }
     });
     JSON.attributeArray("elseElements", [&] {
       for (auto elem : member->getElseElements()) {
-        JSON.object([&] { writeBuilderMember(JSON, elem); });
+        JSON.object([&] { writeBuilderMember(JSON, elem, ctx); });
       }
     });
     break;
@@ -1269,7 +1288,8 @@ void writeBuilderMember(
   }
 }
 
-void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value) {
+void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value,
+                       const ASTContext &ctx) {
   JSON.attribute("valueKind", "Builder");
   JSON.attributeObject("value", [&] {
     if (auto resultBuilderType = Value->getResultBuilderType()) {
@@ -1302,8 +1322,7 @@ void writeBuilderValue(llvm::json::OStream &JSON, BuilderValue *Value) {
             JSON.attribute("kind", "Unknown");
             break;
           }
-
-          writeBuilderMember(JSON, member);
+          writeBuilderMember(JSON, member, ctx);
         });
       }
     });
@@ -1456,9 +1475,6 @@ void writeProperties(llvm::json::OStream &JSON,
         JSON.attribute("mangledTypeName", "n/a - deprecated");
         JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
         JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
-        writeLocationInformation(JSON, decl->getLoc(),
-                                 decl->getDeclContext()->getASTContext());
-
         if (value.get()->getKind() == CompileTimeValue::ValueKind::Runtime) {
           // Extract result builder information only if the variable has not
           // used a different kind of initializer
@@ -1468,9 +1484,10 @@ void writeProperties(llvm::json::OStream &JSON,
           }
         }
 
-        writeValue(JSON, value);
+        writeValue(JSON, value, decl->getDeclContext()->getASTContext(),
+                   decl->getLoc());
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
-                                       decl->getASTContext());
+                                       *decl, decl->getASTContext());
         writeAvailabilityAttributes(JSON, *decl);
       });
     }
