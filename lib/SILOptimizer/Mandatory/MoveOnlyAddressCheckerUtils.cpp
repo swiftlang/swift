@@ -1841,6 +1841,12 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
         if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
+          // A borrow accessor's callsite consists of copy_value +
+          // mark_unresolved_non_copyable_value instructions, which the object
+          // checker handles. If it emitted a diagnostic, the copy remains but
+          // does not copy the loaded value.
+          if (cvi->getOperand()->isBorrowAccessorResult())
+            continue;
           if (!isCopyableValue(cvi->getOperand())) {
             shouldConvertToLoadCopy = true;
             break;
