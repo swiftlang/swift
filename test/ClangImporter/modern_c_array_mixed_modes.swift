@@ -129,6 +129,12 @@ import CLib
   print("NT", nt.rawValue[0], nt.rawValue[1], nt.rawValue[2], nt.rawValue[3])
 }
 
+// Workaround for failure in optimize_none_with_opaque_values (InlineArray
+// subscripts are badly broken there; this is covered by other tests).
+@export(implementation) public func printNT(_ nt: NT) {
+  print("NT", nt.rawValue[0], nt.rawValue[1], nt.rawValue[2], nt.rawValue[3])
+}
+
 @inline(never) @usableFromInline internal func blackHole(_: some Any) {}
 
 //--- src/LegacyExec.swift
@@ -209,4 +215,4 @@ s.array[0] = 0
 print_s(&s)
 
 let nt = NT(rawValue: [.max, 1, 2, 3])
-print("NT", nt.rawValue[0], nt.rawValue[1], nt.rawValue[2], nt.rawValue[3])
+printNT(nt)
