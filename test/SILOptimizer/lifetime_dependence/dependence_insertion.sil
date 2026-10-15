@@ -264,3 +264,78 @@ bb0(%0 : $*Agg):
   %36 = tuple ()
   return %36
 }
+
+@_addressableForDependencies
+struct AddressableHolder {
+  var inner: AddressableForDeps
+}
+
+sil @getAddressableDep : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @useInoutNE : $@convention(thin) (@inout NE) -> ()
+
+// rdar://189654192: an addressable-for-dependencies source that is accessed through an unsafeMutableAddress accessor
+// (UnsafeMutablePointer.pointee) depends on the accessor's 'self', not on the [unsafe] access scope.
+//
+// CHECK-LABEL: sil hidden [ossa] @testUnsafeAddressorAddressable : $@convention(thin) (UnsafeMutablePointer<AddressableForDeps>) -> () {
+// CHECK: bb0(%0 : $UnsafeMutablePointer<AddressableForDeps>):
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe]
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK:   end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testUnsafeAddressorAddressable'
+sil hidden [ossa] @testUnsafeAddressorAddressable : $@convention(thin) (UnsafeMutablePointer<AddressableForDeps>) -> () {
+bb0(%0 : $UnsafeMutablePointer<AddressableForDeps>):
+  %1 = alloc_box ${ var NE }, var, name "ref"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = struct_extract %0, #UnsafeMutablePointer._rawValue
+  %5 = pointer_to_address %4 to [strict] $*AddressableForDeps
+  %6 = mark_dependence [unresolved] %5 on %0
+  %7 = begin_access [modify] [unsafe] %6
+  %8 = function_ref @getAddressableDep : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %9 = apply %8(%7) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  end_access %7
+  store %9 to [init] %3
+  %12 = begin_access [modify] [unknown] %3
+  %13 = function_ref @useInoutNE : $@convention(thin) (@inout NE) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@inout NE) -> ()
+  end_access %12
+  end_borrow %2
+  destroy_value %1
+  %18 = tuple ()
+  return %18
+}
+
+// Same as above, but the source is a stored property projected from the unsafeMutableAddress access.
+//
+// CHECK-LABEL: sil hidden [ossa] @testUnsafeAddressorAddressableProjection : $@convention(thin) (UnsafeMutablePointer<AddressableHolder>) -> () {
+// CHECK: bb0(%0 : $UnsafeMutablePointer<AddressableHolder>):
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe]
+// CHECK:   [[FIELD:%.*]] = struct_element_addr [[ACCESS]], #AddressableHolder.inner
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[FIELD]]) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK:   end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testUnsafeAddressorAddressableProjection'
+sil hidden [ossa] @testUnsafeAddressorAddressableProjection : $@convention(thin) (UnsafeMutablePointer<AddressableHolder>) -> () {
+bb0(%0 : $UnsafeMutablePointer<AddressableHolder>):
+  %1 = alloc_box ${ var NE }, var, name "ref"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = struct_extract %0, #UnsafeMutablePointer._rawValue
+  %5 = pointer_to_address %4 to [strict] $*AddressableHolder
+  %6 = mark_dependence [unresolved] %5 on %0
+  %7 = begin_access [modify] [unsafe] %6
+  %8 = struct_element_addr %7, #AddressableHolder.inner
+  %9 = function_ref @getAddressableDep : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %10 = apply %9(%8) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  end_access %7
+  store %10 to [init] %3
+  %13 = begin_access [modify] [unknown] %3
+  %14 = function_ref @useInoutNE : $@convention(thin) (@inout NE) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@inout NE) -> ()
+  end_access %13
+  end_borrow %2
+  destroy_value %1
+  %19 = tuple ()
+  return %19
+}

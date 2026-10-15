@@ -43,3 +43,5 @@ public:
   void test() const {
   }
 } __attribute__((swift_attr("~Copyable"))) __attribute__((swift_attr("@Sendable")));
+
+struct __attribute__((swift_attr("@MainActor"))) MainActorStruct {};

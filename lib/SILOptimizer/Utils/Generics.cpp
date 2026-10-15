@@ -2118,6 +2118,9 @@ GenericFuncSpecializer::GenericFuncSpecializer(
         GenericFunc, ReInfo.getSerializedKind());
     if (ReInfo.isPrespecialized()) {
       ClonedName = Mangler.manglePrespecialized(ParamSubs);
+    } else if (ReInfo.isNotReabstracted()) {
+      ClonedName = Mangler.mangleNotReabstracted(ParamSubs,
+                                                 ReInfo.getDroppedArgs());
     } else {
       ClonedName = Mangler.mangleReabstracted(ParamSubs,
                                               ReInfo.needAlternativeMangling(),

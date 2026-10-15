@@ -2946,10 +2946,12 @@ void LoadableByAddress::recreateSingleApply(
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];
 
-      // For now, just replace the value with an immediate load if the old value
-      // was direct.
-      if (oldValue->getType() != newValue->getType() &&
-          !oldValue->getType().isAddress()) {
+      // For now, just replace the value with an immediate load if the
+      // old value was direct and the new value is indirect. Note the
+      // type may change while staying direct, e.g. a yielded closure
+      // type whose signature was rewritten from direct to indirect
+      // but the closure value stays direct.
+      if (!oldValue->getType().isAddress() && newValue->getType().isAddress()) {
         LoadOwnershipQualifier ownership;
         if (!F->hasOwnership()) {
           ownership = LoadOwnershipQualifier::Unqualified;

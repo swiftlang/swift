@@ -89,6 +89,8 @@ PASS(CondFailOptimization, "cond-fail-optimization",
      "Optimizes cond_fail instructions")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
+PASS(ImplicitDestroyChecker, "implicit-destroy-checker",
+     "Diagnoses implicit destroys of values that must be consumed")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
      "Initializes static global variables")
 PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",

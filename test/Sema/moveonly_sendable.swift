@@ -105,22 +105,22 @@ func tryToCastIt(_ fd: borrowing FileDescriptor) {
   let _ = fd as Sendable // expected-error {{cannot convert value of type 'FileDescriptor' to type 'any Sendable' in coercion}}
 
   let _ = fd as? Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   let _ = fd as! Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   let _ = fd is Sendable // expected-warning {{cast from 'FileDescriptor' to unrelated type 'any Sendable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   let sendy = mkSendable()
   let _ = sendy as FileDescriptor // expected-error {{cannot convert value of type 'any Sendable' to type 'FileDescriptor' in coercion}}
   let _ = sendy is FileDescriptor // expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   let _ = sendy as! FileDescriptor // expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   let _ = sendy as? FileDescriptor// expected-warning {{cast from 'any Sendable' to unrelated type 'FileDescriptor' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 }
 
 protocol GiveSendable<T> {

@@ -1316,12 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    // Values for the enumerated execution semantics. Reserved; the compiler
-    // doesn't emit them yet.
-    ExecutionSemanticsMask = 0x00000060U, // two bits
+    // Values for the enumerated execution semantics.
+    ExecutionSemanticsMask = 0x000000E0U, // three bits
     ExecutionSemanticsShift = 5,
 
-    /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
     InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
@@ -1389,13 +1387,13 @@ public:
     return bool(Data & HasSendingResult);
   }
 
+  int_type getIntValue() const {
+    return Data;
+  }
+
   FunctionMetadataExecutionSemantics getExecutionSemantics() const {
     return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
                                               ExecutionSemanticsShift);
-  }
-
-  int_type getIntValue() const {
-    return Data;
   }
 
   InvertibleProtocolSet getInvertedProtocols() const {

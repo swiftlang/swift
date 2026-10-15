@@ -47,7 +47,7 @@ public func reseatNode(_ p: inout Node, _ to: Node) { p = to }
 // CHECK: [[NODE:%[0-9]+]] = load ptr, ptr %0
 // CHECK: getelementptr inbounds{{.*}} %TSo4NodeV, ptr [[NODE]]
 @unsafe @cxx @implementation
-public func readNodePtr(_ p: Node) -> Int32 { return p.value }
+public func readNodePtr(_ p: borrowing Node) -> Int32 { return p.value }
 
 // Node *_Nonnull returnsRetainedNode(Node *_Nonnull n)
 //     __attribute__((swift_attr("returns_retained")));

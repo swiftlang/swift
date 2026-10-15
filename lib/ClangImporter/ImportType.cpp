@@ -2145,6 +2145,7 @@ private:
   }
 
   NEVER_VISIT(PlaceholderType)
+  NEVER_VISIT(HoleType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
   NEVER_VISIT(IntegerType)

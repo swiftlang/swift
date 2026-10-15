@@ -120,6 +120,11 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 }
 
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
+  // Callers should mark the global constant where possible: on ELF, a mutable
+  // global placed in a read-only section is emitted into a writable .rodata
+  // section. This is not asserted because some globals are only finalized
+  // later in the LLVM pipeline (e.g. async function pointers, whose context
+  // size is updated by CoroSplit) and so cannot be marked constant here.
   disableAddressSanitizer(*this, var);
   
   switch (TargetInfo.OutputObjectFormat) {

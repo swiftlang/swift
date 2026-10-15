@@ -530,7 +530,7 @@ void decodeRequirement(
     if (!subjectType)
       return;
 
-    BuiltType constraintType;
+    BuiltType constraintType = BuiltType();
     if (child->getKind() ==
         Demangle::Node::Kind::DependentGenericConformanceRequirement) {
       constraintType = Builder.decodeMangledType(child->getChild(1));
@@ -663,6 +663,21 @@ decodeShape(NodePointer Node) {
     return {nullptr, nullptr};
 
   return {Protocol, Requirements};
+}
+
+/// Returns the node kind for an escaping Swift function type with the given
+/// execution semantics.
+inline Node::Kind
+getEscapingSwiftFunctionNodeKind(FunctionMetadataExecutionSemantics semantics) {
+  switch (semantics) {
+  case FunctionMetadataExecutionSemantics::None:
+    return Node::Kind::FunctionType;
+  case FunctionMetadataExecutionSemantics::AtMostOnce:
+    return Node::Kind::CalledAtMostOnceFunctionType;
+  case FunctionMetadataExecutionSemantics::Once:
+    return Node::Kind::CalledOnceFunctionType;
+  }
+  return Node::Kind::FunctionType;
 }
 
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
@@ -1184,16 +1199,28 @@ protected:
           flags.withNumParameters(parameters.size())
               .withParameterFlags(hasParamFlags)
               .withEscaping(
-                          Node->getKind() == NodeKind::FunctionType ||
-                          Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock);
+                  Node->getKind() == NodeKind::FunctionType ||
+                  Node->getKind() == NodeKind::EscapingAutoClosureType ||
+                  Node->getKind() == NodeKind::EscapingObjCBlock ||
+                  // Only escaping function types with execution semantics
+                  // have their own manglings.
+                  Node->getKind() == NodeKind::CalledOnceFunctionType ||
+                  Node->getKind() == NodeKind::CalledAtMostOnceFunctionType);
 
-      if (Node->getKind() == NodeKind::CalledOnceFunctionType)
+      // Function types record their execution semantics, along with the
+      // invertible protocols that they suppress.
+      if (Node->getKind() == NodeKind::CalledOnceFunctionType ||
+          Node->getKind() == NodeKind::CalledAtMostOnceFunctionType) {
+        bool isOnce = Node->getKind() == NodeKind::CalledOnceFunctionType;
         extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::Once);
-      else if (Node->getKind() == NodeKind::CalledAtMostOnceFunctionType)
-        extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::AtMostOnce);
+            isOnce ? FunctionMetadataExecutionSemantics::Once
+                   : FunctionMetadataExecutionSemantics::AtMostOnce);
+        auto inverted = extFlags.getInvertedProtocols();
+        inverted.insert(InvertibleProtocolKind::Copyable);
+        if (isOnce)
+          inverted.insert(InvertibleProtocolKind::Deinitable);
+        extFlags = extFlags.withInvertedProtocols(inverted);
+      }
 
       auto result =
           decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,

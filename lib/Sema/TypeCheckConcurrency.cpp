@@ -1989,6 +1989,64 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
   }
 }
 
+/// Emit a note when an instance of \p instanceActor could be a different
+/// instance than \p globalActor's shared instance. This comes up when code
+/// isolated to one of them uses the other without 'await'.
+///
+/// \param globalActor The global actor on one side of the mismatch.
+/// \param instanceActor The actor type of the instance on the other side.
+/// \param instance The variable storing the instance, if any.
+static void diagnoseActorInstanceMayNotBeGlobalActor(
+    Type globalActor, NominalTypeDecl *instanceActor, const VarDecl *instance,
+    SourceLoc loc) {
+  auto *shared = globalActor->getAnyNominal()->getGlobalActorInstance();
+  if (!shared || !instanceActor ||
+      instanceActor != shared->getInterfaceType()->getAnyActor())
+    return;
+
+  // We don't want to emit this diagnostic for MainActor (which is truly a
+  // singleton and just lacks special casing) or `.shared` since `.shared` will
+  // actually be the same instance by the GlobalActor protocol req, we just
+  // don't special case that assumption.
+  // TODO: Emit a diagnostic explaining this situation, special case `.shared`
+  // expressions, or forbid multiple GlobalActor.ActorType instances to exist.
+  if (instance == shared || instanceActor->isMainActor())
+    return;
+
+  // TODO: Write a userdoc about actor instance isolation vs global
+  // actor isolation and add this diagnostic to it, since we can have groups for
+  // notes now.
+  shared->getASTContext().Diags.diagnose(
+      loc, diag::actor_instance_may_not_be_global_actor,
+      /*named=*/instance != nullptr, instance, instanceActor, globalActor);
+}
+
+void swift::noteActorInstanceMayNotBeGlobalActor(
+    SourceLoc loc, const ActorIsolation &contextIsolation,
+    const ActorIsolation &requiredIsolation, const Expr *selfArgument) {
+  if (contextIsolation.isActorInstanceIsolated() &&
+      requiredIsolation.isGlobalActor())
+    return diagnoseActorInstanceMayNotBeGlobalActor(
+        requiredIsolation.getGlobalActor(), contextIsolation.getActor(),
+        contextIsolation.getActorInstance(), loc);
+
+  if (!contextIsolation.isGlobalActor() ||
+      !requiredIsolation.isActorInstanceIsolated())
+    return;
+
+  const Expr *instance = requiredIsolation.getActorInstanceExpr();
+  if (requiredIsolation.isActorInstanceForSelfParameter())
+    instance = selfArgument;
+  if (!instance)
+    return;
+
+  diagnoseActorInstanceMayNotBeGlobalActor(
+      contextIsolation.getGlobalActor(),
+      instance->getType()->lookThroughAllOptionalTypes()->getAnyActor(),
+      dyn_cast_or_null<VarDecl>(instance->getReferencedDecl().getDecl()),
+      instance->getStartLoc());
+}
+
 /// Get the actor isolation of the innermost relevant context.
 static ActorIsolation getInnermostIsolatedContext(
     const DeclContext *dc,
@@ -4213,6 +4271,10 @@ namespace {
           }
         }
 
+        noteActorInstanceMayNotBeGlobalActor(
+            apply->getLoc(), getContextIsolation(), *unsatisfiedIsolation,
+            argForIsolatedParam);
+
         if (unsatisfiedIsolation->isGlobalActor()) {
           missingGlobalActorOnContext(
               const_cast<DeclContext *>(getDeclContext()),
@@ -4714,6 +4776,12 @@ namespace {
         if (isolatedActor) {
           refKind = isolatedActor->kind;
           refGlobalActor = isolatedActor->globalActor;
+          // If getIsolatedActor fell back to the base not being potentially
+          // isolated but the member is GA isolated, the base doesn't matter and
+          // this is a reference between different actors.
+          if (refKind == ReferencedActor::NonIsolatedParameter &&
+              !result.isolation.isActorInstanceIsolated())
+            refKind = ReferencedActor::Isolated;
         } else {
           auto contextIsolation = getInnermostIsolatedContext(
               getDeclContext(), getClosureActorIsolation);
@@ -4791,6 +4859,11 @@ namespace {
         }
 
         noteIsolatedActorMember(decl, context);
+        noteActorInstanceMayNotBeGlobalActor(
+            loc,
+            getInnermostIsolatedContext(getDeclContext(),
+                                        getClosureActorIsolation),
+            result.isolation, base);
         if (result.isolation.isGlobalActor()) {
           missingGlobalActorOnContext(
               const_cast<DeclContext *>(getDeclContext()),
@@ -9490,14 +9563,31 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
   // we must conservatively reject them.
   if (auto subs = declRef.getSubstitutions()) {
     // For protocol member calls, the Self conformance is used for witness
-    // dispatch and doesn't escape to another context, so we skip it.
-    Type selfInterfaceType;
+    // dispatch and doesn't escape to another context, so we skip it. Find it
+    // by its requirement, not by its type, so other conformances of the same
+    // type are still checked
+    std::optional<unsigned> selfConformanceIndex;
     if (auto *calleeProto =
             declRef.getDecl()->getDeclContext()->getSelfProtocolDecl()) {
-      selfInterfaceType = calleeProto->getSelfInterfaceType();
+      auto selfInterfaceType = calleeProto->getSelfInterfaceType();
+      unsigned index = 0;
+      for (auto req : subs.getGenericSignature().getRequirements()) {
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+        if (req.getProtocolDecl() == calleeProto &&
+            req.getFirstType()->isEqual(selfInterfaceType)) {
+          selfConformanceIndex = index;
+          break;
+        }
+        ++index;
+      }
     }
 
-    for (auto conf : subs.getConformances()) {
+    for (auto [index, conf] : llvm::enumerate(subs.getConformances())) {
+      // Skip the Self conformance; it is diagnosed already in other ways
+      if (index == selfConformanceIndex)
+        continue;
+
       // We're only checking abstract conformances here; concrete ones
       // were checked above already.
       if (!conf.isAbstract())
@@ -9506,14 +9596,6 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
       auto *abstract = conf.getAbstract();
       auto *proto = abstract->getProtocol();
       Type conformingType = abstract->getType();
-
-      // Skip Self conformances; these should be diagnosed already in other ways
-      if (selfInterfaceType) {
-        if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
-          if (archetype->getInterfaceType()->isEqual(selfInterfaceType))
-            continue;
-        }
-      }
 
       // Marker protocols have no requirements and can never be isolated.
       if (proto->isMarkerProtocol())
@@ -9525,12 +9607,13 @@ bool swift::checkIsolatedConformancesForIsolationCrossing(
           proto->inheritsFrom(sendableMetatypeProto))
         continue;
 
-      // If the conforming type is Sendable, its conformances cannot be
-      // isolated — isolated conformances require non-Sendable types.
+      // If the conforming type is SendableMetatype, or is derived from a type
+      // parameter that is, its conformances cannot be isolated. This is the
+      // same rule conformance checking uses to reject isolated conformances
       if (auto *archetype = conformingType->getAs<ArchetypeType>()) {
-        if (archetype->isSendableType()) {
+        if (archetype->isSendableType() ||
+            !archetype->mayHaveIsolatedConformance())
           continue;
-        }
       }
 
       // Get the name of the generic type parameter for the diagnostic.

@@ -4441,22 +4441,34 @@ namespace {
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
-              clang::QualType ty) {
+              clang::QualType ty, bool forSelf = false) {
             // When the captured parameter is passed by reference, the callee
             // may store the address of the referent into the capturing
             // parameter. Model this as a scoped ('borrow') dependency: the
             // capturing value must not outlive the borrow of this argument.
             //
-            // FIXME: for a non-reference escapable parameter we have no way to
+            // For a non-reference escapable parameter we have no way to
             // express that its address escapes (it is imported by value and we
-            // assume its address does not escape), so we still skip it. We
-            // should diagnose that case instead.
+            // assume its address does not escape), so import the API as
+            // @unsafe.
             bool isScoped = ty->isReferenceType();
-            if (!isScoped && isEscapable(ty))
+            const clang::NamedDecl *annotated =
+                forSelf ? nullptr : decl->getParamDecl(idx);
+            // Swift cannot express an escape to a global or unknown location.
+            if (llvm::any_of(attr->params(), [](int param) {
+                  return param == clang::LifetimeCaptureByAttr::Global ||
+                         param == clang::LifetimeCaptureByAttr::Unknown;
+                }))
+              skipLifetime(onAnnotated(
+                  diag::cxx_unsafe_skipped_lifetime_captured_globally,
+                  annotated));
+            if (!isScoped && isEscapable(ty)) {
+              skipLifetime(onAnnotated(
+                  diag::cxx_unsafe_skipped_lifetime_escapable_capture,
+                  annotated));
               return;
+            }
             for (auto param : attr->params()) {
-              // FIXME: Swift assumes no escaping to globals. We should diagnose
-              // this.
               if (param == clang::LifetimeCaptureByAttr::Global ||
                   param == clang::LifetimeCaptureByAttr::Unknown ||
                   param == clang::LifetimeCaptureByAttr::Invalid)
@@ -4481,7 +4493,8 @@ namespace {
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (param->hasAttr<clang::LifetimeBoundAttr>())
           processLifetimeBound(idx, param->getType());
-        if (const auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+        for (const auto *attr :
+             param->specific_attrs<clang::LifetimeCaptureByAttr>())
           processLifetimeCaptureBy(attr, idx, param->getType());
       }
       if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
@@ -4489,12 +4502,13 @@ namespace {
             result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
             /*forSelf=*/true);
-      if (auto attr =
-              getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
-                  decl))
+      for (const auto *attr :
+           getImplicitObjectParamAnnotations<clang::LifetimeCaptureByAttr>(
+               decl))
         processLifetimeCaptureBy(
             attr, result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
+            /*forSelf=*/true);
 
       for (auto &[idx, depIndices] : capturedArgDependences) {
         lifetimeDependencies.emplace_back(
@@ -5883,7 +5897,6 @@ namespace {
         }
       }
 
-      Impl.swiftify(result);
       return result;
     }
 
@@ -8417,7 +8430,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   };
 
   // If we have a setter, rectify it with the getter.
-  ParamDecl *setterIndex;
+  ParamDecl *setterIndex = nullptr;
   bool getterAndSetterInSameType = false;
   bool isIUO = getter->isImplicitlyUnwrappedOptional();
   if (setter) {

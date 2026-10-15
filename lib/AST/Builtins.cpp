@@ -4106,18 +4106,18 @@ getBuiltinBoundGenericType(ASTContext &C,
     auto types = subs.getReplacementTypes();
   
     auto size = types[0]->getCanonicalType();
-    if (validate
-        && size->getMatchingParamKind() != GenericTypeParamKind::Value
-        && !size->hasTypeVariableOrPlaceholder()) {
+    if (validate &&
+        size->getMatchingParamKind() != GenericTypeParamKind::Value &&
+        !size->hasTypeVariableOrHole() && !size->is<PlaceholderType>()) {
       return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     auto element = types[1]->getCanonicalType();
-    if (validate
-        && element->getMatchingParamKind() != GenericTypeParamKind::Type
-        && !element->hasTypeVariableOrPlaceholder()) {
+    if (validate &&
+        element->getMatchingParamKind() != GenericTypeParamKind::Type &&
+        !element->hasTypeVariableOrHole() && !element->is<PlaceholderType>()) {
       return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
-    
+
     return BuiltinFixedArrayType::get(size, element);
   }
   

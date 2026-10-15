@@ -206,6 +206,49 @@ do {
   }
 }
 
+do {
+  class UIMenuElement {}
+  class UIMenu: UIMenuElement {}
+  class UIAction: UIMenuElement {}
+
+  func f(b: Bool, actions: [UIAction], action: UIAction?, menu: UIMenu) -> [UIMenuElement?] {
+    let x = b ? [action] + actions : [menu]
+    return x
+  }
+}
+
+do {
+  class NSObject {}
+  class NSAttributedString: NSObject {}
+
+  struct Foo {
+    func method() -> (NSAttributedString, Bar)? {
+      return nil
+    }
+  }
+
+  struct Bar {}
+
+  func f(text: Foo) {
+    let (_, _) = text.method().map { $0 } ?? (nil, .init())
+  }
+}
+
+// Here, the supertype binding for the ternary expression is a throwing
+// function type.
+do {
+  func rethrowsTest(
+      _: (() throws -> Void)? = nil
+  ) rethrows {}
+
+  func f(g: (() -> Bool)? = nil) {
+    rethrowsTest(g == nil ? nil : {
+      g!()
+      // expected-warning@-1 {{result of call to function returning 'Bool' is unused}}
+    })
+  }
+}
+
 // Tests for a special form of inference where we have both a
 // subtype and a supertype binding for a type variable, and the
 // subtype binding contains a type variable but the supertype

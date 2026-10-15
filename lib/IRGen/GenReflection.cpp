@@ -202,9 +202,10 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_6_0,
     Swift_6_1,
     Swift_6_2,
+    Swift_6_5,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_2
+    Latest = Swift_6_5
   };
 
   VersionRequirement latestRequirement = None;
@@ -220,6 +221,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
       auto isolation = fn->getIsolation();
       auto sendingResult = fn->hasSendingResult();
+
+      // The Swift 6.5 runtime is the first version able to demangle function
+      // types with execution semantics.
+      if (fn->getExecutionSemantics())
+        return addRequirement(Swift_6_5);
 
       // The mangling for nonisolated(nonsending) function types was introduced
       // in Swift 6.2.
@@ -293,6 +299,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   });
 
   switch (latestRequirement) {
+  case Swift_6_5: return llvm::VersionTuple(6, 5);
   case Swift_6_2: return llvm::VersionTuple(6, 2);
   case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);
@@ -738,10 +745,14 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Drill down to the i8* at the beginning of the constant.
   auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
 
-  // Set the low bit.
+  // Set the low bit. The GEP is inbounds (the string is at least two bytes
+  // long) so LLVM can see through it and recognize the relative references to
+  // this string as link-time constants; otherwise, on ELF, the referencing
+  // descriptors would be placed in a writable .rodata section.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
+  addr = llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, addr,
+                                                      bitConstant);
 
   // Update the entry.
   entry = {var, addr};
@@ -1470,7 +1481,7 @@ public:
             const irgen::MetadataSource &Source,
             const MetadataPath &Path) {
 
-      const reflection::MetadataSource *Root;
+      const reflection::MetadataSource *Root = nullptr;
       switch (Source.getKind()) {
       case irgen::MetadataSource::Kind::SelfMetadata:
       case irgen::MetadataSource::Kind::SelfWitnessTable:

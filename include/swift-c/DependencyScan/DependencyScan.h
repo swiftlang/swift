@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 3
+#define SWIFTSCAN_VERSION_MINOR 4
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -346,6 +346,12 @@ swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details);
 
+/// Retrieve the directories whose contents this module enumerated, such as
+/// umbrella directories. Report changes to them with
+/// \c swiftscan_scanner_add_invalidated_paths.
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_clang_detail_get_directory_deps(swiftscan_module_details_t details);
+
 // DEPRECATED
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details);
@@ -540,6 +546,13 @@ swiftscan_source_location_get_column_number(swiftscan_source_location_t source_l
 SWIFTSCAN_PUBLIC void
 swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner);
 
+/// For the specified \c scanner instance, report that \p paths changed since
+/// the previous build. Must be called before its first scan, with absolute
+/// paths spelled as \c swiftscan_clang_detail_get_directory_deps reports them.
+SWIFTSCAN_PUBLIC void
+swiftscan_scanner_add_invalidated_paths(swiftscan_scanner_t scanner,
+                                        const char **paths, size_t num_paths);
+
 /// An entry point to invoke the compiler via a library call.
 SWIFTSCAN_PUBLIC int invoke_swift_compiler(int argc, const char **argv);
 
@@ -707,6 +720,21 @@ swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
                                              const char **argv,
                                              unsigned input_index,
                                              swiftscan_string_ref_t *error);
+
+/// Compute \c CacheKey for the outputs of multiple input files from a compiler
+/// invocation with command-line \c argc and \c argv. This is equivalent to
+/// calling \c swiftscan_cache_compute_key_from_input_index for each index in
+/// \c input_indices, but the command-line is only processed once. Return the
+/// \c CacheKey for each input in the same order as \c input_indices, which
+/// needs to be freed via `swiftscan_string_set_dispose`. If error happens,
+/// return nullptr and the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_cache_compute_keys_from_input_indices(swiftscan_cas_t cas, int argc,
+                                                const char **argv,
+                                                const unsigned *input_indices,
+                                                size_t num_inputs,
+                                                swiftscan_string_ref_t *error);
 
 /// Query the result of the compilation using the output cache key. \c globally
 /// suggests if the lookup should check remote cache if such operation exists.

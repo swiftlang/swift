@@ -240,12 +240,10 @@ extension Float: BinaryFloatingPoint {
 
   @inlinable
   public static var pi: Float {
-    // Note: this is not the correctly rounded (to nearest) value of pi,
-    // because pi would round *up* in Float precision, which can result
-    // in angles in the wrong quadrant if users aren't careful.  This is
-    // not a problem for Double or Float80, as pi rounds down in both of
-    // those formats.
-    return 0x1.921fb4p1
+    // Note: in standard library versions prior to 6.5, this value was rounded
+    // toward zero (0x1.921fb4p1) instead of to nearest. The change in value
+    // was approved under SE-0552 Rounding of `Float.pi`.
+    return 0x1.921fb6p1
   }
 
   @inlinable

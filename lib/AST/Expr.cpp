@@ -108,7 +108,12 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable() || !T->hasPlaceholder());
+  if (T) {
+    // TypeJoinExpr is only present during solving and so can use type variables
+    ASSERT(isa<TypeJoinExpr>(this) || !T->hasTypeVariableOrHole());
+    // TypeExprs can have placeholder types, they get opened in CSGen.
+    ASSERT(isa<TypeExpr>(this) || !T->hasPlaceholder());
+  }
   Ty = T;
 }
 
@@ -2199,7 +2204,7 @@ Type ClosureExpr::getExplicitThrownType() const {
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
+  assert(ty && !ty->hasTypeVariableOrHole() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }

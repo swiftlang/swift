@@ -1820,7 +1820,7 @@ bool WitnessChecker::findBestWitness(
     Done
   };
 
-  bool anyFromUnconstrainedExtension;
+  bool anyFromUnconstrainedExtension = false;
   numViable = 0;
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
@@ -4775,6 +4775,15 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           });
         });
       }
+    }
+
+    if (requirement->isObjC()) {
+      getASTContext().addDelayedConformanceDiag(
+          Conformance, /*isError=*/false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            diagnoseImplicitForceUnwrapOfIUOParams(witness, requirement,
+                                                   /*isWitness=*/true);
+          });
     }
 
     auto check = checkWitness(requirement, best);

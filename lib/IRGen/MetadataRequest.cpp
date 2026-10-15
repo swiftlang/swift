@@ -272,8 +272,11 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     if (!shouldSetLowBit)
       return addr;
 
+    // Inbounds, so that relative references to the tagged string are still
+    // recognized as link-time constants (see getMangledAssociatedConformance).
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
+    return llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, addr,
+                                                        bitConstant);
   };
 
   // Check whether we already have an entry with this name.
@@ -1452,17 +1455,35 @@ getFunctionTypeFlags(CanFunctionType type) {
       // introduce it as necessary.
       break;
 
-    case InvertibleProtocolKind::Deinitable:
-      // The runtime doesn't know about Deinitable yet.
+    case InvertibleProtocolKind::Deinitable: {
+      // An exactly-once function type isn't Deinitable.
+      auto proto =
+          type->getASTContext().getProtocol(KnownProtocolKind::Deinitable);
+      if (proto && lookupConformance(type, proto).isInvalid())
+        InvertedProtocols.insert(invertibleKind);
       break;
+    }
     }
   }
 
   auto isolation = type->getIsolation();
 
+  auto executionSemantics = FunctionMetadataExecutionSemantics::None;
+  if (auto semantics = type->getExecutionSemantics()) {
+    switch (*semantics) {
+    case ExecutionSemantics::AtMostOnce:
+      executionSemantics = FunctionMetadataExecutionSemantics::AtMostOnce;
+      break;
+    case ExecutionSemantics::Once:
+      executionSemantics = FunctionMetadataExecutionSemantics::Once;
+      break;
+    }
+  }
+
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
                       .withSendingResult(type->hasSendingResult())
+                      .withExecutionSemantics(executionSemantics)
                       .withInvertedProtocols(InvertedProtocols);
 
   if (isolation.isErased())

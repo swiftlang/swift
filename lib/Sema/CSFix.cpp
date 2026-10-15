@@ -185,10 +185,9 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   bool useConditionalCast,
                                                   ConstraintLocator *locator) {
-  // If any of the types have type variables or placeholders, don't add the fix.
+  // If any of the types have type variables or holes, don't add the fix.
   // `typeCheckCheckedCast` doesn't support checking such types.
-  if (fromType->hasTypeVariableOrPlaceholder() ||
-      toType->hasTypeVariableOrPlaceholder()) {
+  if (fromType->hasTypeVariableOrHole() || toType->hasTypeVariableOrHole()) {
     return nullptr;
   }
 

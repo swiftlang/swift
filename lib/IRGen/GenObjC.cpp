@@ -1017,7 +1017,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     auto &nativeSchema = indirectedResultTI->nativeReturnValueSchema(IGM);
-    if (nativeSchema.requiresIndirect()) {
+    // The partial application's result may have been rewritten to be returned
+    // indirectly by LoadableByAddress.
+    if (resultType->hasIndirectFormalResults() ||
+        nativeSchema.requiresIndirect()) {
       indirectedDirectResult = params.claimNext();
     }
   }
@@ -1033,8 +1036,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   assert(origMethodType->hasSelfParam());
   auto origParamInfos = origMethodType->getParameters();
   origParamInfos = origParamInfos.drop_back();
+  auto resultParamInfos = resultType->getParameters();
+  assert(origParamInfos.size() == resultParamInfos.size());
 
-  for (auto info : origParamInfos) {
+  for (auto [info, resultInfo] : llvm::zip(origParamInfos, resultParamInfos)) {
     // Addresses consist of a single pointer argument.
     if (isIndirectFormalParameter(info.getConvention())) {
       translatedParams.add(params.claimNext());
@@ -1050,9 +1055,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                                IGM.getMaximalTypeExpansionContext());
     auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(curSILType));
 
-    // Load the indirectly passed parameter.
+    // Load the indirectly passed parameter. The partial application's
+    // parameter may have been rewritten to be passed indirectly by
+    // LoadableByAddress.
     auto &nativeSchema = ti.nativeParameterValueSchema(IGM);
-    if (nativeSchema.requiresIndirect()) {
+    if (isIndirectFormalParameter(resultInfo.getConvention()) ||
+        nativeSchema.requiresIndirect()) {
       Address paramAddr = ti.getAddressForPointer(params.claimNext());
       ti.loadAsTake(subIGF, paramAddr, translatedParams);
       continue;
@@ -1360,7 +1368,7 @@ getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
     auto clangDecl = d->getClangNode().castAsDecl();
     auto &clangASTContext = IGM.getClangASTContext();
     std::string typeStr;
-    CStringSectionType sectionType;
+    CStringSectionType sectionType = CStringSectionType::Default;
     if (auto objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
       typeStr = clangASTContext.getObjCEncodingForMethodDecl(
           objcMethodDecl, useExtendedEncoding /*extended*/);

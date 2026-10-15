@@ -110,3 +110,86 @@ do {
     return result
   }
 }
+
+// Some regression tests reduced from projects.
+do {
+  struct S {}
+
+  func f(x: S?) -> S {
+    let y = x ?? {
+      preconditionFailure("")
+    }()
+    return y
+  }
+}
+
+do {
+  func format(_ value: Double) -> String {
+    return ""
+  }
+
+  func toKeyValList() -> [String: Any?] {
+    return [:]
+  }
+
+  func toStr(verbose: Bool) -> String {
+    return toKeyValList()
+      .map { key, value in
+        let text = (value as? Double).map(format)
+                ?? (value as? Float).map { format(Double($0)) }
+                ?? value.map { "\($0)" } ?? "-"
+        return "\(key): \(text)"
+      }.joined(separator: "")
+  }
+}
+
+do {
+  struct S {
+    var name: String?
+    var info: [Int: Any]?
+    var value: String?
+  }
+
+  func f(s: S) -> String {
+    let k = 0
+    let x = s.name
+                ?? s.info?[k] as? String
+                ?? s.value.map { "\($0)" }
+                ?? ""
+    return x
+  }
+}
+
+do {
+  func f() -> String {
+    let x: String? = nil
+    let y: String? = nil
+    let z: String? = nil
+
+    let result = x ?? y ?? z.map { "\($0)" } ?? ""
+    return result
+  }
+}
+
+do {
+  protocol P {}
+
+  enum OneColumnGroup: P { case x }
+  enum TwoColumnGroup: P { case x }
+  enum ThreeColumnGroup: P { case x }
+
+  struct S {
+    var oneColumn: [OneColumnGroup]
+    var twoColumnsCompact: [TwoColumnGroup]?
+    var twoColumns: [TwoColumnGroup]?
+    var threeColumn: [ThreeColumnGroup]?
+
+    func f1() -> [any P] {
+      return threeColumn ?? twoColumns ?? oneColumn
+    }
+
+    func f2() -> [any P] {
+      return twoColumnsCompact ?? twoColumns ?? oneColumn
+    }
+  }
+}

@@ -2397,7 +2397,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     }
 
     llvm::Value *componentArgsBufSize = allParamValues.takeLast();
-    llvm::Value *componentArgsBuf;
+    llvm::Value *componentArgsBuf = nullptr;
     bool hasSubscriptIndices = params.size() > baseIndexOfIndicesArguments;
 
     // Bind the indices arguments if present.
@@ -4560,10 +4560,18 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
            "objc partial_apply argument is not a single retainable pointer?!");
     llvm::Value *selfVal = llArgs.claimNext();
 
+    // LoadableByAddress may have inserted convert_function instructions that
+    // rewrite large types in the method's signature to be passed indirectly
+    // (see visitConvertFunctionInst). The message send itself still has to
+    // use the original foreign signature.
+    SILValue method = i->getCallee();
+    while (auto *cvt = dyn_cast<ConvertFunctionInst>(method))
+      method = cvt->getOperand();
+
     Explosion function;
     emitObjCPartialApplication(*this,
                                objcMethod,
-                               i->getOrigCalleeType(),
+                               method->getType().castTo<SILFunctionType>(),
                                i->getType().castTo<SILFunctionType>(),
                                selfVal,
                                i->getArguments()[0]->getType(),
@@ -7008,7 +7016,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     return;
 
   if (Decl) {
-    Type Ty = Decl->getTypeInContext();
+    // 'self' in a convenience initializer has dynamic Self type and remains
+    // uninitialized until the delegated initializer returns.
+    Type Ty = Decl->getTypeInContext()->eraseDynamicSelfType();
     if (Ty->getClassDecl() ||
         Ty->getStructDecl())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));

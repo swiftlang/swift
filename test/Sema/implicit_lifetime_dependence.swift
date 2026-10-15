@@ -25,7 +25,7 @@ struct ImplicitInit3 : ~Escapable, ~Copyable {
   let mbv2: BufferView
 }
 
-func foo1() -> BufferView { // expected-error{{a function with a ~Escapable result needs a parameter to depend on}}
+func foo1() -> BufferView { // expected-error{{a function with a non-'Escapable' result needs a parameter to depend on}}
   // expected-note@-1{{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
   return BufferView(nil, 0)
 }

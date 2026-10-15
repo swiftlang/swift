@@ -797,7 +797,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// If the argtype is an opened existential conforming to a protocol type
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
-    ArchetypeType *archetypeTy;
+    ArchetypeType *archetypeTy = nullptr;
     if (isa<ExistentialArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {

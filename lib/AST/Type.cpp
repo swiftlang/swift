@@ -62,7 +62,7 @@ using namespace swift;
 #include "swift/AST/TypeNodes.def"
 
 void TypeLoc::setType(Type Ty) {
-  assert(!Ty || !Ty->hasTypeVariable() || !Ty->hasPlaceholder());
+  assert(!Ty || !Ty->hasTypeVariableOrHole());
   this->Ty = Ty;
 }
 
@@ -170,10 +170,6 @@ bool TypeBase::isSendableExistential() {
     constraint = existential->getConstraintType();
 
   return constraint->getKnownProtocol() == KnownProtocolKind::Sendable;
-}
-
-bool TypeBase::isPlaceholder() {
-  return is<PlaceholderType>();
 }
 
 bool TypeBase::isAnyClassReferenceType() {
@@ -348,6 +344,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
@@ -1636,18 +1633,18 @@ Type TypeBase::withCovariantResultType() {
                            resultFnType, fnType->getExtInfo());
 }
 
-Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
-  if (!hasTypeVariableOrPlaceholder())
+Type TypeBase::replaceTypeVariablesAndHolesWithErrors() {
+  if (!hasTypeVariableOrHole())
     return Type(this);
 
   struct Transform : public TypeTransform<Transform> {
     Transform(ASTContext &ctx) : TypeTransform(ctx) {}
 
     std::optional<Type> transform(TypeBase *ty, TypePosition) {
-      if (!ty->hasTypeVariableOrPlaceholder())
+      if (!ty->hasTypeVariableOrHole())
         return ty;
 
-      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+      if (isa<TypeVariableType>(ty) || isa<HoleType>(ty))
         return ErrorType::get(ctx);
 
       return std::nullopt;
@@ -2049,6 +2046,7 @@ CanType TypeBase::computeCanonicalType() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BuiltinTuple:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
@@ -2619,7 +2617,7 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
     return true;
 
   // Unresolved types that could potentially be callable.
-  if (isPlaceholder() || isTypeParameter() || isTypeVariableOrMember())
+  if (is<PlaceholderType>() || isTypeParameter() || isTypeVariableOrMember())
     return true;
 
   // Callable nominal types.
@@ -4045,8 +4043,9 @@ bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects()[i].getName() == I)
+  auto elts = getElements();
+  for (auto i : indices(elts)) {
+    if (elts[i].getName() == I)
       return i;
   }
 
@@ -4782,7 +4781,7 @@ DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   if (!hasTypeParameter()) return nullptr;
 
   DependentMemberType *unresolvedDepMemTy = nullptr;
-  Type(this).findIf([&](Type type) -> bool {
+  getCanonicalType().findIf([&](Type type) -> bool {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       if (depMemTy->getAssocType() == nullptr) {
         unresolvedDepMemTy = depMemTy;
@@ -5069,6 +5068,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:

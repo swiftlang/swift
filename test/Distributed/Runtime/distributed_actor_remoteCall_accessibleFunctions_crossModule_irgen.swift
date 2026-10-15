@@ -205,7 +205,7 @@ class AnotherImpl {}
 //
 // CHECK-SAME:   i32 trunc (
 // CHECK-SAME:     i64 sub (
-// CHECK-SAME:       i64 ptrtoint (ptr getelementptr (
+// CHECK-SAME:       i64 ptrtoint (ptr getelementptr inbounds (
 // CHECK-SAME:         i8, ptr @"associated conformance 16ResilientImplLib07ServiceB0C0A6APILib023DistributedNotificationD0AA0F00F5Actor",
 // CHECK-SAME:         i64 1
 // CHECK-SAME:       ) to i64),

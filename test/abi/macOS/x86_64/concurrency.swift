@@ -557,7 +557,24 @@ Added: _$ss11ExecutorJobV8_contextBjvg
 // property descriptor for Swift.UnownedJob.unsafeCurrentTask : Swift.UnsafeCurrentTask?
 Added: _$sScJ17unsafeCurrentTaskSctSgvpMV
 
-// Typed throws AsyncThrowingStream
-Added: _$sScs10makeStream2of8throwing15bufferingPolicyScsyxq_G6stream_Scs12ContinuationVyxq__G12continuationtxm_q_mAH09BufferingF0Oyxq___GtFZ
-Added: _$sScs9unfoldingScsyxq_GxSgyYaq_YKc_tcfC
-Added: _$sScs_15bufferingPolicy_Scsyxq_Gxm_Scs12ContinuationV09BufferingB0Oyxq___GyADyxq__GXEtcfC
+// Task.id / UnsafeCurrentTask.id / Task.currentID
+Added: _swift_task_getCurrentTaskId
+Added: _$sScT2ids6TaskIDVvpMV
+Added: _$sSct2ids6TaskIDVvpMV
+Added: _$sScTss5NeverORszABRs_rlE9currentIDs04TaskC0VSgvpZMV
+
+// TaskID struct (Sendable, Hashable)
+Added: _$ss6TaskIDVMa
+Added: _$ss6TaskIDVMn
+Added: _$ss6TaskIDVN
+Added: _$ss6TaskIDVSHsMc
+Added: _$ss6TaskIDVSQsMc
+Added: _$ss6TaskIDV2eeoiySbAB_ABtFZ
+Added: _$ss6TaskIDV4hash4intoys6HasherVz_tF
+Added: _$ss6TaskIDV8rawValues6UInt64VvpMV
+Added: _$ss6TaskIDV9hashValueSivg
+Added: _$ss6TaskIDV9hashValueSivpMV
+Added: _$ss6TaskIDV9_rawValues6UInt64Vvg
+Added: _$ss6TaskIDV9_rawValues6UInt64VvM
+Added: _$ss6TaskIDV9_rawValues6UInt64VvpMV
+Added: _$ss6TaskIDV9_rawValues6UInt64Vvs

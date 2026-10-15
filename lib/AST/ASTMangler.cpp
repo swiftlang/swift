@@ -1409,6 +1409,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::ErrorUnion:
+    case TypeKind::Hole:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::PrimaryArchetype:

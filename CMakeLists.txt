@@ -1800,7 +1800,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
       set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
       if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
-        string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+        get_versioned_target_triple(stdlib_target_triple ${sdk} ${arch} ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
@@ -1842,7 +1842,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
-        add_dependencies("${stdlib_target}-core" swift-frontend)
+        add_dependencies("${stdlib_target}-core" swift-frontend libSwiftScan)
       endif()
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
@@ -1872,6 +1872,10 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftOverlay_ENABLE_CXX_INTEROP=TRUE
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
+      set(runtimes_to_enable StringProcessing|Synchronization|Distributed|Observation)
+      if(sdk STREQUAL "OSX")
+        string(APPEND runtimes_to_enable |Runtime)
+      endif()
       ExternalProject_Add("${stdlib_target}-Supplemental"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
         DEPENDS "${stdlib_target}-core" "${stdlib_target}-Overlay"
@@ -1881,7 +1885,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation|Runtime
+          -DSwift_ENABLE_RUNTIMES=${runtimes_to_enable}
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
