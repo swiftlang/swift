@@ -1056,7 +1056,9 @@ static bool diagnoseSingleNonSendableType(
     } else if (nominal && nominal->getParentModule() == module) {
       // If the nominal type is in the current module, suggest adding
       // `Sendable` if it might make sense. Otherwise, just complain.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+      if (nominal->suppressesConformance(KnownProtocolKind::Transferable)) {
+        nominal->diagnose(diag::sendable_conformance_is_suppressed, nominal);
+      } else if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         auto note =
             nominal->diagnose(diag::add_nominal_sendable_conformance, nominal);
         addSendableFixIt(nominal, note, /*unchecked=*/false);
@@ -1379,6 +1381,9 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return std::nullopt;
 
+  if (nominal->suppressesConformance(KnownProtocolKind::Transferable))
+    return std::nullopt;
+
   class Visitor : public StorageVisitor {
   public:
     NominalTypeDecl *nominal;
@@ -1479,6 +1484,10 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
 
   // If `Sendable` conformance is explicitly suppressed, do nothing.
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return;
+
+  // `~Transferable` suppresses `Sendable` conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Transferable))
     return;
 
   // If the conformance is explicitly stated, do nothing.
@@ -8148,6 +8157,10 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
   // An explicit use `~Sendable` suppresses the conformance.
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return nullptr;
+
+  // An explicit use `~Transferable` suppresses the conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Transferable))
     return nullptr;
 
   // Actor types are always Sendable; they don't get it via this path.
