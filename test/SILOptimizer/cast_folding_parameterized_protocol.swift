@@ -19,7 +19,8 @@ public func concrete_to_existential<T>(_ x: X, _ yt: Y<T>, _ yi: Y<Int>) {
   use(x as! any P)
   // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to any P<T> in {{%.*}} : $*any P<T>
   use(x as! any P<T>)
-  // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to any P<Int> in {{%.*}} : $*any P<Int>
+  // The concrete source provably satisfies `P<Int>`, so the cast folds to a box.
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any P<Int>, $X
   use(x as! any P<Int>)
   // CHECK: unconditional_checked_cast_addr X in {{%.*}} : $*X to any P<String> in {{%.*}} : $*any P<String>
   use(x as! any P<String>)
@@ -28,7 +29,7 @@ public func concrete_to_existential<T>(_ x: X, _ yt: Y<T>, _ yi: Y<Int>) {
 
   // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any P, $Y<T>
   use(yt as! any P)
-  // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to any P<T> in {{%.*}} : $*any P<T>
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any P<T>, $Y<T>
   use(yt as! any P<T>)
   // CHECK: unconditional_checked_cast_addr Y<T> in {{%.*}} : $*Y<T> to any P<Int> in {{%.*}} : $*any P<Int>
   use(yt as! any P<Int>)
@@ -41,7 +42,7 @@ public func concrete_to_existential<T>(_ x: X, _ yt: Y<T>, _ yi: Y<Int>) {
   use(yi as! any P)
   // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to any P<T> in {{%.*}} : $*any P<T>
   use(yi as! any P<T>)
-  // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to any P<Int> in {{%.*}} : $*any P<Int>
+  // CHECK: {{%.*}} = init_existential_addr {{%.*}} : $*any P<Int>, $Y<Int>
   use(yi as! any P<Int>)
   // CHECK: unconditional_checked_cast_addr Y<Int> in {{%.*}} : $*Y<Int> to any P<String> in {{%.*}} : $*any P<String>
   use(yi as! any P<String>)
