@@ -47,6 +47,13 @@ typedef unsigned long long __swift_typeid_t;
  */
 typedef unsigned long long __swift_options_t;
 
+#if defined(__INT64_TYPE__)
+typedef __INT64_TYPE__ __swift_int64_t;
+#else
+#include <stdint.h>
+typedef int64_t __swift_int64_t;
+#endif
+
 typedef __swift_ptrdiff_t __swift_tls_key_t;
 
 /**
@@ -139,7 +146,7 @@ typedef void * EMBEDDED_SWIFT_NULLABLE (*__swift_thread_start_t)(
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 3
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 4
 
 #if defined(__cplusplus)
 extern "C" {
@@ -712,6 +719,76 @@ void _swift_sem_wait(void * EMBEDDED_SWIFT_NONNULL sem);
  * `_swift_sem_wait` if there is one.
  */
 void _swift_sem_post(void * EMBEDDED_SWIFT_NONNULL sem);
+
+/**
+ * Reads the continuous clock, which keeps advancing while the system is
+ * asleep, as a time since an arbitrary fixed point such as system boot.
+ *
+ * - Parameter nanoseconds: Receives the remaining nanoseconds, in
+ *   [0, 999999999].
+ *
+ * When the program is linked with dead stripping (`-dead_strip` or
+ * `--gc-sections`), the `_swift_clockContinuous_*` functions are required only
+ * by code that reads the continuous clock.
+ *
+ * This function can be implemented as a call to `clock_gettime` with
+ * `CLOCK_MONOTONIC_RAW` on Darwin or `CLOCK_BOOTTIME` on Linux.
+ */
+void _swift_clockContinuous_getTime(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reports the resolution of the continuous clock.
+ *
+ * This function can be implemented as a call to `clock_getres`.
+ */
+void _swift_clockContinuous_getResolution(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reads the suspending clock, which does not advance while the system is
+ * asleep, as a time since an arbitrary fixed point such as system boot.
+ *
+ * - Parameter nanoseconds: Receives the remaining nanoseconds, in
+ *   [0, 999999999].
+ *
+ * When the program is linked with dead stripping, the
+ * `_swift_clockSuspending_*` functions are required only by code that reads
+ * the suspending clock, such as the cooperative executor in
+ * `libswift_ConcurrencyDefaultExecutor.a`. A platform that never sleeps can
+ * read the same time source as the continuous clock.
+ *
+ * This function can be implemented as a call to `clock_gettime` with
+ * `CLOCK_UPTIME_RAW` on Darwin or `CLOCK_MONOTONIC` on Linux.
+ */
+void _swift_clockSuspending_getTime(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reports the resolution of the suspending clock.
+ *
+ * This function can be implemented as a call to `clock_getres`.
+ */
+void _swift_clockSuspending_getResolution(
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Blocks the calling execution context for at least the given duration.
+ *
+ * - Parameter nanoseconds: The remaining nanoseconds, in [0, 999999999].
+ *
+ * When the program is linked with dead stripping, this function is required
+ * only by code that waits for a deadline, such as the cooperative executor in
+ * `libswift_ConcurrencyDefaultExecutor.a`.
+ *
+ * This function can be implemented as a call to `nanosleep` that is retried
+ * when a signal interrupts it.
+ */
+void _swift_clock_sleep(__swift_int64_t seconds, __swift_int64_t nanoseconds);
 
 /**
  * Exit the program.

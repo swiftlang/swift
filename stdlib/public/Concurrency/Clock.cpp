@@ -13,6 +13,80 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+
+#include "swift/EmbeddedPlatform.h"
+
+#include "Error.h"
+
+using namespace swift;
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_get_time(
+  long long *seconds,
+  long long *nanoseconds,
+  swift_clock_id clock_id) {
+  switch (clock_id) {
+    case swift_clock_id_continuous: {
+      __swift_int64_t s, ns;
+      _swift_clockContinuous_getTime(&s, &ns);
+      *seconds = s;
+      *nanoseconds = ns;
+      return;
+    }
+    case swift_clock_id_suspending: {
+      __swift_int64_t s, ns;
+      _swift_clockSuspending_getTime(&s, &ns);
+      *seconds = s;
+      *nanoseconds = ns;
+      return;
+    }
+    case swift_clock_id_wall:
+      break;
+  }
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                               clock_id);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_get_clock_res(
+  long long *seconds,
+  long long *nanoseconds,
+  swift_clock_id clock_id) {
+  switch (clock_id) {
+    case swift_clock_id_continuous: {
+      __swift_int64_t s, ns;
+      _swift_clockContinuous_getResolution(&s, &ns);
+      *seconds = s;
+      *nanoseconds = ns;
+      return;
+    }
+    case swift_clock_id_suspending: {
+      __swift_int64_t s, ns;
+      _swift_clockSuspending_getResolution(&s, &ns);
+      *seconds = s;
+      *nanoseconds = ns;
+      return;
+    }
+    case swift_clock_id_wall:
+      break;
+  }
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                               clock_id);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_sleep(
+  long long seconds,
+  long long nanoseconds) {
+  _swift_clock_sleep(seconds, nanoseconds);
+}
+
+#else // !SWIFT_CONCURRENCY_EMBEDDED
+
 #include <errno.h>
 #include <time.h>
 #if defined(_WIN32)
@@ -258,3 +332,5 @@ void swift_sleep(
   #error Missing platform sleep definition
 #endif
 }
+
+#endif // SWIFT_CONCURRENCY_EMBEDDED
