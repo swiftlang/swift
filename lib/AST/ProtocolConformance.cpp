@@ -192,8 +192,15 @@ ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement) const {
   case ProtocolConformanceKind::Specialized:
     return cast<SpecializedProtocolConformance>(this)
       ->getGenericConformance()->getWitnessDecl(requirement);
-  case ProtocolConformanceKind::Builtin:
+  case ProtocolConformanceKind::Builtin: {
+    auto conformance =
+        cast<BuiltinProtocolConformance>(this)->getBuiltinConformanceKind();
+    if (conformance == BuiltinConformanceKind::COMIdentityMetatype)
+      return cast<BuiltinProtocolConformance>(this)
+          ->getWitness(requirement)
+          .getDecl();
     return requirement;
+  }
   }
   llvm_unreachable("unhandled kind");
 }
@@ -378,6 +385,10 @@ bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
 bool RootProtocolConformance::isSynthesized() const {
   if (auto normal = dyn_cast<NormalProtocolConformance>(this))
     return normal->isSynthesizedNonUnique() || normal->isConformanceOfProtocol();
+
+  if (auto builtin = dyn_cast<BuiltinProtocolConformance>(this))
+    return builtin->getBuiltinConformanceKind() ==
+           BuiltinConformanceKind::COMIdentityMetatype;
 
   return false;
 }
@@ -1846,6 +1857,27 @@ swift::classifyCOMIdentityRequirement(ValueDecl *requirement) {
       property->getBaseName() == context.Id_CLSID)
     return COMIdentityRequirementKind::ActivationID;
   return std::nullopt;
+}
+
+bool BuiltinProtocolConformance::hasWitness(ValueDecl *requirement) const {
+  return static_cast<bool>(getWitness(requirement));
+}
+
+Witness BuiltinProtocolConformance::getWitness(ValueDecl *requirement) const {
+  auto kind = getBuiltinConformanceKind();
+  if (kind != BuiltinConformanceKind::COMIdentityMetatype)
+    llvm_unreachable("builtin conformance has no requirement witnesses");
+
+  auto requirementKind = classifyCOMIdentityRequirement(requirement);
+  ASSERT(requirementKind && "unsupported COM identity requirement");
+
+  switch (*requirementKind) {
+  case COMIdentityRequirementKind::InterfaceID:
+  case COMIdentityRequirementKind::ActivationID:
+    return Witness(requirement);
+  }
+
+  llvm_unreachable("unhandled COM identity requirement");
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

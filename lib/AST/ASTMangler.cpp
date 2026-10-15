@@ -306,7 +306,9 @@ std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(C)) {
     appendProtocolConformance(sc);
     appendOperator("WP");
-  } else if (isa<NormalProtocolConformance>(C) || isa<InheritedProtocolConformance>(C)) {
+  } else if (isa<NormalProtocolConformance>(C) ||
+             isa<InheritedProtocolConformance>(C) ||
+             isa<BuiltinProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
   } else if (isa<SelfProtocolConformance>(C)) {
