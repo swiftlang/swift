@@ -251,3 +251,23 @@ public func store_unknown_loop_bounds_u8_2(_ span: inout MutableRawSpan, _ lower
         span.storeBytes(of: UInt8(truncatingIfNeeded: i), toByteOffset: i, as: UInt8.self)
     }
 }
+
+// rdar://189932473
+// A dominating check_range (from extracting) must not make the check_range_offset
+// (from load) with the same operands look redundant.
+// CHECK-LABEL: sil {{.*}}@$s17check_range_tests40load_after_extracting_same_operands_loopys6UInt64Vs7RawSpanV_SaySiGtF :
+// The loop invariant part of the check_range is hoisted to the preheader.
+// CHECK: cond_fail {{.*}}, "Byte offset range out of bounds"
+// CHECK: // Loop header
+// The check_range_offset must remain in the loop.
+// CHECK: cond_fail {{.*}}, "Byte offset range out of bounds"
+// CHECK-LABEL: } // end sil function '$s17check_range_tests40load_after_extracting_same_operands_loopys6UInt64Vs7RawSpanV_SaySiGtF'
+@inline(never)
+public func load_after_extracting_same_operands_loop(_ s: RawSpan, _ offsets: [Int]) -> UInt64 {
+    var r: UInt64 = 0
+    for i in offsets {
+        _ = s.extracting(i..<8)
+        r &+= s.load(fromByteOffset: i, as: UInt64.self)
+    }
+    return r
+}
