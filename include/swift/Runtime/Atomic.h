@@ -107,9 +107,9 @@ inline Value vectorLoad16(const volatile void *address) {
                        : "=x"(bits)
                        : "m"(*(const volatile vector16 *)address)
                        : "memory");
-  Value result;
-  __builtin_memcpy(&result, &bits, sizeof(result));
-  return result;
+  // A bit cast, not a copy into a default-constructed Value: not every
+  // Value has a default constructor.
+  return __builtin_bit_cast(Value, bits);
 }
 #else
 #define SWIFT_ATOMIC_VECTOR_LOAD16 0
