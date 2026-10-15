@@ -78,14 +78,32 @@ struct ResolvableRoot {
   /// Whether the binding is a `let` (vs a `var`). Selects the diagnostic wording.
   let isLet: Bool
 
+  /// The `mark_uninitialized` of the storage, if any; its kind identifies `self` in an initializer.
+  let markUninitialized: MarkUninitializedInst?
+
   let isLexical: Bool
 
   // Does this address start fully initialized?
   let startsInitialized: Bool
 
+  /// An instruction requiring the whole root to be initialized, which is not found by walking uses of the address.
+  enum ExtraLivenessUse {
+    /// The function exits, at which point an `inout` parameter must be initialized.
+    case functionExit(TermInst)
+    /// The lifetime of the `alloc_box` ends.
+    case boxLifetimeEnd(Instruction)
+
+    var instruction: Instruction {
+      switch self {
+      case .functionExit(let exit): return exit
+      case .boxLifetimeEnd(let end): return end
+      }
+    }
+  }
+
   // Extra instructions to consider as full liveness uses of this root, that are not captured by walking uses of
   // the address.
-  let extraLivenessUses: [Instruction]
+  let extraLivenessUses: [ExtraLivenessUse]
 
   // Either the instruction defining this root, or the very first instruction
   // after which it is defined.
@@ -96,17 +114,26 @@ struct ResolvableRoot {
       return address.nextInstruction
   }
 
+  /// `self` in a struct or enum initializer that initializes the stored properties itself.
+  var isRootSelf: Bool {
+    switch markUninitialized?.kind {
+    case .rootSelf?, .crossModuleRootSelf?: true
+    default: false
+    }
+  }
+
   /// Build from a storage allocation (`alloc_box` / `alloc_stack`). Callers holding only
   /// an address must first walk up to the allocation.
   init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache, _ context: FunctionPassContext) {
     let function = val.parentFunction
-    var extraUses: [Instruction] = []
+    var extraUses: [ExtraLivenessUse] = []
 
     switch val {
     case let allocStack as AllocStackInst:
       storage = val
+      markUninitialized = Self.findMarkUninitialized(allocStack)
 
-      if let mu = Self.findMarkUninitialized(storage) {
+      if let mu = markUninitialized {
         address = mu
 
         let indicies = indexCache.fieldIndices(for: storage.type.objectType)
@@ -130,25 +157,22 @@ struct ResolvableRoot {
         return nil
       }
       address = projectBox
+      markUninitialized = Self.findMarkUninitialized(allocBox)
       varDecl = allocBox.varDecl
       isLet = !allocBox.type.getBoxFields(in: function).isMutable(fieldIndex: 0)
       isLexical = boxIsLexical
       startsInitialized = false
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
-      let box: Value
-      if let mu = Self.findMarkUninitialized(storage) {
-        box = mu
-      } else {
-        box = storage
-      }
-      box.uses.endingLifetime.forEach { extraUses.append($0.instruction) }
+      let box: Value = markUninitialized ?? storage
+      box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
       // TODO: add copies of the box too
 
 
     case let arg as FunctionArgument where arg.type.isAddress:
       storage = arg
       address = arg
+      markUninitialized = nil
       varDecl = arg.findVarDecl()
       isLexical = arg.isLexical
       isLet = false
@@ -162,7 +186,7 @@ struct ResolvableRoot {
         startsInitialized = true
 
         // For an inout parameter, all function exit terminators are considered uses.
-        function.exitingBlocks.forEach { extraUses.append($0.terminator) }
+        function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
 
       default:
@@ -856,7 +880,7 @@ private struct Resolver {
       }
 
       // Add any extra uses specific to this root.
-      root.extraLivenessUses.forEach { addUse(.unknown($0), indices.wholeRange) }
+      root.extraLivenessUses.forEach { addUse(.unknown($0.instruction), indices.wholeRange) }
 
       // Ensure correct order within each block
       for blk in uses.keys {
