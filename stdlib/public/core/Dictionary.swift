@@ -956,6 +956,31 @@ extension Dictionary {
     }
   }
 
+  @available(SwiftStdlib 9999, *)
+  public mutating func _index(
+    forKey key: Key,
+    default defaultValue: @autoclosure () -> Value
+  ) -> Index {
+    let (bucket, found) = _variant.mutatingFind(key)
+    if !found {
+      _variant.asNative._insert(at: bucket, key: key, value: defaultValue())
+    }
+    return unsafe Index(
+      _native: _HashTable.Index(bucket: bucket, age: _variant.asNative.age)
+    )
+  }
+
+  @available(SwiftStdlib 9999, *)
+  public mutating func _addValue(_ value: Value, forKey key: Key) -> Bool {
+    let (bucket, found) = _variant.mutatingFind(key)
+    if !found {
+      _variant.asNative._insert(at: bucket, key: key, value: value)
+      return true
+    } else {
+      return false
+    }
+  }
+
   /// Returns a new dictionary containing the keys of this dictionary with the
   /// values transformed by the given closure.
   ///
