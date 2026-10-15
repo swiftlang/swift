@@ -4,10 +4,15 @@
 import Swift
 import Builtin
 
+struct NoncopyableValue<T>: ~Copyable {
+  var t: T
+}
+
 sil @closure_with_args : $@convention(thin) (Int, Bool) -> ()
 sil @closure2_with_args : $@convention(thin) (Int, String) -> ()
 sil @closure3_with_args : $@convention(thin) (String, Bool) -> ()
 sil @generic_callee_inguaranteed : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+sil @noncopyable_closure : $@convention(thin) <T> (@in NoncopyableValue<T>) -> ()
 
 // CHECK-LABEL: sil @test_apply_of_partial_apply
 // CHECK:         [[F:%.*]] = function_ref @closure_with_args
@@ -189,6 +194,51 @@ bb0:
   %2 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
   %3 = apply %2(%1) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
   destroy_value %1 : $@callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// The on-stack context of a closure that is called at most once owns the
+// noncopyable address-only value that the closure consumes. Deleting the dead
+// closure has to destroy the value.
+//
+// CHECK-LABEL: sil [ossa] @test_dead_called_at_most_once_owned_address
+// CHECK:         [[TEMP:%.*]] = alloc_stack $NoncopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK-NOT:     partial_apply
+// CHECK:         destroy_addr [[TEMP]]
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK:       } // end sil function 'test_dead_called_at_most_once_owned_address'
+sil [ossa] @test_dead_called_at_most_once_owned_address : $@convention(thin) <T> (@in NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>):
+  %1 = function_ref @noncopyable_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  %2 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
+  %4 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  destroy_value %4 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  dealloc_stack %2 : $*NoncopyableValue<T>
+  %r = tuple()
+  return %r : $()
+}
+
+// Folding the call into the closure would need a copy of the value to keep it
+// alive until the closure is destroyed, and a noncopyable value can't be
+// copied.
+//
+// CHECK-LABEL: sil [ossa] @test_apply_of_called_at_most_once_owned_address
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once]
+// CHECK-NEXT:    apply [[CLOSURE]]()
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK:       } // end sil function 'test_apply_of_called_at_most_once_owned_address'
+sil [ossa] @test_apply_of_called_at_most_once_owned_address : $@convention(thin) <T> (@in NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>):
+  %1 = function_ref @noncopyable_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  %2 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
+  %4 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  apply %4() : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  dealloc_stack %2 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
 }

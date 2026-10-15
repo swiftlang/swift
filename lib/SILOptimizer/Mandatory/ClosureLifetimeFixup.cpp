@@ -1012,6 +1012,15 @@ static SILValue tryRewriteToPartialApplyStack(
   closureOp->dump();
   llvm::errs() << "--- at\n";
   */
+  // The on-stack context of an at-most-once closure takes ownership of the
+  // noncopyable address-only arguments that the closure consumes, so there
+  // is nothing for the caller to destroy after the closure's lifetime ends.
+  llvm::SmallPtrSet<SILValue, 4> addressArgsOwnedByClosure;
+  for (auto &arg : newPA->getArgumentOperands()) {
+    if (ApplySite(newPA).hasContextOwnedAddressArgument(arg))
+      addressArgsOwnedByClosure.insert(arg.get());
+  }
+
   for (auto destroy : lifetimeEnds) {
     /* DEBUG
     destroy->dump();
@@ -1043,6 +1052,10 @@ static SILValue tryRewriteToPartialApplyStack(
         // necessary.
         if (newPA->hasCalledAtMostOnceSemantics() && !argBorrow &&
             !argValue->getType().isAddress())
+          return SILValue();
+
+        // The closure's context owns the argument.
+        if (addressArgsOwnedByClosure.contains(argValue))
           return SILValue();
 
         // Don't need to destroy if we borrowed in place .

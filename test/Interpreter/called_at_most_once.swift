@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature CalledAttribute) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature CalledAttribute -O) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_CalledAttribute
@@ -25,6 +26,8 @@ func consumeEscaping(_ f: @escaping @called(atMostOnce) (Payload) -> Void, _ val
 }
 
 func dontConsume(_ f: @called(atMostOnce) (Payload) -> Void) { /* never called */ }
+
+func dontConsumeEscaping(_ f: @escaping @called(atMostOnce) (Payload) -> Void) { /* never called */ }
 
 func makeClosure(_ tag: String) -> @called(atMostOnce) () -> Void {
   return { print("called \(tag)") }
@@ -376,3 +379,57 @@ func testClosureSpecializationConsumingCapture() {
 // CHECK-NEXT: Resource(specialized) used
 // CHECK-NEXT: Resource(specialized) deinit
 testClosureSpecializationConsumingCapture()
+
+// A generic noncopyable value is address-only, so a closure that consumes it
+// captures it indirectly. The closure's context owns the value, which is
+// destroyed exactly once, whether or not the closure is called and whether or
+// not it escapes.
+struct GenericResource<T>: ~Copyable {
+  let value: T
+  let tag: String
+  init(_ value: T, _ tag: String) { self.value = value; self.tag = tag }
+  deinit { print("GenericResource(\(tag)) deinit") }
+  consuming func use() { print("GenericResource(\(tag)) used") }
+}
+
+@inline(never)
+func testGenericConsumingCapture<T>(_ value: T) {
+  let r = GenericResource(value, "called")
+  callIt {
+    r.use()
+  }
+}
+
+// CHECK-NEXT: GenericResource(called) used
+// CHECK-NEXT: GenericResource(called) deinit
+testGenericConsumingCapture(1)
+
+@inline(never)
+func testGenericConsumingCaptureNeverCalled<T>(_ value: T) {
+  let r = GenericResource(value, "unused")
+  dontConsume { (_: Payload) in
+    r.use()
+  }
+}
+
+// CHECK-NEXT: GenericResource(unused) deinit
+testGenericConsumingCaptureNeverCalled(1)
+
+@inline(never)
+func testGenericConsumingCaptureEscaping<T>(_ value: T) {
+  let r = GenericResource(value, "escaping")
+  consumeEscaping({ (_: Payload) in r.use() }, Payload(tag: "x"))
+}
+
+// CHECK-NEXT: GenericResource(escaping) used
+// CHECK-NEXT: GenericResource(escaping) deinit
+testGenericConsumingCaptureEscaping(1)
+
+@inline(never)
+func testGenericConsumingCaptureEscapingNeverCalled<T>(_ value: T) {
+  let r = GenericResource(value, "escaping unused")
+  dontConsumeEscaping { (_: Payload) in r.use() }
+}
+
+// CHECK-NEXT: GenericResource(escaping unused) deinit
+testGenericConsumingCaptureEscapingNeverCalled(1)

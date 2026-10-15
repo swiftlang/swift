@@ -200,3 +200,35 @@ public func noncopyableBorrowedCaptureNeverCalled(_ x: Int) {
 // CHECK-NOT: call void @swift_release
 // CHECK-NOT: call void @swift_deallocObject
 // CHECK: ret void
+
+public struct GenericResource<T>: ~Copyable {
+  var x: T
+  public init(x: T) { self.x = x }
+  deinit { print("GenericResource") }
+  public consuming func use() { print("used") }
+}
+
+// A noncopyable address-only value that the closure consumes is owned by the
+// closure's context, even when the context is stack-allocated. The forwarder
+// moves the value out of the context into a temporary for the call, so the
+// context has nothing left to destroy or release.
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19genericOwnedCaptureyyx_AA15GenericResourceVyxGntlFyyXEfU_TA"(ptr swiftself %0)
+// CHECK:  [[FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK:  call ptr @"$s4test15GenericResourceVyxGlWOb"(ptr [[FIELD]], ptr %arg.temp, ptr %T, ptr {{%.*}})
+// CHECK-NOT: call void @swift_release
+// CHECK-NOT: call void @swift_deallocUninitializedObject
+// CHECK:  call swiftcc void @"$s4test19genericOwnedCaptureyyx_AA15GenericResourceVyxGntlFyyXEfU_"(ptr noalias %arg.temp, ptr %T)
+// CHECK-NEXT: ret void
+public func genericOwnedCapture<T>(_ x: T, _ r: consuming GenericResource<T>) {
+  callAtMostOnce { r.use() }
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test27genericOwnedCaptureEscapingyyx_AA15GenericResourceVyxGntlFyyXOofU_TA"(ptr swiftself %0)
+// CHECK:  [[FIELD:%.*]] = getelementptr inbounds i8, ptr %0, i64 {{%.*}}
+// CHECK:  call ptr @"$s4test15GenericResourceVyxGlWOb"(ptr [[FIELD]], ptr %arg.temp, ptr %T, ptr {{%.*}})
+// CHECK:  call void @swift_deallocUninitializedObject(ptr %0,
+// CHECK:  call swiftcc void @"$s4test27genericOwnedCaptureEscapingyyx_AA15GenericResourceVyxGntlFyyXOofU_"(ptr noalias %arg.temp, ptr %T)
+public func genericOwnedCaptureEscaping<T>(_ x: T, _ r: consuming GenericResource<T>) {
+  callAtMostOnceEscaping { r.use() }
+}

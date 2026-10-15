@@ -64,3 +64,28 @@ func testConsumingCaptureIsPromoted() {
     nc1.take()
   }
 }
+
+struct GenericNC<T>: ~Copyable {
+  var t: T
+  consuming func take() {}
+}
+
+// A noncopyable address-only value that the closure consumes is moved into the
+// closure's on-stack context, which owns it, so nothing destroys the
+// temporary after the call.
+//
+// CHECK-LABEL: sil hidden @$s43called_at_most_once_closure_stack_promotion27testGenericConsumingCaptureyyAA0I2NCVyxGnlF : $@convention(thin) <T> (@in GenericNC<T>) -> () {
+// CHECK: [[TEMP:%.*]] = alloc_stack $GenericNC<T>
+// CHECK: copy_addr [take] {{%.*}} to [init] [[TEMP]]
+// CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once] {{%.*}}<T>([[TEMP]]) : $@convention(thin) <τ_0_0> (@in GenericNC<τ_0_0>) -> ()
+// CHECK: [[DEP:%.*]] = mark_dependence [nonescaping] [[PA]] on [[TEMP]]
+// CHECK: [[CALLEE:%.*]] = function_ref @$s43called_at_most_once_closure_stack_promotion0A10AtMostOnceyyyyXEnF
+// CHECK: apply [[CALLEE]]([[DEP]])
+// CHECK-NEXT: dealloc_stack [[PA]]
+// CHECK-NEXT: dealloc_stack [[TEMP]]
+// CHECK: } // end sil function '$s43called_at_most_once_closure_stack_promotion27testGenericConsumingCaptureyyAA0I2NCVyxGnlF'
+func testGenericConsumingCapture<T>(_ nc: consuming GenericNC<T>) {
+  calledAtMostOnce {
+    nc.take()
+  }
+}

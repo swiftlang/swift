@@ -2848,6 +2848,13 @@ signature). Instead:
     by other instruction independently of the `partial_apply`. The
     lifetime of the stack context of a `partial_apply [on_stack]` must
     be terminated with a `dealloc_stack`.
+
+    The context of a `partial_apply [on_stack] [called_at_most_once]`
+    owns the values that the closure consumes. This includes the values
+    that are passed directly and the noncopyable address-only values that
+    are passed as `@in` arguments. The `partial_apply` consumes such an 
+    `@in` argument, which leaves its memory uninitialized, and the caller
+    has nothing left to destroy.
 2.  If the `partial_apply` has an escaping function type (not
     `[on_stack]`) then the closure context will be heap allocated with a
     retain count of 1. Any closed over parameters (except for `@inout`
