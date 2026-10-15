@@ -944,14 +944,14 @@ extension Collection {
   ///     print(streetsSlice[0])
   ///     // error: Index out of bounds
   ///
-  /// - Parameter r: A range of the collection's indices. The bounds of
+  /// - Parameter range: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
   @inlinable
-  public subscript<R: RangeExpression>(r: R)
+  public subscript<R: RangeExpression>(range: R)
   -> SubSequence where R.Bound == Index {
-    return self[r.relative(to: self)]
+    return self[range.relative(to: self)]
   }
   
   @inlinable
