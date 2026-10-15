@@ -80,3 +80,17 @@ public final class SPIProperty {
 // CHECK-NEXT:  @ObservationIgnored
 // CHECK-NEXT:  private  var _it  = 0
 _ = 0
+
+@available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+@Observable
+public final class UsableFromInlineProperty {
+  @usableFromInline var it = 0
+}
+
+// The private backing storage cannot be '@usableFromInline'; the observed
+// property keeps it.
+// CHECK-LABEL: @__swiftmacro{{.*}}UsableFromInlineProperty{{.*}}ObservationTracked{{.*}}fMp_.swift
+// CHECK-NEXT:  {{-+}}
+// CHECK-NEXT:  @ObservationIgnored
+// CHECK-NEXT:  private  var _it  = 0
+_ = 0

@@ -275,6 +275,7 @@ extension VariableDeclSyntax {
   // the observed property, whose accessors provide their effect.
   static let attributesExcludedFromPrivateStorage: Set<String> = [
     "_spi",
+    "usableFromInline",
   ]
 
   func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> VariableDeclSyntax {
