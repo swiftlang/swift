@@ -1367,6 +1367,9 @@ Added: __swift_setWillThrowTypedHandler
 // Separate runtime for `is` tests
 Added: _swift_dynamicCastTest
 
+// Crash when an exactly-once closure is destroyed without being called.
+Added: _swift_onceClosureDestroyedError
+
 // Prespecialized tuple metadata witness tables
 Added: _swift_tupleWitnesses_nonpod_inline
 Added: _swift_tupleWitnesses_nonpod_noninline
