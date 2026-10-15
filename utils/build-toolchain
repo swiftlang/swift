@@ -29,6 +29,9 @@ function usage() {
   echo "-a --no-assert"
   echo "No assertions"
   echo ""
+  echo "-m --multi-arch"
+  echo "Build toolchain for Intel as well as Apple Silicon"
+  echo ""
   echo "--distcc"
   echo "Build with distcc to speed up the toolchain build"
   echo ""
@@ -112,6 +115,9 @@ while [ $# -ne 0 ]; do
     -a|--no-assert)
       NO_ASSERTIONS=",no_assertions"
   ;;
+    -m|--multi-arch)
+      MULTI_ARCH=",multi_arch"
+  ;;
   -h|--help)
     usage
     exit 0
@@ -162,7 +168,7 @@ SCCACHE_FLAG="${SCCACHE_FLAG}"
 
 ./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} ${PRESET_FILE_FLAGS} \
         ${SCCACHE_FLAG} \
-        --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${NO_ASSERTIONS}${NO_TEST}${USE_OS_RUNTIME}${MACOS_ONLY}" \
+        --preset="${PRESET_PREFIX}${SWIFT_PACKAGE}${NO_ASSERTIONS}${NO_TEST}${USE_OS_RUNTIME}${MACOS_ONLY}${MULTI_ARCH}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
