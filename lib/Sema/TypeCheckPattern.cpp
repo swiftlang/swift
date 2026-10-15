@@ -1607,6 +1607,12 @@ Pattern *TypeChecker::coercePatternToType(
       // Otherwise, see if we can introduce a cast pattern to get from an
       // existential pattern type to the enum type.
       else if (type->isAnyExistentialType()) {
+        if (parentTy->hasPlaceholder()) {
+          diags.diagnose(EEP->getParentTypeRepr()->getLoc(),
+                         diag::placeholder_type_not_allowed);
+          return nullptr;
+        }
+
         auto foundCastKind = typeCheckCheckedCast(
             type, parentTy, CheckedCastContextKind::EnumElementPattern, dc);
         // If the cast failed, we can't resolve the pattern.

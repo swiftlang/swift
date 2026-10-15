@@ -156,6 +156,7 @@ public:
   /// type-checked.
   void setType(Type ty) {
     assert(!ty || !ty->hasTypeVariable());
+    ASSERT(!ty || !ty->hasPlaceholder());
     Ty = ty;
   }
 
