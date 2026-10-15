@@ -43,14 +43,13 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/TypeBase.h"
 #include "clang/Basic/Module.h"
 #include "clang/Sema/Overload.h"
-#include "llvm-c/Types.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -123,12 +122,10 @@ printSwiftIdentifier(Identifier name, llvm::raw_ostream &os,
 // `str()`.
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
-  const clang::ASTContext &ctx;
   llvm::SmallString<128> result;
   llvm::raw_svector_ostream out;
 
-  explicit SwiftCountExprEmitter(const clang::ASTContext &ctx)
-      : ctx(ctx), out(result) {}
+  SwiftCountExprEmitter() : out(result) {}
 
   StringRef str() const { return result; }
 
@@ -275,6 +272,63 @@ private:
   }
 };
 
+/// Bounds and lifetime facts about a clang parameter or return type that can
+/// be read from the clang AST alone, shared by the `_SwiftifyImport` and
+/// `_Unswiftify` generators.
+/// FIXME: generalize to also take care of std::span
+struct ClangBoundsInfo {
+  /// The `__counted_by` / `__sized_by` annotation on the type, if any. Its
+  /// count expression is not guaranteed to be expressible in Swift.
+  const clang::CountAttributedType *CAT;
+  /// Construct a (Mutable)(Raw)Span rather than a buffer pointer.
+  bool nonescaping;
+
+private:
+  ClangBoundsInfo(const clang::CountAttributedType *CAT)
+      : CAT(CAT), nonescaping(false) {}
+
+public:
+  static ClangBoundsInfo forReturn(clang::QualType ty) {
+    return {ty->getAs<clang::CountAttributedType>()};
+  }
+  static ClangBoundsInfo forParam(const clang::ParmVarDecl *param) {
+    ClangBoundsInfo info(param->getType()->getAs<clang::CountAttributedType>());
+    info.nonescaping = param->hasAttr<clang::NoEscapeAttr>();
+    return info;
+  }
+
+  /// Emit the bound (an element count for `__counted_by`, a byte size for
+  /// `__sized_by`) as a Swift expression. Currently only used by _Unswiftify,
+  /// which is only invoked if this has already been successfully processed by
+  /// swiftify, so this should never fail.
+  void emitBoundsExpr(llvm::raw_ostream &os) const {
+    ASSERT(hasBoundsAnnotation());
+    SwiftCountExprEmitter emitter;
+    bool emitted = emitter.Visit(CAT->getCountExpr());
+    ASSERT(emitted && "count expression is not expressible in Swift");
+    (void)emitted;
+    os << emitter.str();
+  }
+
+  /// If the cound expr (ignoring implicit casts) is a reference to a single
+  /// parameter, return that parameter's index. Any parameter identified by
+  /// this function will be dropped from the safe signature.
+  std::optional<unsigned> getReferencedParamIndex() const {
+    if (!CAT)
+      return std::nullopt;
+    clang::Expr *expr = CAT->getCountExpr()->IgnoreImpCasts();
+    const auto *declRef = dyn_cast<clang::DeclRefExpr>(expr);
+    if (!declRef)
+      return std::nullopt;
+    const auto *param = dyn_cast<clang::ParmVarDecl>(declRef->getDecl());
+    if (!param)
+      return std::nullopt;
+    return param->getFunctionScopeIndex();
+  }
+
+  bool hasBoundsAnnotation() const { return CAT != nullptr; }
+};
+
 static Type ConcretePointeeType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
@@ -410,7 +464,7 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     if (isSizedBy ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
                   : ConcretePointeeType(swiftType).isNull())
       return false;
-    SwiftCountExprEmitter emitter(ctx);
+    SwiftCountExprEmitter emitter;
     if (!emitter.Visit(CAT->getCountExpr()))
       return false;
 
@@ -764,8 +818,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     };
     clang::QualType clangReturnTy = ClangDecl->getReturnType();
     bool returnIsStdSpan = isStdSpanType(clangReturnTy);
-    auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
-    bool returnHasBoundsInfo = returnIsStdSpan || CAT != nullptr;
+    ClangBoundsInfo returnBoundsInfo =
+        ClangBoundsInfo::forReturn(clangReturnTy);
+    bool returnHasBoundsInfo =
+        returnIsStdSpan || returnBoundsInfo.hasBoundsAnnotation();
     bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
     bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
     bool returnHasLifetimeInfo = false;
@@ -838,18 +894,20 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         return false;
 
       bool paramHasBoundsInfo = false;
-      auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
-      if (CAT && mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
+      ClangBoundsInfo bounds = ClangBoundsInfo::forParam(clangParam);
+      if (bounds.CAT && mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
         Self.diagnose(HeaderLoc(clangParam->getLocation()),
-                 diag::warn_clang_ignored_bounds_on_self, getAttributeName(CAT));
+                      diag::warn_clang_ignored_bounds_on_self,
+                      getAttributeName(bounds.CAT));
         auto swiftName = ClangDecl->template getAttr<clang::SwiftNameAttr>();
         ASSERT(swiftName &&
                "free function mapped to instance method without swift_name??");
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
-      } else if (CAT && printer.printCountedBy(
-                            CAT, swiftParamTy, mappedIndex,
-                            swiftParam->isImplicitlyUnwrappedOptional())) {
+      } else if (bounds.CAT &&
+                 printer.printCountedBy(
+                     bounds.CAT, swiftParamTy, mappedIndex,
+                     swiftParam->isImplicitlyUnwrappedOptional())) {
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
@@ -858,7 +916,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       paramHasBoundsInfo |= paramIsStdSpan;
 
       bool paramHasLifetimeInfo = false;
-      if (clangParam->template hasAttr<clang::NoEscapeAttr>()) {
+      if (bounds.nonescaping) {
         DLOG("Found noescape attribute\n");
         printer.printNonEscaping(mappedIndex);
         paramHasLifetimeInfo = true;
@@ -925,10 +983,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     (void)printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
-    if (CAT && printer.printCountedBy(
-                   CAT, swiftReturnTy, SwiftifyInfoPrinter::RETURN_VALUE_INDEX,
-                   MappedDecl->isImplicitlyUnwrappedOptional())) {
-      DLOG("Found bounds info '" << clang::QualType(CAT, 0)
+    if (returnBoundsInfo.CAT &&
+        printer.printCountedBy(returnBoundsInfo.CAT, swiftReturnTy,
+                               SwiftifyInfoPrinter::RETURN_VALUE_INDEX,
+                               MappedDecl->isImplicitlyUnwrappedOptional())) {
+      DLOG("Found bounds info '" << clang::QualType(returnBoundsInfo.CAT, 0)
                                  << "' on return value\n");
       attachMacro = true;
     }
@@ -1083,45 +1142,11 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
 namespace {
 using namespace swift;
 
-struct UnswiftifyParamInfo {
-  /// Swift source for the bound expression (an element count for
-  /// `__counted_by`, a byte size for `__sized_by`).
-  std::string boundsExprSource;
-  /// Has a `__counted_by` / `__sized_by` annotation.
-  bool hasBoundsAnnotation = false;
-  /// The bound is a byte size rather than an element count.
-  bool sizedBy = false;
-  /// Has the `_or_null` variant.
-  bool orNull = false;
-  /// Construct a (Mutable)(Raw)Span rather than a buffer pointer.
-  bool nonescaping = false;
+struct UnswiftifyParamInfo : ClangBoundsInfo {
   /// Referenced purely as another parameter's bound, so dropped from the
   /// forwarding call.
   bool isElidedBoundsParam = false;
 };
-
-/// If \p expr (ignoring implicit casts) is a reference to one of \p clangFD's
-/// parameters, return that parameter's index. Any parameter identified by this
-/// function will be dropped from the safe signature.
-std::optional<unsigned>
-getReferencedParamIndex(const clang::Expr *expr,
-                        const clang::FunctionDecl *clangFD) {
-  expr = expr->IgnoreImpCasts();
-  const auto *declRef = dyn_cast<clang::DeclRefExpr>(expr);
-  if (!declRef)
-    return std::nullopt;
-  const auto *param = dyn_cast<clang::ParmVarDecl>(declRef->getDecl());
-  if (!param)
-    return std::nullopt;
-  // The count expression's `DeclRefExpr` may name the parameter of a different
-  // redeclaration (prototype vs. definition) than `clangFD`. Parameter indices
-  // are stable across redeclarations, so verify the owner is a redeclaration of
-  // `clangFD` and use that redecl's index.
-  const auto *owner = dyn_cast<clang::FunctionDecl>(param->getDeclContext());
-  if (!owner || owner->getCanonicalDecl() != clangFD->getCanonicalDecl())
-    return std::nullopt;
-  return param->getFunctionScopeIndex();
-}
 
 /// The classification of a (possibly optional) pointer type.
 struct PointerClassification {
@@ -1170,9 +1195,10 @@ struct SafeBufferSpelling {
   /// Select the type for a parameter based on its bounds flags and mutability.
   static SafeBufferSpelling forParam(const UnswiftifyParamInfo &info,
                                      Type pty) {
+    ASSERT(info.CAT && "std::span not yet supported in _Unswiftify");
     auto [pointee, isMutable] = classifyPointerType(pty);
     bool span = info.nonescaping;
-    bool raw = info.sizedBy;
+    bool raw = info.CAT->isCountInBytes();
 
     // Each (span, raw) combination maps to a distinct type family; within a
     // family, mutability picks the concrete spelling.
@@ -1255,6 +1281,7 @@ std::string emitSafeValueBinding(const UnswiftifyParamInfo &info,
                                  std::string bindingName, std::string countName,
                                  bool isInout, llvm::raw_ostream &os) {
   DLOG_SCOPE("Binding safe buffer\n");
+  ASSERT(info.CAT && "std::span not yet supported in _Unswiftify");
   std::string pointerName = escapeSwiftIdentifier(targetParam->getName());
   Type pty = targetParam->getInterfaceType();
   StringRef bindKeyword = isInout ? "var" : "let";
@@ -1272,16 +1299,19 @@ std::string emitSafeValueBinding(const UnswiftifyParamInfo &info,
   // the count to 0 in that case so the null branch constructs an empty
   // collection and the precondition only constrains the non-null case.
   os << "    let " << countName << " = ";
-  if (info.orNull && isOptionalPointer) {
+  if (info.CAT->isOrNull() && isOptionalPointer) {
     os << "(";
     if (pty->isUnsafe())
       os << "unsafe ";
-    os << pointerName << " != nil) ? Int(" << info.boundsExprSource
-       << ") : 0\n";
+    os << pointerName << " != nil) ? Int(";
+    info.emitBoundsExpr(os);
+    os << ") : 0\n";
     os << "    precondition(" << countName
       << " >= 0, \"non-null buffer with negative count\")\n";
   } else {
-    os << "Int(" << info.boundsExprSource << ")\n";
+    os << "Int(";
+    info.emitBoundsExpr(os);
+    os << ")\n";
     os << "    precondition(" << countName
        << " >= 0, \"buffer with negative count\")\n";
     if (isOptionalPointer)
@@ -1337,27 +1367,15 @@ std::string emitSafeValueBinding(const UnswiftifyParamInfo &info,
 void deriveParamInfo(const clang::FunctionDecl *clangFD,
                      llvm::SmallVectorImpl<UnswiftifyParamInfo> &infos) {
   DLOG_SCOPE("Deriving parameter info\n");
-  infos.assign(clangFD->getNumParams(), UnswiftifyParamInfo());
-  clang::ASTContext &clangCtx = clangFD->getASTContext();
-  for (auto [index, clangParam] : llvm::enumerate(clangFD->parameters())) {
-    UnswiftifyParamInfo &info = infos[index];
-    clang::QualType clangParamTy = clangParam->getType();
-    if (const auto *CAT = clangParamTy->getAs<clang::CountAttributedType>()) {
-      SwiftCountExprEmitter emitter(clangCtx);
-      if (emitter.Visit(CAT->getCountExpr())) {
-        info.hasBoundsAnnotation = true;
-        info.sizedBy = CAT->isCountInBytes();
-        info.orNull = CAT->isOrNull();
-        info.boundsExprSource = emitter.str().str();
-        if (auto countIndex =
-                getReferencedParamIndex(CAT->getCountExpr(), clangFD);
-            countIndex && *countIndex < infos.size())
-          infos[*countIndex].isElidedBoundsParam = true;
-      }
-    }
-    if (clangParam->hasAttr<clang::NoEscapeAttr>())
-      info.nonescaping = true;
-  }
+  assert(infos.empty());
+  for (const clang::ParmVarDecl *clangParam : clangFD->parameters())
+    infos.push_back(UnswiftifyParamInfo{ClangBoundsInfo::forParam(clangParam)});
+
+  // A bound may refer to a later parameter, so the elided parameters can only
+  // be flagged once every entry exists.
+  for (const UnswiftifyParamInfo &info : infos)
+    if (std::optional<unsigned> idx = info.getReferencedParamIndex())
+      infos[*idx].isElidedBoundsParam = true;
 }
 
 /// Emit the generated peer's `@c @implementation func NAME(PARAMS) -> RET {`
@@ -1432,7 +1450,7 @@ bool emitArgumentBindings(llvm::raw_ostream &os,
     const ParamDecl *sourceParam = sourceParams->get(callArgIdx);
     bool isInout = sourceParam->isInOut();
     Identifier label = sourceParam->getArgumentName();
-    if (info.hasBoundsAnnotation) {
+    if (info.hasBoundsAnnotation()) {
       Type srcType = sourceParam->getInterfaceType();
       callArgs.emplace_back(
           label,
