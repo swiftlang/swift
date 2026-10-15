@@ -169,6 +169,7 @@ install(TARGETS swift_Concurrency
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_Concurrency)
+emit_symbol_graph(swift_Concurrency)
 install_swift_interface(swift_Concurrency)
 
 # Configure plist creation for Darwin platforms.

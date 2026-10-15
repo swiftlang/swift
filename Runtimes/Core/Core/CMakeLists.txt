@@ -428,6 +428,7 @@ install(TARGETS swiftCore
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftCore)
+emit_symbol_graph(swiftCore)
 install_swift_interface(swiftCore)
 
 # Configure plist creation for Darwin platforms.
