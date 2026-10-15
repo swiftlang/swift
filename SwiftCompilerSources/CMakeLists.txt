@@ -161,7 +161,7 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-D${condition}")
   endforeach()
 
-  if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  if(DEFINED SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT AND NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
 
