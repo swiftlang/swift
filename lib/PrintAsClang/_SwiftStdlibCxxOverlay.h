@@ -183,16 +183,15 @@ SWIFT_INLINE_THUNK const void *_Nullable getErrorMetadata() {
 // libraries for now.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunique-object-duplication"
-  static SymbolicP errorSymbol;
   static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
-#pragma clang diagnostic pop
-  errorSymbol._1 = 2;
-  errorSymbol._2 =
+  // Initialize once so concurrent as() and what() calls only read the symbol.
+  static const SymbolicP errorSymbol = {
+      2,
       static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&got_ss5ErrorMp) -
-                            reinterpret_cast<uintptr_t>(&errorSymbol._2));
-  errorSymbol._3[0] = '_';
-  errorSymbol._3[1] = 'p';
-  errorSymbol._4 = 0;
+                            reinterpret_cast<uintptr_t>(&errorSymbol._2)),
+      {'_', 'p'},
+      0};
+#pragma clang diagnostic pop
   static_assert(sizeof(errorSymbol) == 8, "");
   auto charErrorSymbol = reinterpret_cast<const char *>(&errorSymbol);
 

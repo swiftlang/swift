@@ -2,8 +2,8 @@
 
 // RUN: %target-swift-frontend %S/swift-functions-errors.swift -module-name Functions -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX -typecheck -verify -emit-clang-header-path %t/functions.h
 
-// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-errors-execution.o -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
-// RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
+// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-errors-execution.o -pthread -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+// RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -Xclang-linker -pthread -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain -enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX
 
 // RUN: %target-codesign %t/swift-functions-errors-execution
 // RUN: %target-run %t/swift-functions-errors-execution | %FileCheck %s
@@ -16,14 +16,40 @@
 // UNSUPPORTED: CPU=arm64e
 
 #include "functions.h"
+#include <atomic>
 #include <cassert>
 #include <cstdio>
+#include <cstring>
+#include <thread>
 #include <utility>
 
 int main() {
   static_assert(!noexcept(Functions::emptyThrowFunction()), "noexcept function");
   static_assert(!noexcept(Functions::throwFunction()), "noexcept function");
   static_assert(!noexcept(Functions::throwFunctionWithReturn()), "noexcept function");
+
+  // Concurrent first calls must return the same cached description.
+  try {
+    Functions::throwDescriptiveError();
+  } catch (const swift::Error &e) {
+    std::atomic<bool> start{false};
+    const char *descriptions[4] = {};
+    std::thread readers[4];
+    for (int i = 0; i < 4; ++i) {
+      readers[i] = std::thread([&, i] {
+        while (!start.load(std::memory_order_acquire))
+          std::this_thread::yield();
+        descriptions[i] = e.what();
+      });
+    }
+    start.store(true, std::memory_order_release);
+    for (auto &reader : readers)
+      reader.join();
+    for (const char *description : descriptions) {
+      assert(description == descriptions[0]);
+      assert(std::strcmp(description, "custom error: café ☕") == 0);
+    }
+  }
 
   try {
     Functions::emptyThrowFunction();
@@ -52,7 +78,15 @@ int main() {
   }
   try {
     Functions::testDestroyedError();
-  } catch(const swift::Error &e) { }
+  } catch (const swift::Error &e) {
+    // Describing and copying the error must still destroy its payload once.
+    assert(e.what()[0] != '\0');
+    swift::Error copy(e);
+    assert(copy.what()[0] != '\0');
+    swift::Error assigned;
+    assigned = copy;
+    assigned = std::move(copy);
+  }
 
   static_assert(std::is_base_of<std::exception, swift::Error>::value,
                 "swift::Error is not a std::exception");
