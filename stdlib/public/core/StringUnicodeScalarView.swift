@@ -12,6 +12,112 @@
 
 // FIXME(ABI)#71 : The UTF-16 string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+@inline(__always)
+internal func _utf8Chunk<U: SIMD>(
+  readPtr: inout UnsafeRawPointer,
+  result: inout U,
+  type: U.Type,
+) where U.Scalar == UInt8 {
+  let chunk = readPtr.loadUnaligned(as: U.self)
+  // 1 in each lane where the top bit was 0
+  let asciiCount = ~chunk &>> 7
+  result &+= asciiCount
+  let topTwoBits = chunk &>> 6
+  for idx in topTwoBits.indices {
+    // 1 in each lane where the top 2 bits were 11
+    // for unclear reasons this vectorizes better than the actual SIMD methods
+    result[idx] &+= (topTwoBits[idx] == 3) ? 1 : 0
+  }
+  readPtr = readPtr + MemoryLayout<U>.stride
+}
+
+@inline(__always)
+internal func _utf8CountInitial<U: SIMD>(
+  _ ptr: inout UnsafeRawPointer,
+  base: UnsafeRawPointer,
+  total: Int,
+  unroll: Int = 1,
+  type: U.Type,
+) -> Int where U.Scalar == UInt8 {
+  let end = base + total & (~(MemoryLayout<U>.stride &- 1) * unroll)
+  var result = 0
+  while ptr < end {
+    var runningTotal = U.zero
+    for _ in 0 ..< unroll {
+      _utf8Chunk(readPtr: &ptr, result: &runningTotal, type: U.self)
+    }
+    var scalarTotal = 0
+    for idx in runningTotal.indices {
+      scalarTotal &+= Int(runningTotal[idx])
+    }
+    result += scalarTotal
+  }
+  return result
+}
+
+@inline(__always)
+internal func _utf8Count<U: SIMD>(
+  _ ptr: inout UnsafeRawPointer,
+  base: UnsafeRawPointer,
+  total: Int,
+  unroll: Int = 1,
+  type: U.Type,
+) -> Int where U.Scalar == UInt8 {
+  let end = base + total & (~(MemoryLayout<U>.stride &- 1) * unroll)
+  var result = 0
+  // If we had enough bytes for this to loop it would have run the previous one more times, so save a branch by not checking if we need to
+  if ptr < end {
+    var runningTotal = U.zero
+    for _ in 0 ..< unroll {
+      _utf8Chunk(readPtr: &ptr, result: &runningTotal, type: U.self)
+    }
+    var scalarTotal = 0
+    for idx in runningTotal.indices {
+      scalarTotal &+= Int(runningTotal[idx])
+    }
+    result += scalarTotal
+  }
+  return result
+}
+
+@usableFromInline func countUTF8CodePoints(_ input: UnsafeBufferPointer<UInt8>) -> Int {
+  let count = input.count
+  let base = UnsafeRawPointer(input.baseAddress!)
+  var ptr = base
+  var result = 0
+
+  result += _utf8CountInitial(
+    &ptr,
+    base: base,
+    total: count,
+    unroll: 8,
+    type: SIMD16<UInt8>.self
+  )
+  result += _utf8Count(
+    &ptr,
+    base: base,
+    total: count,
+    unroll: 4,
+    type: SIMD16<UInt8>.self
+  )
+  result += _utf8Count(
+    &ptr,
+    base: base,
+    total: count,
+    unroll: 2,
+    type: SIMD16<UInt8>.self
+  )
+  result += _utf8Count(&ptr, base: base, total: count, type: SIMD16<UInt8>.self)
+  result += _utf8Count(&ptr, base: base, total: count, type: SIMD8<UInt8>.self)
+  result += _utf8Count(&ptr, base: base, total: count, type: SIMD4<UInt8>.self)
+  result += _utf8Count(&ptr, base: base, total: count, type: SIMD2<UInt8>.self)
+  if ptr < (base + count) {
+    result += Int(~ptr.loadUnaligned(as: UInt8.self) >> 7)
+  }
+  return result
+}
+#endif
 
 extension String {
   /// A view of a string's contents as a collection of Unicode scalar values.
@@ -175,7 +281,21 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   public func distance(from start: Index, to end: Index) -> Int {
     let start = _guts.validateInclusiveScalarIndex(start)
     let end = _guts.validateInclusiveScalarIndex(end)
-
+    
+    if _guts.isASCII {
+      return end._encodedOffset - start._encodedOffset
+    }
+    
+#if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+    if _guts.isFastUTF8 {
+      return _guts.withFastUTF8 { utf8 in
+        countUTF8CodePoints(UnsafeBufferPointer(
+          rebasing: utf8[start._encodedOffset ..< end._encodedOffset]
+        ))
+      }
+    }
+#endif
+    
     var i = start
     var count = 0
     if i < end {
