@@ -5874,10 +5874,12 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     }
 
     // SIL prints Transferable requirements, so it has to parse them back.
+    // The stdlib is allowed to adopt Transferable without the feature flag.
     if (protoTy->getDecl()->isSpecificProtocol(
             KnownProtocolKind::Transferable) &&
-        !isSILSourceFile() &&
-        !getASTContext().LangOpts.hasFeature(Feature::NontransferableTypes)) {
+        !(isSILSourceFile() ||
+          getDeclContext()->getParentModule()->isStdlibModule() ||
+          getASTContext().LangOpts.hasFeature(Feature::NontransferableTypes))) {
       if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
         diagnose(repr->getNameLoc(),
                  diag::transferable_protocol_requires_feature);

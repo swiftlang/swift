@@ -119,3 +119,23 @@ func checkCaptures(nt: NT, c: NTClass) {
   useSendable { _ = nt } // expected-error {{capture of 'nt' with non-Sendable type 'NT' in a '@Sendable' closure}}
   useSendable { _ = c } // expected-error {{capture of 'c' with non-Sendable type 'NTClass' in a '@Sendable' closure}}
 }
+
+// A metatype can be Sendable without values of its type being Transferable,
+// so SendableMetatype doesn't imply Transferable, but Sendable still does.
+
+func requiresTransferable<T>(_: T.Type) {}
+// expected-note@-1 {{'where T: Transferable' is implicit here}}
+func usesSendableMetatype<T: SendableMetatype>(_: T.Type) {}
+// expected-note@-1 {{'where T: Transferable' is implicit here}}
+
+func usesNontransferableSendableMetatype<T: SendableMetatype & ~Transferable>(_: T.Type) {
+  requiresTransferable(T.self) // expected-error {{global function 'requiresTransferable' requires that 'T' conform to 'Transferable'}}
+}
+
+func nontransferableSendable<T: Sendable & ~Transferable>(_: T.Type) {}
+// expected-error@-1 {{composition cannot contain '~Transferable' when another member requires 'Transferable'}}
+
+func checkSendableMetatype() {
+  usesSendableMetatype(NT.self) // expected-error {{global function 'usesSendableMetatype' requires that 'NT' conform to 'Transferable'}}
+  usesNontransferableSendableMetatype(NT.self)
+}
