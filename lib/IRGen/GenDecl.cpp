@@ -32,6 +32,7 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -2244,6 +2245,41 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
 /// Emit symbols for eliminated dead methods, which can still be referenced
 /// from other modules. This happens e.g. if a public class contains a (dead)
 /// private method.
+/// Whether a mangled symbol name denotes an optimizer-created specialization
+/// (function-signature, generic, ...). Specializations are never part of a
+/// module's ABI: they have no vtable slot, no TBD entry, and no presence in
+/// the module interface (TBDGen walks AST decls, never optimizer clones).
+/// Note this deliberately does not use SILFunction::isSpecialization(): the
+/// existential specializer never sets SpecializationInfo, so that predicate
+/// misses exactly the functions this is needed for.
+static bool isSpecializationSymbol(llvm::StringRef mangledName) {
+  Demangle::Context ctx;
+  Demangle::NodePointer root = ctx.demangleSymbolAsNode(mangledName);
+  if (!root)
+    return false;
+  using Kind = Demangle::Node::Kind;
+  llvm::SmallVector<Demangle::NodePointer, 16> worklist;
+  worklist.push_back(root);
+  while (!worklist.empty()) {
+    Demangle::NodePointer node = worklist.pop_back_val();
+    switch (node->getKind()) {
+    case Kind::FunctionSignatureSpecialization:
+    case Kind::GenericSpecialization:
+    case Kind::GenericSpecializationNotReAbstracted:
+    case Kind::GenericSpecializationInResilienceDomain:
+    case Kind::GenericPartialSpecialization:
+    case Kind::GenericPartialSpecializationNotReAbstracted:
+      return true;
+    // Prespecialized symbols are ABI by design (explicit cross-module
+    // references), so they must keep their exported aliases.
+    default:
+      break;
+    }
+    for (auto &child : *node)
+      worklist.push_back(child);
+  }
+  return false;
+}
 void IRGenModule::emitVTableStubs() {
   if (getSILModule().getOptions().StopOptimizationAfterSerialization) {
     // We're asked to emit an empty IR module
@@ -2294,7 +2330,20 @@ void IRGenModule::emitVTableStubs() {
                                         F.getName(), stub);
     }
 
-    if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
+    if (isSpecializationSymbol(F.getName()) &&
+        !Module.getTargetTriple().isOSBinFormatCOFF())
+      // The zombie is an optimizer-created specialization whose effective
+      // linkage is public only because the original is a private method of an
+      // open class. An exported alias for it trips TBD validation ("in
+      // generated IR file, but not in TBD file", which runs by default in
+      // asserts compilers), and nothing can legitimately reference it
+      // cross-module. Keep the stub alias hidden so it stays linkable within
+      // the module. This must NOT extend to non-specializations:
+      // derived-class vtables can reference a private base method
+      // cross-module, which is why the alias is exported in the first place.
+      // COFF is exempt to preserve Windows dllexport behavior.
+      alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
+    else if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
     else
       ApplyIRLinkage(IRGen.Opts.InternalizeSymbols
