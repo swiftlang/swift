@@ -161,13 +161,13 @@ do {
 
     func f(_ p: UnsafeMutableRawPointer) {
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(self.p)) else {
-        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
+        // expected-warning@-1 {{initializer for conditional binding has non-optional type 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x
 
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(p)) else {
-        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
+        // expected-warning@-1 {{initializer for conditional binding has non-optional type 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x

@@ -5984,9 +5984,10 @@ ERROR(enum_element_pattern_member_not_found,none,
 ERROR(optional_element_pattern_not_valid_type,none,
       "optional pattern '?' cannot match value of non-optional type %0",
       (Type))
-ERROR(condition_optional_element_pattern_not_valid_type,none,
-      "initializer for conditional binding must have Optional type, not %0",
-      (Type))
+GROUPED_WARNING(condition_binding_non_optional_type,
+                ConditionalBindingNonOptionalType,none,
+                "initializer for conditional binding has non-optional type %0",
+                (Type))
 ERROR(ambiguous_enum_pattern_type,none,
       "generic enum type %0 is ambiguous without explicit generic parameters "
       "when matching value of type %1", (Type, Type))

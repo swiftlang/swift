@@ -15,8 +15,8 @@ func foo() -> Int {
 }
 
 guard let y = 0 else {}
-// CHECK_NAMES: error: initializer for conditional binding must have Optional type, not 'Int' [condition_optional_element_pattern_not_valid_type]{{$}}
-// CHECK_NONAMES: error: initializer for conditional binding must have Optional type, not 'Int'{{$}}
+// CHECK_NAMES: warning: initializer for conditional binding has non-optional type 'Int' [condition_binding_non_optional_type]{{$}}
+// CHECK_NONAMES: warning: initializer for conditional binding has non-optional type 'Int'{{$}}
 
 let z: Double = ""
 // CHECK_NAMES: error: cannot convert value of type 'String' to specified type 'Double' [cannot_convert_initializer_value]{{$}}

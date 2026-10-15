@@ -408,7 +408,7 @@ func test_50875() -> String {
   if let s = c.f() {
     return s
   }
-  if let s = c.g() { //expected-error{{initializer for conditional binding must have Optional type, not 'String'}}
+  if let s = c.g() { //expected-warning{{initializer for conditional binding has non-ptional type 'String'}}
     return s
   }
   if let s = c.h() { //expected-error{{ambiguous use of 'h()'}}
@@ -845,7 +845,7 @@ func testUndefinedInClosureVar() {
   }
 }
 
-// Codify inconsistent behavior of 'guard let' with non-Optional bindings.
+// Test 'guard let' with non-Optional bindings.
 do {
   protocol P {}
 
@@ -856,28 +856,28 @@ do {
 
   func invalidGuardLetInitializer(b: Bool, c1: First, c2: First?, c3: [First], d: Second) {
     guard let _: First = c1 else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'First'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'First'}}
 
     guard let _: P = c1 else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
 
     guard let _: P = b ? c1 : c1 else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
 
     guard let _: P = c2 != nil ? c2! : c1 else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
 
     guard let _: P = c3.first != nil ? c3.first! : c1 else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
 
     guard let _: P = b ? c1 : d else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
 
     guard let _: P = c2 != nil ? c2! : d else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
 
     guard let _: P = c3.first != nil ? c3.first! : d else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'any P'}}
   }
 }
 
