@@ -1569,6 +1569,28 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
     }
   }
 
+  // Contrariwise, when a global function is turned into an accessor using
+  // import-as-member, the accessors are imported first and we must recursively
+  // register their property.
+  if (auto *modernAccessor = dyn_cast<AccessorDecl>(modernVD)) {
+    auto *legacyAccessor = cast_or_null<AccessorDecl>(legacyVD);
+    auto *property = dyn_cast<VarDecl>(modernAccessor->getStorage());
+    auto *legacyProperty =
+        legacyAccessor ? dyn_cast<VarDecl>(legacyAccessor->getStorage())
+                       : nullptr;
+
+    // Guard against registering the property twice (either because there are
+    // two accessors, or by recursing back and forth between "register accessors
+    // for property" and "register property for accessors").
+    if (property && property != legacyProperty &&
+        !property->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
+      registerCArrayProjections(property, legacyProperty,
+                                /*addAlternate=*/false);
+      if (legacyProperty)
+        ImporterImpl.addAlternateDecl(modernAccessor, legacyProperty);
+    }
+  }
+
   // If an operator was synthesized from a function, there is one for each
   // projection and they are projections of each other too.
   if (auto *modernFunc = dyn_cast<FuncDecl>(modernVD)) {

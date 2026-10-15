@@ -26,6 +26,11 @@ Prop makeProp(int (*buf)[4])
 void propMethod(Prop *prop, int (*buf)[4])
     __attribute__((swift_name("Prop.method(self:_:)")));
 
+int (*getBuf(const Prop *prop))[4]
+    __attribute__((swift_name("getter:Prop.buf(self:)")));
+void setBuf(Prop *prop, int (*buf)[4])
+    __attribute__((swift_name("setter:Prop.buf(self:_:)")));
+
 //--- typecheck.swift
 import CArrays
 
@@ -52,6 +57,21 @@ func test(
   prop.method(array)
   // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  // Property
+  let _: UnsafeMutablePointer<InlineArray<4, Int32>> = prop.buf
+  // expected-legacy-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>') to type 'UnsafeMutablePointer<InlineArray<4, Int32>>'}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') and 'InlineArray<4, Int32>') are expected to be equal}}
+  let _: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)> = prop.buf
+  // expected-modern-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>') to type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>'}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('[4 of CInt]' (aka 'InlineArray<4, Int32>') and '(Int32, Int32, Int32, Int32)') are expected to be equal}}
+
+  prop.buf = tuple
+  // expected-modern-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to type 'UnsafeMutablePointer<[4 of CInt]>?' (aka 'Optional<UnsafeMutablePointer<InlineArray<4, Int32>>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  prop.buf = array
+  // expected-legacy-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>?' (aka 'Optional<UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
 }
 
 //--- codegen.swift
@@ -67,4 +87,6 @@ typealias CArray = (Int32, Int32, Int32, Int32)
 func test(_ pointer: UnsafeMutablePointer<CArray>, _ prop: inout Prop) {
   prop = Prop(buf: pointer)
   prop.method(pointer)
+  prop.buf = pointer
+  let _: UnsafeMutablePointer<CArray> = prop.buf
 }

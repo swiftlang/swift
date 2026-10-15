@@ -959,7 +959,9 @@ public:
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
-  llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+  llvm::DenseMap<std::pair<const clang::FunctionDecl *, CArrayProjection>,
+                 VarDecl *>
+      FunctionsAsProperties;
 
   /// Maps a foreign reference type's Clang record to the (retain, release)
   /// Clang functions that implement its custom reference counting.

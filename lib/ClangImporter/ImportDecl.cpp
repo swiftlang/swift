@@ -1124,6 +1124,34 @@ namespace {
     /// purposes.
     ImportNameVersion getVersion() const { return version; }
 
+    /// See if the declaration for \p key has already been imported. Takes the
+    /// \c currentCArrayProjection into account.
+    ///
+    /// Use this to break cycles when, in the process of importing a
+    /// declaration, you make a call that may have re-entered
+    /// \c SwiftDeclConverter and finished importing it for you.
+    ///
+    /// \returns \c nullopt if no import has been attempted; \c nullptr if an
+    ///          attempt to import it failed; the decl if an attempt to import
+    ///          succeeded.
+    std::optional<Decl *> findImportedForProjection(
+        std::pair<const clang::Decl *, ImportNameVersion> key) {
+      auto known = Impl.ImportedDecls.find(key);
+      if (known == Impl.ImportedDecls.end())
+        return std::nullopt;
+
+      auto *cached = known->second;
+      // `Impl.ImportedDecls` includes modern projections, not legacy.
+      if (currentCArrayProjection != CArrayProjection::Legacy || !cached)
+        return cached;
+
+      // A declaration with no projections isn't cached for the legacy
+      // projection yet, unlike one that has only a modern projection.
+      if (cached->getAttrs().hasAttribute<CArrayProjectionAttr>())
+        return importer::getDeclForCounterpartCArrayProjection(cached);
+      return std::nullopt;
+    }
+
     /// The actual language version the user requested we compile for.
     ImportNameVersion getActiveSwiftVersion() const {
       return Impl.CurrentVersion;
@@ -4414,10 +4442,8 @@ namespace {
       auto cacheKey = funcTemplate
                          ? Impl.getImportedDeclsKey(funcTemplate, getVersion())
                          : Impl.getImportedDeclsKey(decl, getVersion());
-      auto known = Impl.ImportedDecls.find(cacheKey);
-      if (known != Impl.ImportedDecls.end()) {
-        return known->second;
-      }
+      if (auto cached = findImportedForProjection(cacheKey))
+        return *cached;
 
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
@@ -4570,10 +4596,8 @@ namespace {
 
       // We may have already imported this function decl while importing its
       // type signature. Check decl cache to make sure we don't import twice.
-      auto known2 = Impl.ImportedDecls.find(cacheKey);
-      if (known2 != Impl.ImportedDecls.end()) {
-        return known2->second;
-      }
+      if (auto cached = findImportedForProjection(cacheKey))
+        return *cached;
 
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
         // We synthesized additional parameters so rebuild the DeclName.
@@ -8095,7 +8119,8 @@ VarDecl *
 SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
                                          const clang::FunctionDecl *accessor) {
   // Check whether we already know about the property.
-  auto knownProperty = Impl.FunctionsAsProperties.find(accessor);
+  auto knownProperty = Impl.FunctionsAsProperties.find(
+      {accessor, currentCArrayProjection});
   if (knownProperty != Impl.FunctionsAsProperties.end())
     return knownProperty->second;
 
@@ -8236,9 +8261,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       property, importedType.isImplicitlyUnwrapped());
 
   // Note that we've formed this property.
-  Impl.FunctionsAsProperties[getter] = property;
+  Impl.FunctionsAsProperties[{getter, currentCArrayProjection}] = property;
   if (setter)
-    Impl.FunctionsAsProperties[setter] = property;
+    Impl.FunctionsAsProperties[{setter, currentCArrayProjection}] = property;
 
   // If this property is in a class or class extension context,
   // add "final".
@@ -8254,8 +8279,10 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   Impl.importAttributes(getter, swiftGetter);
-  Impl.ImportedDecls[Impl.getImportedDeclsKey(getter, getVersion())] =
-      swiftGetter;
+  // `ImportedDecls` only contains modern projections.
+  if (currentCArrayProjection != CArrayProjection::Legacy)
+    Impl.ImportedDecls[Impl.getImportedDeclsKey(getter, getVersion())] =
+        swiftGetter;
   if (swift3GetterName)
     markAsVariant(swiftGetter, *swift3GetterName);
 
@@ -8269,8 +8296,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       return nullptr;
 
     Impl.importAttributes(setter, swiftSetter);
-    Impl.ImportedDecls[Impl.getImportedDeclsKey(setter, getVersion())] =
-        swiftSetter;
+    if (currentCArrayProjection != CArrayProjection::Legacy)
+      Impl.ImportedDecls[Impl.getImportedDeclsKey(setter, getVersion())] =
+          swiftSetter;
     if (swift3SetterName)
       markAsVariant(swiftSetter, *swift3SetterName);
   }
