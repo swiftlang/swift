@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 
 using FunctionVoidToVoid = std::function<void()>;
 using FunctionVoidToInt = std::function<int()>;
@@ -85,5 +86,21 @@ template<typename Func>
 int invokeTemplatedCallableIntToInt(Func f) { return f(123); };
 template<typename Func>
 int invokeTemplatedCallableByConstRefIntToInt(const Func& f) { return f(321); };
+
+// Swift must instantiate this member so the lambda's copy constructor is
+// defined during IRGen, after its initial declaration has been visited.
+template <class T>
+struct FunctionLambdaCaller {
+  T call(T value) const {
+    std::function<T(T)> callback = [](T value) { return value + 1; };
+    std::function<T()> wrapper = [callback = std::move(callback), value]() {
+      return callback(value);
+    };
+    auto copy = wrapper;
+    return copy();
+  }
+};
+
+using IntFunctionLambdaCaller = FunctionLambdaCaller<int>;
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_FUNCTION_H
