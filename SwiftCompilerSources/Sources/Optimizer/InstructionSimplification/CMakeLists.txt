@@ -31,6 +31,7 @@ swift_compiler_sources(Optimizer
   SimplifyEndLifetime.swift
   SimplifyExplicitCopy.swift
   SimplifyFixLifetime.swift
+  SimplifyForwardingInstruction.swift
   SimplifyGlobalValue.swift
   SimplifyIndexingInstructions.swift
   SimplifyInitEnumDataAddr.swift

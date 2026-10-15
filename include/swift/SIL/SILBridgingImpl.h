@@ -1409,7 +1409,17 @@ BridgedValue::Ownership BridgedInstruction::ForwardingInst_forwardingOwnership()
 }
 
 void BridgedInstruction::ForwardingInst_setForwardingOwnership(BridgedValue::Ownership ownership) const {
-  return getAsForwardingInstruction()->setForwardingOwnershipKind(BridgedValue::unbridge(ownership));
+  swift::ValueOwnershipKind newKind = BridgedValue::unbridge(ownership);
+  getAsForwardingInstruction()->setForwardingOwnershipKind(newKind);
+
+  // Other than single-value instructions, which derive their result ownership from the forwarding
+  // ownership, multiple-value instructions store the ownership in their results.
+  if (auto *mvi = llvm::dyn_cast<swift::OwnershipForwardingMultipleValueInstruction>(unbridged())) {
+    for (swift::SILValue result : mvi->getResults()) {
+      if (!result->getType().isTrivial(*mvi->getFunction()))
+        llvm::cast<swift::MultipleValueInstructionResult>(result)->setOwnershipKind(newKind);
+    }
+  }
 }
 
 bool BridgedInstruction::ForwardingInst_preservesOwnership() const {
