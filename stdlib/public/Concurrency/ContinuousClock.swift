@@ -21,7 +21,6 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 public struct ContinuousClock: Sendable {
   /// A continuous point in time used for `ContinuousClock`.
   public struct Instant: Sendable {
@@ -57,7 +56,6 @@ extension Duration {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension Clock where Self == ContinuousClock {
   /// A clock that measures time that always increments but does not stop
   /// incrementing while the system is asleep.
@@ -69,7 +67,6 @@ extension Clock where Self == ContinuousClock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock: Clock {
   /// The current continuous instant.
   public var now: ContinuousClock.Instant {
@@ -115,9 +112,27 @@ extension ContinuousClock: Clock {
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
     if #available(StdlibDeploymentTarget 6.3, *) {
+      #if $Embedded
+      // Embedded cannot dynamically cast the generic clock's associated types,
+      // so decompose the concrete deadline here and use the concrete sleep path.
+      let deadlineComponents = self.timestamp(for: deadline)
+      let toleranceComponents: (seconds: Int64, nanoseconds: Int64)
+      if let tolerance {
+        toleranceComponents = self.durationComponents(for: tolerance)
+      } else {
+        toleranceComponents = (0, -1)
+      }
+      try await Task._sleepUntilDeadline(
+        clockID: deadlineComponents.clockID,
+        seconds: deadlineComponents.seconds,
+        nanoseconds: deadlineComponents.nanoseconds,
+        toleranceSeconds: toleranceComponents.seconds,
+        toleranceNanoseconds: toleranceComponents.nanoseconds)
+      #else
       try await Task._sleep(until: deadline,
                             tolerance: tolerance,
                             clock: self)
+      #endif
     } else {
       fatalError("we should never get here; if we have, availability is broken")
     }
@@ -134,7 +149,6 @@ extension ContinuousClock: Clock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
   @export(implementation)
@@ -144,7 +158,6 @@ extension ContinuousClock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 
