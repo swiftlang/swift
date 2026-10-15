@@ -85,7 +85,121 @@ extension SIMD${n} where Scalar == ${Scalar} {
     lowHalf: SIMD${n//2}<${Scalar}>,
     highHalf: SIMD${n//2}<${Scalar}>
   ) {
-    self = unsafe unsafeBitCast((lowHalf, highHalf), to: Self.self)
+    self = Self()
+    let map = SIMD${n}<Int32>(${", ".join(map(str,range(n)))})
+    _storage._value = Builtin.shufflevector_Vec${n//2}xInt${int.bits}_Vec${n}xInt32(
+      lowHalf._storage._value, highHalf._storage._value, map._storage._value
+    )
+  }
+  
+  /// The first ${n//2} elements of this vector.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n//2}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = self[i]
+  /// }
+  /// ```
+  @export(implementation) @_transparent
+  public var lowHalf: SIMD${n//2}<${Scalar}> {
+    get {
+      let map = SIMD${n//2}<Int32>(${", ".join(map(str,range(n//2)))})
+      var result = SIMD${n//2}<${Scalar}>()
+      result._storage._value = Builtin.shufflevector_${Builtin}_Vec${n//2}xInt32(
+        _storage._value, Builtin.zeroInitializer(), map._storage._value
+      )
+      return result
+    }
+    
+    set {
+      self = Self(lowHalf: newValue, highHalf: highHalf)
+    }
+  }
+  
+  /// The last ${n//2} elements of this vector.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n//2}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = self[${n//2} + i]
+  /// }
+  /// ```
+  @export(implementation) @_transparent
+  public var highHalf: SIMD${n//2}<${Scalar}> {
+    get {
+      let map = SIMD${n//2}<Int32>(${", ".join(map(str,range(n//2, n)))})
+      var result = SIMD${n//2}<${Scalar}>()
+      result._storage._value = Builtin.shufflevector_${Builtin}_Vec${n//2}xInt32(
+        _storage._value, Builtin.zeroInitializer(), map._storage._value
+      )
+      return result
+    }
+    
+    set {
+      self = Self(lowHalf: lowHalf, highHalf: newValue)
+    }
+  }
+  
+  /// The even-indexed ${n//2} elements of this vector.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n//2}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = self[2*i]
+  /// }
+  /// ```
+  @export(implementation) @_transparent
+  public var evenHalf: SIMD${n//2}<${Scalar}> {
+    get {
+      var result = SIMD${n//2}<${Scalar}>()
+      result._storage._value = Builtin.deinterleave_Vec${n//2}xInt${int.bits}(
+        lowHalf._storage._value, highHalf._storage._value
+      ).0
+      return result
+    }
+    
+    set {
+      let ext = Self(lowHalf: newValue, highHalf: SIMD${n//2}<Scalar>())
+      let map = SIMD${n}<Int32>(
+        ${", ".join(map(lambda i: str(n+i) + ", " + str(2*i+1), range(n//2)))}
+      )
+      _storage._value = Builtin.shufflevector_${Builtin}_Vec${n}xInt32(
+        _storage._value, ext._storage._value, map._storage._value
+      )
+    }
+  }
+  
+  /// The odd-indexed ${n//2} elements of this vector.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n//2}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = self[2*i+1]
+  /// }
+  /// ```
+  @export(implementation) @_transparent
+  public var oddHalf: SIMD${n//2}<${Scalar}> {
+    get {
+      var result = SIMD${n//2}<${Scalar}>()
+      result._storage._value = Builtin.deinterleave_Vec${n//2}xInt${int.bits}(
+        lowHalf._storage._value, highHalf._storage._value
+      ).1
+      return result
+    }
+    
+    set {
+      let ext = Self(lowHalf: newValue, highHalf: SIMD${n//2}<Scalar>())
+      let map = SIMD${n}<Int32>(
+        ${", ".join(map(lambda i: str(2*i) + ", " + str(n+i), range(n//2)))}
+      )
+      _storage._value = Builtin.shufflevector_${Builtin}_Vec${n}xInt32(
+        _storage._value, ext._storage._value, map._storage._value
+      )
+    }
   }
   
 %  end
