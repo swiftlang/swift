@@ -167,9 +167,16 @@ extension SIMD${n} where Scalar: FixedWidthInteger {
 @_unavailableInEmbedded
 extension SIMD${n}: CustomDebugStringConvertible {
   public var debugDescription: String {
-    return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
-                       '\\(self['+ str(c) + '])',
-                       range(n)))})"
+    // Using string interpolation here generates huge amounts of code, and this
+    // doesn't need to be fast
+    var middle = ""
+    for i in indices {
+      middle.append("\(self[i]), ")
+      if i != scalarCount - 1 {
+        middle.append(", ")
+      }
+    }
+    return "SIMD${n}<\(Scalar.self)>(\(middle))"
   }
 }
 
