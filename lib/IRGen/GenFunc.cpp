@@ -1841,6 +1841,23 @@ getPartialApplicationForwarderEmission(
   }
 }
 
+/// Returns the fields of a stack-promoted closure context that the context
+/// doesn't own. A borrowed `~Copyable` capture is a bitwise copy of a value
+/// that the enclosing function still owns, so nothing in the context may
+/// destroy it.
+llvm::BitVector
+getUnownedContextFields(HeapLayout const &layout,
+                        ArrayRef<ParameterConvention> conventions) {
+  llvm::BitVector unownedFields(conventions.size());
+  for (unsigned i : indices(conventions)) {
+    auto fieldTy = layout.getElementTypes()[i];
+    if (fieldTy && conventions[i] == ParameterConvention::Direct_Guaranteed &&
+        fieldTy.isMoveOnly())
+      unownedFields.set(i);
+  }
+  return unownedFields;
+}
+
 /// This is a parameter convention-aware version of \c createDtorFn.
 ///
 /// It's used by the partial application forwarder emitter to avoid
@@ -1850,6 +1867,7 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            HeapLayout const *layout, llvm::Value *rawContextPtr,
                            Address contextPtr,
                            const llvm::BitVector &consumedFields,
+                           const llvm::BitVector &unownedFields,
                            bool contextIsOnStack) {
   if (!layout) {
     forwarder.emitNativeStrongRelease(rawContextPtr,
@@ -1872,6 +1890,10 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
   // context object and let us deallocate it as-if it was uninitialized.
   llvm::BitVector fieldsToDestroy(consumedFields);
   fieldsToDestroy.flip();
+
+  // A field that the context doesn't own is destroyed by its real owner.
+  if (!unownedFields.empty())
+    fieldsToDestroy.reset(unownedFields);
   for (unsigned elementIdx : fieldsToDestroy.set_bits()) {
     auto &field = layout->getElement(elementIdx);
     if (field.isTriviallyDestroyable())
@@ -2086,6 +2108,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   Explosion witnessMethodSelfValue;
   llvm::Value *lastCapturedFieldPtr = nullptr;
   llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
+  llvm::BitVector unownedFields;
+  if (layout && outType->isNoEscape())
+    unownedFields = getUnownedContextFields(*layout, conventions);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2325,7 +2350,7 @@ static llvm::Value *emitPartialApplicationForwarder(
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
       destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                            outType->isNoEscape());
+                            unownedFields, outType->isNoEscape());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2448,7 +2473,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
     destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                          outType->isNoEscape());
+                          unownedFields, outType->isNoEscape());
   }
 
   emission->createReturn(call);
@@ -2756,14 +2781,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
         // and so they cannot be destroyed.
-        llvm::BitVector unownedFields(argConventions.size());
-        for (unsigned i : indices(argConventions)) {
-          auto fieldTy = layout.getElementTypes()[i];
-          if (fieldTy &&
-              argConventions[i] == ParameterConvention::Direct_Guaranteed &&
-              fieldTy.isMoveOnly())
-            unownedFields.set(i);
-        }
+        llvm::BitVector unownedFields =
+            getUnownedContextFields(layout, argConventions);
 
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,

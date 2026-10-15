@@ -232,6 +232,38 @@ func testStackPromotedNoncopyableCaptureNeverCalled() {
 // CHECK-NEXT: BorrowableValue(stackNeverCalled) deinit
 testStackPromotedNoncopyableCaptureNeverCalled()
 
+// A stack-promoted closure that consumes one noncopyable capture and only
+// borrows another one owns the first, but the enclosing function still owns the
+// second, so calling or dropping the closure must not destroy it.
+
+func testStackPromotedMixedNoncopyableCapturesCalled() {
+  let r = Resource("mixedCalled")
+  let v = BorrowableValue("mixedCalled")
+  callIt {
+    v.peek()
+    r.use()
+  }
+}
+
+// CHECK-NEXT: BorrowableValue(mixedCalled) peek
+// CHECK-NEXT: Resource(mixedCalled) used
+// CHECK-NEXT: Resource(mixedCalled) deinit
+// CHECK-NEXT: BorrowableValue(mixedCalled) deinit
+testStackPromotedMixedNoncopyableCapturesCalled()
+
+func testStackPromotedMixedNoncopyableCapturesNeverCalled() {
+  let r = Resource("mixedNeverCalled")
+  let v = BorrowableValue("mixedNeverCalled")
+  acceptsCalledAtMostOnce {
+    v.peek()
+    r.use()
+  }
+}
+
+// CHECK-NEXT: Resource(mixedNeverCalled) deinit
+// CHECK-NEXT: BorrowableValue(mixedNeverCalled) deinit
+testStackPromotedMixedNoncopyableCapturesNeverCalled()
+
 // Everything below duplicates the consuming-capture scenarios above for
 // `@escaping @called(atMostOnce)` closures, to make sure escaping closures don't
 // behave any differently from noescape ones.
