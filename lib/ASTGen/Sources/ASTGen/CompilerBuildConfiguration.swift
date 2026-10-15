@@ -172,6 +172,13 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     staticBuildConfiguration.isActiveTargetObjectFormat(name: name)
   }
 
+  func hasTargetFeature(name: String) throws -> Bool {
+    var name = name
+    return name.withBridgedString { cName in
+      ctx.hasTargetFeature(cName)
+    }
+  }
+
   var targetAtomicBitWidths: [Int] {
     staticBuildConfiguration.targetAtomicBitWidths
   }
