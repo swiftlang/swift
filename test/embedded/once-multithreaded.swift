@@ -9,7 +9,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
-// XFAIL: OS=wasip1
+// XFAIL: threading_none
 
 // BEGIN BridgingHeader.h
 
