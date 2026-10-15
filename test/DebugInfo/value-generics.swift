@@ -24,3 +24,10 @@ func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 // CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
 // CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}"$sSiD"
 func concreteV(_: Slab<2, Int>) {}
+
+// Negative integer generic arguments must survive the debug-info
+// mangling round-trip (rdar://189275686).
+struct Foo<let n: Int> {}
+
+// CHECK-DAG: !DICompositeType({{.*}}name: "$s4main3FooVy$n255_GD"
+func negativeV(_: Foo<-256>) {}
