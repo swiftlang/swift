@@ -120,6 +120,9 @@ printSwiftIdentifier(Identifier name, llvm::raw_ostream &os,
 // `__sized_by` count expression and emits an equivalent Swift expression.
 // `Visit(expr)` returns true on success and the result can be retrieved via
 // `str()`.
+// FIXME: once we abort instead of ignoring untranslatable count expressions
+// we should be able to emit straight to the target ostream instead of
+// collecting it into a temporary string.
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
   llvm::SmallString<128> result;
@@ -905,6 +908,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
       } else if (bounds.CAT &&
+                 // FIXME: abort instead of ignoring unsupported count attrs
                  printer.printCountedBy(
                      bounds.CAT, swiftParamTy, mappedIndex,
                      swiftParam->isImplicitlyUnwrappedOptional())) {
@@ -971,6 +975,12 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       attachMacro = true;
     }
 
+    // Note: checking the returned Swift type was deliberately deferred after
+    // every other early exit to avoid triggering importing the return type. All
+    // parameter types are imported before running 'swiftify', but return types
+    // previously weren't, so triggering an import of the return type could
+    // result in errors being emitted. This is no longer the case and this could
+    // be reordered if so desired.
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
       swiftReturnTy = funcDecl->getResultInterfaceType();
