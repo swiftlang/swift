@@ -111,43 +111,67 @@ void PrintOptions::initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                       TypeTransformContext(D));
 }
 
-static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
-  AccessScope scope =
-      VD->getFormalAccessScope(/*useDC*/nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  return scope.isPublic();
+/// Whether \p D is unavailable at runtime in an availability domain that has
+/// been `@_spiOnly` imported. Such decls should be hidden from the public
+/// interface of a -library-level=api module.
+static bool isUnavailableInSPIOnlyImportedDomain(const Decl *D) {
+  auto &ctx = D->getDeclContext()->getASTContext();
+  if (ctx.LangOpts.LibraryLevel != LibraryLevel::API)
+    return false;
+
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  if (!SF)
+    return false;
+
+  auto restrictions =
+      AvailabilityContext::forDeploymentTarget(ctx).allRestrictionsForDecl(D);
+  llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
+
+  for (auto domain : unavailableDomains) {
+    if (auto *domainDecl = domain.getDecl()) {
+      if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
+          RestrictedImportKind::SPIOnly)
+        return true;
+    }
+  }
+
+  return false;
 }
 
-static bool isPublicOrUsableFromInline(Type ty) {
-  // Note the double negative here: we're looking for any referenced decls that
-  // are *not* public-or-usableFromInline.
-  return !ty.findIf([](Type typePart) -> bool {
+InterfaceVisibility swift::getInterfaceVisibility(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    AccessScope scope =
+        VD->getFormalAccessScope(/*useDC*/nullptr,
+                                 /*treatUsableFromInlineAsPublic*/true);
+    if (scope.isPackage())
+      return InterfaceVisibility::Package;
+    if (!scope.isPublic())
+      return InterfaceVisibility::None;
+  }
+
+  if (D->isSPI() || isUnavailableInSPIOnlyImportedDomain(D))
+    return InterfaceVisibility::SPI;
+  return InterfaceVisibility::Public;
+}
+
+InterfaceVisibility swift::getInterfaceVisibility(Type ty) {
+  auto visibility = InterfaceVisibility::Public;
+  ty.findIf([&](Type typePart) -> bool {
     // FIXME: If we have an internal typealias for a non-internal type, we ought
     // to be able to print it by desugaring.
+    const ValueDecl *VD = nullptr;
     if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
-      return !isPublicOrUsableFromInline(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
-      return !isPublicOrUsableFromInline(nominal);
-    return false;
-  });
-}
+      VD = aliasTy->getDecl();
+    else if (auto *nominal = typePart->getAnyNominal())
+      VD = nominal;
+    if (VD)
+      visibility = std::max(visibility, getInterfaceVisibility(VD));
 
-static bool isPackage(const ValueDecl *VD) {
-  AccessScope scope =
-      VD->getFormalAccessScope(/*useDC*/nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  return scope.isPackage();
-}
-
-static bool isPackage(Type ty) {
-  // \see isPublicOrUsableFromInline(Type ty)
-  return !ty.findIf([](Type typePart) -> bool {
-    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
-      return !isPackage(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
-      return !isPackage(nominal);
-    return false;
+    // Stop walking once the type can't get any more restricted.
+    return visibility == InterfaceVisibility::None;
   });
+  return visibility;
 }
 
 static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
@@ -182,38 +206,6 @@ static bool isInObjCImpl(const ValueDecl *VD) {
 static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   if (options.IsForSwiftInterface)
     return true;
-
-  return false;
-}
-
-static bool shouldSkipDeclInPublicInterface(const Decl *D) {
-  // @_spi should be skipped in the public interface.
-  if (D->isSPI())
-    return true;
-
-  // Decls that are unavailable at runtime in an availability domain that has
-  // been @_spiOnly imported should be hidden from the public interface of
-  // a -library-level=api module.
-  auto &ctx = D->getDeclContext()->getASTContext();
-  if (ctx.LangOpts.LibraryLevel != LibraryLevel::API)
-    return false;
-
-  auto *SF = D->getDeclContext()->getParentSourceFile();
-  if (!SF)
-    return false;
-
-  auto restrictions =
-      AvailabilityContext::forDeploymentTarget(ctx).allRestrictionsForDecl(D);
-  llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
-  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
-
-  for (auto domain : unavailableDomains) {
-    if (auto *domainDecl = domain.getDecl()) {
-      if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
-          RestrictedImportKind::SPIOnly)
-        return true;
-    }
-  }
 
   return false;
 }
@@ -327,9 +319,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
-      if (options.printPublicInterface() && shouldSkipDeclInPublicInterface(D))
-        return false;
-
       // Skip the backing storage property of a wrapped property when the
       // wrapped property itself is printed. The attached wrapper attribute is
       // printed too, so the backing storage property is synthesized again when
@@ -343,20 +332,29 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        // Skip anything that isn't 'public' or '@usableFromInline' or has a
-        // _specialize attribute with a targetFunction parameter.
-        if (!isPublicOrUsableFromInline(VD) &&
-            !isPrespecilizationDeclWithTarget(VD)) {
+      // Skip anything that isn't visible in this interface. SPI is always
+      // skipped in the public interface, but non-public decls can still be
+      // printed for the reasons below.
+      auto visibility = getInterfaceVisibility(D);
+      if (!options.printsInterfaceVisibility(visibility)) {
+        auto *VD = dyn_cast<ValueDecl>(D);
+        if (!VD || visibility == InterfaceVisibility::SPI)
+          return false;
+
+        // Print decls that have a _specialize attribute with a targetFunction
+        // parameter.
+        if (!isPrespecilizationDeclWithTarget(VD)) {
           // We do want to print private stored properties, without their
           // original names present.
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
             if (contributesToParentTypeStorage(ASD))
               return true;
 
-          if (!options.printPackageInterface() || !isPackage(VD))
-            return false;
+          return false;
         }
+      }
+
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
 
         // Skip member implementations and @objc overrides in @objcImpl
         // extensions.
@@ -396,19 +394,17 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
 
         for (const Requirement &req : ED->getGenericRequirements()) {
-          if (!isPublicOrUsableFromInline(req.getFirstType())) {
-            if (!options.printPackageInterface() || !isPackage(req.getSecondType()))
-              return false;
-          }
+          if (!options.printsInterfaceVisibility(
+                  getInterfaceVisibility(req.getFirstType())))
+            return false;
 
           switch (req.getKind()) {
           case RequirementKind::Conformance:
           case RequirementKind::Superclass:
           case RequirementKind::SameType:
-            if (!isPublicOrUsableFromInline(req.getSecondType())) {
-              if (!options.printPackageInterface() || !isPackage(req.getSecondType()))
-                return false;
-            }
+            if (!options.printsInterfaceVisibility(
+                    getInterfaceVisibility(req.getSecondType())))
+              return false;
             break;
           case RequirementKind::SameShape:
           case RequirementKind::Layout:
@@ -1716,13 +1712,10 @@ static bool mustPrintPropertyName(VarDecl *decl, const PrintOptions &opts) {
   //        if we serialized references to them using field indices.
   if (contributesToParentTypeStorage(decl)) return true;
 
-  // Print a package decl if in print package mode (for .package.swiftinterface),
-  if (opts.printPackageInterface() && isPackage(decl))
-    return true;
-
-  // If it's public or @usableFromInline, we must print the name because it's a
+  // If it's visible in this interface, we must print the name because it's a
   // visible entry-point.
-  if (isPublicOrUsableFromInline(decl)) return true;
+  if (opts.printsInterfaceVisibility(getInterfaceVisibility(decl)))
+    return true;
 
   // If it has an initial value, we must print the name because it's used in
   // the mangled name of the initializer expression generator function.
@@ -9134,7 +9127,8 @@ swift::getInheritedForPrinting(
         return false;
 
       // Otherwise only do this for package declarations.
-      return options.printPackageInterface() && isPackage(T);
+      return options.printPackageInterface() &&
+             getInterfaceVisibility(T) == InterfaceVisibility::Package;
     }();
 
     if (shouldPrintSynthesizedSendable) {

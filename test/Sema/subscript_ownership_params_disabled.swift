@@ -19,7 +19,7 @@ struct S {
   // A noncopyable index has no ownership specifier available to it, so there is
   // nothing to suggest here.
   subscript(nc n: NC) -> Int { return slots[n.value] }
-  // expected-error@-1 {{subscripts cannot have noncopyable parameters yet}}
+  // expected-error@-1 {{subscripts cannot have non-'Copyable' parameters yet}}
 
   // `inout` within the index type is still fine: that is a function type, not
   // the parameter itself.

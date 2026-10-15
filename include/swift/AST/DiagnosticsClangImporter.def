@@ -238,16 +238,16 @@ NOTE(cxx_unsafe_explicit_annotation, none,
      "%select{this type is|'%1' is}0 annotated unsafe in C++",
      (bool, StringRef))
 NOTE(cxx_unsafe_indirect_view, none,
-     "this is a non-escapable view whose lifetime dependency Swift cannot "
+     "this is a non-'Escapable' view whose lifetime dependency Swift cannot "
      "track", ())
 
 NOTE(cxx_unsafe_inferred_result_dependence, none,
-     "this returns a non-escapable value whose lifetime Swift had to infer; "
+     "this returns a non-'Escapable' value whose lifetime Swift had to infer; "
      "annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the "
      "result depends on", ())
 NOTE(cxx_unsafe_unannotated_nonescapable_param, none,
-     "%select{this takes a non-escapable parameter with no lifetime annotation|"
-     "non-escapable parameter '%1' has no lifetime annotation}0",
+     "%select{this takes a non-'Escapable' parameter with no lifetime annotation|"
+     "non-'Escapable' parameter '%1' has no lifetime annotation}0",
      (bool, StringRef))
 NOTE(cxx_unsafe_skipped_lifetime_escapable_result, none,
      "this lifetime annotation is not enforced: the result is Escapable, so "
@@ -286,8 +286,8 @@ NOTE(cxx_unknown_escapability_cannot_derive, none,
      "members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE",
      ())
 NOTE(cxx_unknown_escapability_nonescapable_member, none,
-     "this type has unknown escapability: %select{it holds a non-escapable "
-     "type|its member '%1' is non-escapable}0, but it provides its own copy, "
+     "this type has unknown escapability: %select{it holds a non-'Escapable' "
+     "type|its member '%1' is non-'Escapable'}0, but it provides its own copy, "
      "move or destruction, so Swift cannot tell whether it is a view; annotate "
      "it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE", (bool, StringRef))
 NOTE(cxx_unknown_escapability_pointer, none,
@@ -380,7 +380,7 @@ ERROR(foreign_reference_type_unreachable, none,
       (StringRef))
 
 ERROR(nonescapable_foreign_reference_type, none,
-      "%0 cannot be both a foreign reference type and non-escapable; foreign "
+      "%0 cannot be both a foreign reference type and non-'Escapable'; foreign "
       "reference types are imported as Swift classes, which are always "
       "escapable",
       (const clang::NamedDecl *))
@@ -471,7 +471,7 @@ GROUPED_WARNING(return_escapable_with_lifetimebound,  ClangDeclarationImport, no
      "the returned type '%0' is annotated as escapable; it cannot have lifetime dependencies",
      (StringRef))
 GROUPED_WARNING(return_nonescapable_without_lifetimebound, ClangDeclarationImport, none,
-     "the returned type '%0' is annotated as non-escapable; its lifetime dependencies must be annotated",
+     "the returned type '%0' is annotated as non-'Escapable'; its lifetime dependencies must be annotated",
      (StringRef))
 
 ERROR(unknown_template_parameter,none,
@@ -492,11 +492,11 @@ NOTE(bridged_pointer_type_not_found,none,
      (unsigned))
 
 NOTE(ptr_to_nonescapable,none,
-     "pointer to non-escapable type %0 cannot be imported",
+     "pointer to non-'Escapable' type %0 cannot be imported",
      (const clang::Type*))
 
 NOTE(nonescapable_member_of_escapable, none,
-     "escapable record %1 cannot have non-escapable %select{field|base}0 '%2'",
+     "'Escapable' record %1 cannot have non-'Escapable' %select{field|base}0 '%2'",
      (bool, const clang::NamedDecl *, StringRef))
 
 NOTE(refcounted_ptr_missing_torawpointer, none,

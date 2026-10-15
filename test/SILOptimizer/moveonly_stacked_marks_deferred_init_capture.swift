@@ -26,7 +26,7 @@ struct NC: ~Copyable {
 func take(_: () -> ()) { }
 
 func deferredInitClosureCapture() {
-    let nc: NC // expected-error {{copy of noncopyable typed value. This is a compiler bug.}}
+    let nc: NC // expected-error {{copy of non-'Copyable' typed value. This is a compiler bug.}}
     if .random() {
         nc = .init()
     } else {
