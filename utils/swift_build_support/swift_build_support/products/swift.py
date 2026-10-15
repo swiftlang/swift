@@ -135,6 +135,31 @@ class Swift(product.Product):
     def is_before_build_script_impl_product(cls):
         return False
 
+    @classmethod
+    def is_unified_llvm_build(cls, args):
+        """is_unified_llvm_build(args) -> bool
+
+        Whether Swift is being built inside the LLVM CMake as an external
+        project (i.e. -DLLVM_EXTERNAL_PROJECTS=swift is on the LLVM
+        command line). In that layout LLVM's ninja graph already builds
+        swift-frontend and the host stdlib, so the standalone
+        build-script-impl swift pass is duplicated work and can be
+        short-circuited.
+        """
+        for opt in getattr(args, 'extra_llvm_cmake_options', []) or []:
+            if not opt:
+                continue
+            # extra-llvm-cmake-options entries can be a single option or a
+            # newline/space-separated block; look at each line.
+            for line in opt.splitlines():
+                line = line.strip()
+                if 'LLVM_EXTERNAL_PROJECTS' not in line:
+                    continue
+                _, _, value = line.partition('=')
+                if 'swift' in [t.strip() for t in value.split(';')]:
+                    return True
+        return False
+
     @property
     def _runtime_sanitizer_flags(self):
         sanitizer_list = []
