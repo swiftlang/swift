@@ -118,12 +118,43 @@ public struct ObservableMacro {
       trailingTrivia: .space
     )
   }
+
+  // 'lazy' properties cannot be rewritten as computed properties with an
+  // 'init' accessor, so they cannot be observed.
+  static func lazyPropertyDiagnostic(_ property: VariableDeclSyntax, lazyModifier: DeclModifierSyntax, offeringFixIt: Bool) -> Diagnostic {
+    let name = property.identifier?.trimmed.text ?? ""
+    var fixIts = [FixIt]()
+    if offeringFixIt {
+      var ignored = AttributeSyntax(
+        atSign: .atSignToken(),
+        attributeName: IdentifierTypeSyntax(name: .identifier(ignoredMacroName)),
+        trailingTrivia: .space
+      )
+      ignored.leadingTrivia = property.leadingTrivia
+      var ignoredProperty = property.with(\.leadingTrivia, [])
+      ignoredProperty.attributes = [.attribute(ignored)] + ignoredProperty.attributes
+      fixIts.append(FixIt(
+        message: ObservationFixItMessage(message: "add '@\(ignoredMacroName)'", domain: "Observation", id: .lazyProperty),
+        changes: [.replace(oldNode: Syntax(property), newNode: Syntax(ignoredProperty))]
+      ))
+    }
+    return Diagnostic(
+      node: Syntax(lazyModifier),
+      message: ObservationDiagnostic(
+        message: "'@Observable' does not support 'lazy' properties; mark '\(name)' with '@\(ignoredMacroName)' to exclude it from observation",
+        domain: "Observation",
+        id: .lazyProperty
+      ),
+      fixIts: fixIts
+    )
+  }
 }
 
 struct ObservationDiagnostic: DiagnosticMessage {
   enum ID: String {
     case invalidApplication = "invalid type"
     case missingInitializer = "missing initializer"
+    case lazyProperty = "lazy property"
   }
   
   var message: String
@@ -140,6 +171,16 @@ struct ObservationDiagnostic: DiagnosticMessage {
     self.message = message
     self.diagnosticID = MessageID(domain: domain, id: id.rawValue)
     self.severity = severity
+  }
+}
+
+struct ObservationFixItMessage: FixItMessage {
+  var message: String
+  var fixItID: MessageID
+
+  init(message: String, domain: String, id: ObservationDiagnostic.ID) {
+    self.message = message
+    self.fixItID = MessageID(domain: domain, id: id.rawValue)
   }
 }
 
@@ -373,8 +414,12 @@ extension ObservableMacro: MemberAttributeMacro {
        property.hasMacroApplication(ObservableMacro.trackedMacroName) {
       return []
     }
-    
-    
+
+    if let lazyModifier = property.lazyModifier {
+      context.diagnose(ObservableMacro.lazyPropertyDiagnostic(property, lazyModifier: lazyModifier, offeringFixIt: true))
+      return []
+    }
+
     return [
       AttributeSyntax(attributeName: IdentifierTypeSyntax(name: .identifier(ObservableMacro.trackedMacroName)))
     ]
@@ -429,6 +474,12 @@ public struct ObservationTrackedMacro: AccessorMacro {
 
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
+    }
+
+    // '@Observable' does not attach '@ObservationTracked' to 'lazy' properties,
+    // so this is an explicit application.
+    if let lazyModifier = property.lazyModifier {
+      throw DiagnosticsError(diagnostics: [ObservableMacro.lazyPropertyDiagnostic(property, lazyModifier: lazyModifier, offeringFixIt: false)])
     }
 
     let initAccessor: AccessorDeclSyntax =
@@ -505,7 +556,12 @@ extension ObservationTrackedMacro: PeerMacro {
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
     }
-    
+
+    // diagnosed by the accessor expansion
+    if property.lazyModifier != nil {
+      return []
+    }
+
     let localContext = LocalMacroExpansionContext(context: context)
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.trackedAttribute, in: localContext))
     return [storage]
