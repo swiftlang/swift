@@ -40,7 +40,7 @@
 // RUN: %swiftc_driver_plain -driver-print-jobs -target armv7k-apple-watchos8 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -target armv7k-apple-watchos26 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
 
-// RPATH: bin/ld{{"? }}
+// RPATH: /ld{{"? }}
 // RPATH-SAME: -rpath {{"?/usr/lib/swift(-.+)?"? }}
 // RPATH-SAME: -o {{[^ ]+}}
 
@@ -58,6 +58,6 @@
 // RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -no-toolchain-stdlib-rpath -target x86_64-apple-macosx26.0 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
 
-// TOOLCHAIN-RPATH: bin/ld{{"? }}
+// TOOLCHAIN-RPATH: /ld{{"? }}
 // TOOLCHAIN-RPATH-SAME: -rpath garbage/[[PLATFORM]]{{ }}
 // TOOLCHAIN-RPATH-SAME: -o {{[^ ]+}}
