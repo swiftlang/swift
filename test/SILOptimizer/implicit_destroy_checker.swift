@@ -255,14 +255,14 @@ func dropsSibling() {
 // consumed" error in this section is redundant.
 
 func consumedByDefer() {
-  let nd = make() // expected-error {{noncopyable 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+  let nd = make() // expected-error {{non-'Copyable' 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   // expected-error@-1 {{'nd' is not consumed on all paths}}
   defer { nd.finish() } // expected-note {{consumed here}}
   print("body")
 } // expected-note {{path exits here without a consume}}
 
 func consumedByEscapingClosure() {
-  let nd = make() // expected-error {{noncopyable 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+  let nd = make() // expected-error {{non-'Copyable' 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   // expected-error@-1 {{'nd' is not consumed on all paths}}
   let f = { nd.finish() } // expected-note {{consumed here}}
   f()
@@ -271,7 +271,7 @@ func consumedByEscapingClosure() {
 func consumedByLocalFunction() {
   let nd = make() // expected-error {{'nd' is not consumed on all paths}}
   func local() {
-    nd.finish() // expected-error {{noncopyable 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+    nd.finish() // expected-error {{non-'Copyable' 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   }
   local()
 } // expected-note {{path exits here without a consume}}
