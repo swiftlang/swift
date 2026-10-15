@@ -6,18 +6,18 @@
 
 // RUN: %target-verify-unswiftify -I %t -module-name main %t/impl.swift %t/caller.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-first- -verify-additional-prefix impl-checked-
+// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-checked-
 // RUN: %target-verify-unswiftify -I %t -module-name main %t/caller.swift %t/impl.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix caller-first- -verify-additional-prefix impl-checked-
+// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-checked-
 
 // Compiling only one of the two files (the other is non-primary).
 // RUN: %target-verify-unswiftify -I %t -module-name main -primary-file %t/caller.swift %t/impl.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix caller-primary-
+// RUN:   -verify-additional-file %t/foo.h
 // RUN: %target-verify-unswiftify -I %t -module-name main -primary-file %t/impl.swift %t/caller.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-primary- -verify-additional-prefix impl-checked-
+// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-checked-
 
 //--- module.modulemap
 module CFoo { header "foo.h" export * }
@@ -25,9 +25,8 @@ module CFoo { header "foo.h" export * }
 //--- foo.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 #define __noescape __attribute__((noescape))
-// expected-expansion@+14:76{{
+// expected-expansion@+13:76{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-impl-first-note@2 2{{'sum_span' has been explicitly marked unavailable here}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func sum_span(_ buf: Span<CInt>) -> CInt {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: buf.count)!|}}
 //   expected-remark@4{{macro content: |    let _bufPtr = buf.withUnsafeBufferPointer {|}}
@@ -45,11 +44,9 @@ int sum_span(const int * _Nonnull __counted_by(len) __noescape buf, int len);
 import CFoo
 
 public func qualifiedCall(_ s: Span<CInt>) -> CInt {
-  // expected-impl-first-error@+1{{'sum_span' is unavailable: replaced by a safe-interop '@c @implementation' Swift implementation}}
   CFoo.sum_span(s)
 }
 public func qualifiedCallModuleSyntax(_ s: Span<CInt>) -> CInt {
-  // expected-impl-first-error@+1{{'sum_span' is unavailable: replaced by a safe-interop '@c @implementation' Swift implementation}}
   CFoo::sum_span(s)
 }
 public func unqualifiedCall(_ s: Span<CInt>) -> CInt {
