@@ -229,7 +229,7 @@ ERROR(ivar_not_initialized_by_init_accessor,none,
       (StringRef))
 
 ERROR(noncopyable_dynamic_lifetime_unsupported,none,
-      "conditional initialization or destruction of noncopyable types is not "
+      "conditional initialization or destruction of non-'Copyable' types is not "
       "supported; this variable must be consistently in an initialized or "
       "uninitialized state through every code path", ())
 
@@ -900,7 +900,7 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type",
+      "non-'Copyable' '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type",
       (StringRef))
 ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
@@ -916,7 +916,7 @@ ERROR(sil_movechecking_value_consumed_in_a_loop, none,
 ERROR(sil_movechecking_use_after_partial_consume, none,
       "cannot use '%0' after partial consume", (StringRef))
 ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
-      "cannot consume noncopyable stored property '%0' %select{of a class|that is global}1",
+      "cannot consume non-'Copyable' stored property '%0' %select{of a class|that is global}1",
       (StringRef, bool))
 ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       "cannot partially consume '%0' when it has a deinitializer",
@@ -984,9 +984,9 @@ NOTE(sil_movechecking_deinit_here, none,
 ERROR(sil_movechecking_not_understand_consumable_and_assignable, none,
       "usage of no-implicit-copy value that the compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_not_understand_moveonly, none,
-      "usage of a noncopyable type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
+      "usage of a non-'Copyable' type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_missed_copy, none,
-      "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+      "copy of non-'Copyable' typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_exclusivity_violation, none,
       "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
@@ -1355,7 +1355,7 @@ ERROR(executor_factory_must_conform, none,
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
-      "deinit of non-copyable type %0 not visible in the current module", (Type))
+      "deinit of non-'Copyable' type %0 not visible in the current module", (Type))
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))

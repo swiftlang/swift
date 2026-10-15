@@ -57,7 +57,7 @@ func paren_vararg1(_ va: (MO)...) {} // expected-error@:26 {{type 'MO' does not 
 // expected-note@-1:30 {{required because variadic parameter type must be stored inside an 'Array'}}
 
 // Make sure we perform this check for all inverse requirements, not just Copyable!
-struct MOO: ~Escapable {}  // expected-error {{an implicit initializer cannot return a ~Escapable result}}
+struct MOO: ~Escapable {}  // expected-error {{an implicit initializer cannot return a non-'Escapable' result}}
 
 func basic_vararg2(_ va: MOO...) {} // expected-error@:26 {{type 'MOO' does not conform to protocol 'Escapable'}}
 // expected-note@-1:29 {{required because variadic parameter type must be stored inside an 'Array'}}

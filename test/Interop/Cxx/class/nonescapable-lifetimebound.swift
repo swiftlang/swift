@@ -157,7 +157,7 @@ struct SWIFT_NONESCAPABLE ViewFromFactory {
     const int *member;
 };
 
-// expected-warning@+2 {{the returned type 'ViewNoAnnotation' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2 {{the returned type 'ViewNoAnnotation' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 struct SWIFT_NONESCAPABLE ViewNoAnnotation {
     ViewNoAnnotation(const Owner &o);
     const int *member;

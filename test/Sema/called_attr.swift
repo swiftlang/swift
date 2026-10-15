@@ -24,7 +24,7 @@ struct Storage {
   // expected-note@-1 {{consider adding '~Copyable' to struct 'Storage'}}
 
   let atMostOnce: @called(atMostOnce) () -> Void
-  // expected-error@-1 {{stored property 'atMostOnce' of 'Copyable'-conforming struct 'Storage' has non-Copyable type '@called(atMostOnce) () -> Void'}}
+  // expected-error@-1 {{stored property 'atMostOnce' of 'Copyable'-conforming struct 'Storage' has non-'Copyable' type '@called(atMostOnce) () -> Void'}}
 }
 
 struct NCStorage: ~Copyable {
@@ -277,8 +277,8 @@ struct ExactlyOnceStorage {
   // expected-note@-1 {{consider adding '~Copyable' to struct 'ExactlyOnceStorage'}}
 
   let exactlyOnce: @called(exactlyOnce) () -> Void
-  // expected-error@-1 {{stored property 'exactlyOnce' of 'Copyable'-conforming struct 'ExactlyOnceStorage' has non-Copyable type '@called(exactlyOnce) () -> Void'}}
-  // expected-error@-2 {{stored property 'exactlyOnce' of 'Deinitable'-conforming struct 'ExactlyOnceStorage' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{stored property 'exactlyOnce' of 'Copyable'-conforming struct 'ExactlyOnceStorage' has non-'Copyable' type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-2 {{stored property 'exactlyOnce' of 'Deinitable'-conforming struct 'ExactlyOnceStorage' has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
 }
 
 func exactlyOnceArgumentConversions(fn: @escaping () -> Void, exactlyOnce: @called(exactlyOnce) () -> Void) {
@@ -675,7 +675,7 @@ func captureRules(
   takesExactlyOnce { b() } // Ok
 
   takesAtMostOnce { c() }
-  // expected-error@-1 {{consumed capture 'c' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{consumed capture 'c' of 'Deinitable'-conforming closure has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
 
   // Nested closures
   let _ = { @called(exactlyOnce) in
@@ -684,15 +684,15 @@ func captureRules(
   }
   let _ = { @called(atMostOnce) in
     let inner = { @called(exactlyOnce) in e() }
-    // expected-error@-1 {{consumed capture 'e' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+    // expected-error@-1 {{consumed capture 'e' of 'Deinitable'-conforming closure has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
     inner()
   }
 
   // Capture lists
   let _ = { [f] in f() }
-  // expected-error@-1 {{capture list entry 'f' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{capture list entry 'f' of 'Deinitable'-conforming closure has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   let _ = { @called(atMostOnce) [g] in g() }
-  // expected-error@-1 {{capture list entry 'g' of 'Deinitable'-conforming closure has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{capture list entry 'g' of 'Deinitable'-conforming closure has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   let _ = { @called(exactlyOnce) [h] in h() } // Ok
 }
 
@@ -715,10 +715,10 @@ func captureRulesAtMostOnce(
 
 struct StoredPropertyStruct: ~Copyable {
   let a: @called(exactlyOnce) () -> Void
-  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming struct 'StoredPropertyStruct' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming struct 'StoredPropertyStruct' has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   var b: @called(exactlyOnce) () -> Void // Only the first is diagnosed.
   static let c: @called(exactlyOnce) () -> Void = { }
-  // expected-error@-1 {{static property 'c' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{static property 'c' cannot have non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   let atMostOnce: @called(atMostOnce) () -> Void // Ok
 
   // Computed properties and subscripts behave like functions.
@@ -732,9 +732,9 @@ struct StoredPropertyStruct: ~Copyable {
 
 class StoredPropertyClass {
   var a: @called(exactlyOnce) () -> Void
-  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming class 'StoredPropertyClass' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming class 'StoredPropertyClass' has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   lazy var b: @called(exactlyOnce) () -> Void = { }
-  // expected-error@-1 {{lazy property 'b' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{lazy property 'b' cannot have non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
 
   init(a: @escaping @called(exactlyOnce) () -> Void) {
     self.a = a
@@ -743,7 +743,7 @@ class StoredPropertyClass {
 
 actor StoredPropertyActor {
   let a: @called(exactlyOnce) () -> Void
-  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming actor 'StoredPropertyActor' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{stored property 'a' of 'Deinitable'-conforming actor 'StoredPropertyActor' has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
 
   init(a: @escaping @called(exactlyOnce) () -> Void) {
     self.a = a
@@ -751,37 +751,37 @@ actor StoredPropertyActor {
 }
 
 let globalExactlyOnce: @called(exactlyOnce) () -> Void = { }
-// expected-error@-1 {{global variable 'globalExactlyOnce' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+// expected-error@-1 {{global variable 'globalExactlyOnce' cannot have non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
 
 enum Payloads: ~Copyable {
   case a(@called(exactlyOnce) () -> Void)
-  // expected-error@-1 {{associated value 'a' of 'Deinitable'-conforming enum 'Payloads' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{associated value 'a' of 'Deinitable'-conforming enum 'Payloads' has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   case b(Int, label: @called(exactlyOnce) () -> Void)
 }
 
 enum IndirectPayloads: ~Copyable {
   indirect case a(@called(exactlyOnce) () -> Void)
-  // expected-error@-1 {{associated value 'a' of 'Deinitable'-conforming enum 'IndirectPayloads' has non-Deinitable type '@called(exactlyOnce) () -> Void'}}
-  // expected-error@-2 {{noncopyable enum 'IndirectPayloads' cannot be marked indirect or have indirect cases yet}}
+  // expected-error@-1 {{associated value 'a' of 'Deinitable'-conforming enum 'IndirectPayloads' has non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-2 {{non-'Copyable' enum 'IndirectPayloads' cannot be marked indirect or have indirect cases yet}}
 }
 
 func tupleParameter(_: (@called(exactlyOnce) () -> Void, Int)) {}
-// expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
-// expected-error@-2 {{parameter of noncopyable type '(@called(exactlyOnce) () -> Void, Int)' must specify ownership}}
+// expected-error@-1 {{tuple with non-'Copyable' element type '@called(exactlyOnce) () -> Void' is not supported}}
+// expected-error@-2 {{parameter of non-'Copyable' type '(@called(exactlyOnce) () -> Void, Int)' must specify ownership}}
 // expected-note@-3 {{add 'borrowing' for an immutable reference}}
 // expected-note@-4 {{add 'inout' for a mutable reference}}
 // expected-note@-5 {{add 'consuming' to take the value from the caller}}
 
 func tupleResult() -> (Int, @called(exactlyOnce) () -> Void) { fatalError() }
-// expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+// expected-error@-1 {{tuple with non-'Copyable' element type '@called(exactlyOnce) () -> Void' is not supported}}
 
 func tupleStorage(_ f: @escaping @called(exactlyOnce) () -> Void) {
   let _: (x: @called(exactlyOnce) () -> Void, y: Int)
-  // expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+  // expected-error@-1 {{tuple with non-'Copyable' element type '@called(exactlyOnce) () -> Void' is not supported}}
   let _: ((Int, @called(exactlyOnce) () -> Void), Int)
-  // expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+  // expected-error@-1 {{tuple with non-'Copyable' element type '@called(exactlyOnce) () -> Void' is not supported}}
   let _ = (f, 0)
-  // expected-error@-1 {{tuple with noncopyable element type '@called(exactlyOnce) () -> Void' is not supported}}
+  // expected-error@-1 {{tuple with non-'Copyable' element type '@called(exactlyOnce) () -> Void' is not supported}}
   let _: (@called(exactlyOnce) () -> Void) = { } // Ok, not a tuple
 }
 
@@ -789,7 +789,7 @@ func makeExactlyOnce() -> @called(exactlyOnce) () -> Void { { } }
 
 func asyncLetStorage() async {
   async let f: @called(exactlyOnce) () -> Void = makeExactlyOnce()
-  // expected-error@-1 {{'async let' binding 'f' cannot have non-Deinitable type '@called(exactlyOnce) () -> Void'}}
+  // expected-error@-1 {{'async let' binding 'f' cannot have non-'Deinitable' type '@called(exactlyOnce) () -> Void'}}
   await f()
 }
 
@@ -842,6 +842,6 @@ func copyOperator(
   _ exactlyOnce: @called(exactlyOnce) () -> Void,
   _ atMostOnce: @called(atMostOnce) () -> Void
 ) {
-  _ = copy exactlyOnce // expected-error {{'copy' cannot be applied to noncopyable types}}
-  _ = copy atMostOnce // expected-error {{'copy' cannot be applied to noncopyable types}}
+  _ = copy exactlyOnce // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
+  _ = copy atMostOnce // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
 }

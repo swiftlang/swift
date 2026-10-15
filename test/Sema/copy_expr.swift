@@ -75,7 +75,7 @@ func testVarClassAccessField() {
 struct MoveOnly : ~Copyable {}
 
 func testNoMoveOnlyCopy(_ x: borrowing MoveOnly) {
-  let _ = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
+  let _ = copy x // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
 }
 
 func testCopyResultImmutable() {

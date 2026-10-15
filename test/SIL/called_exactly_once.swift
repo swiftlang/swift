@@ -74,7 +74,7 @@ func capturedByNonescapingClosure(_ f: @escaping @called(exactlyOnce) () -> Void
 
 func capturedByLocalFunction(_ f: @escaping @called(exactlyOnce) () -> Void) { // expected-error {{'f' is not called on all paths}}
   func local() {
-    f() // expected-error {{noncopyable 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
+    f() // expected-error {{non-'Copyable' 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   }
   local()
 } // expected-note {{path exits here without a call}}
