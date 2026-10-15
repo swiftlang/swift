@@ -444,10 +444,26 @@ static bool hasAnyOpaqueArchetype(SILFunction &F) {
   return foundOpaqueArchetype;
 }
 
+/// Dropping [serialized] widens the resilience expansion to Maximal, which can
+/// turn an address-only type into a loadable one. A debug_value that kept its
+/// op_deref because a load was impossible must now use the load form.
+static void updateDebugValueDerefs(SILFunction &F) {
+  for (auto &BB : F) {
+    for (auto &inst : BB) {
+      auto *dvi = dyn_cast<DebugValueInst>(&inst);
+      if (!dvi || !dvi->hasDeref() || !dvi->getDebugReconstructionBlock())
+        continue;
+      if (dvi->getVarType().isLoadableOrOpaque(F))
+        dvi->convertDerefToLoad();
+    }
+  }
+}
+
 void updateOpaqueArchetypes(SILFunction &F) {
   // Only map if there are opaque archetypes that could change.
+  // Mapping already debug_value derefs through the cloner.
   if (!hasAnyOpaqueArchetype(F))
-    return;
+    return updateDebugValueDerefs(F);
 
   MapOpaqueArchetypes(F).replace();
 }
