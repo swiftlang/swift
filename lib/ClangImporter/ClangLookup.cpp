@@ -1026,31 +1026,65 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
     FuncDecl *getter = importSubscriptOverload(CXXGetter),
              *setter = importSubscriptOverload(CXXSetter);
 
-    // Mark subscript setter as mutating in Swift even if C++ operator is const.
-    if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
-        !Struct->getDeclaredType()->isForeignReferenceType())
-      setter->setSelfAccessKind(SelfAccessKind::Mutating);
-
     if (!getter && !setter)
       // Didn't end up with a usable getter or setter, so nothing to synthesize
       continue;
 
     SwiftDeclSynthesizer synth{*this};
-    auto *subscript = synth.makeSubscript(getter, setter);
+
+    // Builds a subscript from the given accessors and adds it to the type.
+    auto addSubscript = [&](FuncDecl *getter,
+                            FuncDecl *setter) -> SubscriptDecl * {
+      // Mark subscript setter as mutating in Swift even if C++ operator is
+      // const.
+      if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
+          !Struct->getDeclaredType()->isForeignReferenceType())
+        setter->setSelfAccessKind(SelfAccessKind::Mutating);
+
+      auto *subscript = synth.makeSubscript(getter, setter);
+      if (!subscript)
+        return nullptr;
+
+      // Import attributes from the Clang operator[] decl(s) onto the
+      // synthesized accessor thunks (importAttributes is a no-op on
+      // SubscriptDecl itself).
+      if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
+          getterAccessor && CXXGetter)
+        importAttributes(CXXGetter.method, getterAccessor);
+      if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
+          setterAccessor && CXXSetter)
+        importAttributes(CXXSetter.method, setterAccessor);
+
+      Struct->addMember(subscript);
+      result.push_back(subscript);
+      return subscript;
+    };
+
+    auto *subscript = addSubscript(getter, setter);
     if (!subscript)
       continue;
 
-    // Import attributes from the Clang operator[] decl(s) onto the synthesized
-    // accessor thunks (importAttributes is a no-op on SubscriptDecl itself).
-    if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
-        getterAccessor && CXXGetter)
-      importAttributes(CXXGetter.method, getterAccessor);
-    if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
-        setterAccessor && CXXSetter)
-      importAttributes(CXXSetter.method, setterAccessor);
+    // If the underlying functions use C arrays, they have a legacy projection
+    // as well, and so does a subscript built from them.
+    if ((getter && getter->getAttrs().hasAttribute<CArrayProjectionAttr>()) ||
+        (setter && setter->getAttrs().hasAttribute<CArrayProjectionAttr>())) {
+      FuncDecl *legacyGetter =
+                   importer::getDeclForCounterpartCArrayProjection(getter),
+               *legacySetter =
+                   importer::getDeclForCounterpartCArrayProjection(setter);
+      bool hasLegacy = (!getter || legacyGetter) && (!setter || legacySetter);
 
-    Struct->addMember(subscript);
-    result.push_back(subscript);
+      SubscriptDecl *legacySubscript = nullptr;
+      if (hasLegacy) {
+        for (auto *fn : {legacyGetter, legacySetter}) {
+          if (fn)
+            markUnavailable(fn, "use subscript");
+        }
+        legacySubscript = addSubscript(legacyGetter, legacySetter);
+      }
+      synth.registerCArrayProjections(subscript, legacySubscript,
+                                      /*addAlternate=*/false);
+    }
   }
 
   return result;
