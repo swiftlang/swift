@@ -30,6 +30,7 @@ public struct Resource: ~Copyable {
   public init(x: Int) { self.x = x }
   deinit { print("Resource") }
   public consuming func use() { print("used \(x)") }
+  public borrowing func peek() { print("peeked \(x)") }
 }
 
 final class Tracker {
@@ -78,6 +79,24 @@ public func mixedCaptures(_ x: Int) {
   callAtMostOnce {
     _ = t
     r.use()
+  }
+}
+
+// A closure that mixes a consumed `~Copyable` capture (`consumed`) with a
+// borrowed one (`borrowed`). The stack-allocated context only holds a bitwise
+// copy of `borrowed`, because the enclosing function still owns the value, so
+// the forwarder must leave that field alone and destroy nothing once the call
+// has taken `consumed`.
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test24mixedNoncopyableCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
+// CHECK:  call swiftcc void @"$s4test24mixedNoncopyableCapturesyySiFyyXEfU_"(
+// CHECK-NEXT: ret void
+public func mixedNoncopyableCaptures(_ x: Int) {
+  let consumed = Resource(x: x)
+  let borrowed = Resource(x: x + 1)
+  callAtMostOnce {
+    borrowed.peek()
+    consumed.use()
   }
 }
 
