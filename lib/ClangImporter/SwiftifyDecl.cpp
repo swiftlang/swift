@@ -663,9 +663,10 @@ static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {
   return ParentClass->getForeignClassKind() != ClassDecl::ForeignKind::Normal;
 }
 
-template<typename T>
-static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
-    return false; // Only C++ methods have implicit params
+template <typename T>
+static bool
+getFirstImplicitObjectParamAnnotation(const clang::ObjCMethodDecl *D) {
+  return false; // Only C++ methods have implicit params
 }
 
 static bool shouldSkipModule(ModuleDecl *M) {
@@ -745,7 +746,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
     bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
     bool returnHasLifetimeInfo = false;
-    if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
+    if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+            ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
       if (Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
         if (!dependsOnClass(
