@@ -2929,12 +2929,12 @@ public:
   }
 
   const TupleTypeElt &getElement(unsigned i) const {
-    return getTrailingObjects()[i];
+    return getElements()[i];
   }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return getTrailingObjects()[ElementNo].getType();
+    return getElement(ElementNo).getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -6678,7 +6678,7 @@ public:
   /// Returns the type of the element at the given \p index.
   /// This is a lowered SIL type.
   CanType getElementType(unsigned index) const {
-    return getTrailingObjects()[index];
+    return getElementTypes()[index];
   }
 
   SILType getSILElementType(unsigned index) const; // in SILType.h
@@ -8332,7 +8332,7 @@ public:
 
   /// Returns the type of the element at the given \p index.
   Type getElementType(unsigned index) const {
-    return getTrailingObjects()[index];
+    return getElementTypes()[index];
   }
 
   bool containsPackExpansionType() const;
