@@ -345,12 +345,7 @@ public struct AsyncStream<Element> {
   /// part of task cancellation, it's subject to the same considerations for
   /// avoiding deadlock as outlined in the documentation for
   /// ``withTaskCancellationHandler(operation:onCancel:)``.
-  @abi(
-    init(
-      unfolding produce: @escaping () async -> Element?,
-      onCancel: (@Sendable () -> Void)?
-    )
-  )
+  @_silgen_name("$sScS9unfolding8onCancelScSyxGxSgyYac_yyYbcSgtcfC")
   @preconcurrency // Original API had `@Sendable` only on `onCancel`
   public init(
     unfolding produce: nonisolated(nonsending) @escaping @Sendable () async -> Element?,
