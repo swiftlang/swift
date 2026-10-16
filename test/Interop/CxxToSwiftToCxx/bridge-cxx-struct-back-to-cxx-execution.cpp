@@ -49,6 +49,13 @@ struct NonTrivialTemplate {
 
 using NonTrivialTemplateTrivial = NonTrivialTemplate<Trivial>;
 
+struct EmptyStruct {};
+
+template<class T>
+struct EmptyTemplate {};
+
+using EmptyTemplateInt = EmptyTemplate<int>;
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -100,6 +107,25 @@ public func retPassThroughGeneric<T>(_ x: T) -> T {
 
 public func retArrayNonTrivial(_ x: CInt) -> [NonTrivialTemplateTrivial] {
     return [NonTrivialTemplateTrivial(Trivial(x, -x))]
+}
+
+public func retEmpty() -> EmptyStruct {
+    print("retEmpty")
+    return EmptyStruct()
+}
+
+public func retEmptyTemplate() -> EmptyTemplateInt {
+    print("retEmptyTemplate")
+    return EmptyTemplateInt()
+}
+
+public struct StrctWithEmpty {
+    public let empty: EmptyStruct
+}
+
+public func retStrctWithEmpty() -> StrctWithEmpty {
+    print("retStrctWithEmpty")
+    return StrctWithEmpty(empty: EmptyStruct())
 }
 
 //--- use-swift-cxx-types.cpp
@@ -184,6 +210,17 @@ int main() {
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
+  {
+    EmptyStruct x = UseCxx::retEmpty();
+    EmptyTemplateInt y = UseCxx::retEmptyTemplate();
+    EmptyStruct z = UseCxx::retStrctWithEmpty().getEmpty();
+    (void)x;
+    (void)y;
+    (void)z;
+  }
+// CHECK-NEXT: retEmpty
+// CHECK-NEXT: retEmptyTemplate
+// CHECK-NEXT: retStrctWithEmpty
   puts("EndOfTest");
 // CHECK-NEXT: EndOfTest
   return 0;
