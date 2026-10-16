@@ -405,7 +405,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     _ elementType: Element.Type = Element.self,
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
-  ) {
+  ) { // Typed throws variant without the `Failure == Error` requirement
     let storage: _Storage = .create(limit: limit)
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
@@ -668,7 +668,7 @@ extension AsyncThrowingStream {
   @available(SwiftStdlib 6.5, *)
   public static func makeStream(
     of elementType: Element.Type = Element.self,
-    throwing failureType: Failure.Type = Failure.self,
+    throwing failureType: Failure.Type = Failure.self, // Typed throws variant without the `Failure == Error` requirement
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
   ) -> (stream: AsyncThrowingStream<Element, Failure>, continuation: AsyncThrowingStream<Element, Failure>.Continuation) {
     var continuation: AsyncThrowingStream<Element, Failure>.Continuation!
@@ -757,27 +757,11 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ) where Failure == Error {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
-  @available(SwiftStdlib 6.5, *)
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public init(
-    _ elementType: Element.Type = Element.self,
-    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
-    _ build: (Continuation) -> Void
-  ) {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-  @available(SwiftStdlib 6.5, *)
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public init(
-    unfolding produce: nonisolated(nonsending) @escaping () async throws(Failure) -> Element?
-  ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
 }
