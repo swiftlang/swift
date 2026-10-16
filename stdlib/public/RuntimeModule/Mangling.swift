@@ -25,7 +25,7 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.Runtime
+@_implementationOnly import BacktracingImpl.Runtime
 
 // - MARK: Demangling
 

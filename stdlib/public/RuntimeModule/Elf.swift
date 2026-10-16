@@ -28,7 +28,7 @@ internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
 #endif
-internal import BacktracingImpl.ImageFormats.Elf
+@_implementationOnly import BacktracingImpl.ImageFormats.Elf
 
 // .. Use *our* Elf definitions ................................................
 

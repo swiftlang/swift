@@ -17,7 +17,7 @@
 
 import Swift
 
-internal import BacktracingImpl.Runtime
+@_implementationOnly import BacktracingImpl.Runtime
 
 @_spi(SymbolLocation)
 public struct SymbolLocationSymbol: Sendable, Hashable, Equatable {

@@ -27,8 +27,8 @@ internal import Glibc
 internal import Musl
 #endif
 
-internal import BacktracingImpl.OS.Libc
-internal import BacktracingImpl.ImageFormats.PDB
+@_implementationOnly import BacktracingImpl.OS.Libc
+@_implementationOnly import BacktracingImpl.ImageFormats.PDB
 
 enum MultiStreamFileError: Error {
   #if os(Windows)

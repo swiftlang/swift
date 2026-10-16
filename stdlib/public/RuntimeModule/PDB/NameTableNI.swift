@@ -17,7 +17,7 @@
 
 import Swift
 
-internal import BacktracingImpl.ImageFormats.PDB
+@_implementationOnly import BacktracingImpl.ImageFormats.PDB
 
 /// This is the name table from the PDB header, as opposed to the
 /// one in the NameMap stream.
