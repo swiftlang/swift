@@ -22,24 +22,39 @@
 
 // C-CALLER: all C entry point checks passed
 
-// DEFINE: %{expect-trap} = env SWIFT_BACKTRACE=enable=no %{python} %S/../../../Inputs/not.py
+// Quote string closed by %{check-optnone-trap-message}
+// DEFINE: %{expect-trap} = env SWIFT_BACKTRACE=enable=no %{python} %S/../../../Inputs/not.py "%target-run %t/c-caller.out
+
+// Optimized builds drop `precondition` messages, so the message is only checked
+// when optimizations are off.
+// N.B: all these test cases seem to trap even with -Ounchecked, thanks to
+// checks in the stdlib. If _Unswiftify wrapper checks end up having noticeable
+// overhead, we may want to do some more thorough investigation to ensure this
+// is always true, and if so replace `precondition` with an assertion that only
+// fires for -Onone.
+// DEFINE: %{check-optnone-trap-message} = \
+// DEFINE:   %if swift_test_mode_optimize ||                            \
+// DEFINE:       swift_test_mode_optimize_size ||                       \
+// DEFINE:       swift_test_mode_optimize_unchecked ||                  \
+// DEFINE:       swift_test_mode_optimize_with_implicit_dynamic %{ " %} \
+// DEFINE:   %else %{ " 2>&1 | %FileCheck %s --check-prefix%}
 
 // C-TRAP-NEG: Precondition failed: buffer with negative count
-// RUN: %{expect-trap} "%target-run %t/c-caller.out span-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out span-nullable-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out ubp-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out ubp-nullable-nil-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out mspan-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out mubp-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out raw-sum-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out raw-fill-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
-// RUN: %{expect-trap} "%target-run %t/c-caller.out ubp-nullable-nonnil-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NEG
+// RUN: %{expect-trap} span-neg                %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} span-nullable-neg       %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} ubp-neg                 %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} ubp-nullable-nil-neg    %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} mspan-neg               %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} mubp-neg                %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} raw-sum-neg             %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} raw-fill-neg            %{check-optnone-trap-message}=C-TRAP-NEG
+// RUN: %{expect-trap} ubp-nullable-nonnil-neg %{check-optnone-trap-message}=C-TRAP-NEG
 
 // C-TRAP-OR-NULL-NEG: Precondition failed: non-null buffer with negative count
-// RUN: %{expect-trap} "%target-run %t/c-caller.out ornull-nonnil-neg" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-OR-NULL-NEG
+// RUN: %{expect-trap} ornull-nonnil-neg       %{check-optnone-trap-message}=C-TRAP-OR-NULL-NEG
 
 // C-TRAP-NULL-POS: Precondition failed: null buffer with non-zero count
-// RUN: %{expect-trap} "%target-run %t/c-caller.out ubp-nullable-nil-pos" 2>&1 | %FileCheck %s --check-prefix=C-TRAP-NULL-POS
+// RUN: %{expect-trap} ubp-nullable-nil-pos    %{check-optnone-trap-message}=C-TRAP-NULL-POS
 
 //--- module.modulemap
 module CHeader {
