@@ -2178,9 +2178,10 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     // A `@c @implementation` whose signature uses safe-interop types is a safe
     // implementation of an imported C function: the C entry point is generated
     // by an implicit `@_Unswiftify` peer macro. Classify it up front so we can
-    // require the experimental feature and a non-underscored `@c` attribute,
-    // and so the expensive C-decl lookup and macro attachment below is skipped
-    // on misuse.
+    // require the experimental feature and a non-underscored `@c` attribute.
+    // To ensure peer macro expansions aren't evaluated and cached before we
+    // have time to attach the macro invocation, `@_Unswiftify` is attached
+    // as part of `ExpandPeerMacroRequest::evaluate`, when relevant.
     bool isSafe = AFD->hasSafeInteropSignature();
     if (isSafe) {
       if (!Ctx.LangOpts.hasFeature(Feature::SafeInteropImplementations)) {
@@ -2227,12 +2228,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
           interface->diagnose(diag::found_candidate);
       }
     }
-
-    // For a safe `@c @implementation`, the `@_Unswiftify` peer macro that
-    // synthesizes the C-callable bridge function is attached and expanded
-    // lazily by `ExpandPeerMacroRequest::evaluate` (which also emits any
-    // signature-mismatch diagnostics). The original safe Swift function
-    // continues to be a pure Swift symbol (see `Decl::hasOnlyCEntryPoint`).
   }
 }
 
