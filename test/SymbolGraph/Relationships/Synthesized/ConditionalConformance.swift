@@ -42,8 +42,7 @@ public struct S<T> {
   }
 }
 
-// S<Int> will also have synthesized conformances to Copyable and Escapable, so match multiple lines
-// at once to make sure we only find the conformance we want to see
+// Match multiple lines at once to make sure the constraints belong to the conformance we want to see
 // CONFORMS: "kind": "conformsTo"{{.*[[:space:]].*}} "source": "s:22ConditionalConformance1SV"{{.*[[:space:]].*}} "target": "s:22ConditionalConformance1PP"{{.*[[:space:]].*}} "swiftConstraints"
 // CONFORMS: "kind": "sameType"
 // CONFORMS-NEXT: "lhs": "T"
