@@ -719,6 +719,30 @@ bb0(%0 : @owned $Optional<T>):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @f082_unwrapMixedTrivial : $@convention(thin) <T> (@in Mixed<T>) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $*Mixed<T>):
+// CHECK:   [[A:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.i!enumelt
+// CHECK:   [[I:%.*]] = load [trivial] [[A]] : $*Builtin.Int64
+// CHECK:   return [[I]] : $Builtin.Int64
+// CHECK-LABEL: } // end sil function 'f082_unwrapMixedTrivial'
+sil [ossa] @f082_unwrapMixedTrivial : $@convention(thin) <T> (@in Mixed<T>) -> Int {
+bb0(%0 : @owned $Mixed<T>):
+  %1 = unchecked_enum_data %0 : $Mixed<T>, #Mixed.i!enumelt
+  return %1 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @f083_unwrapMixedObject : $@convention(thin) <T> (@in Mixed<T>) -> @owned AnyObject {
+// CHECK: bb0(%0 : $*Mixed<T>):
+// CHECK:   [[A:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.o!enumelt
+// CHECK:   [[O:%.*]] = load [take] [[A]] : $*AnyObject
+// CHECK:   return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'f083_unwrapMixedObject'
+sil [ossa] @f083_unwrapMixedObject : $@convention(thin) <T> (@in Mixed<T>) -> @owned AnyObject {
+bb0(%0 : @owned $Mixed<T>):
+  %1 = unchecked_enum_data %0 : $Mixed<T>, #Mixed.o!enumelt
+  return %1 : $AnyObject
+}
+
 // CHECK-LABEL: sil [ossa] @f090_tupletuple : $@convention(thin) ((Builtin.Int64, Builtin.Int64), Builtin.Int64) -> (@out (Builtin.Int64, Builtin.Int64), @out (Builtin.Int64, Builtin.Int64), Builtin.Int64, Builtin.Int64) {
 // CHECK: bb0(%0 : $*(Builtin.Int64, Builtin.Int64), %1 : $*(Builtin.Int64, Builtin.Int64), %2 : $(Builtin.Int64, Builtin.Int64), %3 : $Builtin.Int64):
 // CHECK:   store %2 to [trivial] %0 : $*(Builtin.Int64, Builtin.Int64)
