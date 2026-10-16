@@ -100,7 +100,6 @@
 
 #define DEBUG_TYPE "Clang module importer"
 
-STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 STATISTIC(
@@ -1316,6 +1315,9 @@ namespace {
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
       for (auto redecl : decl->redecls()) {
+        FrontendStatsTracer StatsTracer(
+            Impl.SwiftContext.Stats,
+            "add-namespace-redecl-to-bridging-header-lookup-table", redecl);
         // Because a namespaces's decl context is the bridging header, make sure
         // we add them to the bridging header lookup table.
         addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
@@ -10394,8 +10396,6 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 }
 
 void ClangImporter::Implementation::startedImportingEntity() {
-  ++NumTotalImportedEntities;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = SwiftContext.Stats)
     ++Stats->getFrontendCounters().NumTotalClangImportedEntities;
 }
@@ -10543,10 +10543,21 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   auto Known = importDeclCached(ClangDecl, version, UseCanonicalDecl);
   if (Known.has_value()) {
+    if (auto *Stats = SwiftContext.Stats)
+      ++Stats->getFrontendCounters().ClangImportDeclCacheHit;
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
       return nullptr;
     return Known.value();
+  }
+
+  ++importDeclRecursionDepth;
+  SWIFT_DEFER { --importDeclRecursionDepth; };
+
+  if (auto *Stats = SwiftContext.Stats) {
+    ++Stats->getFrontendCounters().ClangImportDeclCacheMiss;
+    auto &maxDepth = Stats->getFrontendCounters().ClangImportDeclRecursionDepth;
+    maxDepth = std::max(maxDepth, importDeclRecursionDepth);
   }
 
   bool TypedefIsSuperfluous = false;
@@ -11544,6 +11555,7 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+    OS << CD->getDeclKindName() << ' ';
     if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
       ND->printName(OS);
     } else {
