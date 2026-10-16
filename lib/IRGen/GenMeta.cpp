@@ -27,6 +27,8 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
@@ -7540,6 +7542,74 @@ bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
 
   return isa<ClangModuleUnit>(decl->getModuleScopeContext()) &&
     !isa<ProtocolDecl>(decl);
+}
+
+bool irgen::mayCxxCallForeignTypeMetadataAccessor(const LangOptions &langOpts,
+                                                  CanType type) {
+  if (!langOpts.EnableCXXInterop || langOpts.hasFeature(Feature::Embedded))
+    return false;
+  // Type metadata for foreign types is not yet supported on Windows. Bug
+  // #76168.
+  if (langOpts.Target.isOSWindows())
+    return false;
+  if (getTypeMetadataAccessStrategy(type) !=
+      MetadataAccessStrategy::ForeignAccessor)
+    return false;
+  return cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
+             type->getAnyNominal()->getClangDecl()) != nullptr;
+}
+
+void irgen::forEachForeignTypeUsedByCxx(
+    const LangOptions &langOpts, CanType type, bool onlyGenericArguments,
+    llvm::function_ref<void(NominalTypeDecl *)> fn) {
+  // Type metadata for foreign types is not yet supported on Windows. Bug
+  // #76168.
+  if (!langOpts.EnableCXXInterop || langOpts.hasFeature(Feature::Embedded) ||
+      langOpts.Target.isOSWindows())
+    return;
+
+  struct Walker : TypeWalker {
+    Walker(bool onlyGenericArguments,
+           llvm::function_ref<void(NominalTypeDecl *)> fn)
+        : onlyGenericArguments(onlyGenericArguments), fn(fn) {}
+
+    Action walkToTypePre(Type ty) override {
+      if (ty->is<BoundGenericType>())
+        genericDepth++;
+      else if (auto *nominal = ty->getAs<NominalType>())
+        noteUse(nominal->getDecl());
+      return Action::Continue;
+    }
+
+    Action walkToTypePost(Type ty) override {
+      if (ty->is<BoundGenericType>())
+        genericDepth--;
+
+      return Action::Continue;
+    }
+
+    void noteUse(NominalTypeDecl *type) {
+      if (!type->hasClangNode())
+        return;
+      // The generated header also lets C++ code use the C and C++ types that
+      // it refers to as generic arguments, e.g. in swift::Array.
+      if (genericDepth == 0 &&
+          (onlyGenericArguments ||
+           !cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
+               type->getClangDecl())))
+        return;
+      fn(type);
+    }
+    bool onlyGenericArguments;
+    llvm::function_ref<void(NominalTypeDecl *)> fn;
+    int genericDepth = 0;
+  } walker{onlyGenericArguments, fn};
+  type.walk(walker);
+}
+
+bool irgen::isInExtensionOfImportedType(const Decl *decl) {
+  auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
+  return nominal && nominal->hasClangNode();
 }
 
 void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {

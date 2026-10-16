@@ -593,16 +593,13 @@ public:
                                                                 printer);
       return;
     }
-    if (!isa<clang::TypeDecl>(clangDecl))
-      return;
     // Get the underlying clang type from a type alias decl, record decl, or
     // enum decl.
-    auto clangType = clangDecl->getASTContext()
-                         .getTypeDeclType(cast<clang::TypeDecl>(clangDecl))
-                         .getCanonicalType();
-    if (!isa<clang::RecordType, clang::EnumType>(clangType.getTypePtr()))
+    const auto *clangType =
+        cxx_translation::getRecordOrEnumTypeWithMetadataTrait(clangDecl);
+    if (!clangType)
       return;
-    auto it = seenClangTypes.insert(clangType.getTypePtr());
+    auto it = seenClangTypes.insert(clangType);
     if (it.second)
       ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M,
                                                               printer);

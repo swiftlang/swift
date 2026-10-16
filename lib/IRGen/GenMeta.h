@@ -17,7 +17,9 @@
 #ifndef SWIFT_IRGEN_GENMETA_H
 #define SWIFT_IRGEN_GENMETA_H
 
+#include "IRGen.h"
 #include "swift/ABI/MetadataValues.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include <utility>
 
 namespace llvm {
@@ -30,9 +32,11 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class Decl;
   struct ExistentialTypeGeneralization;
   class FileUnit;
   class FuncDecl;
+  class LangOptions;
   enum class ResilienceExpansion : unsigned;
   struct SILDeclRef;
   class SILType;
@@ -53,6 +57,25 @@ namespace irgen {
 
   bool requiresForeignTypeMetadata(CanType type);
   bool requiresForeignTypeMetadata(NominalTypeDecl *decl);
+
+  /// Whether the generated C++ header can call the metadata accessor of this
+  /// imported type. The header declares a TypeMetadataTrait that calls the
+  /// accessor for every C or C++ struct or enum it refers to.
+  bool mayCxxCallForeignTypeMetadataAccessor(const LangOptions &langOpts,
+                                             CanType type);
+
+  /// Calls \p fn with the foreign types in \p type whose metadata the
+  /// generated C++ header can request when a public declaration refers to
+  /// \p type: generic arguments, and unless \p onlyGenericArguments is set,
+  /// the C and C++ types that the header can use as generic arguments itself.
+  void
+  forEachForeignTypeUsedByCxx(const LangOptions &langOpts, CanType type,
+                              bool onlyGenericArguments,
+                              llvm::function_ref<void(NominalTypeDecl *)> fn);
+
+  /// Whether \p decl is declared in an extension of an imported type. The
+  /// generated C++ header doesn't expose these declarations.
+  bool isInExtensionOfImportedType(const Decl *decl);
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,

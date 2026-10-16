@@ -91,6 +91,11 @@ static bool validateSymbols(DiagnosticEngine &diags,
           // Note: Add the unmangled name to the irNotTBD list, which is owned
           //       by the IRModule, instead of the mangled name.
           irNotTBD.push_back(unmangledName);
+      } else if (!GV->isDeclaration() && GV->isWeakForLinker() &&
+                 !GV->hasHiddenVisibility()) {
+        // Exported weak definitions, such as the metadata accessors of
+        // imported types that the generated C++ header calls, can be listed.
+        symbolSet.erase(name);
       }
     } else {
       assert(!symbolSet.contains(name) &&
