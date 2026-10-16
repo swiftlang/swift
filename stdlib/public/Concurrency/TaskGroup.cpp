@@ -1929,7 +1929,9 @@ reevaluate_if_taskgroup_has_results:;
       assumed = TaskGroupStatus{assumedStatus};
       continue; // We raced with something, try again.
     }
+#if !SWIFT_CONCURRENCY_EMBEDDED
     SWIFT_TASK_DEBUG_LOG("poll, after CAS: %s", statusString().c_str());
+#endif
 
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
