@@ -40,12 +40,13 @@ import Virtual
 
 // CHECK-SYSV: @_ZTV14AbstractEngine = {{(dso_local )?}}constant { [4 x ptr] } { [4 x ptr] [ptr null, ptr @_ZTI14AbstractEngine, ptr @_ZNK14AbstractEngine8aeAnchorEv{{(\.ptrauth)?}}, ptr @__cxa_pure_virtual{{(\.ptrauth(\.[0-9]+)?)?}}] }
 
-// The classes whose key function stays in C++.
-// NOVTABLE-SYSV-NOT: @_ZTV10SimpleBase
-// NOVTABLE-SYSV-NOT: @_ZTV13SimpleDerived
-// NOVTABLE-SYSV-NOT: @_ZTV12CloneDerived
-// NOVTABLE-SYSV-NOT: @_ZTV5Mixer
-// NOVTABLE-SYSV-NOT: @_ZTV5Gauge
+// The classes whose key function stays in C++. Swift can still refer to their
+// vtables, e.g. from the value witnesses of Mixer's type metadata.
+// NOVTABLE-SYSV-NOT: @_ZTV10SimpleBase = {{(dso_local |linkonce_odr |weak_odr )*}}constant
+// NOVTABLE-SYSV-NOT: @_ZTV13SimpleDerived = {{(dso_local |linkonce_odr |weak_odr )*}}constant
+// NOVTABLE-SYSV-NOT: @_ZTV12CloneDerived = {{(dso_local |linkonce_odr |weak_odr )*}}constant
+// NOVTABLE-SYSV-NOT: @_ZTV5Mixer = {{(dso_local |linkonce_odr |weak_odr )*}}constant
+// NOVTABLE-SYSV-NOT: @_ZTV5Gauge = {{(dso_local |linkonce_odr |weak_odr )*}}constant
 // NOVTABLE-WIN-NOT: @"??_7
 
 

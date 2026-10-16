@@ -20,6 +20,10 @@
 #include "swift/AST/Identifier.h"
 #include <optional>
 
+namespace clang {
+class Type;
+} // end namespace clang
+
 namespace swift {
 
 class EnumDecl;
@@ -140,6 +144,12 @@ bool isNoncopyableValueTypeExposableToCxx(Type type);
 
 bool isObjCxxOnly(const ValueDecl *VD);
 bool isObjCxxOnly(const clang::Decl *D, const ASTContext &ctx);
+
+/// If \p D declares a C or C++ struct, class, union or enum, possibly through
+/// a typedef, returns its canonical type. The generated header declares a
+/// \c swift::TypeMetadataTrait for these types when it refers to them, which
+/// calls their Swift type metadata accessor.
+const clang::Type *getRecordOrEnumTypeWithMetadataTrait(const clang::Decl *D);
 
 /// Returns true if the given value decl D is visible to C++ of its
 /// own accord (i.e. without considering its context)

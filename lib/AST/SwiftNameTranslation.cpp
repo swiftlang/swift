@@ -27,6 +27,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/StringExtras.h"
 
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/STLExtras.h"
@@ -278,6 +279,18 @@ bool swift::cxx_translation::isObjCxxOnly(const ValueDecl *VD) {
   ObjCTypeWalker walker{VD->getASTContext()};
   VD->getInterfaceType().walk(walker);
   return walker.hadObjCType;
+}
+
+const clang::Type *swift::cxx_translation::getRecordOrEnumTypeWithMetadataTrait(
+    const clang::Decl *D) {
+  auto *typeDecl = dyn_cast_or_null<clang::TypeDecl>(D);
+  if (!typeDecl)
+    return nullptr;
+  auto type =
+      typeDecl->getASTContext().getTypeDeclType(typeDecl).getCanonicalType();
+  if (!isa<clang::RecordType, clang::EnumType>(type.getTypePtr()))
+    return nullptr;
+  return type.getTypePtr();
 }
 
 bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
