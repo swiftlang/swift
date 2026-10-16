@@ -694,7 +694,7 @@ EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote distributed actor references")
 
 /// Enable @_target, a per-function target-features/CPU override.
-EXPERIMENTAL_FEATURE(TargetAttribute, true)
+EXPERIMENTAL_FEATURE(TargetAttribute, false)
 
 /// Enable distributed actors in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDistributed, true)
