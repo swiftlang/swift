@@ -2260,6 +2260,28 @@ void ModuleFile::consumeHiddenTypeXRefPathPieces(
   }
 }
 
+/// A C++ class template specialization is cross-referenced by the primary
+/// template's name and the specialization's USR in the discriminator field.
+static void resolveClangTemplateSpecialization(
+    ASTContext &ctx, ArrayRef<ValueDecl *> templates, Identifier discriminator,
+    SmallVectorImpl<ValueDecl *> &results) {
+  for (auto *decl : templates) {
+    auto *ctd =
+        dyn_cast_or_null<clang::ClassTemplateDecl>(decl->getClangDecl());
+    if (!ctd)
+      continue;
+    for (const auto *spec : ctd->specializations()) {
+      llvm::SmallString<128> buffer;
+      clang::index::generateUSRForDecl(spec, buffer);
+      if (discriminator.str() == buffer) {
+        if (auto *imported =
+                ctx.getClangModuleLoader()->importDeclDirectly(spec))
+          results.push_back(cast<ValueDecl>(imported));
+      }
+    }
+  }
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -2326,7 +2348,12 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       pathTrace.addType(filterTy);
     }
 
-    if (privateDiscriminator) {
+    if (privateDiscriminator && importedFromClang) {
+      SmallVector<ValueDecl *, 4> templates;
+      baseModule->lookupValue(name, NLKind::QualifiedLookup, templates);
+      resolveClangTemplateSpecialization(
+          getContext(), templates, getIdentifier(privateDiscriminator), values);
+    } else if (privateDiscriminator) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
     } else {
@@ -2782,27 +2809,9 @@ giveUpFastPath:
 
       if (!privateDiscriminator.empty()) {
         if (importedFromClang) {
-          // This is a clang imported class template, that's
-          // serialized using original template name, and
-          // its USR that denotes the specific specialization.
           auto members = nominal->lookupDirect(memberName);
-          for (const auto &m : members) {
-            if (!m->hasClangNode())
-              continue;
-            if (auto *ctd =
-                    dyn_cast<clang::ClassTemplateDecl>(m->getClangDecl())) {
-              for (const auto *spec : ctd->specializations()) {
-                llvm::SmallString<128> buffer;
-                clang::index::generateUSRForDecl(spec, buffer);
-                if (privateDiscriminator.str() == buffer) {
-                  if (auto import = getContext()
-                                        .getClangModuleLoader()
-                                        ->importDeclDirectly(spec))
-                    values.push_back(cast<ValueDecl>(import));
-                }
-              }
-            }
-          }
+          resolveClangTemplateSpecialization(getContext(), members,
+                                             privateDiscriminator, values);
         } else {
           ModuleDecl *searchModule = M;
           if (!searchModule)
