@@ -35,6 +35,7 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK FirstSmallStruct(const FirstSmallStruct &other) noexcept {
+// CHECK-NEXT:   if (!other._storage.isAllocated()) return;
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -134,6 +135,7 @@ public struct LargeStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs11LargeStructV") LargeStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK LargeStruct(const LargeStruct &other) noexcept {
+// CHECK-NEXT:   if (!other._storage.isAllocated()) return;
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs11LargeStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__

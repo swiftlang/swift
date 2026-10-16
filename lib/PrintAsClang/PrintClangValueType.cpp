@@ -314,6 +314,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << '~' << baseName << "() noexcept {\n";
     if (isNoncopyable)
       os << "    if (_isMovedFrom) return;\n";
+    // A moved-from object with an opaque layout has no allocation.
+    if (isOpaqueLayout)
+      os << "    if (!_storage.isAllocated()) return;\n";
     printVWTable(os);
     os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
     os << "  }\n";
@@ -366,6 +369,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << "(const " << baseName << " &other) noexcept {\n";
+      // A copy of a moved-from object is moved from too.
+      if (isOpaqueLayout)
+        os << "    if (!other._storage.isAllocated()) return;\n";
       printVWTable(os);
       if (isOpaqueLayout) {
         os << "    _storage = ";
@@ -383,15 +389,51 @@ void ClangValueTypePrinter::printValueTypeDecl(
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
          << " &other) noexcept {\n";
+      // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
+      // source into a new object and move that in.
+      if (isOpaqueLayout) {
+        os << "    if (!_storage.isAllocated() || "
+              "!other._storage.isAllocated()) {\n";
+        os << "      *this = " << baseName << "(other);\n";
+        os << "      return *this;\n";
+        os << "    }\n";
+      }
       printVWTable(os);
       os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
             "*>(other._getOpaquePointer()), metadata._0);\n";
       os << "  return *this;\n";
       os << "  }\n";
-
-      // FIXME: implement the move assignment.
-      // FIXME: implement the move constructor.
     }
+
+    if (isOpaqueLayout) {
+      // move constructor. The Swift value stays in its allocation.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(" << baseName << " &&other) noexcept : _storage("
+         << "static_cast<";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << " &&>(other._storage)) {}\n";
+
+      // move assignment.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(" << baseName << " &&other) noexcept {\n";
+      os << "    if (this == &other) return *this;\n";
+      os << "    if (_storage.isAllocated()) {\n";
+      printVWTable(os);
+      os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "    }\n";
+      // This also frees the old allocation.
+      os << "    _storage = static_cast<";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << " &&>(other._storage);\n";
+      os << "  return *this;\n";
+      os << "  }\n";
+    }
+    // FIXME: implement the move operations for a copyable type with an inline
+    // layout.
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
