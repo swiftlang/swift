@@ -90,6 +90,7 @@
 // CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair final {
 
 // CHECK: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// CHECK-NEXT: bool _isMovedFrom = false;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
