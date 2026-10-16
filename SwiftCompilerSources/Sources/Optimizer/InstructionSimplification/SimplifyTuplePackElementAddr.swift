@@ -1,8 +1,8 @@
-//===--- SimplifyTuple.swift ---------------------------------------===//
+//===--- SimplifyTuplePackElementAddr.swift -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,8 +13,8 @@
 import AST
 import SIL
 
-// Replace a tuple_pack_element_addr_inst with a scalar_pack_index index operand
-// with tuple_element_addr, if its tuple type contains no pack expansions.
+// Replace a tuple_pack_element_addr with a scalar_pack_index index operand with
+// tuple_element_addr, if its tuple type contains no pack expansions.
 //
 // %tuple = alloc_stack $(Int, Int)
 // %idx = scalar_pack_index 0 of $Pack{Int, Int}
@@ -25,7 +25,7 @@ import SIL
 // %tuple = alloc_stack $(Int, Int)
 // %addr = tuple_element_addr 0 of %tuple as $*Int
 //
-extension TuplePackElementAddrInst : Simplifiable, SILCombineSimplifiable {
+extension TuplePackElementAddrInst : Simplifiable, OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard !self.tupleOperand.value.type.tupleContainsPackExpansionType,
           let scalarIndex = self.indexOperand.value as? ScalarPackIndexInst
