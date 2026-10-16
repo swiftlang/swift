@@ -6,18 +6,18 @@
 
 // RUN: %target-verify-unswiftify -I %t -module-name main %t/impl.swift %t/caller.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-checked-
+// RUN:   -verify-additional-file %t%{fs-sep}foo.h -verify-additional-prefix impl-checked-
 // RUN: %target-verify-unswiftify -I %t -module-name main %t/caller.swift %t/impl.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-checked-
+// RUN:   -verify-additional-file %t%{fs-sep}foo.h -verify-additional-prefix impl-checked-
 
 // Compiling only one of the two files (the other is non-primary).
 // RUN: %target-verify-unswiftify -I %t -module-name main -primary-file %t/caller.swift %t/impl.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h
+// RUN:   -verify-additional-file %t%{fs-sep}foo.h
 // RUN: %target-verify-unswiftify -I %t -module-name main -primary-file %t/impl.swift %t/caller.swift \
 // RUN:   -enable-experimental-feature SafeInteropImplementations \
-// RUN:   -verify-additional-file %t/foo.h -verify-additional-prefix impl-checked-
+// RUN:   -verify-additional-file %t%{fs-sep}foo.h -verify-additional-prefix impl-checked-
 
 //--- module.modulemap
 module CFoo { header "foo.h" export * }
