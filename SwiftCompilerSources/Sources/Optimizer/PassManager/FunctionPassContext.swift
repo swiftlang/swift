@@ -50,6 +50,10 @@ struct FunctionPassContext : MutatingContext {
     let bridgedPDT = bridgedPassContext.getPostDomTree()
     return PostDominatorTree(bridged: bridgedPDT)
   }
+
+  var postOrder: PostOrder {
+    PostOrder(bridged: bridgedPassContext.getPostOrder())
+  }
   
   var loopTree: LoopTree {
     let bridgedLT = bridgedPassContext.getLoopTree()

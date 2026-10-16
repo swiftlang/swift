@@ -31,6 +31,10 @@ class SILFunction;
 /// lazily re-evaluates the post order when it is invalidated so that we do not
 /// reform the post order over and over again (it can be expensive).
 class PostOrderAnalysis : public FunctionAnalysisBase<PostOrderFunctionInfo> {
+  /// Incremented whenever a cached PostOrderFunctionInfo is freed, so that holders of one can
+  /// detect that it is gone.
+  uint64_t epoch = 0;
+
 protected:
   virtual std::unique_ptr<PostOrderFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override {
@@ -52,6 +56,26 @@ public:
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::PostOrder;
+  }
+
+  uint64_t getEpoch() const { return epoch; }
+
+  virtual void invalidate() override {
+    ++epoch;
+    FunctionAnalysisBase::invalidate();
+  }
+
+  virtual void invalidate(SILFunction *F,
+                          SILAnalysis::InvalidationKind K) override {
+    if (shouldInvalidate(K) && hasFunctionInfo(F))
+      ++epoch;
+    FunctionAnalysisBase::invalidate(F, K);
+  }
+
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
+    if (hasFunctionInfo(F))
+      ++epoch;
+    FunctionAnalysisBase::notifyWillDeleteFunction(F);
   }
 };
 

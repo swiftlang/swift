@@ -1,0 +1,18 @@
+// RUN: not --crash %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s --implicit-check-not 'view:'
+
+sil_stage canonical
+
+import Builtin
+
+// A copy of the post-order survives invalidation of the analysis, but the view does not.
+// Block indices are printed after the entry block was split, so the original bb1 is now bb2.
+
+// CHECK-DAG: copy: [2, 0]
+// CHECK-DAG: PostOrder used after PostOrderAnalysis was invalidated
+sil [ossa] @invalidated : $@convention(thin) () -> () {
+bb0:
+  specify_test "post_order_invalidation"
+  br bb1
+bb1:
+  return undef : $()
+}
