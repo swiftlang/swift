@@ -220,7 +220,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   };
 
   if (Type unicode = astContext.getNamedSwiftType(stdlibModule, "Unicode")) {
-    if (auto *unicodeEnum = unicode->getEnumOrBoundGenericEnum()) {
+    if (auto *unicodeEnum = unicode->getEnumDecl()) {
       for (auto *result :
            unicodeEnum->lookupDirect(astContext.getIdentifier("Scalar"))) {
         if (auto *scalarDecl = dyn_cast<StructDecl>(result)) {
