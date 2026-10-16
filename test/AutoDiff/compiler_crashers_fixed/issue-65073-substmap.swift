@@ -22,7 +22,7 @@ public extension Array where Element: Differentiable {
     @derivative(of: update(at:byCalling:))
     mutating func vjpUpdate(at index: Int,byCalling closure: @differentiable(reverse) (inout Element) -> Void) -> (value: Void, pullback: (inout Self.TangentVector) -> Void){
         let closurePullback = pullback(at: self[index], of: closure)
-        return (value: (), pullback: { closurePullback(&$0.base[index]) })
+        return (value: (), pullback: { closurePullback(&$0[index]) })
     }
 }
 public struct D<I: Equatable, D> {public subscript(_ index: I) -> D? {get {fatalError()} set {fatalError()}}}

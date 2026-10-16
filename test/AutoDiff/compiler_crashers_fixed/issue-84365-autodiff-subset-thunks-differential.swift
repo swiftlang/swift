@@ -21,7 +21,7 @@ public func vjpSoftSolveForwardWithQ(logits: [Float]) -> (value: ([Float], [Floa
     return (
         value: (y, q),
         pullback: { _, _ in 
-            return Array<Float>.DifferentiableView([Float](repeating: 0, count: n))
+            return Array<Float>.TangentVector([Float](repeating: 0, count: n))
         }
     )
 }
