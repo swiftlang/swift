@@ -880,6 +880,12 @@ void BridgedCloner::registerLocalArchetypeRemapping(
   cloner->registerLocalArchetypeRemapping(from.unbridged(), to.unbridged());
 }
 
+void BridgedCloner::registerConcreteLocalArchetypeMapping(
+    BridgedGenericEnvironment from, BridgedSubstitutionMap to) const {
+  cloner->registerConcreteLocalArchetypeMapping(from.unbridged(),
+                                                to.unbridged());
+}
+
 BridgedType BridgedCloner::getOpType(BridgedType type) const {
   return cloner->getOpType(type.unbridged());
 }

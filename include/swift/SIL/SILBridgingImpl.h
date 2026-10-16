@@ -2297,8 +2297,28 @@ SwiftInt BridgedInstruction::ScalarPackIndexInst_getComponentIndex() const {
   return getAs<swift::ScalarPackIndexInst>()->getComponentIndex();
 }
 
+SwiftInt BridgedInstruction::PackPackIndexInst_getComponentStartIndex() const {
+  return getAs<swift::PackPackIndexInst>()->getComponentStartIndex();
+}
+
+SwiftInt BridgedInstruction::PackPackIndexInst_getComponentEndIndex() const {
+  return getAs<swift::PackPackIndexInst>()->getComponentEndIndex();
+}
+
 BridgedCanType BridgedInstruction::AnyPackIndexInst_getIndexedPackType() const {
   return getAs<swift::AnyPackIndexInst>()->getIndexedPackType();
+}
+
+BridgedGenericEnvironment
+BridgedInstruction::OpenPackElementInst_getOpenedGenericEnvironment() const {
+  return {getAs<swift::OpenPackElementInst>()->getOpenedGenericEnvironment()};
+}
+
+BridgedSubstitutionMap
+BridgedInstruction::OpenPackElementInst_tryGetElementArchetypeSubstitutionMap()
+    const {
+  return {getAs<swift::OpenPackElementInst>()
+              ->tryGetElementArchetypeSubstitutionMap()};
 }
 
 bool BridgedInstruction::DifferentiableFunctionInst_hasExtractee(
