@@ -316,7 +316,7 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
   if (!importedType.isNull())
     return importedType;
 
-  // We might be looking at a builtin
+  // We might be looking at a builtin type.
   auto builtinType = reverseBuiltinTypeMapping(type);
   if (!builtinType.isNull())
     return builtinType;
@@ -386,75 +386,88 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
   // typealias names (like 'CInt') that aren't obviously associated
   // with the underlying C library type.
 
+  // We know that the cache lookup has already failed for this type, so
+  // if the standard library types have already been cached, we don't
+  // need to redo the lookup.
+  if (StdlibTypesAreCached) {
+    assert(Cache.find(Type(type)) == Cache.end());
+    return clang::QualType();
+  }
+
+  // All of the builtin types we cache this way are non-generic and
+  // parentless, so we don't need to do anything if we see a type with
+  // interesting substructure.
+  if (type->hasGenericArgs() || type->getParent())
+    return clang::QualType();
+
+  // This also implies that the type is canonical.
+  assert(type->isCanonical());
+
   auto stdlib = Context.getStdlibModule();
   assert(stdlib && "translating stdlib type to C without stdlib module?");
   auto &ctx = ClangASTContext;
 
-  if (!StdlibTypesAreCached) {
-    auto cacheStdlibType = [&](StringRef swiftName,
-                               clang::BuiltinType::Kind builtinKind) {
-      Type swiftType = getNamedSwiftType(stdlib, swiftName);
-      if (!swiftType) return;
+  auto cacheStdlibType = [&](StringRef swiftName,
+                             clang::BuiltinType::Kind builtinKind) {
+    Type swiftType = getNamedSwiftType(stdlib, swiftName);
+    if (!swiftType) return;
 
-      auto &sema = Context.getClangModuleLoader()->getClangSema();
+    auto &sema = Context.getClangModuleLoader()->getClangSema();
 
-      if (Context.LangOpts.EnableObjCInterop) {
-        // Handle Int and UInt specially. On Apple platforms, these map to
-        // the NSInteger and NSUInteger typedefs. So try that if the typedefs
-        // are available, to ensure we get consistent ObjC @encode strings.
-        if (swiftType->isInt()) {
-          auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger");
-          if (!NSIntegerTy.isNull()) {
-            Cache.insert({swiftType->getCanonicalType(), NSIntegerTy});
-            return;
-          }
-        } else if (swiftType->isUInt()) {
-          auto NSUIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSUInteger");
-          if (!NSUIntegerTy.isNull()) {
-            Cache.insert({swiftType->getCanonicalType(), NSUIntegerTy});
-            return;
-          }
+    if (Context.LangOpts.EnableObjCInterop) {
+      // Handle Int and UInt specially. On Apple platforms, these map to
+      // the NSInteger and NSUInteger typedefs. So try that if the typedefs
+      // are available, to ensure we get consistent ObjC @encode strings.
+      if (swiftType->isInt()) {
+        auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger");
+        if (!NSIntegerTy.isNull()) {
+          Cache.insert({swiftType->getCanonicalType(), NSIntegerTy});
+          return;
+        }
+      } else if (swiftType->isUInt()) {
+        auto NSUIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSUInteger");
+        if (!NSUIntegerTy.isNull()) {
+          Cache.insert({swiftType->getCanonicalType(), NSUIntegerTy});
+          return;
         }
       }
+    }
 
-      // For something like `typealias CInt = Int32`, reverseBuiltinTypeMapping
-      // will get Int32 as the input, so we need to record the desugared type.
-      Cache.insert({swiftType->getCanonicalType(),
-                    getClangBuiltinTypeFromKind(ctx, builtinKind)});
-    };
+    // For something like `typealias CInt = Int32`, reverseBuiltinTypeMapping
+    // will get Int32 as the input, so we need to record the desugared type.
+    Cache.insert({swiftType->getCanonicalType(),
+                  getClangBuiltinTypeFromKind(ctx, builtinKind)});
+  };
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
-    cacheStdlibType(#SWIFT_TYPE_NAME, clang::BuiltinType::CLANG_BUILTIN_KIND);
+  cacheStdlibType(#SWIFT_TYPE_NAME, clang::BuiltinType::CLANG_BUILTIN_KIND);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
-    // On 64-bit Windows, no C type is imported as an Int or UInt; CLong is
-    // imported as an Int32 and CLongLong as an Int64. Therefore, manually
-    // add mappings to C for Int and UInt.
-    // On 64-bit Cygwin, no manual mapping is required.
-    if (Triple.isOSWindows() && Triple.isArch64Bit()
-        && !Triple.isWindowsCygwinEnvironment()) {
-      // Map UInt to uintptr_t
-      auto swiftUIntType = getNamedSwiftType(stdlib, "UInt");
-      auto clangUIntPtrType = ctx.getCanonicalType(ctx.getUIntPtrType());
-      Cache.insert({swiftUIntType, clangUIntPtrType});
+  // On 64-bit Windows, no C type is imported as an Int or UInt; CLong is
+  // imported as an Int32 and CLongLong as an Int64. Therefore, manually
+  // add mappings to C for Int and UInt.
+  // On 64-bit Cygwin, no manual mapping is required.
+  if (Triple.isOSWindows() && Triple.isArch64Bit()
+      && !Triple.isWindowsCygwinEnvironment()) {
+    // Map UInt to uintptr_t
+    auto swiftUIntType = getNamedSwiftType(stdlib, "UInt");
+    auto clangUIntPtrType = ctx.getCanonicalType(ctx.getUIntPtrType());
+    Cache.insert({swiftUIntType, clangUIntPtrType});
 
-      // Map Int to intptr_t
-      auto swiftIntType = getNamedSwiftType(stdlib, "Int");
-      auto clangIntPtrType = ctx.getCanonicalType(ctx.getIntPtrType());
-      Cache.insert({swiftIntType, clangIntPtrType});
-    }
-    StdlibTypesAreCached = true;
+    // Map Int to intptr_t
+    auto swiftIntType = getNamedSwiftType(stdlib, "Int");
+    auto clangIntPtrType = ctx.getCanonicalType(ctx.getIntPtrType());
+    Cache.insert({swiftIntType, clangIntPtrType});
   }
 
+  StdlibTypesAreCached = true;
+
+  // Now check the cache again to see if any of the types we just added
+  // match the type we're looking at. Since the type is known to be
+  // canonical, we can just look it up directly.
   auto it = Cache.find(Type(type));
   if (it != Cache.end())
     return it->second;
-
-  it = Cache.find(type->getCanonicalType());
-  if (it != Cache.end()) {
-    Cache.insert({Type(type), it->second});
-    return it->second;
-  }
 
   return clang::QualType();
 }
@@ -778,7 +791,7 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
 
 clang::QualType
 ClangTypeConverter::visitExistentialType(ExistentialType *type) {
-  return visit(type->getConstraintType());
+  return convert(type->getConstraintType());
 }
 
 clang::QualType
@@ -818,7 +831,7 @@ ClangTypeConverter::visitBuiltinFloatType(BuiltinFloatType *type) {
 clang::QualType
 ClangTypeConverter::visitBuiltinVectorType(BuiltinVectorType *type) {
   auto &clangCtx = ClangASTContext;
-  auto eltTy = visit(type->getElementType());
+  auto eltTy = convert(type->getElementType());
   return clangCtx.getVectorType(
     eltTy, type->getNumElements(), clang::VectorKind::Generic
   );
@@ -858,10 +871,6 @@ ClangTypeConverter::visitType(TypeBase *type) {
   return clang::QualType();
 }
 
-clang::QualType ClangTypeConverter::visit(Type type) {
-  return static_cast<super *>(this)->visit(type);
-}
-
 clang::QualType ClangTypeConverter::convert(Type type) {
   auto it = Cache.find(type);
   if (it != Cache.end())
@@ -887,7 +896,8 @@ clang::QualType ClangTypeConverter::convert(Type type) {
   }
 
   // If that failed, convert the type, cache, and return.
-  clang::QualType result = visit(type);
+  // We have to cast to super to bypass our deletion of visit.
+  clang::QualType result = static_cast<super *>(this)->visit(type);
   Cache.insert({type, result});
   return result;
 }
@@ -944,8 +954,31 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
 }
 
 clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
-  auto withCache = [&](auto conversion) {
-    auto cached = Cache.find(type);
+  // Check whether the type is cached, and otherwise do the given
+  // conversion and then cache the result.
+  //
+  // The template-argument conversion rules are not quite the same as
+  // the rules performed by the standard conversion paths of convert,
+  // visitX, etc. Therefore, we cannot just check the cache at the top
+  // of this function, and we cannot always write the result of this
+  // function into the cache. But when we *do* find ourselves delegating
+  // to the standard routines, we need to check and update the cache,
+  // both for efficiency and because some of the standard routines
+  // have a precondition that the type isn't already cached.
+  //
+  // It's important that caching only be done for types that would
+  // get the exact same treatment by the standard conversion paths.
+  // For example, if the standard paths check a special case before
+  // it calls reverseBuiltinTypeMapping, we need to check the same
+  // special case, or else we'll find ourselves caching the wrong
+  // result, which can mess up the standard paths if we happen to
+  // try to convert the type as a template argument first.
+  //
+  // In particular, because we call getAs below and therefore look
+  // through sugar, we generally need to pass in the type we need
+  // to use for caching.
+  auto withCache = [&](Type typeToCache, auto conversion) {
+    auto cached = Cache.find(typeToCache);
     if (cached != Cache.end())
       return cached->second;
 
@@ -953,7 +986,7 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
     auto result = conversion();
 
     if (!result.isNull())
-      Cache.insert({type, result});
+      Cache.insert({typeToCache, result});
     return result;
   };
 
@@ -964,13 +997,16 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
       return convertClangDecl(type, clangDecl);
 
   if (auto pointerType = type->getAs<BuiltinRawPointerType>())
-    return withCache([&]() { return visitBuiltinRawPointerType(pointerType); });
+    return withCache(pointerType,
+             [&]() { return visitBuiltinRawPointerType(pointerType); });
 
   if (auto integerType = type->getAs<BuiltinIntegerType>())
-    return withCache([&]() { return visitBuiltinIntegerType(integerType); });
+    return withCache(integerType,
+             [&]() { return visitBuiltinIntegerType(integerType); });
 
   if (auto floatType = type->getAs<BuiltinFloatType>())
-    return withCache([&]() { return visitBuiltinFloatType(floatType); });
+    return withCache(floatType,
+             [&]() { return visitBuiltinFloatType(floatType); });
 
   if (auto tupleType = type->getAs<TupleType>()) {
     // We do not call visitTupleType() because we cannot yet handle tuples with
@@ -991,49 +1027,51 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
       return clang::QualType();
 
     // Reverse the pointer and SIMD types.
-    if (structType->getGenericArgs().size() == 1) {
-      auto argType = structType->getGenericArgs()[0]->getCanonicalType();
+    return withCache(structType, [&]() {
+      if (structType->getGenericArgs().size() == 1) {
+        auto argType = structType->getGenericArgs()[0]->getCanonicalType();
 
-      if (auto kind = classifyPointer(structType))
-        return withCache([&]() {
-          return convertPointerType</*templateArgument=*/true>(argType,
-                                                               kind.value());
-        });
+        if (auto kind = classifyPointer(structType))
+          return withCache(structType, [&]() {
+            return convertPointerType</*templateArgument=*/true>(argType,
+                                                                 kind.value());
+          });
 
-      if (auto width = classifySIMD(structType))
-        return withCache([&]() {
-          return convertSIMDType</*templateArgument=*/true>(argType,
-                                                            width.value());
-        });
-    }
+        if (auto width = classifySIMD(structType))
+          return withCache(structType, [&]() {
+            return convertSIMDType</*templateArgument=*/true>(argType,
+                                                              width.value());
+          });
+      }
 
-    auto importedType =
-        withCache([&]() { return reverseImportedTypeMapping(structType); });
+      // Reverse imported and builtin types.
+      auto importedType = reverseImportedTypeMapping(structType);
+      if (!importedType.isNull())
+        return importedType;
 
-    if (!importedType.isNull())
-      return importedType;
-
-    return withCache([&]() { return reverseBuiltinTypeMapping(structType); });
+      return reverseBuiltinTypeMapping(structType);
+    });
   }
 
   // We might have a level of optionality on the Swift side that doesn't
   // exist on the C++ side.
   if (auto argType = type->getOptionalObjectType()) {
-    if (auto kind = classifyPointer(argType))
-      return withCache([&]() {
-        auto pointeeType = argType->castTo<NominalType>()
-                               ->getGenericArgs()[0]
-                               ->getCanonicalType();
+    if (auto kind = classifyPointer(argType)) {
+      auto pointerType = argType->castTo<NominalType>();
+      return withCache(pointerType, [&]() {
+        auto pointeeType = pointerType->getGenericArgs()[0]
+                                      ->getCanonicalType();
         return convertPointerType</*templateArgument=*/true>(pointeeType,
                                                              kind.value());
       });
+    }
 
     // Optional<FRT> maps to a nullable pointer so the instantiated
     // function re-imports with an optional return type. Otherwise, it would
     // be re-imported as non-optional FRT.
     if (argType->isForeignReferenceType()) {
-      return withCache([&]() {
-        if (auto nominal = argType->getAs<NominalType>()) {
+      if (auto nominal = argType->getAs<NominalType>()) {
+        return withCache(nominal, [&]() {
           if (auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(
                   nominal->getDecl()->getClangDecl())) {
             auto ptrTy = ClangASTContext.getPointerType(
@@ -1047,9 +1085,9 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
             return ClangASTContext.getAttributedType(nullableAttr, ptrTy,
                                                      ptrTy);
           }
-        }
-        return clang::QualType();
-      });
+          return clang::QualType();
+        });
+      }
     }
 
     // Arbitrary optional types are not (yet) supported
@@ -1057,13 +1095,13 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
   }
 
   if (auto functionType = type->getAs<FunctionType>()) {
-    return withCache([&]() {
+    return withCache(functionType, [&]() {
       return visitFunctionType</*templateArgument=*/true>(functionType);
     });
   }
 
   if (auto functionType = type->getAs<SILFunctionType>()) {
-    return withCache([&]() {
+    return withCache(functionType, [&]() {
       return visitSILFunctionType</*templateArgument=*/true>(functionType);
     });
   }

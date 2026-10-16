@@ -165,7 +165,9 @@ private:
   clang::QualType visitSILBlockStorageType(SILBlockStorageType *type);
   clang::QualType visitSugarType(SugarType *type);
   clang::QualType visitType(TypeBase *type);
-  clang::QualType visit(Type type);
+
+  /// We delete this because we want all recursive calls to be to convert.
+  clang::QualType visit(Type type) = delete;
 };
 
 } // end namespace swift
