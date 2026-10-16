@@ -132,6 +132,32 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
   return false;
 }
 
+/// The explosion size above which a debug_value's operand is killed.
+///
+/// A load within a reconstruction block (created by prependDeref) will create
+/// a fragment for each of the aggregate's elements in IRGen. LLVM's
+/// calculateDbgEntityHistory (run from the AsmPrinter) is quadratic and
+/// can considerably increase compile time.
+static constexpr unsigned MaxDebugReconstructionExplosionSize = 64;
+
+/// Prepend a deref to operand \p idx of \p dbg.
+/// If the load would be too expensive, the operand is killed.
+static void tryPrependDerefToDebugValue(DebugValueInst *dbg, unsigned idx,
+                                        irgen::IRGenModule &Mod) {
+  if (dbg->getDebugReconstructionBlock()) {
+    SILType addrTy = dbg->getOperand(idx)->getType();
+    auto canType = addrTy.getObjectType().getASTType();
+    if (canType->hasTypeParameter())
+      canType = getSubstGenericEnvironment(dbg->getFunction())
+                    ->mapTypeIntoEnvironment(canType)
+                    ->getCanonicalType();
+    if (Mod.getTypeInfoForLowered(canType).getSchema().size() >
+        MaxDebugReconstructionExplosionSize)
+      return dbg->killOperand(idx);
+  }
+  dbg->prependDeref(idx);
+}
+
 /// Check if a type is a large loadable tuple type that requires indirect
 /// passing according to the native calling convention.
 static bool isLargeLoadableTupleType(GenericEnvironment *GenericEnv, SILType t,
@@ -1908,7 +1934,8 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       // Update the debug_value to point to the variable in the alloca.
       scalarUse->set(address);
-      dbgInst->prependDeref(scalarUse->getOperandNumber());
+      tryPrependDerefToDebugValue(dbgInst, scalarUse->getOperandNumber(),
+                                  pass.Mod);
     }
   }
 }
@@ -2428,7 +2455,7 @@ static void rewriteFunction(StructLoweringState &pass,
     } else {
       assert(currOperand->getType().isAddress() &&
              "Expected an address type");
-      instr->prependDeref(operand->getOperandNumber());
+      tryPrependDerefToDebugValue(instr, operand->getOperandNumber(), pass.Mod);
     }
   }
 
@@ -4226,6 +4253,10 @@ public:
     return heuristic.isLargeLoadableType(ty);
   }
 
+  void tryPrependDerefToDebugValue(DebugValueInst *dbg, unsigned idx) {
+    ::tryPrependDerefToDebugValue(dbg, idx, *irgenModule);
+  }
+
   bool contains(SILValue v) {
     return valueToAddressMap.find(v) != valueToAddressMap.end();
   }
@@ -4876,7 +4907,7 @@ protected:
       }
       SILValue addr = assignment.getAddressForValue(operandVal);
       operand.set(addr);
-      dbg->prependDeref(operand.getOperandNumber());
+      assignment.tryPrependDerefToDebugValue(dbg, operand.getOperandNumber());
     }
   }
 
