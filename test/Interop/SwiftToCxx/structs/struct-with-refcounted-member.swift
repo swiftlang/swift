@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
-// RUN: %FileCheck %s < %t/structs.h
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-%target-objc-interop < %t/structs.h
 // RUN: %FileCheck %s --check-prefix=FIXED < %t/structs.h
 // RUN: %target-swift-frontend %s -module-name Structs -enable-library-evolution -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/resilient.h
 // RUN: %FileCheck %s --check-prefixes=FIXED,RESILIENT < %t/resilient.h
@@ -114,8 +114,12 @@ public struct UnknownReference {
     let value: AnyObject
 }
 
+// AnyObject uses native reference counting when Objective-C interop is disabled.
 // CHECK-LABEL: SWIFT_INLINE_THUNK ~UnknownReference() noexcept {
-// CHECK:         vwTable->destroy(_getOpaquePointer(), metadata._0);
+// CHECK-objc:    vwTable->destroy(_getOpaquePointer(), metadata._0);
+// CHECK-nonobjc-NEXT: void *reference;
+// CHECK-nonobjc-NEXT: memcpy(&reference, _getOpaquePointer(), sizeof(reference));
+// CHECK-nonobjc-NEXT: swift::_impl::swift_release(reference);
 // CHECK-NEXT:  }
 
 public struct UnownedReference {
