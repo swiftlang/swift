@@ -257,18 +257,22 @@ var standardOutput = CFileStream(fp: stdout)
 var standardError = CFileStream(fp: stderr)
 
 #if os(Windows)
-/// Write `text` to the Application event log as one or more error events.
-///
-/// ReportEventW() limits each string to 31,839 characters, so long text is
-/// split at line boundaries into numbered parts.
-internal func reportToEventLog(_ text: String, source: String) -> Bool {
-  let maxChunkLength = 31_000
+// Event log messages have an upper size limit of about 32k
+// so if our crash log is too big then split it
+// into "chunks" that will each be reported in
+// a separate event log message.
+// In practice this seems unlikely in Windows but the event log is a bit
+// of a catch-all anyway, so try to handle cases people don't expect.
+// We expect people to use file logging mostly on UI or services
+// and console logging for console programs.
+private let maxChunkLength = 31_000
 
+/// Write `text` to the Application event log as one or more error events.
+internal func reportToEventLog(_ text: String, source: String) -> Bool {
   var chunks: [String] = []
   var chunk = ""
   var chunkLength = 0
   for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-    var line = Substring(line)
     while true {
       let lineLength = line.utf16.count + 2
       if chunkLength + lineLength <= maxChunkLength {
@@ -288,6 +292,7 @@ internal func reportToEventLog(_ text: String, source: String) -> Bool {
       line = line.dropFirst(prefix.count)
     }
   }
+
   if chunkLength > 0 {
     chunks.append(chunk)
   }
@@ -295,9 +300,11 @@ internal func reportToEventLog(_ text: String, source: String) -> Bool {
   let hEventLog = source.withCString(encodedAs: UTF16.self) {
     RegisterEventSourceW(nil, $0)
   }
+
   guard let hEventLog else {
     return false
   }
+
   defer {
     _ = DeregisterEventSource(hEventLog)
   }
@@ -311,7 +318,7 @@ internal func reportToEventLog(_ text: String, source: String) -> Bool {
       message = chunk
     }
 
-    let reported = message.withCString(encodedAs: UTF16.self) {
+    guard message.withCString(encodedAs: UTF16.self) {
       pwszMessage in
       var strings: [LPCWSTR?] = [pwszMessage]
       return ReportEventW(hEventLog,
@@ -323,12 +330,11 @@ internal func reportToEventLog(_ text: String, source: String) -> Bool {
                           0,
                           &strings,
                           nil)
-    }
-    if !reported {
-      succeeded = false
+    } else {
+      return false
     }
   }
 
-  return succeeded
+  return true
 }
 #endif

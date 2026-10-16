@@ -125,8 +125,10 @@ internal struct SwiftBacktrace {
 
   static func write(_ string: String, flush: Bool = false) {
     #if os(Windows)
-    if eventLogText != nil {
-      eventLogText!.append(string)
+    if let eventLogText {
+      // we are collating the output to a string for writing at the
+      // end into the event log
+      eventLogText.append(string)
       return
     }
     #endif
@@ -142,9 +144,11 @@ internal struct SwiftBacktrace {
 
   static func writeln(_ string: String, flush: Bool = false) {
     #if os(Windows)
-    if eventLogText != nil {
-      eventLogText!.append(string)
-      eventLogText!.append("\n")
+    if let eventLogText {
+      // we are collating the output to a string for writing at the
+      // end into the event log
+      eventLogText.append(string)
+      eventLogText.append("\n")
       return
     }
     #endif
@@ -212,13 +216,17 @@ Generate a backtrace for the parent process.
 --output-to <stream>    Set which output stream to use.  Options are "stdout"
 -o <stream>             and "stderr".  The default is "stdout".
 
-                        On Windows, you may also specify "console", which
-                        behaves like "stderr", or "eventlog", which writes
-                        the backtrace to the Application event log.
-
                         Alternatively, you may specify a file path here.  If
                         the path points to a directory, a unique filename will
                         be generated automatically.
+
+                        On Windows, you can specify "eventlog", which writes
+                        the backtrace to the Application event log.
+                        If a console is not present (e.g. UI code), the runtime
+                        will default to "eventlog", and will suppress creation
+                        of a new window for "stderror" or "stdout" output.
+                        On Windows, you may also specify "console", which
+                        behaves like "stderr" but allows creation of a window.
 
 --format <format>       Set the output format.  Options are "text" and "json";
                         the default is "text".
