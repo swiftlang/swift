@@ -1484,9 +1484,9 @@ static ManagedValue emitBuiltinApplyDerivative(
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
-  bool throws;
+  bool throws, async;
   auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
-      builtinName, kind, arity, throws);
+      builtinName, kind, arity, throws, async);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyDerivativeFunction(kind, arity, SGF, loc,
                                                     substitutions, args, C);
@@ -1501,9 +1501,9 @@ static ManagedValue emitBuiltinApplyTranspose(
           ->getDecl());
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   unsigned arity;
-  bool throws;
+  bool throws, async;
   auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
-      builtinName, arity, throws);
+      builtinName, arity, throws, async);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyTransposeFunction(
       arity, throws, SGF, loc, substitutions, args, C);
