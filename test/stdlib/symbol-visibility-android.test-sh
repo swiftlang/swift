@@ -1,0 +1,13 @@
+// Ensure that the runtime does not carry its own copy of libc++abi on Android.
+//
+// The C++ ABI runtime comes from libc++_shared.so. A second, exported copy in
+// the Swift runtime libraries splits C++ exception state between two copies,
+// so std::rethrow_exception and std::rethrow_if_nested abort.
+
+// RUN: %llvm-nm --defined-only --extern-only %platform-dylib-dir/%target-library-name(swiftCore) | %FileCheck --allow-empty %s
+// RUN: %llvm-nm --defined-only --extern-only %platform-dylib-dir/%target-library-name(swift_Concurrency) | %FileCheck --allow-empty %s
+
+// CHECK-NOT: __cxa_
+// CHECK-NOT: __gxx_personality_v0
+
+// REQUIRES: OS=linux-android
