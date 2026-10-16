@@ -260,6 +260,10 @@ private struct FunctionChecker {
         break
       }
 
+      case is TuplePackElementAddrInst,
+           is TuplePackExtractInst:
+        throw Violation(.embedded_swift_tuple_pack_element, in: instruction)
+
     default:
       break
     }

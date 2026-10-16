@@ -427,6 +427,8 @@ NOTE(embedded_existential_created,none,
       "protocol type value created here", ())
 NOTE(embedded_constructor_called,none,
       "instance of type created here", ())
+GROUPED_ERROR(embedded_swift_tuple_pack_element, EmbeddedRestrictions, none,
+              "variadic generic expansions in tuples not available in embedded Swift", ())
 
 // no-allocations diagnostics
 GROUPED_WARNING(embedded_swift_allocating_type,HeapAllocation,none,

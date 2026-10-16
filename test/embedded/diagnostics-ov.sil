@@ -1,0 +1,21 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-experimental-feature Embedded -embedded-swift-diagnostics -verify %s -o /dev/null
+
+// REQUIRES: swift_feature_Embedded
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct MyStruct: ~Copyable {
+  deinit
+}
+
+sil [ossa] @tuple_pack_elements : $@convention(thin) (@guaranteed (MyStruct, MyStruct)) -> () {
+bb0(%0 : @guaranteed $(MyStruct, MyStruct)):
+  %zero = scalar_pack_index 0 of $Pack{MyStruct, MyStruct}
+  %elem = tuple_pack_extract %zero of %0 as $MyStruct // expected-error{{variadic generic expansions in tuples not available in embedded Swift}}
+  %res = tuple ()
+  return %res
+}
