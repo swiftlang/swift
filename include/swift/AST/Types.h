@@ -379,6 +379,10 @@ enum class TypeMatchFlags {
   /// module didn't record the Clang function type; two present-but-different
   /// Clang types still mismatch.
   AllowMissingClangType = 1 << 10,
+  /// Require the parameters of function values within the types to agree on
+  /// whether they are owned, which changes how those values are lowered. The
+  /// parameter lists of the declaration itself are exempt; see \c matches.
+  RequireMatchingNestedParamOwnership = 1 << 11,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -1319,8 +1323,10 @@ public:
          llvm::function_ref<CanType(ArchetypeType *orig, CanType subst)> substFn);
 
   /// Determines whether this type is similar to \p other as defined by
-  /// \p matchOptions.
-  bool matches(Type other, TypeMatchOptions matchOptions);
+  /// \p matchOptions. The first \p numParameterLists curried parameter lists
+  /// of these types belong to a declaration rather than a function value.
+  bool matches(Type other, TypeMatchOptions matchOptions,
+               unsigned numParameterLists = 0);
 
   bool matchesParameter(Type other, TypeMatchOptions matchMode);
 

@@ -23,6 +23,33 @@ class Derived: Base {
   override func generic<T>(_ x: consuming T) {}
 }
 
+class NestedBase {
+  func passClosure(_ g: (borrowing Tracked) -> ()) {}
+  func returnClosure() -> (consuming Tracked) -> () { { _ in } }
+}
+
+class NestedDerived: NestedBase {
+  override func passClosure(_ g: (consuming Tracked) -> ()) {
+    g(Tracked("passed"))
+    print("after passed")
+  }
+  override func returnClosure() -> (borrowing Tracked) -> () {
+    { print("borrowed \($0.name)") }
+  }
+}
+
+@inline(never)
+func makeNestedBase() -> NestedBase { NestedDerived() }
+
+@inline(never)
+func testNested(_ b: NestedBase) {
+  b.passClosure { print("saw \($0.name)") }
+
+  let g = b.returnClosure()
+  g(Tracked("returned"))
+  print("after returned")
+}
+
 @inline(never)
 func makeBase() -> Base { Derived() }
 
@@ -52,6 +79,13 @@ func test(_ b: Base) {
 // CHECK-NEXT: after consume
 // CHECK-NEXT: still alive: generic
 // CHECK-NEXT: deinit generic
+// CHECK-NEXT: saw passed
+// CHECK-NEXT: deinit passed
+// CHECK-NEXT: after passed
+// CHECK-NEXT: borrowed returned
+// CHECK-NEXT: deinit returned
+// CHECK-NEXT: after returned
 // CHECK-NEXT: done
 test(makeBase())
+testNested(makeNestedBase())
 print("done")

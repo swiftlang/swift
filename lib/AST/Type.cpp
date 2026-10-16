@@ -3861,7 +3861,8 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
 
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                     ParameterPosition paramPosition,
-                    OptionalUnwrapping insideOptional) {
+                    OptionalUnwrapping insideOptional,
+                    unsigned numParameterLists) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
@@ -3873,7 +3874,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (auto obj1 = t1.getOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
         return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToOptional);
+                       OptionalUnwrapping::OptionalToOptional,
+                       numParameterLists);
       }
 
       // Value-to-optional.
@@ -3884,7 +3886,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::ValueToOptional);
+                       OptionalUnwrapping::ValueToOptional, numParameterLists);
       }
 
     } else if (matchMode.contains(
@@ -3892,7 +3894,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getOptionalObjectType()) {
         return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
-                       OptionalUnwrapping::OptionalToValue);
+                       OptionalUnwrapping::OptionalToValue, numParameterLists);
       }
     }
   }
@@ -3916,14 +3918,15 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
         return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
-                       OptionalUnwrapping::None);
+                       OptionalUnwrapping::None, /*numParameterLists=*/0);
       }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, elementPosition, OptionalUnwrapping::None)) {
+                   matchMode, elementPosition, OptionalUnwrapping::None,
+                   /*numParameterLists=*/0)) {
         return false;
       }
     }
@@ -3947,7 +3950,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       for (auto i : indices(fn2.getParams())) {
         if (!matches(fn2Params[i].getOldType(), fn1Params[i].getOldType(),
                      matchMode, ParameterPosition::ParameterTupleElement,
-                     OptionalUnwrapping::None)) {
+                     OptionalUnwrapping::None, /*numParameterLists=*/0)) {
+          return false;
+        }
+
+        if (matchMode.contains(
+                TypeMatchFlags::RequireMatchingNestedParamOwnership) &&
+            numParameterLists == 0 &&
+            fn1Params[i].isOwned() != fn2Params[i].isOwned()) {
           return false;
         }
 
@@ -3960,7 +3970,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Results are covariant.
       return (matches(fn1.getResult(), fn2.getResult(), matchMode,
                       ParameterPosition::NotParameter,
-                      OptionalUnwrapping::None));
+                      OptionalUnwrapping::None,
+                      numParameterLists > 0 ? numParameterLists - 1 : 0));
     };
 
     return matchesFunctionType(fn1, fn2, matchMode, insideOptional,
@@ -4004,7 +4015,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                                  std::get<0>(elt)->getCanonicalType(),
                                  std::get<1>(elt)->getCanonicalType(),
                                  matchMode, ParameterPosition::NotParameter,
-                                 OptionalUnwrapping::None);
+                                 OptionalUnwrapping::None,
+                                 /*numParameterLists=*/0);
                            }))
             return true;
         }
@@ -4022,14 +4034,17 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   return false;
 }
 
-bool TypeBase::matches(Type other, TypeMatchOptions matchMode) {
+bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
+                       unsigned numParameterLists) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::NotParameter, OptionalUnwrapping::None);
+                   ParameterPosition::NotParameter, OptionalUnwrapping::None,
+                   numParameterLists);
 }
 
 bool TypeBase::matchesParameter(Type other, TypeMatchOptions matchMode) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   ParameterPosition::Parameter, OptionalUnwrapping::None);
+                   ParameterPosition::Parameter, OptionalUnwrapping::None,
+                   /*numParameterLists=*/0);
 }
 
 bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
