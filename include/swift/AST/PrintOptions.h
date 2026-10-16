@@ -316,7 +316,8 @@ public:
 
     /// If there is an exported module name and the named module is the main
     /// module or has been loaded by the main module, use it instead of the
-    /// regular name.
+    /// regular name. A loaded module must also be visible through the imports
+    /// printed in the interface, so that clients can refer to it.
     IfLoaded,
 
     /// Always use the regular name.
