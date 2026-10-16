@@ -17,6 +17,7 @@ private func log(_ message: @autoclosure () -> String) {
   llvmDebug("lifetime-resolution", message())
 }
 
+// TODO: determine whether this needs OSSACompleteLifetime to run first.
 let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   (function: Function, context: FunctionPassContext) in
 
@@ -1433,6 +1434,9 @@ private struct PartitionedUses: CustomStringConvertible {
 
     liverange.insert(contentsOf: consumes.users)
     liverange.insert(contentsOf: uses.users)
+    // FIXME: this should add `indirectUses`. We also need a cache of information about the dependent values's uses, to
+    //  effectively extend the range of instructions to be considered deinit barriers so it includes all
+    //  dependent value's lifetimeLimits too.
 
     collectDeinitBarriers(into: &indirectUses, liverange: liverange,
       lifetimeLimits: lifetimeLimits, def: root, context)
