@@ -348,3 +348,14 @@ public func resumeThrowingContinuationThrowing(_ cont: Builtin.RawUnsafeContinua
   // CHECK-NEXT: destroy_value %1 : $any Error
   Builtin.resumeThrowingContinuationThrowing(cont, error)
 }
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s4test12pushDeadline5clock7instantyx_7Instants5ClockPQztYas12IdentifiableRzsAFRzlF
+// CHECK:       bb0([[CLOCK:%.*]] : $*C, [[INSTANT:%.*]] : $*C.Instant):
+// CHECK:         [[RECORD:%.*]] = builtin "taskPushDeadline"<C, C.Instant>([[CLOCK]] : $*C, [[INSTANT]] : $*C.Instant) : $UnsafeRawPointer
+// CHECK:         builtin "taskPopDeadline"
+// CHECK-LABEL: } // end sil function '$s4test12pushDeadline5clock7instantyx_7Instants5ClockPQztYas12IdentifiableRzsAFRzlF'
+@available(SwiftStdlib 5.7, *)
+public func pushDeadline<C: Clock & Identifiable>(clock: C, instant: C.Instant) async {
+  let record = Builtin.taskPushDeadline(clock: clock, instant: instant)
+  Builtin.taskPopDeadline(record: record)
+}
