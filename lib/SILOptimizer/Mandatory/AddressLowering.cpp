@@ -3858,6 +3858,22 @@ protected:
     markRewritten(copyInst, destAddr);
   }
 
+  // Explicitly copy from an opaque source operand.
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *copyInst) {
+    SILValue srcVal = copyInst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    AddressMaterialization addrMat(pass, copyInst, builder);
+    SILValue destAddr = addrMat.materializeAddress(copyInst);
+    // Unlike copy_value, explicit_copy_value is never a def-projection of its
+    // operand, and the operand stays live across it, so they can't share
+    // storage.
+    assert(destAddr != srcAddr && "explicit_copy_value must not alias source");
+    builder.createExplicitCopyAddr(copyInst->getLoc(), srcAddr, destAddr,
+                                   IsNotTake, IsInitialization);
+    markRewritten(copyInst, destAddr);
+  }
+
   void visitDebugValueInst(DebugValueInst *debugInst) {
     SILValue srcVal = use->get();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;

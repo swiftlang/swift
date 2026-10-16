@@ -23,14 +23,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_CxxImplementation
 
-// FIXME: rdar://189971200
-// UseRewriter::visitExplicitCopyValueInst() in AddressLowering is not yet
-// implemented. This fails:
-//   %14 = explicit_copy_value %13 : $Tracked
-//   ^^^ Unimplemented opaque value use.
-//   While running pass #221 SILFunctionTransform "AddressLowering" ...
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 #include <stdio.h>
 
 #include "non-trivial.h"
