@@ -337,6 +337,12 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   public func getNameOfField(withIndex idx: Int) -> StringRef {
     StringRef(bridged: type.bridged.getFieldName(idx))
   }
+
+  /// The field's declaration as the user wrote it: a property wrapper's backing storage
+  /// maps back to the wrapped property.
+  public func getUserFacingFieldDecl(withIndex idx: Int) -> VarDecl? {
+    type.bridged.getUserFacingFieldDecl(idx).getAs(VarDecl.self)
+  }
 }
 
 public struct EnumCase : Equatable {
@@ -404,6 +410,11 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public func label(at index: Int) -> Identifier {
     type.bridged.getTupleElementLabel(index)
+  }
+
+  /// The element's label, or the empty string if it is unlabeled.
+  public func labelName(at index: Int) -> StringRef {
+    StringRef(bridged: type.bridged.getTupleElementLabelName(index))
   }
 }
 

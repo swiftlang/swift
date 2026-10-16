@@ -4039,6 +4039,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     DiagnoseKind Kind = llvm::StringSwitch<DiagnoseKind>(AttrName)
                             .Case("unpermitted_copy",
                                   DiagnoseKind::UnpermittedCopy)
+                            .Case("let_reinit", DiagnoseKind::LetReinit)
                             .Default(DiagnoseKind::Invalid);
 
     if (Kind == DiagnoseKind::Invalid) {

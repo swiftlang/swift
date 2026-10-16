@@ -9319,6 +9319,10 @@ public:
 
     /// The marked value is a copy that is not permitted by the language model.
     UnpermittedCopy,
+
+    /// The marked address is the destination of a second initialization of
+    /// immutable storage.
+    LetReinit,
   };
 
 private:
