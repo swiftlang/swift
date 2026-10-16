@@ -20,6 +20,7 @@ func fixedShapeResults() {
   let _: (Int, String)? = materialize(CandidateValues<(Int, String)>())
   let _: Int?? = materialize(CandidateValues<Int?>())
   let _: Any = materialize(CandidateValues<Int, String>())
+  let _: () -> Any = materialize(CandidateValues<() -> Int>())
 }
 
 // Inject the entire empty-pack result into Optional even when Optional cannot

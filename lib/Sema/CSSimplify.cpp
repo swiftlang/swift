@@ -5692,6 +5692,9 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
+  if (hasConversionOrRestriction(ConversionRestrictionKind::TuplePack))
+    return false;
+
   auto hasAnyRestriction = [&]() {
     return llvm::any_of(conversionsOrFixes,
                         [](const RestrictionOrFix &correction) {
@@ -7653,7 +7656,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return formUnsolvedResult();
   }
 
-  std::optional<std::pair<Type, Type>> tuplePackMatch;
+  llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
 
   // If the original type on one side consisted of a tuple type with
   // unresolved pack expansion(s), let's make sure that both sides are
@@ -7712,11 +7715,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         !isTypeVariableWrappedInOptional(desugar2) &&
         !desugar1->isAny() &&
         !desugar2->isAny()) {
-      tuplePackMatch.emplace(
-          desugar1->is<TupleType>() ? type1
-                                    : TupleType::get({type1}, getASTContext()),
-          desugar2->is<TupleType>() ? type2
-                                    : TupleType::get({type2}, getASTContext()));
+      conversionsOrFixes.push_back(ConversionRestrictionKind::TuplePack);
     }
   }
 
@@ -7742,8 +7741,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // util pack expansion type variables are bound.
     return formUnsolvedResult(/*useOriginalTypes=*/true);
   }
-
-  llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
 
   // Decompose parallel structure.
   TypeMatchOptions subflags =
@@ -8651,14 +8648,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
-  // If tuple pack matching is a candidate, attempt repairs after decomposing
-  // that candidate.
-  // FIXME: Consider repair candidates alongside tuple pack matching and handle
-  // competing repaired solutions without losing diagnostics. Currently,
-  // ignoring the contextual type here can compete with repairing an element
-  // mismatch after tuple pack matching and cause diagnostic generation to fail.
-  if (!tuplePackMatch && shouldAttemptFixes() &&
-      !flags.contains(TMF_ApplyingFix)) {
+  if (shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix)) {
     if (repairFailures(type1, type2, kind, flags, conversionsOrFixes,
                        locator)) {
       if (conversionsOrFixes.empty())
@@ -8666,19 +8656,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (conversionsOrFixes.empty() && !tuplePackMatch)
+  if (conversionsOrFixes.empty())
     return SolutionKind::Error;
 
   // Where there is more than one potential conversion, create a disjunction
-  // so that we'll explore all of the options, including tuple pack matching.
-  if (conversionsOrFixes.size() + tuplePackMatch.has_value() > 1) {
+  // so that we'll explore all of the options.
+  if (conversionsOrFixes.size() > 1) {
     auto fixedLocator = getConstraintLocator(locator);
     SmallVector<Constraint *, 2> constraints;
-    if (tuplePackMatch) {
-      constraints.push_back(Constraint::create(
-          *this, kind, tuplePackMatch->first, tuplePackMatch->second,
-          fixedLocator));
-    }
 
     for (auto potential : conversionsOrFixes) {
       auto constraintKind = kind;
@@ -8720,12 +8705,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // For a single potential conversion, directly recurse, so that we
   // don't allocate a new constraint or constraint locator.
-
-  // Handle tuple pack matching.
-  if (tuplePackMatch) {
-    return matchTypes(tuplePackMatch->first, tuplePackMatch->second,
-                      kind, flags, locator);
-  }
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
@@ -14985,6 +14964,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
+
+  case ConversionRestrictionKind::TuplePack:
+    return matchTypes(
+        type1->is<TupleType>() ? type1
+                               : TupleType::get({type1}, getASTContext()),
+        type2->is<TupleType>() ? type2
+                               : TupleType::get({type2}, getASTContext()),
+        matchKind, flags, locator);
 
   case ConversionRestrictionKind::Superclass: {
     addContextualScore();

@@ -7246,6 +7246,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                               toType->getCanonicalType() });
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
+    case ConversionRestrictionKind::TuplePack:
+      // Use the resolved types to perform the conversion below.
+      break;
     case ConversionRestrictionKind::DeepEquality: {
       // HACK: Fix problem related to Swift 4 mode (with assertions),
       // since Swift 4 mode allows passing arguments with extra parens

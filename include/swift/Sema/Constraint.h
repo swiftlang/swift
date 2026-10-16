@@ -242,6 +242,8 @@ enum class ConstraintClassification : char {
 /// a superclass conversion from A to B or there might be a user-defined
 /// conversion from A to B. The solver may need to explore both paths.
 enum class ConversionRestrictionKind {
+  /// Match a tuple containing a pack expansion by wrapping the non-tuple type.
+  TuplePack,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
