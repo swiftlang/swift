@@ -1161,6 +1161,49 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
                                                 /* +1 */ SwiftError *error);
 
+/// Opaque handle to a split continuation, returned by
+/// swift_continuation_createSplit and consumed by the other
+/// swift_continuation_*Split entry points.
+struct SplitContinuation;
+
+/// Create a *split* continuation for a result of the given type.
+///
+/// Unlike swift_continuation_init, this does not bind the continuation to the
+/// current task or touch the task's execution state. It allocates the
+/// continuation's ContinuationAsyncContext (state Pending) and result storage
+/// sized for the resultType, and returns the split continuation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+SplitContinuation *
+swift_continuation_createSplit(const Metadata *resultType);
+
+/// Await a split continuation from the current task.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_continuation_awaitSplit(SplitContinuation *continuation);
+
+/// Destroy a split continuation created by swift_continuation_createSplit,
+/// after its result has been consumed by the await.  Frees the context and its
+/// result storage.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_destroySplit(SplitContinuation *continuation);
+
+/// Resume a continuation, offering the current thread to run the resumed task
+/// instead of enqueuing it.
+///
+/// `continuation` may be an normal continuation or a split continuation.
+/// If `error` is null, the continuation returns `result`, which is moved into
+/// the continuation; otherwise it throws `error`, and `result` is destroyed.
+/// Both are passed at +1.
+///
+/// If the executors passed match the awaiting task, the task runs on the
+/// current thread before this returns; otherwise it is enqueued.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_resumeOnExecutors(AsyncTask *continuation,
+                                          /* +1 */ OpaqueValue *result,
+                                          /* +1 */ SwiftError *error,
+                                          SerialExecutorRef serialExecutor,
+                                          TaskExecutorRef taskExecutor,
+                                          const Metadata *resultType);
+
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);
