@@ -139,16 +139,29 @@ where Element: AdditiveArithmetic & Differentiable {
     lhs: Array.DifferentiableView,
     rhs: Array.DifferentiableView
   ) -> Array.DifferentiableView {
-    if lhs.base.count == 0 {
-      return rhs
+    var result = lhs
+    result += rhs
+    return result
+  }
+  
+  @inlinable
+  public static func += (
+    lhs: inout Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) {
+    if rhs.base.isEmpty { return }
+    if lhs.base.isEmpty {
+      lhs = rhs
+      return
     }
-    if rhs.base.count == 0 {
-      return lhs
+    precondition(lhs.base.count == rhs.base.count, "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
+    lhs.base.withUnsafeMutableBufferPointer { destination in
+      rhs.base.withUnsafeBufferPointer { source in
+        for i in destination.indices {
+          destination[i] += source[i]
+        }
+      }
     }
-    precondition(
-      lhs.base.count == rhs.base.count,
-      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(+))
   }
 
   @inlinable
@@ -156,16 +169,38 @@ where Element: AdditiveArithmetic & Differentiable {
     lhs: Array.DifferentiableView,
     rhs: Array.DifferentiableView
   ) -> Array.DifferentiableView {
-    if lhs.base.count == 0 {
-      return Array.DifferentiableView(rhs.base.map { .zero - $0 })
+    var result = lhs
+    result -= rhs
+    return result
+  }
+  
+  @inlinable
+  public static func -= (
+    lhs: inout Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) {
+    if rhs.base.isEmpty { return }
+    if lhs.base.isEmpty {
+      lhs = Array.DifferentiableView(
+        [Element](unsafeUninitializedCapacity: rhs.base.count) { buffer, initializedCount in
+          rhs.base.withUnsafeBufferPointer { source in
+            for i in buffer.indices {
+              buffer.initializeElement(at: i, to: .zero - source[i])
+            }
+          }
+          initializedCount = rhs.base.count
+        }
+      )
+      return
     }
-    if rhs.base.count == 0 {
-      return lhs
+    precondition(lhs.base.count == rhs.base.count, "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
+    lhs.base.withUnsafeMutableBufferPointer { destination in
+      rhs.base.withUnsafeBufferPointer { source in
+        for i in destination.indices {
+          destination[i] -= source[i]
+        }
+      }
     }
-    precondition(
-      lhs.base.count == rhs.base.count,
-      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
   }
 
   @inlinable
