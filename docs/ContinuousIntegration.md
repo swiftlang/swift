@@ -50,6 +50,7 @@ All supported platforms     | @swift-ci Please test                         | Sw
 All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform<br>Swift Test macOS Platform<br>Swift Test Windows Platform<br>
 macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform
 macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform
+macOS platform (Cross-Compile Intel) | @swift-ci Please test macOS cross-compile x86_64 | Swift Test macOS Platform (cross-compile x86_64)
 macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on macOS Platform (many runs - rigorous)
 macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - soundness)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform
