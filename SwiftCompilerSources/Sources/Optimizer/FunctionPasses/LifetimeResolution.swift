@@ -27,8 +27,9 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   var resolver = Resolver(function, context)
   var indexCache = FieldIndexTrieCache(for: function)
 
-  // Process results in reverse post-order to ensure dependent uses are already resolved.
-  for block in function.blocks.reversed() {
+  // Visit blocks in post-order, each bottom-up, so a value's uses in the blocks it dominates are
+  // resolved before the value itself.
+  for block in function.postOrderBlocks(context) {
     for inst in block.instructions.reversed() {
       // Ignore `mark_uninitialized` this pass is driven by the storage itself.
       if inst is MarkUninitializedInst { continue }
