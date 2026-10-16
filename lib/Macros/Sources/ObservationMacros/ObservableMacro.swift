@@ -119,6 +119,26 @@ public struct ObservableMacro {
     )
   }
 
+  static func invalidApplication(of node: AttributeSyntax, to declaration: some DeclGroupSyntax) -> DiagnosticsError? {
+    guard let identified = declaration.asProtocol(NamedDeclSyntax.self) else {
+      return nil
+    }
+    let observableType = identified.name.trimmed
+    if declaration.isEnum {
+      // enumerations cannot store properties
+      return DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to enumeration type '\(observableType.text)'", id: .invalidApplication)
+    }
+    if declaration.isStruct {
+      // structs are not yet supported; copying/mutation semantics tbd
+      return DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to struct type '\(observableType.text)'", id: .invalidApplication)
+    }
+    if declaration.isActor {
+      // actors cannot yet be supported for their isolation
+      return DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to actor type '\(observableType.text)'", id: .invalidApplication)
+    }
+    return nil
+  }
+
   // 'lazy' properties cannot be rewritten as computed properties with an
   // 'init' accessor, so they cannot be observed.
   static func lazyPropertyDiagnostic(_ property: VariableDeclSyntax, lazyModifier: DeclModifierSyntax, offeringFixIt: Bool) -> Diagnostic {
@@ -365,20 +385,12 @@ extension ObservableMacro: MemberMacro {
     }
     
     let observableType = identified.name.trimmed
-    
-    if declaration.isEnum {
-      // enumerations cannot store properties
-      throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to enumeration type '\(observableType.text)'", id: .invalidApplication)
+
+    // diagnosed by the extension expansion
+    if ObservableMacro.invalidApplication(of: node, to: declaration) != nil {
+      return []
     }
-    if declaration.isStruct {
-      // structs are not yet supported; copying/mutation semantics tbd
-      throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to struct type '\(observableType.text)'", id: .invalidApplication)
-    }
-    if declaration.isActor {
-      // actors cannot yet be supported for their isolation
-      throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to actor type '\(observableType.text)'", id: .invalidApplication)
-    }
-    
+
     var declarations = [DeclSyntax]()
 
     declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType, context: context), to: &declarations)
@@ -404,6 +416,11 @@ extension ObservableMacro: MemberAttributeMacro {
     providingAttributesFor member: MemberDeclaration,
     in context: Context
   ) throws -> [AttributeSyntax] {
+    // diagnosed by the extension expansion
+    if ObservableMacro.invalidApplication(of: node, to: declaration) != nil {
+      return []
+    }
+
     guard let property = member.as(VariableDeclSyntax.self), property.isValidForObservation,
           property.identifier != nil else {
       return []
@@ -434,6 +451,13 @@ extension ObservableMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
+    // Diagnose here rather than in the member expansion, because the
+    // compiler doesn't always expand member macros (for example, on an enum
+    // whose members are never looked up), but it always expands this one.
+    if let error = invalidApplication(of: node, to: declaration) {
+      throw error
+    }
+
     // This method can be called twice - first with an empty `protocols` when
     // no conformance is needed, and second with a `MissingTypeSyntax` instance.
     if protocols.isEmpty {
