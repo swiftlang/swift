@@ -5725,6 +5725,38 @@ consumed at most once. If the marker is `no_consume_or_assign`, then the
 move checker will validate that the result of this instruction is never
 consumed or assigned over.
 
+### diagnose
+
+```
+sil-instruction ::= 'diagnose' '[' sil-diagnose-kind ']' sil-operand
+
+sil-diagnose-kind ::= 'unpermitted_copy'
+                  ::= 'let_reinit'
+
+diagnose [unpermitted_copy] %1 : $T
+diagnose [let_reinit] %2 : $*T
+```
+
+Marks its operand as needing a diagnostic of the given kind, to be emitted
+by a later diagnostic pass. This separates the pass that detects a
+violation of the language rules from the pass that explains it to the user,
+which may require more expensive analysis. Valid only in Raw SIL. The
+diagnostic pass that emits the diagnostic must remove the instruction.
+
+`diagnose` is an instantaneous use of its operand: it does not consume
+the operand, and has no effect on the program's semantics. It is
+considered to have side effects so that it is not deleted before the
+diagnostic is emitted.
+
+If the kind is `unpermitted_copy`, then the operand is a copied value, or
+the address copied from, where the copy was required to make the SIL
+valid but is not permitted by the language rules, such as a copy of a
+noncopyable value.
+
+If the kind is `let_reinit`, then the operand is the address of immutable
+storage, and the `diagnose` precedes an initialization of that storage
+which may happen after it was already initialized.
+
 ### end_formal_scope
 
 ```
