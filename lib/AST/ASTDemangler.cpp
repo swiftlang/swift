@@ -1516,6 +1516,11 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
   } else if (kind == Demangle::Node::Kind::Protocol) {
     return dyn_cast<ProtocolDecl>(decl);
   } else if (kind == Demangle::Node::Kind::Structure) {
+    // C++ foreign reference types are imported as classes, but are mangled as
+    // structs, like any other Clang tag type.
+    if (auto classDecl = dyn_cast<ClassDecl>(decl))
+      if (classDecl->isForeignReferenceType())
+        return classDecl;
     return dyn_cast<StructDecl>(decl);
   } else {
     assert(kind == Demangle::Node::Kind::TypeAlias);
