@@ -1,0 +1,23 @@
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature CalledAttribute %s | %FileCheck %s
+
+// REQUIRES: swift_feature_CalledAttribute
+
+// Check that the convert_function [without_actually_discarding] attribute is
+// parsed and printed.
+// CHECK-LABEL: sil hidden [ossa] @testWithoutActuallyDiscarding : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @called(atMostOnce) @callee_owned () -> () {
+// CHECK: convert_function %0 : $@called(exactlyOnce) @callee_owned () -> () to [without_actually_discarding] $@called(atMostOnce) @callee_owned () -> ()
+sil hidden [ossa] @testWithoutActuallyDiscarding : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @called(atMostOnce) @callee_owned () -> () {
+bb0(%0 : @owned $@called(exactlyOnce) @callee_owned () -> ()):
+  %1 = convert_function %0 : $@called(exactlyOnce) @callee_owned () -> () to [without_actually_discarding] $@called(atMostOnce) @callee_owned () -> ()
+  return %1 : $@called(atMostOnce) @callee_owned () -> ()
+}
+
+// The attribute also works on a non-escaping function.
+// CHECK-LABEL: sil hidden [ossa] @testWithoutActuallyDiscardingNoEscape : $@convention(thin) (@guaranteed @noescape @called(exactlyOnce) @callee_guaranteed () -> ()) -> () {
+// CHECK: convert_function %0 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> () to [without_actually_discarding] $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+sil hidden [ossa] @testWithoutActuallyDiscardingNoEscape : $@convention(thin) (@guaranteed @noescape @called(exactlyOnce) @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()):
+  %1 = convert_function %0 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> () to [without_actually_discarding] $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}

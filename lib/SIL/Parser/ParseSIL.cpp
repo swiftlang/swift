@@ -4586,7 +4586,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     Identifier ToToken;
     SourceLoc ToLoc;
     bool not_guaranteed = false;
-    bool without_actually_escaping = false;
+    auto convertKind = ConvertFunctionInst::Kind::Ordinary;
     bool needsStackProtection = false;
     bool isImmortal = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
@@ -4618,7 +4618,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
         if (attrName == "without_actually_escaping")
-          without_actually_escaping = true;
+          convertKind = ConvertFunctionInst::Kind::WithoutActuallyEscaping;
+        else if (attrName == "without_actually_discarding")
+          convertKind = ConvertFunctionInst::Kind::WithoutActuallyDiscarding;
         else
           return true;
       }
@@ -4660,8 +4662,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createUpcast(InstLoc, Val, Ty, forwardingOwnership);
       break;
     case SILInstructionKind::ConvertFunctionInst:
-      ResultVal = B.createConvertFunction(
-          InstLoc, Val, Ty, without_actually_escaping, forwardingOwnership);
+      ResultVal = B.createConvertFunction(InstLoc, Val, Ty, convertKind,
+                                          forwardingOwnership);
       break;
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
       ResultVal =

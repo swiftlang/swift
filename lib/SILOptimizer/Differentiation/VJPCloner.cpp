@@ -292,9 +292,8 @@ public:
       pullbackValue = pullbackPartialApply;
     } else if (pullbackSubstType->isABICompatibleWith(pullbackFnType, *vjp)
                    .isCompatible()) {
-      pullbackValue =
-          Builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
-                                        /*withoutActuallyEscaping*/ false);
+      pullbackValue = Builder.createConvertFunction(loc, pullbackPartialApply,
+                                                    pullbackType);
     } else {
       llvm::report_fatal_error("Pullback value type is not ABI-compatible "
                                "with the returned pullback type");
@@ -503,8 +502,7 @@ public:
       if (pullbackFnType != pullbackUnsubstFnType) {
         pullback = builder.createConvertFunction(
             loc, pullback,
-            SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
-            /*withoutActuallyEscaping*/ false);
+            SILType::getPrimitiveObjectType(pullbackUnsubstFnType));
       }
     }
 
@@ -851,8 +849,7 @@ public:
             if (origFnType != origFnUnsubstType) {
               borrowedDiffFunc = builder.createConvertFunction(
                   loc, borrowedDiffFunc,
-                  SILType::getPrimitiveObjectType(origFnUnsubstType),
-                  /*withoutActuallyEscaping*/ false);
+                  SILType::getPrimitiveObjectType(origFnUnsubstType));
             }
             vjpValue = builder.createDifferentiableFunctionExtract(
                 loc, NormalDifferentiableFunctionTypeComponent::VJP,
@@ -863,8 +860,7 @@ public:
       auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
       if (vjpFnType != vjpFnUnsubstType) {
         vjpValue = builder.createConvertFunction(
-            loc, vjpValue, SILType::getPrimitiveObjectType(vjpFnUnsubstType),
-            /*withoutActuallyEscaping*/ false);
+            loc, vjpValue, SILType::getPrimitiveObjectType(vjpFnUnsubstType));
       }
     }
 
@@ -971,8 +967,7 @@ public:
       if (pullbackFnType != pullbackUnsubstFnType) {
         pullback = builder.createConvertFunction(
             loc, pullback,
-            SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
-            /*withoutActuallyEscaping*/ false);
+            SILType::getPrimitiveObjectType(pullbackUnsubstFnType));
       }
     }
 
@@ -1218,8 +1213,7 @@ public:
         if (pullbackFnType != pullbackUnsubstFnType) {
           pullback = trampolineBuilder.createConvertFunction(
               loc, pullback,
-              SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
-              /*withoutActuallyEscaping*/ false);
+              SILType::getPrimitiveObjectType(pullbackUnsubstFnType));
         }
       }
 

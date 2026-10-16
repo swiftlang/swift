@@ -3123,10 +3123,11 @@ ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
       DebugLoc, Operand, TypeDependentOperands, Ty, forwardingOwnershipKind);
 }
 
-ConvertFunctionInst *ConvertFunctionInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-    SILFunction *F,
-    bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind) {
+ConvertFunctionInst *
+ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILModule &Mod, SILFunction *F,
+                            Kind ConversionKind,
+                            ValueOwnershipKind forwardingOwnershipKind) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   if (F) {
     assert(&F->getModule() == &Mod);
@@ -3137,7 +3138,7 @@ ConvertFunctionInst *ConvertFunctionInst::create(
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
   auto *CFI = ::new (Buffer)
       ConvertFunctionInst(DebugLoc, Operand, TypeDependentOperands, Ty,
-                          WithoutActuallyEscaping, forwardingOwnershipKind);
+                          ConversionKind, forwardingOwnershipKind);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //

@@ -2283,8 +2283,8 @@ SwiftInt BridgedInstruction::FullApplySite_numIndirectResultArguments() const {
   return fas.getNumIndirectSILResults();
 }
 
-bool BridgedInstruction::ConvertFunctionInst_withoutActuallyEscaping() const {
-  return getAs<swift::ConvertFunctionInst>()->withoutActuallyEscaping();
+SwiftInt BridgedInstruction::ConvertFunctionInst_getConversionKind() const {
+  return (SwiftInt)getAs<swift::ConvertFunctionInst>()->getConversionKind();
 }
 
 BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
@@ -3539,8 +3539,13 @@ BridgedInstruction BridgedBuilder::createAbortApply(BridgedValue value) const {
   return {unbridged().createAbortApply(regularLoc(), value.getSILValue())};
 }
 
-BridgedInstruction BridgedBuilder::createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const {
-return {unbridged().createConvertFunction(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), withoutActuallyEscaping)};
+BridgedInstruction
+BridgedBuilder::createConvertFunction(BridgedValue originalFunction,
+                                      BridgedType resultType,
+                                      SwiftInt conversionKind) const {
+  return {unbridged().createConvertFunction(
+      regularLoc(), originalFunction.getSILValue(), resultType.unbridged(),
+      (swift::ConvertFunctionInst::Kind)conversionKind)};
 }
 
 BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const {

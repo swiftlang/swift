@@ -1255,20 +1255,21 @@ public:
                                                      base, inToken, tokenTy));
   }
 
-  ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
-                                             SILType Ty,
-                                             bool WithoutActuallyEscaping) {
-    return createConvertFunction(Loc, Op, Ty, WithoutActuallyEscaping,
+  ConvertFunctionInst *
+  createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
+                        ConvertFunctionInst::Kind ConversionKind =
+                            ConvertFunctionInst::Kind::Ordinary) {
+    return createConvertFunction(Loc, Op, Ty, ConversionKind,
                                  Op->getOwnershipKind());
   }
 
   ConvertFunctionInst *
   createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
-                        bool WithoutActuallyEscaping,
+                        ConvertFunctionInst::Kind ConversionKind,
                         ValueOwnershipKind forwardingOwnershipKind) {
-    return insert(ConvertFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getModule(), F,
-        WithoutActuallyEscaping, forwardingOwnershipKind));
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              getModule(), F, ConversionKind,
+                                              forwardingOwnershipKind));
   }
 
   ThunkInst *createThunk(SILLocation Loc, SILValue Op, ThunkInst::Kind kind,

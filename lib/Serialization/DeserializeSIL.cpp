@@ -2264,14 +2264,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::ConvertFunctionInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
            && "Layout should be OneTypeOneOperand.");
-    bool withoutActuallyEscaping = Attr & 0x01;
+    assert((Attr & 0x03) <=
+               unsigned(ConvertFunctionInst::Kind::WithoutActuallyDiscarding) &&
+           "Unknown convert_function kind");
+    auto conversionKind = ConvertFunctionInst::Kind(Attr & 0x03);
     ResultInst = Builder.createConvertFunction(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        withoutActuallyEscaping);
+        conversionKind);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {

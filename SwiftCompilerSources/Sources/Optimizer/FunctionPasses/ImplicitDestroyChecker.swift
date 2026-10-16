@@ -89,6 +89,7 @@ private struct BlocksThatEndInUnreachable : ~Copyable {
     var changed = true
     while changed {
       changed = false
+      // FIXME: [deinitable] .reversed() doesn't guarantee successors will be visited prior to predecessors
       for block in function.blocks.reversed() where !blocks.contains(block) {
         let successors = block.successors
         if block.terminator is UnreachableInst ||
