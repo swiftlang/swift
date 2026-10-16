@@ -75,9 +75,6 @@ struct ResolvableRoot {
   /// The source variable, for diagnostics.
   let varDecl: VarDecl?
 
-  /// Whether the binding is a `let` (vs a `var`). Selects the diagnostic wording.
-  let isLet: Bool
-
   /// The `mark_uninitialized` of the storage, if any; its kind identifies `self` in an initializer.
   let markUninitialized: MarkUninitializedInst?
 
@@ -114,11 +111,34 @@ struct ResolvableRoot {
       return address.nextInstruction
   }
 
+  /// Whether the binding is a `let` (vs a `var`), which may only be initialized once.
+  var isLet: Bool { !(storage is FunctionArgument) && (varDecl?.isLet ?? false) }
+
   /// `self` in a struct or enum initializer that initializes the stored properties itself.
   var isRootSelf: Bool {
     switch markUninitialized?.kind {
     case .rootSelf?, .crossModuleRootSelf?: true
     default: false
+    }
+  }
+
+  /// The leaves of the storage that may only be initialized once: all of a `let` binding,
+  /// or the `let` stored properties of `self` in a struct initializer.
+  func immutableLeaves(_ indices: FieldIndexTrie) -> Set<Int> {
+    switch markUninitialized?.kind {
+    case .variable?, nil:
+      return isLet ? Set(indices.wholeRange) : []
+    case .rootSelf?, .crossModuleRootSelf?:
+      guard let fields = address.type.getNominalFields(in: address.parentFunction) else {
+        return []
+      }
+      var leaves = Set<Int>()
+      for field in fields.indices where fields.getUserFacingFieldDecl(withIndex: field)?.isLet ?? false {
+        leaves.formUnion(indices.range(of: SmallProjectionPath(.structField, index: field)))
+      }
+      return leaves
+    default:
+      return []
     }
   }
 
@@ -148,7 +168,6 @@ struct ResolvableRoot {
       }
 
       varDecl = allocStack.varDecl
-      isLet = allocStack.debugVariable?.isLet() ?? true   // TODO: find a more reliable way to discover this.
       isLexical = allocStack.isLexical
 
     case let allocBox as AllocBoxInst:
@@ -159,7 +178,6 @@ struct ResolvableRoot {
       address = projectBox
       markUninitialized = Self.findMarkUninitialized(allocBox)
       varDecl = allocBox.varDecl
-      isLet = !allocBox.type.getBoxFields(in: function).isMutable(fieldIndex: 0)
       isLexical = boxIsLexical
       startsInitialized = false
 
@@ -175,7 +193,6 @@ struct ResolvableRoot {
       markUninitialized = nil
       varDecl = arg.findVarDecl()
       isLexical = arg.isLexical
-      isLet = false
 
       switch arg.convention {
       case .indirectIn:
@@ -651,6 +668,7 @@ private struct Resolver {
     typealias PartialAvailability = (inst: Instruction, avail: [Availability], range: FieldIndexTrie.IndexRange)
     var partialDestroys: [PartialAvailability] = []
     var destroysBeforeInit: [PartialAvailability] = []
+    let immutableLeaves = root.immutableLeaves(indices)
 
     // Do a first pass over blocks, collecting any needed partial destroys for a second step.
     for block in function.blocks {
@@ -674,6 +692,13 @@ private struct Resolver {
 
         switch kind {
         case let .def(op):
+          // All of `self` may be reassigned, even after initializing its `let` properties.
+          let assignsWholeSelf = root.isRootSelf && op.value.accessPath.projectionPath.isEmpty
+          if !assignsWholeSelf,
+             range.contains(where: { immutableLeaves.contains($0) && current[$0].contains(.yes) }) {
+            Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
+          }
+
           let nontrivial = range.filter { !indices.leafType($0).isTrivial(in: function) }
           if nontrivial.isEmpty {
             break

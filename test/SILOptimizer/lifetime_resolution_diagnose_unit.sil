@@ -5,6 +5,7 @@
 // diagnose pass is exercised in isolation via its FunctionTest hook:
 //   - `diagnose [unpermitted_copy]` on a `load [copy]`  -> use-after-consume
 //   - `assign undef to [init]`                          -> use-before-init
+//   - `diagnose [let_reinit]`                           -> repeated `let` initialization
 //
 // (The variable name renders empty here because hand-written SIL has no backing
 // VarDecl; from real Swift source the name resolves normally.)
@@ -97,12 +98,34 @@ bb0:
   return %t
 }
 
+// A `diagnose [let_reinit]` marks a store to immutable storage that may already be initialized.
+sil [ossa] @diagnose_let_reinit : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, let, name "x"
+  %1 = mark_uninitialized [var] %0 : $*K
+  specify_test "lifetime_resolution_diagnose"
+  %a = apply %getFn() : $@convention(thin) () -> @owned K
+  store %a to [init] %1 : $*K
+  %b = apply %getFn() : $@convention(thin) () -> @owned K
+  diagnose [let_reinit] %1 : $*K // expected-error {{may only be initialized once}}
+  store %b to [assign] %1 : $*K
+  destroy_addr %1 : $*K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
 // Markers on storage that is not resolvable still produce an error.
 sil [ossa] @diagnose_unknown_storage : $@convention(thin) () -> () {
 bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
   %0 = global_addr @globalK : $*K
   specify_test "lifetime_resolution_diagnose"
   assign undef to [init] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
+  %a = apply %getFn() : $@convention(thin) () -> @owned K
+  diagnose [let_reinit] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
+  store %a to [assign] %0 : $*K
   %t = tuple ()
   return %t
 }

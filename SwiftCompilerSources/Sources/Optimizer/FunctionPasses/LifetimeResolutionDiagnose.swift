@@ -15,6 +15,7 @@ import SIL
 
 // Recognizes the markers left behind by LifetimeResolution's `legalize` and emits the user-facing diagnostics:
 //   - `assign undef to [init]`      -> use-before-init
+//   - `diagnose [let_reinit]`       -> second initialization of immutable storage
 //   - `diagnose [unpermitted_copy]` -> use-after-consume
 let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-diagnose") {
   (function: Function, context: FunctionPassContext) in
@@ -27,13 +28,15 @@ let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-dia
 private func diagnoseLifetimeViolations(_ function: Function, _ context: FunctionPassContext) {
   // Collect the markers up front. The `diagnose` markers are erased once every diagnostic has been emitted.
   var unpermittedCopies: [DiagnoseInst] = []
+  var letReinits: [DiagnoseInst] = []
   var undefInits: [AssignInst] = []
   for inst in function.instructions {
     switch inst {
     case let diagnose as DiagnoseInst:
       switch diagnose.kind {
       case .unpermittedCopy: unpermittedCopies.append(diagnose)
-      case .letReinit, .invalid: break
+      case .letReinit: letReinits.append(diagnose)
+      case .invalid: break
       }
     case let assign as AssignInst where assign.assignOwnership == .initialize && assign.source is Undef:
       undefInits.append(assign)
@@ -44,9 +47,10 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
 
   var diagnoser = Diagnoser(function, context)
   diagnoser.diagnoseUsesBeforeInit(undefInits)
+  diagnoser.diagnoseLetReinits(letReinits)
   diagnoser.diagnoseUsesAfterConsume(unpermittedCopies)
 
-  for marker in unpermittedCopies {
+  for marker in unpermittedCopies + letReinits {
     context.erase(instruction: marker)
   }
 }
@@ -524,6 +528,33 @@ private struct Diagnoser {
     storage.indices.forEachCoveringSubtree(of: leaves, excludingRoot: true) { path in
       let loc = storage.storedProperty(at: path)?.nameLoc ?? sourceLoc(fallback)
       diagnostics.diagnose(.stored_property_not_initialized, storage.name(of: path), at: loc)
+    }
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                              Let re-init
+  //===--------------------------------------------------------------------===//
+
+  /// `diagnose [let_reinit] %addr`: immutable storage at `%addr` may already be initialized.
+  mutating func diagnoseLetReinits(_ markers: [DiagnoseInst]) {
+    for marker in markers {
+      let address = marker.operand.value
+      guard let storage = storage(backing: address) else {
+        diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
+        continue
+      }
+      guard shouldEmitError(for: storage.allocation, at: marker.location) else { continue }
+
+      let path = address.accessPath.projectionPath
+      diagnostics.diagnose(.immutable_property_already_initialized, storage.name(of: path), at: marker.location)
+
+      let decl = storage.root.isRootSelf ? storage.storedProperty(at: path) : storage.root.varDecl
+      if let decl {
+        if decl.hasInitialValue {
+          diagnostics.diagnose(.initial_value_provided_in_let_decl, at: decl.nameLoc)
+        }
+        decl.emitLetToVarNoteIfSimple()
+      }
     }
   }
 

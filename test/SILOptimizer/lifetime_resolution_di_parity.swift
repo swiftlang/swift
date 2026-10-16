@@ -147,6 +147,49 @@ func letInitializedBeforeBreak(_ n: Int) {
   use(x) // expected-error {{constant 'x' used before being initialized}}
 }
 
+// `let` assigned in a loop body: both a missing and a repeated initialization.
+func letAssignedInLoop(_ n: Int) {
+  let x: Int // expected-note {{constant defined here}} expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  for i in 0..<n { x = i } // expected-error {{immutable value 'x' may only be initialized once}}
+  use(x) // expected-error {{constant 'x' used before being initialized}}
+}
+
+func letAssignedTwice() {
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = 1
+  x = 2 // expected-error {{immutable value 'x' may only be initialized once}}
+  use(x)
+}
+
+struct LetProperties {
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y: Int = 0 // expected-note {{initial value already provided in 'let' declaration}} expected-note {{change 'let' to 'var' to make it mutable}}
+  init(_ b: Bool) {
+    x = 1
+    if b { x = 2 } // expected-error {{immutable value 'self.x' may only be initialized once}}
+    y = 3 // expected-error {{immutable value 'self.y' may only be initialized once}}
+  }
+
+  // Assigning all of `self` is permitted even after initializing a `let` property.
+  init(whole: ()) {
+    x = 1
+    self = LetProperties(true)
+  }
+}
+
+// Initializing the only stored property is not an assignment of all of `self`.
+struct OnlyLetProperty {
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
+  init() {
+    x = 1
+    x = 2 // expected-error {{immutable value 'self.x' may only be initialized once}}
+  }
+  init(whole: OnlyLetProperty) {
+    x = 1
+    self = whole
+  }
+}
+
 // The use is in a `defer` that runs on a path where `x` is uninitialized.
 func useInDefer(_ c: Bool) {
   let x: Int // expected-note {{constant defined here}}
