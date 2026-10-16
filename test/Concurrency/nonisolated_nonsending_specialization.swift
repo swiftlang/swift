@@ -209,7 +209,19 @@ func testReabstraction(body: () async -> Void) async throws {
   // CHECK: // closure #1 in testReabstraction(body:)
   // CHECK: // Isolation: @concurrent
   // CHECK: sil private @$s37nonisolated_nonsending_specialization17testReabstraction4bodyyyyYaXE_tYaKFyyYaKXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
-  // CHECK-NOT: hop_to_executor {{.*}}
+  // CHECK: bb0({{.*}} : $Builtin.ImplicitActor, {{.*}}):
+  // CHECK: [[GENERIC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+  //
+  // There must not be a hop as we enter the function with nonisolated(nonsending) convention:
+  // CHECK-NOT: hop_to_executor
+  // CHECK: try_apply {{.*}}, normal bb1, error bb2
+  //
+  // The closure is called with the nonisolated(nonsending) convention, so it
+  // must hop back to its isolation before it returns or throws:
+  // CHECK: bb1({{.*}} : $()):
+  // CHECK-NEXT: hop_to_executor [[GENERIC]]
+  // CHECK: bb2({{.*}} : $any Error):
+  // CHECK-NEXT: hop_to_executor [[GENERIC]]
   // CHECK: } // end sil function '$s37nonisolated_nonsending_specialization17testReabstraction4bodyyyyYaXE_tYaKFyyYaKXEfU_'
   try await withValueGeneric {
     _ = 42
