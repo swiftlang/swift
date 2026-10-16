@@ -1596,8 +1596,10 @@ public:
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
 
-      // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->hasValueTypeDestructor()) {
+        // has to have a deinit or else it's pointless, unless the type is
+        // ~Deinitable, where `discard self` is how a value's lifetime ends.
+      } else if (!nominalDecl->hasValueTypeDestructor() &&
+                 nominalType->isDeinitable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -2613,7 +2615,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
-      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
+      if (auto classTy = selfTy->getClassDecl()) {
         assert(classTy->getSuperclass());
         auto &Diags = fromCtor->getASTContext().Diags;
         Diags.diagnose(apply->getArgs()->getLoc(), diag::chain_convenience_init,
@@ -3759,7 +3761,17 @@ bool swift::shouldUseIterable(ASTContext &ctx, Type seqTy,
     return false;
   }
 
-  // Always prefer conformance to Sequence over Iterable when
+  // Always try to use Iterable for sequences that conform to
+  // CxxIterable when it is available.
+  if (auto cxxIterable =
+          ctx.getProtocol(KnownProtocolKind::CxxIterable)) {
+    if (auto conf = lookupConformance(seqTy, cxxIterable)) {
+      auto availability = AvailabilityContext::forLocation(loc, dc);
+      return !availability.hasUnsatisfiedRestrictionsForConformance(conf);
+    }
+  }
+
+  // Else, always prefer conformance to Sequence over Iterable when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
@@ -3784,6 +3796,7 @@ class DesugarForEachStmt {
   bool isAsync;
   bool isBorrowing = false;
   VarDecl *makeIteratorVar = nullptr;
+  VarDecl *sequenceVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
   WhileStmt *innerLoop = nullptr;
@@ -3837,10 +3850,27 @@ public:
     }
 
     buildMakeIteratorVar();
+    buildOpaqueSequenceExpr();
+
+    // `buildMakeIterator` refers to the sequence binding, build it first.
+    auto *sequenceBinding = buildSequenceBinding();
 
     SmallVector<ASTNode, 2> stmts;
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
+
+    // The iterator depends on the sequence binding, so it has to be destroyed
+    // before the binding's borrow ends. SILGen ends the local borrow accesses
+    // of a brace before it runs the brace's cleanups, so the iterator can't
+    // share a brace with the binding: nest it in an inner brace, which destroys
+    // the iterator when it is popped.
+    if (sequenceBinding) {
+      auto *loopBrace = BraceStmt::createImplicit(
+          ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+      stmts.clear();
+      stmts.push_back(sequenceBinding);
+      stmts.push_back(loopBrace);
+    }
 
     auto *braceStmt = BraceStmt::createImplicit(ctx, stmt->getStartLoc(), stmts,
                                                 stmt->getEndLoc());
@@ -3998,12 +4028,38 @@ private:
     return nextCall;
   }
 
-  PatternBindingDecl *buildMakeIterator() {
+  void buildOpaqueSequenceExpr() {
     auto *sequence = stmt->getSequence();
-    auto seqType = sequence->getType();
-    auto *opaqueSeqExpr =
-        new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);
+    auto *opaqueSeqExpr = new (ctx)
+        OpaqueValueExpr(sequence->getSourceRange(), sequence->getType());
     stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
+  }
+
+  /// Borrow the sequence in an implicit local whose scope encloses the loop.
+  PatternBindingDecl *buildSequenceBinding() {
+    // Only a borrowing iterator holds onto the sequence for the duration of
+    // the loop.
+    if (!isBorrowing)
+      return nullptr;
+
+    std::string name;
+    if (auto *np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+      name = "$" + np->getBoundName().str().str();
+    name += "$sequence";
+
+    sequenceVar = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Borrowing,
+        stmt->getSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
+    sequenceVar->setImplicit();
+
+    Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
+    return PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, pattern, stmt->getOpaqueSequenceExpr(),
+        dc);
+  }
+
+  PatternBindingDecl *buildMakeIterator() {
+    auto seqType = stmt->getSequence()->getType();
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
@@ -4019,8 +4075,19 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
+    // Call `makeBorrowingIterator()` on the sequence binding when there is
+    // one, so that the iterator depends on the binding's scope.
+    Expr *base;
+    if (sequenceVar) {
+      base = new (ctx) DeclRefExpr(
+          sequenceVar, DeclNameLoc(stmt->getSequence()->getStartLoc()),
+          /*implicit=*/true);
+    } else {
+      base = stmt->getOpaqueSequenceExpr();
+    }
+
     auto *makeIteratorRef = new (ctx)
-        MemberRefExpr(opaqueSeqExpr, stmt->getForLoc(), witness,
+        MemberRefExpr(base, stmt->getForLoc(), witness,
                       DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
 
     Expr *makeIteratorCall =

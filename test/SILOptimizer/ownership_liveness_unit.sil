@@ -298,6 +298,32 @@ bb0(%0 : @guaranteed $C):
   return %99 : $()
 }
 
+// Storing an address into a pack escapes it: the pack_element_get's uses are
+// not followed.
+//
+// TODO: AddressUseVisitor still treats this as a leaf use. Treating it as an
+// escape makes lifetime dependence diagnostics reject non-escaping closures
+// that capture a pack of non-escaping closures.
+//
+// CHECK-LABEL: testInteriorPackElementSetEscape: interior_liveness with: %0
+// CHECK: Incomplete liveness: Escaping address
+// CHECK: last user:   pack_element_set
+// CHECK-NEXT: testInteriorPackElementSetEscape:
+sil [ossa] @testInteriorPackElementSetEscape : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  specify_test "interior_liveness %0"
+  %1 = ref_element_addr %0, #D.object
+  %2 = alloc_pack $Pack{C}
+  %3 = scalar_pack_index 0 of $Pack{C}
+  pack_element_set %1 into %3 of %2
+  %5 = pack_element_get %3 of %2 as $*C
+  %6 = load [copy] %5
+  destroy_value %6
+  dealloc_pack %2
+  %9 = tuple ()
+  return %9
+}
+
 // CHECK-LABEL: testInteriorUnconditionalAddrCast: interior_liveness with: %1
 // CHECK: Interior liveness: %1 = argument of bb0 : $D
 // CHECK-NEXT: bb0: LiveWithin

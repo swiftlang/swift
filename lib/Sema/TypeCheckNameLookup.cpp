@@ -641,6 +641,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
         !baseTypeOrNull->isExistentialType())
       return;
 
+    // Never correct 'self', we have specialized diagnostics for it.
+    if (corrections.WrittenName.isSimpleName(Ctx.Id_self))
+      return;
+
     const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than

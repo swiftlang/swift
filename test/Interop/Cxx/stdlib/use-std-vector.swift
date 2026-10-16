@@ -229,5 +229,82 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
     expectEqual(getNumber(v[2]), 3)
 }
 
+StdVectorTestSuite.test("VectorOfInt.underestimatedCount via existential") {
+    var v = Vector()
+    fill(vector: &v)
+
+    let s: any Sequence = v
+    expectEqual(s.underestimatedCount, 3)
+
+    let z = zip(v, [4, 5, 6])
+    expectEqual(z.underestimatedCount, 3)
+    expectEqual(z.map { $0.0 + CInt($0.1) }, [5, 7, 9])
+}
+
+@inline(never)
+func genericUnderestimatedCount<S: Sequence>(_ s: S) -> Int {
+    return s.underestimatedCount
+}
+
+@inline(never)
+func genericContains<S: Sequence>(_ s: S, _ e: S.Element) -> Bool
+    where S.Element: Equatable {
+    return s.contains(e)
+}
+
+StdVectorTestSuite.test("VectorOfInt.contains") {
+    var v = Vector()
+    fill(vector: &v)
+
+    expectEqual(genericUnderestimatedCount(v), 3)
+
+    expectTrue(genericContains(v, 2))
+    expectFalse(genericContains(v, 4))
+}
+
+StdVectorTestSuite.test("VectorOfInt borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let constArr : [Int32] = [1, 2, 3]
+    let constVec = Vector(constArr)
+    expectEqual(constVec.size(), constArr.count)
+    var counter = 0
+    for el in constVec {
+        expectEqual(el, constArr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+
+    var mutArr : [Int32] = [4, 5, 6, 7]
+    var mutVec = Vector(mutArr)
+    expectEqual(mutVec.size(), mutArr.count)
+    counter = 0
+    for el in mutVec {
+        expectEqual(el, mutArr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
+}
+
+StdVectorTestSuite.test("VectorOfNonCopyable borrowing for loop").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+    let constVec = makeVectorOfNonCopyable()
+    let arr : [Int32] = [1, 2, 3]
+    expectEqual(constVec.size(), arr.count)
+    var counter = 0
+    for el in constVec {
+        expectEqual(el.number, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+
+    var mutVec = makeVectorOfNonCopyable()
+    expectEqual(mutVec.size(), arr.count)
+    counter = 0
+    for el in mutVec {
+        expectEqual(el.number, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
 
 runAllTests()

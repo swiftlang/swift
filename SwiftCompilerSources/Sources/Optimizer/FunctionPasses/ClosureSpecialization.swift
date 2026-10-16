@@ -451,6 +451,10 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     guard let callee = partialApply.referencedFunction,
           !partialApply.hasSubstitutions,
 
+          // Captures are appended to the specialized function's parameters. A
+          // dynamic-Self metadata argument must remain the last parameter.
+          (!callee.isDefinition || !callee.mayBindDynamicSelf),
+
           // Avoid an infinite specialization loop caused by repeated runs of ClosureSpecialization and
           // ConstantCapturePropagation.
           // ConstantCapturePropagation propagates constant function-literals. Such function specializations

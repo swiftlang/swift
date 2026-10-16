@@ -37,6 +37,8 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
@@ -1513,7 +1515,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (!elementObj)
     return Type();
 
-  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  auto elementClass = elementObj->getClassDecl();
   if (!elementClass)
     return Type();
 
@@ -1884,6 +1886,9 @@ ImportedType ClangImporter::Implementation::importType(
   if (type.isNull())
     return {Type(), false};
 
+  if (auto *Stats = SwiftContext.Stats)
+    ++Stats->getFrontendCounters().ClangImportType;
+
   // The "built-in" Objective-C types id, Class, and SEL can actually be (and
   // are) defined within the library. Clang tracks the redefinition types
   // separately, so it can provide fallbacks in certain cases. For Swift, we
@@ -2144,6 +2149,7 @@ private:
   }
 
   NEVER_VISIT(PlaceholderType)
+  NEVER_VISIT(HoleType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
   NEVER_VISIT(IntegerType)
@@ -2853,22 +2859,30 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
     // HACK: Clang will crash while trying to instantiate this default arg.
     return false;
 
-  if (param->hasUninstantiatedDefaultArg() &&
-      isa<clang::CXXConstructorDecl>(functionDecl))
-    // HACK: Constructors of std::set have default arguments that rely on the
-    // comparator type being copyable.
-    return false;
-
-  clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;
   // Try to instantiate the default expression.
-  auto defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
-      clang::SourceLocation(), const_cast<clang::FunctionDecl *>(functionDecl),
-      const_cast<clang::ParmVarDecl *>(param));
+  clang::ExprResult defaultArgExprResult;
+  bool instantiationFailed;
+  {
+    auto &clangDiags = getClangSema().getDiagnostics();
+    bool prevSuppressAllDiagnostics = clangDiags.getSuppressAllDiagnostics();
+    clangDiags.setSuppressAllDiagnostics(true);
+    SWIFT_DEFER {
+      clangDiags.setSuppressAllDiagnostics(prevSuppressAllDiagnostics);
+    };
+    clang::DiagnosticErrorTrap errorTrap(clangDiags);
+    defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
+        clang::SourceLocation(),
+        const_cast<clang::FunctionDecl *>(functionDecl),
+        const_cast<clang::ParmVarDecl *>(param));
+    instantiationFailed =
+        !defaultArgExprResult.isUsable() || errorTrap.hasErrorOccurred();
+  }
   // If the default expression can't be instantiated, bail.
-  if (!defaultArgExprResult.isUsable())
+  if (instantiationFailed)
     return false;
 
-  defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
+  auto defaultArgExpr =
+      cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
 
   // If the type of this parameter is a view type, do not import the
   // default expression, since we cannot guarantee the lifetime of the
@@ -3884,8 +3898,8 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum()) {
+  if (type->getStructDecl() ||
+      type->getEnumDecl()) {
     auto nominal = type->getAnyNominal();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;

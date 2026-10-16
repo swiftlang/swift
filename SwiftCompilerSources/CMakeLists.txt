@@ -157,7 +157,7 @@ function(add_swift_compiler_modules_library name)
 
   # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
   # need it.
-  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS})
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_CONDITIONS})
     list(APPEND swift_compile_options "-D${condition}")
   endforeach()
 
@@ -381,7 +381,7 @@ else()
         message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
       endif()
 
-      set(min_supported_swift_version 5.9)
+      set(min_supported_swift_version 6.2)
       if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
         message(FATAL_ERROR
             "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "

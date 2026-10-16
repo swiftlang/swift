@@ -19,11 +19,23 @@ import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 extension BridgedASTContext {
+  private var staticBuildConfigurationStorage: UnsafeMutablePointer<StaticBuildConfigurationStorage> {
+    staticBuildConfigurationPtr.assumingMemoryBound(
+      to: StaticBuildConfigurationStorage.self
+    )
+  }
+
   /// Retrieve the (cached) static build configuration for this ASTContext.
   public var staticBuildConfiguration: StaticBuildConfiguration {
-    staticBuildConfigurationPtr.assumingMemoryBound(
-      to: StaticBuildConfiguration.self
-    ).pointee
+    staticBuildConfigurationStorage.pointee.configuration
+  }
+
+  /// Retrieve the (cached) JSON representation of the static build
+  /// configuration for this ASTContext.
+  public var staticBuildConfigurationJSON: String {
+    get throws {
+      try staticBuildConfigurationStorage.pointee.json()
+    }
   }
 }
 

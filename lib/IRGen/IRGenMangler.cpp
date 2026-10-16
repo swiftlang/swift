@@ -338,7 +338,7 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
       // archetypes, and the mangling does not have to be unique, so we just
       // mangle the unbound generic form of the type.
       if (superclass->hasArchetype()) {
-        superclass = superclass->getClassOrBoundGenericClass()
+        superclass = superclass->getClassDecl()
           ->getDeclaredType();
       }
 

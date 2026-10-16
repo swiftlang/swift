@@ -140,12 +140,13 @@ bb0(%0 : $SomeProtocol):
 // CHECK-LABEL: sil hidden @$s21existential_transform2cpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:  %0 = alloc_ref $SomeClass                       
-// CHECK:  debug_value %0 : $SomeClass, let, name "self", argno 1 
-// CHECK:  %2 = function_ref @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n4main0G5ClassC_Tg5 : $@convention(thin) (@guaranteed SomeClass) -> Int32 
-// CHECK:  %3 = apply %2(%0) : $@convention(thin) (@guaranteed SomeClass) -> Int32
-// CHECK:  strong_release %0 : $SomeClass                  
-// CHECK:  %5 = tuple ()                                   
-// CHECK:  return %5 : $()                                 
+// CHECK:  debug_value %0 : $SomeClass, let, name "self", argno 1
+// CHECK:  debug_value undef : $any SomeProtocol, let, name "magic1"
+// CHECK:  %3 = function_ref @$s21existential_transform11wrap_foo_cp1as5Int32VAA12SomeProtocol_p_tFTf4e_n4main0G5ClassC_Tg5 : $@convention(thin) (@guaranteed SomeClass) -> Int32
+// CHECK:  %4 = apply %3(%0) : $@convention(thin) (@guaranteed SomeClass) -> Int32
+// CHECK:  strong_release %0 : $SomeClass
+// CHECK:  %6 = tuple ()
+// CHECK:  return %6 : $()
 // CHECK-LABEL: } // end sil function '$s21existential_transform2cpyyF'
 sil hidden @$s21existential_transform2cpyyF : $@convention(thin) () -> () {
 bb0:
@@ -250,12 +251,13 @@ bb0(%0 : $SomeClassProtocolComp & SomeOtherClassProtocolComp):
 // CHECK-LABEL: sil hidden @$s21existential_transform3cpcyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:  %0 = alloc_ref $SomeClassComp                   
-// CHECK:  debug_value %0 : $SomeClassComp, let, name "self", argno 1 
-// CHECK:  %2 = function_ref @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n4main0hiK0C_Tg5 : $@convention(thin) (@guaranteed SomeClassComp) -> Int32 
-// CHECK:  %3 = apply %2(%0) : $@convention(thin) (@guaranteed SomeClassComp) -> Int32
-// CHECK:  strong_release %0 : $SomeClassComp              
-// CHECK:  %5 = tuple ()                                   
-// CHECK:  return %5 : $()                                 
+// CHECK:  debug_value %0 : $SomeClassComp, let, name "self", argno 1
+// CHECK:  debug_value undef : $any SomeClassProtocolComp & SomeOtherClassProtocolComp, let, name "magic3"
+// CHECK:  %3 = function_ref @$s21existential_transform16wrap_foo_bar_cpc1as5Int32VAA21SomeClassProtocolComp_AA0h5OtherijK0p_tFTf4e_n4main0hiK0C_Tg5 : $@convention(thin) (@guaranteed SomeClassComp) -> Int32
+// CHECK:  %4 = apply %3(%0) : $@convention(thin) (@guaranteed SomeClassComp) -> Int32
+// CHECK:  strong_release %0 : $SomeClassComp
+// CHECK:  %6 = tuple ()
+// CHECK:  return %6 : $()
 // CHECK-LABEL: } // end sil function '$s21existential_transform3cpcyyF'
 sil hidden @$s21existential_transform3cpcyyF : $@convention(thin) () -> () {
 bb0:

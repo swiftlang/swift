@@ -78,6 +78,11 @@ def ArgumentIsFileList : OptionFlag;
 // which action is performed.
 def CacheInvariant : OptionFlag;
 
+// The option's argument is a CAS ID (or `<name>=<CAS ID>`) when compilation
+// caching is enabled. The referenced CAS object is added to the cache key as a
+// reference instead of the argument string.
+def ArgumentIsCASID : OptionFlag;
+
 /////////
 // Options
 
@@ -676,9 +681,10 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def debug_module_path : Separate<["-"], "debug-module-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, ArgumentIsCASID]>,
   HelpText<"Path or cache key to this module's binary swiftmodule artifact (required by debug info)">;
-def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption, ArgumentIsPath]>,
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">,
+  Flags<[FrontendOption, ArgumentIsPath, ArgumentIsCASID]>,
   Alias<debug_module_path>;
 def debug_module_self_key : Flag<["-"], "debug-module-self-key">,
   Flags<[FrontendOption]>,
@@ -2249,6 +2255,12 @@ def incremental_dependency_scan:
   Flag<["-"], "incremental-dependency-scan">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Re-use/validate prior build dependency scan artifacts">;
+
+def incremental_dependency_scan_cache_path:
+  Separate<["-"], "incremental-dependency-scan-cache-path">,
+  Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
+  HelpText<"Specify the path to serialize/reuse the dependency scan cache">,
+  MetaVarName<"<path>">;
 
 def driver_experimental_explicit_module_build:
   Flag<["-"], "experimental-explicit-module-build">,

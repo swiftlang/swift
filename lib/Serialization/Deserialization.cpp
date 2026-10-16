@@ -14,6 +14,7 @@
 #include "DeserializationErrors.h"
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -4497,19 +4498,20 @@ public:
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind;
+    std::optional<uint8_t> rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
-    unsigned numNameComponentsBiased;
+    unsigned numNameComponentsBiased = 0;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
     bool isIUO;
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool overriddenAffectsABI, needsNewTableEntry, isTransparent;
+    bool overriddenAffectsABI, needsNewTableEntry;
+    bool isTransparent = false;
     DeclID opaqueReturnTypeID;
-    bool isUserAccessible;
+    bool isUserAccessible = false;
     bool isDistributedThunk;
     bool hasSendingResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
@@ -4558,7 +4560,7 @@ public:
 
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
-    AccessorKind accessorKind;
+    std::optional<AccessorKind> accessorKind;
     if (isAccessor) {
       auto storageResult = MF.getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -4570,7 +4572,8 @@ public:
             errorFlags, numTableEntries);
       }
 
-      if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind))
+      if (auto accessorKindResult =
+              getActualAccessorKind(rawAccessorKind.value()))
         accessorKind = *accessorKindResult;
       else
         return MF.diagnoseFatal();
@@ -4579,7 +4582,7 @@ public:
       // into this code.  When we come out, don't create the accessor twice.
       // TODO: find some better way of breaking this cycle, like lazily
       // deserializing the accessors.
-      if (auto accessor = storage->getAccessor(accessorKind))
+      if (auto accessor = storage->getAccessor(accessorKind.value()))
         return accessor;
     }
 
@@ -4669,9 +4672,9 @@ public:
                                         async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
-      auto *accessor =
-          AccessorDecl::createDeserialized(ctx, accessorKind, storage, async,
-                                           throws, thrownType, resultType, DC);
+      auto *accessor = AccessorDecl::createDeserialized(
+          ctx, accessorKind.value(), storage, async, throws, thrownType,
+          resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -7988,8 +7991,10 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     CanType parent = parentTy.get()
                          ? parentTy.get()->getCanonicalType()
                          : CanType();
-    return HiddenType::get(MF.getContext(), hidden->MangledName,
-                           MF.getAssociatedModule(), hidden, parent);
+    CanType type = CanType(
+        HiddenType::get(MF.getContext(), hidden->MangledName, hidden, parent));
+    MF.getContext().recordRecoveredHiddenType(type);
+    return type;
   }
 
   // Look through compatibility aliases.
@@ -8471,15 +8476,13 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable;
+  bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable,
+      hasInverseDeinitable;
   ArrayRef<uint64_t> rawProtocolIDs;
 
   decls_block::ProtocolCompositionTypeLayout::readRecord(
-      scratch,
-      hasExplicitAnyObject,
-      hasInverseCopyable,
-      hasInverseEscapable,
-      rawProtocolIDs);
+      scratch, hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable,
+      hasInverseDeinitable, rawProtocolIDs);
 
   SmallVector<Type, 4> protocols;
   for (TypeID protoID : rawProtocolIDs) {
@@ -8494,6 +8497,8 @@ Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     inverses.insert(InvertibleProtocolKind::Copyable);
   if (hasInverseEscapable)
     inverses.insert(InvertibleProtocolKind::Escapable);
+  if (hasInverseDeinitable)
+    inverses.insert(InvertibleProtocolKind::Deinitable);
 
   return ProtocolCompositionType::get(MF.getContext(), protocols, inverses,
                                       hasExplicitAnyObject);
@@ -9085,16 +9090,6 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
   return IntegerType::get(blobData, isNegative, ctx);
 }
 
-Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
-                                             SmallVectorImpl<uint64_t> &scratch,
-                                             StringRef blobData) {
-  auto &ctx = MF.getContext();
-
-  decls_block::HiddenTypeLayout::readRecord(scratch);
-
-  return HiddenType::get(ctx, blobData, MF.getAssociatedModule(), nullptr,
-                         CanType());
-}
 } // namespace decls_block
 } // namespace serialization
 }

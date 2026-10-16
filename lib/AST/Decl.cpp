@@ -63,6 +63,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
@@ -1300,6 +1301,24 @@ bool Decl::preconcurrency() const {
   }
 
   return false;
+}
+
+bool Decl::preconcurrencyIncludingInferred() const {
+  if (preconcurrency())
+    return true;
+
+  // An inferred `@preconcurrency` is recorded as an implicit attribute when
+  // the isolation of a source decl is computed. Don't compute it for other
+  // decls: their attributes are already complete, and doing so can be cyclic
+  // (e.g. looking up the source location of a deserialized decl mangles it).
+  auto *value = dyn_cast<ValueDecl>(this);
+  if (!value || !getDeclContext()->getParentSourceFile() ||
+      !DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Preconcurrency,
+                                               this))
+    return false;
+
+  (void)getActorIsolation(const_cast<ValueDecl *>(value));
+  return getAttrs().hasAttribute<PreconcurrencyAttr>();
 }
 
 /// Look at the attributes to determine whether they involve an attribute
@@ -5189,6 +5208,10 @@ StringRef ValueDecl::getCDeclName() const {
          clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage)
           && clangDecl->getIdentifier())
       return clangDecl->getName();
+    // Operators have no identifier; use e.g. `operator==`.
+    if (clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage &&
+        clangDecl->isOverloadedOperator())
+      return importer::getCxxOperatorName(clangDecl->getOverloadedOperator());
   }
 
   auto abiRole = ABIRoleInfo(this);
@@ -5202,8 +5225,14 @@ StringRef ValueDecl::getCDeclName() const {
   };
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>())
     return nameOrBaseIdentifier(cdeclAttr->Name);
-  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>())
+  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>()) {
+    // A Swift operator implements the C++ operator of the same spelling.
+    if (cxxAttr->Name.empty() && isOperator())
+      return getASTContext()
+          .getIdentifier(("operator" + getBaseIdentifier().str()).str())
+          .str();
     return nameOrBaseIdentifier(cxxAttr->Name);
+  }
 
   return "";
 }
@@ -7398,6 +7427,17 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
     return superclass->isIncompatibleWithWeakReferences();
   }
   return false;
+}
+
+bool ClassDecl::canSuppressInvertible(InvertibleProtocolKind ip) const {
+  switch (ip) {
+  case InvertibleProtocolKind::Copyable:
+    return getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses);
+  case InvertibleProtocolKind::Escapable:
+  case InvertibleProtocolKind::Deinitable:
+    return false;
+  }
+  llvm_unreachable("unhandled InvertibleProtocolKind");
 }
 
 bool ClassDecl::inheritsSuperclassInitializers() const {
@@ -12638,8 +12678,16 @@ Type EnumElementDecl::getPayloadInterfaceType() const {
 void EnumElementDecl::setParameterList(ParameterList *params) {
   Params = params;
 
-  if (params)
+  if (params) {
     params->setDeclContextOfParamDecls(this);
+
+    // An enum case payload cannot be isolated, and 'isolated' is diagnosed
+    // during type resolution. ParamDecl::setTypeRepr still derives the flag
+    // from the specifier, so clear it here; otherwise the case constructor's
+    // type would carry an isolated parameter that its ExtInfo can't record.
+    for (auto *param : *params)
+      param->setIsolated(false);
+  }
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
@@ -12891,7 +12939,7 @@ void FuncDecl::setHasTopLevelLocalContextCaptures(bool hasCaptures) {
 }
 
 Type TypeBase::getSwiftNewtypeUnderlyingType() {
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   if (!structDecl)
     return {};
 
@@ -13006,7 +13054,7 @@ void ClassDecl::setSuperclass(Type superclass) {
          && "superclass must be interface type");
   LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
   LazySemanticInfo.SuperclassDecl.setPointerAndInt(
-    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    superclass ? superclass->getClassDecl() : nullptr,
     true);
 }
 

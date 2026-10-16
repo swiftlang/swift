@@ -285,6 +285,7 @@ void SILFunction::init(
   this->IsPerformanceConstraint = false;
   this->NeedBreakInfiniteLoops = false;
   this->NeedCompleteLifetimes = false;
+  this->HasInfiniteSpecializationLoop = false;
   // Set by AddressLowering when it lowers this function in the Raw-stage
   // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
   // born after the module advances past Raw are reported lowered by the
@@ -1111,7 +1112,7 @@ bool SILFunction::hasDynamicSelfMetadata() const {
   if (selfTy.isForeignReferenceType())
     return false;
 
-  return !!selfTy.getClassOrBoundGenericClass();
+  return !!selfTy.getClassDecl();
 }
 
 bool SILFunction::hasName(const char *Name) const {

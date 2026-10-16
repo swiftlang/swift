@@ -1,0 +1,543 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -sil-verify-all -module-name test %t/fragile.sil | %FileCheck %t/fragile.sil
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -enable-library-evolution -sil-verify-all -module-name test %t/resilient.sil | %FileCheck %t/resilient.sil
+
+//--- fragile.sil
+// A switch_enum on a borrowed address-only enum projects each payload in place
+// and neither takes nor destroys it.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Klass {}
+
+enum Payloads<T> {
+  case opaque(T)
+  case klass(Klass)
+  case trivial(Builtin.Int64)
+  case pair(T, Klass)
+  case empty
+}
+
+struct Box<T> : ~Copyable {
+  var value: T
+}
+
+enum BoxEnum<T> : ~Copyable {
+  case box(Box<T>)
+  case empty
+}
+
+struct Handle : ~Copyable {
+  var klass: Klass
+}
+
+enum HandleEnum<T> : ~Copyable {
+  case opaque(T)
+  case handle(Handle)
+}
+
+sil @useOpaque : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+sil @useInt : $@convention(thin) (Builtin.Int64) -> ()
+sil @usePayloads : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> ()
+sil @makePayloads : $@convention(thin) <T> () -> @out Payloads<T>
+
+// CHECK-LABEL: sil [ossa] @borrowed_switch_opaque_payload : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         switch_enum_addr [[ENUM]] : $*Payloads<T>, case #Payloads.opaque!enumelt: [[OPAQUE:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+// CHECK:       [[OPAQUE]]:
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.opaque!enumelt
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'borrowed_switch_opaque_payload'
+sil [ossa] @borrowed_switch_opaque_payload : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> () {
+bb0(%0 : @guaranteed $Payloads<T>):
+  switch_enum %0 : $Payloads<T>, case #Payloads.opaque!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $T):
+  %2 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb3
+
+bb2(%5 : @guaranteed $Payloads<T>):
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_switch_copy_opaque_payload : {{.*}} {
+// CHECK:       bb0([[OUT:%[^,]+]] : $*T, [[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         [[PAYLOAD:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.opaque!enumelt
+// CHECK-NEXT:    copy_addr [[PAYLOAD]] to [init] [[OUT]] : $*T
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'borrowed_switch_copy_opaque_payload'
+sil [ossa] @borrowed_switch_copy_opaque_payload : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> @out T {
+bb0(%0 : @guaranteed $Payloads<T>):
+  switch_enum %0 : $Payloads<T>, case #Payloads.opaque!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $T):
+  %2 = copy_value %1 : $T
+  return %2 : $T
+
+bb2(%4 : @guaranteed $Payloads<T>):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_switch_loadable_payload : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         [[ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.klass!enumelt
+// CHECK-NEXT:    [[KLASS:%[^,]+]] = load_borrow [[ADDR]] : $*Klass
+// CHECK:         apply {{%[^,]+}}([[KLASS]])
+// CHECK-NEXT:    end_borrow [[KLASS]] : $Klass
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'borrowed_switch_loadable_payload'
+sil [ossa] @borrowed_switch_loadable_payload : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> () {
+bb0(%0 : @guaranteed $Payloads<T>):
+  switch_enum %0 : $Payloads<T>, case #Payloads.klass!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $Klass):
+  %2 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3
+
+bb2(%5 : @guaranteed $Payloads<T>):
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_switch_trivial_payload : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         [[ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.trivial!enumelt
+// CHECK-NEXT:    [[INT:%[^,]+]] = load [trivial] [[ADDR]] : $*Builtin.Int64
+// CHECK:         apply {{%[^,]+}}([[INT]])
+// CHECK-LABEL: } // end sil function 'borrowed_switch_trivial_payload'
+sil [ossa] @borrowed_switch_trivial_payload : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> () {
+bb0(%0 : @guaranteed $Payloads<T>):
+  switch_enum %0 : $Payloads<T>, case #Payloads.trivial!enumelt: bb1, default bb2
+
+bb1(%1 : $Builtin.Int64):
+  %2 = function_ref @useInt : $@convention(thin) (Builtin.Int64) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb3
+
+bb2(%5 : @guaranteed $Payloads<T>):
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A loadable element of a destructured payload is borrowed until the case ends.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_switch_tuple_payload : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         [[PAIR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.pair!enumelt
+// CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[PAIR]] : $*(T, Klass), 1
+// CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]] : $*Klass
+// CHECK:         apply {{%[^,]+}}([[KLASS]])
+// CHECK:         end_borrow [[KLASS]] : $Klass
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'borrowed_switch_tuple_payload'
+sil [ossa] @borrowed_switch_tuple_payload : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> () {
+bb0(%0 : @guaranteed $Payloads<T>):
+  switch_enum %0 : $Payloads<T>, case #Payloads.pair!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $(T, Klass)):
+  (%2, %3) = destructure_tuple %1 : $(T, Klass)
+  %4 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %4<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %6 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3
+
+bb2(%9 : @guaranteed $Payloads<T>):
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_switch_default : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         switch_enum_addr [[ENUM]] : $*Payloads<T>, case #Payloads.empty!enumelt: {{bb[0-9]+}}, default [[DEFAULT:bb[0-9]+]]
+// CHECK:       [[DEFAULT]]:
+// CHECK:         apply {{%[^,]+}}<T>([[ENUM]])
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'borrowed_switch_default'
+sil [ossa] @borrowed_switch_default : $@convention(thin) <T> (@in_guaranteed Payloads<T>) -> () {
+bb0(%0 : @guaranteed $Payloads<T>):
+  switch_enum %0 : $Payloads<T>, case #Payloads.empty!enumelt: bb1, default bb2
+
+bb1:
+  br bb3
+
+bb2(%2 : @guaranteed $Payloads<T>):
+  %3 = function_ref @usePayloads : $@convention(thin) <τ_0_0> (@in_guaranteed Payloads<τ_0_0>) -> ()
+  %4 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed Payloads<τ_0_0>) -> ()
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The enum stays initialized through the switch and is destroyed afterwards.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_switch_local : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $Payloads<T>
+// CHECK:         apply {{%[^,]+}}<T>([[STACK]])
+// CHECK:         switch_enum_addr [[STACK]] : $*Payloads<T>, case #Payloads.opaque!enumelt: [[OPAQUE:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+// CHECK:       [[OPAQUE]]:
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_inplace_enum_data_addr [[STACK]] : $*Payloads<T>, #Payloads.opaque!enumelt
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NOT:     destroy_addr [[PAYLOAD]]
+// CHECK:         destroy_addr [[STACK]] : $*Payloads<T>
+// CHECK:         dealloc_stack [[STACK]] : $*Payloads<T>
+// CHECK-LABEL: } // end sil function 'borrowed_switch_local'
+sil [ossa] @borrowed_switch_local : $@convention(thin) <T> () -> () {
+bb0:
+  %0 = function_ref @makePayloads : $@convention(thin) <τ_0_0> () -> @out Payloads<τ_0_0>
+  %1 = apply %0<T>() : $@convention(thin) <τ_0_0> () -> @out Payloads<τ_0_0>
+  %2 = begin_borrow %1 : $Payloads<T>
+  switch_enum %2 : $Payloads<T>, case #Payloads.opaque!enumelt: bb1, default bb2
+
+bb1(%4 : @guaranteed $T):
+  %5 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %6 = apply %5<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %2 : $Payloads<T>
+  br bb3
+
+bb2(%9 : @guaranteed $Payloads<T>):
+  end_borrow %2 : $Payloads<T>
+  br bb3
+
+bb3:
+  destroy_value %1 : $Payloads<T>
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_switch_nested : {{.*}} {
+// CHECK:       bb0([[OUTER:%[^,]+]] : $*Optional<Payloads<T>>):
+// CHECK:         switch_enum_addr [[OUTER]] : $*Optional<Payloads<T>>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: {{bb[0-9]+}}
+// CHECK:       [[SOME]]:
+// CHECK-NEXT:    [[INNER:%[^,]+]] = unchecked_inplace_enum_data_addr [[OUTER]] : $*Optional<Payloads<T>>, #Optional.some!enumelt
+// CHECK-NEXT:    switch_enum_addr [[INNER]] : $*Payloads<T>, case #Payloads.opaque!enumelt: [[OPAQUE:bb[0-9]+]], default {{bb[0-9]+}}
+// CHECK:       [[OPAQUE]]:
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_inplace_enum_data_addr [[INNER]] : $*Payloads<T>, #Payloads.opaque!enumelt
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'borrowed_switch_nested'
+sil [ossa] @borrowed_switch_nested : $@convention(thin) <T> (@in_guaranteed Optional<Payloads<T>>) -> () {
+bb0(%0 : @guaranteed $Optional<Payloads<T>>):
+  switch_enum %0 : $Optional<Payloads<T>>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb4
+
+bb1(%1 : @guaranteed $Payloads<T>):
+  switch_enum %1 : $Payloads<T>, case #Payloads.opaque!enumelt: bb2, default bb3
+
+bb2(%3 : @guaranteed $T):
+  %4 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %4<T>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb5
+
+bb3(%7 : @guaranteed $Payloads<T>):
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The shape SILGen emits for a borrowing switch over a noncopyable enum.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_switch_noncopyable : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*BoxEnum<T>):
+// CHECK:         [[MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ENUM]] : $*BoxEnum<T>
+// CHECK-NEXT:    [[ACCESS:%[^,]+]] = begin_access [read] [static] [no_nested_conflict] [[MARK]] : $*BoxEnum<T>
+// CHECK-NEXT:    switch_enum_addr [[ACCESS]] : $*BoxEnum<T>, case #BoxEnum.box!enumelt: [[BOX:bb[0-9]+]], case #BoxEnum.empty!enumelt: [[EMPTY:bb[0-9]+]]
+// CHECK:       [[BOX]]:
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_inplace_enum_data_addr [[ACCESS]] : $*BoxEnum<T>, #BoxEnum.box!enumelt
+// CHECK:         [[PAYLOAD_MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PAYLOAD]] : $*Box<T>
+// CHECK-NEXT:    [[VALUE:%[^,]+]] = struct_element_addr [[PAYLOAD_MARK]] : $*Box<T>, #Box.value
+// CHECK-NEXT:    apply {{%[^,]+}}<T>([[VALUE]])
+// CHECK-NEXT:    end_access [[ACCESS]] : $*BoxEnum<T>
+// CHECK:       [[EMPTY]]:
+// CHECK-NEXT:    end_access [[ACCESS]] : $*BoxEnum<T>
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'borrowed_switch_noncopyable'
+sil [ossa] @borrowed_switch_noncopyable : $@convention(thin) <T> (@in_guaranteed BoxEnum<T>) -> () {
+bb0(%0 : @guaranteed $BoxEnum<T>):
+  %1 = copy_value %0 : $BoxEnum<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $BoxEnum<T>
+  %3 = begin_borrow [fixed] %2 : $BoxEnum<T>
+  switch_enum %3 : $BoxEnum<T>, case #BoxEnum.box!enumelt: bb1, case #BoxEnum.empty!enumelt: bb2
+
+bb1(%5 : @guaranteed $Box<T>):
+  %6 = copy_value %5 : $Box<T>
+  %7 = mark_unresolved_non_copyable_value [no_consume_or_assign] %6 : $Box<T>
+  %8 = begin_borrow %7 : $Box<T>
+  %9 = struct_extract %8 : $Box<T>, #Box.value
+  %10 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %11 = apply %10<T>(%9) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %8 : $Box<T>
+  destroy_value %7 : $Box<T>
+  end_borrow %3 : $BoxEnum<T>
+  br bb3
+
+bb2:
+  end_borrow %3 : $BoxEnum<T>
+  br bb3
+
+bb3:
+  destroy_value %2 : $BoxEnum<T>
+  %r = tuple ()
+  return %r : $()
+}
+
+// A case that consumes the enum, as a guarded case of a consuming switch does,
+// ends the payload's borrow first.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_switch_then_consume : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*Payloads<T>):
+// CHECK:         switch_enum_addr [[ENUM]] : $*Payloads<T>, case #Payloads.pair!enumelt: [[PAIR_BB:bb[0-9]+]], default
+// CHECK:       [[PAIR_BB]]:
+// CHECK-NEXT:    [[PAIR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.pair!enumelt
+// CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[PAIR]] : $*(T, Klass), 1
+// CHECK-NEXT:    [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]] : $*Klass
+// CHECK:         apply {{%[^,]+}}([[KLASS]])
+// CHECK-NEXT:    end_borrow [[KLASS]] : $Klass
+// CHECK-NEXT:    [[TAKEN:%[^,]+]] = unchecked_inplace_enum_data_addr [[ENUM]] : $*Payloads<T>, #Payloads.pair!enumelt
+// CHECK-NEXT:    destroy_addr [[TAKEN]] : $*(T, Klass)
+// CHECK-LABEL: } // end sil function 'borrowed_switch_then_consume'
+sil [ossa] @borrowed_switch_then_consume : $@convention(thin) <T> (@in Payloads<T>) -> () {
+bb0(%0 : @owned $Payloads<T>):
+  %1 = begin_borrow %0 : $Payloads<T>
+  switch_enum %1 : $Payloads<T>, case #Payloads.pair!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $(T, Klass)):
+  (%4, %5) = destructure_tuple %3 : $(T, Klass)
+  %6 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1 : $Payloads<T>
+  %9 = unchecked_enum_data %0 : $Payloads<T>, #Payloads.pair!enumelt
+  destroy_value %9 : $(T, Klass)
+  br bb3
+
+bb2(%12 : @guaranteed $Payloads<T>):
+  end_borrow %1 : $Payloads<T>
+  destroy_value %0 : $Payloads<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The payload's borrow covers its noncopyable copy, which the move-only checker
+// replaces with the borrow.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_switch_noncopyable_loadable_payload : {{.*}} {
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [read] [static] [no_nested_conflict] {{%[^,]+}} : $*HandleEnum<T>
+// CHECK:         [[ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ACCESS]] : $*HandleEnum<T>, #HandleEnum.handle!enumelt
+// CHECK-NEXT:    [[HANDLE:%[^,]+]] = load_borrow [[ADDR]] : $*Handle
+// CHECK-NEXT:    [[COPY:%[^,]+]] = copy_value [[HANDLE]] : $Handle
+// CHECK-NEXT:    [[MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]] : $Handle
+// CHECK:         destroy_value [[MARK]] : $Handle
+// CHECK-NEXT:    end_borrow [[HANDLE]] : $Handle
+// CHECK-NEXT:    end_access [[ACCESS]] : $*HandleEnum<T>
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'borrowed_switch_noncopyable_loadable_payload'
+sil [ossa] @borrowed_switch_noncopyable_loadable_payload : $@convention(thin) <T> (@in_guaranteed HandleEnum<T>) -> () {
+bb0(%0 : @guaranteed $HandleEnum<T>):
+  %1 = copy_value %0 : $HandleEnum<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $HandleEnum<T>
+  %3 = begin_borrow [fixed] %2 : $HandleEnum<T>
+  switch_enum %3 : $HandleEnum<T>, case #HandleEnum.handle!enumelt: bb1, case #HandleEnum.opaque!enumelt: bb2
+
+bb1(%5 : @guaranteed $Handle):
+  %6 = copy_value %5 : $Handle
+  %7 = mark_unresolved_non_copyable_value [no_consume_or_assign] %6 : $Handle
+  %8 = begin_borrow %7 : $Handle
+  %9 = struct_extract %8 : $Handle, #Handle.klass
+  %10 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %8 : $Handle
+  destroy_value %7 : $Handle
+  end_borrow %3 : $HandleEnum<T>
+  br bb3
+
+bb2(%16 : @guaranteed $T):
+  end_borrow %3 : $HandleEnum<T>
+  br bb3
+
+bb3:
+  destroy_value %2 : $HandleEnum<T>
+  %r = tuple ()
+  return %r : $()
+}
+
+//--- resilient.sil
+// A switch_enum on a borrowed resilient enum projects each payload through a
+// scratch copy of the enum and neither takes nor destroys the payload.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+public enum ResilientEnum<T> {
+  case opaque(T)
+  case empty
+}
+
+@frozen
+public struct Box<T> : ~Copyable {
+  public var value: T
+}
+
+public enum ResilientBoxEnum<T> : ~Copyable {
+  case box(Box<T>)
+  case empty
+}
+
+sil @useOpaque : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @condition : $@convention(thin) () -> Builtin.Int1
+
+// CHECK-LABEL: sil [serialized] [ossa] @resilient_switch_opaque_payload : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*ResilientEnum<T>):
+// CHECK:         switch_enum_addr [[ENUM]] : $*ResilientEnum<T>, case #ResilientEnum.opaque!enumelt: [[OPAQUE:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+// CHECK:       [[OPAQUE]]:
+// CHECK-NEXT:    [[SCRATCH:%[^,]+]] = alloc_stack $ResilientEnum<T>
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_borrow_enum_data_addr [[ENUM]] : $*ResilientEnum<T>, #ResilientEnum.opaque!enumelt in [[SCRATCH]] : $*ResilientEnum<T>
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientEnum<T>
+// CHECK-NEXT:    br
+// CHECK:       [[DEFAULT]]:
+// CHECK-NOT:     dealloc_stack
+// CHECK:         br
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'resilient_switch_opaque_payload'
+sil [serialized] [ossa] @resilient_switch_opaque_payload : $@convention(thin) <T> (@in_guaranteed ResilientEnum<T>) -> () {
+bb0(%0 : @guaranteed $ResilientEnum<T>):
+  switch_enum %0 : $ResilientEnum<T>, case #ResilientEnum.opaque!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $T):
+  %2 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb3
+
+bb2(%5 : @guaranteed $ResilientEnum<T>):
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The scratch is deallocated in the latch, before the back edge.
+//
+// CHECK-LABEL: sil [serialized] [ossa] @resilient_switch_in_loop : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*ResilientEnum<T>):
+// CHECK:         br [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK-NEXT:    switch_enum_addr [[ENUM]] : $*ResilientEnum<T>, case #ResilientEnum.opaque!enumelt: [[OPAQUE:bb[0-9]+]], default [[EXIT:bb[0-9]+]]
+// CHECK:       [[OPAQUE]]:
+// CHECK-NEXT:    [[SCRATCH:%[^,]+]] = alloc_stack $ResilientEnum<T>
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_borrow_enum_data_addr [[ENUM]] : $*ResilientEnum<T>, #ResilientEnum.opaque!enumelt in [[SCRATCH]] : $*ResilientEnum<T>
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK:         cond_br {{%[^,]+}}, [[LATCH:bb[0-9]+]], [[BREAK:bb[0-9]+]]
+// CHECK:       [[LATCH]]:
+// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientEnum<T>
+// CHECK-NEXT:    br [[HEADER]]
+// CHECK:       [[BREAK]]:
+// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientEnum<T>
+// CHECK-LABEL: } // end sil function 'resilient_switch_in_loop'
+sil [serialized] [ossa] @resilient_switch_in_loop : $@convention(thin) <T> (@in_guaranteed ResilientEnum<T>) -> () {
+bb0(%0 : @guaranteed $ResilientEnum<T>):
+  br bb1
+
+bb1:
+  switch_enum %0 : $ResilientEnum<T>, case #ResilientEnum.opaque!enumelt: bb2, default bb5
+
+bb2(%3 : @guaranteed $T):
+  %4 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %4<T>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %6 = function_ref @condition : $@convention(thin) () -> Builtin.Int1
+  %7 = apply %6() : $@convention(thin) () -> Builtin.Int1
+  cond_br %7, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+  br bb6
+
+bb5(%11 : @guaranteed $ResilientEnum<T>):
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The shape SILGen emits for a borrowing switch over a noncopyable enum.
+//
+// CHECK-LABEL: sil [serialized] [ossa] @resilient_switch_noncopyable : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*ResilientBoxEnum<T>):
+// CHECK:         [[MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ENUM]] : $*ResilientBoxEnum<T>
+// CHECK-NEXT:    [[ACCESS:%[^,]+]] = begin_access [read] [static] [no_nested_conflict] [[MARK]] : $*ResilientBoxEnum<T>
+// CHECK-NEXT:    switch_enum_addr [[ACCESS]] : $*ResilientBoxEnum<T>, case #ResilientBoxEnum.box!enumelt: [[BOX:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+// CHECK:       [[BOX]]:
+// CHECK-NEXT:    [[SCRATCH:%[^,]+]] = alloc_stack $ResilientBoxEnum<T>
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_borrow_enum_data_addr [[ACCESS]] : $*ResilientBoxEnum<T>, #ResilientBoxEnum.box!enumelt in [[SCRATCH]] : $*ResilientBoxEnum<T>
+// CHECK:         [[PAYLOAD_MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PAYLOAD]] : $*Box<T>
+// CHECK-NEXT:    [[VALUE:%[^,]+]] = struct_element_addr [[PAYLOAD_MARK]] : $*Box<T>, #Box.value
+// CHECK-NEXT:    apply {{%[^,]+}}<T>([[VALUE]])
+// CHECK-NEXT:    end_access [[ACCESS]] : $*ResilientBoxEnum<T>
+// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientBoxEnum<T>
+// CHECK:       [[DEFAULT]]:
+// CHECK-NEXT:    end_access [[ACCESS]] : $*ResilientBoxEnum<T>
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'resilient_switch_noncopyable'
+sil [serialized] [ossa] @resilient_switch_noncopyable : $@convention(thin) <T> (@in_guaranteed ResilientBoxEnum<T>) -> () {
+bb0(%0 : @guaranteed $ResilientBoxEnum<T>):
+  %1 = copy_value %0 : $ResilientBoxEnum<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $ResilientBoxEnum<T>
+  %3 = begin_borrow [fixed] %2 : $ResilientBoxEnum<T>
+  switch_enum %3 : $ResilientBoxEnum<T>, case #ResilientBoxEnum.box!enumelt: bb1, default bb2
+
+bb1(%5 : @guaranteed $Box<T>):
+  %6 = copy_value %5 : $Box<T>
+  %7 = mark_unresolved_non_copyable_value [no_consume_or_assign] %6 : $Box<T>
+  %8 = begin_borrow %7 : $Box<T>
+  %9 = struct_extract %8 : $Box<T>, #Box.value
+  %10 = function_ref @useOpaque : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %11 = apply %10<T>(%9) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %8 : $Box<T>
+  destroy_value %7 : $Box<T>
+  end_borrow %3 : $ResilientBoxEnum<T>
+  br bb3
+
+bb2(%16 : @guaranteed $ResilientBoxEnum<T>):
+  end_borrow %3 : $ResilientBoxEnum<T>
+  br bb3
+
+bb3:
+  destroy_value %2 : $ResilientBoxEnum<T>
+  %r = tuple ()
+  return %r : $()
+}

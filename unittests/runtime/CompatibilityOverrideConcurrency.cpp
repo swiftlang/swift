@@ -112,16 +112,6 @@ static void swift_task_enqueueMainExecutor_override(
   Ran = true;
 }
 
-SWIFT_CC(swift)
-static void swift_task_startOnMainActor_override(AsyncTask* task) {
-  Ran = true;
-}
-
-SWIFT_CC(swift)
-static void swift_task_immediate_override(AsyncTask* task, SerialExecutorRef targetExecutor) {
-  Ran = true;
-}
-
 #ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
 [[noreturn]] SWIFT_CC(swift)
 static void swift_task_asyncMainDrainQueue_override_fn(

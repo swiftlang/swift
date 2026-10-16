@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <limits.h>
 #include <optional>
 #include <vector>
@@ -134,6 +135,19 @@ enum class NonRecursivePrintOption : uint32_t {
   SkipNonisolatedNonsending = 1 << 1,
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
+
+/// The most restrictive interface that a declaration or type can be printed in.
+/// The cases are ordered from least to most restrictive.
+enum class InterfaceVisibility : uint8_t {
+  /// Printed in every interface.
+  Public,
+  /// Printed in the private and package interfaces.
+  SPI,
+  /// Printed only in the package interface.
+  Package,
+  /// Not printed in any interface.
+  None,
+};
 
 /// Options for printing AST nodes.
 ///
@@ -256,6 +270,22 @@ public:
 
   void setInterfaceMode(InterfaceMode mode) {
     InterfaceContentKind = mode;
+  }
+
+  /// Whether something with the given visibility is printed in the interface
+  /// described by these options.
+  bool printsInterfaceVisibility(InterfaceVisibility visibility) const {
+    switch (visibility) {
+    case InterfaceVisibility::Public:
+      return true;
+    case InterfaceVisibility::SPI:
+      return !printPublicInterface();
+    case InterfaceVisibility::Package:
+      return printPackageInterface();
+    case InterfaceVisibility::None:
+      return false;
+    }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether to prefer printing TypeReprs instead of Types,
@@ -435,6 +465,10 @@ public:
 
   /// Suppress printing of @c in favor of @_cdecl.
   bool SuppressCAttribute = false;
+
+  /// Suppress printing of Deinitable and ~Deinitable in the inheritance
+  /// clauses of protocols.
+  bool SuppressDeinitableProtocol = false;
 
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;

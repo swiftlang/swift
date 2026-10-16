@@ -14,7 +14,7 @@ import Basic
 import ASTBridging
 
 /// A Swift type.
-/// It is not necessarily canonical, e.g. typealiases are not resolved.
+/// It is not necessarily canonical, e.g. typealiases are not desugared.
 public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildren {
   public enum TraitResult {
     case isNot
@@ -105,6 +105,10 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
   public var genericArgumentsOfBoundGenericType: TypeArray {
     TypeArray(bridged: bridged.BoundGenericType_getGenericArgs())
   }
+
+  public var elementTypesOfPackType: TypeArray {
+    TypeArray(bridged: bridged.PackType_getElementTypes())
+  }
 }
 
 /// A Type that is statically known to be canonical.
@@ -129,6 +133,12 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   /// True if this type involves a local archetype defined in `environment`.
   public func hasLocalArchetype(from environment: GenericEnvironment) -> Bool {
     bridged.hasLocalArchetypeFromEnvironment(environment.bridged)
+  }
+
+  /// Collect the conformances of \c fromType to each of the protocols of an
+  /// existential type's layout.
+  public func collectExistentialConformances(existentialType: CanonicalType) -> ConformanceArray {
+    return ConformanceArray(bridged: bridged.collectExistentialConformances(existentialType.bridged))
   }
 }
 
@@ -193,6 +203,7 @@ extension TypeProperties {
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
   public var isPack: Bool { rawType.bridged.isPack() }
+  public var isPackExpansion: Bool { rawType.bridged.isPackExpansion() }
   public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
@@ -280,6 +291,7 @@ extension TypeProperties {
   public var hasArchetype: Bool { rawType.bridged.hasArchetype() }
   public var hasTypeParameter: Bool { rawType.bridged.hasTypeParameter() }
   public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
+  public var hasOpaqueArchetype: Bool { rawType.bridged.hasOpaqueArchetype() }
   /// True if this type mentions an existential (opened existential) archetype.
   public var hasExistentialArchetype: Bool { rawType.bridged.hasExistentialArchetype() }
   public var hasDynamicSelf: Bool { rawType.bridged.hasDynamicSelf() }
@@ -322,7 +334,7 @@ extension TypeProperties {
   public var isGenericAtAnyLevel: Bool { rawType.bridged.isGenericAtAnyLevel() }
 
   public var nominal: NominalTypeDecl? {
-    rawType.bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
+    rawType.bridged.getNominalDecl().getAs(NominalTypeDecl.self)
   }
 
   /// Performs a global conformance lookup for this type for `protocol`.

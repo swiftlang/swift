@@ -203,6 +203,13 @@ namespace irgen {
                                    CanType srcType,
                                    ProtocolConformanceRef conformance);
 
+  /// Project a generic reference to a COM interface using its conformance
+  /// adjustment. The reference has already been loaded from generic storage.
+  llvm::Value *emitGenericCOMInterfaceProjection(IRGenFunction &IGF,
+                                                 llvm::Value *value,
+                                                 CanType type,
+                                                 ProtocolDecl *protocol);
+
   using GenericParamFulfillmentCallback =
     llvm::function_ref<void(GenericRequirement req,
                             const MetadataSource &source,

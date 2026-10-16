@@ -2691,8 +2691,8 @@ public:
       if (auto dynB = origInstance->getAs<DynamicSelfType>()) {
         origInstance = dynB->getSelfType();
       }
-      if (auto aClass = substInstance->getClassOrBoundGenericClass()) {
-        if (auto bClass = origInstance->getClassOrBoundGenericClass()) {
+      if (auto aClass = substInstance->getClassDecl()) {
+        if (auto bClass = origInstance->getClassDecl()) {
           if (aClass != bClass) {
             return bClass;
           }

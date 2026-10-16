@@ -272,7 +272,7 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
     return false;
 
-  auto *inherited = decl->getRawType()->getEnumOrBoundGenericEnum();
+  auto *inherited = decl->getRawType()->getEnumDecl();
   if (!inherited)
     return false;
 
@@ -966,6 +966,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
+    return false;
+
+  // Embedded Swift does not support dynamic replacement, so nothing is
+  // 'dynamic'. An explicit 'dynamic' is diagnosed and ignored.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
   // Add dynamic if -enable-implicit-dynamic was requested.
@@ -2578,9 +2583,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (auto *parentDecl = hiddenDecl->ParentDecl)
       parent = parentDecl->getDeclaredInterfaceType()->getCanonicalType();
 
-    auto hiddenType = HiddenType::get(
-        Context, hiddenDecl->MangledName, hiddenDecl->getModuleContext(),
-        hiddenDecl, parent);
+    auto hiddenType =
+        HiddenType::get(Context, hiddenDecl->MangledName, hiddenDecl, parent);
     return MetatypeType::get(hiddenType, Context);
   }
 

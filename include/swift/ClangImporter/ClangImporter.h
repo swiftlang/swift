@@ -823,6 +823,7 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  ValueDecl *getOverriddenSuperclassMember(const ValueDecl *decl) override;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
@@ -980,7 +981,7 @@ inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {
 /// Whether \p type is an imported C++ class that C++ cannot pass in registers
 /// (a non-trivial copy or move constructor, or a non-trivial destructor).
 inline bool isNonTrivialCxxRecord(Type type) {
-  const auto *structDecl = type->getStructOrBoundGenericStruct();
+  const auto *structDecl = type->getStructDecl();
   if (!structDecl)
     return false;
   const auto *record =
@@ -1013,6 +1014,12 @@ bool isClangNamespace(const DeclContext *dc);
 
 /// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
 bool isClangCxxRecord(const DeclContext *dc);
+
+/// The C++ name of an overloaded operator, e.g. "operator==".
+StringRef getCxxOperatorName(clang::OverloadedOperatorKind op);
+
+/// The overloaded operator named \p name, e.g. "operator==", if any.
+std::optional<clang::OverloadedOperatorKind> getCxxOperatorKind(StringRef name);
 
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.

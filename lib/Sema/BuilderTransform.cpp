@@ -116,13 +116,19 @@ protected:
     return recordVar(PB, container);
   }
 
+  Type makePlaceholderVarType(VarDecl *var) {
+    auto *repr = new (ctx) PlaceholderTypeRepr(var->getLoc());
+    return PlaceholderType::get(ctx, repr);
+  }
+
   VarDecl *buildPlaceholderVar(SourceLoc loc,
                                SmallVectorImpl<ASTNode> &container,
                                Type type = Type(), Expr *initExpr = nullptr) {
     auto *var = builder.buildVar(loc);
+    if (!type)
+      type = makePlaceholderVarType(var);
     Pattern *placeholder = TypedPattern::createImplicit(
-        ctx, NamedPattern::createImplicit(ctx, var),
-        type ? type : PlaceholderType::get(ctx, var));
+        ctx, NamedPattern::createImplicit(ctx, var), type);
     auto *PB = PatternBindingDecl::createImplicit(
         ctx, StaticSpellingKind::None, placeholder, /*init=*/initExpr, dc,
         var->getStartLoc());
@@ -691,7 +697,7 @@ protected:
     // only when a solution is found.
     VarDecl *arrayVar = buildPlaceholderVar(
         startLoc, doBody,
-        ArraySliceType::get(PlaceholderType::get(ctx, forEachVar.get())),
+        ArraySliceType::get(makePlaceholderVarType(forEachVar.get())),
         ArrayExpr::create(ctx, /*LBrace=*/startLoc, /*Elements=*/{},
                           /*Commas=*/{}, /*RBrace=*/startLoc));
 

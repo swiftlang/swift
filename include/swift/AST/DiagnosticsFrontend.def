@@ -109,6 +109,8 @@ ERROR(cannot_open_file,none,
 ERROR(cannot_open_serialized_file,none,
       "cannot open file '%0' for diagnostics emission (%1)",
       (StringRef, StringRef))
+ERROR(cannot_serialize_sarif_diagnostics,none,
+      "cannot write SARIF diagnostics to '%0': %1", (StringRef, StringRef))
 ERROR(error_open_input_file,none,
       "error opening input file '%0' (%1)", (StringRef, StringRef))
 ERROR(error_clang_importer_create_fail,none,

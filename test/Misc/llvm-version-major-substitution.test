@@ -1,0 +1,5 @@
+RUN: echo '%llvm_version_major' | %FileCheck %s
+
+# Check that the '%llvm_version_major' substitution expands to
+# LLVM_VERSION_MAJOR.
+CHECK: {{^2[3-9]$}}

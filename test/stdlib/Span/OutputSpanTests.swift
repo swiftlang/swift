@@ -138,6 +138,29 @@ suite.test("initialize buffer with repeated elements")
   }
 }
 
+suite.test("append repeating negative count")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+
+  var a = Allocation(of: 4, Int.self)
+  a.initialize {
+    expectCrashLater()
+    $0.append(repeating: 0, count: -1)
+  }
+}
+
+suite.test("append repeating overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+
+  var a = Allocation(of: 4, Int.self)
+  a.initialize {
+    $0.append(0)
+    expectCrashLater()
+    $0.append(repeating: 1, count: 4)
+  }
+}
+
 suite.test("indices property")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }

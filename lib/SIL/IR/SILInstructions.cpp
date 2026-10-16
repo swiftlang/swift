@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -784,7 +785,7 @@ bool DebugValueInst::isExprTypeValid() const {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
       auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
       if (!FieldParent ||
-          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+          RunningType.getNominalDecl() != FieldParent)
         return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
@@ -1908,7 +1909,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBaseWithTrailingOperands(
       Elems, Loc, Ty, forwardingOwnershipKind)
 {
-  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
+  assert(!Ty.getStructDecl()->hasUnreferenceableStorage());
 }
 
 BorrowedFromInst *BorrowedFromInst::create(SILDebugLocation DebugLoc, SILValue borrowedValue,
@@ -3611,7 +3612,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootTy->getClassOrBoundGenericClass()) {
+      } else if (rootTy->getClassDecl()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       } else {
         keyPathClass = ctx.getWritableKeyPathDecl();
@@ -3709,7 +3710,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   CanType currentRoot = rootTy;
 
   for (const auto &comp : components) {
-    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+    bool rootIsClass = (bool)currentRoot->getClassDecl();
 
     switch (comp.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
@@ -3859,6 +3860,86 @@ visitReferencedFunctionsAndMethods(
 }
 
 
+namespace {
+
+/// A helper class used to check whether one type is structurally contained
+/// the other type either completely or partially.
+class TypeComparator : public TypeMatcher<TypeComparator> {
+  bool IsContained = false;
+
+public:
+  bool isEqual(CanType T1, CanType T2) { return T1 == T2; }
+  /// Check whether the type T1 is different from T2 and contained in the type
+  /// T2.
+  bool isStrictlyContainedIn(CanType T1, CanType T2) {
+    if (isEqual(T1, T2))
+      return false;
+    return T2.findIf([&T1, this](Type T) -> bool {
+      return isEqual(T->getCanonicalType(), T1);
+    });
+  }
+
+  /// Check whether the type T1 is strictly or partially contained in the type
+  /// T2.
+  /// Partially contained means that if you drop the common structural "prefix"
+  /// of T1 and T2 and get T1' and T2' then T1' is strictly contained in T2'.
+  bool isPartiallyContainedIn(CanType T1, CanType T2) {
+    if (isStrictlyContainedIn(T1, T2))
+      return true;
+    match(T1, T2);
+    return IsContained;
+  }
+
+  /// This method is invoked aftre skipping a common prefix of two types,
+  /// when a structural difference is found.
+  bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                Type sugaredFirstType) {
+    auto firstCanType = firstType->getCanonicalType();
+    auto secondCanType = secondType->getCanonicalType();
+    if (isEqual(firstCanType, secondCanType))
+      return false;
+    if (isStrictlyContainedIn(firstCanType, secondCanType)) {
+      IsContained = true;
+      return false;
+    }
+    return false;
+  }
+};
+
+} // end anonymous namespace
+
+/// Checks if a second substitution map is an expanded version of
+/// the first substitution map.
+/// This is the case if at least one of the substitution type in Subs2 is
+/// "bigger" than the corresponding substitution type in Subs1.
+/// Type T2 is "smaller" than type T1 if T2 is structurally contained in T1.
+bool swift::growingSubstitutions(SubstitutionMap Subs1,
+                                 SubstitutionMap Subs2) {
+  auto Replacements1 = Subs1.getReplacementTypes();
+  auto Replacements2 = Subs2.getReplacementTypes();
+  assert(Replacements1.size() == Replacements2.size());
+  TypeComparator TypeCmp;
+  // Perform component-wise comparisons for substitutions.
+  for (unsigned idx : indices(Replacements1)) {
+    auto Type1 = Replacements1[idx]->getCanonicalType();
+    auto Type2 = Replacements2[idx]->getCanonicalType();
+    // If types are the same, the substitution type does not grow.
+    if (TypeCmp.isEqual(Type2, Type1))
+      continue;
+    // If the new substitution type is getting smaller, the
+    // substitution type does not grow.
+    if (TypeCmp.isPartiallyContainedIn(Type2, Type1))
+      continue;
+    if (TypeCmp.isPartiallyContainedIn(Type1, Type2))
+      return true;
+    // None of the types is contained in the other type.
+    // They are not comparable in this sense.
+  }
+
+  // The substitution list is not growing.
+  return false;
+}
+
 GenericSpecializationInformation::GenericSpecializationInformation(
     SILFunction *Caller, SILFunction *Parent, SubstitutionMap Subs)
     : Caller(Caller), Parent(Parent), Subs(Subs) {}
@@ -3929,7 +4010,7 @@ DestructureStructInst::create(const SILFunction &F, SILDebugLocation Loc,
                               ValueOwnershipKind forwardingOwnershipKind) {
   auto &M = F.getModule();
 
-  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+  assert(Operand->getType().getStructDecl() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;

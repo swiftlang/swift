@@ -89,6 +89,8 @@ PASS(CondFailOptimization, "cond-fail-optimization",
      "Optimizes cond_fail instructions")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
+PASS(ImplicitDestroyChecker, "implicit-destroy-checker",
+     "Diagnoses implicit destroys of values that must be consumed")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
      "Initializes static global variables")
 PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
@@ -165,8 +167,10 @@ PASS(TempLValueElimination, "temp-lvalue-elimination",
      "Remove short-lived immutable temporary l-values")
 PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
      "New Loop Invariant Code Motion")
+PASS(PackTypeElimination, "pack-type-elimination",
+     "Eliminates pack element archetype types")
 PASS(PackSpecialization, "pack-specialization",
-     "Specialize uses of parameter packs")
+     "Explode parameter packs in function signatures")
 PASS(DeadObjectElimination, "dead-object-elimination",
      "Removes dead object, stack and array allocations")
 PASS(MandatoryDeadObjectElimination, "mandatory-dead-object-elimination",

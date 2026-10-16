@@ -555,6 +555,15 @@ static ValueDecl *getBinaryOperationWithOverflow(ASTContext &ctx,
                             _tuple(argType, _int(1)));
 }
 
+/// Build a declaration for a relaxed binary operation.
+static ValueDecl *getBinaryOperationRelaxed(ASTContext &ctx,
+                                            Identifier id,
+                                            Type argType) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(argType, argType),
+                            argType);
+}
+
 static ValueDecl *getUnaryOperation(ASTContext &ctx, Identifier id,
                                     Type argType) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(argType), argType);
@@ -745,17 +754,10 @@ namespace {
 
   public:
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1,
-                           bool wantsAdditionalAnyObjectRequirement = false,
-                           bool areParametersPacks = false)
+                           bool areParameterPacks = false)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
-                                             areParametersPacks);
-      if (wantsAdditionalAnyObjectRequirement) {
-        Requirement req(RequirementKind::Conformance,
-                        TheGenericParamList->getParams()[0]->getInterfaceType(),
-                        ctx.getAnyObjectConstraint());
-        addedRequirements.push_back(req);
-      }
+                                             areParameterPacks);
       for (auto gp : TheGenericParamList->getParams()) {
         genericParamTypes.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
@@ -792,10 +794,18 @@ namespace {
 
     template <class G>
     void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
-      assert(proto && "missing protocol");
+      ASSERT(proto && "missing protocol");
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
                       proto->getDeclaredInterfaceType());
+      addedRequirements.push_back(req);
+    }
+
+    template <class G>
+    void addAnyObjectRequirement(const G &generator) {
+      Requirement req(RequirementKind::Conformance,
+                      generator.build(*this),
+                      Context.getAnyObjectConstraint());
       addedRequirements.push_back(req);
     }
 
@@ -1362,12 +1372,14 @@ static ValueDecl *getValueToBridgeObject(ASTContext &ctx, Identifier id) {
                             _bridgeObject);
 }
 
+// FIXME: This builtin actually appears to be unused.
 static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   // <T : AnyObject> T -> T
   //
-  BuiltinFunctionBuilder builder(C, 1, true);
+  BuiltinFunctionBuilder builder(C, 1);
   auto T = makeGenericParam();
   builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+  builder.addAnyObjectRequirement(T);
   builder.addParameter(T, ParamSpecifier::LegacyOwned);
   builder.setResult(T);
   return builder.build(Id);
@@ -1433,9 +1445,10 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
-static ValueDecl *getAutoDiffApplyDerivativeFunction(
-    ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
-    unsigned arity, bool throws) {
+static ValueDecl *
+getAutoDiffApplyDerivativeFunction(ASTContext &Context, Identifier Id,
+                                   AutoDiffDerivativeFunctionKind kind,
+                                   unsigned arity, bool throws, bool async) {
   assert(arity >= 1);
   // JVP:
   //   <...T...(arity), R, E: Error> (@differentiable(_forward) (...T) throws(E) -> R, ...T)
@@ -1476,7 +1489,9 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
                 // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
                 .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
                 .withNoEscape()
-                .withThrows(throws, throws? fnThrownTypeGen.build(builder) : Type())
+                .withAsync(async)
+                .withThrows(throws,
+                            throws ? fnThrownTypeGen.build(builder) : Type())
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
@@ -1508,12 +1523,16 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     builder.setThrows();
     builder.setThrownError(fnThrownTypeGen);
   }
+  if (async)
+    builder.setAsync();
   return builder.build(Id);
 }
 
-static ValueDecl *getAutoDiffApplyTransposeFunction(
-    ASTContext &Context, Identifier Id, unsigned arity, bool throws,
-    Type thrownType) {
+static ValueDecl *getAutoDiffApplyTransposeFunction(ASTContext &Context,
+                                                    Identifier Id,
+                                                    unsigned arity, bool throws,
+                                                    Type thrownType,
+                                                    bool async) {
   assert(arity >= 1);
   // <...T...(arity), R>
   //     (@differentiable(_linear) (...T) throws -> R, ...R.TangentVector)
@@ -1545,6 +1564,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
           FunctionType::ExtInfoBuilder()
               .withDifferentiabilityKind(DifferentiabilityKind::Linear)
               .withNoEscape()
+              .withAsync(async)
               .withThrows(throws, thrownType)
               .build();
       SmallVector<FunctionType::Param, 2> params;
@@ -2346,8 +2366,7 @@ static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) 
 
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
-                                 /* anyObject */ false,
-                                 /* areParametersPack */ true);
+                                 /* areParameterPacks */ true);
 
   auto paramTy = makeMetatype(makeTuple(makePackExpansion(makeGenericParam())));
   builder.addParameter(paramTy);
@@ -2416,8 +2435,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getApplyActorIsolatedUnchecked(ASTContext &ctx, Identifier id) {
-  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 3,
-                                 /* wantsAdditionalAnyObjectRequirement */ true);
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 3);
 
   // <A: AnyObject, T: ~Copyable, E: Error>(
   //   _: (isolated A) throws(E) -> T, _: A
@@ -2425,8 +2443,9 @@ static ValueDecl *getApplyActorIsolatedUnchecked(ASTContext &ctx, Identifier id)
 
   auto A = makeGenericParam(0);
   auto T = makeGenericParam(1);
-  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
   auto E = makeGenericParam(2);
+  builder.addAnyObjectRequirement(A);
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
   builder.addConformanceRequirement(E, KnownProtocolKind::Error);
 
   auto extInfo = ASTExtInfoBuilder()
@@ -2645,6 +2664,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
+   OverloadedBuiltinKind::overload,
+#define BUILTIN_BINARY_OPERATION_RELAXED(id, name, _, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
@@ -3024,6 +3045,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Copyable);
   if (Id == Context.Id_Escapable)
     return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Escapable);
+  if (Id == Context.Id_Deinitable)
+    return Context.synthesizeInvertibleProtocolDecl(
+        InvertibleProtocolKind::Deinitable);
 
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
@@ -3202,21 +3226,22 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   if (OperationName.starts_with("applyDerivative_")) {
     AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
-    bool throws;
-    if (!autodiff::getBuiltinApplyDerivativeConfig(
-            OperationName, kind, arity, throws))
+    bool throws, async;
+    if (!autodiff::getBuiltinApplyDerivativeConfig(OperationName, kind, arity,
+                                                   throws, async))
       return nullptr;
-    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity, throws);
+    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity, throws,
+                                              async);
   }
   if (OperationName.starts_with("applyTranspose_")) {
     unsigned arity;
-    bool throws;
-    if (!autodiff::getBuiltinApplyTransposeConfig(
-            OperationName, arity, throws))
+    bool throws, async;
+    if (!autodiff::getBuiltinApplyTransposeConfig(OperationName, arity, throws,
+                                                  async))
       return nullptr;
     // TODO: Support somehow typed throws
     return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws,
-                                             /*thrownType=*/Type());
+                                             /*thrownType=*/Type(), async);
   }
 
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
@@ -3293,22 +3318,27 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
-      return getBinaryOperation(Context, Id, Types[0]);
+    return getBinaryOperation(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
 #define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name)                         \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      if (!Types.empty())
-        return nullptr;
-      return getPolymorphicBinaryOperation(Context, Id);
+    if (!Types.empty()) return nullptr;
+    return getPolymorphicBinaryOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-      if (Types.size() != 1) return nullptr;
-      return getBinaryOperationWithOverflow(Context, Id, Types[0]);
+    if (Types.size() != 1) return nullptr;
+    return getBinaryOperationWithOverflow(Context, Id, Types[0]);
+    
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_OPERATION_RELAXED(id, name, _, attrs, overload)  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+    if (Types.size() != 1) return nullptr;
+    return getBinaryOperationRelaxed(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload)  case BuiltinValueKind::id:
@@ -4085,18 +4115,18 @@ getBuiltinBoundGenericType(ASTContext &C,
     auto types = subs.getReplacementTypes();
   
     auto size = types[0]->getCanonicalType();
-    if (validate
-        && size->getMatchingParamKind() != GenericTypeParamKind::Value
-        && !size->hasTypeVariableOrPlaceholder()) {
+    if (validate &&
+        size->getMatchingParamKind() != GenericTypeParamKind::Value &&
+        !size->hasTypeVariableOrHole() && !size->is<PlaceholderType>()) {
       return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     auto element = types[1]->getCanonicalType();
-    if (validate
-        && element->getMatchingParamKind() != GenericTypeParamKind::Type
-        && !element->hasTypeVariableOrPlaceholder()) {
+    if (validate &&
+        element->getMatchingParamKind() != GenericTypeParamKind::Type &&
+        !element->hasTypeVariableOrHole() && !element->is<PlaceholderType>()) {
       return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
-    
+
     return BuiltinFixedArrayType::get(size, element);
   }
   

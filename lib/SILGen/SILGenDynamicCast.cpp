@@ -686,37 +686,47 @@ void Lowering::emitNoncopyableTypeTest(SILGenFunction &SGF, SILLocation loc,
       falseBB, trueCount, falseCount);
 }
 
-/// Borrow the storage \p operand names so a type test can read it without
-/// copying or consuming it.
-///
-/// Anything that names storage -- a local, a global, a stored property, a
-/// parameter, mutable or not -- is borrowed in place. Only an operand that
-/// produces a temporary of its own falls through to ordinary rvalue emission,
-/// and that temporary is ours to read anyway.
+/// Return \p value in memory, borrowing it into a temporary if it is not an
+/// address already, so the casting runtime has something to read.
 ///
 /// The caller must have established a FormalEvaluationScope covering the use of
-/// the returned value.
-ManagedValue Lowering::emitTypeTestOperand(SILGenFunction &SGF,
-                                           Expr *operand) {
-  if (Expr *storage = SGF.findStorageReferenceExprForMoveOnly(
-          operand, StorageReferenceOperationKind::Borrow)) {
-    LValue lv = SGF.emitLValue(storage, SGFAccessKind::BorrowedAddressRead);
-    return SGF.emitBorrowedLValue(operand, std::move(lv));
-  }
-
+/// the returned value, which has to outlive the test's terminator.
+static ManagedValue emitTypeTestSubjectInMemory(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                ManagedValue value) {
   // If the operand is an address, we can use it directly
-  ManagedValue value =
-      SGF.emitRValueAsSingleValue(operand, SGFContext::AllowImmediatePlusZero);
   if (value.getType().isAddress())
     return value;
 
   // If it's not an address, borrow the value into a temporary
   // allocation for the casting runtime.
-  SILValue temp = SGF.emitTemporaryAllocation(operand, value.getType());
+  SILValue temp = SGF.emitTemporaryAllocation(loc, value.getType());
   ManagedValue borrowed =
-      SGF.emitFormalEvaluationManagedBeginBorrow(operand, value.getValue());
-  return SGF.emitFormalEvaluationManagedStoreBorrow(operand,
-                                                    borrowed.getValue(), temp);
+      SGF.emitFormalEvaluationManagedBeginBorrow(loc, value.getValue());
+  return SGF.emitFormalEvaluationManagedStoreBorrow(loc, borrowed.getValue(),
+                                                    temp);
+}
+
+/// Borrow the storage \p operand names so a type test can read it without
+/// copying or consuming it.
+ManagedValue Lowering::emitTypeTestOperand(SILGenFunction &SGF,
+                                           Expr *operand) {
+  ManagedValue value;
+  if (Expr *storage = SGF.findStorageReferenceExprForMoveOnly(
+          operand, StorageReferenceOperationKind::Borrow)) {
+    // Named storage (local, global, stored propery, parameter)
+    // should be borrowed in place
+    LValue lv = SGF.emitLValue(storage, SGFAccessKind::BorrowedAddressRead);
+    value = SGF.emitBorrowedLValue(operand, std::move(lv));
+  } else {
+    // Temporary value is owned by us
+    value =
+        SGF.emitRValueAsSingleValue(operand, SGFContext::AllowImmediatePlusZero);
+  }
+
+  // Either branch above can yield a value that would need to be in
+  // memory for the cast functions to use.
+  return emitTypeTestSubjectInMemory(SGF, operand, value);
 }
 
 SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,

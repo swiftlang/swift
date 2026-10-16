@@ -226,12 +226,17 @@ public struct HeapObject {
 #endif
 
 #if _pointerBitWidth(_64)
-  static let bridgeObjectToPlainObjectMask = UInt(0x8fff_ffff_ffff_fff8)
+  static let bridgeObjectToPlainObjectMask = UInt(0x0fff_ffff_ffff_fff8)
 #elseif _pointerBitWidth(_32)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff_ffff)
 #elseif _pointerBitWidth(_16)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff)
 #endif
+
+  // High bits to OR into a bridgeObject pointer after masking out the flags to
+  // reconstruct a full valid pointer. This can be used to accommodate targets
+  // that use the high part of the address space. Most targets use zero.
+  static let bridgeObjectPointerHighBits = UInt(0x0000_0000_0000_0000)
 }
 
 
@@ -253,10 +258,10 @@ public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 
 @_extern(c, "_swift_typedAllocate")
-public func _swift_typedAllocate(_ size: Int, _ alignMask: Int,  _ flags: CUnsignedLongLong, _ typeId: UInt64) -> UnsafeMutableRawPointer?
+public func _swift_typedAllocate(_ size: Int, _ alignment: Int, _ flags: CUnsignedLongLong, _ typeId: UInt64) -> UnsafeMutableRawPointer?
 
 @_extern(c, "_swift_typedDeallocate")
-public func _swift_typedDeallocate(_ buf: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ flags: CUnsignedLongLong, _ typeId: UInt64)
+public func _swift_typedDeallocate(_ buf: UnsafeMutableRawPointer, _ size: Int, _ alignment: Int, _ flags: CUnsignedLongLong, _ typeId: UInt64)
 
 @_extern(c, "_swift_reportError")
 @usableFromInline
@@ -369,7 +374,7 @@ public func swift_coroFrameAlloc(_ size: Int, _ type: UInt64) -> UnsafeMutableRa
 @c
 public func swift_coroFrameAllocTyped(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  return unsafe _swift_typedAllocate(size, _swift_MinAllocationAlignment - 1, 0, type)
+  return unsafe _swift_typedAllocate(size, _swift_MinAllocationAlignment, 0, type)
 #else
   return unsafe alignedAlloc(size: size, alignment: _swift_MinAllocationAlignment)
 #endif
@@ -378,7 +383,7 @@ public func swift_coroFrameAllocTyped(_ size: Int, _ type: UInt64) -> UnsafeMuta
 @c
 public func swift_coroFrameDeallocTyped(_ ptr: UnsafeMutableRawPointer, _ type: UInt64) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_typedDeallocate(ptr, -1, _swift_MinAllocationAlignment - 1, 0, type)
+  unsafe _swift_typedDeallocate(ptr, -1, _swift_MinAllocationAlignment, 0, type)
 #else
   unsafe free(ptr)
 #endif
@@ -398,7 +403,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_deallocate(ptr, size, alignMask, 0)
+  unsafe _swift_deallocate(ptr, alignMask &+ 1, size, 0)
 #else
   unsafe free(ptr)
 #endif
@@ -407,7 +412,7 @@ public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ ali
 @c
 public func swift_allocRawTyped(_ size: Int, _ alignMask: Int, _ typeId: UInt64) -> UnsafeMutableRawPointer? {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  return unsafe _swift_typedAllocate(size, alignMask, 0, typeId)
+  return unsafe _swift_typedAllocate(size, alignMask &+ 1, 0, typeId)
 #else
   return unsafe swift_slowAlloc(size, alignMask)
 #endif
@@ -416,7 +421,7 @@ public func swift_allocRawTyped(_ size: Int, _ alignMask: Int, _ typeId: UInt64)
 @c
 public func swift_deallocRawTyped(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ typeId: UInt64) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_typedDeallocate(ptr, size, alignMask, 0, typeId)
+  unsafe _swift_typedDeallocate(ptr, size, alignMask &+ 1, 0, typeId)
 #else
   unsafe swift_slowDealloc(ptr, size, alignMask)
 #endif
@@ -438,7 +443,7 @@ func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSi
 @c
 public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int, typeId: UInt64) -> Builtin.RawPointer {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  let _p: UnsafeMutableRawPointer? = unsafe _swift_typedAllocate(requiredSize, requiredAlignmentMask, 0, typeId)
+  let _p: UnsafeMutableRawPointer? = unsafe _swift_typedAllocate(requiredSize, requiredAlignmentMask &+ 1, 0, typeId)
   let p = unsafe _p!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
@@ -478,7 +483,7 @@ func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize
 @c
 public func swift_deallocObjectTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask, 0, typeId)
+  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask &+ 1, 0, typeId)
 #else
   unsafe swift_deallocObject(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 #endif
@@ -520,7 +525,7 @@ public func swift_deallocClassInstanceTyped(object: Builtin.RawPointer, allocate
   // there are no outstanding weak refs, this deallocates the object.
   unsafe weakRelease(object: p, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask, typeId: typeId)
 #elseif SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(p), allocatedSize, allocatedAlignMask, 0, typeId)
+  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(p), allocatedSize, allocatedAlignMask &+ 1, 0, typeId)
 #else
   unsafe swift_deallocClassInstance(object: p, allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 #endif
@@ -636,7 +641,7 @@ public func swift_allocBoxTyped(_ metadata: Builtin.RawPointer, _ typeId: UInt64
   let layout = unsafe _boxAllocationLayout(metadata: UnsafeMutableRawPointer(metadata))
 
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  let p = unsafe _swift_typedAllocate(layout.size, layout.alignMask, 0, typeId)!
+  let p = unsafe _swift_typedAllocate(layout.size, layout.alignMask &+ 1, 0, typeId)!
 #else
   let p = unsafe swift_slowAlloc(layout.size, layout.alignMask)!
 #endif
@@ -752,10 +757,12 @@ private var _errorBoxDestroyImplRef: (Builtin.RawPointer) -> Void = { _ in }
 private func _ensureErrorMetadataInitialized() {
   guard !_errorMetadataInitialized else { return }
   _errorBoxDestroyImplRef = _errorBoxDestroyImpl
-  let destroyPtr = unsafe _swift_embedded_error_destroy_ptr()
-  unsafe withUnsafeMutablePointer(to: &_errorMetadataStorage.destroy) { p in
-    unsafe (p.pointee = UnsafeRawPointer(destroyPtr))
-  }
+  // The signature is address-diversified, so pass the slot's real address.
+  let destroyLocation = unsafe UnsafeMutableRawPointer(
+    Builtin.addressof(&_errorMetadataStorage)
+  ).advanced(by: MemoryLayout<UnsafeRawPointer>.size)
+    .assumingMemoryBound(to: UnsafeMutableRawPointer?.self)
+  unsafe _swift_embedded_error_store_destroy(destroyLocation)
   _errorMetadataInitialized = true
 }
 
@@ -891,10 +898,6 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
   if objectBits == 0 { return false }
 
-  #if _pointerBitWidth(_64)
-  if (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
-  #endif
-
   return true
 }
 
@@ -1015,17 +1018,42 @@ func tryRetain(object: UnsafeMutablePointer<HeapObject>) -> Int {
 }
 #endif
 
+func isImmortalBridgeObject(_ object: Builtin.RawPointer) -> Bool {
+#if _pointerBitWidth(_64)
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  return (objectBits & HeapObject.immortalObjectPointerBit) != 0
+#else
+  return false
+#endif
+}
+
+func untaggedBridgeObject(_ object: Builtin.RawPointer) -> Builtin.RawPointer {
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  let withoutFlags = objectBits & HeapObject.bridgeObjectToPlainObjectMask
+  // Keep null as null rather than giving it the high bits.
+  if withoutFlags == 0 {
+    return Builtin.inttoptr_Word(0._builtinWordValue)
+  }
+  let withHighBits = withoutFlags | HeapObject.bridgeObjectPointerHighBits
+  return Builtin.inttoptr_Word(withHighBits._builtinWordValue)
+}
+
 @c
 @discardableResult
 public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
-  return swift_bridgeObjectRetain_n(object: object, n: 1)
+  return bridgeObjectRetain_n(object: object, n: 1)
 }
 
 @c
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
-  let objectBits = UInt(Builtin.ptrtoint_Word(object))
-  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  _ = swift_retain_n(object: untaggedObject, n: n)
+  return bridgeObjectRetain_n(object: object, n: n)
+}
+
+@inline(__always)
+func bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  if !isImmortalBridgeObject(object) {
+    _ = swift_retain_n(object: untaggedBridgeObject(object), n: n)
+  }
   return object
 }
 
@@ -1145,9 +1173,9 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBo
         let layout = unsafe _boxAllocationLayout(metadata: metadata)
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
         if typeId != 0 {
-          unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(object), layout.size, layout.alignMask, 0, typeId)
+          unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(object), layout.size, layout.alignMask &+ 1, 0, typeId)
         } else {
-          unsafe _swift_deallocate(UnsafeMutableRawPointer(object), layout.size, layout.alignMask, 0)
+          unsafe _swift_deallocate(UnsafeMutableRawPointer(object), layout.alignMask &+ 1, layout.size, 0)
         }
 #else
         unsafe swift_slowDealloc(UnsafeMutableRawPointer(object), layout.size, layout.alignMask)
@@ -1180,14 +1208,19 @@ public func swift_releaseBoxTyped(_ box: UnsafeMutableRawPointer, _ typeId: UInt
 
 @c
 public func swift_bridgeObjectRelease(object: Builtin.RawPointer) {
-  swift_bridgeObjectRelease_n(object: object, n: 1)
+  bridgeObjectRelease_n(object: object, n: 1)
 }
 
 @c
 public func swift_bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
-  let objectBits = UInt(Builtin.ptrtoint_Word(object))
-  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  swift_release_n(object: untaggedObject, n: n)
+  bridgeObjectRelease_n(object: object, n: n)
+}
+
+@inline(__always)
+func bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
+  if !isImmortalBridgeObject(object) {
+    swift_release_n(object: untaggedBridgeObject(object), n: n)
+  }
 }
 
 @c

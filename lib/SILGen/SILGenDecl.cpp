@@ -1510,6 +1510,17 @@ bool IsPatternInitialization::tryInitializeFromStorageReference(
   if (!isNoncopyableExistentialSubject())
     return false;
 
+  if (!subInitialization.get()) {
+    // `if case is T = box` or `if case _ as T = box` bind nothing
+    // so they just need to borrow the source within a borrow scope
+    // that is closed in the continuation block.
+    FormalEvaluationScope borrowScope(SGF);
+    ManagedValue borrowed = emitTypeTestOperand(SGF, initializer);
+    if (!borrowed || !borrowed.getType().isAddress())
+      return false;
+    return tryEmitNoncopyablePatternMatch(SGF, loc, borrowed);
+  }
+
   // Is the subject stored where we can use it directly?  If not, return
   // false and caller will copy it.
   Expr *storageExpr = findConsumableStorageReference(initializer);
@@ -1538,6 +1549,23 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
   CanType sourceType = pattern->getType()->getCanonicalType();
   CanType targetType = pattern->getCastType()->getCanonicalType();
 
+  auto &initInfo = getInitInfo();
+
+  if (!subInitialization.get()) {
+    // `if case is T = box` or `if case _ as T = box`
+    // can use a simple type test.
+    SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
+    SILBasicBlock *failBB =
+        SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
+
+    emitNoncopyableTypeTest(SGF, loc, value, sourceType, targetType, contBB,
+                            failBB, initInfo.numTrueTaken,
+                            initInfo.numFalseTaken);
+
+    SGF.B.setInsertionPoint(contBB);
+    return true;
+  }
+
   auto &targetTL = SGF.getTypeLowering(targetType);
 
   // Destination buffer for the extracted payload. Note the target may be
@@ -1548,7 +1576,6 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *failBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
 
-  auto &initInfo = getInitInfo();
   SGF.B.createCheckedCastAddrBranch(
       loc, CheckedCastInstOptions(), CastConsumptionKind::TakeOnSuccess,
       value.forward(SGF), sourceType, destAddr, targetType, contBB, failBB,
@@ -1663,13 +1690,28 @@ public:
       bindValue = bindValue.copy(SGF, loc);
     }
 
-    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        pattern, bindValue,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
-        MarkUnresolvedNonCopyableValueInst::IsStrict);
+    // mark_unresolved_non_copyable_value drives the move-only checker, which
+    // has nothing to check for a copyable value. It also has to own the value
+    // it checks; a guaranteed value cannot be consumed to begin with.
+    if (bindValue.getType().isMoveOnly() &&
+        (bindValue.getType().isAddress() || bindValue.isPlusOne(SGF))) {
+      bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          pattern, bindValue,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+          MarkUnresolvedNonCopyableValueInst::IsStrict);
+    }
 
     SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                               SILAccessEnforcement::Unknown);
+
+    // Rewind to the bound value's definition so the buffer's insertion-point
+    // marker dominates it, while its cleanup is still pushed after the value's.
+    {
+      SavedInsertionPointRAII savedIP(SGF.B);
+      if (auto *def = bindValue.getValue()->getDefiningInstruction())
+        SGF.B.setInsertionPoint(def);
+      SGF.enterLocalVariableAddressableBufferScope(var);
+    }
 
     // Emit debug info for the borrowed noncopyable binding.
     if (EmitDebugValueOnInit) {
@@ -1686,6 +1728,19 @@ public:
 } // end anonymous namespace
 
 namespace {
+
+/// Formally, `case is T` has the same meaning as `case _ as T`;
+/// they both verify the type without binding any payload in the result.
+///
+/// Duplicated from SILGenPattern.cpp, which asks the same thing of `switch`
+/// cases; the two should be unified.
+static bool patternNeedsNoPayload(const Pattern *pattern) {
+  // True for `case is T`
+  if (!pattern)
+    return true;
+  // True for `case _ as T` (and variations thereof)
+  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
+}
 
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
@@ -1775,7 +1830,11 @@ struct InitializationForPattern
   InitializationPtr visitIsPattern(IsPattern *P) {
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
-      subInit = visit(subP);
+      if (!patternNeedsNoPayload(subP)) {
+	// Simplify `case _ as T` to `case is T` by handling it with no
+	// sub-initialization.
+        subInit = visit(subP);
+      }
     return InitializationPtr(
         new IsPatternInitialization(P, std::move(subInit), initInfo));
   }

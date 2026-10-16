@@ -23,6 +23,12 @@ enum E {
   case B(C)
 }
 
+class TestArrayStorage {}
+
+sil_global @static_array : $TestArrayStorage = {
+  %initval = object $TestArrayStorage ()
+}
+
 sil @cl : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @upcast :
@@ -89,6 +95,19 @@ bb0:
   %r = tuple ()
   return %r
 }
+
+// CHECK-LABEL: sil [ossa] @test_none_ownership :
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'test_none_ownership'
+sil [ossa] @test_none_ownership : $@convention(thin) () -> () {
+bb0:
+  %0 = global_value @static_array : $TestArrayStorage
+  end_lifetime %0
+  %r = tuple ()
+  return %r
+}
+
 
 // CHECK-LABEL: sil [ossa] @bridge_object_to_ref :
 // CHECK:       bb0(%0 : @owned $Builtin.BridgeObject):

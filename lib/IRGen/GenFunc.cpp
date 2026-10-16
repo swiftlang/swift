@@ -227,6 +227,12 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -263,6 +269,12 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -292,6 +304,12 @@ namespace {
                                       IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -494,6 +512,12 @@ namespace {
                      align),
         FuncSignatureInfo(ty) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -531,6 +555,12 @@ namespace {
                          IsFixedSize, IsABIAccessible),
         CaptureOffset(captureOffset)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
@@ -860,8 +890,30 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         out);
 }
 
+/// Whether the context of the closure that \c outType describes captures an
+/// indirect argument with the given convention and type by address, instead of
+/// owning the value.
+static bool capturesIndirectArgumentByAddress(CanSILFunctionType outType,
+                                              ParameterConvention convention,
+                                              SILType argType) {
+  // The context of an escaping closure owns its indirect arguments.
+  if (!outType->isNoEscape())
+    return false;
+
+  // A closure that is called at most once is the exception for a noncopyable
+  // argument that it consumes. Like the other consumed captures of such a
+  // closure, its context owns the value.
+  if (convention == ParameterConvention::Indirect_In &&
+      outType->hasCalledAtMostOnceSemantics() && argType.isMoveOnly())
+    return false;
+
+  // A stack-promoted closure doesn't own most of its indirect arguments, so it
+  // captures their addresses.
+  return true;
+}
+
 CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
-                                       bool isNoEscape) {
+                                       bool capturesIndirectByAddress) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.
   case ParameterConvention::Direct_Owned:
@@ -876,12 +928,12 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
     return type;
 
   // Capture indirect parameters if the closure is not [onstack]. [onstack]
-  // closures don't take ownership of their arguments so we just capture the
-  // address.
+  // closures don't take ownership of most of their arguments so we just capture
+  // the address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
-    if (isNoEscape)
+    if (capturesIndirectByAddress)
       return CanInOutType::get(type);
     else
       return type;
@@ -1811,6 +1863,23 @@ getPartialApplicationForwarderEmission(
   }
 }
 
+/// Returns the fields of a stack-promoted closure context that the context
+/// doesn't own. A borrowed `~Copyable` capture is a bitwise copy of a value
+/// that the enclosing function still owns, so nothing in the context may
+/// destroy it.
+llvm::BitVector
+getUnownedContextFields(HeapLayout const &layout,
+                        ArrayRef<ParameterConvention> conventions) {
+  llvm::BitVector unownedFields(conventions.size());
+  for (unsigned i : indices(conventions)) {
+    auto fieldTy = layout.getElementTypes()[i];
+    if (fieldTy && conventions[i] == ParameterConvention::Direct_Guaranteed &&
+        fieldTy.isMoveOnly())
+      unownedFields.set(i);
+  }
+  return unownedFields;
+}
+
 /// This is a parameter convention-aware version of \c createDtorFn.
 ///
 /// It's used by the partial application forwarder emitter to avoid
@@ -1820,6 +1889,7 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            HeapLayout const *layout, llvm::Value *rawContextPtr,
                            Address contextPtr,
                            const llvm::BitVector &consumedFields,
+                           const llvm::BitVector &unownedFields,
                            bool contextIsOnStack) {
   if (!layout) {
     forwarder.emitNativeStrongRelease(rawContextPtr,
@@ -1842,6 +1912,10 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
   // context object and let us deallocate it as-if it was uninitialized.
   llvm::BitVector fieldsToDestroy(consumedFields);
   fieldsToDestroy.flip();
+
+  // A field that the context doesn't own is destroyed by its real owner.
+  if (!unownedFields.empty())
+    fieldsToDestroy.reset(unownedFields);
   for (unsigned elementIdx : fieldsToDestroy.set_bits()) {
     auto &field = layout->getElement(elementIdx);
     if (field.isTriviallyDestroyable())
@@ -2056,6 +2130,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   Explosion witnessMethodSelfValue;
   llvm::Value *lastCapturedFieldPtr = nullptr;
   llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
+  llvm::BitVector unownedFields;
+  if (layout && outType->isNoEscape())
+    unownedFields = getUnownedContextFields(*layout, conventions);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2167,14 +2244,19 @@ static llvm::Value *emitPartialApplicationForwarder(
 
         auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
                               &subIGF](const TypeInfo &fieldTI, SILType fieldTy,
-                                       Address fieldAddr) {
-          // The +1 argument is passed indirectly, so we need to copy into a
-          // temporary.
+                                       Address fieldAddr, bool isTake) {
+          // The +1 argument is passed indirectly, so we need to copy or move
+          // into a temporary.
           needsAllocas = true;
           auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
           auto addressPointer = stackAddr.getAddress().getAddress();
-          fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
-                                     fieldTy, false);
+          if (isTake)
+            fieldTI.initializeWithTake(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false,
+                                       /*zeroizeIfSensitive=*/false);
+          else
+            fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false);
           param.add(addressPointer);
 
           // Remember to deallocate later.
@@ -2182,7 +2264,8 @@ static llvm::Value *emitPartialApplicationForwarder(
               AddressToDeallocate{fieldTy, fieldTI, stackAddr});
         };
 
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, fieldConvention,
+                                              fieldTy)) {
           // If the closure is [onstack] it only captured the address of the
           // value. Load that address from the context.
           Explosion addressExplosion;
@@ -2194,9 +2277,16 @@ static llvm::Value *emitPartialApplicationForwarder(
               subIGF.getTypeInfoForLowered(newFieldTy.getASTType());
           fieldAddr =
               newFieldTI.getAddressForPointer(addressExplosion.claimNext());
-          initStackCopy(newFieldTI, newFieldTy, fieldAddr);
+          initStackCopy(newFieldTI, newFieldTy, fieldAddr, /*isTake=*/false);
+        } else if (outType->hasCalledAtMostOnceSemantics() &&
+                   fieldConvention == ParameterConvention::Indirect_In &&
+                   fieldTy.isMoveOnly()) {
+          // The closure is called at most once, so move the value out of the
+          // context, which then must not destroy it.
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/true);
+          consumedFields.set(fieldIndex);
         } else {
-          initStackCopy(fieldTI, fieldTy, fieldAddr);
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/false);
         }
         break;
       }
@@ -2295,7 +2385,7 @@ static llvm::Value *emitPartialApplicationForwarder(
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
       destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                            outType->isNoEscape());
+                            unownedFields, outType->isNoEscape());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2418,7 +2508,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
     destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                          outType->isNoEscape());
+                          unownedFields, outType->isNoEscape());
   }
 
   emission->createReturn(call);
@@ -2461,8 +2551,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     if (!isa<FixedTypeInfo>(ti)) {
@@ -2475,8 +2567,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
 
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
@@ -2726,14 +2820,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
         // and so they cannot be destroyed.
-        llvm::BitVector unownedFields(argConventions.size());
-        for (unsigned i : indices(argConventions)) {
-          auto fieldTy = layout.getElementTypes()[i];
-          if (fieldTy &&
-              argConventions[i] == ParameterConvention::Direct_Guaranteed &&
-              fieldTy.isMoveOnly())
-            unownedFields.set(i);
-        }
+        llvm::BitVector unownedFields =
+            getUnownedContextFields(layout, argConventions);
 
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
@@ -2795,7 +2883,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, argConventions[i],
+                                              argValTypes[i])) {
           cast<LoadableTypeInfo>(fieldLayout.getType())
               .initialize(IGF, args, fieldAddr, isOutlined);
         } else {

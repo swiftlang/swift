@@ -972,6 +972,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OptionalPayload>() ||
         last.is<LocatorPathElt::OpenedGeneric>() ||
         last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||
@@ -1858,12 +1859,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
-  assert(!baseType->isPlaceholder() &&
-         "Base type must not be a type placeholder");
+  assert(!baseType->is<HoleType>() && "Base type must not be a type hole");
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
-  assert(!unwrappedType->isPlaceholder() &&
-         "Unwrapped type must not be a type placeholder");
+  assert(!unwrappedType->is<HoleType>() &&
+         "Unwrapped type must not be a type hole");
 
   if (!baseType->getOptionalObjectType())
     return false;
@@ -4398,7 +4398,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
     Type Ty, TypoCorrectionResults &corrections, DeclNameRef memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
-  if (!Ty->getEnumOrBoundGenericEnum())
+  if (!Ty->getEnumDecl())
     return DeclName();
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
@@ -4415,10 +4415,10 @@ ValueDecl *MissingMemberFailure::
 findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
   IterableDeclContext *idc = nullptr;
 
-  if (auto ED = instanceTy->getEnumOrBoundGenericEnum()) {
+  if (auto ED = instanceTy->getEnumDecl()) {
     idc = ED;
   }
-  else if (auto SD = instanceTy->getStructOrBoundGenericStruct()) {
+  else if (auto SD = instanceTy->getStructDecl()) {
     // Did ClangImporter add OptionSet to this struct?
     for (auto protoAttr :
             SD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -4626,7 +4626,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     return true;
   } else {
     // Check for a few common cases that can cause missing members.
-    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    auto *ED = baseType->getEnumDecl();
     if (ED && getName().isSimpleName("rawValue")) {
       auto loc = ED->getNameLoc();
       if (loc.isValid()) {

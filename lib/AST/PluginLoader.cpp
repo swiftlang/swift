@@ -120,7 +120,7 @@ PluginLoader::getPluginMap() {
   auto fs = getPluginLoadingFS(Ctx);
   std::error_code ec;
 
-  auto validateLibrary = [&](StringRef path) -> llvm::Expected<std::string> {
+  auto validatePlugin = [&](StringRef path) -> llvm::Expected<std::string> {
     auto remappedPath = remapPath(path);
     if (!Ctx.SearchPathOpts.ResolvedPluginVerification || path.empty())
       return remappedPath;
@@ -205,15 +205,22 @@ PluginLoader::getPluginMap() {
       // Respect resolved plugin config above other search path, and it can
       // overwrite plugins found by other options or previous resolved
       // configuration.
+      // Verify the library, or the executable if it is an executable plugin.
+      bool isExecutablePlugin = val.LibraryPath.empty();
+      StringRef pluginPath =
+          isExecutablePlugin ? val.ExecutablePath : val.LibraryPath;
       for (auto &moduleName : val.ModuleNames) {
-        auto libPath = validateLibrary(val.LibraryPath);
-        if (!libPath) {
+        auto verifiedPath = validatePlugin(pluginPath);
+        if (!verifiedPath) {
           Ctx.Diags.diagnose(SourceLoc(), diag::resolved_macro_changed,
-                             remapPath(val.LibraryPath),
-                             toString(libPath.takeError()));
+                             remapPath(pluginPath),
+                             toString(verifiedPath.takeError()));
           continue;
         }
-        try_emplace(moduleName, *libPath, remapPath(val.ExecutablePath),
+        std::string libPath = isExecutablePlugin ? "" : *verifiedPath;
+        std::string execPath =
+            isExecutablePlugin ? *verifiedPath : remapPath(val.ExecutablePath);
+        try_emplace(moduleName, libPath, execPath,
                     /*overwrite*/ true, val.LibraryPath, val.ExecutablePath);
       }
       continue;

@@ -272,8 +272,11 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     if (!shouldSetLowBit)
       return addr;
 
+    // Inbounds, so that relative references to the tagged string are still
+    // recognized as link-time constants (see getMangledAssociatedConformance).
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
+    return llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, addr,
+                                                        bitConstant);
   };
 
   // Check whether we already have an entry with this name.
@@ -525,7 +528,7 @@ llvm::Constant *
 irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                       CanType type,
                                       bool allowDynamicUninitialized) {
-  auto theDecl = type->getClassOrBoundGenericClass();
+  auto theDecl = type->getClassDecl();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
@@ -1013,7 +1016,7 @@ bool irgen::shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type) {
   //
   // TODO: On platforms without ObjC interop, we can do direct access to
   // Swift metadata without a runtime call at all.
-  if (auto classDecl = type.getClassOrBoundGenericClass()) {
+  if (auto classDecl = type.getClassDecl()) {
     if (!hasKnownSwiftMetadata(IGM, classDecl))
       return true;
     if (classDecl->isGenericContext() &&
@@ -1451,14 +1454,36 @@ getFunctionTypeFlags(CanFunctionType type) {
       // already in the normal function type flags. The runtime will
       // introduce it as necessary.
       break;
+
+    case InvertibleProtocolKind::Deinitable: {
+      // An exactly-once function type isn't Deinitable.
+      auto proto =
+          type->getASTContext().getProtocol(KnownProtocolKind::Deinitable);
+      if (proto && lookupConformance(type, proto).isInvalid())
+        InvertedProtocols.insert(invertibleKind);
+      break;
+    }
     }
   }
 
   auto isolation = type->getIsolation();
 
+  auto executionSemantics = FunctionMetadataExecutionSemantics::None;
+  if (auto semantics = type->getExecutionSemantics()) {
+    switch (*semantics) {
+    case ExecutionSemantics::AtMostOnce:
+      executionSemantics = FunctionMetadataExecutionSemantics::AtMostOnce;
+      break;
+    case ExecutionSemantics::Once:
+      executionSemantics = FunctionMetadataExecutionSemantics::Once;
+      break;
+    }
+  }
+
   auto extFlags = ExtendedFunctionTypeFlags()
                       .withTypedThrows(!type->getThrownError().isNull())
                       .withSendingResult(type->hasSendingResult())
+                      .withExecutionSemantics(executionSemantics)
                       .withInvertedProtocols(InvertedProtocols);
 
   if (isolation.isErased())
@@ -2101,7 +2126,7 @@ namespace {
       if (auto *PCT =
               type->getConstraintType()->getAs<ProtocolCompositionType>()) {
         auto constraintTy = PCT->withoutMarkerProtocols();
-        if (constraintTy->getClassOrBoundGenericClass()) {
+        if (constraintTy->getClassDecl()) {
           auto response = IGF.emitTypeMetadataRef(
               constraintTy->getCanonicalType(), request);
           return setLocal(type, response);
@@ -2755,7 +2780,7 @@ emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
     return;
   }
   initializedTypes.insert(theType);
-  auto *classDecl = theType->getClassOrBoundGenericClass();
+  auto *classDecl = theType->getClassDecl();
   assert(classDecl);
   if (classDecl->isGenericContext()) {
     llvm::Function *accessor =
@@ -2799,7 +2824,7 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
     auto parameter = requirement.getTypeParameter();
     auto noncanonicalArgument = parameter.subst(substitutions);
     auto argument = noncanonicalArgument->getCanonicalType();
-    if (argument->getClassOrBoundGenericClass()) {
+    if (argument->getClassDecl()) {
       emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
           IGF, argument, initializedTypes);
     }
@@ -3120,7 +3145,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
         return;
       }
       // Need to materialize the base class, if any.
-      if (comp->getMembers().front()->getClassOrBoundGenericClass()) {
+      if (comp->getMembers().front()->getClassDecl()) {
         visit(CanType(comp->getMembers().front()));
         numMembers -= 1;
       }

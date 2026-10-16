@@ -468,7 +468,7 @@ bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
 }
 
 static RuntimeEffect metadataEffect(SILType ty) {
-  ClassDecl *cl = ty.getClassOrBoundGenericClass();
+  ClassDecl *cl = ty.getClassDecl();
   if (cl && !cl->hasKnownSwiftImplementation())
     return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
   return RuntimeEffect::MetaData;
@@ -764,11 +764,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = SILType();
     return RuntimeEffect::MetaData;
 
-  case SILInstructionKind::OpenExistentialAddrInst:
-    if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
-        OpenedExistentialAccess::Mutable)
+  case SILInstructionKind::OpenExistentialAddrInst: {
+    auto *open = cast<OpenExistentialAddrInst>(inst);
+    if (open->getAccessKind() == OpenedExistentialAccess::Mutable &&
+        !open->getOperand()->getType().canUseExistentialRepresentation(
+            ExistentialRepresentation::COM))
       return RuntimeEffect::Allocating | RuntimeEffect::Existential;
     return RuntimeEffect::Existential;
+  }
 
   case SILInstructionKind::OpenExistentialRefInst: {
     impactType = inst->getOperand(0)->getType();
@@ -904,7 +907,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
         impactType = SILType::getPrimitiveObjectType(CanType(instTy));
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
-      auto *cl = instTy->getClassOrBoundGenericClass();
+      auto *cl = instTy->getClassDecl();
       bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
                               cl->isForeign());
       if (isForeign || instTy->isAnyObject())
@@ -933,7 +936,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
           return RuntimeEffect::MetaData | RuntimeEffect::Existential;
         }
       }
-      auto *cl = opType.getClassOrBoundGenericClass();
+      auto *cl = opType.getClassDecl();
       bool usesObjCModel =
           cl && cl->getObjectModel() == ReferenceCounting::ObjC;
       if (usesObjCModel)
@@ -1498,7 +1501,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   // A move-only-with-deinit type cannot be SROA.
   //
   // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
-  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
+  if (auto *nominalTy = ty.getNominalDecl()) {
     if (nominalTy->hasValueTypeDestructor())
       return false;
   }

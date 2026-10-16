@@ -20,7 +20,6 @@ public struct Double {
 
   @_transparent
   public init() {
-    let zero: Int64 = 0
     self._value = Builtin.zeroInitializer()
   }
 

@@ -7,7 +7,7 @@
 // RUN: %target-swift-emit-ir \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -I %S/Inputs \
 // RUN:   %s | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi
 
@@ -47,7 +47,7 @@ public func reseatNode(_ p: inout Node, _ to: Node) { p = to }
 // CHECK: [[NODE:%[0-9]+]] = load ptr, ptr %0
 // CHECK: getelementptr inbounds{{.*}} %TSo4NodeV, ptr [[NODE]]
 @unsafe @cxx @implementation
-public func readNodePtr(_ p: Node) -> Int32 { return p.value }
+public func readNodePtr(_ p: borrowing Node) -> Int32 { return p.value }
 
 // Node *_Nonnull returnsRetainedNode(Node *_Nonnull n)
 //     __attribute__((swift_attr("returns_retained")));

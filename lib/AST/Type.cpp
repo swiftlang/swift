@@ -18,6 +18,7 @@
 
 #include "clang/AST/Type.h"
 #include "ForeignRepresentationInfo.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Concurrency.h"
@@ -61,7 +62,7 @@ using namespace swift;
 #include "swift/AST/TypeNodes.def"
 
 void TypeLoc::setType(Type Ty) {
-  assert(!Ty || !Ty->hasTypeVariable() || !Ty->hasPlaceholder());
+  assert(!Ty || !Ty->hasTypeVariableOrHole());
   this->Ty = Ty;
 }
 
@@ -171,10 +172,6 @@ bool TypeBase::isSendableExistential() {
   return constraint->getKnownProtocol() == KnownProtocolKind::Sendable;
 }
 
-bool TypeBase::isPlaceholder() {
-  return is<PlaceholderType>();
-}
-
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
@@ -262,12 +259,7 @@ Type TypeBase::findAlwaysUnsafeType() const {
 static std::optional<ReferenceCounting>
 getHiddenTypeReferenceCounting(CanHiddenType type) {
   auto *layoutInfoDecl = type->getLayoutInfoDecl();
-  // TODO: Remove this legacy fallback once every HiddenType carries an
-  // abstract layout.
-  if (!layoutInfoDecl)
-    return std::nullopt;
-
-  assert(layoutInfoDecl->Layout &&
+  assert(layoutInfoDecl && layoutInfoDecl->Layout &&
          "HiddenTypeLayoutInfoDecl should have abstract layout");
   return layoutInfoDecl->Layout->referenceCountingSystem;
 }
@@ -352,6 +344,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
@@ -437,7 +430,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
 
   auto members = type.getMembers();
   if (!members.empty() &&
-      (members[0].getClassOrBoundGenericClass() ||
+      (members[0].getClassDecl() ||
        isa<UnboundGenericType>(members[0]))) {
     explicitSuperclass = members[0];
     members = members.slice(1);
@@ -1255,7 +1248,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
             existentialType->getConstraintType().getPointer())
       return Type(this);
 
-    if (newConstraintType->getClassOrBoundGenericClass())
+    if (newConstraintType->getClassDecl())
       return newConstraintType;
 
     return ExistentialType::get(newConstraintType);
@@ -1618,7 +1611,7 @@ Type TypeBase::withCovariantResultType() {
     resultType = objectType;
   }
 
-  ASSERT(resultType->getClassOrBoundGenericClass());
+  ASSERT(resultType->getClassDecl());
   resultType = DynamicSelfType::get(resultType, getASTContext());
 
   // Rebuild the inner function type.
@@ -1640,18 +1633,18 @@ Type TypeBase::withCovariantResultType() {
                            resultFnType, fnType->getExtInfo());
 }
 
-Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
-  if (!hasTypeVariableOrPlaceholder())
+Type TypeBase::replaceTypeVariablesAndHolesWithErrors() {
+  if (!hasTypeVariableOrHole())
     return Type(this);
 
   struct Transform : public TypeTransform<Transform> {
     Transform(ASTContext &ctx) : TypeTransform(ctx) {}
 
     std::optional<Type> transform(TypeBase *ty, TypePosition) {
-      if (!ty->hasTypeVariableOrPlaceholder())
+      if (!ty->hasTypeVariableOrHole())
         return ty;
 
-      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+      if (isa<TypeVariableType>(ty) || isa<HoleType>(ty))
         return ErrorType::get(ctx);
 
       return std::nullopt;
@@ -2053,6 +2046,7 @@ CanType TypeBase::computeCanonicalType() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BuiltinTuple:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
@@ -2338,7 +2332,7 @@ CanType TypeBase::getMinimalCanonicalType() const {
       }
 
       const auto MinimalTy = PCT->getMinimalCanonicalType();
-      if (MinimalTy->getClassOrBoundGenericClass()) {
+      if (MinimalTy->getClassDecl()) {
         return MinimalTy;
       }
 
@@ -2352,7 +2346,7 @@ CanType TypeBase::getMinimalCanonicalType() const {
       }
 
       const auto MinimalTy = PCT->getMinimalCanonicalType();
-      if (MinimalTy->getClassOrBoundGenericClass()) {
+      if (MinimalTy->getClassDecl()) {
         return MetatypeType::get(MinimalTy);
       }
 
@@ -2623,7 +2617,7 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
     return true;
 
   // Unresolved types that could potentially be callable.
-  if (isPlaceholder() || isTypeParameter() || isTypeVariableOrMember())
+  if (is<PlaceholderType>() || isTypeParameter() || isTypeVariableOrMember())
     return true;
 
   // Callable nominal types.
@@ -2634,7 +2628,7 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
 }
 
 bool TypeBase::mayHaveSuperclass() {
-  if (getClassOrBoundGenericClass())
+  if (getClassDecl())
     return true;
 
   if (auto archetype = getAs<ArchetypeType>())
@@ -2722,7 +2716,7 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
   // the potential subtype must be a class, superclass-bounded archetype,
   // or subclass existential involving an imported class and @objc
   // protocol.
-  if (!getClassOrBoundGenericClass() ||
+  if (!getClassDecl() ||
       !(ty->mayHaveSuperclass() ||
         (ty->isObjCExistentialType() &&
          ty->getSuperclass() &&
@@ -2731,7 +2725,7 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
 
   SmallPtrSet<ClassDecl *, 8> seen;
   do {
-    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+    if (auto *classDecl = ty->getClassDecl())
       if (!seen.insert(classDecl).second)
         return false;
     if (ty->isEqual(this))
@@ -3192,7 +3186,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty) {
 
   SmallPtrSet<ClassDecl *, 8> seen;
   do {
-    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+    if (auto *classDecl = ty->getClassDecl())
       if (!seen.insert(classDecl).second)
         return false;
     if (isBindableTo(ty))
@@ -3327,7 +3321,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Object;
 
   // @objc classes.
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;
   }
@@ -3771,8 +3765,8 @@ static bool isABICompatibleEvenAddingOptional(CanType t1, CanType t2) {
   // Class metatypes are ABI-compatible even under optionality change.
   if (auto metaTy1 = dyn_cast<MetatypeType>(t1)) {
     if (auto metaTy2 = dyn_cast<MetatypeType>(t2)) {
-      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
-          metaTy2.getInstanceType().getClassOrBoundGenericClass()) {
+      if (metaTy1.getInstanceType().getClassDecl() &&
+          metaTy2.getInstanceType().getClassDecl()) {
         return true;
       }
     }
@@ -4049,8 +4043,9 @@ bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects()[i].getName() == I)
+  auto elts = getElements();
+  for (auto i : indices(elts)) {
+    if (elts[i].getName() == I)
       return i;
   }
 
@@ -4223,7 +4218,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -4295,7 +4290,7 @@ PackArchetypeType::get(const ASTContext &Ctx,
                        Type InterfaceType, Type ShapeType,
                        SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                        Type Superclass, LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -4459,7 +4454,10 @@ Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
 ///
 /// Note: This includes the inverse of all current invertible protocols.
 Type ProtocolCompositionType::theUnconstrainedAnyType(const ASTContext &C) {
-  return ProtocolCompositionType::get(C, {}, InvertibleProtocolSet::allKnown(),
+  // Nothing can suppress Deinitable yet.
+  auto inverses = InvertibleProtocolSet::allKnown();
+  inverses.remove(InvertibleProtocolKind::Deinitable);
+  return ProtocolCompositionType::get(C, {}, inverses,
                                       /*HasExplicitAnyObject=*/false);
 }
 
@@ -4783,7 +4781,7 @@ DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   if (!hasTypeParameter()) return nullptr;
 
   DependentMemberType *unresolvedDepMemTy = nullptr;
-  Type(this).findIf([&](Type type) -> bool {
+  getCanonicalType().findIf([&](Type type) -> bool {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       if (depMemTy->getAssocType() == nullptr) {
         unresolvedDepMemTy = depMemTy;
@@ -4956,7 +4954,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   if (isForeignReferenceType())
     return lookThroughAllOptionalTypes()
-                   ->getClassOrBoundGenericClass()
+                   ->getClassDecl()
                    ->hasRefCountingAnnotations()
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
@@ -5070,6 +5068,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
@@ -5265,7 +5264,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 }
 
 bool TypeBase::isForeignReferenceType() {
-  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassDecl())
     return classDecl->isForeignReferenceType();
   return false;
 }
@@ -5359,7 +5358,7 @@ bool CanType::isErrorExistentialType() const {
 }
 
 bool CanType::isForeignReferenceType() {
-  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassDecl())
     return classDecl->isForeignReferenceType();
   return false;
 }
@@ -5709,7 +5708,7 @@ static std::optional<DiagnosticBehavior>
 getConcurrencyDiagnosticBehaviorLimitRec(
     Type type, DeclContext *declCtx,
     llvm::SmallPtrSetImpl<NominalTypeDecl *> &visited) {
-  if (auto *nomDecl = type->getNominalOrBoundGenericNominal()) {
+  if (auto *nomDecl = type->getNominalDecl()) {
     // If we have already seen this type, treat it as having no limit.
     if (!visited.insert(nomDecl).second)
       return std::nullopt;

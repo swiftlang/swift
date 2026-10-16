@@ -45,4 +45,4 @@ public struct S: P {
 }
 
 // CHECK-DAG: @"$e5Repro7WrapperVyAA1SVGAA1PAAWP" = {{.*}}global {{.*}}@"$e5Repro3IdxCAA1QAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
-// CHECK-DAG: @"$e5Repro3IdxCAA1QAAWP" = {{.*}}constant [2 x ptr] [ptr null, ptr @"$e5Repro3IdxCAA1QA2aDP1qSiyFTWAC_Tgq5{{(\.ptrauth(\.[0-9]+)?)?}}"]
+// CHECK-DAG: @"$e5Repro3IdxCAA1QAAWP" = {{.*}}constant [2 x ptr] [ptr null, ptr @"$e5Repro3IdxCAA1QA2aDP1qSiyFTWAC_TGq5{{(\.ptrauth(\.[0-9]+)?)?}}"]

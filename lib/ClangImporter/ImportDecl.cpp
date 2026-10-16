@@ -20,8 +20,6 @@
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
@@ -102,7 +100,6 @@
 
 #define DEBUG_TYPE "Clang module importer"
 
-STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 STATISTIC(
@@ -1318,6 +1315,9 @@ namespace {
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
       for (auto redecl : decl->redecls()) {
+        FrontendStatsTracer StatsTracer(
+            Impl.SwiftContext.Stats,
+            "add-namespace-redecl-to-bridging-header-lookup-table", redecl);
         // Because a namespaces's decl context is the bridging header, make sure
         // we add them to the bridging header lookup table.
         addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
@@ -4202,7 +4202,7 @@ namespace {
             func->setSelfAccessKind(SelfAccessKind::Mutating);
           } else {
             if (selfIsBorrowing ||
-                getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+                getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
                     decl))
               func->setSelfAccessKind(SelfAccessKind::Borrowing);
             else
@@ -4443,22 +4443,34 @@ namespace {
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
-              clang::QualType ty) {
+              clang::QualType ty, bool forSelf = false) {
             // When the captured parameter is passed by reference, the callee
             // may store the address of the referent into the capturing
             // parameter. Model this as a scoped ('borrow') dependency: the
             // capturing value must not outlive the borrow of this argument.
             //
-            // FIXME: for a non-reference escapable parameter we have no way to
+            // For a non-reference escapable parameter we have no way to
             // express that its address escapes (it is imported by value and we
-            // assume its address does not escape), so we still skip it. We
-            // should diagnose that case instead.
+            // assume its address does not escape), so import the API as
+            // @unsafe.
             bool isScoped = ty->isReferenceType();
-            if (!isScoped && isEscapable(ty))
+            const clang::NamedDecl *annotated =
+                forSelf ? nullptr : decl->getParamDecl(idx);
+            // Swift cannot express an escape to a global or unknown location.
+            if (llvm::any_of(attr->params(), [](int param) {
+                  return param == clang::LifetimeCaptureByAttr::Global ||
+                         param == clang::LifetimeCaptureByAttr::Unknown;
+                }))
+              skipLifetime(onAnnotated(
+                  diag::cxx_unsafe_skipped_lifetime_captured_globally,
+                  annotated));
+            if (!isScoped && isEscapable(ty)) {
+              skipLifetime(onAnnotated(
+                  diag::cxx_unsafe_skipped_lifetime_escapable_capture,
+                  annotated));
               return;
+            }
             for (auto param : attr->params()) {
-              // FIXME: Swift assumes no escaping to globals. We should diagnose
-              // this.
               if (param == clang::LifetimeCaptureByAttr::Global ||
                   param == clang::LifetimeCaptureByAttr::Unknown ||
                   param == clang::LifetimeCaptureByAttr::Invalid)
@@ -4483,20 +4495,22 @@ namespace {
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (param->hasAttr<clang::LifetimeBoundAttr>())
           processLifetimeBound(idx, param->getType());
-        if (const auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+        for (const auto *attr :
+             param->specific_attrs<clang::LifetimeCaptureByAttr>())
           processLifetimeCaptureBy(attr, idx, param->getType());
       }
-      if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
+      if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
         processLifetimeBound(
             result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
             /*forSelf=*/true);
-      if (auto attr =
-              getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
-                  decl))
+      for (const auto *attr :
+           getImplicitObjectParamAnnotations<clang::LifetimeCaptureByAttr>(
+               decl))
         processLifetimeCaptureBy(
             attr, result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
+            /*forSelf=*/true);
 
       for (auto &[idx, depIndices] : capturedArgDependences) {
         lifetimeDependencies.emplace_back(
@@ -5119,7 +5133,7 @@ namespace {
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
             if (decl->getType()->isEnumeralType()) {
-              if (type->getEnumOrBoundGenericEnum()) {
+              if (type->getEnumDecl()) {
                 // When importing as an enum, also apply implicit force unwrap
                 convertKind = ConstantConvertKind::ConstructionWithUnwrap;
               } else {
@@ -5372,7 +5386,7 @@ namespace {
       // If the declaration we attached the 'objc' attribute to is within a
       // type, record it in the type.
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
-        if (auto tyDecl = contextTy->getNominalOrBoundGenericNominal()) {
+        if (auto tyDecl = contextTy->getNominalDecl()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (name)
               tyDecl->recordObjCMethod(method, *name);
@@ -5885,7 +5899,6 @@ namespace {
         }
       }
 
-      Impl.swiftify(result);
       return result;
     }
 
@@ -6392,7 +6405,7 @@ namespace {
         if (!nsObjectTy)
           return nullptr;
         const ClassDecl *nsObjectDecl =
-          nsObjectTy->getClassOrBoundGenericClass();
+          nsObjectTy->getClassDecl();
 
         auto result = createFakeClass(Impl.SwiftContext.Id_Protocol,
                                           /* cacheResult */ false,
@@ -8419,7 +8432,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   };
 
   // If we have a setter, rectify it with the getter.
-  ParamDecl *setterIndex;
+  ParamDecl *setterIndex = nullptr;
   bool getterAndSetterInSameType = false;
   bool isIUO = getter->isImplicitlyUnwrappedOptional();
   if (setter) {
@@ -10383,8 +10396,6 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 }
 
 void ClangImporter::Implementation::startedImportingEntity() {
-  ++NumTotalImportedEntities;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = SwiftContext.Stats)
     ++Stats->getFrontendCounters().NumTotalClangImportedEntities;
 }
@@ -10532,10 +10543,21 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   auto Known = importDeclCached(ClangDecl, version, UseCanonicalDecl);
   if (Known.has_value()) {
+    if (auto *Stats = SwiftContext.Stats)
+      ++Stats->getFrontendCounters().ClangImportDeclCacheHit;
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
       return nullptr;
     return Known.value();
+  }
+
+  ++importDeclRecursionDepth;
+  SWIFT_DEFER { --importDeclRecursionDepth; };
+
+  if (auto *Stats = SwiftContext.Stats) {
+    ++Stats->getFrontendCounters().ClangImportDeclCacheMiss;
+    auto &maxDepth = Stats->getFrontendCounters().ClangImportDeclRecursionDepth;
+    maxDepth = std::max(maxDepth, importDeclRecursionDepth);
   }
 
   bool TypedefIsSuperfluous = false;
@@ -10709,7 +10731,7 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
               LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)));
         continue;
       }
-      if (inheritedType->getClassOrBoundGenericClass()) {
+      if (inheritedType->getClassDecl()) {
         requirements.push_back(
             Requirement(RequirementKind::Superclass, paramType, inheritedType));
         continue;
@@ -11533,6 +11555,7 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+    OS << CD->getDeclKindName() << ' ';
     if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
       ND->printName(OS);
     } else {
@@ -11566,44 +11589,6 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 };
 
 static ClangDeclTraceFormatter TF;
-
-// MARK: - Abstract Layout Computation
-
-std::optional<AbstractTypeLayout>
-swift::computeClangAbstractLayout(const NominalTypeDecl *decl) {
-  auto *clangDecl =
-      dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl());
-  if (!clangDecl)
-    return std::nullopt;
-
-  clangDecl = clangDecl->getDefinition();
-  if (!clangDecl)
-    return std::nullopt;
-
-  auto &ctx = decl->getASTContext();
-  auto *clangLoader = ctx.getClangModuleLoader();
-  if (!clangLoader)
-    return std::nullopt;
-
-  auto &clangCtx = clangLoader->getClangASTContext();
-  const auto &recordLayout = clangCtx.getASTRecordLayout(clangDecl);
-
-  AbstractTypeLayout result;
-  result.mangledName = Mangle::ASTMangler(ctx).mangleNominalType(decl);
-  result.size = recordLayout.getSize().getQuantity();
-  result.alignment = recordLayout.getAlignment().getQuantity();
-  result.stride = llvm::alignTo(result.size, result.alignment);
-
-  Type swiftType = decl->getDeclaredInterfaceType();
-  result.bitwiseCopyable = swiftType->isBitwiseCopyable();
-
-  if (auto *structDecl = dyn_cast<StructDecl>(decl))
-    result.isOpaque = structDecl->isCxxNonTrivial();
-  else
-    result.isOpaque = false;
-
-  return result;
-}
 
 template<>
 const UnifiedStatsReporter::TraceFormatter*

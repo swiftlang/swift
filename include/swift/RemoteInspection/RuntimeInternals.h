@@ -211,11 +211,13 @@ template <typename Runtime>
 struct ChildFragment {
   typename Runtime::StoredPointer Parent;
   typename Runtime::StoredPointer NextChild;
+  typename Runtime::StoredPointer PrevChild;
 };
 
 template <typename Runtime>
 struct GroupChildFragment {
   typename Runtime::StoredPointer Group;
+  typename Runtime::StoredPointer NextReadyTaskAndErrorFlag;
 };
 
 /// Mirror of `AsyncTask::NameFragment` in include/swift/ABI/Task.h.

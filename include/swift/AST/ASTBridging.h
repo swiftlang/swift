@@ -100,6 +100,7 @@ struct BridgedCanGenericSignature;
 struct BridgedGenericEnvironment;
 struct BridgedConformance;
 class BridgedParameterList;
+class BridgedDiagnosticArgument;
 
 // Forward declare the underlying AST node type for each wrapper.
 namespace swift {
@@ -353,11 +354,16 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc Value_getNameLoc() const;
+  BRIDGED_INLINE BridgedDiagnosticArgument Value_asDiagnosticArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
   Value_getBaseIdentifier() const;
   BRIDGED_INLINE bool hasClangNode() const;
   BRIDGED_INLINE bool Value_isObjC() const;
   BRIDGED_INLINE bool AbstractStorage_isConst() const;
+  BRIDGED_INLINE bool Var_isLet() const;
+  BRIDGED_INLINE bool Var_hasInitialValue() const;
+  BRIDGED_INLINE void Var_emitLetToVarNoteIfSimple() const;
+  SWIFT_IMPORT_UNSAFE swift::SourceLoc Param_getConsumingSpecifierLoc() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   BRIDGED_INLINE bool NominalType_hasNonUniqueDefinition() const;
@@ -383,7 +389,10 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ProtocolDecl_getInheritedProtocols(SwiftInt index) const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedParameterList
+  AbstractFunction_getParameterList() const;
   BRIDGED_INLINE bool Constructor_isInheritable() const;
+  BRIDGED_INLINE bool Constructor_isFailable() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
   BRIDGED_INLINE bool EnumElementDecl_hasAssociatedValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedParameterList
@@ -3200,6 +3209,8 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinIsolationMacro,
 };
 
+struct BridgedConformanceArray;
+
 struct BridgedASTType {
   enum class TraitResult {
     IsNot,
@@ -3241,6 +3252,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool hasOpaqueArchetype() const;
   BRIDGED_INLINE bool hasExistentialArchetype() const;
   BRIDGED_INLINE bool hasDynamicSelf() const;
   BRIDGED_INLINE bool isArchetype() const;
@@ -3272,6 +3284,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinBridgeObject() const;
   BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isPackExpansion() const;
   BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
@@ -3286,7 +3299,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isUnsafeMutableBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeRawBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeMutableRawBufferPointerType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalDecl() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
@@ -3314,6 +3327,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isSILPackElementAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
   BoundGenericType_getGenericArgs() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
+  PackType_getElementTypes() const;
 };
 
 class BridgedCanType {
@@ -3326,6 +3341,8 @@ public:
   BRIDGED_INLINE bool hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanGenericSignature
   SILFunctionType_getSubstGenericSignature() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray collectExistentialConformances(
+      BridgedCanType existential) const;
 };
 
 struct BridgedASTTypeArray {

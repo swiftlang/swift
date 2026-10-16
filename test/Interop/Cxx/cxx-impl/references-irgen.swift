@@ -44,7 +44,7 @@ public func swapRefs(_ a: inout CInt, _ b: inout CInt) {
 // CHECK-WIN-LABEL: define{{.*}} i32 @"?readConstRef@@YAHAEBH@Z"(ptr %0)
 // CHECK: getelementptr inbounds{{.*}} %Ts5Int32V, ptr %0
 @unsafe @cxx @implementation
-public func readConstRef(_ x: CInt) -> CInt { return x * 10 }
+public func readConstRef(_ x: borrowing CInt) -> CInt { return x * 10 }
 
 
 // Reference returns
@@ -94,7 +94,7 @@ public func refOverload(_ x: inout CInt) { x += 100 }
 // CHECK-SYSV-LABEL: define{{.*}} void @_Z11refOverloadRKi(ptr %0)
 // CHECK-WIN-LABEL: define{{.*}} void @"?refOverload@@YAXAEBH@Z"(ptr %0)
 @unsafe @cxx @implementation
-public func refOverload(_ x: CInt) { referencesGlobal = x }
+public func refOverload(_ x: borrowing CInt) { referencesGlobal = copy x }
 
 // void refOverload(int *_Nonnull p);
 // CHECK-SYSV-LABEL: define{{.*}} void @_Z11refOverloadPi(ptr %0)
@@ -131,7 +131,7 @@ public func bumpTotal(_ acc: inout Accumulator) { acc.total += 1 }
 // CHECK-WIN-LABEL: define{{.*}} i32 @"?readTotal@@YAHAEBUAccumulator@@@Z"(ptr %0)
 // CHECK: getelementptr inbounds{{.*}} %TSo11AccumulatorV, ptr %0
 @unsafe @cxx @implementation
-public func readTotal(_ acc: Accumulator) -> CInt { return acc.total }
+public func readTotal(_ acc: borrowing Accumulator) -> CInt { return acc.total }
 
 
 // Swift-side calls go through the imported declarations to the same entry

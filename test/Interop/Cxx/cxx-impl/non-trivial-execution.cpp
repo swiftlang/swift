@@ -173,6 +173,22 @@ int main() {
   }
   // CHECK-NEXT: live=0
   printf("live=%d\n", Tracked::liveCount);
+  Tracked::copyCount = 0;
+
+  {
+    Tracked t(13);
+    MoveOnly m(14);
+    int fromTracked = readTracked(t);
+    int fromMoveOnly = readMoveOnly(m);
+    // CHECK-NEXT: borrows: 13 copies=0 live=1
+    printf("borrows: %d copies=%d live=%d\n", fromTracked, Tracked::copyCount,
+           Tracked::liveCount);
+    // CHECK-NEXT: borrows move-only: 14 original=14 live=1
+    printf("borrows move-only: %d original=%d live=%d\n", fromMoveOnly, m.value,
+           MoveOnly::liveCount);
+  }
+  // CHECK-NEXT: live=0 move-only live=0
+  printf("live=%d move-only live=%d\n", Tracked::liveCount, MoveOnly::liveCount);
 
   return 0;
 }

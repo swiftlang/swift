@@ -286,6 +286,7 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
 def swift_module_file: Joined<["-"], "swift-module-file=">,
   MetaVarName<"<name>=<path>">,
   HelpText<"Specify Swift module input explicitly built from textual interface">;
@@ -308,6 +309,7 @@ def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
@@ -785,13 +787,6 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
-def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
-  HelpText<"Dump abstract layout information for Clang-backed types">;
-
-def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
-  HelpText<"Dump every hidden-type layout known to this compilation, "
-           "including those deserialized from imported swiftmodules">;
-
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
@@ -1055,6 +1050,12 @@ def solver_enable_promote_supertypes : Flag<["-"], "solver-enable-promote-supert
   HelpText<"Enable an experimental optimization which will be on by default at some point">;
 
 def solver_disable_promote_supertypes : Flag<["-"], "solver-disable-promote-supertypes">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
+
+def solver_enable_short_conversions : Flag<["-"], "solver-enable-short-conversions">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_short_conversions : Flag<["-"], "solver-disable-short-conversions">,
   HelpText<"Disable an experimental optimization which will be on by default at some point">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
@@ -1359,6 +1360,11 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def dump_abstract_type_layout_info_EQ :
+  Joined<["-"], "dump-abstract-type-layout-info=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the selected compiler-facing layout information for serialized and recovered hidden types; one of 'sil-type', 'type-lowering', 'type-info', or 'all'">;
 
 def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
   Flags<[FrontendOption]>,
@@ -1686,18 +1692,22 @@ def always_compile_output_files :
   HelpText<"Always compile output files even it might not change the results">;
 
 // CAS/Caching related options.
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def input_file_key : Separate<["-"], "input-file-key">,
   HelpText<"Cache Key for input file">;
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
   HelpText<"Cache Key for bridging header pch">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
   HelpText<"Read the input files from disk and overlay them on the CAS file "

@@ -36,6 +36,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -333,6 +334,15 @@ static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
   return true;
 }
 
+/// Whether the given function type conforms to Deinitable.
+static bool isDeinitableFunctionType(EitherFunctionType eitherFnTy) {
+  // An exactly-once value must be called, so it can't be destroyed implicitly.
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
+    return !fnTy->isCalledOnce();
+
+  return !cast<const SILFunctionType *>(eitherFnTy)->isCalledOnce();
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -409,6 +419,10 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
       if (isCopyableFunctionType(functionType))
         return synthesizeConformance();
       break;
+    case KnownProtocolKind::Deinitable:
+      if (isDeinitableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     case KnownProtocolKind::BitwiseCopyable:
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();
@@ -482,6 +496,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
+    case KnownProtocolKind::Deinitable:
     case KnownProtocolKind::BitwiseCopyable:
     case KnownProtocolKind::SendableMetatype:
       return ProtocolConformanceRef(
@@ -505,7 +520,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::SendableMetatype:
     case KnownProtocolKind::Copyable:
-    case KnownProtocolKind::Escapable: {
+    case KnownProtocolKind::Escapable:
+    case KnownProtocolKind::Deinitable: {
       ASTContext &ctx = protocol->getASTContext();
 
       // FixedArray is Sendable, Copyable, or Escapable if its element type is.
@@ -658,6 +674,10 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
   // PlaceholderType is a placeholder for an unknown type. We consider it to
   // conform to all protocols, since the intended type might have.
   if (type->is<PlaceholderType>())
+    return ProtocolConformanceRef::forAbstract(type, protocol);
+
+  // Same goes for HoleType.
+  if (type->is<HoleType>())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Pack types can conform to protocols.
@@ -843,7 +863,7 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
     // Dig out the conforming nominal type.
     auto rootConformance = inherited->getRootConformance();
     auto conformingClass
-      = rootConformance->getType()->getClassOrBoundGenericClass();
+      = rootConformance->getType()->getClassDecl();
 
     // Map up to our superclass's type.
     auto superclassTy = type->getSuperclassForDecl(conformingClass);
@@ -1006,6 +1026,14 @@ void TypeBase::computeInvertibleConformances() {
       canType, InvertibleProtocolKind::Copyable);
   Bits.TypeBase.IsEscapable = conformsToInvertible(
       canType, InvertibleProtocolKind::Escapable);
+
+  // A Copyable type is Deinitable if the Copyable protocol inherits from
+  // Deinitable, so only look for the conformance of other types.
+  Bits.TypeBase.IsDeinitable =
+      (Bits.TypeBase.IsCopyable &&
+       InverseRequirement::copyableImpliesDeinitable(
+           canType->getASTContext())) ||
+      conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
@@ -1025,6 +1053,13 @@ bool TypeBase::isEscapable() {
   if (!Bits.TypeBase.ComputedInvertibleConformances)
     computeInvertibleConformances();
   return Bits.TypeBase.IsEscapable;
+}
+
+/// \returns true iff this type conforms to Deinitable.
+bool TypeBase::isDeinitable() {
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return Bits.TypeBase.IsDeinitable;
 }
 
 bool TypeBase::isEscapable(GenericSignature sig) {

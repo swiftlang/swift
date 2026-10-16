@@ -34,7 +34,7 @@ struct ScanQueryContext {
   std::unique_ptr<DepScanInMemoryDiagnosticCollector> InMemoryDiagnosticCollector;
   /// A thread-safe serialized diagnostics consumer.
   /// Note, although type-erased, this must be an instance of
-  /// 'ThreadSafeSerializedDiagnosticConsumer'
+  /// 'ThreadSafeSerializedDiagnosticConsumer' or its SARIF counterpart.
   std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer;
 
   ScanQueryContext(
@@ -136,6 +136,9 @@ public:
       ArrayRef<const char *> Command, StringRef WorkingDirectory,
       std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
           &initializationDiagnostics);
+
+  /// Report that \p Path changed since the previous build.
+  void addInvalidatedPath(StringRef Path);
 
 private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries

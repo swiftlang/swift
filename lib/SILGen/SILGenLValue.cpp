@@ -1022,11 +1022,11 @@ namespace {
 
   /// A physical path component which projects out an opened archetype
   /// from an existential.
-  class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
+  class OpenAddressExistentialComponent : public PhysicalPathComponent {
   public:
-    OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype,
-                                   LValueTypeData typeData)
-        : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind,
+    OpenAddressExistentialComponent(CanArchetypeType openedArchetype,
+                                    LValueTypeData typeData)
+        : PhysicalPathComponent(typeData, OpenAddressExistentialKind,
                                 /*actorIsolation=*/std::nullopt) {
       assert(getSubstFormalType() == openedArchetype);
     }
@@ -1048,9 +1048,10 @@ namespace {
       auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
       case ExistentialRepresentation::COM:
-        llvm_unreachable("opening a COM existential is not implemented");
       case ExistentialRepresentation::Opaque:
         if (!base.getValue()->getType().isAddress()) {
+          assert(rep == ExistentialRepresentation::Opaque &&
+                 "COM existential lvalue must be an address");
           assert(!SGF.useLoweredAddresses());
           auto borrow = SGF.B.createBeginBorrow(
               loc, base.getValue(), IsNotLexical, DoesNotHavePointerEscape);
@@ -1092,7 +1093,7 @@ namespace {
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "OpenOpaqueExistentialComponent("
+      OS.indent(indent) << "OpenAddressExistentialComponent("
                         << getSubstFormalType() << ")\n";
     }
   };
@@ -1936,13 +1937,13 @@ namespace {
         if (BaseFormalType) {
           auto selfTy = base.getType().getASTType();
           auto metatypeTy = MetatypeType::get(selfTy);
-          if (selfTy->getClassOrBoundGenericClass()) {
+          if (selfTy->getClassDecl()) {
             selfMetatype = SGF.B
                                .createValueMetatype(
                                    loc, SGF.getLoweredType(metatypeTy), base)
                                .getValue();
           } else {
-            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            assert(BaseFormalType->getStructDecl());
             selfMetatype =
                 SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy));
           }
@@ -3601,14 +3602,11 @@ namespace {
           strategy.getKind() == AccessStrategy::DispatchToAccessor) {
         auto *protocol = dyn_cast<ProtocolDecl>(Storage->getDeclContext());
         if (protocol && protocol->isCOMInterface()) {
-          Type selfType = protocol->getSelfInterfaceType().subst(Subs);
-          if (selfType->is<ExistentialArchetypeType>()) {
-            strategy = AccessStrategy::getMaterializeToTemporary(
-                AccessStrategy::getAccessor(AccessorKind::Get,
-                                            /*dispatched=*/true),
-                AccessStrategy::getAccessor(AccessorKind::Set,
-                                            /*dispatched=*/true));
-          }
+          strategy = AccessStrategy::getMaterializeToTemporary(
+              AccessStrategy::getAccessor(AccessorKind::Get,
+                                          /*dispatched=*/true),
+              AccessStrategy::getAccessor(AccessorKind::Set,
+                                          /*dispatched=*/true));
         }
       }
 
@@ -4559,7 +4557,7 @@ void LValue::addMemberVarComponent(
         LV.add<RefElementComponent>(Storage, Options, varStorageType,
                                     typeData, ActorIso);
       } else {
-        assert(BaseFormalType->getStructOrBoundGenericStruct());
+        assert(BaseFormalType->getStructDecl());
         LV.add<StructElementComponent>(Storage, varStorageType, typeData,
                                        ActorIso);
       }
@@ -4863,12 +4861,14 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
     assert((isBorrowAccess(accessKind) || isConsumeAccess(accessKind))
            && "should only see a (force_value (load)) lvalue as part of a "
               "borrow or consume");
-    subExpr = load->getSubExpr();
+    // Borrow the storage in place.
+    if (isBorrowAccess(accessKind))
+      subExpr = load->getSubExpr();
   }
                                          
   // Like BindOptional, this is a read even if we only write to the result.
   // (But it's unnecessary to use a force this way!)
-  LValue lv = visitRec(e->getSubExpr(),
+  LValue lv = visitRec(subExpr,
                        getBaseAccessKindForStorage(accessKind),
                        options.forComputedBaseLValue());
   LValueTypeData typeData =
@@ -6102,10 +6102,9 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
     .getPreferredExistentialRepresentation();
   switch (rep) {
   case ExistentialRepresentation::COM:
-    llvm_unreachable("opening a COM existential is not implemented");
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
-    lv.add<OpenOpaqueExistentialComponent>(openedArchetype, typeData);
+    lv.add<OpenAddressExistentialComponent>(openedArchetype, typeData);
     break;
   }
   case ExistentialRepresentation::Metatype:

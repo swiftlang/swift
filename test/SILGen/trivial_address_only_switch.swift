@@ -1,4 +1,6 @@
 // RUN: %target-swift-emit-silgen -verify -target %target-swift-6.2-abi-triple %s
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -verify -target %target-swift-6.2-abi-triple %s
+// RUN: not --crash %target-swift-emit-sil -enable-sil-opaque-values -sil-verify-all -target %target-swift-6.2-abi-triple %s
 
 public enum StreamYieldResult<let count: Int>: Sendable {
     case literal(buffer: InlineArray<count, UInt8>)

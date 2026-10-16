@@ -417,7 +417,7 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
   }
 
   // Then check if our classValue is an any Actor.
-  if (auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal();
+  if (auto *nomDecl = classValue->getType().getNominalDecl();
       nomDecl && nomDecl->isAnyActor()) {
     return SILIsolationInfo::getActorInstanceIsolated(queriedValue, classValue,
                                                       nomDecl);
@@ -429,7 +429,7 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
     if (auto *nomDecl =
             classValue->getType()
                 .getLoweredInstanceTypeOfMetatype(classValue->getFunction())
-                .getNominalOrBoundGenericNominal()) {
+                .getNominalDecl()) {
 
       // See if the nominal decl is global actor isolated. In such a case, we
       // know that the metatype is also actor isolated.
@@ -711,7 +711,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       if (funcType->hasSelfParam()) {
         auto selfParam = funcType->getSelfInstanceType(
             fri->getModule(), func->getTypeExpansionContext());
-        if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
+        if (auto *nomDecl = selfParam->getNominalDecl()) {
           auto nomDeclIsolation = swift::getActorIsolation(nomDecl);
           if (nomDeclIsolation.isGlobalActor()) {
             return SILIsolationInfo::getGlobalActorIsolated(
@@ -960,7 +960,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
       // Handle a switch_enum from a global-actor-isolated type.
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
-            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
+            swi->getOperand()->getType().getEnumDecl();
         return SILIsolationInfo::getGlobalActorIsolated(arg, enumDecl);
       }
 

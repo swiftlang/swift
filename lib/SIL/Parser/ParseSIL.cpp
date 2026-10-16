@@ -4039,6 +4039,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     DiagnoseKind Kind = llvm::StringSwitch<DiagnoseKind>(AttrName)
                             .Case("unpermitted_copy",
                                   DiagnoseKind::UnpermittedCopy)
+                            .Case("let_reinit", DiagnoseKind::LetReinit)
                             .Default(DiagnoseKind::Invalid);
 
     if (Kind == DiagnoseKind::Invalid) {
@@ -4805,7 +4806,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
+    // The printer emits !true_count/!false_count, so read them back; without
+    // this the weights are silently dropped on a SIL round trip.
+    ProfileCounter trueCount, falseCount;
     if (parseConditionalBranchDestinations() ||
+        parseSILCondBranchProfileCounters(*this, trueCount, falseCount) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
@@ -4813,7 +4818,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         InstLoc, options, consumptionKind, SourceAddr, SourceType,
         DestAddr, TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
-        getBBForReference(FailureBBName, FailureBBLoc));
+        getBBForReference(FailureBBName, FailureBBLoc), trueCount, falseCount);
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst:
@@ -7366,9 +7371,15 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
-    if (AttrName == "called_once") {
+    if (AttrName == "called_at_most_once") {
       assert(!bool(AttrValue));
       PartialApplySemantics = ExecutionSemantics::AtMostOnce;
+      continue;
+    }
+
+    if (AttrName == "called_once") {
+      assert(!bool(AttrValue));
+      PartialApplySemantics = ExecutionSemantics::Once;
       continue;
     }
 
@@ -8304,7 +8315,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
   } else {
     if (SILParser(P).parseSILType(specializedClassTy))
       return true;
-    theClass = specializedClassTy.getClassOrBoundGenericClass();
+    theClass = specializedClassTy.getClassDecl();
     if (!theClass) {
       return true;
     }
@@ -8425,7 +8436,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   if (parser.Tok.is(tok::sil_dollar)) {
     if (SILParser(parser).parseSILType(specializedNominalTy))
       return true;
-    theNominalDecl = specializedNominalTy.getNominalOrBoundGenericNominal();
+    theNominalDecl = specializedNominalTy.getNominalDecl();
     if (!theNominalDecl)
       return true;
   } else {

@@ -907,26 +907,6 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool coalesceAndDiagnose(const Solution &solution,
-                           ArrayRef<ConstraintFix *> secondaryFixes,
-                           bool asNote = false) const override {
-    // If the from type or to type is a placeholder type that corresponds to an
-    // ErrorExpr, the issue has already been diagnosed. There's no need to
-    // produce another diagnostic for the contextual mismatch complaining that
-    // a type is not convertible to a placeholder type.
-    if (auto fromPlaceholder = getFromType()->getAs<PlaceholderType>()) {
-      if (isa<ErrorExpr *>(fromPlaceholder->getOriginator())) {
-        return true;
-      }
-    }
-    if (auto toPlaceholder = getToType()->getAs<PlaceholderType>()) {
-      if (isa<ErrorExpr *>(toPlaceholder->getOriginator())) {
-        return true;
-      }
-    }
-    return ConstraintFix::coalesceAndDiagnose(solution, secondaryFixes, asNote);
-  }
-
   bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,

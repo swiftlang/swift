@@ -185,7 +185,6 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
-  IGNORED_ATTR(HasHiddenStoredProperties)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
@@ -717,7 +716,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     }
 
     // Types who are marked @_staticExclusiveOnly cannot have mutating functions.
-    if (auto SD = contextTy->getStructOrBoundGenericStruct()) {
+    if (auto SD = contextTy->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           attrModifier == SelfAccessKind::Mutating) {
         diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_mutating,
@@ -798,8 +797,22 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
 
 void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
-  if (D->getAttrs().hasAttribute<TransparentAttr>())
+  if (D->getAttrs().hasAttribute<TransparentAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
+    return;
+  }
+
+  // Embedded Swift does not support dynamic replacement, so 'dynamic' is
+  // ignored (see IsDynamicRequest).
+  if (attr->isImplicit())
+    return;
+  auto *dc = isa<DeclContext>(D) ? cast<DeclContext>(D) : D->getDeclContext();
+  if (auto behavior =
+          shouldDiagnoseEmbeddedLimitations(dc, attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::dynamic_in_embedded_swift, D)
+        .limitBehavior(*behavior)
+        .fixItRemove(attr->getRange());
+  }
 }
 
 /// Replaces asynchronous IBActionAttr/IBSegueActionAttr function declarations
@@ -3632,8 +3645,8 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     return;
   }
   // Only classes can have required constructors.
-  if (parentTy->getClassOrBoundGenericClass() &&
-      !parentTy->getClassOrBoundGenericClass()->isActor()) {
+  if (parentTy->getClassDecl() &&
+      !parentTy->getClassDecl()->isActor()) {
     // The constructor must be declared within the class itself.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C
@@ -4451,6 +4464,21 @@ findReplacedStorageDecl(DeclNameRef replacedFunctionName,
 void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr) {
   assert(isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D));
   auto *replacement = cast<ValueDecl>(D);
+
+  // Embedded Swift does not support dynamic replacement, so the attribute is
+  // ignored (see DynamicallyReplacedDeclRequest).
+  auto *dc = isa<DeclContext>(D) ? cast<DeclContext>(D) : D->getDeclContext();
+  if (auto behavior =
+          shouldDiagnoseEmbeddedLimitations(dc, attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::dynamic_replacement_in_embedded_swift,
+             D)
+        .limitBehavior(*behavior)
+        .fixItRemove(attr->getRangeWithAt());
+  }
+  if (Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    attr->setInvalid();
+    return;
+  }
 
   if (!isa<ExtensionDecl>(replacement->getDeclContext()) &&
       !replacement->getDeclContext()->isModuleScopeContext()) {
@@ -6088,7 +6116,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     attr->setInvalid();
   }
 
-  ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
+  ClassDecl *underlyingClass = underlyingType->getClassDecl();
   if (underlyingClass) {
     if (underlyingClass->isIncompatibleWithWeakReferences()) {
       Diags
@@ -6343,6 +6371,10 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
   if (VD->isImplicit())
+    return nullptr;
+
+  // Embedded Swift does not support dynamic replacement.
+  if (VD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return nullptr;
 
   auto *attr = VD->getAttrs().getAttribute<DynamicReplacementAttr>();

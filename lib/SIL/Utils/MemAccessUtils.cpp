@@ -989,7 +989,7 @@ const ValueDecl *AccessStorage::getDecl() const {
     // base, we can only make a best effort to extract it from the object type,
     // which might not even be a class in the case of bridge objects.
     if (ClassDecl *classDecl =
-        getObject()->getType().getClassOrBoundGenericClass()) {
+        getObject()->getType().getClassDecl()) {
       return getIndexedField(classDecl, getPropertyIndex());
     }
     return nullptr;
@@ -1407,7 +1407,7 @@ bool swift::visitProductLeafAccessPathNodes(
         auto *elementNode = node->getChild(index);
         worklist.push_back({silType.getTupleElementType(index), elementNode});
       }
-    } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
+    } else if (auto *decl = silType.getStructDecl()) {
       if (decl->isResilient(tec.getContext()->getParentModule(),
                             tec.getResilienceExpansion())) {
         visitor(AccessPath::PathNode(node), silType);

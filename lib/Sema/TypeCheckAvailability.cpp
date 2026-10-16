@@ -24,7 +24,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
@@ -278,11 +277,6 @@ const {
   if (originKind == DisallowedOriginKind::None)
     return DiagnosticBehavior::Ignore;
 
-  // If we can capture the layouts of hidden types, suppress
-  // diagnostic.
-  if (encapsulatedAsHiddenStoredProperty(D, originKind))
-    return DiagnosticBehavior::Ignore;
-
   auto &ctx = DC->getASTContext();
 
   if (shouldSuppressExportabilityDiagnosticsForHiddenTypes(
@@ -348,53 +342,6 @@ ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return std::nullopt;
-}
-
-bool ExportContext::encapsulatedAsHiddenStoredProperty(
-    const ValueDecl *D, DisallowedOriginKind originKind) const {
-  if (originKind != DisallowedOriginKind::InternalBridgingHeaderImport)
-    return false;
-  if (!getDeclContext()->getASTContext().LangOpts.hasFeature(
-          Feature::AbstractStoredPropertyLayout))
-    return false;
-  auto reason = getExportabilityReason();
-  if (!reason)
-    return false;
-  switch (*reason) {
-  case ExportabilityReason::ImplicitlyPublicVarDecl:
-  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
-    break;
-  default:
-    return false;
-  }
-
-  // Encapsulation applies. Record the hidden-type layout so it will be
-  // serialized into this module's hidden-type layouts block.
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
-    if (auto layout = computeClangAbstractLayout(nominal)) {
-      auto *DC = getDeclContext();
-      DC->getParentModule()->recordHiddenTypeLayout(
-          layout->mangledName, *layout);
-      // Also record the canonical type so the serializer can substitute a
-      // HiddenType placeholder for stored-property references in the emitted
-      // .swiftmodule, without re-mangling at every VarDecl serialization site.
-      DC->getASTContext().recordTypeToHideWhenEmittingModule(
-          nominal->getDeclaredInterfaceType()->getCanonicalType(),
-          layout->mangledName);
-      auto *enclosingStruct =
-          dyn_cast_or_null<StructDecl>(DC->getInnermostTypeContext());
-      ASSERT(enclosingStruct &&
-             "encapsulated hidden stored property must be inside a struct");
-      if (!enclosingStruct->getAttrs()
-               .hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        auto &ctx = DC->getASTContext();
-        enclosingStruct->getAttrs().add(
-            new (ctx) HasHiddenStoredPropertiesAttr(/*IsImplicit=*/true));
-      }
-      return true;
-    }
-  }
-  return false;
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
@@ -1980,6 +1927,10 @@ static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
       case InvertibleProtocolKind::Escapable:
         if (!arg->isEscapable())
           return ip;
+        break;
+      case InvertibleProtocolKind::Deinitable:
+        // Nothing can suppress Deinitable, so no generic argument lacks it.
+        break;
       }
     }
   }
@@ -2001,6 +1952,10 @@ checkExistentialForInvertibleReqs(CanType type) {
     case InvertibleProtocolKind::Escapable:
       if (!type->isEscapable())
         return ip;
+      break;
+    case InvertibleProtocolKind::Deinitable:
+      // Nothing can suppress Deinitable, so no existential lacks it.
+      break;
     }
   }
   return std::nullopt;
@@ -2045,6 +2000,8 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
           ? diag::availability_escapable_existential_casting_only_version_newer
           : diag::availability_escapable_generics_casting_only_version_newer;
       break;
+    case InvertibleProtocolKind::Deinitable:
+      llvm_unreachable("nothing can suppress Deinitable");
     }
 
     // Enforce the availability restriction.

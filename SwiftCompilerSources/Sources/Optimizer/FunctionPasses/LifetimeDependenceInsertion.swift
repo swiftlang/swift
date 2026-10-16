@@ -226,8 +226,11 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // A coroutine creates its own borrow scope, nested within its borrowed operand.
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
-      // addressable dependencies directly depend on the incoming address.
-      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value) {
+      // addressable dependencies directly depend on the incoming address, unless that address is projected from an
+      // unsafe[Mutable]Address accessor. Then it depends on the accessor's 'self', which gatherVariableIntroducers
+      // finds.
+      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value)
+           && source.value.accessBaseWithScopes.innermostAccess?.unsafeAddressorSelf == nil {
         bases.append(source.value)
         return
       }

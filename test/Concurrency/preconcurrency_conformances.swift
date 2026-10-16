@@ -88,7 +88,7 @@ extension MyActor : @preconcurrency TestSendability {
 
   func test_ref_diagnostics() {
     _ = value?.x
-    // expected-error@-1 {{main actor-isolated property 'x' can not be referenced on a nonisolated actor instance}}
+    // expected-error@-1 {{main actor-isolated property 'x' can not be referenced on a different actor instance}}
     _ = value?.test(nil)
     // expected-error@-1 {{call to main actor-isolated instance method 'test' in a synchronous actor-isolated context}}
   }

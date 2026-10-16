@@ -484,8 +484,12 @@ if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
   endif()
 endif()
 
-# LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
-# need it.
+# LLVM_VERSION_MAJOR conditions for Swift sources in the compiler and Lit tests,
+# where (in)equality operations cannot be metaprogrammed.
+#
+# NB: Before you bump the below minimum, please make sure to audit all
+#     occurrences of LLVM_VERSION_MAJOR_AT_LEAST_<current minimum>.
+#
 set(SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR 23)
 if(LLVM_VERSION_MAJOR LESS ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR})
   message(FATAL_ERROR
@@ -493,10 +497,10 @@ if(LLVM_VERSION_MAJOR LESS ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR})
     "SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR "
     "(${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}).")
 endif()
-set(SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS)
+set(SWIFT_LLVM_VERSION_MAJOR_CONDITIONS)
 foreach(version RANGE ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}
                       ${LLVM_VERSION_MAJOR})
-  list(APPEND SWIFT_LLVM_VERSION_MAJOR_SWIFT_COMPILE_DEFINITIONS
+  list(APPEND SWIFT_LLVM_VERSION_MAJOR_CONDITIONS
     "LLVM_VERSION_MAJOR_AT_LEAST_${version}")
 endforeach()
 
@@ -915,6 +919,8 @@ else()
   set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
 endif()
 
+# Turned off while swift-toolchain-sarif is not yet built in CI on every
+# host and the output is unexercised on Windows.
 option(SWIFT_BUILD_SARIF
   "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
   FALSE)
@@ -1794,7 +1800,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
       set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
       if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
-        string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+        get_versioned_target_triple(stdlib_target_triple ${sdk} ${arch} ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
@@ -1836,7 +1842,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
-        add_dependencies("${stdlib_target}-core" swift-frontend)
+        add_dependencies("${stdlib_target}-core" swift-frontend libSwiftScan)
       endif()
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
@@ -1866,6 +1872,10 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftOverlay_ENABLE_CXX_INTEROP=TRUE
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
+      set(runtimes_to_enable StringProcessing|Synchronization|Distributed|Observation)
+      if(sdk STREQUAL "OSX")
+        string(APPEND runtimes_to_enable |Runtime)
+      endif()
       ExternalProject_Add("${stdlib_target}-Supplemental"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
         DEPENDS "${stdlib_target}-core" "${stdlib_target}-Overlay"
@@ -1875,7 +1885,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation|Runtime
+          -DSwift_ENABLE_RUNTIMES=${runtimes_to_enable}
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

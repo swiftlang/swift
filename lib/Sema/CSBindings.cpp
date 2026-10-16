@@ -274,9 +274,11 @@ void BindingSet::computeJoinsAndMeets() {
   MergedBinding subtypes;
   std::optional<unsigned> firstSubtype;
 
+  auto &ctx = CS.getASTContext();
+
   // FIXME: Remove this.
-  bool allowTypeVariableJoins =
-      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool allowTypeVariableJoins = ctx.TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool enableShortConversions = ctx.TypeCheckerOpts.SolverEnableShortConversions;
 
   for (unsigned i : indices(Bindings)) {
     auto binding = Bindings[i];
@@ -337,14 +339,16 @@ void BindingSet::computeJoinsAndMeets() {
       return;
     }
 
-    // Don't allow this for now, because it leads to infinite recursion
-    // in constraint simplification. Once optional conversions are no
-    // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSupertype->getOptionalObjectType()) {
-      if (objectType->is<JoinType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
-                                << commonSupertype << "\n");
-        return;
+    if (!enableShortConversions) {
+      // Don't allow this for now, because it leads to infinite recursion
+      // in constraint simplification. Once optional conversions are no
+      // longer presented as a disjunction, this case be removed.
+      if (auto objectType = commonSupertype->getOptionalObjectType()) {
+        if (objectType->is<JoinType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
+                                  << commonSupertype << "\n");
+          return;
+        }
       }
     }
 
@@ -403,7 +407,7 @@ void BindingSet::computeJoinsAndMeets() {
       newBindings.clear();
 
       // Add an exact binding. It should always fail when attempted.
-      newBindings.emplace_back(commonSubtype, AllowedBindingKind::Exact,
+      newBindings.emplace_back(subtypes.types[0], AllowedBindingKind::Exact,
                                subtypes.bindingSource,
                                subtypes.originator);
 
@@ -426,11 +430,13 @@ void BindingSet::computeJoinsAndMeets() {
     // Don't allow this for now, because it leads to infinite recursion
     // in constraint simplification. Once optional conversions are no
     // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSubtype->getOptionalObjectType()) {
-      if (objectType->is<MeetType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
-                                << commonSubtype << "\n");
-        return;
+    if (!enableShortConversions) {
+      if (auto objectType = commonSubtype->getOptionalObjectType()) {
+        if (objectType->is<MeetType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
+                                  << commonSubtype << "\n");
+          return;
+        }
       }
     }
 
@@ -702,10 +708,10 @@ bool BindingSet::isDelayed() const {
       return true;
 
     // When inferring the type of a variable in a pattern, delay its resolution
-    // so that we resolve type variables inside the expression as placeholders
-    // instead of marking the type of the variable itself as a placeholder. This
+    // so that we resolve type variables inside the expression as holes
+    // instead of marking the type of the variable itself as a hole. This
     // allows us to produce more specific errors because the type variable in
-    // the expression that introduced the placeholder might be diagnosable using
+    // the expression that introduced the hole might be diagnosable using
     // fixForHole.
     if (locator->isLastElement<LocatorPathElt::PatternDecl>()) {
       return true;
@@ -1276,7 +1282,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       auto type = binding.BindingType;
 
-      if (type->isPlaceholder())
+      if (type->is<HoleType>())
         continue;
 
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
@@ -1472,7 +1478,7 @@ bool BindingSet::finalizeKeyPathBindings() {
           // If key path is structurally correct and has a resolved root
           // type, let's promote the fallback type into a binding because
           // root would have been inferred from explicit type already and
-          // it's benefitial for diagnostics to assign a non-placeholder
+          // it's benefitial for diagnostics to assign a non-hole
           // type to key path literal to propagate root/value to the context.
           if (!keyPath->hasSingleInvalidComponent() &&
               (keyPath->getParsedRoot() ||
@@ -2219,7 +2225,7 @@ static bool isSupertypeEligibleForPromotionWhenHacksAreOn(Type t) {
     if (archetypeTy->getSuperclass())
       return false;
 
-  auto *classDecl = t->getClassOrBoundGenericClass();
+  auto *classDecl = t->getClassDecl();
   if (classDecl && classDecl->getSuperclassDecl())
     return false;
 
@@ -2317,7 +2323,7 @@ void BindingSet::promoteBindings() {
     // introducing Void will just cause local solution ambiguities.
     auto *locator = TypeVar->getImpl().getLocator();
     if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
-        !binding.BindingType->isPlaceholder()) {
+        !binding.BindingType->is<HoleType>()) {
       auto voidType = CS.getASTContext().TheEmptyTupleType;
       addBinding(binding.withSameSource(
           voidType, AllowedBindingKind::Fallback));
@@ -2379,18 +2385,52 @@ void BindingSet::promoteBindings() {
         }
       }
 
-      // Two cases where we prefer the subtype binding:
+      // Three cases where we prefer the subtype binding:
       //
-      // 1) If the subtype binding comes from a weaker form of conversion constraint,
-      // for example:
+      // 1) If the subtype binding is for a @convention(c) type, we prefer it always
+      // because conversion *to* @convention(c) only works with a closure literal
+      // known to have no captures; conversion *from* @convention(c) to an ordinary
+      // function type always succeeds.
+      auto isCFunctionType = [](Type t) -> bool {
+        if (auto *funcTy = t->getAs<FunctionType>()) {
+          return funcTy->getExtInfo().getRepresentation()
+            == FunctionType::Representation::CFunctionPointer;
+        }
+
+        return false;
+      };
+
+      bool isConversionToCFunction =
+          isCFunctionType(promotedSubtype->BindingType
+              ->lookThroughAllOptionalTypes());
+
+      if (isConversionToCFunction) {
+        promoteSubtypeBinding("@convention(c) conversion");
+        return;
+      }
+
+      // 2) If the subtype binding comes from a weaker form of conversion constraint,
+      // and we have a pointer conversion, for example:
       //
       //   Array<T> arg conv $T1
       //   $T1 conv UnsafePointer<T>
       //
       // We have to bind $T1 to UnsafePointer<T> and not Array<T>, because
       // conv constraints do not allow array-to-pointer conversions.
-      //
-      // 2) If we have something like this:
+      auto *first = promotedSupertype->getSource();
+      auto *second = promotedSubtype->getSource();
+      if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
+        bool isConversionToPointer = !!promotedSubtype->BindingType
+                ->lookThroughAllOptionalTypes()->getAnyPointerElementType();
+
+        // Case 1
+        if (isConversionToPointer) {
+          promoteSubtypeBinding("pointer conversion");
+          return;
+        }
+      }
+
+      // 3) If we have something like this:
       //
       //  S conv $T0
       //  $T0 bind any Sendable
@@ -2401,24 +2441,9 @@ void BindingSet::promoteBindings() {
       //
       // Note that for the other direction, any Sendable bind $T0, we already get a
       // supertype binding, and that will be what's preferred anyway.
-      auto *first = promotedSupertype->getSource();
-      auto *second = promotedSubtype->getSource();
-      if (rankConversionKind(second, CS) < rankConversionKind(first, CS)) {
-        auto type = promotedSubtype->BindingType;
-        bool isConversionToPointer =
-            !!type->lookThroughAllOptionalTypes()->getAnyPointerElementType();
-
-        // Case 1
-        if (isConversionToPointer) {
-          promoteSubtypeBinding("pointer conversion");
-          return;
-        }
-
-        // Case 2
-        if (second->getKind() == ConstraintKind::Bind) {
-          promoteSubtypeBinding("bind");
-          return;
-        }
+      if (second->getKind() == ConstraintKind::Bind) {
+        promoteSubtypeBinding("bind");
+        return;
       }
     }
 
@@ -2900,7 +2925,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   do {
     // Conformance check on type variable would always return true,
     // but type variable can't cover anything until it's bound.
-    if (type->isTypeVariableOrMember() || type->isPlaceholder())
+    if (type->isTypeVariableOrMember() || type->is<HoleType>())
       return std::make_pair(false, Type());
 
     if (isCoveredBy(binding.Kind, type, CS)) {

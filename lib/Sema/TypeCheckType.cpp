@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
@@ -1705,12 +1706,31 @@ Type TypeResolution::applyUnboundGenericArguments(
          "and collect arguments to pack generic parameters");
 
   auto &ctx = getASTContext();
-  TypeSubstitutionMap subs;
 
   // Get the interface type for the declaration. We will be substituting
   // type parameters that appear inside this type with the provided
   // generic arguments.
-  auto resultType = decl->getDeclaredInterfaceType();
+  Type resultType;
+
+  auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl);
+  if (typeAliasDecl) {
+    if (stage == TypeResolutionStage::Structural) {
+      // Use the structural type if possible, to avoid requesting generic
+      // signatures.
+      resultType = typeAliasDecl->getStructuralType();
+
+      // However, fall back to the interface type if the structural type
+      // contains unbound dependent member types. We cannot substitute
+      // those.
+      if (resultType->findUnresolvedDependentMemberType() != nullptr)
+        resultType = typeAliasDecl->getUnderlyingType();
+
+    } else {
+      resultType = typeAliasDecl->getUnderlyingType();
+    }
+  } else {
+    resultType = decl->getDeclaredInterfaceType();
+  }
 
   // If types involved in requirements check have either type variables
   // or unbound generics, let's skip the check here, and let the solver
@@ -1725,6 +1745,8 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
+  TypeSubstitutionMap subs;
+
   // Get the substitutions for outer generic parameters from the parent
   // type.
   if (parentTy) {
@@ -1735,24 +1757,25 @@ Type TypeResolution::applyUnboundGenericArguments(
         return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
       }
 
-      // We have a generic type alias referenced with an unbound generic
-      // base, which is only valid if all of the unbound generic type's
-      // generic parameters are fixed to concrete types by the generic
-      // signature of the type alias, eg:
-      //
-      // struct G<T> {
-      //   typealias A<U> = Int where T == String
-      // }
-      if (!resultType->hasTypeParameter())
-        return resultType;
-
-      auto genericSig = decl->getGenericSignature();
-      auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      for (auto gp : parentSig.getGenericParams()) {
-        ASSERT(genericSig->isConcreteType(gp));
-        subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-            genericSig->getConcreteType(gp);
+      if (resultType->hasTypeParameter()) {
+        // We have a generic type alias referenced with an unbound generic
+        // base, which is only valid if all of the unbound generic type's
+        // generic parameters are fixed to concrete types by the generic
+        // signature of the type alias, eg:
+        //
+        // struct G<T> {
+        //   typealias A<U> = Int where T == String
+        // }
+        auto genericSig = decl->getGenericSignature();
+        auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
+        for (auto gp : parentSig.getGenericParams()) {
+          ASSERT(genericSig->isConcreteType(gp));
+          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+              genericSig->getConcreteType(gp);
+        }
       }
+
+      skipRequirementsCheck = true;
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
@@ -1769,7 +1792,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  // Realize the types of the generic arguments and add them to the
+  // Next, resolve the types of the generic arguments and add them to the
   // substitution map.
   auto innerParams = decl->getGenericParams()->getParams();
   for (unsigned i : indices(innerParams)) {
@@ -1805,28 +1828,28 @@ Type TypeResolution::applyUnboundGenericArguments(
     skipRequirementsCheck |= substTy->hasUnboundGenericType();
   }
 
-  const auto substitutions = [&](SubstitutableType *type) -> Type {
-    auto result = QueryTypeSubstitutionMap{subs}(type);
-    if (result->hasTypeParameter()) {
-      if (const auto contextSig = getGenericSignature()) {
-        auto *genericEnv = contextSig.getGenericEnvironment();
-        // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
-        // because we sometimes have type parameters here that are invalid for
-        // our generic signature. This can happen if the type parameter was
-        // found via unqualified lookup, but the current context's
-        // generic signature failed to build because of circularity or
-        // completion failure.
-        return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
-                            LookUpConformanceInModule(),
-                            SubstFlags::PreservePackExpansionLevel);
-      }
-    }
-    return result;
-  };
-
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
+    const auto substitutions = [&](SubstitutableType *type) -> Type {
+      auto result = QueryTypeSubstitutionMap{subs}(type);
+      if (result->hasTypeParameter()) {
+        if (const auto contextSig = getGenericSignature()) {
+          auto *genericEnv = contextSig.getGenericEnvironment();
+          // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
+          // because we sometimes have type parameters here that are invalid for
+          // our generic signature. This can happen if the type parameter was
+          // found via unqualified lookup, but the current context's
+          // generic signature failed to build because of circularity or
+          // completion failure.
+          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                              LookUpConformanceInModule(),
+                              SubstFlags::PreservePackExpansionLevel);
+        }
+      }
+      return result;
+    };
+
     if (hasTypeVariables) {
       ASSERT(requirementOpener && "Must have requirement opener for type vars");
       requirementOpener(decl, substitutions);
@@ -1859,20 +1882,15 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  // For a typealias, use the underlying type. We'll wrap up the result
-  // later.
-  auto typealias = dyn_cast<TypeAliasDecl>(decl);
-  if (typealias) {
-    resultType = typealias->getUnderlyingType();
+  // Apply the substitution map to the interface type of the declaration.
+  if (resultType->hasTypeParameter()) {
+    resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
+                                  LookUpConformanceInModule());
   }
 
-  // Apply the substitution map to the interface type of the declaration.
-  resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule());
-
-  // Form a sugared typealias reference.
-  if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
-    resultType = TypeAliasType::get(typealias, parentTy, genericArgs,
+  // Form a sugared typealias reference if necessary.
+  if (typeAliasDecl && (!parentTy || !parentTy->isAnyExistentialType())) {
+    resultType = TypeAliasType::get(typeAliasDecl, parentTy, genericArgs,
                                     resultType);
   }
 
@@ -2213,7 +2231,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
 
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
-      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal())
+      if (auto typeDecl = parentType->getNominalDecl())
         diagnose(typeDecl, diag::decl_declared_here, typeDecl);
     }
   }
@@ -2283,6 +2301,37 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
              declaredType)
         .fixItReplace(repr->getNameLoc().getSourceRange(),
                       declaredType.getString());
+  }
+}
+
+static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
+                                           const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  auto nameString = typeDecl->getName().str();
+  auto diag = [&](StringRef featureName) {
+    // Don't require this in the standard library or _Concurrency library.
+    auto module = dc->getParentModule();
+    if (module->isStdlibModule() || module->isConcurrencyModule())
+      return;
+  
+    ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature, nameString,
+                       featureName);
+  };
+
+  if (nameString == "Cell" ||
+      nameString == "ConstCell" ||
+      nameString == "Volatile") {
+    if (ctx.LangOpts.hasFeature(Feature::Cells))
+      return;
+
+    diag(Feature::Cells.getName());
   }
 }
 
@@ -2419,6 +2468,8 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseExperimentalStdlibTypes(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -4307,7 +4358,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
       // types.
-      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+      if (auto SD = ty->getStructDecl()) {
         if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
             ownership == ParamSpecifier::InOut) {
           diagnose(eltTypeRepr->getLoc(),
@@ -5074,9 +5125,19 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  // Function values with execution semantics own their context, so they must
+  // be thick.
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto *called = claim<CalledTypeAttr>(attrs))
-    executionSemantics = called->getExecutionSemantics();
+  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+    if (representation != SILFunctionType::Representation::Thick) {
+      assert(conventionAttr);
+      diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                      diag::invalid_called_and_attr_attributes, conventionAttr);
+      hasError = true;
+    } else {
+      executionSemantics = called->getExecutionSemantics();
+    }
+  }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
@@ -5578,10 +5639,46 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
   return result->hasError() ? ErrorType::get(ctx) : result;
 }
 
+/// Returns true if a reference to Deinitable in the given position is part of
+/// a `~Deinitable` that the NondeinitableTypes feature allows: in the
+/// inheritance clause of a struct or an enum, or on a generic parameter or an
+/// associated type.
+static bool canSuppressDeinitable(TypeResolutionOptions options,
+                                  DeclContext *dc) {
+  if (!dc->getASTContext().LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  if (!options.is(TypeResolverContext::Inverted))
+    return false;
+
+  switch (options.getBaseContext()) {
+  case TypeResolverContext::Inherited:
+    return isa<StructDecl>(dc) || isa<EnumDecl>(dc);
+  case TypeResolverContext::GenericParameterInherited:
+  case TypeResolverContext::AssociatedTypeInherited:
+  case TypeResolverContext::GenericRequirement:
+    return true;
+  default:
+    return false;
+  }
+}
+
 NeverNullType
 TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                      TypeResolutionOptions options) {
   Type result = resolveDeclRefTypeReprRec(repr, options);
+
+  // The compiler reserves Deinitable for its own use.
+  if (auto *protoTy = result->getAs<ProtocolType>()) {
+    if (protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Deinitable) &&
+        !getDeclContext()->getParentModule()->isStdlibModule() &&
+        !canSuppressDeinitable(options, getDeclContext())) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::deinitable_reserved);
+      repr->setInvalid();
+      return ErrorType::get(getASTContext());
+    }
+  }
 
   // Diagnose an error if generic arguments are missing.
   if (result->is<UnboundGenericType>() && !repr->hasGenericArgList() &&
@@ -6523,28 +6620,12 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   bool hadError = false;
   bool foundDupLabel = false;
-  std::optional<unsigned> moveOnlyElementIndex = std::nullopt;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     auto ty = resolveType(tyR, elementOptions);
     if (ty->hasError()) {
       hadError = true;
-    }
-    // Tuples with move-only elements aren't yet supported.
-    // Track the presence of a noncopyable field for diagnostic purposes only.
-    // We don't need to re-diagnose if a tuple contains another tuple, though,
-    // since we should've diagnosed the inner tuple already.
-    // FIXME: This won't diagnose if the type contains unbound generics
-    if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
-        !options.contains(TypeResolutionFlags::SILMode) &&
-        inStage(TypeResolutionStage::Interface) &&
-        !moveOnlyElementIndex.has_value() && !ty->hasUnboundGenericType() &&
-        !ty->hasTypeVariable() && !isa<TupleTypeRepr>(tyR)) {
-      auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
-          resolution.getGenericSignature().getGenericEnvironment(), ty);
-      if (!contextTy->hasError() && contextTy->isNoncopyable())
-        moveOnlyElementIndex = i;
     }
 
     auto eltName = repr->getElementName(i);
@@ -6594,12 +6675,28 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !elements[0].getType()->is<PackExpansionType>())
       return elements[0].getType();
   }
-  
-  if (moveOnlyElementIndex.has_value()) {
-    auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
-    auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
-    assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
-    diagnose(loc, diag::tuple_move_only_not_supported, noncopyableTy);
+
+  // Diagnose the first element that a tuple can't contain. A nested tuple
+  // was already diagnosed when it was resolved.
+  // FIXME: This won't diagnose if the type contains unbound generics
+  if (!options.contains(TypeResolutionFlags::SILMode) &&
+      inStage(TypeResolutionStage::Interface)) {
+    auto *genericEnv = resolution.getGenericSignature().getGenericEnvironment();
+    for (unsigned i : indices(elements)) {
+      auto *tyR = repr->getElementType(i);
+      auto ty = elements[i].getType();
+      if (ty->hasUnboundGenericType() || ty->hasTypeVariable() ||
+          isa<TupleTypeRepr>(tyR))
+        continue;
+
+      auto contextTy =
+          GenericEnvironment::mapTypeIntoEnvironment(genericEnv, ty);
+      if (contextTy->hasError())
+        continue;
+
+      if (diagnoseUnsupportedTupleElement(contextTy, tyR->getLoc(), ctx))
+        break;
+    }
   }
 
   return TupleType::get(elements, ctx);
@@ -6774,6 +6871,13 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
       auto *proto = getASTContext().getProtocol(kp);
       for (auto *otherProto : layout.getProtocols()) {
+        // If Copyable implies Deinitable, then applyInverses() explains that
+        // `~Deinitable` also requires `~Copyable`.
+        if (ip == InvertibleProtocolKind::Deinitable &&
+            otherProto->isSpecificProtocol(KnownProtocolKind::Copyable) &&
+            InverseRequirement::copyableImpliesDeinitable(getASTContext()))
+          continue;
+
         if (proto == otherProto ||
             otherProto->inheritsFrom(proto)) {
           diagnose(repr->getLoc(),

@@ -13,6 +13,8 @@
 #ifndef SWIFT_AST_REFERENCE_COUNTING_H
 #define SWIFT_AST_REFERENCE_COUNTING_H
 
+#include <cstdint>
+
 namespace swift {
 
 /// The kind of reference counting implementation a heap object uses.

@@ -222,7 +222,11 @@ extension _StringObject {
     object: AnyObject, discriminator: UInt64, countAndFlags: CountAndFlags
   ) {
     defer { _fixLifetime(object) }
-    let builtinRawObject: Builtin.Int64 = Builtin.reinterpretCast(object)
+    // Remove high bits set in the pointer where our flags go.
+    let rawObject: UInt64 = Builtin.reinterpretCast(object)
+    let maskedObject = rawObject & ~Nibbles.pointerHighBits()
+
+    let builtinRawObject: Builtin.Int64 = maskedObject._value
     let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.reinterpretCast(
@@ -235,7 +239,9 @@ extension _StringObject {
   internal init(
     pointerBits: UInt64, discriminator: UInt64, countAndFlags: CountAndFlags
   ) {
-    let builtinValueBits: Builtin.Int64 = pointerBits._value
+    // Remove high bits set in the pointer where our flags go.
+    let maskedPointerBits = pointerBits & ~Nibbles.pointerHighBits()
+    let builtinValueBits: Builtin.Int64 = maskedPointerBits._value
     let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
@@ -397,6 +403,15 @@ extension _StringObject.Nibbles {
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
   static internal var discriminatorMask: UInt64 { return ~largeAddressMask }
+
+  @export(implementation) @inline(__always)
+  static internal func pointerHighBits() -> UInt64 {
+    // High bits that must be masked out of a pointer in order to make the high
+    // bits available for flags. This can be used to accommodate targets
+    // that use the high part of the address space. Most targets use zero. Must
+    // match HeapObject.bridgeObjectPointerHighBits on embedded.
+    0x0000_0000_0000_0000
+  }
 }
 
 extension _StringObject.Nibbles {
@@ -941,7 +956,7 @@ extension _StringObject {
   internal var largeAddressBits: UInt {
     _internalInvariant(isLarge)
     return UInt(truncatingIfNeeded:
-      discriminatedObjectRawBits & Nibbles.largeAddressMask)
+      (discriminatedObjectRawBits & Nibbles.largeAddressMask) | Nibbles.pointerHighBits())
   }
 
   @inline(__always)

@@ -33,6 +33,9 @@ endif()
 function(generate_windows_vfs_overlay)
   file(TO_CMAKE_PATH ${VCToolsInstallDir} VCToolsInstallDir)
   file(TO_CMAKE_PATH ${UniversalCRTSdkDir} UniversalCRTSdkDir)
+  file(TO_CMAKE_PATH ${WindowsSdkDir} WindowsSdkDir)
+  string(REGEX REPLACE "[/\\\\]+$" "" WindowsSDKVersion
+         "${WindowsSDKVersion}")
   configure_file("${PROJECT_SOURCE_DIR}/cmake/WindowsVFS.yaml.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
                  @ONLY)
@@ -41,6 +44,8 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
   generate_windows_vfs_overlay()
   file(TO_CMAKE_PATH "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
        SWIFT_WINDOWS_VFS_OVERLAY)
+  set(SWIFT_WINDOWS_MODULE_MAP
+      "${WindowsSdkDir}/Include/${WindowsSDKVersion}/module.modulemap")
 endif()
 
 #
@@ -204,7 +209,8 @@ function(swift_create_stdlib_targets name variant define_all_alias)
 endfunction()
 
 if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
-   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+   AND NOT SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+   AND "${SWIFT_THREADING_PACKAGE}" STREQUAL "none")
   message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
 endif()
 

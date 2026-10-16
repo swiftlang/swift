@@ -2338,6 +2338,14 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 bool IRGenModule::finalize() {
+  if (getOptions().DumpAbstractTypeLayoutInfo !=
+      IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
+    for (auto type : Context.getRecoveredHiddenTypes()) {
+      auto hidden = cast<HiddenType>(type);
+      dumpAbstractTypeLayoutInfo(type, hidden->getMangledName(), "recovery");
+    }
+  }
+
   const char *ModuleHashVarName = "llvm.swift_module_hash";
   if (IRGen.Opts.OutputKind == IRGenOutputKind::ObjectFile &&
       !Module.getGlobalVariable(ModuleHashVarName) &&
@@ -2495,7 +2503,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (!Triple.isOSDarwin() && !Context.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  auto *clDecl = objectType.getClassDecl();
   if (!clDecl)
     return false;
 

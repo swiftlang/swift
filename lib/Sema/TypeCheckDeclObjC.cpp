@@ -196,7 +196,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for classes.
-  if (auto *CD = T->getClassOrBoundGenericClass()) {
+  if (auto *CD = T->getClassDecl()) {
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
           .highlight(TypeRange)
@@ -212,7 +212,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for structs.
-  if (auto *SD = T->getStructOrBoundGenericStruct()) {
+  if (auto *SD = T->getStructDecl()) {
     if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
       // This can be a non-trivial C++ record.
       diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class,
@@ -260,7 +260,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
     // See if the superclass is not @objc.
     if (auto superclass = layout.explicitSuperclass) {
-      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
+      if (!superclass->getClassDecl()->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_class_constraint,
                        superclass)
             .limitBehavior(behavior);
@@ -400,28 +400,6 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    // The C++ ABI decides whether the callee owns a non-trivial class passed
-    // by value (it does not under Itanium, it does under Microsoft), so
-    // `borrowing` and `consuming` each contradict one ABI. Only the default
-    // ownership follows the ABI.
-    auto ownership = param->getValueOwnership();
-    if (language == ForeignLanguage::Cxx &&
-        (ownership == ValueOwnership::Shared ||
-         ownership == ValueOwnership::Owned) &&
-        importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
-      softenIfAccessNote(AFD, Reason.getAttr(),
-                         diags
-                             .diagnose(param->getStartLoc(),
-                                       diag::cxx_param_ownership_unsupported,
-                                       AFD, param,
-                                       ownership == ValueOwnership::Owned)
-                             .highlight(param->getSourceRange())
-                             .limitBehavior(behavior));
-      Reason.describe(AFD);
-
-      return false;
-    }
-
     if (param->getTypeInContext()->hasError())
       return false;
 
@@ -439,7 +417,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     // Permit '()' when this method overrides a method with a
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
-    AbstractFunctionDecl *overridden;
+    AbstractFunctionDecl *overridden = nullptr;
     if (param->getTypeInContext()->isVoid() && AFD->hasThrows() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
@@ -498,7 +476,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clazz = type->getClassOrBoundGenericClass();
+  auto clazz = type->getClassDecl();
   if (!clazz)
     return false;
 
@@ -741,7 +719,8 @@ bool swift::isRepresentableInLanguage(
     return false;
 
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
-  if (AFD->isOperator()) {
+  // A `@cxx` implementation of a C++ operator may be a Swift operator.
+  if (AFD->isOperator() && language != ForeignLanguage::Cxx) {
     AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
                     ? diag::objc_operator_proto
                     : diag::objc_operator))
@@ -1098,8 +1077,7 @@ bool swift::isRepresentableInLanguage(
     }
 
     // Determine the parameter index at which the error will go.
-    unsigned errorParameterIndex;
-    bool foundErrorParameterIndex = false;
+    std::optional<unsigned> errorParameterIndex;
 
     // If there is an explicit @objc attribute with a name, look for
     // the "error" selector piece.
@@ -1111,15 +1089,13 @@ bool swift::isRepresentableInLanguage(
           // the error parameter.
           auto piece = selectorPieces[i-1];
           if (piece == ctx.Id_error) {
-            errorParameterIndex = i-1;
-            foundErrorParameterIndex = true;
+            errorParameterIndex = i - 1;
             break;
           }
 
           // If the first selector piece ends with "Error", it's here.
           if (i == 1 && camel_case::getLastWord(piece.str()) == "Error") {
-            errorParameterIndex = i-1;
-            foundErrorParameterIndex = true;
+            errorParameterIndex = i - 1;
             break;
           }
         }
@@ -1128,7 +1104,7 @@ bool swift::isRepresentableInLanguage(
 
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
-    if (!foundErrorParameterIndex) {
+    if (!errorParameterIndex) {
       auto *paramList = AFD->getParameters();
       errorParameterIndex = paramList->size();
 
@@ -1140,11 +1116,12 @@ bool swift::isRepresentableInLanguage(
       // 'initFoo'.
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
         if (CD->isObjCZeroParameterWithLongSelector())
-          --errorParameterIndex;
+          --errorParameterIndex.value();
 
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
-        auto type = paramList->get(errorParameterIndex - 1)->getTypeInContext();
+        auto type =
+            paramList->get(errorParameterIndex.value() - 1)->getTypeInContext();
 
         // It can't be a trailing closure unless it has a specific form.
         // Only consider the rvalue type.
@@ -1156,7 +1133,7 @@ bool swift::isRepresentableInLanguage(
 
         // Is it a function type?
         if (!type->is<AnyFunctionType>()) break;
-        --errorParameterIndex;
+        --errorParameterIndex.value();
       }
     }
 
@@ -1167,7 +1144,7 @@ bool swift::isRepresentableInLanguage(
     switch (kind) {
     case ForeignErrorConvention::ZeroResult:
       errorConvention = ForeignErrorConvention::getZeroResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
@@ -1176,7 +1153,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NonZeroResult:
       errorConvention = ForeignErrorConvention::getNonZeroResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
@@ -1185,7 +1162,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::ZeroPreservedResult:
       errorConvention = ForeignErrorConvention::getZeroPreservedResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -1193,7 +1170,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NilResult:
       errorConvention = ForeignErrorConvention::getNilResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -1201,7 +1178,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NonNilError:
       errorConvention = ForeignErrorConvention::getNilResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -4150,12 +4127,48 @@ private:
     return MatchOutcome::WrongType;
   }
 
+  /// The importer drops the `T &` result of e.g. `operator+=`, but the
+  /// implementation must still return it, as a pointer. Returns \p type, the
+  /// imported type of \p decl, with that result restored.
+  static Type restoreCxxOperatorResult(const ValueDecl *decl, Type type) {
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (!clangFD || !clangFD->isOverloadedOperator() ||
+        !clangFD->getReturnType()->isLValueReferenceType())
+      return type;
+    const auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy || !fnTy->getResult()->isVoid())
+      return type;
+    const auto *record = clangFD->getReturnType()->getPointeeCXXRecordDecl();
+    if (!record)
+      return type;
+    const auto *referent = dyn_cast_or_null<NominalTypeDecl>(
+        decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
+            record));
+    if (!referent)
+      return type;
+    // A reference to a foreign reference type is the type itself.
+    Type result = referent->getDeclaredInterfaceType();
+    if (!result->isForeignReferenceType()) {
+      auto kind = clangFD->getReturnType()->getPointeeType().isConstQualified()
+                      ? PTK_UnsafePointer
+                      : PTK_UnsafeMutablePointer;
+      result = result->wrapInPointer(kind);
+      if (!result)
+        return type;
+    }
+    return FunctionType::get(fnTy->getParams(), {}, result, fnTy->getExtInfo());
+  }
+
   static Type getMemberType(ValueDecl *decl) {
+    Type type;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
       if (fn->hasImplicitSelfDecl())
         // Strip off the uncurried `self` parameter.
-        return fn->getMethodInterfaceType();
-    return decl->getInterfaceType();
+        type = fn->getMethodInterfaceType();
+    if (!type)
+      type = decl->getInterfaceType();
+    return restoreCxxOperatorResult(decl, type);
   }
 
   /// Describes an availability mismatch between a requirement and a candidate
@@ -4178,6 +4191,21 @@ private:
     auto &ctx = cand->getASTContext();
     if (ctx.LangOpts.DisableAvailabilityChecking)
       return std::nullopt;
+
+    if (const auto *clangFD =
+            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl())) {
+      // Member operators are imported unavailable in favor of synthesized Swift
+      // operators; that doesn't apply to the C++ operator.
+      if (clangFD->isOverloadedOperator() && req->isUnavailable())
+        return std::nullopt;
+
+      // A pure virtual method of a value type is imported unavailable, as it
+      // has no implementation to call. Implementing it is diagnosed as such
+      // once it matches.
+      if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD))
+        if (method->isPureVirtual() && req->isUnavailable())
+          return std::nullopt;
+    }
 
     std::optional<AvailabilityContext> baseRequirementAvailability;
 
@@ -4305,25 +4333,32 @@ private:
     return matchesImpl(req, cand, explicitObjCName);
   }
 
+  /// A virtual method of a foreign reference type imports as a synthesized
+  /// `__synthesizedVirtualCall_` thunk. Returns the underlying virtual method
+  /// for such a thunk, and \p decl otherwise.
+  static const ValueDecl *getCxxInterface(const ValueDecl *decl) {
+    if (const auto *thunk = dyn_cast<FuncDecl>(decl))
+      if (const auto *original = decl->getASTContext()
+                                     .getClangModuleLoader()
+                                     ->getOriginalForVirtualThunk(thunk))
+        return original;
+    return decl;
+  }
+
   /// Extra validity checks for a successfully matched `@cxx @implementation`
   /// pair. Returns true if an error was diagnosed (the match is invalid).
   bool diagnoseInvalidCxxMatch(ValueDecl *req, ValueDecl *cand) {
     if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
       return false;
 
-    // A virtual method of a foreign reference type matches the importer's
-    // synthesized `__synthesizedVirtualCall_` thunk. Every check below is
-    // about the underlying virtual method the implementation will provide the
-    // body of.
-    const Decl *interface = req;
-    if (auto *thunk = dyn_cast<FuncDecl>(req))
-      if (auto *original = req->getASTContext().getClangModuleLoader()
-                               ->getOriginalForVirtualThunk(thunk))
-        interface = original;
+    // Every check below is about the underlying virtual method the
+    // implementation will provide the body of.
+    const Decl *interface = getCxxInterface(req);
     const auto *clangFD =
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
+    StringRef cxxName = cast<ValueDecl>(interface)->getCDeclName();
 
     // A @cxx implementation must be the C++ function's one and only
     // definition. Reject a match to a function that is already defined in the
@@ -4339,7 +4374,7 @@ private:
       unsigned reason = clangFD->isDefined()     ? 0
                         : clangFD->isConstexpr() ? 2
                                                  : 1;
-      diagnose(cand, diag::cxx_func_defined, cand, clangFD->getName(), reason);
+      diagnose(cand, diag::cxx_func_defined, cand, cxxName, reason);
       return true;
     }
 
@@ -4378,19 +4413,57 @@ private:
           return param->getType()->isRValueReferenceType();
         });
     if (usesRValueReferences) {
-      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
-               clangFD->getName());
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand, cxxName);
       return true;
     }
 
-    // An lvalue reference parameter is implemented by an `inout` or a by-value
-    // parameter. C++ callers may pass aliasing references, which `inout` and
-    // by-value parameters let the optimizer assume away, so the implementation
+    auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+
+    // Check value ownership.
+    for (unsigned i = 0, n = params->size(); i != n; ++i) {
+      auto *param = params->get(i);
+      auto ownership = param->getValueOwnership();
+      clang::QualType clangType = clangFD->getParamDecl(i)->getType();
+
+      // A `const T &` parameter is borrowed for the call, so the implementation
+      // must spell it `borrowing`.
+      if (clangType->isLValueReferenceType() &&
+          clangType->getPointeeType().isConstQualified()) {
+        if (ownership == ValueOwnership::Shared)
+          continue;
+        auto diag = diagnose(param->getStartLoc(),
+                             diag::cxx_const_ref_param_requires_borrowing, cand,
+                             cxxName, param);
+        diag.highlight(param->getSourceRange());
+        if (const auto *repr = param->getTypeRepr()) {
+          if (const auto *ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr))
+            diag.fixItReplace(ownershipRepr->getSpecifierLoc(), "borrowing");
+          else
+            diag.fixItInsert(repr->getStartLoc(), "borrowing ");
+        }
+        return true;
+      }
+
+      // The C++ ABI decides whether the callee owns a non-trivial class passed
+      // by value (it does not under Itanium, it does under Microsoft), so
+      // `borrowing` and `consuming` each contradict one ABI.
+      if ((ownership == ValueOwnership::Shared ||
+           ownership == ValueOwnership::Owned) &&
+          importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
+        diagnose(param->getStartLoc(), diag::cxx_param_ownership_unsupported,
+                 cand, cxxName, param, ownership == ValueOwnership::Owned)
+            .highlight(param->getSourceRange());
+        return true;
+      }
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a
+    // `borrowing` parameter. C++ callers may pass aliasing references, which
+    // such parameters let the optimizer assume away, so the implementation
     // must be marked `@unsafe`. A reference to a foreign reference type is
     // exempt: the parameter carries the object, not the reference.
     if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
       auto *loader = cand->getASTContext().getClangModuleLoader();
-      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
       bool diagnosed = false;
       for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
         const auto *clangParam = clangFD->getParamDecl(i);
@@ -4404,8 +4477,7 @@ private:
           continue;
 
         if (!diagnosed) {
-          diagnose(cand, diag::cxx_references_require_unsafe, cand,
-                   clangFD->getName())
+          diagnose(cand, diag::cxx_references_require_unsafe, cand, cxxName)
               .fixItInsert(
                   cand->getAttributeInsertionLoc(/*forModifier=*/false),
                   "@unsafe ");
@@ -4442,17 +4514,44 @@ private:
     return false;
   }
 
+  /// A matched `@cxx @implementation` is marked `override` exactly when the
+  /// C++ method it implements overrides a method of a Swift superclass.
+  void diagnoseCxxOverrideKeyword(ValueDecl *req, ValueDecl *cand) {
+    if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
+      return;
+
+    auto *loader = cand->getASTContext().getClangModuleLoader();
+    auto *overridden = loader->getOverriddenSuperclassMember(req);
+    auto *overrideAttr = cand->getAttrs().getAttribute<OverrideAttr>();
+
+    if (overridden && !overrideAttr) {
+      diagnose(cand, diag::missing_override)
+          .fixItInsert(cand->getStartLoc(), "override ");
+      diagnose(getCxxInterface(overridden), diag::overridden_here);
+      return;
+    }
+
+    if (!overridden && overrideAttr) {
+      const auto *method = dyn_cast_or_null<clang::CXXMethodDecl>(
+          getCxxInterface(req)->getClangDecl());
+      if (method && method->size_overridden_methods() > 0)
+        diagnose(cand, diag::cxx_override_attr_not_superclass, cand,
+                 (*method->begin_overridden_methods())->getParent(),
+                 cand->getDeclContext()->getSelfNominalTypeDecl())
+            .fixItRemove(overrideAttr->getRange());
+      else
+        diagnose(cand, diag::cxx_override_attr_not_override, cand)
+            .fixItRemove(overrideAttr->getRange());
+      overrideAttr->setInvalid();
+    }
+  }
+
   /// Reject a matched `@c` or `@cxx @implementation` pair whose C or C++
   /// declaration returns a reference-counted foreign reference type at +0.
   /// Returns true if an error was diagnosed (the match is invalid).
   bool diagnoseUnretainedForeignResult(ValueDecl *req, ValueDecl *cand) {
-    // A virtual method of a foreign reference type matches the importer's
-    // synthesized thunk. The check is about the underlying virtual method.
-    const Decl *interface = req;
-    if (auto *thunk = dyn_cast<FuncDecl>(req))
-      if (auto *original = req->getASTContext().getClangModuleLoader()
-                               ->getOriginalForVirtualThunk(thunk))
-        interface = original;
+    // The check is about the underlying virtual method.
+    const Decl *interface = getCxxInterface(req);
     const auto *clangFD =
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     const auto *candFD = dyn_cast<FuncDecl>(cand);
@@ -4468,7 +4567,7 @@ private:
     // TODO: Support returning a foreign reference type unretained.
     const auto *resultClass = candFD->getResultInterfaceType()
                                   ->lookThroughAllOptionalTypes()
-                                  ->getClassOrBoundGenericClass();
+                                  ->getClassDecl();
     if (!resultClass || !resultClass->hasRefCountingAnnotations())
       return false;
     if (importer::getOwnershipOfReturnedFRT(clangFD, cand->getASTContext()) ==
@@ -4479,7 +4578,7 @@ private:
     unsigned reason =
         importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
     diagnose(cand, diag::cdecl_unretained_result_unsupported, cand, isCxx,
-             clangFD->getName(), reason);
+             cast<ValueDecl>(interface)->getCDeclName(), reason);
     return true;
   }
 
@@ -4505,6 +4604,7 @@ private:
       if (diagnoseInvalidCxxMatch(req, cand) ||
           diagnoseUnretainedForeignResult(req, cand))
         return;
+      diagnoseCxxOverrideKeyword(req, cand);
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
       // The storage matched, but its accessors may not have.
@@ -4923,7 +5023,7 @@ static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
         /*isReceiver=*/false);
 
   for (auto [paramTy, isReceiver] : operands) {
-    auto *classDecl = paramTy->getClassOrBoundGenericClass();
+    auto *classDecl = paramTy->getClassDecl();
 
     // Immortal foreign reference types have no retain/release to implement.
     if (!classDecl || !classDecl->hasRefCountingAnnotations())

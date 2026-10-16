@@ -13,6 +13,8 @@
 #ifndef SWIFT_SIL_SILTYPEPROPERTIES_H
 #define SWIFT_SIL_SILTYPEPROPERTIES_H
 
+#include <cstdint>
+
 namespace swift {
 
 enum IsLexical_t : bool {

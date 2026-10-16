@@ -1,0 +1,84 @@
+{
+  "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+        {
+          "location" : {
+            "uri" : "file://TMP_DIR/test.swift"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        }
+      ],
+      "columnKind" : "utf16CodeUnits",
+      "results" : [
+        {
+          "level" : "error",
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 9,
+                  "endLine" : 1,
+                  "startColumn" : 8,
+                  "startLine" : 1
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "unable to resolve module dependency: 'DoesNotExist'"
+          },
+          "ruleId" : "dependency_scan_module_not_found",
+          "ruleIndex" : 0
+        },
+        {
+          "level" : "note",
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 9,
+                  "endLine" : 1,
+                  "startColumn" : 8,
+                  "startLine" : 1
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "a dependency of main module 'test'"
+          },
+          "ruleId" : "dependency_as_imported_by_main_module",
+          "ruleIndex" : 1
+        }
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "rules" : [
+            {
+              "id" : "dependency_scan_module_not_found"
+            },
+            {
+              "id" : "dependency_as_imported_by_main_module"
+            }
+          ],
+          "version" : "SWIFT_VERSION"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}

@@ -14,7 +14,7 @@ public func swapRefs(_ a: inout CInt, _ b: inout CInt) {
 }
 
 @unsafe @cxx @implementation
-public func readConstRef(_ x: CInt) -> CInt {
+public func readConstRef(_ x: borrowing CInt) -> CInt {
   return x * 10
 }
 
@@ -56,8 +56,8 @@ public func refOverload(_ x: inout CInt) {
 }
 
 @unsafe @cxx @implementation
-public func refOverload(_ x: CInt) {
-  referencesGlobal = x
+public func refOverload(_ x: borrowing CInt) {
+  referencesGlobal = copy x
 }
 
 @cxx @implementation
@@ -79,6 +79,6 @@ public func bumpTotal(_ acc: inout Accumulator) {
 }
 
 @unsafe @cxx @implementation
-public func readTotal(_ acc: Accumulator) -> CInt {
+public func readTotal(_ acc: borrowing Accumulator) -> CInt {
   return acc.total
 }

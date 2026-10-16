@@ -35,4 +35,4 @@
 
 // Constructors of class templates do not get their default arguments imported.
 // CHECK:      class FRTTemplateCtorWithDefaultArg<CInt> {
-// CHECK-NEXT:   init(_ value: CInt){{$}}
+// CHECK-NEXT:   init(_ value: CInt = cxxDefaultArg){{$}}

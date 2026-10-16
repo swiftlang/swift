@@ -110,7 +110,6 @@ class ModuleType;
 class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
-class ErrorExpr;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -186,7 +185,7 @@ public:
     HasElementArchetype = 0x4000,
 
     /// Whether the type is allocated in the constraint solver arena. This can
-    /// differ from \c HasTypeVariable for types such as placeholders, which do
+    /// differ from \c HasTypeVariable for types such as holes, which do
     /// not have type variables, but we still want to allocate in the solver if
     /// they have a type variable originator.
     SolverAllocated = 0x8000,
@@ -200,7 +199,10 @@ public:
     /// Whether this type contains an unsafe type.
     IsUnsafe = 0x040000,
 
-    Last_Property = IsUnsafe
+    /// This type contains a type hole.
+    HasHole = 0x080000,
+
+    Last_Property = HasHole
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -249,7 +251,7 @@ public:
   bool hasElementArchetype() const { return Bits & HasElementArchetype; }
 
   /// Whether the type is allocated in the constraint solver arena. This can
-  /// differ from \c hasTypeVariable() for types such as placeholders, which
+  /// differ from \c hasTypeVariable() for types such as holes, which
   /// do not have type variables, but we still want to allocate in the solver if
   /// they have a type variable originator.
   bool isSolverAllocated() const { return Bits & SolverAllocated; }
@@ -275,6 +277,9 @@ public:
 
   /// Does a type with these properties structurally contain a placeholder?
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
+
+  /// Does a type with these properties structurally contain a hole?
+  bool hasHole() const { return Bits & HasHole; }
 
   bool hasParameterPack() const { return Bits & HasParameterPack; }
 
@@ -421,7 +426,7 @@ protected:
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, NumTypeKindBits +
-                             RecursiveTypeProperties::BitWidth + 1 + 3,
+                             RecursiveTypeProperties::BitWidth + 1 + 4,
     /// Kind - The discriminator that indicates what subclass of type this is.
     Kind : NumTypeKindBits,
 
@@ -432,7 +437,8 @@ protected:
 
     ComputedInvertibleConformances : 1,
     IsCopyable : 1,
-    IsEscapable : 1
+    IsEscapable : 1,
+    IsDeinitable : 1
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -463,11 +469,11 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+28,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+25,
     /// Type variable options.
     Options : 7,
     /// The unique number assigned to this type variable.
-    ID : 27
+    ID : 25
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
@@ -493,15 +499,15 @@ protected:
     Representation : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+32,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+31,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     HasExplicitAnyObject : 1,
 
-    : NumPadBits,
-
     /// The number of protocols being composed.
-    Count : 32
+    Count : 31;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
@@ -510,44 +516,44 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
-    : NumPadBits,
-
     /// The number of elements of the tuple.
-    Count : 32
+    Count : 32;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
-    : NumPadBits,
-
     /// The number of elements of the pack.
-    Count : 32
+    Count : 32;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+32,
+  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+31,
     /// Whether elements of the pack are addresses.
     ElementIsAddress : 1,
 
-    : NumPadBits,
-
     /// The number of elements of the pack
-    Count : 32
+    Count : 31;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
-    : NumPadBits,
-
     /// The number of generic arguments.
-    GenericArgCount : 32
+    GenericArgCount : 32;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1+30,
-    : NumPadBits,
-
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+30,
     /// Whether we have a parent type.
     HasParent : 1,
 
     /// The number of generic arguments.
-    GenericArgCount : 31
+    GenericArgCount : 30;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,
@@ -574,6 +580,7 @@ protected:
     Bits.TypeBase.ComputedInvertibleConformances = false;
     Bits.TypeBase.IsCopyable = false;
     Bits.TypeBase.IsEscapable = false;
+    Bits.TypeBase.IsDeinitable = false;
 
     setRecursiveProperties(properties);
   }
@@ -701,8 +708,6 @@ public:
   /// Is this `any Sendable` type?
   bool isSendableExistential();
 
-  bool isPlaceholder();
-
   /// Returns true if this contextual type does not satisfy a conformance to
   /// Copyable.
   bool isNoncopyable();
@@ -712,6 +717,10 @@ public:
 
   /// Returns true if this contextual type satisfies a conformance to Escapable.
   bool isEscapable();
+
+  /// Returns true if this contextual type satisfies a conformance to
+  /// Deinitable, which means that its values can be destroyed implicitly.
+  bool isDeinitable();
 
   /// Returns true if this type satisfies a conformance to Escapable in the
   /// given generic signature.
@@ -749,9 +758,9 @@ public:
   }
 
   // Convenience for checking whether the given type either has a type
-  // variable or placeholder.
-  bool hasTypeVariableOrPlaceholder() const {
-    return hasTypeVariable() || hasPlaceholder();
+  // variable or hole.
+  bool hasTypeVariableOrHole() const {
+    return hasTypeVariable() || hasHole();
   }
 
   /// Determine where this type is a type variable or a dependent
@@ -761,6 +770,11 @@ public:
   /// Determine whether this type involves a \c PlaceholderType.
   bool hasPlaceholder() const {
     return getRecursiveProperties().hasPlaceholder();
+  }
+
+  /// Determine whether this type involves a \c HoleType.
+  bool hasHole() const {
+    return getRecursiveProperties().hasHole();
   }
 
   /// Determine whether the type involves a PrimaryArchetypeType *or* a
@@ -1159,15 +1173,15 @@ public:
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
-  ClassDecl *getClassOrBoundGenericClass() const;
+  ClassDecl *getClassDecl() const;
 
   /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
-  StructDecl *getStructOrBoundGenericStruct();
+  StructDecl *getStructDecl();
   
   /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
-  EnumDecl *getEnumOrBoundGenericEnum();
+  EnumDecl *getEnumDecl();
 
   /// If this is a class, check if this class is a foreign reference type.
   bool isForeignReferenceType();
@@ -1365,7 +1379,7 @@ public:
 
   /// If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
-  NominalTypeDecl *getNominalOrBoundGenericNominal();
+  NominalTypeDecl *getNominalDecl();
 
   /// If this is a nominal type, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
@@ -1441,10 +1455,10 @@ public:
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
 
-  /// Replace all type variables and placeholders in the type with ErrorType.
+  /// Replace all type variables and holes in the type with ErrorType.
   /// This is necessary in a small number of cases where we need to ensure that
   /// a type isn't solver allocated, for e.g diagnostic printing.
-  Type replaceTypeVariablesAndPlaceholdersWithErrors();
+  Type replaceTypeVariablesAndHolesWithErrors();
 
   /// Assumes this is a nominal type. Returns a substitution map that sends each
   /// generic parameter of the declaration's generic signature to the corresponding
@@ -2915,12 +2929,12 @@ public:
   }
 
   const TupleTypeElt &getElement(unsigned i) const {
-    return getTrailingObjects()[i];
+    return getElements()[i];
   }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return getTrailingObjects()[ElementNo].getType();
+    return getElement(ElementNo).getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -3888,9 +3902,9 @@ public:
   /// variables if present.
   Type getSendableDependentType() const;
 
-  /// A dependent type that determines whether the function is
-  /// @called(atMostOnce). This is only used within the constraint system, and
-  /// will contain type variables if present.
+  /// A dependent type that determines whether the function has exactly-once or
+  /// at-most-once execution semantics. This is only used within the constraint
+  /// system, and will contain type variables if present.
   Type getExecutionSemanticsDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
@@ -6664,7 +6678,7 @@ public:
   /// Returns the type of the element at the given \p index.
   /// This is a lowered SIL type.
   CanType getElementType(unsigned index) const {
-    return getTrailingObjects()[index];
+    return getElementTypes()[index];
   }
 
   SILType getSILElementType(unsigned index) const; // in SILType.h
@@ -8087,10 +8101,10 @@ TypeVariableType : public TypeBase {
       : TypeBase(TypeKind::TypeVariable, &C,
                  RecursiveTypeProperties::HasTypeVariable |
                      RecursiveTypeProperties::SolverAllocated) {
-    // Note: the ID may overflow (current limit is 2^20 - 1).
+    // Note: the ID may overflow (current limit is 2^25 - 1).
     Bits.TypeVariableType.ID = ID;
     if (Bits.TypeVariableType.ID != ID) {
-      llvm::report_fatal_error("Type variable id overflow");
+      ABORT("Type variable id overflow");
     }
   }
 
@@ -8177,33 +8191,58 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorUnionType, Type)
 
-/// PlaceholderType - In the AST, this represents the type of a placeholder `_`.
-/// In the constraint system, this is opened into a type variable, and uses of
-/// PlaceholderType are instead used to represent holes where types cannot be
+/// PlaceholderType - the type of a placeholder `_`, or an implicit type to be
 /// inferred.
 class PlaceholderType : public TypeBase {
-  // NOTE: If you add a new Type-based originator, you'll need to update the
-  // recursive property logic in PlaceholderType::get.
-  using Originator =
-      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
-                         VarDecl *, ErrorExpr *, TypeRepr *, Pattern *>;
+  /// The underlying TypeRepr, or \c nullptr for an implicit placeholder such
+  /// as for an implicitly-typed var.
+  PlaceholderTypeRepr *Repr;
 
-  Originator O;
-
-  PlaceholderType(ASTContext &C, Originator originator,
-                  RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Placeholder, &C, properties), O(originator) {}
+  PlaceholderType(ASTContext &C, PlaceholderTypeRepr *repr)
+      : TypeBase(TypeKind::Placeholder, &C,
+                 RecursiveTypeProperties::HasPlaceholder),
+        Repr(repr) {}
 
 public:
-  static Type get(ASTContext &ctx, Originator originator);
+  static Type get(ASTContext &ctx, PlaceholderTypeRepr *repr);
 
-  Originator getOriginator() const { return O; }
+  PlaceholderTypeRepr *getRepr() const { return Repr; }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Placeholder;
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
+
+/// A constraint system type hole - represents a type that could not be
+/// inferred. Only appears in the constraint system, becomes an ErrorType after
+/// solving.
+///
+/// NOTE: In principle we could instead use ErrorType for this, but:
+/// - We currently have cases where ErrorTypes can leak into the constraint
+///   system without being marked as holes (to mitigate this we refuse to
+///   match any ErrorTypes in `matchTypes`).
+/// - We're not very good at enforcing that solver-allocated ErrorTypes don't
+///   leak out of the constraint system -- currently we handle this by just
+///   always folding them away, see `replaceTypeVariablesAndHolesWithErrors`.
+class HoleType : public TypeBase {
+  Type OrigTy;
+
+  HoleType(ASTContext &C, Type origTy, RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Hole, &C, properties), OrigTy(origTy) {}
+
+public:
+  static Type get(Type origTy);
+
+  /// Retrieve the original type, which in most cases is a TypeVariableType or
+  /// DependentMemberType, but can also be an arbitrary type with an error.
+  Type getOriginator() const { return OrigTy; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hole;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HoleType, Type)
 
 /// A type to represent a type join between a type variable and a concrete type.
 ///
@@ -8293,7 +8332,7 @@ public:
 
   /// Returns the type of the element at the given \p index.
   Type getElementType(unsigned index) const {
-    return getTrailingObjects()[index];
+    return getElementTypes()[index];
   }
 
   bool containsPackExpansionType() const;
@@ -8575,40 +8614,32 @@ class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef MangledName;
-  ModuleDecl *DefiningModule;
   HiddenTypeLayoutInfoDecl *LayoutInfoDecl = nullptr;
   CanType Parent;
 
-  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
-             HiddenTypeLayoutInfoDecl *layoutInfoDecl, CanType parent,
-             const ASTContext &ctx)
+  HiddenType(StringRef mangledName, HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+             CanType parent, const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx,
                  parent ? parent->getRecursiveProperties()
                         : RecursiveTypeProperties()),
-        MangledName(mangledName), DefiningModule(definingModule),
-        LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
+        MangledName(mangledName), LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
 
 public:
   static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
-                         ModuleDecl *definingModule,
                          HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                          CanType parent);
 
   StringRef getMangledName() const { return MangledName; }
-  ModuleDecl *getDefiningModule() const { return DefiningModule; }
   HiddenTypeLayoutInfoDecl *getLayoutInfoDecl() const { return LayoutInfoDecl; }
   CanType getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    Profile(ID, getMangledName(), getDefiningModule(), getLayoutInfoDecl(),
-            getParent());
+    Profile(ID, getMangledName(), getLayoutInfoDecl(), getParent());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
-                      ModuleDecl *definingModule,
                       HiddenTypeLayoutInfoDecl *layoutInfoDecl,
                       CanType parent) {
     ID.AddString(mangledName);
-    ID.AddPointer(definingModule);
     ID.AddPointer(layoutInfoDecl);
     ID.AddPointer(parent.getPointer());
   }
@@ -8703,11 +8734,11 @@ inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
   return isArchetypeOrExistential && !T.isAnyClassReferenceType();
 }
 
-inline ClassDecl *TypeBase::getClassOrBoundGenericClass() const {
-  return getCanonicalType().getClassOrBoundGenericClass();
+inline ClassDecl *TypeBase::getClassDecl() const {
+  return getCanonicalType().getClassDecl();
 }
 
-inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
+inline ClassDecl *CanType::getClassDecl() const {
   if (auto classTy = dyn_cast<ClassType>(*this))
     return classTy->getDecl();
 
@@ -8717,11 +8748,11 @@ inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
   return nullptr;
 }
 
-inline StructDecl *TypeBase::getStructOrBoundGenericStruct() {
-  return getCanonicalType().getStructOrBoundGenericStruct();
+inline StructDecl *TypeBase::getStructDecl() {
+  return getCanonicalType().getStructDecl();
 }
 
-inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
+inline StructDecl *CanType::getStructDecl() const {
   if (auto structTy = dyn_cast<StructType>(*this))
     return structTy->getDecl();
 
@@ -8731,11 +8762,11 @@ inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
   return nullptr;
 }
 
-inline EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
-  return getCanonicalType().getEnumOrBoundGenericEnum();
+inline EnumDecl *TypeBase::getEnumDecl() {
+  return getCanonicalType().getEnumDecl();
 }
 
-inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
+inline EnumDecl *CanType::getEnumDecl() const {
   if (auto enumTy = dyn_cast<EnumType>(*this))
     return enumTy->getDecl();
 
@@ -8745,17 +8776,17 @@ inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
   return nullptr;
 }
 
-inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
-  return getCanonicalType().getNominalOrBoundGenericNominal();
+inline NominalTypeDecl *TypeBase::getNominalDecl() {
+  return getCanonicalType().getNominalDecl();
 }
 
-inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
+inline NominalTypeDecl *CanType::getNominalDecl() const {
   if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
     return Ty->getDecl();
   if (auto Ty = dyn_cast<ExistentialType>(*this))
-    return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
+    return Ty->getConstraintType()->getNominalDecl();
   if (auto Ty = dyn_cast<ParameterizedProtocolType>(*this))
-    return Ty->getBaseType()->getNominalOrBoundGenericNominal();
+    return Ty->getBaseType()->getNominalDecl();
   return nullptr;
 }
 

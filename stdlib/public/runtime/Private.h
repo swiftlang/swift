@@ -584,6 +584,10 @@ public:
   /// \param context When non-NULL, receives any information about the
   /// execution context that is required to use this conformance.
   ///
+  /// \param numParamsExemptFromInvertibleChecks The number of leading generic
+  /// parameters whose arguments are not checked against the implicit
+  /// invertible protocol requirements (Copyable, Escapable).
+  ///
   /// \returns the error if an error occurred, None otherwise.
   std::optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericParamDescriptor> genericParams,
@@ -592,7 +596,8 @@ public:
       SubstGenericParameterRefFn substGenericParam,
       SubstGenericParameterOrdinalRefFn substGenericParamOrdinal,
       SubstDependentWitnessTableRefFn substWitnessTable,
-      ConformanceExecutionContext *context);
+      ConformanceExecutionContext *context,
+      unsigned numParamsExemptFromInvertibleChecks = 0);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when

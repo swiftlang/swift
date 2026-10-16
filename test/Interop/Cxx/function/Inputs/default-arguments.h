@@ -157,3 +157,17 @@ struct InvalidStruct {
   void invalidDefaultExprMethod(Base<T> x = RequiresDef<T>()) const {}
 };
 typedef InvalidStruct<NoDefinition> InvalidStructNoDef;
+
+struct NonDefaultConstructible {
+  int value;
+  NonDefaultConstructible(int value) : value(value) {}
+};
+
+template <typename T>
+struct HasTemplatedCtorWithDefaultArg {
+  int value;
+  HasTemplatedCtorWithDefaultArg(int a, T t = T()) : value(a) {}
+};
+typedef HasTemplatedCtorWithDefaultArg<int> HasTemplatedCtorWithDefaultArgInt;
+typedef HasTemplatedCtorWithDefaultArg<NonDefaultConstructible>
+    HasTemplatedCtorWithDefaultArgNonDefaultConstructible;

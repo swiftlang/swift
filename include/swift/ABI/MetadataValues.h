@@ -1316,12 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    // Values for the enumerated execution semantics. Reserved; the compiler
-    // doesn't emit them yet.
-    ExecutionSemanticsMask = 0x00000060U, // two bits
+    // Values for the enumerated execution semantics.
+    ExecutionSemanticsMask = 0x000000E0U, // three bits
     ExecutionSemanticsShift = 5,
 
-    /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
     InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
@@ -1389,13 +1387,13 @@ public:
     return bool(Data & HasSendingResult);
   }
 
+  int_type getIntValue() const {
+    return Data;
+  }
+
   FunctionMetadataExecutionSemantics getExecutionSemantics() const {
     return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
                                               ExecutionSemanticsShift);
-  }
-
-  int_type getIntValue() const {
-    return Data;
   }
 
   InvertibleProtocolSet getInvertedProtocols() const {
@@ -3182,13 +3180,21 @@ public:
   enum {
     /// Whether this is a "distributed" actor function.
     Distributed = 0,
+    /// Whether the accessor this record points at has a leading `isolated (any Actor)?`.
+    HasLeadingImplicitActorIsolationParameter = 1,
   };
 
   explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
   constexpr AccessibleFunctionFlags() {}
 
   /// Whether the this is a "distributed" actor function.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed,
+    isDistributed, setDistributed)
+
+  /// Whether the target function has a leading implicit actor isolation parameter.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLeadingImplicitActorIsolationParameter,
+    hasLeadingImplicitActorIsolationParameter,
+    setHasLeadingImplicitActorIsolationParameter)
 };
 
 } // end namespace swift

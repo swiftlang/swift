@@ -18,7 +18,6 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
@@ -65,26 +64,9 @@ class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
-class StructDecl;
-
 namespace Lowering {
 class TypeConverter;
 }
-
-struct AbstractFieldLayout {
-  uint64_t offset;
-  llvm::StringRef name;
-  AbstractTypeLayout typeLayout;
-};
-
-struct AbstractStructLayout {
-  AbstractTypeLayout typeLayout;
-  llvm::SmallVector<AbstractFieldLayout, 4> fields;
-};
-
-std::optional<AbstractStructLayout>
-computeAbstractStructLayout(const StructDecl *decl,
-                            const IRGenOptions &irgenOpts);
 
 struct ModuleBuffers {
   std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
@@ -517,6 +499,7 @@ public:
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
   std::string getConstValuesFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
+  std::string getSARIFDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
   /// so return the TBDPath when in that mode and fail an assert
@@ -819,7 +802,8 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
-  bool setupCASIfNeeded(ArrayRef<const char *> Args);
+  bool setupCASIfNeeded();
+  bool setupCompileJobBaseKeyIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
   void setupCachingDiagnosticsProcessorIfNeeded();
 

@@ -87,6 +87,19 @@ sil [ossa] @dealloc_box_dead_end : $@convention(thin) () -> () {
   return %retval : $()
 }
 
+// CHECK-LABEL: Begin Error in function diagnose_after_raw
+// CHECK:       SIL verification failed: Only valid in Raw SIL! Should have been eliminated by /some/ diagnostic pass
+// CHECK:       Verifying instruction:
+// CHECK:            [[ARGUMENT:%[^,]+]] = argument
+// CHECK:       ->   diagnose [unpermitted_copy] [[ARGUMENT]]
+// CHECK-LABEL: End Error in function diagnose_after_raw
+sil [ossa] @diagnose_after_raw : $@convention(thin) (@guaranteed C) -> () {
+entry(%c : @guaranteed $C):
+  diagnose [unpermitted_copy] %c : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
 // CHECK-LABEL: Begin Error in function abort_apply_callee_allocated_coro
 // CHECK:       SIL verification failed: abort_apply of callee-allocated yield-once coroutine!?
 // CHECK:       Verifying instruction:

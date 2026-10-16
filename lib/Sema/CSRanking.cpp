@@ -1572,8 +1572,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     // If either of the types have holes or unresolved type variables, we can't
     // compare them. `isSubtypeOf` cannot be used with solver-allocated types.
-    if (type1->hasTypeVariableOrPlaceholder() ||
-        type2->hasTypeVariableOrPlaceholder()) {
+    if (type1->hasTypeVariableOrHole() || type2->hasTypeVariableOrHole()) {
       identical = false;
       continue;
     }
@@ -1630,14 +1629,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // Post-1.0, we'll need to remove this hack in favor of richer constraint
     // declarations.
     if (!(score1 || score2)) {
-      if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType2 = type2->getNominalDecl()) {
         if ((nominalType2->getName() ==
              cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score2;
         }
       }
 
-      if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType1 = type1->getNominalDecl()) {
         if ((nominalType1->getName() ==
              cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score1;

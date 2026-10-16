@@ -1409,6 +1409,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::ErrorUnion:
+    case TypeKind::Hole:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::PrimaryArchetype:
@@ -4331,7 +4332,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   //
   // `dropIsolation` is set here as a workaround because `dropGlobalActor`
   // used to call `withoutIsolation` unconditionally before.
-  if (decl->preconcurrency()) {
+  if (decl->preconcurrencyIncludingInferred()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
                               /*dropIsolation=*/true);
   }
@@ -5036,6 +5037,7 @@ void ASTMangler::appendMacroExpansionContext(
   }
 
   SourceManager &sourceMgr = Context.SourceMgr;
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
 
   auto appendMacroExpansionLoc = [&]() {
     appendIdentifier(origDC->getParentModule()->getName().str());
@@ -5043,11 +5045,10 @@ void ASTMangler::appendMacroExpansionContext(
     auto *SF = origDC->getParentSourceFile();
     appendIdentifier(llvm::sys::path::filename(SF->getFilename()), /*allowRawIdentifiers=*/false);
 
-    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
+    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc, bufferID);
     appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));
   };
 
-  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
   auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
   if (!generatedSourceInfo) {
     return appendMacroExpansionLoc();

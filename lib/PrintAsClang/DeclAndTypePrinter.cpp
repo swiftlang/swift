@@ -58,7 +58,7 @@ using namespace swift;
 using namespace swift::objc_translation;
 
 static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     return classDecl->getName()
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
@@ -673,8 +673,8 @@ private:
             Type objectType;
             OptionalTypeKind optKind;
             std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-                paramType->getNominalOrBoundGenericNominal(), paramType);
-            auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+                paramType->getNominalDecl(), paramType);
+            auto objectTypeDecl = objectType->getNominalDecl();
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
             if (isTriviallyCopyable(objectTypeDecl, optKind)) {
@@ -686,7 +686,7 @@ private:
             } else {
               bool isOptional = false;
               if (!objectTypeDecl) {
-                objectTypeDecl = paramType->getNominalOrBoundGenericNominal();
+                objectTypeDecl = paramType->getNominalDecl();
                 isOptional = true;
               }
               outOfLineOS << "    return swift::";
@@ -840,7 +840,7 @@ private:
                       DeclAndTypePrinter::getObjectTypeAndOptionality(
                           ED, paramType);
                   auto objectTypeDecl =
-                      objectType->getNominalOrBoundGenericNominal();
+                      objectType->getNominalDecl();
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (isTriviallyCopyable(objectTypeDecl, optKind)) {
@@ -856,7 +856,7 @@ private:
                                    "&op, sizeof(op));\n";
                   } else {
                     objectTypeDecl =
-                        paramType->getNominalOrBoundGenericNominal();
+                        paramType->getNominalDecl();
                     outOfLineOS << "    alignas(";
                     owningPrinter.printTypeName(
                         outOfLineOS, paramType,
@@ -2109,7 +2109,7 @@ private:
     assert(genericTy->getGenericArgs().size() == 1);
 
     auto argTy = genericTy->getGenericArgs().front();
-    if (auto classDecl = argTy->getClassOrBoundGenericClass())
+    if (auto classDecl = argTy->getClassDecl())
       os << "IBOutletCollection(" << getNameForObjC(classDecl) << ") ";
     else
       os << "IBOutletCollection(id) ";
@@ -2119,7 +2119,7 @@ private:
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
-    if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+    if (auto classDecl = ty->getClassDecl()) {
       if (classDecl->isForeignReferenceType())
         return false;
 
@@ -2204,7 +2204,7 @@ private:
         copyTy = unwrappedTy;
       }
 
-      auto nominal = copyTy->getNominalOrBoundGenericNominal();
+      auto nominal = copyTy->getNominalDecl();
       if (isa_and_nonnull<StructDecl>(nominal)) {
         if (copyTy->isArray() ||
             copyTy->isDictionary() ||
@@ -2389,7 +2389,7 @@ public:
     Type objcType = conformance.getTypeWitnessByName(ctx.Id_ObjectiveCType);
 
     // Dig out the Objective-C class.
-    return objcType->getClassOrBoundGenericClass();
+    return objcType->getClassDecl();
   }
 
 private:
@@ -2593,7 +2593,7 @@ private:
 
   void visitStructType(StructType *ST,
                        std::optional<OptionalTypeKind> optionalKind) {
-    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ST->getStructDecl();
 
     // Handle known type names.
     if (printIfKnownSimpleType(SD, optionalKind))
@@ -2629,7 +2629,7 @@ private:
 
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
-    const StructDecl *SD = ty->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ty->getStructDecl();
     if (ty->isMarkerExistential()) {
       ty = ctx.getAnyObjectType();
     } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
@@ -2707,7 +2707,7 @@ private:
   visitBoundGenericClassType(BoundGenericClassType *BGT,
                              std::optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
-    auto CD = BGT->getClassOrBoundGenericClass();
+    auto CD = BGT->getClassDecl();
     if (!CD->isObjC())
       return visitType(BGT, optionalKind);
 
@@ -2754,7 +2754,7 @@ private:
 
   void visitClassType(ClassType *CT,
                       std::optional<OptionalTypeKind> optionalKind) {
-    const ClassDecl *CD = CT->getClassOrBoundGenericClass();
+    const ClassDecl *CD = CT->getClassDecl();
     assert(CD->isObjC() || CD->isForeignReferenceType());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
     if (clangDecl) {
@@ -2788,7 +2788,7 @@ private:
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *CD = superclass->getClassOrBoundGenericClass();
+      auto *CD = superclass->getClassDecl();
       assert(CD->isObjC());
       if (isMetatype) {
         os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";

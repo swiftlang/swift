@@ -114,6 +114,41 @@ public:
   };
 };
 
+/// Accept types which don't round-trip correctly due to the type having a
+/// module ABI name be different from the module where the type lives it (via
+/// -module-abi-name).
+class EqualUpToABIModuleName
+    : public CanTypeDifferenceVisitor<EqualUpToABIModuleName> {
+  static bool sameMangledDecl(NominalTypeDecl *reconstructedDecl,
+                              NominalTypeDecl *originalDecl) {
+    // Only accept types that come from two different modules, and that the
+    // modules have different ABI names, and which mangle identically.
+    auto *reconstructedModule = reconstructedDecl->getParentModule();
+    auto *originalModule = originalDecl->getParentModule();
+    if (reconstructedModule == originalModule ||
+        reconstructedModule->getABIName() != originalModule->getABIName())
+      return false;
+    Mangle::ASTMangler mangler(reconstructedDecl->getASTContext());
+    return mangler.mangleNominalType(reconstructedDecl) ==
+           mangler.mangleNominalType(originalDecl);
+  }
+
+public:
+  bool visitNominalType(CanNominalType t1, CanNominalType t2) {
+    return !sameMangledDecl(t1->getDecl(), t2->getDecl());
+  }
+  bool visitBoundGenericType(CanBoundGenericType t1, CanBoundGenericType t2) {
+    if (t1->getDecl() != t2->getDecl() &&
+        !sameMangledDecl(t1->getDecl(), t2->getDecl()))
+      return visitDifferentTypeStructure(t1, t2);
+    return visitComponentArray(t1, t2, t1.getGenericArgs(),
+                               t2.getGenericArgs());
+  }
+  bool check(Type t1, Type t2) {
+    return !visit(t1->getCanonicalType(), t2->getCanonicalType());
+  };
+};
+
 /// FIXME: This should be removed in favor of fixing ASTDemangler to wrap types in
 /// ExistentialType where appropriate.
 static bool equalWithoutExistentialTypes(Type t1, Type t2) {
@@ -1130,7 +1165,8 @@ private:
                  // FIXME: Some existential types are reconstructed without
                  // an explicit ExistentialType wrapping the constraint.
                  !equalWithoutExistentialTypes(Reconstructed, Ty) &&
-                 !EqualUpToClangTypes().check(Reconstructed, Ty)) {
+                 !EqualUpToClangTypes().check(Reconstructed, Ty) &&
+                 !EqualUpToABIModuleName().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
         ABORT([&](auto &out) {
           out << "Incorrect reconstructed type for " << SugaredName << "\n";
@@ -1373,7 +1409,7 @@ private:
     if (!Ty)
       return {false,{}};
     // Go from Pair<Int, Double> to Pair<T, U>.
-    auto *Decl = Ty->getNominalOrBoundGenericNominal();
+    auto *Decl = Ty->getNominalDecl();
     if (!Decl)
       return {false, {}};
     // Go from Pair<Int, Double> to Pair<T, U>.
@@ -1431,7 +1467,7 @@ private:
     // When emitting debug information for a type such as Pair<Int, Double>,
     // emit a description of all the fields for Pair<T, U>, and emit the regular
     // debug information for Pair<Int, Double>.
-    auto *Decl = Type->getNominalOrBoundGenericNominal();
+    auto *Decl = Type->getNominalDecl();
     if (!Decl)
       return nullptr;
 
@@ -2048,6 +2084,7 @@ private:
     case TypeKind::TypeVariable:
     case TypeKind::ErrorUnion:
     case TypeKind::Placeholder:
+    case TypeKind::Hole:
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::Module:
@@ -2836,7 +2873,7 @@ private:
         }
       }
 
-      auto *TypeDecl = T->getNominalOrBoundGenericNominal();
+      auto *TypeDecl = T->getNominalDecl();
       if (!TypeDecl)
         return TypeWalker::Action::Continue;
 
@@ -2919,7 +2956,7 @@ private:
   /// @_originallyDefinedIn. Returns null if no type is annotated.
   NominalTypeDecl *getDeclAnnotatedByOriginallyDefinedIn(DebugTypeInfo DbgTy) {
     auto Type = DbgTy.getType();
-    auto *TypeDecl = Type->getNominalOrBoundGenericNominal();
+    auto *TypeDecl = Type->getNominalDecl();
     if (!TypeDecl)
       return nullptr;
 
@@ -2977,7 +3014,7 @@ private:
       TypeDecl = AliasDecl;
       Context = AliasDecl->getParent();
       ClangDecl = AliasDecl->getClangDecl();
-    } else if (auto *ND = DbgTy.getType()->getNominalOrBoundGenericNominal()) {
+    } else if (auto *ND = DbgTy.getType()->getNominalDecl()) {
       TypeDecl = ND;
       // If this is an originally defined in type, we want to emit this type's
       // scope to be the ABI module.

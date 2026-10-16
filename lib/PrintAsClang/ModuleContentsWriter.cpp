@@ -987,6 +987,10 @@ public:
         // Immediately filter out invalid extensions.
         if (ED->isInvalid())
           return true;
+        // With lazy type checking, an extension of an unresolvable type
+        // might not have been diagnosed and marked invalid yet.
+        if (!ED->getExtendedNominal())
+          return true;
         if (outputLangMode == OutputLanguageMode::Cxx)
           return false;
         auto baseClass = ED->getSelfClassDecl();

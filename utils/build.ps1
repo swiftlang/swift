@@ -484,7 +484,7 @@ $PythonModules = @{
   "psutil" = @{
     Version = "6.1.0";
     SHA256 = @{
-      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      AMD64 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
       ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     };
     Dependencies = @();
@@ -494,6 +494,31 @@ $PythonModules = @{
     SHA256 = @{
       AMD64 = "416260257577718c05135c55958b674000baef9a1c7d9e8f306ec60d71db850f";
       ARM64 = "d89c3468de4cdc4f08a57e214384d0471911a3830fcdaf7a8cc587e42a866372";
+    };
+    Dependencies = @("cffi", "pycparser", "typing_extensions");
+  };
+  "cffi" = @{
+    Version = "2.0.0";
+    # There is no cp310 win_arm64 wheel; ARM64 builds from the sdist.
+    SHA256 = @{
+      AMD64 = "b18a3ed7d5b3bd8d9ef7a8cb226502c6bf8308df1525e1cc676c3680e7176739";
+      ARM64 = "44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529";
+    };
+    Dependencies = @();
+  };
+  "pycparser" = @{
+    Version = "2.23";
+    SHA256 = @{
+      AMD64 = "e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934";
+      ARM64 = "e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934";
+    };
+    Dependencies = @();
+  };
+  "typing_extensions" = @{
+    Version = "4.15.0";
+    SHA256 = @{
+      AMD64 = "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548";
+      ARM64 = "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548";
     };
     Dependencies = @();
   };
@@ -1543,6 +1568,7 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
     $env:WindowsSDKLibVersion = "$WinSDKVersion\"
     $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+    $env:WindowsSdkDir = $CustomWinSDKRoot
     $env:WindowsSDKVersion = "$WinSDKVersion\"
 
     $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
@@ -1614,7 +1640,9 @@ function Get-Dependencies {
 
       $TemporaryDestination = Join-Path -Path $ArtifactCache -ChildPath ".$ExtractPath.$PID.$([Guid]::NewGuid()).tmp"
       try {
-        Expand-Archive -LiteralPath $Source -DestinationPath $TemporaryDestination
+        # Expand-Archive is several times slower on Windows PowerShell 5.1.
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::ExtractToDirectory($Source, $TemporaryDestination)
         $PublishedSource = if ($ArchiveRoot) {
           Join-Path -Path $TemporaryDestination -ChildPath $ArchiveRoot
         } else {
@@ -1741,8 +1769,11 @@ function Get-Dependencies {
     }
 
     function Test-PythonModuleInstalled([string] $ModuleName) {
+      # Also check the dependencies so that caches populated before one was
+      # pinned get repaired.
+      $Modules = @($ModuleName) + $PythonModules[$ModuleName].Dependencies
       try {
-        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$ModuleName') else 1)"
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import importlib.util, sys; sys.exit(0 if all(importlib.util.find_spec(m) for m in sys.argv[1:]) else 1)" @Modules
         return $true
       } catch {
         return $false
@@ -1767,7 +1798,7 @@ function Get-Dependencies {
 
       # Dependencies are pinned above; --require-hashes rejects anything else
       # pip would resolve on its own.
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-deps --disable-pip-version-check
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --disable-pip-version-check
 
       Write-Success "$ModuleName"
     }
@@ -2566,13 +2597,14 @@ function Build-CMakeProject {
     Write-Host "$CMakeBin $cmakeGenerateArgs"
     Invoke-Program $CMakeBin @cmakeGenerateArgs
 
-    # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
-      }
+    # Build all requested targets in one invocation. Test targets such as
+    # ExperimentalTest do not depend on the default target, so build it first.
+    if ($BuildTargets -contains "default") {
+      Invoke-Program $CMakeBin --build $Bin
+    }
+    $Targets = @($BuildTargets | Where-Object { $_ -ne "default" })
+    if ($Targets.Length -gt 0) {
+      Invoke-Program $CMakeBin --build $Bin --target @Targets
     }
 
     if ($BuildTargets.Length -eq 0 -and $InstallTo) {
@@ -3378,7 +3410,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
-      $Targets += @("SwiftCompilerPlugin", "check-swift")
+      # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
+      # need it, so it is built before check-swift starts.
+      $Targets += @("SwiftCompilerPlugin")
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
@@ -3394,6 +3428,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       $LLDBSitePackages = "$CompilerCache\lib\site-packages\lldb"
       New-Item -ItemType Directory -Force $LLDBSitePackages | Out-Null
       foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
+        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+      }
+      $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
+      $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
+      foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
         Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
       }
 
@@ -3513,8 +3552,13 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
+    if ($Targets) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    }
+    if ($TestSwift) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+    }
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {

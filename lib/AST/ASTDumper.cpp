@@ -5154,8 +5154,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Frozen, frozen)
   TRIVIAL_ATTR_PRINTER(GKInspectable, gk_inspectable)
   TRIVIAL_ATTR_PRINTER(GlobalActor, global_actor)
-  TRIVIAL_ATTR_PRINTER(HasHiddenStoredProperties,
-                       has_hidden_stored_properties)
   TRIVIAL_ATTR_PRINTER(HasInitialValue, has_initial_value)
   TRIVIAL_ATTR_PRINTER(HasMissingDesignatedInitializers,
                        has_missing_designated_initializers)
@@ -6342,25 +6340,12 @@ namespace {
 
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
-      auto originator = T->getOriginator();
-      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
-        printRec(typeVar, Label::always("type_variable"));
-      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
-                            Label::optional("originating_var"), DeclColor);
-      } else if (isa<ErrorExpr *>(originator)) {
-        printFlag("error_expr");
-      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
-        printRec(errTy, Label::always("error_type"));
-      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
-        printRec(DMT, Label::always("dependent_member_type"));
-      } else if (isa<TypeRepr *>(originator)) {
-        printFlag("type_repr");
-      } else if (isa<Pattern *>(originator)) {
-        printFlag("pattern");
-      } else {
-        assert(false && "unknown originator");
-      }
+      printFoot();
+    }
+
+    void visitHoleType(HoleType *T, Label label) {
+      printCommon("hole_type", label);
+      printRec(T->getOriginator(), Label::always("originator"));
       printFoot();
     }
 
@@ -6973,6 +6958,9 @@ namespace {
           break;
         case InvertibleProtocolKind::Escapable:
           printFlag("inverse_escapable");
+          break;
+        case InvertibleProtocolKind::Deinitable:
+          printFlag("inverse_deinitable");
           break;
         }
       }

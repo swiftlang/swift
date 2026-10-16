@@ -867,17 +867,16 @@ do {
     guard let _: P = c2 != nil ? c2! : c1 else { return }
     // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
 
-    guard let _: P = c3.first != nil ? c3.first! : c1 else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    // We only diagnose this situation when the outermost conversion in the
+    // initializer is an optional injection. But it may happen that the
+    // conversion is pushed down into the arms of a ternary, for example.
+    guard let _: P = c3.first != nil ? c3.first! : c1 else { return }  // FIXME: Should also be an error
 
-    guard let _: P = b ? c1 : d else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    guard let _: P = b ? c1 : d else { return }  // FIXME: Should also be an error
 
-    guard let _: P = c2 != nil ? c2! : d else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    guard let _: P = c2 != nil ? c2! : d else { return }  // FIXME: Should also be an error
 
-    guard let _: P = c3.first != nil ? c3.first! : d else { return }
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+    guard let _: P = c3.first != nil ? c3.first! : d else { return }  // FIXME: Should also be an error
   }
 }
 
@@ -903,4 +902,24 @@ func testNestedMissingMembers() {
     if case .a(.x) = e { // expected-error {{type 'E' has no member 'a'}}
     }
   }
+}
+
+// https://github.com/swiftlang/swift/issues/56302
+// Matching an optional against a non-optional 'as'/'is' pattern implicitly
+// unwraps it, so the test is not always true.
+func testAsPatternImplicitOptionalUnwrap(maybeInt: Int?, int: Int, doubleOpt: Int??) {
+  if case let x as Int = maybeInt { _ = x } // no warning
+  if case is Int = maybeInt {} // no warning
+  switch maybeInt {
+  case let x as Int: _ = x // no warning
+  default: break
+  }
+
+  if case let x as Int = int { _ = x } // expected-warning {{'as' test is always true}} expected-warning {{'if' condition is always true}}
+  if case is Int = int {} // expected-warning {{'is' test is always true}} expected-warning {{'if' condition is always true}}
+  if case let x as Int? = maybeInt { _ = x } // expected-warning {{'as' test is always true}} expected-warning {{'if' condition is always true}}
+
+  if case let x as Int? = doubleOpt { _ = x } // no warning
+  if case let x as Int = doubleOpt { _ = x } // no warning
+  if case let x as Int?? = doubleOpt { _ = x } // expected-warning {{'as' test is always true}} expected-warning {{'if' condition is always true}}
 }

@@ -1169,7 +1169,7 @@ static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
                                             VarDecl *anonymousFieldDecl) {
   auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
   auto anonymousFieldTypeDecl =
-      anonymousFieldType->getStructOrBoundGenericStruct();
+      anonymousFieldType->getStructDecl();
 
   for (auto decl :
        anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
@@ -1694,7 +1694,12 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
 
   // This default handles C++'s operator[] that returns a value type.
   Expr *propertyExpr = getterImplCallExpr;
-  PointerTypeKind ptrKind;
+
+  // FIXME: Make getAnyPointerElementType accept an optional or return an
+  // optional pair. A contract where the out parameter is set whenever the
+  // result is non-null invites human error.
+  const PointerTypeKind invalidPtrKind = PointerTypeKind(~0U);
+  PointerTypeKind ptrKind = invalidPtrKind;
 
   // The following check returns true if the subscript operator returns a
   // C++ reference type. This check actually checks to see if the type is
@@ -1703,6 +1708,8 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   // here.
   if (!isAddress &&
       getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
+    ASSERT(ptrKind != invalidPtrKind);
+
     // `getterImpl` can return either UnsafePointer or
     // UnsafeMutablePointer. Retrieve the corresponding `.pointee`
     // declaration.
@@ -2366,7 +2373,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     // parameter need no copying: they are part of 'methodType'.
     if (auto *attr = param->getAttr<clang::LifetimeBoundAttr>())
       newParam->addAttr(attr->clone(clangCtx));
-    if (auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+    for (auto *attr : param->specific_attrs<clang::LifetimeCaptureByAttr>())
       newParam->addAttr(attr->clone(clangCtx));
     if (auto *attr = param->getAttr<clang::NoEscapeAttr>())
       newParam->addAttr(attr->clone(clangCtx));
@@ -3285,8 +3292,12 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
           /*OverrideExisting=*/true))
     return nullptr;
 
-  clang::QualType funcTy = clangCtx.getFunctionType(
-      basePtrTy, {derivedPtrTy}, clang::FunctionProtoType::ExtProtoInfo());
+  // The cast can't throw, so say so in its type. Otherwise every call to it
+  // from Swift needs an exception landing pad.
+  clang::FunctionProtoType::ExtProtoInfo prototypeInfo;
+  prototypeInfo.ExceptionSpec.Type = clang::EST_BasicNoexcept;
+  clang::QualType funcTy =
+      clangCtx.getFunctionType(basePtrTy, {derivedPtrTy}, prototypeInfo);
 
   // Build a deterministic, unique name from the mangled canonical types of the
   // derived and base classes, to avoid collisions in the SwiftLookupTable.

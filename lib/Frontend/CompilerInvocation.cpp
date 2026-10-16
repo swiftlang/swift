@@ -2255,6 +2255,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_promote_supertypes,
                    Opts.SolverEnablePromoteSupertypes);
 
+  Opts.SolverEnableShortConversions =
+      Args.hasFlag(OPT_solver_enable_short_conversions,
+                   OPT_solver_disable_short_conversions,
+                   Opts.SolverEnableShortConversions);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
@@ -4197,6 +4202,25 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_dump_abstract_type_layout_info_EQ)) {
+    StringRef kind(A->getValue());
+    if (kind == "sil-type")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::SILType;
+    else if (kind == "type-lowering")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeLowering;
+    else if (kind == "type-info")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeInfo;
+    else if (kind == "all")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::All;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
   }
 
   auto getRuntimeCompatVersion = [&]() -> std::optional<llvm::VersionTuple> {

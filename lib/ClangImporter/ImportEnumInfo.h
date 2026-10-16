@@ -29,6 +29,7 @@ class MacroInfo;
 } // namespace clang
 
 namespace swift {
+class UnifiedStatsReporter;
 namespace importer {
 
 /// Describes how a particular C enumeration type will be imported
@@ -106,6 +107,7 @@ private:
 /// information.
 class EnumInfoCache {
   clang::Preprocessor &clangPP;
+  UnifiedStatsReporter *Stats;
 
   llvm::DenseMap<const clang::EnumDecl *, EnumInfo> enumInfos;
 
@@ -114,7 +116,9 @@ class EnumInfoCache {
   EnumInfoCache &operator = (const EnumInfoCache &) = delete;
 
 public:
-  explicit EnumInfoCache(clang::Preprocessor &cpp) : clangPP(cpp) {}
+  explicit EnumInfoCache(clang::Preprocessor &cpp,
+                         UnifiedStatsReporter *stats = nullptr)
+      : clangPP(cpp), Stats(stats) {}
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl);
 
