@@ -54,7 +54,16 @@ class NotSendable {}
 
 @main struct Main {
   static func main() async {
+    // MARK: - Typed Throws
+
     if #available(SwiftStdlib 6.5, *) {
+      tests.test("continuation typed throws Never") {
+        let stream = AsyncThrowingStream<Void, Never> { continuation in
+          continuation.finish()
+        }
+        for await _ in stream {}
+      }
+
       tests.test("continuation typed throws") {
         let stream = AsyncThrowingStream<Void, SomeError> { continuation in
           continuation.finish(throwing: SomeError())
@@ -79,6 +88,13 @@ class NotSendable {}
           // access member of `SomeError`
           _ = error.value
         }
+      }
+
+      tests.test("unfolding typed throws Never") {
+        let stream = AsyncThrowingStream<Void, Never>(unfolding: {
+          return nil
+        })
+        for await _ in stream {}
       }
     }
 
@@ -954,31 +970,49 @@ class NotSendable {}
 
       // MARK: - Unfolding Initializer
 
-      /*
-       tests.test("unfolding nonisolated(nonsending)") {
-         let stream = AsyncStream<Void>(unfolding: {
-           let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor(),
-           let currentExecutor = currentExecutor.unownedExecutor.asSerialExecutor()
-           expectTrue(mainExecutor === currentExecutor)
-           return nil
-         })
-         for await _ in stream {}
-       }
+      // Check that the nonisolated(nonsending) unfolding closure executes
+      // on the caller's actor ("caller" in this case refers to the actor
+      // on which the `AsyncIteratorProtocol` `next()` / `next(isolation:)`
+      // method runs). Because of a compiler bug with the `#isolation` macro
+      // we first need to explicitly cast to `(any Actor)?` before retrieving
+      // the `SerialExecutor`.
+      tests.test("unfolding closure executes on the caller's actor") {
+        let expectation = Expectation()
+        let stream = AsyncStream<Void>(unfolding: {
+          let currentActor = #isolation as (any Actor)?
+          let currentExecutor = currentActor?.unownedExecutor.asSerialExecutor()
+          let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor()
+          expectTrue(mainExecutor === currentExecutor)
+          expectation.fulfilled = true
+          return nil
+        })
+        for await _ in stream {}
+        expectTrue(expectation.fulfilled) // Check that the unfolding closure ran
+      }
 
-       tests.test("unfolding nonisolated(nonsending) throwing") {
-         let stream = AsyncThrowingStream<Void, Error>(unfolding: {
-           let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor()
-           let currentExecutor = #isolation.unownedExecutor.asSerialExecutor()
-           expectTrue(mainExecutor === currentExecutor)
-           return nil
-         })
-         do {
-           for try await _ in stream {}
-         } catch {
+      // Check that the nonisolated(nonsending) unfolding closure executes
+      // on the caller's actor ("caller" in this case refers to the actor
+      // on which the `AsyncIteratorProtocol` `next()` / `next(isolation:)`
+      // method runs). Because of a compiler bug with the `#isolation` macro
+      // we first need to explicitly cast to `(any Actor)?` before retrieving
+      // the `SerialExecutor`.
+      tests.test("unfolding closure executes on the caller's actor throwing") {
+        let expectation = Expectation()
+        let stream = AsyncThrowingStream<Void, Error>(unfolding: {
+          let currentActor = #isolation as (any Actor)?
+          let currentExecutor = currentActor?.unownedExecutor.asSerialExecutor()
+          let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor()
+          expectTrue(mainExecutor === currentExecutor)
+          expectation.fulfilled = true
+          return nil
+        })
+        do {
+          for try await _ in stream {}
+        } catch {
 
-         }
-       }
-       */
+        }
+        expectTrue(expectation.fulfilled) // Check that the unfolding closure ran
+      }
 
       tests.test("unfolding basic") {
         nonisolated(unsafe) var counter = 0
