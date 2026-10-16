@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
 //
 // REQUIRES: executable_test
 
@@ -64,6 +64,53 @@ CXXCopyConstructorTestSuite.test("Copy constructor with one parameter that has a
   let original = HasCopyConstructorWithOneParameterWithDefaultArg(1)
   let copy = original
   expectTrue(original.numCopies + copy.numCopies > 1)
+}
+
+enum BorrowedCaptureError: Error {
+  case result(CInt)
+}
+
+extension HasUserProvidedCopyConstructor {
+  borrowing func call(_ argument: CInt) -> CInt {
+    withUnsafePointer(to: argument) { pointer in
+      readWithArgument(self, pointer)
+    }
+  }
+
+  borrowing func callNested(_ argument: CInt, shouldThrow: Bool) throws -> CInt {
+    var result: CInt = 0
+    return try withUnsafePointer(to: argument) { input in
+      try withUnsafeMutablePointer(to: &result) { output in
+        output.pointee = readWithArgument(self, input)
+        if shouldThrow {
+          throw BorrowedCaptureError.result(output.pointee)
+        }
+        return output.pointee
+      }
+    }
+  }
+}
+
+CXXCopyConstructorTestSuite.test("Nonescaping closures borrow a C++ receiver") {
+  let value = HasUserProvidedCopyConstructor(0)
+  let initialCopies = getCopyConstructorCount().pointee
+  expectEqual(42, value.call(42))
+  expectEqual(initialCopies, getCopyConstructorCount().pointee)
+
+  expectEqual(43, try! value.callNested(43, shouldThrow: false))
+  expectEqual(initialCopies, getCopyConstructorCount().pointee)
+
+  do {
+    _ = try value.callNested(44, shouldThrow: true)
+    expectUnreachable("expected a thrown result")
+  } catch BorrowedCaptureError.result(let result) {
+    expectEqual(44, result)
+  } catch {
+    expectUnreachable("unexpected error: \(error)")
+  }
+  expectEqual(initialCopies, getCopyConstructorCount().pointee)
+  expectEqual(45, value.call(45))
+  expectEqual(initialCopies, getCopyConstructorCount().pointee)
 }
 
 runAllTests()

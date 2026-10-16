@@ -293,10 +293,18 @@ func testAddressOnlyBorrowingEscapingClosure<T : P>(_ x: borrowing GenericNonTri
 }
 
 func testAddressOnlyBorrowingNonEscapingClosure<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
-    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     func useNonEscaping(_ f: () -> ()) {}
-    useNonEscaping { // expected-note {{consumed here}}
+    useNonEscaping {
         _ = x
+    }
+}
+
+func testAddressOnlyBorrowingNonEscapingClosureConsume<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    func useNonEscaping(_ f: () -> ()) {}
+    useNonEscaping {
+        let y = x // expected-error {{'x' is borrowed and cannot be consumed}}
+        // expected-note @-1 {{consumed here}}
+        _ = y
     }
 }
 
@@ -483,10 +491,8 @@ struct AddressOnlySelfTest<T> {
     }
 
     borrowing func testCallNonEscapingClosure() {
-        // expected-error @-1 {{'self' is borrowed and cannot be consumed}}
-        // TODO: fix
         func f(_ x: () -> ()) {}
-        f { // expected-note {{consumed here}}
+        f {
             _ = self
         }
     }
