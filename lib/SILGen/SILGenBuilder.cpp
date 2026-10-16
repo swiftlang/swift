@@ -107,10 +107,10 @@ ManagedValue SILGenBuilder::createPartialApply(
 ManagedValue
 SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy,
-                                     bool withoutActuallyEscaping) {
+                                     ConvertFunctionInst::Kind kind) {
   CleanupCloner cloner(*this, fn);
   SILValue result = createConvertFunction(loc, fn.forward(getSILGenFunction()),
-                                          resultTy, withoutActuallyEscaping);
+                                          resultTy, kind);
   return cloner.clone(result);
 }
 

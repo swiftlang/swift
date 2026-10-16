@@ -3699,8 +3699,7 @@ void swift::trySpecializeApplyOfGeneric(
           SILBuilderWithScope builder(Apply.getInstruction());
           auto fnType = PAI->getType();
           result =
-              builder.createConvertFunction(Apply.getLoc(), NewPAI, fnType,
-                                            /*withoutActuallyEscaping*/ false);
+              builder.createConvertFunction(Apply.getLoc(), NewPAI, fnType);
         }
         // This is a partial_apply of a re-abstraction thunk. Just skip this.
         assert(PAI->getType() == result->getType());

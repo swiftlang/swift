@@ -1360,8 +1360,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
   if (origFnType != origFnUnsubstType) {
     origFnVal = SGF.B.createConvertFunction(
-        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType));
   }
 
   // Get the derivative function.
@@ -1378,8 +1377,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   if (derivativeFnType != derivativeFnUnsubstType) {
     derivativeFn = SGF.B.createConvertFunction(
         loc, derivativeFn,
-        SILType::getPrimitiveObjectType(derivativeFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(derivativeFnUnsubstType));
   }
 
   // We don't need to destroy the original function or retain the
@@ -1444,8 +1442,7 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   if (transposeFnType != transposeFnUnsubstType) {
     transposeFn = SGF.B.createConvertFunction(
         loc, transposeFn,
-        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType));
     transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
   }
 

@@ -2985,8 +2985,8 @@ void LoadableByAddress::recreateSingleApply(
           callee->getType().castTo<SILFunctionType>(), *currIRMod,
           /*mustTransform*/ true);
       SILType newType = SILType::getPrimitiveObjectType(newFnType);
-      callee = applyBuilder.createConvertFunction(castedApply->getLoc(),
-                                                  callee, newType, false);
+      callee = applyBuilder.createConvertFunction(castedApply->getLoc(), callee,
+                                                  newType);
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
@@ -3232,9 +3232,9 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   }
   case SILInstructionKind::ConvertFunctionInst: {
     auto instr = cast<ConvertFunctionInst>(convInstr);
-    newInstr = convBuilder.createConvertFunction(
-        instr->getLoc(), instr->getOperand(), newType,
-        instr->withoutActuallyEscaping());
+    newInstr =
+        convBuilder.createConvertFunction(instr->getLoc(), instr->getOperand(),
+                                          newType, instr->getConversionKind());
     break;
   }
   case SILInstructionKind::ConvertEscapeToNoEscapeInst: {

@@ -2310,8 +2310,7 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
     = cast<AnyFunctionType>(e->getType()->getCanonicalType());
   SILType resultType = SGF.getLoweredType(destTy);
   SILValue result =
-      SGF.B.createConvertFunction(e, original.forward(SGF), resultType,
-                                  /*Withoutactuallyescaping=*/false);
+      SGF.B.createConvertFunction(e, original.forward(SGF), resultType);
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
@@ -6845,9 +6844,9 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   // verification yet.
   auto closureRepresentation = silFnTy->getExtInfo().getRepresentation();
   if (closureRepresentation != SILFunctionTypeRepresentation::Thick) {
-    auto escapingClosure =
-        SGF.B.createConvertFunction(E, functionValue, escapingFnTy,
-                                    /*WithoutActuallyEscaping=*/true);
+    auto escapingClosure = SGF.B.createConvertFunction(
+        E, functionValue, escapingFnTy,
+        ConvertFunctionInst::Kind::WithoutActuallyEscaping);
     bool isBlockConvention =
         closureRepresentation == SILFunctionTypeRepresentation::Block;
     return visitSubExpr(escapingClosure,

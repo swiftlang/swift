@@ -1058,7 +1058,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation
   ApplySite_getArgumentLocation(BridgedOperand operand) const;
   BRIDGED_INLINE SwiftInt FullApplySite_numIndirectResultArguments() const;
-  BRIDGED_INLINE bool ConvertFunctionInst_withoutActuallyEscaping() const;
+  BRIDGED_INLINE SwiftInt ConvertFunctionInst_getConversionKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType TypeValueInst_getParamType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
   AllocPackInst_getPackType() const;
@@ -1597,7 +1597,9 @@ struct BridgedBuilder{
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAbortApply(BridgedValue value) const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createConvertFunction(BridgedValue originalFunction, BridgedType resultType,
+                        SwiftInt conversionKind) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMakeBorrow(BridgedValue referent) const;
