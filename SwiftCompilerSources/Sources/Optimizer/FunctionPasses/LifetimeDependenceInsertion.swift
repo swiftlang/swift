@@ -229,7 +229,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // addressable dependencies directly depend on the incoming address, unless that address is projected from an
       // unsafe[Mutable]Address accessor. Then it depends on the accessor's 'self', which gatherVariableIntroducers
       // finds.
-      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value)
+      if source.convention.isAddressable(for: source.value)
            && source.value.accessBaseWithScopes.innermostAccess?.unsafeAddressorSelf == nil {
         bases.append(source.value)
         return

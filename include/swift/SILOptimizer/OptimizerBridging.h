@@ -316,7 +316,6 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool noAllocations() const;
 
   // Temporary for AddressableParameters Bootstrapping.
-  BRIDGED_INLINE bool enableAddressDependencies() const;
 
   // Closure specializer
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
