@@ -116,12 +116,60 @@ public:
   void dump();
 };
 
+/// Returns true if the \p fnTy type has an implicit leading `Builtin.ImplicitActor` argument.
+/// The callee does not hop in its prologue, and the caller does not hop back after the call.
+///
+/// This includes:
+/// - nonisolated(nonsending) functions
+/// - closures that keep their static isolation but "behave like" nonisolated(nonsending)
+///   (see `ClosureExpr::behavesLikeNonisolatedNonsending`).
+///
+/// Their implicit leading parameter is not marked isolated, so neither the function type isolation
+/// nor `SILFunction::getActorIsolation()` says nonisolated(nonsending).
+static bool usesNonisolatedNonsendingConvention(CanSILFunctionType fnTy) {
+  if (fnTy->hasNonisolatedNonsendingIsolation())
+    return true;
+  for (auto param : fnTy->getParameters()) {
+    if (param.hasOption(SILParameterInfo::ImplicitLeading) &&
+        isa<BuiltinImplicitActorType>(param.getInterfaceType()))
+      return true;
+  }
+  return false;
+}
+
+/// Returns true if \p inst is an async call with the nonisolated(nonsending)
+/// convention, see `usesNonisolatedNonsendingConvention`.
+static bool isNonisolatedNonsendingAsyncCall(SILInstruction *inst) {
+  auto fas = FullApplySite::isa(inst);
+  return fas && fas.isAsync() &&
+         usesNonisolatedNonsendingConvention(fas.getSubstCalleeType());
+}
+
+/// Determine the actor isolation on which \p function runs on when it is entered.
+static SILValue getEntryActorIsolation(SILFunction *function) {
+  auto isolation = function->getActorIsolation();
+
+  // nonisolated(nonsending) functions are guaranteed to run on the their caller
+  // which is also passed as implicit leading actor parameter, return that actor.
+  if (isolation.isNonisolatedNonsending())
+    return function->maybeGetIsolatedArgument();
+
+  // Get the formal isolation of the function:
+  if (isolation.getKind() == ActorIsolation::ActorInstance &&
+      usesNonisolatedNonsendingConvention(function->getLoweredFunctionType()))
+    return function->maybeGetIsolatedArgument();
+
+  return SILValue(); // nonisolated
+}
+
 /// Search for hop_to_executor instructions and add their operands to \p actors.
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
   int uniqueActorID = 0;
 
-  if (function->getActorIsolation().isNonisolatedNonsending()) {
-    actors[function->maybeGetIsolatedArgument()] = uniqueActorID++;
+  // The entry actor must get an ID even if no hop_to_executor uses it, because
+  // removeRedundantHopToExecutors looks it up as the state at function entry
+  if (SILValue entryActor = getEntryActorIsolation(function)) {
+    actors[entryActor] = uniqueActorID++;
   }
 
   for (SILBasicBlock &block : *function) {
@@ -198,8 +246,15 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
-    if (applySite.isAsync() && !applySite.isNonisolatedNonsending())
+    if (applySite.isAsync()) {
+      // Calling a nonisolated(nonsending) func does not suspend (yet),
+      // we just call it immediately from calling context.
+      if (isNonisolatedNonsendingAsyncCall(inst))
+        return false;
+
+      // It is a plain 'await' that can suspend.
       return true;
+    }
     return false;
   }
   if (isa<AwaitAsyncContinuationInst>(inst))
@@ -222,11 +277,10 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
         return BlockState::NotSet;
       }
 
-      if (function->getActorIsolation().isNonisolatedNonsending()) {
-        auto *fArg =
-            cast<SILFunctionArgument>(function->maybeGetIsolatedArgument());
-        return actors.lookup(SILValue(fArg));
-      }
+      // The entry block has no predecessors, so the dataflow needs to be told
+      // which executor the function runs on when it is entered.
+      if (SILValue entryActor = getEntryActorIsolation(function))
+        return actors.lookup_or(entryActor, BlockState::Unknown);
 
       return BlockState::Unknown;
     }();
@@ -386,26 +440,32 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
     return false;
   }
 
-  // A call to a caller isolation inheriting function does not create dead
-  // executors since caller isolation inheriting functions do not hop in their
-  // prologue.
-  if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() && fas.isNonisolatedNonsending()) {
+  // A nonisolated(nonsending) callee doesn't hop in its prologue, it starts
+  // running on whatever executor it is called on. So the call itself must be
+  // made on the caller's executor, and a hop_to_executor before it is not
+  // dead.
+  if (isNonisolatedNonsendingAsyncCall(inst)) {
     return true;
   }
 
-  // Treat function exits from a caller isolation inheriting function as
+  // Treat function exits from a nonisolated(nonsending) function as
   // requiring the liveness of hop to executors before it.
   //
   // DISCUSSION: We do this since callers of callee functions with isolation
   // inheriting isolation are not required to have a hop after the return from
   // the callee function... so we have no guarantee that there isn't code in the
   // caller that needs this hop to executor to run on the correct actor.
+  //
+  // This also applies to closures that keep their static isolation but are
+  // called with the nonisolated(nonsending) convention because their callers
+  // don't hop back after the call either.
   if (auto *term = dyn_cast<TermInst>(inst);
       term && term->isFunctionExiting()) {
-    if (inst->getFunction()->getActorIsolation().isNonisolatedNonsending()) {
+    auto *fn = inst->getFunction();
+    if (fn->getActorIsolation().isNonisolatedNonsending())
       return true;
-    }
+    if (usesNonisolatedNonsendingConvention(fn->getLoweredFunctionType()))
+      return true;
   }
 
   return inst->mayReadOrWriteMemory();
