@@ -377,6 +377,10 @@ extension String {
     where Input == UnsafeBufferPointer<UInt8>, Encoding == Unicode.ASCII)
   @_specialize(
     where Input == Array<UInt8>, Encoding == Unicode.ASCII)
+  @_specialize(
+    where Input == UnsafeBufferPointer<UInt16>, Encoding == Unicode.UTF16)
+  @_specialize(
+    where Input == Array<UInt16>, Encoding == Unicode.UTF16)
   internal static func _fromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -497,19 +501,27 @@ extension String {
 
   @usableFromInline
   @available(SwiftStdlib 6.0, *)
+  @_specialize(where Encoding == Unicode.ASCII)
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
   internal static func _validate<Encoding: Unicode.Encoding>(
     _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
     as encoding: Encoding.Type
   ) -> String? {
-    if encoding.CodeUnit.self == UInt8.self {
+    if encoding.self == Unicode.ASCII.self {
       let bytes = unsafe _identityCast(input, to: UnsafeBufferPointer<UInt8>.self)
-      if encoding.self == UTF8.self {
-        guard case .success(let info) = unsafe validateUTF8(bytes) else { return nil }
-        return unsafe String._uncheckedFromUTF8(bytes, asciiPreScanResult: info.isASCII)
-      } else if encoding.self == Unicode.ASCII.self {
-        guard unsafe _allASCII(bytes) else { return nil }
-        return unsafe String._uncheckedFromASCII(bytes)
-      }
+      guard unsafe _allASCII(bytes) else { return nil }
+      return unsafe String._uncheckedFromASCII(bytes)
+    }
+    if encoding.self == UTF8.self {
+      let bytes = unsafe _identityCast(input, to: UnsafeBufferPointer<UInt8>.self)
+      guard case .success(let info) = unsafe validateUTF8(bytes) else { return nil }
+      return unsafe String._uncheckedFromUTF8(bytes, asciiPreScanResult: info.isASCII)
+    }
+    if encoding.self == Unicode.UTF16.self {
+      let codeUnits = unsafe _identityCast(
+        input, to: UnsafeBufferPointer<UInt16>.self)
+      return unsafe String._fromUTF16(codeUnits, repairing: false)?.0
     }
 
     return unsafe String._fromCodeUnits(input, encoding: encoding, repair: false)?.0
