@@ -372,6 +372,8 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
 
   auto *closureResultLoc =
       cs.getConstraintLocator({}, ConstraintLocator::ClosureResult);
+  auto *contextLoc =
+      cs.getConstraintLocator({}, ConstraintLocator::ApplyArgToParam);
 
   auto *closureResult = cs.createTypeVariable(closureResultLoc, /*options=*/0);
 
@@ -387,7 +389,7 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
   auto closureResultWithTransitiveVoid = cs.createTypeVariable(closureResultLoc,
                                                                /*options=*/0);
 
-  auto contextualVar = cs.createTypeVariable({}, /*options=*/0);
+  auto contextualVar = cs.createTypeVariable(contextLoc, /*options=*/0);
 
   // Void subtype $T0
   // $T0 subtype $T1

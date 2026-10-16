@@ -420,44 +420,6 @@ do {
   }
 }
 
-// https://github.com/swiftlang/swift/issues/77003
-do {
-  struct Task<E> {
-    init(_: () -> ()) where E == Never {}
-    init(_: () throws -> ()) where E == Error {}
-  }
-
-  func f0<T, U>(_: T.Type, _ fn: (T) -> U, _: (U) -> ()) {}
-
-  func f1<T, U>(_: T.Type, _ fn: (T) -> U?, _: (U) -> ()) {}
-
-  func g1(x: Int?.Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f1(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f2<T, U>(_: T.Type, _ fn: (T) -> (U, U), _: (U) -> ()) {}
-
-  func g2(x: (Int, Int).Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f2(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f3<T, U>(_: T.Type, _ fn: (T) -> [U], _: (U) -> ()) {}
-
-  func g3(x: [Int].Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f3(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f4<T, U>(_: T.Type, _ fn: (T) -> [U?], _: (U) -> ()) {}
-
-  func g4(x: [Int?].Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f4(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-}
-
 // Regression tests for closure returns defaulting to Void.
 // Here, we want to make sure that we don't diagnose ambiguity
 // because there are two places where we can convert to Void
