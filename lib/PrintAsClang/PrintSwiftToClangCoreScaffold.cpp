@@ -219,7 +219,17 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       supportedPrimitiveTypes.push_back(type);
   };
 
-  addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "CChar32"));
+  if (Type unicode = astContext.getNamedSwiftType(stdlibModule, "Unicode")) {
+    if (auto *unicodeEnum = unicode->getEnumOrBoundGenericEnum()) {
+      for (auto *result :
+           unicodeEnum->lookupDirect(astContext.getIdentifier("Scalar"))) {
+        if (auto *scalarDecl = dyn_cast<StructDecl>(result)) {
+          addIfAvailable(scalarDecl->getDeclaredInterfaceType());
+          break;
+        }
+      }
+    }
+  }
 
   if (clangTI.hasInt128Type()) {
     addIfAvailable(astContext.getInt128Type());
