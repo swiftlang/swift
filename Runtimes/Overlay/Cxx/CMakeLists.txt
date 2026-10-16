@@ -13,6 +13,7 @@ add_library(swiftCxx STATIC
   CxxConvertibleToBool.swift
   CxxConvertibleToCollection.swift
   CxxDictionary.swift
+  CxxException.swift
   CxxOptional.swift
   CxxPair.swift
   CxxRandomAccessCollection.swift

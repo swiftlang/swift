@@ -182,11 +182,22 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   return result;
 }
 
+/// Whether \p decl is imported from a C++ function that is imported as
+/// throwing. Such a function must not witness a nonthrowing requirement,
+/// which would let Swift call it without handling its exceptions.
+static bool isImportedFromCxxThrowingFunction(const ValueDecl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (auto *source = ctx.getClangModuleLoader()->getForwardingSource(decl))
+    decl = source;
+  auto *function = dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+  return function && importer::shouldImportCxxFunctionAsThrowing(ctx, function);
+}
+
 template <typename Decl>
 static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
                                                  Identifier id) {
   auto results = lookupDirectWithoutExtensions(decl, id);
-  if (results.size() != 1)
+  if (results.size() != 1 || isImportedFromCxxThrowingFunction(results.front()))
     return nullptr;
   return dyn_cast<Decl>(results.front());
 }
@@ -201,7 +212,8 @@ static ValueDecl *lookupOperator(
   // First look for operator declared as a member.
   auto memberResults = lookupDirectWithoutExtensions(decl, id);
   for (const auto &member : memberResults) {
-    if (isValidSwiftMember(member))
+    if (!isImportedFromCxxThrowingFunction(member) &&
+        isValidSwiftMember(member))
       return member;
   }
 
@@ -215,7 +227,9 @@ static ValueDecl *lookupOperator(
   auto lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
   // Look up operators in the namespace context first.
   for (auto entry : lookupTable->lookupMemberOperators(DeclBaseName(id))) {
-    if (isValidClangGlobal(dyn_cast<clang::FunctionDecl>(entry))) {
+    auto *function = dyn_cast<clang::FunctionDecl>(entry);
+    if (isValidClangGlobal(function) &&
+        !importer::shouldImportCxxFunctionAsThrowing(ctx, function)) {
       return cast_or_null<ValueDecl>(loader->importDeclDirectly(entry));
     }
   }
@@ -228,7 +242,8 @@ static ValueDecl *lookupOperator(
         entry.dyn_cast<clang::NamedDecl *>());
     if (!decl)
       continue;
-    if (isValidClangGlobal(decl)) {
+    if (isValidClangGlobal(decl) &&
+        !importer::shouldImportCxxFunctionAsThrowing(ctx, decl)) {
       return cast_or_null<ValueDecl>(loader->importDeclDirectly(decl));
     }
   }
@@ -759,7 +774,9 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
     // well. Try to instantiate it.
     clang::FunctionDecl *instantiated = instantiateTemplatedOperator(
         impl, clangDecl, clang::BinaryOperatorKind::BO_EQ);
-    if (instantiated && !impl.isUnavailableInSwift(instantiated)) {
+    if (instantiated && !impl.isUnavailableInSwift(instantiated) &&
+        !importer::shouldImportCxxFunctionAsThrowing(impl.SwiftContext,
+                                                     instantiated)) {
       // If `operator==` was instantiated successfully, try to find `func ==`
       // again.
       equalEqual = getEqualEqualOperator(decl);
@@ -819,7 +836,9 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   if (!minus) {
     clang::FunctionDecl *instantiated = instantiateTemplatedOperator(
         impl, clangDecl, clang::BinaryOperatorKind::BO_Sub);
-    if (instantiated && !impl.isUnavailableInSwift(instantiated)) {
+    if (instantiated && !impl.isUnavailableInSwift(instantiated) &&
+        !importer::shouldImportCxxFunctionAsThrowing(impl.SwiftContext,
+                                                     instantiated)) {
       minus = getMinusOperator(decl);
       if (!minus) {
         clang::QualType returnTy = instantiated->getReturnType();
@@ -1043,7 +1062,10 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       lookupCxxZeroArityMethod(clangSema, clangDecl, "begin");
   auto [endConst, endMut] =
       lookupCxxZeroArityMethod(clangSema, clangDecl, "end");
-  if (!beginConst || !endConst)
+  if (!beginConst || !endConst ||
+      importer::shouldImportCxxFunctionAsThrowing(impl.SwiftContext,
+                                                  beginConst) ||
+      importer::shouldImportCxxFunctionAsThrowing(impl.SwiftContext, endConst))
     return;
 
   auto iterTy = beginConst->getReturnType().getCanonicalType();
