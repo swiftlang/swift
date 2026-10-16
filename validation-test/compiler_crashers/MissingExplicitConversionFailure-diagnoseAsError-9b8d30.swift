@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"28423040","signature":"swift::constraints::MissingExplicitConversionFailure::diagnoseAsError()","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"ForceDowncast::diagnose"}
+// {"kind":"typecheck","original":"28423040","signature":"swift::constraints::MissingExplicitConversionFailure::diagnoseAsError()","signatureAssert":"Assertion failed: (isa<X>(Val) && \"cast_if_present<Ty>() argument of incompatible type!\"), function cast_if_present","signatureNext":"ForceDowncast::diagnose"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: OS=macosx
 import Foundation
