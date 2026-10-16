@@ -19,8 +19,10 @@
 // DEFINE:   -Xcc -Xclang -Xcc -detailed-preprocessing-record \
 // DEFINE:   %s
 
-// RUN: %swiftc_driver -emit-module -emit-module-path themod.swiftmodule -Xfrontend -experimental-skip-all-function-bodies  %{args}
-// RUN: %swiftc_driver -index-file -index-file-path %s -index-store-path %t/idx -index-ignore-system-modules %{args}
+// sourcekitd builds modules implicitly, so the compiler invocations must too for
+// the two to share the module cache.
+// RUN: %swiftc_driver -no-explicit-module-build -emit-module -emit-module-path themod.swiftmodule -Xfrontend -experimental-skip-all-function-bodies  %{args}
+// RUN: %swiftc_driver -no-explicit-module-build -index-file -index-file-path %s -index-store-path %t/idx -index-ignore-system-modules %{args}
 // RUN: %sourcekitd-test -req=sema %s -- %{args}
 // RUN: %find_files %t%{fs-sep}mcp 'mymod-*.pcm' | count 1
 

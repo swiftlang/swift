@@ -117,25 +117,39 @@ public:
 
   /// Collect the full module dependency graph for the input.
   ///
+  /// \param MainExecutablePath The path of the compiler executable that will
+  /// build the modules this scan reports, which the scan computes tool
+  /// locations from (see \c createScanQueryContext). Empty if unknown.
+  ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_dependency_result_t otherwise.
   llvm::ErrorOr<swiftscan_dependency_graph_t>
-  getDependencies(ArrayRef<const char *> Command,
-                  StringRef WorkingDirectory);
+  getDependencies(ArrayRef<const char *> Command, StringRef WorkingDirectory,
+                  StringRef MainExecutablePath = {});
 
   /// Collect the set of imports for the input module
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_prescan_result_t otherwise.
   llvm::ErrorOr<swiftscan_import_set_t>
-  getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
+  getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory,
+             StringRef MainExecutablePath = {});
 
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
+  ///
+  /// \param MainExecutablePath The path of the compiler executable that will
+  /// run the jobs for the modules this scan reports. The scan derives the
+  /// locations of the tools and libraries those jobs use from it, for example
+  /// the Clang driver's install directory, which decides where a C++ standard
+  /// library is found. It must be the executable the client will run, or the
+  /// scan and the jobs can find different installations. If empty, the scan
+  /// assumes an executable named \c swiftc without a directory.
   llvm::ErrorOr<ScanQueryContext> createScanQueryContext(
       ArrayRef<const char *> Command, StringRef WorkingDirectory,
       std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
-          &initializationDiagnostics);
+          &initializationDiagnostics,
+      StringRef MainExecutablePath = {});
 
   /// Report that \p Path changed since the previous build.
   void addInvalidatedPath(StringRef Path);

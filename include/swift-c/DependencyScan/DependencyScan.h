@@ -421,8 +421,25 @@ SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
                                    int argc, const char **argv);
 
+/// Set the path of the compiler executable that will run the jobs of the
+/// modules this scan reports, for example the \c swift-frontend the client
+/// will run for each explicit module build job. The scanner finds the
+/// installation of tools and libraries, such as the C++ standard library,
+/// relative to it, as the compiler does, so the scan and the jobs agree on
+/// where they are. If not set, the scanner assumes an executable without a
+/// directory, which finds them differently from a compiler installed in a
+/// toolchain on some systems.
+SWIFTSCAN_PUBLIC void swiftscan_scan_invocation_set_main_executable_path(
+    swiftscan_scan_invocation_t invocation, const char *main_executable_path);
+
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_scan_invocation_get_working_directory(
+    swiftscan_scan_invocation_t invocation);
+
+/// The path set with \c swiftscan_scan_invocation_set_main_executable_path ,
+/// or a null string if there is none. Owned by the invocation.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_scan_invocation_get_main_executable_path(
     swiftscan_scan_invocation_t invocation);
 
 SWIFTSCAN_PUBLIC int
