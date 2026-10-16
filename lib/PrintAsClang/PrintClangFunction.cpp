@@ -808,25 +808,6 @@ static bool printDirectReturnOrParamCType(
   return true;
 }
 
-/// Make adjustments to the Swift parameter name in generated C++, to
-/// avoid things like additional warnings.
-static void renameCxxParameterIfNeeded(const AbstractFunctionDecl *FD,
-                                       std::string &paramName) {
-  if (paramName.empty())
-    return;
-  const auto *enumDecl = FD->getDeclContext()->getSelfEnumDecl();
-  if (!enumDecl)
-    return;
-  // Rename a parameter in an enum method that shadows an existing case name,
-  // to avoid a -Wshadow warning in Clang.
-  for (const auto *Case : enumDecl->getAllElements()) {
-    if (Case->getNameStr() == paramName) {
-      paramName = (llvm::Twine(paramName) + "_").str();
-      return;
-    }
-  }
-}
-
 /// The lifetime dependency of `FD`'s result, if it has one.
 ///
 /// The sources of that dependency are the arguments whose lifetime the returned
@@ -888,7 +869,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     //        colliding functions.
     for (const auto *enumElement : enumDecl->getAllElements()) {
       auto elementName = enumElement->getName();
-      if (!elementName.isSpecial() && elementName.getBaseIdentifier().is(name))
+      if (!elementName.isSpecial() &&
+          cxx_translation::getNameForCxx(enumElement) == name)
         return ClangRepresentation::unsupported;
     }
   }
@@ -1025,8 +1007,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       needsComma = true;
     };
     auto printParamName = [&](const ParamDecl &param) {
-      std::string paramName =
-          param.getName().empty() ? "" : param.getName().str().str();
+      std::string paramName = ClangSyntaxPrinter::getParameterName(FD, &param);
       if (param.isSelfParameter())
         paramName = "_self";
       if (!paramName.empty()) {
@@ -1160,8 +1141,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
               DeclAndTypePrinter::getObjectTypeAndOptionality(
                   param, param->getInterfaceType());
           std::string paramName =
-              param->getName().empty() ? "" : param->getName().str().str();
-          renameCxxParameterIfNeeded(FD, paramName);
+              ClangSyntaxPrinter::getParameterName(FD, param);
           // Always emit a named parameter for the C++ inline thunk to ensure it
           // can be referenced in the body.
           if (kind == FunctionSignatureKind::CxxInlineThunk &&
@@ -1441,12 +1421,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         paramOS << "_";
       paramOS << paramIndex;
     } else {
-      StringRef nameStr = param.getName().str();
+      std::string nameStr = ClangSyntaxPrinter::getParameterName(FD, &param);
       if (isConsumed)
-        paramName += nameStr.str();
+        paramName += nameStr;
       else
         paramName = nameStr;
-      renameCxxParameterIfNeeded(FD, paramName);
     }
     return paramName;
   };
