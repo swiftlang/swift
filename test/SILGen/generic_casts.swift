@@ -21,14 +21,16 @@ func opaque_archetype_to_opaque_archetype
 func opaque_archetype_is_opaque_archetype
 <T:NotClassBound, U>(_ t:T, u:U.Type) -> Bool {
   return t is U
-  // CHECK:   checked_cast_addr_br take_always T in [[VAL:%.*]] : $*T to U in [[DEST:%.*]] : $*U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
-  // CHECK: [[YES]]:
-  // CHECK:   [[Y:%.*]] = integer_literal $Builtin.Int1, -1
-  // CHECK:   destroy_addr [[DEST]]
-  // CHECK:   br [[CONT:bb[0-9]+]]([[Y]] : $Builtin.Int1)
+  // An `is` produces no value, so there is no destination buffer and nothing to
+  // destroy on the success edge. The failure block is now emitted first.
+  // CHECK:   checked_cast_addr_br test_only T in [[VAL:%.*]] : $*T to U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[NO]]:
   // CHECK:   [[N:%.*]] = integer_literal $Builtin.Int1, 0
-  // CHECK:   br [[CONT]]([[N]] : $Builtin.Int1)
+  // CHECK:   br [[CONT:bb[0-9]+]]([[N]] : $Builtin.Int1)
+  // CHECK: [[YES]]:
+  // CHECK:   [[Y:%.*]] = integer_literal $Builtin.Int1, -1
+  // CHECK-NOT: destroy_addr
+  // CHECK:   br [[CONT]]([[Y]] : $Builtin.Int1)
   // CHECK: [[CONT]]([[I1:%.*]] : $Builtin.Int1):
   // CHECK-NEXT:  [[META:%.*]] = metatype $@thin Bool.Type
   // CHECK-NEXT:  function_ref Swift.Bool.init(_builtinBooleanLiteral: Builtin.Int1)
@@ -51,8 +53,9 @@ func opaque_archetype_to_class_archetype
 func opaque_archetype_is_class_archetype
 <T:NotClassBound, U:ClassBound> (_ t:T, u:U.Type) -> Bool {
   return t is U
-  // CHECK: copy_addr {{.*}} : $*T
-  // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to U
+  // The source is read where it lies, so it is no longer copied into a temporary.
+  // CHECK-NOT: copy_addr {{.*}} : $*T
+  // CHECK: checked_cast_addr_br test_only T in [[VAL:%.*]] : {{.*}} to U
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts019class_archetype_to_c1_D0{{[_0-9a-zA-Z]*}}F
@@ -84,7 +87,7 @@ func opaque_archetype_to_addr_only_concrete
 func opaque_archetype_is_addr_only_concrete
 <T:NotClassBound> (_ t:T) -> Bool {
   return t is Unloadable
-  // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to Unloadable in
+  // CHECK: checked_cast_addr_br test_only T in [[VAL:%.*]] : {{.*}} to Unloadable
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts37opaque_archetype_to_loadable_concrete{{[_0-9a-zA-Z]*}}F
@@ -100,7 +103,7 @@ func opaque_archetype_to_loadable_concrete
 func opaque_archetype_is_loadable_concrete
 <T:NotClassBound>(_ t:T) -> Bool {
   return t is S
-  // CHECK: checked_cast_addr_br take_always T in {{%.*}} : $*T to S in
+  // CHECK: checked_cast_addr_br test_only T in {{%.*}} : $*T to S
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts019class_archetype_to_C0{{[_0-9a-zA-Z]*}}F
@@ -136,7 +139,7 @@ func opaque_existential_to_opaque_archetype
 func opaque_existential_is_opaque_archetype
 <T:NotClassBound>(_ p:NotClassBound, _: T) -> Bool {
   return p is T
-  // CHECK:   checked_cast_addr_br take_always any NotClassBound in [[CONTAINER:%.*]] : {{.*}} to T in
+  // CHECK:   checked_cast_addr_br test_only any NotClassBound in [[CONTAINER:%.*]] : {{.*}} to T
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts37opaque_existential_to_class_archetype{{[_0-9a-zA-Z]*}}F
@@ -152,7 +155,7 @@ func opaque_existential_to_class_archetype
 func opaque_existential_is_class_archetype
 <T:ClassBound>(_ p:NotClassBound, _: T) -> Bool {
   return p is T
-  // CHECK: checked_cast_addr_br take_always any NotClassBound in {{%.*}} : $*any NotClassBound to T in
+  // CHECK: checked_cast_addr_br test_only any NotClassBound in {{%.*}} : $*any NotClassBound to T
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts021class_existential_to_C10_archetype{{[_0-9a-zA-Z]*}}F
@@ -180,7 +183,7 @@ func opaque_existential_to_addr_only_concrete(_ p: NotClassBound) -> Unloadable 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts40opaque_existential_is_addr_only_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_is_addr_only_concrete(_ p: NotClassBound) -> Bool {
   return p is Unloadable
-  // CHECK:   checked_cast_addr_br take_always any NotClassBound in {{%.*}} : $*any NotClassBound to Unloadable in
+  // CHECK:   checked_cast_addr_br test_only any NotClassBound in {{%.*}} : $*any NotClassBound to Unloadable
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts39opaque_existential_to_loadable_concrete{{[_0-9a-zA-Z]*}}F
@@ -194,7 +197,7 @@ func opaque_existential_to_loadable_concrete(_ p: NotClassBound) -> S {
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts39opaque_existential_is_loadable_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_is_loadable_concrete(_ p: NotClassBound) -> Bool {
   return p is S
-  // CHECK: checked_cast_addr_br take_always any NotClassBound in {{%.*}} : $*any NotClassBound to S in
+  // CHECK: checked_cast_addr_br test_only any NotClassBound in {{%.*}} : $*any NotClassBound to S
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts021class_existential_to_C0{{[_0-9a-zA-Z]*}}F
@@ -235,6 +238,8 @@ func optional_any_conditionally_to_opaque_archetype<T>(_ x: Any?) -> T? {
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts32optional_any_is_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_is_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
   return x is T
+  // Despite the `is`, this digs into the optional operand, so Sema desugars it
+  // into a value-producing conditional cast rather than a plain type test.
   // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to T in {{%.*}} : $*T
 }
 
@@ -258,7 +263,7 @@ func optional_any_is_optional_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
   return x is T?
   //   Because the levels of optional are the same, 'is' doesn't transform into an 'as?',
   //   so we just cast directly without digging into the optional operand.
-  // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to Optional<T> in {{%.*}} : $*Optional<T>
+  // CHECK: checked_cast_addr_br test_only Optional<Any> in {{%.*}} : $*Optional<Any> to Optional<T>
 }
 
 // And we can dig into the operand when casting to a class archetype, as it

@@ -208,11 +208,11 @@ func test_var_4(p p: P) {
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(any P, Int), 0
   // CHECK:   [[T0:%.*]] = tuple_element_addr [[PAIR]] : $*(any P, Int), 1
   // CHECK:   [[PAIR_1:%.*]] = load [trivial] [[T0]] : $*Int
-  // CHECK:   [[TMP:%.*]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[PAIR_0]] : $*any P to X in [[TMP]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // `is X` and `is Y` bind nothing, so neither payload is ever extracted: no
+  // scratch buffer to allocate, load out of, or deallocate on any edge.
+  // CHECK:   checked_cast_addr_br test_only any P in [[PAIR_0]] : $*any P to X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_X]]:
-  // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*X
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var Int }
   // CHECK:   [[XLIFETIME:%.*]] = begin_borrow [var_decl] [[XADDR]]
   // CHECK:   [[X:%.*]] = project_box [[XLIFETIME]]
@@ -225,7 +225,6 @@ func test_var_4(p p: P) {
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @$s10switch_var1a1xySi_tF
   // CHECK:   destroy_value [[XADDR]]
-  // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*any P
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -233,18 +232,14 @@ func test_var_4(p p: P) {
 
   // CHECK: [[NO_CASE1]]:
   // CHECK:   destroy_value [[XADDR]]
-  // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT]]
 
   // CHECK: [[NEXT]]:
-  // CHECK:   [[TMP:%.*]] = alloc_stack $Y
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[PAIR_0]] : $*any P to Y in [[TMP]] : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[PAIR_0]] : $*any P to Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_Y]]:
-  // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*Y
   // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }
   // CHECK:   [[YLIFETIME:%.*]] = begin_borrow [var_decl] [[YADDR]]
   // CHECK:   [[Y:%.*]] = project_box [[YLIFETIME]]
@@ -260,7 +255,6 @@ func test_var_4(p p: P) {
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1b1xySi_tF
   // CHECK:   destroy_value [[YADDR]]
-  // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   destroy_addr [[PAIR_0]] : $*any P
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
@@ -268,10 +262,8 @@ func test_var_4(p p: P) {
 
   // CHECK: [[NO_CASE2]]:
   // CHECK:   destroy_value [[YADDR]]
-  // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
   // CHECK: [[IS_NOT_Y]]:
-  // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT]]
 
   // CHECK: [[NEXT]]:

@@ -292,8 +292,9 @@ func test_isa_2(_ p: P) {
   // CHECK: tuple_element_addr{{.*}} $*(any P, Int), 1, loc "{{.*}}":[[@LINE-12]]:10
   // CHECK: load {{.*}}, loc "{{.*}}":[[@LINE-12]]:8
   //
-  // CHECK: checked_cast_addr_br {{.*}}, loc "{{.*}}":[[@LINE-14]]:9
-  // CHECK: load {{.*}}, loc "{{.*}}":[[@LINE-15]]:9
+  // `case (is X, ...)` binds nothing from the cast, so it lowers to a test and
+  // there is no longer a payload load to check the location of.
+  // CHECK: checked_cast_addr_br {{.*}}, loc "{{.*}}":[[@LINE-16]]:9
     
 }
 

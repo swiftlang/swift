@@ -207,6 +207,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(BridgeObjectToRef)
   NO_UPDATE_NEEDED(Builtin)
   NO_UPDATE_NEEDED(CheckedCastBranch)
+  NO_UPDATE_NEEDED(CheckedCastAddrBranch)
   NO_UPDATE_NEEDED(ClassMethod)
   NO_UPDATE_NEEDED(COMMethod)
   NO_UPDATE_NEEDED(ConvertFunction)

@@ -652,37 +652,54 @@ RValue Lowering::emitConditionalCheckedCast(
 /// True if a cast from \p sourceType to \p targetType can be answered by a
 /// non-consuming type test rather than going through the full dynamic
 /// cast machinery used by `as?`
-/// Note: This is deliberately limited to a subset of `is` cast operations.
-///       This will be expanded later to cover most `is` operations.
-///
-/// The test reads the source through swift_dynamicCastTest, which needs the
-/// source in memory and needs the cast to be the plain value cast -- collection
-/// downcasts carry element-wise conversions that no type test can stand in for.
-bool Lowering::canUseNoncopyableTypeTest(CanType sourceType,
-                                         CanType targetType,
-                                         CheckedCastKind castKind) {
+bool Lowering::canUseTypeTestForIsa(SILGenFunction &SGF, CanType sourceType,
+                                    CanType targetType,
+                                    CheckedCastKind castKind) {
   if (castKind != CheckedCastKind::ValueCast)
     return false;
 
-  // Only *necessary* for values that cannot be copied.
-  return sourceType->isNoncopyable() && sourceType->isExistentialType();
+  // COM has its own lowering and consumption kind
+  if (targetType->lookThroughAllOptionalTypes()->isCOMExistentialType() ||
+      sourceType->lookThroughAllOptionalTypes()->isCOMExistentialType())
+    return false;
+
+  // Scalar casts -- class and metatype references -- keep the ordinary
+  // lowering: a scalar cast yields its result as a block argument and carries
+  // no consumption kind, so it cannot express a test.
+  // Note: computeCastStrategy() doesn't work here; before AddressLowering,
+  // Opaque Values makes everything scalar. IRGen sees this after
+  // AddressLowering, so ask what will be true there.
+  if (canIRGenUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType,
+                                              targetType))
+    return false;
+
+  // The test reads the source where it already lives, so it has to be at the
+  // abstraction level the instruction expects. The ordinary path reabstracts to
+  // the most general pattern first; where that would actually change the
+  // lowering, leave it to do so.
+  AbstractionPattern mostGeneral = SGF.SGM.Types.getMostGeneralAbstraction();
+  if (SGF.getTypeLowering(mostGeneral, sourceType).getLoweredType() !=
+      SGF.getTypeLowering(sourceType).getLoweredType())
+    return false;
+
+  return true;
 }
 
-void Lowering::emitNoncopyableTypeTest(SILGenFunction &SGF, SILLocation loc,
-                                       ManagedValue existentialAddr,
-                                       CanType sourceType, CanType targetType,
-                                       SILBasicBlock *trueBB,
-                                       SILBasicBlock *falseBB,
-                                       ProfileCounter trueCount,
-                                       ProfileCounter falseCount) {
-  assert(existentialAddr.getType().isAddress() &&
+void Lowering::emitTypeTestForIsa(SILGenFunction &SGF, SILLocation loc,
+                                  ManagedValue subjectAddr,
+                                  CanType sourceType, CanType targetType,
+                                  SILBasicBlock *trueBB,
+                                  SILBasicBlock *falseBB,
+                                  ProfileCounter trueCount,
+                                  ProfileCounter falseCount) {
+  assert(subjectAddr.getType().isAddress() &&
          "type test needs the existential in memory");
 
   // Emit `checked_cast_addr_br test_only` with no destination
   SGF.B.createCheckedCastAddrBranch(
       loc, computeCheckedCastOptions(targetType),
       CastConsumptionKind::TestOnly,
-      existentialAddr.getValue(), sourceType, SILValue(), targetType, trueBB,
+      subjectAddr.getValue(), sourceType, SILValue(), targetType, trueBB,
       falseBB, trueCount, falseCount);
 }
 
@@ -740,7 +757,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     auto sourceType =
         operand->getType()->getWithoutSpecifierType()->getCanonicalType();
     auto targetCanType = targetType->getCanonicalType();
-    if (canUseNoncopyableTypeTest(sourceType, targetCanType, castKind)) {
+    if (canUseTypeTestForIsa(SGF, sourceType, targetCanType, castKind)) {
       auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
 
       // The borrow of the subject has to outlive the terminator, so this scope
@@ -751,8 +768,8 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       ExitableFullExpr scope(SGF, CleanupLocation(loc));
       SILBasicBlock *trueBB = SGF.createBasicBlock();
       SILBasicBlock *falseBB = SGF.createBasicBlock();
-      emitNoncopyableTypeTest(SGF, loc, addr, sourceType, targetCanType, trueBB,
-                              falseBB);
+      emitTypeTestForIsa(SGF, loc, addr, sourceType, targetCanType, trueBB,
+                         falseBB);
 
       SGF.B.emitBlock(trueBB);
       SILValue yes = SGF.B.createIntegerLiteral(loc, i1Ty, 1);
