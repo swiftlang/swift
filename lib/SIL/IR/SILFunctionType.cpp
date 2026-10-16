@@ -2863,6 +2863,13 @@ static CanSILFunctionType getSILFunctionType(
       valueType = valueType.subst(*reqtSubs);
       coroutineSubstYieldType = valueType->getReducedType(
           genericSig);
+    } else if (constant != origConstant) {
+      // A class override takes its yield from the formal type it's lowered
+      // with, which may be the overridden coroutine's.
+      auto yields = substFnInterfaceType.getYields();
+      assert(yields.size() == 1 && "coroutine accessor without a yield?");
+      coroutineSubstYieldType =
+          yields[0].getType()->getReducedType(genericSig);
     } else {
       coroutineSubstYieldType = valueType->getReducedType(
           accessor->getGenericSignature());

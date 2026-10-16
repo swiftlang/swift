@@ -3967,6 +3967,19 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
         }
       }
 
+      // Yields are covariant.
+      auto fn1Yields = fn1.getYields();
+      auto fn2Yields = fn2.getYields();
+      if (fn1Yields.size() != fn2Yields.size())
+        return false;
+      for (auto [yield1, yield2] : llvm::zip_equal(fn1Yields, fn2Yields)) {
+        if (yield1.getFlags() != yield2.getFlags() ||
+            !matches(yield1.getType(), yield2.getType(), matchMode,
+                     ParameterPosition::NotParameter, OptionalUnwrapping::None,
+                     /*numParameterLists=*/0))
+          return false;
+      }
+
       // Results are covariant.
       return (matches(fn1.getResult(), fn2.getResult(), matchMode,
                       ParameterPosition::NotParameter,
