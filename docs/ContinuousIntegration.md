@@ -46,17 +46,18 @@ We describe each in detail below:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
-All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
-macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform<br>Swift Test macOS Platform (arm64)
-macOS platform (Apple Silicon) | @swift-ci Please test macOS arm64           | Swift Test macOS Platform (arm64)
-macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform<br>Swift Test macOS Platform (arm64)
+All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform<br>Swift Test macOS Platform<br>Swift Test Windows Platform<br>
+All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform<br>Swift Test macOS Platform<br>Swift Test Windows Platform<br>
+macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform
+macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform
 macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on macOS Platform (many runs - rigorous)
 macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - soundness)
-Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
-Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
+Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform
+Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform
 Linux platform               | @swift-ci Please test WebAssembly             | Swift Test WebAssembly (Ubuntu 20.04)
 Swift SDK for Android        | @swift-ci Please test android                 | Swift SDK for Android
+Windows platform               | @swift-ci Please test Windows platform          | Swift Test Windows Platform
+Windows platform               | @swift-ci Please clean test Windows platform    | Swift Test Windows Platform
 
 The core principles of validation testing is that:
 
