@@ -57,7 +57,8 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1037; // ~Deinitable in protocol compositions
+const uint16_t SWIFTMODULE_VERSION_MINOR =
+    1038; // C++ synthesized entry point references
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -382,6 +383,17 @@ enum CtorInitializerKind : uint8_t {
   ConvenienceFactory = 3,
 };
 using CtorInitializerKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class CxxSynthesizedEntryPointKind : uint8_t {
+  /// The statically dispatched `__staticCall_` method behind the virtual
+  /// method thunk of a foreign reference type.
+  StaticVirtualCall = 0,
+  /// The helper that the synthesized body of an inherited C++ member calls.
+  InheritedMemberHelper = 1,
+};
+using CxxSynthesizedEntryPointKindField = BCFixed<1>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -2319,6 +2331,13 @@ namespace decls_block {
     XREF_GENERIC_PARAM_PATH_PIECE,
     BCVBR<5>, // depth
     BCVBR<5>  // index
+  >;
+
+  // Select an entry point that the importer synthesizes for the preceding
+  // function.
+  using XRefCxxSynthesizedEntryPointPathPieceLayout = BCRecordLayout<
+    XREF_CXX_SYNTHESIZED_ENTRY_POINT_PATH_PIECE,
+    CxxSynthesizedEntryPointKindField
   >;
 
   using SILGenNameDeclAttrLayout = BCRecordLayout<
