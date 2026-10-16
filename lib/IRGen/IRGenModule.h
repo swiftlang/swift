@@ -923,6 +923,10 @@ public:
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
 
+  /// The destructor of every exactly-once closure context in this module. See
+  /// getExactlyOnceClosureDestructor().
+  llvm::Function *ExactlyOnceClosureDestructor = nullptr;
+
   llvm::StructType *
   createTransientStructType(StringRef name,
                             std::initializer_list<llvm::Type *> types,
@@ -1586,6 +1590,10 @@ public:
       llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
 
   llvm::Constant *getAddrOfFieldName(StringRef Name);
+
+  /// Returns the destructor that terminates the program, which every
+  /// exactly-once closure context in this module has.
+  llvm::Function *getExactlyOnceClosureDestructor();
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,

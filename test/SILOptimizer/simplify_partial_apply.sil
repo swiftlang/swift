@@ -308,3 +308,111 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %r = tuple()
   return %r : $()
 }
+
+// The on-stack context of an exactly-once closure owns the
+// noncopyable address-only value that the closure consumes. Deleting the dead
+// closure has to destroy the value.
+//
+// CHECK-LABEL: sil [ossa] @test_dead_called_exactly_once_owned_address
+// CHECK:         [[TEMP:%.*]] = alloc_stack $NoncopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK-NOT:     partial_apply
+// CHECK:         destroy_addr [[TEMP]]
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK:       } // end sil function 'test_dead_called_exactly_once_owned_address'
+sil [ossa] @test_dead_called_exactly_once_owned_address : $@convention(thin) <T> (@in NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>):
+  %1 = function_ref @noncopyable_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  %2 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
+  %4 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  destroy_value %4 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  dealloc_stack %2 : $*NoncopyableValue<T>
+  %r = tuple()
+  return %r : $()
+}
+
+// Folding the call into the closure would need a copy of the value to keep it
+// alive until the closure is destroyed, and a noncopyable value can't be
+// copied.
+//
+// CHECK-LABEL: sil [ossa] @test_apply_of_called_exactly_once_owned_address
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK-NEXT:    apply [[CLOSURE]]()
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK:       } // end sil function 'test_apply_of_called_exactly_once_owned_address'
+sil [ossa] @test_apply_of_called_exactly_once_owned_address : $@convention(thin) <T> (@in NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>):
+  %1 = function_ref @noncopyable_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  %2 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
+  %4 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  apply %4() : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  dealloc_stack %2 : $*NoncopyableValue<T>
+  %r = tuple()
+  return %r : $()
+}
+
+// Deleting the dead closure destroys the consumed value that the context owns,
+// but not the value that the closure captures inout.
+//
+// CHECK-LABEL: sil [ossa] @test_dead_called_exactly_once_owned_and_inout_addresses
+// CHECK:         [[TEMP:%.*]] = alloc_stack $NoncopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK-NOT:     partial_apply
+// CHECK:         destroy_addr [[TEMP]]
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'test_dead_called_exactly_once_owned_and_inout_addresses'
+sil [ossa] @test_dead_called_exactly_once_owned_and_inout_addresses : $@convention(thin) <T> (@in NoncopyableValue<T>, @inout NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
+  %2 = function_ref @noncopyable_consuming_and_inout_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %3 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %3 : $*NoncopyableValue<T>
+  %5 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  destroy_value %5 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  dealloc_stack %3 : $*NoncopyableValue<T>
+  %r = tuple()
+  return %r : $()
+}
+
+// The context doesn't own a value that the closure captures inout, so the call
+// can be folded into the closure.
+//
+// CHECK-LABEL: sil [ossa] @test_apply_of_called_exactly_once_inout_address
+// CHECK:         [[F:%.*]] = function_ref @noncopyable_inout_closure
+// CHECK-NOT:     partial_apply
+// CHECK:         apply [[F]]<T>(%0)
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'test_apply_of_called_exactly_once_inout_address'
+sil [ossa] @test_apply_of_called_exactly_once_inout_address : $@convention(thin) <T> (@inout NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>):
+  %1 = function_ref @noncopyable_inout_closure : $@convention(thin) <τ_0_0> (@inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %2 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1<T>(%0) : $@convention(thin) <τ_0_0> (@inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  apply %2() : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  destroy_value %2 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// A value that the closure captures inout doesn't make folding possible when
+// the context also owns a consumed value.
+//
+// CHECK-LABEL: sil [ossa] @test_apply_of_called_exactly_once_owned_and_inout_addresses
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once] {{%.*}}<T>({{%.*}}, %1)
+// CHECK-NEXT:    apply [[CLOSURE]]()
+// CHECK-NEXT:    destroy_value [[CLOSURE]]
+// CHECK:       } // end sil function 'test_apply_of_called_exactly_once_owned_and_inout_addresses'
+sil [ossa] @test_apply_of_called_exactly_once_owned_and_inout_addresses : $@convention(thin) <T> (@in NoncopyableValue<T>, @inout NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
+  %2 = function_ref @noncopyable_consuming_and_inout_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %3 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %3 : $*NoncopyableValue<T>
+  %5 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  apply %5() : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  dealloc_stack %3 : $*NoncopyableValue<T>
+  %r = tuple()
+  return %r : $()
+}

@@ -1890,16 +1890,23 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            Address contextPtr,
                            const llvm::BitVector &consumedFields,
                            const llvm::BitVector &unownedFields,
-                           bool contextIsOnStack) {
+                           bool contextIsOnStack, bool isCalledOnce) {
   if (!layout) {
+    assert(!isCalledOnce && "exactly-once contexts always have a layout");
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
     return;
   }
 
-  // If none of the parameters are owned, let's use release that would
-  // destroy all of the captures (fields of the closure context).
-  if (consumedFields.empty() || consumedFields.none()) {
+  // The destructor of an exactly-once context traps, because reaching it means
+  // that the closure was dropped. That means we can't rely on it to clean up
+  // any captures and the fields of an exactly-once must be destroyed here and
+  // the context must be deallocated as uninitialized, instead of releasing it.
+  //
+  // For an at-most-once closure that doesn't own any parameters beyond the ones
+  // it consumes in the body, just release the context to destroy all of the
+  // captures (fields of the closure context).
+  if (!isCalledOnce && (consumedFields.empty() || consumedFields.none())) {
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
     return;
@@ -2385,7 +2392,8 @@ static llvm::Value *emitPartialApplicationForwarder(
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
       destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                            unownedFields, outType->isNoEscape());
+                            unownedFields, outType->isNoEscape(),
+                            outType->isCalledOnce());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2508,7 +2516,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
     destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                          unownedFields, outType->isNoEscape());
+                          unownedFields, outType->isNoEscape(),
+                          outType->isCalledOnce());
   }
 
   emission->createReturn(call);
@@ -2696,6 +2705,12 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
   }
 
+  // An exactly-once closure always gets a context of its own so that its
+  // destructor can trap when the closure is dropped. That means it can't take
+  // advantage of the single ref-counted object optimization.
+  if (outType->isCalledOnce())
+    hasSingleSwiftRefcountedContext = No;
+
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
   
   // If we have a single refcounted pointer context (and no polymorphic args
@@ -2829,7 +2844,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
         auto metadata = layout.getPrivateMetadata(
             IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields,
-            /*isStackAllocated=*/true);
+            /*isStackAllocated=*/true, outType->isCalledOnce());
         auto object = IGF.Builder.CreateBitCast(data, IGF.IGM.RefCountedPtrTy);
         object = IGF.emitInitStackObjectCall(metadata, object, "closure");
         data = IGF.Builder.CreateBitCast(object, IGF.IGM.OpaquePtrTy);
@@ -2839,7 +2854,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                        substType, subs,
                                                        layout);
 
-        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets,
+                                      outType->isCalledOnce());
     }
     Address dataAddr = layout.emitCastTo(IGF, data);
     

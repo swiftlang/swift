@@ -1,0 +1,102 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-experimental-feature CalledAttribute -closure-lifetime-fixup %s | %FileCheck %s
+
+// REQUIRES: swift_feature_CalledAttribute
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+struct NoncopyableValue<T>: ~Copyable {
+  var t: T
+}
+
+struct CopyableValue<T> {
+  var t: T
+}
+
+sil [ossa] @noncopyable_closure : $@convention(thin) <T> (@in NoncopyableValue<T>) -> ()
+sil [ossa] @copyable_closure : $@convention(thin) <T> (@in CopyableValue<T>) -> ()
+sil [ossa] @use_called_exactly_once : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+
+// The on-stack context of an exactly-once closure owns the
+// noncopyable address-only value that the closure consumes, so there is
+// nothing left for the caller to destroy once the closure's lifetime ends.
+//
+// CHECK-LABEL: sil [ossa] @test_noncopyable_capture :
+// CHECK:         [[TEMP:%.*]] = alloc_stack $NoncopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}<T>([[TEMP]])
+// CHECK:         [[DEP:%.*]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[TEMP]]
+// CHECK:         apply {{%.*}}([[DEP]])
+// CHECK-NOT:     destroy_addr
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK:       } // end sil function 'test_noncopyable_capture'
+sil [ossa] @test_noncopyable_capture : $@convention(thin) <T> (@in NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>):
+  %1 = function_ref @noncopyable_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  %2 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %2
+  %4 = partial_apply [called_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
+  %5 = convert_escape_to_noescape %4 to $@noescape @called(exactlyOnce) @callee_owned () -> ()
+  %6 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  dealloc_stack %2
+  %9 = tuple ()
+  return %9
+}
+
+// A copyable value is not owned by the context: the closure's forwarder copies
+// it, so the caller still destroys it after the closure's lifetime ends.
+//
+// CHECK-LABEL: sil [ossa] @test_copyable_capture :
+// CHECK:         [[TEMP:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}<T>([[TEMP]])
+// CHECK:         [[DEP:%.*]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[TEMP]]
+// CHECK:         apply {{%.*}}([[DEP]])
+// CHECK-NEXT:    destroy_addr [[TEMP]]
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK:       } // end sil function 'test_copyable_capture'
+sil [ossa] @test_copyable_capture : $@convention(thin) <T> (@in CopyableValue<T>) -> () {
+bb0(%0 : $*CopyableValue<T>):
+  %1 = function_ref @copyable_closure : $@convention(thin) <τ_0_0> (@in CopyableValue<τ_0_0>) -> ()
+  %2 = alloc_stack $CopyableValue<T>
+  copy_addr [take] %0 to [init] %2
+  %4 = partial_apply [called_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in CopyableValue<τ_0_0>) -> ()
+  %5 = convert_escape_to_noescape %4 to $@noescape @called(exactlyOnce) @callee_owned () -> ()
+  %6 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  dealloc_stack %2
+  %9 = tuple ()
+  return %9
+}
+
+sil [ossa] @noncopyable_consuming_and_inout_closure : $@convention(thin) <T> (@in NoncopyableValue<T>, @inout_aliasable NoncopyableValue<T>) -> ()
+
+// The context owns the consumed value, and the caller owns the value that is
+// captured inout, so the caller destroys neither.
+//
+// CHECK-LABEL: sil [ossa] @test_noncopyable_consuming_and_inout_captures :
+// CHECK:         [[TEMP:%.*]] = alloc_stack $NoncopyableValue<T>
+// CHECK:         copy_addr [take] %0 to [init] [[TEMP]]
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}<T>([[TEMP]], %1)
+// CHECK:         [[DEP1:%.*]] = mark_dependence [nonescaping] [[CLOSURE]] {{.*}} on [[TEMP]]
+// CHECK:         [[DEP2:%.*]] = mark_dependence [nonescaping] [[DEP1]] {{.*}} on %1
+// CHECK:         apply {{%.*}}([[DEP2]])
+// CHECK-NOT:     destroy_addr
+// CHECK-NEXT:    dealloc_stack [[TEMP]]
+// CHECK:       } // end sil function 'test_noncopyable_consuming_and_inout_captures'
+sil [ossa] @test_noncopyable_consuming_and_inout_captures : $@convention(thin) <T> (@in NoncopyableValue<T>, @inout NoncopyableValue<T>) -> () {
+bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
+  %2 = function_ref @noncopyable_consuming_and_inout_closure : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %3 = alloc_stack $NoncopyableValue<T>
+  copy_addr [take] %0 to [init] %3
+  %5 = partial_apply [called_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
+  %6 = convert_escape_to_noescape %5 to $@noescape @called(exactlyOnce) @callee_owned () -> ()
+  %7 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned @noescape @called(exactlyOnce) @callee_owned () -> ()) -> ()
+  dealloc_stack %3
+  %10 = tuple ()
+  return %10
+}

@@ -521,12 +521,61 @@ void irgen::emitDeallocatePartialClassInstanceTyped(
       {object, metadata, size, alignMask, typeDescriptor});
 }
 
+/// Emit the code that terminates the program when an exactly-once closure
+/// context is destroyed.
+static void emitExactlyOnceClosureDestroyedTrap(IRGenFunction &IGF,
+                                                llvm::Value *context) {
+  // Use the runtime entry point if it is available to make debugging dropped
+  // exactly-once closures easier.
+  auto &IGM = IGF.IGM;
+  if (!IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+      IGM.isOnceClosureDestroyedErrorFeatureAvailable()) {
+    auto call = IGF.Builder.CreateCall(
+        IGM.getOnceClosureDestroyedErrorFunctionPointer(), {context});
+    call->setDoesNotThrow();
+    IGF.Builder.CreateUnreachable();
+    return;
+  }
+
+  IGF.emitTrap("Exactly-once closure was destroyed without being called",
+               /*EmitUnreachable=*/true);
+}
+
+/// Returns the destructor that the context of every exactly-once closure in
+/// this module has. Reaching this destructor indicates that the exactly-once
+/// closure was dropped instead of called, violating its execution semantics.
+///
+/// This destructor implementation can be shared among all exactly once closures
+/// since it doesn't depend on the layout of the closure context.
+llvm::Function *IRGenModule::getExactlyOnceClosureDestructor() {
+  if (ExactlyOnceClosureDestructor)
+    return ExactlyOnceClosureDestructor;
+
+  llvm::Function *fn = llvm::Function::Create(
+      DeallocatingDtorTy, llvm::Function::InternalLinkage,
+      "__swift_exactly_once_closure_destructor", &Module);
+  auto attrs = constructInitialAttributes();
+  addSwiftSelfAttributes(attrs, 0);
+  fn->setAttributes(attrs);
+  fn->setCallingConv(SwiftCC);
+
+  IRGenFunction IGF(*this, fn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(IGF, fn);
+
+  emitExactlyOnceClosureDestroyedTrap(IGF, &*fn->arg_begin());
+
+  ExactlyOnceClosureDestructor = fn;
+  return fn;
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createDtorFn(
-    IRGenModule &IGM, const HeapLayout &layout,
-    std::optional<uint64_t> mallocTypeId, const llvm::Twine &layoutName,
-    const llvm::BitVector &unownedFields, bool isStackAllocated) {
+static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
+                                    std::optional<uint64_t> mallocTypeId,
+                                    const llvm::Twine &layoutName,
+                                    const llvm::BitVector &unownedFields,
+                                    bool isStackAllocated) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
       "__swift_" + layoutName + "_destructor", &IGM.Module);
@@ -662,18 +711,17 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                                       indices);
 }
 
-llvm::Constant *
-HeapLayout::getPrivateMetadata(IRGenModule &IGM,
-                               llvm::Constant *captureDescriptor,
-                               std::optional<uint64_t> mallocTypeId,
-                               const llvm::Twine &name,
-                               const llvm::BitVector &unownedFields,
-                               bool isStackAllocated) const {
+llvm::Constant *HeapLayout::getPrivateMetadata(
+    IRGenModule &IGM, llvm::Constant *captureDescriptor,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name,
+    const llvm::BitVector &unownedFields, bool isStackAllocated,
+    bool trapsOnDestroy) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(
         IGM, *this,
-        createDtorFn(IGM, *this, mallocTypeId, name, unownedFields,
-                     isStackAllocated),
+        trapsOnDestroy ? IGM.getExactlyOnceClosureDestructor()
+                       : createDtorFn(IGM, *this, mallocTypeId, name,
+                                      unownedFields, isStackAllocated),
         captureDescriptor, MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
@@ -704,10 +752,10 @@ HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
   return ::computeTypedMallocTypeDescriptor(IGM, storageEntries);
 }
 
-llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
-                                               const llvm::Twine &name,
-                                           llvm::Constant *captureDescriptor,
-                                           const HeapNonFixedOffsets *offsets) {
+llvm::Value *IRGenFunction::emitUnmanagedAlloc(
+    const HeapLayout &layout, const llvm::Twine &name,
+    llvm::Constant *captureDescriptor, const HeapNonFixedOffsets *offsets,
+    bool trapsOnDestroy) {
   if (layout.isKnownEmpty()
       && layout.isTriviallyDestroyable()) {
     return IGM.RefCountedNull;
@@ -715,7 +763,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
 
   auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
   llvm::Value *metadata = layout.getPrivateMetadata(
-      IGM, captureDescriptor, maybeDescriptor, name, /*unownedFields=*/{});
+      IGM, captureDescriptor, maybeDescriptor, name, /*unownedFields=*/{},
+      /*isStackAllocated=*/false, trapsOnDestroy);
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
