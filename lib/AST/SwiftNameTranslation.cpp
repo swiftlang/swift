@@ -332,6 +332,10 @@ bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(Type type) {
   return nominal && isNoncopyableValueTypeExposableToCxx(nominal);
 }
 
+bool swift::cxx_translation::isMainActorIsolated(const ValueDecl *VD) {
+  return getActorIsolation(const_cast<ValueDecl *>(VD)).isMainActor();
+}
+
 swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(
     const ValueDecl *VD, NominalTypeLayoutQueries *layoutQueries) {
@@ -339,7 +343,10 @@ swift::cxx_translation::getDeclRepresentation(
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return getDeclRepresentation(abiRole.getCounterpart(), layoutQueries);
 
-  if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
+  // The C++ thunks of main-actor-isolated declarations check their isolation
+  // at runtime.
+  auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
+  if (isolation.isActorIsolated() && !isolation.isMainActor())
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
@@ -381,10 +388,12 @@ swift::cxx_translation::getDeclRepresentation(
         layoutQueries->isZeroSized(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
-  if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
-    // Check if any property accessor throws, do not expose it in that case.
-    for (const auto *accessor : varDecl->getAllAccessors()) {
-      if (accessor->hasThrows())
+  if (const auto *storage = dyn_cast<AbstractStorageDecl>(VD)) {
+    for (const auto *accessor : storage->getAllAccessors()) {
+      if (accessor->hasAsync())
+        return {Unsupported, UnrepresentableAsync};
+      // Check if any property accessor throws, do not expose it in that case.
+      if (isa<VarDecl>(VD) && accessor->hasThrows())
         return {Unsupported, UnrepresentableThrows};
     }
   }
