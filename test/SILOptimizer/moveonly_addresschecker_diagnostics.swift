@@ -4564,3 +4564,75 @@ func assignableButNotConsumableEndAccessImplicitLifetimeTest(_ x: MyClassWithMov
         x.moveOnlyVarStruct.nonTrivialStruct2 = NonTrivialStruct2()
     }
 }
+
+// A value consumed and used at the same instruction (passed both @in and
+// @in_guaranteed to one apply).
+struct ConsumeUseHolder<T> { let base: T }
+
+func takeConsumingAndBorrowing<T>(
+  _ a: consuming ConsumeUseHolder<T>, _ b: borrowing ConsumeUseHolder<T>
+) {}
+
+func testConsumeAndBorrowSameApply<T>(_ x: consuming ConsumeUseHolder<T>) { // expected-error {{'x' consumed and used at the same time}}
+  takeConsumingAndBorrowing(x, x) // expected-error {{overlapping accesses to 'x', but deinitialization requires exclusive access}} expected-note {{conflicting access is here}} expected-note {{consumed and used here}}
+}
+
+// Resolved by copying either the consumed or the borrowed argument.
+func testConsumeAndBorrowSameApply_copyConsumed<T>(_ x: consuming ConsumeUseHolder<T>) {
+  takeConsumingAndBorrowing(copy x, x)
+}
+func testConsumeAndBorrowSameApply_copyBorrowed<T>(_ x: consuming ConsumeUseHolder<T>) {
+  takeConsumingAndBorrowing(x, copy x)
+}
+
+// inout + borrowing the same value at one apply: exclusivity violation,
+// resolved by copying the borrowed argument.
+func takeInoutAndBorrowing<T>(
+  _ a: inout ConsumeUseHolder<T>, _ b: borrowing ConsumeUseHolder<T>
+) {}
+
+func testInoutAndBorrowSameApply<T>(_ x: consuming ConsumeUseHolder<T>) {
+  takeInoutAndBorrowing(&x, x) // expected-error {{overlapping accesses to 'x', but modification requires exclusive access}} expected-note {{conflicting access is here}}
+}
+func testInoutAndBorrowSameApply_copyBorrowed<T>(_ x: consuming ConsumeUseHolder<T>) {
+  takeInoutAndBorrowing(&x, copy x)
+}
+
+// Same, via a ~Copyable protocol witness.
+protocol Finishable: ~Copyable {
+  consuming func finish(body: (inout Int) -> Void)
+}
+struct WrapFinishable<Base: Finishable & ~Copyable>: Finishable, ~Copyable {
+  var underlying: Base
+  let label: Int
+  consuming func finish(body: (inout Int) -> Void) { // expected-error {{'self' consumed and used at the same time}}
+    self.underlying.finish { (buf: inout Int) -> Void in // expected-note {{consumed and used here}}
+      body(&buf)
+      _ = self.label
+    }
+  }
+}
+
+// Same, via an async ~Copyable protocol witness / try_apply.
+protocol UnderlyingReader: ~Copyable {}
+protocol ConcludingReader<FinalElement>: ~Copyable {
+  associatedtype Underlying: UnderlyingReader, ~Copyable
+  associatedtype FinalElement
+  consuming func consumeAndConclude<Return>(
+    body: (consuming sending Underlying) async throws -> Return
+  ) async throws -> (Return, FinalElement)
+}
+struct WrapConcluding<Base: ConcludingReader & ~Copyable>: ConcludingReader, ~Copyable {
+  typealias Underlying = Base.Underlying
+  typealias FinalElement = Base.FinalElement
+  var base: Base
+  let sizeLimit: Int
+  consuming func consumeAndConclude<Return>( // expected-error {{'self' consumed and used at the same time}}
+    body: (consuming sending Underlying) async throws -> Return
+  ) async throws -> (Return, FinalElement) {
+    try await self.base.consumeAndConclude { reader in // expected-note {{consumed and used here}}
+      _ = self.sizeLimit
+      return try await body(reader)
+    }
+  }
+}
