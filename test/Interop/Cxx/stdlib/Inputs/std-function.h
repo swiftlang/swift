@@ -2,7 +2,9 @@
 #define TEST_INTEROP_CXX_STDLIB_INPUTS_STD_FUNCTION_H
 
 #include <functional>
+#include <memory>
 #include <string>
+#include <utility>
 
 using FunctionVoidToVoid = std::function<void()>;
 using FunctionVoidToInt = std::function<int()>;
@@ -51,6 +53,20 @@ using FunctionNonTrivialHasDeletedCopyCtor = std::function<NonTrivialHasDeletedC
 inline FunctionIntToInt getIdentityFunction() {
   return [](int x) { return x; };
 }
+
+template <typename T>
+struct SharedCaptureFunctionFactory {
+  struct Capture {
+    T value;
+  };
+
+  FunctionIntToInt makeFunction(T value) const {
+    auto capture = std::make_shared<Capture>(Capture{value});
+    return [capture = std::move(capture)](int x) { return capture->value + x; };
+  }
+};
+
+using IntSharedCaptureFunctionFactory = SharedCaptureFunctionFactory<int>;
 
 inline bool isEmptyFunction(FunctionIntToInt f) { return !(bool)f; }
 
