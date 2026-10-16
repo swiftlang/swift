@@ -26,7 +26,7 @@ let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-dia
 }
 
 private func diagnoseLifetimeViolations(_ function: Function, _ context: FunctionPassContext) {
-  // Collect the markers up front. The `diagnose` markers are erased once every diagnostic has been emitted.
+  // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
   var unpermittedCopies: [DiagnoseInst] = []
   var letReinits: [DiagnoseInst] = []
   var undefInits: [AssignInst] = []
@@ -45,10 +45,10 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
     }
   }
 
-  var diagnoser = Diagnoser(function, context)
+  var diagnoser = Diagnoser(function, unpermittedCopies: unpermittedCopies, context)
   diagnoser.diagnoseUsesBeforeInit(undefInits)
   diagnoser.diagnoseLetReinits(letReinits)
-  diagnoser.diagnoseUsesAfterConsume(unpermittedCopies)
+  diagnoser.diagnoseUsesAfterConsume()
 
   for marker in unpermittedCopies + letReinits {
     context.erase(instruction: marker)
@@ -144,11 +144,13 @@ private func allocation(backing address: Value) -> Value? {
 
 private enum UseKind {
   case read             // observes the value without taking ownership
+  case consume          // takes ownership of the value
   case inoutArgument    // passed by reference, e.g. `&x`
   case closureCapture   // captured by a closure
   case functionCapture  // captured by a nested function
   case addressTaken     // converted to a pointer
   case returnFromInit   // `self` returned from an initializer
+  case functionExit     // the end of an `inout` parameter's scope, where it must be initialized
 }
 
 /// The classified uses of some storage or value, each with the access path it uses within storage.
@@ -165,12 +167,13 @@ private struct UseMap {
     kills[inst, default: []].append(accessPath)
   }
 
-  /// The use of `subelement` by `inst`, where a nil `subelement` or access path is the whole storage.
+  /// The strongest use of `subelement` by `inst`, where a nil `subelement` or access path is the whole storage.
   func use(_ inst: Instruction, of subelement: AccessPath?) -> Use? {
-    uses[inst, default: []].first { use in
+    let overlapping = uses[inst, default: []].filter { use in
       guard let subelement, let accessPath = use.accessPath else { return true }
       return !accessPath.isDistinct(from: subelement)
     }
+    return overlapping.first(where: { $0.kind == .consume }) ?? overlapping.first
   }
 
   /// Whether `inst` overwrites all of `subelement`.
@@ -184,6 +187,7 @@ private struct UseMap {
 /// Classifies the uses of some storage.
 private struct AddressUseClassifier: AddressDefUseWalker {
   typealias Path = UnusedWalkingPath
+  let demotedConsumes: Set<Instruction>
   let isInitSelf: Bool
   var uses = UseMap()
 
@@ -193,10 +197,16 @@ private struct AddressUseClassifier: AddressDefUseWalker {
     func record(_ kind: UseKind) { uses.record(inst, kind, accessPath) }
     func kill() { uses.kill(inst, accessPath) }
 
+    // Only a take of a noncopyable value consumes, unless it is a demoted consume.
+    let isDemotedConsume = demotedConsumes.contains(inst)
+    let isNoncopyable = address.value.type.isMoveOnly
+
     switch inst {
     case let load as LoadInst:
       if isInitSelf && flowsIntoReturn(load) {
         record(.returnFromInit)
+      } else if isDemotedConsume || (isNoncopyable && load.uses.contains(where: isConsumingUse)) {
+        record(.consume)
       } else {
         record(.read)
       }
@@ -207,6 +217,8 @@ private struct AddressUseClassifier: AddressDefUseWalker {
         kill()
       } else if isInitSelf, let result = copyAddr.destination as? FunctionArgument, result.convention == .indirectOut {
         record(.returnFromInit)
+      } else if isDemotedConsume || isNoncopyable {
+        record(.consume)
       } else {
         record(.read)
       }
@@ -222,6 +234,8 @@ private struct AddressUseClassifier: AddressDefUseWalker {
       switch apply.convention(of: address) {
       case .indirectOut:
         kill()
+      case .indirectIn, .indirectInCXX:
+        record(isNoncopyable ? .consume : .read)
       case .indirectInout, .indirectInoutAliasable:
         record(.inoutArgument)
       default:
@@ -240,18 +254,21 @@ private struct AddressUseClassifier: AddressDefUseWalker {
   }
 }
 
-/// Classifies the uses of an owned value, walking transparently through forwarding instructions.
+/// Classifies the uses of an owned value, walking through forwarding instructions and borrows.
 private struct ValueUseClassifier: ValueDefUseWalker {
   typealias Path = SmallProjectionPath
-  let ignoring: CopyValueInst
+  let demotedConsumes: Set<Instruction>
   var uses = UseMap()
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   mutating func walkDown(value operand: Operand, path: SmallProjectionPath) -> WalkResult {
-    if operand.instruction == ignoring {
-      return .continueWalk
+    switch operand.instruction {
+    case is CopyValueInst, is MoveValueInst:
+      // The copied or moved value is a different binding.
+      return leafUse(value: operand, path: path)
+    default:
+      return walkDownDefault(value: operand, path: path)
     }
-    return walkDownDefault(value: operand, path: path)
   }
 
   mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
@@ -260,10 +277,19 @@ private struct ValueUseClassifier: ValueDefUseWalker {
     case is DestroyValueInst, is EndBorrowInst, is DebugValueInst, is DiagnoseInst:
       break
     default:
-      uses.record(inst, .read)
+      if demotedConsumes.contains(inst) || (value.value.type.isMoveOnly && isConsumingUse(value)) {
+        uses.record(inst, .consume)
+      } else {
+        uses.record(inst, .read)
+      }
     }
     return .continueWalk
   }
+}
+
+/// Whether `use` takes ownership of its value, other than to destroy it.
+private func isConsumingUse(_ use: Operand) -> Bool {
+  use.endsLifetime && !(use.instruction is DestroyValueInst)
 }
 
 /// Whether `value` is what the function returns, possibly wrapped in an Optional by a failable initializer.
@@ -292,6 +318,9 @@ private struct OffendingUse {
 
   /// The blocks the search passed through, from the starting block to the use's block.
   let path: [BasicBlock]
+
+  /// Whether this is the starting instruction itself, reached again around a loop.
+  let isLoop: Bool
 }
 
 /// Finds the nearest use of `subelement` reachable from `start` without passing through a kill, breadth-first.
@@ -308,7 +337,7 @@ private func findOffendingUse(of subelement: AccessPath?, in uses: UseMap, after
       }
       if let (kind, accessPath) = uses.use(inst, of: subelement) {
         return .found(OffendingUse(instruction: inst, kind: kind, accessPath: accessPath,
-                                   path: path()))
+                                   path: path(), isLoop: inst == start))
       }
       if uses.isKill(inst, of: subelement) { return .satisfied }
     }
@@ -352,6 +381,95 @@ private func findOffendingUse(of subelement: AccessPath?, in uses: UseMap, after
   return nil
 }
 
+/// The single instruction that uses `value`, ignoring markers and lifetime ends.
+private func singleUse(of value: Value) -> Operand? {
+  let uses = value.uses.lazy.filter {
+    switch $0.instruction {
+    case is DiagnoseInst, is DestroyValueInst, is EndBorrowInst, is DebugValueInst: false
+    default: true
+    }
+  }
+  return uses.singleElement
+}
+
+/// The call that a temporary copy at `address` is passed to, e.g. `useGeneric(t)`.
+private func callReceivingTemporary(_ address: Value) -> Operand? {
+  guard let allocStack = address as? AllocStackInst, !allocStack.isFromVarDecl else {
+    return nil
+  }
+  return allocStack.uses.lazy.filter { $0.instruction is FullApplySite }.singleElement
+}
+
+//===----------------------------------------------------------------------===//
+//                                 Consumes
+//===----------------------------------------------------------------------===//
+
+/// A consume that LifetimeResolution demoted to a copy because the value is still used afterwards.
+private struct ConsumeSite {
+  let marker: DiagnoseInst
+
+  /// The demoted `load`, `copy_addr`, or `copy_value`.
+  let instruction: Instruction
+
+  /// The operand that receives ownership of the copy, e.g. a call argument, if known.
+  let consumer: Operand?
+
+  init?(_ marker: DiagnoseInst) {
+    self.marker = marker
+    switch marker.operand.value {
+    case let load as LoadInst:
+      instruction = load
+      consumer = singleUse(of: load)
+    case let copy as CopyValueInst:
+      instruction = copy
+      consumer = singleUse(of: copy)
+    case let address where address.type.isAddress:
+      // `copy_addr` immediately precedes its marker.
+      guard let copyAddr = marker.previous as? CopyAddrInst, copyAddr.source == address else {
+        return nil
+      }
+      instruction = copyAddr
+      consumer = callReceivingTemporary(copyAddr.destination)
+    default:
+      return nil
+    }
+  }
+
+  /// The instruction that takes ownership of the copy, or the copy itself if unknown.
+  var consumingInstruction: Instruction { consumer?.instruction ?? instruction }
+
+  /// Where the consume appears in source. A loaded address is located at the consumed expression, whereas
+  /// a copied value is located at its consumer.
+  var location: Location { instruction is CopyValueInst ? consumingInstruction.location : instruction.location }
+}
+
+/// The instruction a use of storage ultimately serves, e.g. the call that a loaded argument is passed to.
+private func userInstruction(of use: Instruction) -> Instruction {
+  switch use {
+  case let load as LoadInst:
+    return singleUse(of: load)?.instruction ?? load
+  case let loadBorrow as LoadBorrowInst:
+    return singleUse(of: loadBorrow)?.instruction ?? loadBorrow
+  case let copy as CopyValueInst:
+    return singleUse(of: copy)?.instruction ?? copy
+  case let copyAddr as CopyAddrInst:
+    return callReceivingTemporary(copyAddr.destination)?.instruction ?? copyAddr
+  default:
+    return use
+  }
+}
+
+/// How a use-after-consume is reported.
+private enum ConsumeViolation: Equatable {
+  case usedAfterConsume
+  case consumedTwice
+  case usedAfterPartialConsume
+  case consumedInLoop
+  case consumedAndUsedAtOnce
+  case notReinitialized
+  case unknownUse
+}
+
 //===----------------------------------------------------------------------===//
 //                                 Diagnoser
 //===----------------------------------------------------------------------===//
@@ -361,17 +479,35 @@ private struct Diagnoser {
   let context: FunctionPassContext
   var indexCache: FieldIndexTrieCache
 
-  /// The uses of each storage allocation, computed on demand.
+  /// The consumes that LifetimeResolution demoted, and the markers it left for unrecognized ones.
+  let consumes: [ConsumeSite]
+  let unrecognizedConsumes: [DiagnoseInst]
+  let demotedConsumes: Set<Instruction>
+
+  /// The uses of each storage allocation or owned value, computed on demand.
   private var storages: [HashableValue: Storage] = [:]
   private var useMaps: [HashableValue: UseMap] = [:]
 
   /// Like DefiniteInitialization, report at most one error per storage and source location.
   private var emittedErrors: [(storage: Value, location: Location)] = []
 
-  init(_ function: Function, _ context: FunctionPassContext) {
+  init(_ function: Function, unpermittedCopies: [DiagnoseInst], _ context: FunctionPassContext) {
     self.function = function
     self.context = context
     self.indexCache = FieldIndexTrieCache(for: function)
+
+    var consumes: [ConsumeSite] = []
+    var unrecognizedConsumes: [DiagnoseInst] = []
+    for marker in unpermittedCopies {
+      if let consume = ConsumeSite(marker) {
+        consumes.append(consume)
+      } else {
+        unrecognizedConsumes.append(marker)
+      }
+    }
+    self.consumes = consumes
+    self.unrecognizedConsumes = unrecognizedConsumes
+    self.demotedConsumes = Set(consumes.map { $0.instruction })
   }
 
   var diagnostics: DiagnosticEngine { context.diagnosticEngine }
@@ -408,7 +544,7 @@ private struct Diagnoser {
     if let uses = useMaps[storage.allocation.hashable] {
       return uses
     }
-    var classifier = AddressUseClassifier(isInitSelf: storage.initSelfKind != nil)
+    var classifier = AddressUseClassifier(demotedConsumes: demotedConsumes, isInitSelf: storage.initSelfKind != nil)
     _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
     var uses = classifier.uses
 
@@ -428,8 +564,29 @@ private struct Diagnoser {
         }
       }
     }
+
+    // The uses LifetimeResolution considered beyond those of the address.
+    for extraUse in storage.root.extraLivenessUses {
+      switch extraUse {
+      case .functionExit(let exit):
+        uses.record(exit, .functionExit)
+      case .boxLifetimeEnd:
+        break  // TODO: not yet diagnosed
+      }
+    }
     useMaps[storage.allocation.hashable] = uses
     return uses
+  }
+
+  /// Classifies every use of the owned `value`.
+  mutating func uses(of value: Value) -> UseMap {
+    if let uses = useMaps[value.hashable] {
+      return uses
+    }
+    var classifier = ValueUseClassifier(demotedConsumes: demotedConsumes)
+    _ = classifier.walkDownUses(ofValue: value, path: SmallProjectionPath(.anyValueFields))
+    useMaps[value.hashable] = classifier.uses
+    return classifier.uses
   }
 
   //===--------------------------------------------------------------------===//
@@ -562,48 +719,115 @@ private struct Diagnoser {
   //                            Use after consume
   //===--------------------------------------------------------------------===//
 
-  /// `diagnose [unpermitted_copy] %x`: report the demoted copy as though it were an illegal consuming use.
-  mutating func diagnoseUsesAfterConsume(_ markers: [DiagnoseInst]) {
-    for marker in markers {
-      switch marker.operand.value {
-      case let load as LoadInst:
-        diagnoseUseAfterConsume(ofAddress: load)
-      case let copy as CopyValueInst:
-        diagnoseUseAfterConsume(ofValue: copy, marker)
-      default:
-        // An error message backstop for unrecognized diagnose scenarios to ensure we still emit an error.
-        diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
+  private struct UseAfterConsume {
+    let violation: ConsumeViolation
+    let use: OffendingUse?
+    let name: String
+    let storage: Value
+    let consume: ConsumeSite
+  }
+
+  /// `diagnose [unpermitted_copy] %x`: a consume was demoted to a copy, because the value is used afterwards.
+  mutating func diagnoseUsesAfterConsume() {
+    for marker in unrecognizedConsumes {
+      diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
+    }
+
+    for consume in consumes {
+      guard let report = analyze(consume) else {
+        diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: consume.marker.location)
+        continue
+      }
+      emit(report)
+    }
+  }
+
+  private mutating func analyze(_ consume: ConsumeSite) -> UseAfterConsume? {
+    let storageValue: Value
+    var storage: Storage? = nil
+    var consumedPath: AccessPath? = nil
+    let uses: UseMap
+
+    if let copy = consume.instruction as? CopyValueInst {
+      storageValue = copy.fromValue
+      uses = self.uses(of: copy.fromValue)
+    } else {
+      let address = (consume.instruction as? LoadInst)?.address ?? (consume.instruction as! CopyAddrInst).source
+      guard let s = self.storage(backing: address) else { return nil }
+      storage = s
+      storageValue = s.allocation
+      consumedPath = address.accessPath
+      uses = self.uses(of: s)
+    }
+
+    let use = findOffendingUse(of: consumedPath, in: uses, after: consume.instruction, context)
+    let violation: ConsumeViolation
+    if let use {
+      if use.isLoop {
+        violation = .consumedInLoop
+      } else if use.kind == .functionExit {
+        violation = .notReinitialized
+      } else if userInstruction(of: use.instruction) == consume.consumingInstruction {
+        violation = .consumedAndUsedAtOnce
+      } else if use.kind == .consume {
+        violation = .consumedTwice
+      } else if let consumedPath, let usePath = use.accessPath, usePath.contains(consumedPath) {
+        violation = .usedAfterPartialConsume
+      } else {
+        violation = .usedAfterConsume
+      }
+    } else {
+      violation = .unknownUse
+    }
+
+    // Name what was consumed, or for a partial consume, what was used.
+    let name: String
+    if let storage {
+      let path = violation == .usedAfterPartialConsume ? use!.accessPath! : consumedPath!
+      name = storage.name(of: path.projectionPath)
+    } else {
+      name = storageValue.findVarDecl()?.userFacingName.string ?? ""
+    }
+
+    return UseAfterConsume(violation: violation, use: use, name: name, storage: storageValue, consume: consume)
+  }
+
+  private mutating func emit(_ report: UseAfterConsume) {
+    let errorLocation: Location
+    switch report.violation {
+    case .consumedInLoop, .notReinitialized, .unknownUse:
+      errorLocation = report.consume.location
+    default:
+      errorLocation = report.use!.instruction.location
+    }
+    guard shouldEmitError(for: report.storage, at: errorLocation) else { return }
+
+    switch report.violation {
+    case .usedAfterConsume, .unknownUse:
+      diagnostics.diagnose(.sil_movechecking_value_used_after_consume, report.name, at: errorLocation)
+    case .consumedTwice:
+      diagnostics.diagnose(.sil_movechecking_owned_value_consumed_more_than_once, report.name, at: errorLocation)
+    case .usedAfterPartialConsume:
+      diagnostics.diagnose(.sil_movechecking_use_after_partial_consume, report.name, at: errorLocation)
+    case .consumedInLoop:
+      diagnostics.diagnose(.sil_movechecking_value_consumed_in_a_loop, report.name, at: errorLocation)
+    case .consumedAndUsedAtOnce:
+      diagnostics.diagnose(.sil_movechecking_owned_value_consumed_and_used_at_same_time, report.name,
+                           at: errorLocation)
+    case .notReinitialized:
+      let isClosureCapture = (report.storage as? FunctionArgument)?.isClosureCapture ?? false
+      diagnostics.diagnose(.sil_movechecking_not_reinitialized_before_end_of_function, report.name,
+                           isClosureCapture ? 1 : 0, at: errorLocation)
+    }
+
+    let consume = report.consume
+    if !consume.location.hasSameSourceLocation(as: errorLocation) {
+      if report.violation == .usedAfterPartialConsume {
+        diagnostics.diagnose(.sil_movechecking_partial_consume_here, at: consume.location)
+      } else {
+        diagnostics.diagnose(.sil_movechecking_consuming_use_here, at: consume.location)
       }
     }
-  }
-
-  private mutating func diagnoseUseAfterConsume(ofAddress load: LoadInst) {
-    let storage = self.storage(backing: load.address)
-    let name = storage?.name(of: load.address.accessPath.projectionPath) ?? ""
-    let uses = storage.map { self.uses(of: $0) } ?? UseMap()
-
-    // Error at the offending downstream use; note at the consume that was demoted.
-    let offending = findOffendingUse(of: load.address.accessPath, in: uses, after: load, context)?.instruction ?? load
-    diagnostics.diagnose(.sil_movechecking_value_used_after_consume, name, at: offending.location)
-    diagnostics.diagnose(.sil_movechecking_consuming_use_here, at: load.location)
-  }
-
-  // `%copy`'s only other use (besides `marker`) is what now consumes the copy instead of its source.
-  private func diagnoseUseAfterConsume(ofValue copy: CopyValueInst, _ marker: DiagnoseInst) {
-    guard let consuming = copy.uses.ignore(user: marker).singleUse else {
-      diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
-      return
-    }
-    let consumingInst = consuming.instruction
-    let name = copy.fromValue.findVarDecl()?.userFacingName.string ?? ""
-    var classifier = ValueUseClassifier(ignoring: copy)
-    _ = classifier.walkDownUses(ofValue: copy.fromValue, path: SmallProjectionPath())
-
-    // Error at the offending downstream use; note at the consume that was demoted.
-    let offending = findOffendingUse(of: nil, in: classifier.uses, after: consumingInst, context)?.instruction
-                      ?? consumingInst
-    diagnostics.diagnose(.sil_movechecking_value_used_after_consume, name, at: offending.location)
-    diagnostics.diagnose(.sil_movechecking_consuming_use_here, at: consumingInst.location)
   }
 }
 

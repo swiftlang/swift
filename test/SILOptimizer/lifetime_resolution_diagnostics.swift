@@ -84,7 +84,7 @@ func consumeOperatorInLoop(_ b: Bool) {
   let x: C
   x = C()
   while b {
-    _ = consume x  // expected-error {{'x' used after consume}} // expected-note {{consumed here}}
+    _ = consume x  // expected-error {{'x' consumed in a loop}}
   }
 }
 
@@ -135,7 +135,7 @@ func consumeOfCopyableLetIntoBinding() {
 
 func inoutConsume_error(_ s: inout String) {
   if .random() {
-    _ = consume s  // expected-error {{'s' used after consume}}  // expected-note {{consumed here}}
+    _ = consume s  // expected-error {{missing reinitialization of inout parameter 's' after consume}}
   }
 }
 func inoutConsume_fixed(_ s: inout String) {
@@ -253,7 +253,7 @@ func ncConsumeOperatorLastUse() {
 func ncInitializedLetDoubleConsume() {
   let x = NC(c: C())
   takeNC(x)  // expected-note {{consumed here}}
-  takeNC(x)  // expected-error {{'x' used after consume}}
+  takeNC(x)  // expected-error {{'x' consumed more than once}}
 }
 
 func ncInitializedLetConsumeOperator() {
@@ -266,7 +266,7 @@ func ncInitializedLetConsumeOperator() {
 // the incoming argument, with no `mark_uninitialized`.
 func ncConsumingParamDoubleConsume(_ x: consuming NC) {
   takeNC(x)  // expected-note {{consumed here}}
-  takeNC(x)  // expected-error {{'x' used after consume}}
+  takeNC(x)  // expected-error {{'x' consumed more than once}}
 }
 
 // --- field sensitivity (copyable aggregates) ---

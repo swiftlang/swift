@@ -190,6 +190,18 @@ struct OnlyLetProperty {
   }
 }
 
+// Redeclaring `x` on the next iteration, after a `continue`, does not use it.
+func uninitializedAfterContinue(_ n: Int, _ a: Bool, _ b: Bool) {
+  for i in 0..<n {
+    var x: Int // expected-note {{variable defined here}}
+    if i == 0 { continue }
+    if i > 1 { x = 1 }
+    if a { if b { use(1) } else { use(2) } } else { use(3) }
+    if a { if b { use(1) } else { use(2) } } else { use(3) }
+    use(x) // expected-error {{variable 'x' used before being initialized}}
+  }
+}
+
 // The use is in a `defer` that runs on a path where `x` is uninitialized.
 func useInDefer(_ c: Bool) {
   let x: Int // expected-note {{constant defined here}}
