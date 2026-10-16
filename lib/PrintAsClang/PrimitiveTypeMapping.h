@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -49,6 +50,14 @@ public:
   /// Returns the C++ type name and nullability for the given Swift
   /// primitive type declaration, or \c None if no such type name exists.
   std::optional<ClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
+
+  /// Returns the builtin C++ integer type that the given Swift primitive type
+  /// declaration denotes on the target, e.g. \c SignedLong for `Int` and
+  /// \c SignedLongLong for `Int64` on 64-bit Darwin. Returns \c std::nullopt
+  /// for types that are not printed as a signed or unsigned `char`, `short`,
+  /// `int`, `long` or `long long`, e.g. `char`, `char16_t` or `double`.
+  std::optional<clang::TargetInfo::IntType>
+  getKnownCxxIntegerType(const TypeDecl *typeDecl);
 
   std::optional<ClangTypeInfo> getKnownSIMDTypeInfo(Type t, ASTContext &ctx);
 
