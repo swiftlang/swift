@@ -35,6 +35,14 @@ public struct HasMethods {
         }
     }
 
+    // Subscripts cannot be marked with the expose attribute, so only the
+    // header checks below cover this one.
+    public subscript(index: Int) -> Int {
+        get throws {
+            return index
+        }
+    }
+
     @_expose(Cxx) // expected-error {{property 'unsupportedAEICProp' can not be exposed to C++ as it requires code to be emitted into client}}
     @_alwaysEmitIntoClient
     public var unsupportedAEICProp: Bool {
@@ -42,8 +50,10 @@ public struct HasMethods {
     }
 }
 
-// CHECK: HasMethods
-// CHECK: supported
+// CHECK: class SWIFT_SYMBOL("s:9Functions10HasMethodsV") HasMethods final {
+// CHECK-NOT: operator [](
+// CHECK: SWIFT_INLINE_THUNK void supported()
+// CHECK-NOT: operator [](
 
 // CHECK: // Unavailable in C++: Swift global function 'unsupportedAEIC()'.{{.*}}can not be exposed to C++ as it requires code to be emitted into client.
 // CHECK-EMPTY:
