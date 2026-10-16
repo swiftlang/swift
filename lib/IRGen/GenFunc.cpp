@@ -1898,14 +1898,11 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
     return;
   }
 
-  // The destructor of an exactly-once context traps, because reaching it means
-  // that the closure was dropped. That means we can't rely on it to clean up
-  // any captures and the fields of an exactly-once must be destroyed here and
-  // the context must be deallocated as uninitialized, instead of releasing it.
-  //
-  // For an at-most-once closure that doesn't own any parameters beyond the ones
-  // it consumes in the body, just release the context to destroy all of the
-  // captures (fields of the closure context).
+  // For a closure that doesn't have any owned fields to destroy, just
+  // release the context object. We can't do that for exaclty-once closures,
+  // though, because the destructor of an exactly-once context traps since
+  // reaching indicates that the closure was dropped. Proceed to deallocating
+  // the context as uninitialized instead of releasing it in that case.
   if (!isCalledOnce && (consumedFields.empty() || consumedFields.none())) {
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
@@ -2812,7 +2809,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   if (args.empty() && layout.isKnownEmpty() &&
       layout.isTriviallyDestroyable()) {
-    if (outType->isNoEscape())
+    if (outType->isCalledOnce())
+      data = IGF.IGM.getAddrOfExactlyOnceSharedContext();
+    else if (outType->isNoEscape())
       data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
     else
       data = IGF.IGM.RefCountedNull;

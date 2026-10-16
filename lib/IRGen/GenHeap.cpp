@@ -23,6 +23,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SipHash.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
@@ -750,6 +751,71 @@ HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
   }
 
   return ::computeTypedMallocTypeDescriptor(IGM, storageEntries);
+}
+
+/// Emit a static initializer that makes the runtime initialize the header of
+/// the shared context of exactly-once closures.
+static void emitExactlyOnceSharedContextInitializer(
+    IRGenModule &IGM, llvm::GlobalVariable *context, llvm::Constant *metadata) {
+  auto *fn = llvm::Function::Create(
+      llvm::FunctionType::get(IGM.VoidTy, /*isVarArg=*/false),
+      llvm::GlobalValue::PrivateLinkage,
+      "__swift_exactly_once_closure_context_init", &IGM.Module);
+  fn->setAttributes(IGM.constructInitialAttributes());
+  fn->setCallingConv(IGM.DefaultCC);
+  IGM.setColocateMetadataSection(fn);
+
+  IRGenFunction IGF(IGM, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
+
+  /// swift_initStackObject sets the metadata and the ref-count field the way that
+  /// the running runtime requires, and the object it initializes is never freed,
+  /// so it is appropriate for an object that is not heap allocated.
+  IGF.Builder.CreateCall(IGM.getInitStackObjectFunctionPointer(),
+                         {metadata, context});
+  IGF.Builder.CreateRetVoid();
+
+  // Use the same priority as the other static initializers that IRGen emits,
+  // which is slightly lower than the priority of C++ global constructors, so
+  // that the context is initialized before any code that could use it runs.
+  llvm::appendToGlobalCtors(IGM.Module, fn, 60000, nullptr);
+}
+
+llvm::Constant *IRGenModule::getAddrOfExactlyOnceSharedContext() {
+  if (ExactlyOnceSharedContext)
+    return ExactlyOnceSharedContext;
+
+  // Reuse the metadata that the contexts of exactly-once closures with
+  // captures have, because it has the destructor that traps.
+  HeapLayout layout(*this, LayoutStrategy::Optimal, {}, {});
+  auto *metadata = layout.getPrivateMetadata(
+      *this, llvm::ConstantPointerNull::get(CaptureDescriptorPtrTy),
+      /*mallocTypeId=*/std::nullopt, "exactly_once_closure",
+      /*unownedFields=*/{}, /*isStackAllocated=*/false,
+      /*trapsOnDestroy=*/true);
+
+  // A newer runtime might change the layout of the ref-count field. Run a
+  // global ctor that will call into the runtime to initialize the object
+  // with an appropriate ref-count value. In Embedded Swift the field can just
+  // be initialized with a known value at compile time since the runtime is
+  // linked statically.
+  bool initializeAtLoad = !Context.LangOpts.hasFeature(Feature::Embedded);
+  const uint64_t staticRefCount = initializeAtLoad ? 0 : 1;
+
+  auto *initializer = llvm::ConstantStruct::get(
+      RefCountedStructTy,
+      {metadata, llvm::ConstantInt::get(IntPtrTy, staticRefCount)});
+  auto *var =
+      new llvm::GlobalVariable(Module, RefCountedStructTy, /*isConstant=*/false,
+                               llvm::GlobalValue::InternalLinkage, initializer,
+                               "__swift_exactly_once_closure_context");
+  var->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
+
+  if (initializeAtLoad)
+    emitExactlyOnceSharedContextInitializer(*this, var, metadata);
+  ExactlyOnceSharedContext = var;
+  return var;
 }
 
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(

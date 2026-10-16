@@ -15,6 +15,8 @@
 // RUN: %target-run %t/opt.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/onone.out callGlobal | %FileCheck %s --check-prefix=CALL-callGlobal
 // RUN: %target-run %t/opt.out callGlobal | %FileCheck %s --check-prefix=CALL-callGlobal
+// RUN: %target-run %t/onone.out callCaptureless | %FileCheck %s --check-prefix=CALL-callCaptureless
+// RUN: %target-run %t/opt.out callCaptureless | %FileCheck %s --check-prefix=CALL-callCaptureless
 // RUN: %target-run %t/onone.out callBorrowed | %FileCheck %s --check-prefix=CALL-callBorrowed
 // RUN: %target-run %t/opt.out callBorrowed | %FileCheck %s --check-prefix=CALL-callBorrowed
 // RUN: %target-run %t/onone.out callMixed | %FileCheck %s --check-prefix=CALL-callMixed
@@ -38,6 +40,14 @@
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropWithResource 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropCaptureless 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropCaptureless 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropEscapingCaptureless 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropEscapingCaptureless 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropGlobal 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropGlobal 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropAfterCalls 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropAfterCalls 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropGeneric 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropGeneric 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropGenericEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
@@ -239,10 +249,23 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     drop { _ = consume resource }
   case "dropEscaping":
     dropEscaping { box.count += 1 }
+  case "callCaptureless":
+    call { print("body") }
   case "callBorrowed":
     // A stack-promoted closure doesn't own the noncopyable value that it
     // borrows, so calling the closure must not destroy that value.
     call { print(resource.name) }
+  case "dropCaptureless":
+    drop { print("never") }
+  case "dropEscapingCaptureless":
+    dropEscaping { print("never") }
+  case "dropGlobal":
+    dropEscaping(hello)
+  case "dropAfterCalls":
+    // Closures that share a context must not change the outcome of a later
+    // drop.
+    for _ in 0..<10 { callEscaping { print("many") } }
+    dropEscaping { print("never") }
   default:
     fatalError("unknown case")
   }
@@ -291,6 +314,9 @@ default:
 // CALL-callGlobal: hello
 // CALL-callGlobal-NEXT: called
 // CALL-callGlobal-NEXT: Resource r deinit
+
+// CALL-callCaptureless: body
+// CALL-callCaptureless-NEXT: called
 
 // CALL-callBorrowed: r
 // CALL-callBorrowed-NEXT: called
