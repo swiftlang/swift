@@ -170,6 +170,16 @@ SolverTrail::Change::UpdatedTypeVariable(
 }
 
 SolverTrail::Change
+SolverTrail::Change::AddedMergeableType(TypeVariableType *typeVar,
+                                        CanType seenType) {
+  Change result;
+  result.Kind = ChangeKind::AddedMergeableType;
+  result.Merged.TypeVar = typeVar;
+  result.Merged.merged = seenType;
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::AddedConversionRestriction(Type srcType, Type dstType) {
   Change result;
   result.Kind = ChangeKind::AddedConversionRestriction;
@@ -370,6 +380,17 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
+SolverTrail::Change::AddedConflict(TypeVariableType *typeVar,
+                                   ConflictedType *conflict) {
+  Change result;
+  result.Kind = ChangeKind::AddedConflict;
+  result.Conflict.TypeVar = typeVar;
+  result.Conflict.ConflictType = conflict;
+
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::PrunedDisjunction(Constraint *disjunction,
                                        FunctionType *argFuncType,
                                        unsigned resultGenerationNumber) {
@@ -491,6 +512,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::AddedTypeVariable:
     cg.removeNode(TypeVar);
+    break;
+
+  case ChangeKind::AddedMergeableType:
+    cs.mergeableTypes.map.erase(Merged.TypeVar);
     break;
 
   case ChangeKind::AddedConstraint:
@@ -696,6 +721,13 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
   }
 
+  case ChangeKind::AddedConflict: {
+    cs.mergeableTypes.map[Conflict.TypeVar].remove(Conflict.ConflictType);
+    if (cs.mergeableTypes.map[Conflict.TypeVar].empty())
+      cs.mergeableTypes.map.erase(TypeVar);
+    break;
+  }
+
   case ChangeKind::PrunedDisjunction: {
     cs.getRemainingDisjunction(Disjunction.Disjunction)
         .undoArgFuncTypeChange(Disjunction.ArgFuncType, Disjunction.ResultGenerationNumber);
@@ -782,6 +814,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::AddedTypeVariable:
     out << "(AddedTypeVariable ";
     TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AddedMergeableType:
+    out << "(AddedMergeableType ";
+    Merged.TypeVar->print(out, PO);
+    out << " , ";
+    Merged.merged->print(out, PO);
     out << ")\n";
     break;
 
@@ -944,6 +984,15 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << " with type ";
     Binding.BindingType->print(out, PO);
     out << " and kind " << Options << ")\n";
+    break;
+
+  case ChangeKind::AddedConflict:
+    out << "(AddedConflict ";
+    Conflict.TypeVar->print(out, PO);
+    out << " with conflicted type ";
+    // TODO: make a print method for conflicted types
+    Conflict.ConflictType->diagnosticType->print(out, PO);
+    out << ")\n";
     break;
 
   case ChangeKind::PrunedDisjunction:
