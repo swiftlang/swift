@@ -418,14 +418,16 @@ if(APPLE AND BUILD_SHARED_LIBS)
   target_link_options(swiftCore PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
 endif()
 
+emit_swift_interface(swiftCore)
 install(TARGETS swiftCore
   EXPORT SwiftCoreTargets
   COMPONENT SwiftCore_runtime
   ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftCore)
-install_swift_interface(swiftCore)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftCore_development
+    DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}")
 
 # Configure plist creation for Darwin platforms.
 generate_plist(swiftCore "${CMAKE_PROJECT_VERSION}" swiftCore)

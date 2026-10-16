@@ -43,7 +43,6 @@ include(GNUInstallDirs)
 
 include(AvailabilityMacros)
 include(EmitSwiftInterface)
-include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
 include(CatalystSupport)
@@ -145,14 +144,16 @@ target_link_libraries(swiftDistributed PRIVATE
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
+emit_swift_interface(swiftDistributed)
 install(TARGETS swiftDistributed
   EXPORT SwiftDistributedTargets
   COMPONENT ${PROJECT_NAME}_runtime
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftDistributed)
-install_swift_interface(swiftDistributed)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT ${PROJECT_NAME}_development
+    DESTINATION "${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}")
 
 # Configure plist creation for Darwin platforms.
 generate_plist(swiftDistributed "${CMAKE_PROJECT_VERSION}" swiftDistributed)

@@ -23,12 +23,14 @@ target_link_libraries(swiftCRT PRIVATE
 target_include_directories(swiftCRT INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
+emit_swift_interface(swiftCRT)
 install(TARGETS swiftCRT
   EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftCRT)
-install_swift_interface(swiftCRT)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftOverlay_development
+    DESTINATION "${SwiftOverlay_INSTALL_SWIFTMODULEDIR}")
 
 embed_manifest(swiftCRT)
