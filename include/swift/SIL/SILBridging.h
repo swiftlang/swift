@@ -1070,7 +1070,13 @@ struct BridgedInstruction {
   AllocPackInst_getPackType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType PackLengthInst_getPackType() const;
   BRIDGED_INLINE SwiftInt ScalarPackIndexInst_getComponentIndex() const;
+  BRIDGED_INLINE SwiftInt PackPackIndexInst_getComponentStartIndex() const;
+  BRIDGED_INLINE SwiftInt PackPackIndexInst_getComponentEndIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType AnyPackIndexInst_getIndexedPackType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericEnvironment
+  OpenPackElementInst_getOpenedGenericEnvironment() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap
+  OpenPackElementInst_tryGetElementArchetypeSubstitutionMap() const;
   BRIDGED_INLINE bool
   DifferentiableFunctionInst_hasExtractee(SwiftInt extractee) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue
@@ -1795,6 +1801,8 @@ struct BridgedCloner {
   void setInsertionPoint(BridgedInstruction beforeInst) const;
   void registerLocalArchetypeRemapping(BridgedGenericEnvironment from,
                                        BridgedGenericEnvironment to) const;
+  void registerConcreteLocalArchetypeMapping(BridgedGenericEnvironment from,
+                                             BridgedSubstitutionMap to) const;
   SWIFT_IMPORT_UNSAFE BridgedType getOpType(BridgedType type) const;
 };
 

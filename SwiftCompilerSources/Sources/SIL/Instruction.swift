@@ -2263,7 +2263,19 @@ final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
 final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
-final public class OpenPackElementInst : SingleValueInstruction {}
+final public class OpenPackElementInst : SingleValueInstruction {
+  public var openedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenPackElementInst_getOpenedGenericEnvironment())
+  }
+  public var elementArchetypeSubstitutionMap: SubstitutionMap? {
+    let map = SubstitutionMap(
+      bridged: bridged.OpenPackElementInst_tryGetElementArchetypeSubstitutionMap())
+    if map.isEmpty {
+      return nil
+    }
+    return map
+  }
+}
 final public class PackLengthInst : SingleValueInstruction {
   public var packType: CanonicalType {
     CanonicalType(bridged: bridged.PackLengthInst_getPackType())
@@ -2273,6 +2285,9 @@ final public class PackLengthInst : SingleValueInstruction {
 @_semantics("fast_cast")
 public protocol AnyPackIndexInst : SingleValueInstruction {
   var indexedPackType: CanonicalType { get }
+  // The structural index of the accessed component within the pack, if it is
+  // statically known.
+  var structuralIndex: Int? { get }
 }
 
 extension AnyPackIndexInst {
@@ -2281,11 +2296,54 @@ extension AnyPackIndexInst {
   }
 }
 
-final public class DynamicPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
-final public class PackPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
+final public class DynamicPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
+  public var structuralIndex: Int? {
+    // If the dynamic index is statically known, and the indexed pack has a
+    // prefix of non-pack-expansion elements up to and including the dynamic
+    // index, then the dynamic index is equivalent to a structural index with
+    // the same value.
+    guard let index = (operand.value as? IntegerLiteralInst)?.value
+    else {
+      return nil
+    }
+
+    let elements = indexedPackType.rawType.elementTypesOfPackType
+    guard index < elements.count,
+          elements[...index].allSatisfy({ !$0.isPackExpansion })
+    else {
+      return nil
+    }
+
+    return index
+  }
+}
+
+final public class PackPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
+  public var componentStartIndex: Int {
+    Int(bridged.PackPackIndexInst_getComponentStartIndex())
+  }
+  public var componentEndIndex: Int {
+    Int(bridged.PackPackIndexInst_getComponentEndIndex())
+  }
+  public var sliceIndexOperand: AnyPackIndexInst {
+    operand.value as! AnyPackIndexInst
+  }
+  public var structuralIndex: Int? {
+    if let staticSliceIndex = sliceIndexOperand.structuralIndex {
+      // This instruction produces a dynamic index into a slice of the operand
+      // pack, which starts at componentStartIndex.
+      return componentStartIndex + staticSliceIndex
+    }
+    return nil
+  }
+}
+
 final public class ScalarPackIndexInst : SingleValueInstruction, AnyPackIndexInst {
   public var componentIndex: Int {
     Int(bridged.ScalarPackIndexInst_getComponentIndex())
+  }
+  public var structuralIndex: Int? {
+    componentIndex
   }
 }
 

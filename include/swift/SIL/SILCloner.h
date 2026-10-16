@@ -3258,46 +3258,10 @@ void SILCloner<ImplClass>::visitDynamicPackIndexInst(
 
   auto newIndexValue = getOpValue(Inst->getOperand());
   auto loc = getOpLocation(Inst->getLoc());
-  CanPackType newPackType =
-      cast<PackType>(getOpASTType(Inst->getIndexedPackType()));
+  auto newPackType = cast<PackType>(getOpASTType(Inst->getIndexedPackType()));
 
-  // Attempt to simplify to a scalar_pack_index.
-  auto simplifyToScalar = [&]() -> bool {
-    auto *intLiteral = dyn_cast<IntegerLiteralInst>(newIndexValue);
-    if (!intLiteral)
-      return false;
-
-    APInt value = intLiteral->getValue();
-
-    auto zextValue = value.tryZExtValue();
-    if (!zextValue)
-      return false;
-
-    unsigned flattenedIndex = *zextValue;
-
-    // Determine whether flattenedIndex can be treated as a structural index.
-    //
-    // A dynamic pack index counts the elements of pack expansions
-    // individually. It is equal to the structural index if it is in bounds,
-    // and none of the elements up to and including that index are pack
-    // expansions.
-    if (flattenedIndex >= newPackType->getNumElements())
-      return false;
-
-    for (auto type :
-         newPackType->getElementTypes().take_front(flattenedIndex + 1)) {
-      if (type->is<PackExpansionType>())
-        return false;
-    }
-
-    recordClonedInstruction(Inst, getBuilder().createScalarPackIndex(
-                                      loc, flattenedIndex, newPackType));
-    return true;
-  };
-
-  if (!simplifyToScalar())
-    recordClonedInstruction(Inst, getBuilder().createDynamicPackIndex(
-                                      loc, newIndexValue, newPackType));
+  recordClonedInstruction(Inst, getBuilder().createDynamicPackIndex(
+                                    loc, newIndexValue, newPackType));
 }
 
 template <typename ImplClass>
@@ -3311,21 +3275,6 @@ void SILCloner<ImplClass>::visitPackPackIndexInst(PackPackIndexInst *Inst) {
   auto newComponentStartIndex =
     getOpStructuralPackIndex(Inst->getIndexedPackType(),
                              Inst->getComponentStartIndex());
-
-  // Attempt to simplify to a scalar_pack_index.
-  if (auto *spi = dyn_cast<ScalarPackIndexInst>(newIndexValue)) {
-
-    // The new pack index operand is scalar. We can add the offset of the start
-    // of the slice to get an index into the full pack. This will refer to the
-    // same (scalar) pack element, because the index operand instruction indexes
-    // a pack that is guaranteed to have the same elements as the slice.
-
-    recordClonedInstruction(
-        Inst, getBuilder().createScalarPackIndex(
-                  loc, newComponentStartIndex + spi->getComponentIndex(),
-                  newPackType));
-    return;
-  }
 
   recordClonedInstruction(
       Inst, getBuilder().createPackPackIndex(loc, newComponentStartIndex,
@@ -3355,70 +3304,13 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
 
   auto newIndexValue = getOpValue(Inst->getIndexOperand());
-  auto origEnv = Inst->getOpenedGenericEnvironment();
-
-  // If the structural pack index is statically known, and the pack element at
-  // that index is scalar, we can resolve element archetypes to concrete types
-  // and eliminate this instruction entirely.
-  if (auto *scalarPackIndex = dyn_cast<ScalarPackIndexInst>(
-          newIndexValue.getDefiningInstruction())) {
-    unsigned index = scalarPackIndex->getComponentIndex();
-
-    // Collect concrete element types for each pack element binding.
-    //
-    // If the element at a structural index in a pack is concrete (not an
-    // expansion), we know that the opened @pack_element archetype will always
-    // be equivalent to that type. This means we can replace it with that
-    // concrete type.
-    llvm::SmallDenseMap<CanType, CanType, 4> elementReplacements;
-
-    origEnv->forEachPackElementBinding(
-        [&](ElementArchetypeType *elementArchetype, PackType *origPack) {
-          CanPackType pack =
-              cast<PackType>(getOpASTType(origPack->getCanonicalType()));
-
-          ASSERT(pack->getNumElements() > index &&
-                 !pack->getElementType(index)->is<PackExpansionType>() &&
-                 "open_pack_element only binds archetypes for packs with the "
-                 "same shape as the pack indexed by the instruction we got the "
-                 "index from, so the opened packs must all have a scalar "
-                 "element at the supplied index.");
-          // NOTE: we can safely use this index to access the scalar pack
-          // element for each opened pack because they must all have the same
-          // shape as the pack type referenced by the pack indexing instruction.
-          auto element = pack->getElementType(index);
-          auto interfaceTy =
-              elementArchetype->getInterfaceType()->getCanonicalType();
-          elementReplacements[interfaceTy] = element->getCanonicalType();
-        });
-
-    // Build a SubstitutionMap for the full opened element signature that
-    // maps outer params via origContextSubs and element params to concrete
-    // types.
-    auto genericSig = origEnv->getGenericSignature();
-    auto newContextSubs =
-        getOpSubstitutionMap(origEnv->getOuterSubstitutions());
-    auto subsMap = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) -> Type {
-          auto *gp = cast<GenericTypeParamType>(type);
-          auto canGP = gp->getCanonicalType();
-          auto it = elementReplacements.find(canGP);
-          if (it != elementReplacements.end())
-            return it->second;
-          return Type(type).subst(newContextSubs);
-        },
-        LookUpConformanceInModule());
-    registerConcreteLocalArchetypeMapping(origEnv, subsMap);
-    return;
-  }
+  auto loc = getOpLocation(Inst->getLoc());
 
   // We need to make a new opened-element environment.  This is *not*
   // a refinement of the contextual environment of the new insertion
   // site; we just substitute the contextual substitutions in the
   // opened environment and build a new one.
-
-  auto loc = getOpLocation(Inst->getLoc());
+  auto origEnv = Inst->getOpenedGenericEnvironment();
 
   // Substitute the contextual substitutions.
   auto newContextSubs =

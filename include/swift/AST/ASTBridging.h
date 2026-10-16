@@ -3283,6 +3283,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinBridgeObject() const;
   BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isPackExpansion() const;
   BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
@@ -3325,6 +3326,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isSILPackElementAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
   BoundGenericType_getGenericArgs() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
+  PackType_getElementTypes() const;
 };
 
 class BridgedCanType {
