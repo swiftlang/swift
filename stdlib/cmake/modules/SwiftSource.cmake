@@ -520,6 +520,7 @@ function(_compile_swift_files
       DEPLOYMENT_VERSION_WATCHOS ${SWIFTFILE_DEPLOYMENT_VERSION_WATCHOS}
       MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
       )
+  set(swift_cxx_header_flags ${swift_flags})
 
   if(SWIFTFILE_STATIC)
     list(APPEND swift_flags -static)
@@ -1210,9 +1211,9 @@ function(_compile_swift_files
           ${swift_ide_test_dependency}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
-      set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" PARENT_SCOPE)
+      set(module_dependency_targets "${module_dependency_target_static}")
     else()
-      set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
+      set(module_dependency_targets "${module_dependency_target}")
     endif()
 
     # macCatalyst zippered swiftmodule
@@ -1284,11 +1285,67 @@ function(_compile_swift_files
             ${swift_ide_test_dependency}
             ${copy_legacy_layouts_dep}
           COMMENT "Generating ${maccatalyst_module_file_static}")
-        set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" "${maccatalyst_module_dependency_target_static}" PARENT_SCOPE)
+        set(module_dependency_targets "${module_dependency_target_static}" "${maccatalyst_module_dependency_target_static}")
       else()
-        set("${dependency_module_target_out_var_name}" "${module_dependency_target}" "${maccatalyst_module_dependency_target}" PARENT_SCOPE)
+        set(module_dependency_targets "${module_dependency_target}" "${maccatalyst_module_dependency_target}")
       endif()
     endif()
+
+    # Keep the public C++ view of Swift beside the matching runtime. Its ABI
+    # depends on the target, so each platform and architecture gets a header.
+    if(SWIFTFILE_IS_STDLIB_CORE AND NOT SWIFTFILE_SDK STREQUAL "embedded"
+        AND "${SWIFTFILE_BOOTSTRAPPING}" STREQUAL "")
+      if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+        list(APPEND swift_cxx_header_flags "-disable-objc-interop")
+      endif()
+      set(cxx_header_variants primary)
+      if(maccatalyst_build_flavor STREQUAL "zippered")
+        list(APPEND cxx_header_variants maccatalyst)
+      endif()
+      foreach(variant ${cxx_header_variants})
+        set(cxx_header_flags ${swift_cxx_header_flags})
+        set(cxx_header_module "${module_file}")
+        set(cxx_header_library_subdir "${library_subdir}")
+        if(variant STREQUAL "maccatalyst")
+          set(cxx_header_module "${maccatalyst_module_file}")
+          set(cxx_header_library_subdir "${maccatalyst_library_subdir}")
+          remove_given_flag(cxx_header_flags "target")
+          remove_given_flag(cxx_header_flags "target-variant")
+          list(APPEND cxx_header_flags "-target" "${ios_like_target_triple}")
+        endif()
+        set(cxx_header_dir "${lib_dir}/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift")
+        set(cxx_header "${cxx_header_dir}/Swift.h")
+        add_custom_command_target(cxx_header_dependency_target
+          COMMAND "${CMAKE_COMMAND}" -E make_directory "${cxx_header_dir}"
+          COMMAND ${set_environment_args}
+            "${swift_compiler_tool}" -frontend -typecheck -parse-as-library
+            -parse-stdlib -module-name Swift -cxx-interoperability-mode=default
+            -clang-header-expose-decls=has-expose-attr-or-stdlib
+            ${cxx_header_flags}
+            -emit-clang-header-path "${cxx_header}" "${cxx_header_module}"
+          OUTPUT "${cxx_header}"
+          DEPENDS "${cxx_header_module}" ${swift_compiler_tool_dep}
+          COMMENT "Generating ${cxx_header}")
+        list(APPEND module_dependency_targets "${cxx_header_dependency_target}")
+        swift_install_in_component(FILES "${cxx_header}"
+          DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift"
+          COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+        if(SWIFTFILE_STATIC)
+          set(cxx_header_static_dir "${SWIFTSTATICLIB_DIR}/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift")
+          add_custom_command_target(cxx_header_static_dependency_target
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${cxx_header_static_dir}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${cxx_header}" "${cxx_header_static_dir}/Swift.h"
+            OUTPUT "${cxx_header_static_dir}/Swift.h"
+            DEPENDS "${cxx_header}"
+            COMMENT "Copying ${cxx_header_static_dir}/Swift.h")
+          list(APPEND module_dependency_targets "${cxx_header_static_dependency_target}")
+          swift_install_in_component(FILES "${cxx_header_static_dir}/Swift.h"
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift"
+            COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+        endif()
+      endforeach()
+    endif()
+    set("${dependency_module_target_out_var_name}" "${module_dependency_targets}" PARENT_SCOPE)
 
     # This is the target to generate the .sib files. It is not built by default.
     add_custom_command_target(

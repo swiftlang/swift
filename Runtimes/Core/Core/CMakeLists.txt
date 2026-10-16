@@ -430,6 +430,48 @@ install(TARGETS swiftCore
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
+# Emit the public C++ header from the completed module, without enabling C++
+# interoperability while compiling the standard library itself.
+function(emit_stdlib_cxx_header module_triple target_triple output_directory install_directory)
+  add_custom_command(TARGET swiftCore POST_BUILD
+    BYPRODUCTS "${output_directory}/swift/Swift.h"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_directory}/swift"
+    COMMAND "${CMAKE_Swift_COMPILER}" -frontend -typecheck -parse-as-library
+      -parse-stdlib -module-name Swift -cxx-interoperability-mode=default
+      -clang-header-expose-decls=has-expose-attr-or-stdlib
+      -target "${target_triple}"
+      "$<$<BOOL:${CMAKE_OSX_SYSROOT}>:-sdk>"
+      "$<$<BOOL:${CMAKE_OSX_SYSROOT}>:${CMAKE_OSX_SYSROOT}>"
+      "$<$<AND:$<NOT:$<BOOL:${CMAKE_OSX_SYSROOT}>>,$<BOOL:${CMAKE_SYSROOT}>>:-sdk>"
+      "$<$<AND:$<NOT:$<BOOL:${CMAKE_OSX_SYSROOT}>>,$<BOOL:${CMAKE_SYSROOT}>>:${CMAKE_SYSROOT}>"
+      "$<$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>:-disable-objc-interop>"
+      -I "${PROJECT_SOURCE_DIR}/SwiftShims/swift/shims"
+      -Xcc "-fmodule-map-file=${PROJECT_SOURCE_DIR}/SwiftShims/swift/shims/module.modulemap"
+      "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:-Xcc>"
+      "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:-DSWIFT_STATIC_STDLIB>"
+      -emit-clang-header-path "${output_directory}/swift/Swift.h"
+      "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule/${module_triple}.swiftmodule"
+    COMMENT "Generating ${output_directory}/swift/Swift.h"
+    COMMAND_EXPAND_LISTS VERBATIM)
+  install(FILES "${output_directory}/swift/Swift.h"
+    DESTINATION "${install_directory}/swift"
+    COMPONENT SwiftCore_development)
+endfunction()
+
+if(CMAKE_Swift_COMPILER_TARGET)
+  set(cxx_header_target "${CMAKE_Swift_COMPILER_TARGET}")
+else()
+  set(cxx_header_target "${SwiftCore_MODULE_TRIPLE}")
+endif()
+emit_stdlib_cxx_header("${SwiftCore_MODULE_TRIPLE}" "${cxx_header_target}"
+  "${CMAKE_CURRENT_BINARY_DIR}/cxx" "${SwiftCore_INSTALL_LIBDIR}")
+if(SwiftCore_VARIANT_MODULE_TRIPLE)
+  emit_stdlib_cxx_header("${SwiftCore_VARIANT_MODULE_TRIPLE}"
+    "${SwiftCore_COMPILER_VARIANT_TARGET}"
+    "${CMAKE_CURRENT_BINARY_DIR}/cxx-maccatalyst"
+    "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/maccatalyst/${SwiftCore_ARCH_SUBDIR}")
+endif()
+
 # Configure plist creation for Darwin platforms.
 generate_plist(swiftCore "${CMAKE_PROJECT_VERSION}" swiftCore)
 embed_manifest(swiftCore)

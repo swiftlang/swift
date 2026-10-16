@@ -57,13 +57,16 @@ struct EmittedClangHeaderDependencyInfo {
 };
 
 /// Prints the declarations of \p M to \p os in C++ language mode.
+/// Omit the core scaffold when an imported stdlib header provides it. A
+/// separately emitted stdlib header uses the C++ client's deployment target
+/// to select the available primitive metadata traits.
 ///
 /// \returns Dependencies required by this module.
-EmittedClangHeaderDependencyInfo
-printModuleContentsAsCxx(raw_ostream &os, ModuleDecl &M,
-                         SwiftToClangInteropContext &interopContext,
-                         AccessLevel minAccess, bool requiresExposedAttribute,
-                         llvm::StringSet<> &exposedModules);
+EmittedClangHeaderDependencyInfo printModuleContentsAsCxx(
+    raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    AccessLevel minAccess, bool requiresExposedAttribute,
+    llvm::StringSet<> &exposedModules, bool emitCoreScaffold = true,
+    bool useClangDeploymentTarget = false);
 
 } // end namespace swift
 

@@ -7,6 +7,13 @@
 
 // RUN: %target-interop-build-clangxx -std=gnu++17 -fmodules -fcxx-modules -c %t/consumer.cpp -F %t -fsyntax-only -Werror=non-modular-include-in-framework-module
 
+// Repeat with both frameworks using the shared standard library header.
+// RUN: %empty-directory(%t/include/swift)
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/include/swift/Swift.h
+// RUN: %target-swift-frontend %t/TestFmSwift.swift -module-name TestFm -cxx-interoperability-mode=default -typecheck -verify -clang-header-expose-module Swift=swift/Swift.h -emit-clang-header-path %t/TestFm.framework/Headers/TestFm-Swift.h
+// RUN: %target-swift-frontend %t/SecondSwift.swift -module-name Second -cxx-interoperability-mode=default -typecheck -verify -clang-header-expose-module Swift=swift/Swift.h -emit-clang-header-path %t/Second.framework/Headers/Second-Swift.h
+// RUN: %target-interop-build-clangxx -std=c++17 -fmodules -fcxx-modules -fmodules-cache-path=%t/shared-cache -fsyntax-only %t/consumer.cpp -F %t -I %t/include -Werror=non-modular-include-in-framework-module
+
 // Check that a client C++ file can use Swift stdlib APIs from two
 // mixed-language C++ and Swift frameworks.
 
