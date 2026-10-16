@@ -133,6 +133,37 @@ void testSwap() {
 }
 ```
 
+### Consuming Parameters
+
+The experimental feature `GenerateConsumingValueParametersInCXX` exposes consumed
+copyable Swift value parameters as C++ parameters passed by value. An lvalue is
+copied at the call boundary; a temporary or a non-const rvalue transfers ownership
+through the wrapper's move constructor. A const rvalue is copied.
+
+For example, a Swift function can initialize storage with a consumed generic value:
+
+```swift
+public func initializeSwiftValue<T>(_ destination: UnsafeMutableRawPointer,
+                                   _ value: consuming T) {
+  destination.assumingMemoryBound(to: T.self).initialize(to: consume value)
+}
+```
+
+With the feature enabled when generating the C++ header, the caller can transfer
+the value with `initializeSwiftValue(destination, std::move(value))`. The
+destination must be suitably aligned, uninitialized storage for the Swift value.
+The source wrapper is then empty, as described in
+[Resilient Swift Structures](#resilient-swift-structures).
+
+Borrowing and `inout` parameters retain their reference bindings. Consuming
+methods still copy their receiver, and concrete Swift class parameters retain
+their existing bindings. Generic arguments use the move or copy operation of
+their substituted C++ type.
+
+This changes the C++ function type from one taking `const T &` to one taking `T`,
+including function pointers and explicit template specializations. Use the same
+feature setting for generated headers used together. The Swift ABI is unchanged.
+
 ### Function Overloading
 
 Swift allows you to specify which overload of the function you would like to call using argument labels. For example, the following snippet is explicitly calling the second definition of `greet` because of the call using `greet(person:,from:)` argument labels:
@@ -212,7 +243,9 @@ arithmeticMean({ 1.0, 2.0 });
 
 ## Using Swift Structure Types
 
-Swift structures that are usable from C++ are available in their corresponding module namespace. They’re bridged over as a C++ `class` that has an opaque representation and layout whose size and alignment matches the size and alignment of the Swift structure.
+Swift structures that are usable from C++ are available in their corresponding module namespace. They’re bridged over as a C++ `class` that has an opaque representation and layout. It stores the Swift structure followed by a flag that records whether the value was moved out, so the class can be larger than the Swift structure.
+
+Moving such a C++ object takes the Swift value out of the source without copying it, and leaves the source empty. [Resilient Swift Structures](#resilient-swift-structures) describes what an empty object supports.
 
 You can construct an instance of a structure using the static `init` method in the C++ class:
 
@@ -358,7 +391,7 @@ The boxing implies that the following operations will allocate and store a new v
 
 **NOTE**: A fixed-layout structure that contains a resilient structure as a stored property is also boxed on the C++ side.
 
-Moving a boxed value with a C++ move constructor or move assignment transfers its heap allocation and leaves the source empty. The Swift value is not copied and no new allocation is made. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`. A copyable value with a fixed layout has no move operations yet, so moving it calls the copy constructor and the source keeps its value.
+Moving a boxed value with a C++ move constructor or move assignment transfers its heap allocation and leaves the source empty. The Swift value is not copied and no new allocation is made. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`.
 
 ```c++
 auto url = Foundation::URL::init("https://swift.org");

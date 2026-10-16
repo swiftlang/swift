@@ -37,7 +37,7 @@ public func borrowMoveOnlyStruct(_ s: borrowing MoveOnlyStruct) -> Int {
 
 public func consumeMoveOnlyStruct(_ s: consuming MoveOnlyStruct) {}
 
-// A copyable type keeps its copy operations and gains no moved-from flag.
+// A copyable type keeps its copy operations.
 public struct CopyableStruct {
     public let x: Int
 }
@@ -74,13 +74,14 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 
 // The checks below follow the order in which the types are emitted.
 
-// Copyable types are unaffected.
+// Copyable types keep their copy operations and also track moved-from values.
 // CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::CopyableStruct> = true;
 // CHECK: class SWIFT_SYMBOL({{.*}}) CopyableStruct final {
 // CHECK:   SWIFT_INLINE_THUNK ~CopyableStruct() noexcept {
-// CHECK-NOT:     if (_isMovedFrom) return;
+// CHECK-NEXT:     if (_isMovedFrom) return;
 // CHECK:   SWIFT_INLINE_THUNK CopyableStruct(const CopyableStruct &other) noexcept {
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// CHECK-NEXT:   bool _isMovedFrom = false;
 // CHECK-NEXT:   friend class _impl::_impl_CopyableStruct;
 
 // A noncopyable type cannot be used as a Swift generic argument yet.

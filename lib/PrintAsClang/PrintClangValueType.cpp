@@ -174,7 +174,7 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
         os << "static ";
         ClangSyntaxPrinter(typeDecl->getASTContext(), os).printInlineForThunk();
         os << "String init(NSString * _Nonnull nsString) noexcept {\n";
-        os << "    auto result = _make();\n";
+        os << "    String result;\n";
         os << "    auto res = "
               "_impl::$sSS10FoundationE36_"
               "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge "
@@ -225,9 +225,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     }
   }
-  // A noncopyable type is exposed as a move-only C++ class. Because Swift's
-  // moves are destructive and C++'s are not, such a class carries a flag that
-  // records whether it was moved from, so that its destructor can be a no-op.
+  // Because Swift's moves are destructive and C++'s are not, a class with an
+  // inline layout carries a flag that records whether it was moved from, so
+  // that its destructor can be a no-op. A class with an opaque layout needs no
+  // flag, as a moved-from object has no allocation. A noncopyable type is
+  // exposed as a move-only C++ class.
   bool isNoncopyable =
       cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
   assert((!isNoncopyable || !isOpaqueLayout) &&
@@ -312,11 +314,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  ";
     printer.printInlineForThunk();
     os << '~' << baseName << "() noexcept {\n";
-    if (isNoncopyable)
-      os << "    if (_isMovedFrom) return;\n";
     // A moved-from object with an opaque layout has no allocation.
     if (isOpaqueLayout)
       os << "    if (!_storage.isAllocated()) return;\n";
+    else
+      os << "    if (_isMovedFrom) return;\n";
     printVWTable(os);
     os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
     os << "  }\n";
@@ -325,7 +327,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
       os << "  " << baseName << " &operator =(const " << baseName
          << " &) = delete;\n";
+    }
 
+    if (!isOpaqueLayout) {
       // move constructor.
       os << "  ";
       printer.printInlineForThunk();
@@ -364,14 +368,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "    other._isMovedFrom = true;\n";
       os << "  return *this;\n";
       os << "  }\n";
-    } else {
+    }
+
+    if (!isNoncopyable) {
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << "(const " << baseName << " &other) noexcept {\n";
       // A copy of a moved-from object is moved from too.
-      if (isOpaqueLayout)
+      if (isOpaqueLayout) {
         os << "    if (!other._storage.isAllocated()) return;\n";
+      } else {
+        os << "    if (other._isMovedFrom) {\n";
+        os << "      _isMovedFrom = true;\n";
+        os << "      return;\n";
+        os << "    }\n";
+      }
       printVWTable(os);
       if (isOpaqueLayout) {
         os << "    _storage = ";
@@ -391,13 +403,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
          << " &other) noexcept {\n";
       // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
       // source into a new object and move that in.
-      if (isOpaqueLayout) {
+      if (isOpaqueLayout)
         os << "    if (!_storage.isAllocated() || "
               "!other._storage.isAllocated()) {\n";
-        os << "      *this = " << baseName << "(other);\n";
-        os << "      return *this;\n";
-        os << "    }\n";
-      }
+      else
+        os << "    if (_isMovedFrom || other._isMovedFrom) {\n";
+      os << "      *this = " << baseName << "(other);\n";
+      os << "      return *this;\n";
+      os << "    }\n";
       printVWTable(os);
       os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
             "*>(other._getOpaquePointer()), metadata._0);\n";
@@ -432,8 +445,6 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  return *this;\n";
       os << "  }\n";
     }
-    // FIXME: implement the move operations for a copyable type with an inline
-    // layout.
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
@@ -441,41 +452,30 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
     os << "private:\n";
 
-    // Print out private default constructor.
+    // Print out the private default constructor, which leaves the Swift value
+    // uninitialized. Factories construct their result with it directly:
+    // returning an uninitialized object from a separate function could move
+    // it before Swift initializes it when C++14 copy elision is disabled.
     os << "  ";
     printer.printInlineForThunk();
     printer.printBaseName(typeDecl);
-    if (isOpaqueLayout) {
-      os << "(";
-      printer.printSwiftImplQualifier();
-      os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
-            "_storage(vwTable->size, "
-            "vwTable->getAlignment()) {}\n";
-    } else {
-      os << "() noexcept {}\n";
-    }
-    // Print out '_make' function which returns an unitialized instance for
-    // passing to Swift.
-    os << "  static ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " _make() noexcept {";
+    os << "() noexcept {";
     if (isOpaqueLayout) {
       os << "\n";
       printVWTable(os);
-      os << "    return ";
-      printer.printBaseName(typeDecl);
-      os << "(vwTable);\n  }\n";
+      os << "    _storage = ";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << "(vwTable->size, vwTable->getAlignment());\n  }\n";
     } else {
-      os << " return ";
-      printer.printBaseName(typeDecl);
-      os << "(); }\n";
+      os << "}\n";
     }
     // Print out the private accessors to the underlying Swift value storage.
     // Every use of a value by Swift goes through these, so they are where a
-    // moved-from noncopyable value, which holds no Swift value, is caught.
+    // moved-from value, which holds no Swift value, is caught. 'OpaqueStorage'
+    // checks its own allocation.
     StringRef movedFromCheck =
-        isNoncopyable ? "if (_isMovedFrom) abort(); " : "";
+        isOpaqueLayout ? "" : "if (_isMovedFrom) abort(); ";
     os << "  ";
     printer.printInlineForThunk();
     os << "const char * _Nonnull _getOpaquePointer() const noexcept { "
@@ -528,7 +528,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
     // The moved-from flag has to come after the Swift value, so that the
     // address of this class stays the address of the value itself.
-    if (isNoncopyable)
+    if (!isOpaqueLayout)
       os << "  bool _isMovedFrom = false;\n";
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
@@ -576,10 +576,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << " returnNewValue(T callable) {\n";
-          os << "    auto result = ";
+          os << "    ";
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
-          os << "::_make();\n";
+          os << " result;\n";
           os << "    callable(result._getOpaquePointer());\n";
           os << "    return result;\n";
           os << "  }\n";

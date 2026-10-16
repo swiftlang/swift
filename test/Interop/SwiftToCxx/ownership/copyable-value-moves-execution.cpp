@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/copyable-value-moves.swift -module-name Moves -enable-library-evolution -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves.h
 
 // Without copy elision, C++14 moves the objects that the factories create
 // before Swift has initialized their values.
+// RUN: %target-swift-frontend %S/copyable-value-moves.swift -module-name Moves -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves.h
 // RUN: %target-interop-build-clangxx -std=c++14 -fno-elide-constructors -c %s -I %t -o %t/moves.o
-// RUN: %target-interop-build-swift %S/copyable-value-moves.swift -module-name Moves -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain -Xlinker %t/moves.o -o %t/moves
+// RUN: %target-interop-build-swift %S/copyable-value-moves.swift -module-name Moves -Xfrontend -entry-point-function-name -Xfrontend swiftMain -Xlinker %t/moves.o -o %t/moves
 // RUN: %target-codesign %t/moves
 // RUN: %target-run %t/moves
 
@@ -14,6 +14,21 @@
 // RUN: not --crash %target-run %t/moves inout 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/moves member 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/moves enum 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves array 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves optional 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+
+// Repeat with boxed values.
+// RUN: %target-swift-frontend %S/copyable-value-moves.swift -module-name Moves -enable-library-evolution -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves.h
+// RUN: %target-interop-build-clangxx -std=c++14 -fno-elide-constructors -c %s -I %t -o %t/moves.o
+// RUN: %target-interop-build-swift %S/copyable-value-moves.swift -module-name Moves -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain -Xlinker %t/moves.o -o %t/moves
+// RUN: %target-codesign %t/moves
+// RUN: %target-run %t/moves
+// RUN: not --crash %target-run %t/moves borrow 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves generic 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves inout 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves member 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves enum 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/moves array 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/moves optional 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 
 // REQUIRES: executable_test
@@ -49,7 +64,11 @@ using namespace Moves;
 
 static_assert(std::is_nothrow_move_constructible<Value>::value, "");
 static_assert(std::is_nothrow_move_assignable<Value>::value, "");
-static_assert(sizeof(Value) == sizeof(void *), "no state besides the box");
+static_assert(!swift::_impl::isOpaqueLayout<Value> ||
+                  sizeof(Value) == sizeof(void *),
+              "a boxed value needs no state besides the box");
+static_assert(std::is_standard_layout<Value>::value,
+              "an inline Swift value stays at offset zero");
 
 extern "C" size_t swift_retainCount(void *_Nonnull);
 static size_t retainCount(const Ref &ref) {
@@ -114,6 +133,8 @@ static void useMovedFrom(const char *mode, const Ref &ref) {
   auto moved = std::move(value);
   auto choice = makeChoice(moved);
   auto movedChoice = std::move(choice);
+  auto array = makeArray(moved);
+  auto movedArray = std::move(array);
   auto optional = makeOptional(moved);
   auto movedOptional = std::move(optional);
   // MOVED-FROM: about to use a moved-from value
@@ -129,6 +150,8 @@ static void useMovedFrom(const char *mode, const Ref &ref) {
     (void)value.check();
   else if (!strcmp(mode, "enum"))
     (void)choice.isValue();
+  else if (!strcmp(mode, "array"))
+    (void)borrowGeneric(array);
   else if (!strcmp(mode, "optional"))
     (void)optional.get();
   // MOVED-FROM-NOT: unreachable
@@ -173,6 +196,19 @@ int main(int argc, char **argv) {
     auto movedNumber = std::move(number);
     assert(movedNumber.isNumber());
     checkMoves(makeOptional(value), ref);
+
+    // Array copies share their elements, so check its moves separately.
+    auto array = makeArray(value);
+    auto count = retainCount(ref);
+    auto allocs = allocations;
+    auto moved = std::move(array);
+    assert(allocations == allocs);
+    assert(retainCount(ref) == count);
+    assert(moved.getCount() == 1);
+    array = std::move(moved);
+    auto element = array[0];
+    assert(element.check());
+    assert(borrow(element) == 43);
   }
   assert(retainCount(ref) == 1);
   assert(liveAllocations == 0);

@@ -4,7 +4,13 @@
 // RUN: %FileCheck --check-prefix=NOSELF %s < %t/consume.h
 // RUN: %check-interop-cxx-header-in-clang(%t/consume.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
+// RUN: %target-swift-frontend %s -module-name Consume -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -enable-experimental-feature GenerateConsumingValueParametersInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/consume-moves.h
+// RUN: %FileCheck --check-prefix=NONCOPYABLE %s < %t/consume-moves.h
+// RUN: %FileCheck --check-prefix=NOSELF %s < %t/consume-moves.h
+// RUN: %check-interop-cxx-header-in-clang(%t/consume-moves.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+
 // REQUIRES: swift_feature_GenerateBindingsForNoncopyableTypesInCXX
+// REQUIRES: swift_feature_GenerateConsumingValueParametersInCXX
 
 // Whether C++ has to move a value into Swift follows the lowered parameter
 // convention, not the specifier written in the source.
@@ -48,18 +54,23 @@ extension MO {
 // CHECK: SWIFT_INLINE_THUNK void consumeCopyable(const Copyable1& s) noexcept
 
 // CHECK: SWIFT_INLINE_THUNK void consumeMO(MO&& s) noexcept
+// NONCOPYABLE: SWIFT_INLINE_THUNK void consumeMO(MO&& s) noexcept
 // CHECK-NEXT: alignas(alignof(MO)) char copyBuffer_consumedParamCopy_s[sizeof(MO)];
 // CHECK-NEXT: auto &consumedParamCopy_s = *(new(copyBuffer_consumedParamCopy_s) MO(static_cast<MO &&>(s)));
 
 // An 'inout' parameter stays a mutable lvalue reference and is not moved from.
 // CHECK: SWIFT_INLINE_THUNK void mutateMO(MO& s) noexcept
+// NONCOPYABLE: SWIFT_INLINE_THUNK void mutateMO(MO& s) noexcept
 // CHECK-NOT: copyBuffer_consumedParamCopy_s
 
 // CHECK: SWIFT_INLINE_THUNK void takeOwnedMO(MO&& s) noexcept
+// NONCOPYABLE: SWIFT_INLINE_THUNK void takeOwnedMO(MO&& s) noexcept
 
 // CHECK: SWIFT_INLINE_THUNK void Holder::setValue(MO&& value)
+// NONCOPYABLE: SWIFT_INLINE_THUNK void Holder::setValue(MO&& value)
 
 // CHECK: SWIFT_INLINE_THUNK Holder Holder::init(MO&& value)
+// NONCOPYABLE: SWIFT_INLINE_THUNK Holder Holder::init(MO&& value)
 
 // A getter would have to copy the property out of a borrowed 'self'.
 // NOSELF-NOT: getValue

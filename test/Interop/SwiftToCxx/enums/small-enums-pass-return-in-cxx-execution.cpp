@@ -17,8 +17,8 @@
 int main() {
     using namespace Enums;
 
-    // sizeof(generated cxx class) = 1 + max(sizeof(case) for all cases) + padding
-    static_assert(sizeof(Tiny) == 1, "MemoryLayout<Tiny>.stride == 1");
+    // Inline wrappers store the Swift payload followed by a moved-from flag.
+    static_assert(sizeof(Tiny) == 2, "includes the moved-from flag");
     static_assert(sizeof(Small) == 16, "MemoryLayout<Small>.stride == 16");
 
     auto tiny = makeTiny(10);
