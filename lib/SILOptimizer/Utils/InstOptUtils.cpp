@@ -726,9 +726,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
                        "not ABI "
                        "compatible");
       // Insert convert_function.
-      return {builder->createConvertFunction(loc, value, destTy,
-                                             /*WithoutActuallyEscaping=*/false),
-              false};
+      return {builder->createConvertFunction(loc, value, destTy), false};
     }
   }
   NominalTypeDecl *srcNominal = srcTy.getNominalDecl();

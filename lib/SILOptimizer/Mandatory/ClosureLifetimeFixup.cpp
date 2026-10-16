@@ -763,9 +763,9 @@ static SILValue tryRewriteToPartialApplyStack(
     auto origTy = convert->getType().castTo<SILFunctionType>();
     auto origWithNoEscape = SILType::getPrimitiveObjectType(
         origTy->getWithExtInfo(origTy->getExtInfo().withNoEscape()));
-    closureOp = b.createConvertFunction(convert->getLoc(), closure,
-                                        origWithNoEscape, false);
-    
+    closureOp =
+        b.createConvertFunction(convert->getLoc(), closure, origWithNoEscape);
+
     /* DEBUG
     llvm::errs() << "--- with\n";
     closureOp->dumpInContext();

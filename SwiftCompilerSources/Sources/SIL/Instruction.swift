@@ -1493,7 +1493,22 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
 final public
 class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {
   public var fromFunction: Value { operand.value }
-  public var withoutActuallyEscaping: Bool { bridged.ConvertFunctionInst_withoutActuallyEscaping() }
+
+  /// The kind of the conversion. The raw values match `swift::ConvertFunctionInst::Kind`.
+  public enum Kind: Int {
+    /// An ordinary conversion between ABI-compatible function types.
+    case ordinary = 0
+
+    /// The conversion turns a non-escaping closure into an escaping function type.
+    case withoutActuallyEscaping = 1
+
+    /// The conversion turns an exactly-once function into an at-most-once function.
+    case withoutActuallyDiscarding = 2
+  }
+
+  public var conversionKind: Kind { Kind(rawValue: bridged.ConvertFunctionInst_getConversionKind())! }
+  public var withoutActuallyEscaping: Bool { conversionKind == .withoutActuallyEscaping }
+  public var withoutActuallyDiscarding: Bool { conversionKind == .withoutActuallyDiscarding }
 }
 
 final public

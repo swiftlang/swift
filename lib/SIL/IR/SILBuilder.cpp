@@ -177,7 +177,7 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
     if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
       if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
         if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
-          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+          return createConvertFunction(Loc, Op, Ty);
         }
       }
     }
@@ -211,7 +211,7 @@ SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
     if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
       if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
         if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
-          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+          return createConvertFunction(Loc, Op, Ty);
         }
       }
     }

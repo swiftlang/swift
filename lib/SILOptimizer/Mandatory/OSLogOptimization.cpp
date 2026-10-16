@@ -737,8 +737,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
       // Convert to the expected type if necessary.
       if (expectedFnType != resultType) {
         auto convert = builder.createConvertFunction(
-            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType),
-            false);
+            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType));
         return convert;
       }
     }

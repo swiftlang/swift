@@ -2369,8 +2369,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         attrs |= 0x01;
     }
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
-      if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
-        attrs |= 0x01;
+      attrs |= unsigned(cast<ConvertFunctionInst>(SI).getConversionKind());
     } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
       attrs = encodeValueOwnership(refCast->getOwnershipKind());
     } else if (auto *opening = dyn_cast<OpenCOMExistentialInst>(&SI)) {
