@@ -114,6 +114,12 @@ public final class InheritedUser: InheritedMiddle {
 // CHECK: class SWIFT_SYMBOL("s:8Generics12LaterGenericV") LaterGeneric;
 // CHECK: class SWIFT_SYMBOL("s:8Generics16LaterGenericEnumO") LaterGenericEnum;
 
+// CHECK: class SWIFT_SYMBOL("s:8Generics16ComesFirstStructV") ComesFirstStruct;
+// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstStruct> = true;
+
+// CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum;
+// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstEnum> = true;
+
 // CHECK: class SWIFT_SYMBOL("s:8Generics15ComesFirstClassC") ComesFirstClass final : public swift::_impl::RefCountedClass {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   using RefCountedClass::RefCountedClass;
@@ -127,12 +133,6 @@ public final class InheritedUser: InheritedMiddle {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK LaterGeneric<swift::Int> getLaterStruct() noexcept SWIFT_SYMBOL("s:8Generics15ComesFirstClassC11laterStructAA12LaterGenericVySiGvp");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void setLaterStruct(const LaterGeneric<swift::Int>& newValue) noexcept SWIFT_SYMBOL("s:8Generics15ComesFirstClassC11laterStructAA12LaterGenericVySiGvp");
 // CHECK-NEXT: protected:
-
-// CHECK: class SWIFT_SYMBOL("s:8Generics16ComesFirstStructV") ComesFirstStruct;
-// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstStruct> = true;
-
-// CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum;
-// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::ComesFirstEnum> = true;
 
 // CHECK: class SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO") ComesFirstEnum final {
 // CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const noexcept SWIFT_SYMBOL("s:8Generics14ComesFirstEnumO15returnsLaterOptAA0F7GenericVyACGyF");

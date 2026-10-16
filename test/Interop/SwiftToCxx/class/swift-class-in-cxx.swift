@@ -23,13 +23,6 @@ public final class ClassWithIntField {
 
 // CHECK: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
-// CHECK: SWIFT_EXTERN void * _Nonnull $s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughClassWithIntField(_:)
-// CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s5Class06returnA12WithIntFieldAA0acdE0CyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnClassWithIntField()
-// CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA12WithIntFieldyyAA0acdE0CF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntField(_:)
-// CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(void * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntFieldInout(_:)
-
-// CHECK: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
-
 // CHECK: class SWIFT_SYMBOL("s:5Class0A12WithIntFieldC") ClassWithIntField;
 // CHECK-NEXT: } // end namespace
 
@@ -42,8 +35,12 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
-// CHECK: namespace
-// CHECK-SAME: Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
+// CHECK: SWIFT_EXTERN void * _Nonnull $s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughClassWithIntField(_:)
+// CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s5Class06returnA12WithIntFieldAA0acdE0CyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // returnClassWithIntField()
+// CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA12WithIntFieldyyAA0acdE0CF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntField(_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(void * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // takeClassWithIntFieldInout(_:)
+
+// CHECK: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
 // CHECK: namespace
 // CHECK-SAME: _impl {

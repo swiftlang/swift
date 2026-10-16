@@ -163,6 +163,18 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
     y.x = x
 }
 
+// CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
+// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair;
+
+// CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif // __cpp_concepts
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Generics::GenericPair<T_0_0, T_0_1>> = isUsableInGenericContext<T_0_0> && isUsableInGenericContext<T_0_1>;
+
 // CHECK: SWIFT_EXTERN void $s8Generics11GenericPairV1yq_vg(SWIFT_INDIRECT_RESULT void * _Nonnull, void * _Nonnull , SWIFT_CONTEXT const void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV1yq_vs(const void * _Nonnull value, void * _Nonnull , SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairVyACyxq_Gx_Siq_tcfC(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, ptrdiff_t i, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:_:_:)
@@ -201,18 +213,6 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughGenericPair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics16takeConcretePairyyAA07GenericD0Vys6UInt16VAFGF(struct swift_interop_passStub_Generics_uint32_t_0_4 x) SWIFT_NOEXCEPT SWIFT_CALL; // takeConcretePair(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(const void * _Nonnull x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)
-
-// CHECK: template<class T_0_0, class T_0_1>
-// CHECK-NEXT: #ifdef __cpp_concepts
-// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
-// CHECK-NEXT: #endif
-// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair;
-
-// CHECK: template<class T_0_0, class T_0_1>
-// CHECK-NEXT: #ifdef __cpp_concepts
-// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
-// CHECK-NEXT: #endif // __cpp_concepts
-// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Generics::GenericPair<T_0_0, T_0_1>> = isUsableInGenericContext<T_0_0> && isUsableInGenericContext<T_0_1>;
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts

@@ -104,9 +104,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics17GenericCustomTypeO") GenericCustomType;
 
-// CHECK: inline const constexpr bool isOpaqueLayout<Generics::GenericCustomType<T_0_0>> = true;
-
-// CHECK: template<class T_0_0>
+// CHECK: inline const constexpr bool isUsableInGenericContext<Generics::GenericCustomType<T_0_0>> = isUsableInGenericContext<T_0_0>;
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
@@ -119,6 +117,10 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Generics::GenericOpt<T_0_0>> = isUsableInGenericContext<T_0_0>;
+
+// CHECK: inline const constexpr bool isOpaqueLayout<Generics::GenericCustomType<T_0_0>> = true;
+
+// CHECK: template<class T_0_0>
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
