@@ -3553,15 +3553,15 @@ KeyPathInst::~KeyPathInst() {
     operand.~Operand();
 }
 
-BoundGenericType *KeyPathInst::getKeyPathType() const {
+NominalType *KeyPathInst::getKeyPathType() const {
   auto kpTy = getType();
 
   if (auto existential = kpTy.getAs<ExistentialType>()) {
     return existential->getExistentialLayout()
-        .explicitSuperclass->castTo<BoundGenericType>();
+        .explicitSuperclass->castTo<NominalType>();
   }
 
-  return kpTy.getAs<BoundGenericType>();
+  return kpTy.getAs<NominalType>();
 }
 
 KeyPathPattern *KeyPathInst::getPattern() const {
@@ -3595,9 +3595,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   // starting `capability = .value` in
   // `_getKeyPathClassAndInstanceSizeFromPattern`.
   if (components.empty()) {
-    auto identityTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                            /*parent=*/swift::Type(),
-                                            {rootTy, valueTy})
+    auto identityTy = NominalType::get(ctx.getWritableKeyPathDecl(),
+                                       /*parent=*/swift::Type(),
+                                       {rootTy, valueTy}, ctx)
                           ->getCanonicalType();
     return SILType::getPrimitiveObjectType(identityTy);
   }
@@ -3691,9 +3691,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       break;
     }
     assert(keyPathClass && "unhandled component kind above?");
-    auto concreteTy = BoundGenericType::get(keyPathClass,
-                                            /*parent=*/swift::Type(),
-                                            {rootTy, valueTy})
+    auto concreteTy = NominalType::get(keyPathClass,
+                                       /*parent=*/swift::Type(),
+                                       {rootTy, valueTy}, ctx)
                           ->getCanonicalType();
     return SILType::getPrimitiveObjectType(concreteTy);
   }
@@ -3806,8 +3806,8 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   }
 
   auto concreteTy =
-      BoundGenericType::get(keyPathClass, /*parent=*/swift::Type(),
-                            {rootTy, valueTy})
+      NominalType::get(keyPathClass, /*parent=*/swift::Type(),
+                       {rootTy, valueTy}, ctx)
           ->getCanonicalType();
   return SILType::getPrimitiveObjectType(concreteTy);
 }

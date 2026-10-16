@@ -743,7 +743,7 @@ struct InferRequirementsWalker : public TypeWalker {
 
 }
 
-/// Infer requirements from applications of BoundGenericTypes to type
+/// Infer requirements from applications of generic types to type
 /// parameters. For example, given a function declaration
 ///
 ///     func union<T>(_ x: Set<T>, _ y: Set<T>)

@@ -8019,7 +8019,8 @@ bool swift::forEachConformance(
       type = sugarType->getImplementationType();
     }
 
-    if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
+    if (auto boundGeneric = dyn_cast<NominalType>(type.getPointer());
+        boundGeneric && boundGeneric->hasGenericArgs()) {
       auto subs = boundGeneric->getContextSubstitutionMap();
       if (forEachConformance(subs, body, visitedConformances))
         return true;

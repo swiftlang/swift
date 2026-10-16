@@ -7052,37 +7052,6 @@ public:
     printQualifiedType(T);
   }
 
-  void visitBoundGenericType(BoundGenericType *T,
-                             NonRecursivePrintOptions nrOptions) {
-    if (Options.SynthesizeSugarOnTypes) {
-      if (T->isArray()) {
-        Printer << "[";
-        visit(T->getGenericArgs()[0]);
-        Printer << "]";
-        return;
-      }
-      if (T->isDictionary()) {
-        Printer << "[";
-        visit(T->getGenericArgs()[0]);
-        Printer << " : ";
-        visit(T->getGenericArgs()[1]);
-        Printer << "]";
-        return;
-      }
-      if (T->isOptional()) {
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << "?";
-        return;
-      }
-    }
-    printQualifiedType(T);
-
-    if (Options.PrintTypesForDebugging)
-      printGenericArgs(T->getGenericArgs());
-    else
-      printGenericArgs(T->getExpandedGenericArgs());
-  }
-
   void printParentType(Type T) {
     /// Don't print the parent type if it's being printed in that type context.
     if (Options.TransformContext) {
@@ -7127,16 +7096,37 @@ public:
     Printer << ".";
   }
 
-  void visitEnumType(EnumType *T, NonRecursivePrintOptions nrOptions) {
-    printQualifiedType(T);
-  }
+  void visitNominalType(NominalType *T, NonRecursivePrintOptions nrOptions) {
+    if (Options.SynthesizeSugarOnTypes) {
+      if (T->isArray()) {
+        Printer << "[";
+        visit(T->getGenericArgs()[0]);
+        Printer << "]";
+        return;
+      }
+      if (T->isDictionary()) {
+        Printer << "[";
+        visit(T->getGenericArgs()[0]);
+        Printer << " : ";
+        visit(T->getGenericArgs()[1]);
+        Printer << "]";
+        return;
+      }
+      if (T->isOptional()) {
+        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        Printer << "?";
+        return;
+      }
+    }
 
-  void visitStructType(StructType *T, NonRecursivePrintOptions nrOptions) {
     printQualifiedType(T);
-  }
 
-  void visitClassType(ClassType *T, NonRecursivePrintOptions nrOptions) {
-    printQualifiedType(T);
+    if (T->hasGenericArgs()) {
+      if (Options.PrintTypesForDebugging)
+        printGenericArgs(T->getGenericArgs());
+      else
+        printGenericArgs(T->getExpandedGenericArgs());
+    }
   }
 
   void visitAnyMetatypeType(AnyMetatypeType *T,

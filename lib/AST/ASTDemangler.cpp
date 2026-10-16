@@ -426,7 +426,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
     return Type();
 
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
-    return BoundGenericType::get(nominalDecl, parent, args);
+    return NominalType::get(nominalDecl, parent, args, Ctx);
 
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
   auto *dc = aliasDecl->getDeclContext();
@@ -1387,8 +1387,7 @@ Type ASTBuilder::createBoundGenericObjCClassType(StringRef name,
     parent = dc->getDeclaredInterfaceType();
   }
 
-  return BoundGenericClassType::get(cast<ClassDecl>(typeDecl),
-                                    parent, args);
+  return ClassType::get(cast<ClassDecl>(typeDecl), parent, args, Ctx);
 }
 
 ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {

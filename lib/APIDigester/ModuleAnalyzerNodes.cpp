@@ -1651,8 +1651,9 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   // Handle the case where Type has sub-types.
-  if (auto BGT = T->getAs<BoundGenericType>()) {
-    for (auto Arg : BGT->getGenericArgs()) {
+  if (auto NT = T->getAs<NominalType>()) {
+    // FIXME: parent type?
+    for (auto Arg : NT->getGenericArgs()) {
       Root->addChild(constructTypeNode(Arg));
     }
   } else if (auto Tup = T->getAs<TupleType>()) {

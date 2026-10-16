@@ -2693,16 +2693,19 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
       Walker(IRGenerator &IRGen) : IRGen(IRGen) {}
 
       Action walkToTypePre(Type ty) override {
-        if (ty->is<BoundGenericType>())
-          genericDepth++;
-        else if (auto *nominal = ty->getAs<NominalType>())
-          noteUseOfTypeMetadata(nominal->getDecl());
+        if (auto *nominal = ty->getAs<NominalType>()) {
+          if (nominal->hasGenericArgs())
+            genericDepth++;
+          else
+            noteUseOfTypeMetadata(nominal->getDecl());
+        }
         return Action::Continue;
       }
 
       Action walkToTypePost(Type ty) override {
-        if (ty->is<BoundGenericType>())
-          genericDepth--;
+        if (auto *nominal = ty->getAs<NominalType>())
+          if (nominal->hasGenericArgs())
+            genericDepth--;
 
         return Action::Continue;
       }

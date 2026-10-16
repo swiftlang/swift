@@ -6481,7 +6481,7 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   Type getRootType() const;
   Type getValueType() const;

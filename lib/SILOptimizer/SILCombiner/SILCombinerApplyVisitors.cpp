@@ -1623,7 +1623,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (!storageTy->is_ContiguousArrayStorage())
     return false;
 
-  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  auto boundGenericTy = dyn_cast<NominalType>(storageTy);
   if (!boundGenericTy)
     return false;
 

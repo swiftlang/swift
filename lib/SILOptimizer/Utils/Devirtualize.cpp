@@ -58,7 +58,7 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *cha, ClassDecl *cd,
 
   // FIXME: This is wrong -- we could have a non-generic class nested
   // inside a generic class
-  if (isa<BoundGenericClassType>(classType)) {
+  if (isa<ClassType>(classType)) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto removedIt =
@@ -444,7 +444,7 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
     //
     // The conformance Bar : Q is difficult to recover in the general case.
     //
-    // Some combination of storing substitution maps in BoundGenericTypes
+    // Some combination of storing substitution maps in NominalTypes
     // as well as for method overrides would solve this, but for now, just
     // punt to global lookup.
     LookUpConformanceInModule());

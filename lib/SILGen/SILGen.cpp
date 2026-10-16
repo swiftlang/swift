@@ -649,8 +649,8 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto rootType = sig.getGenericParams()[0]->getCanonicalType();
   auto valueType = sig.getGenericParams()[1]->getCanonicalType();
 
-  auto keyPathTy = BoundGenericType::get(keyPathDecl, Type(),
-                                         { rootType, valueType })
+  auto keyPathTy = NominalType::get(keyPathDecl, Type(),
+                                    {rootType, valueType}, getASTContext())
     ->getCanonicalType();
 
   // (@in_guaranteed/@inout Root, @guaranteed KeyPath<Root, Value>)

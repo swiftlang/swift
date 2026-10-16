@@ -387,7 +387,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType();
-    if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
+    if (auto BGT = Ty.getAs<StructType>()) {
       // Check the array element type parameter.
       bool isClass = false;
       for (auto EltTy : BGT->getGenericArgs()) {

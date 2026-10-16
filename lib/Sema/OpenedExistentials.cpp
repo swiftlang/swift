@@ -167,7 +167,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
                                              /*canBeCovariantResult=*/false);
   }
 
-  if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
+  if (auto *const nominal = type->getAs<NominalType>()) {
     auto info = GenericParameterReferenceInfo();
 
     // Don't forget to look in the parent.
@@ -178,22 +178,22 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
     }
 
     // Most bound generic types are invariant.
-    if (auto *const bgt = type->getAs<BoundGenericType>()) {
-      if (bgt->isArray()) {
+    if (nominal->hasGenericArgs()) {
+      if (nominal->isArray()) {
         // Swift.Array preserves variance in its 'Value' type.
         info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().front(),
+            genericSig, origParam, openedParam, nominal->getGenericArgs().front(),
             position, /*canBeCovariantResult=*/false);
-      } else if (bgt->isDictionary()) {
+      } else if (nominal->isDictionary()) {
         // Swift.Dictionary preserves variance in its 'Element' type.
         info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().front(),
+            genericSig, origParam, openedParam, nominal->getGenericArgs().front(),
             TypePosition::Invariant, /*canBeCovariantResult=*/false);
         info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().back(),
+            genericSig, origParam, openedParam, nominal->getGenericArgs().back(),
             position, /*canBeCovariantResult=*/false);
       } else {
-        for (const auto &paramType : bgt->getGenericArgs()) {
+        for (const auto &paramType : nominal->getGenericArgs()) {
           info |= findGenericParameterReferencesRec(
               genericSig, origParam, openedParam, paramType,
               TypePosition::Invariant, /*canBeCovariantResult=*/false);

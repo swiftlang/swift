@@ -2552,7 +2552,7 @@ std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   return std::nullopt;
 }
 
-BoundGenericType *KeyPathExpr::getKeyPathType() const {
+NominalType *KeyPathExpr::getKeyPathType() const {
   auto type = getType();
   if (!type)
     return nullptr;
@@ -2566,7 +2566,7 @@ BoundGenericType *KeyPathExpr::getKeyPathType() const {
            type->isReferenceWritableKeyPath());
   }
 
-  return type->castTo<BoundGenericType>();
+  return type->castTo<NominalType>();
 }
 
 Type KeyPathExpr::getRootType() const {

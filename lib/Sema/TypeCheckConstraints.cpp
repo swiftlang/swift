@@ -892,8 +892,8 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   // Don't allow any type variables to leak into the nested ConstraintSystem
   // (including as originator types for holes). This also ensure that we
   // avoid lifetime issues for e.g cases where we lazily populate the
-  // `ContextSubMap` on `NominalOrBoundGenericNominalType` in the nested arena,
-  // since it will be destroyed on leaving.
+  // `ContextSubMap` on `NominalType` in the nested arena, since it will
+  // be destroyed on leaving.
   ASSERT(!type1->getRecursiveProperties().isSolverAllocated() &&
          !type2->getRecursiveProperties().isSolverAllocated() &&
          "Cannot escape solver-allocated types into a nested ConstraintSystem");

@@ -147,8 +147,6 @@ private:
   clang::QualType visitExistentialMetatypeType(ExistentialMetatypeType *type);
   clang::QualType visitProtocolType(ProtocolType *type);
   clang::QualType visitClassType(ClassType *type);
-  clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
-  clang::QualType visitBoundGenericType(BoundGenericType *type);
   clang::QualType visitEnumType(EnumType *type);
   template <bool templateArgument = false>
   clang::QualType visitFunctionType(FunctionType *type);

@@ -7839,7 +7839,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   // Unresolved key path argument requires a tailored diagnostic
   // that doesn't mention a fallback type - `KeyPath<_, _>`.
   if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
-    auto keyPathTy = argType->castTo<BoundGenericType>();
+    auto keyPathTy = argType->castTo<NominalType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
     if (rootTy->isBareErrorType()) {
       emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
@@ -8232,7 +8232,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   if (!argType->isKnownKeyPathType())
     return false;
 
-  auto kpType = argType->castTo<BoundGenericType>();
+  auto kpType = argType->castTo<NominalType>();
   auto kpRootType = kpType->getGenericArgs()[0];
   auto kpValueType = kpType->getGenericArgs()[1];
 

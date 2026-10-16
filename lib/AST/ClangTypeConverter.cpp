@@ -325,6 +325,17 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
     if (auto t = Context.getBridgedToObjC(type->getDecl(), type))
       return convert(t);
 
+  if (auto kind = classifyPointer(type)) {
+    auto argType = type->getGenericArgs()[0]->getCanonicalType();
+    return convertPointerType</*templateArgument=*/false>(argType,
+                                                          kind.value());
+  }
+
+  if (auto width = classifySIMD(type)) {
+    auto argType = type->getGenericArgs()[0]->getCanonicalType();
+    return convertSIMDType</*templateArgument=*/false>(argType, width.value());
+  }
+
   // Out of ideas, there must've been some error. :(
   return clang::QualType();
 }
@@ -526,6 +537,15 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
   auto &clangCtx = ClangASTContext;
   auto swiftDecl = type->getDecl();
 
+  // Any @objc class type in Swift that shows up in an @objc method maps 1-1 to
+  // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
+  //
+  // TODO: We should try to preserve type arguments on imported ObjC generic
+  // classes, instead of relying on our knowledge of clang's encoding.
+  // This would entail extracting the type arguments, calling `convert` to
+  // create clang types, extracting the ObjCProtocolDecls and then using
+  // getObjCObjectType with `id` as the base.
+  //
   // TODO: [non-objc-class-clang-type-conversion]
   // See the corresponding note in GenClangType.cpp
   if (!swiftDecl->isObjC())
@@ -554,45 +574,6 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
 
   auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
   return clangCtx.getObjCObjectPointerType(clangType);
-}
-
-// TODO: We should try to preserve type arguments on imported ObjC generic
-// classes, instead of relying on our knowledge of clang's encoding.
-// This would entail extracting the type arguments, calling `convert` to
-// create clang types, extracting the ObjCProtocolDecls and then using
-// getObjCObjectType with `id` as the base.
-clang::QualType
-ClangTypeConverter::visitBoundGenericClassType(BoundGenericClassType *type) {
-  // Any @objc class type in Swift that shows up in an @objc method maps 1-1 to
-  // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
-  return getClangIdType(ClangASTContext);
-}
-
-clang::QualType
-ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
-  // The only supported conversions are for T?, SIMD*<T>, and *Pointer<T>,
-  // so there should only be a single generic type argument.
-  if (type->getGenericArgs().size() != 1)
-    return clang::QualType();
-
-  auto argType = type->getGenericArgs()[0]->getCanonicalType();
-
-  if (type->getDecl()->isOptionalDecl()) {
-    auto innerTy = convert(argType);
-    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
-        argType->isForeignReferenceType())
-      return innerTy;
-    return clang::QualType();
-  }
-
-  if (auto kind = classifyPointer(type))
-    return convertPointerType</*templateArgument=*/false>(argType,
-                                                          kind.value());
-
-  if (auto width = classifySIMD(type))
-    return convertSIMDType</*templateArgument=*/false>(argType, width.value());
-
-  return clang::QualType();
 }
 
 template <bool templateArgument>
@@ -659,6 +640,15 @@ clang::QualType ClangTypeConverter::convertPointerType(CanType pointeeType,
 }
 
 clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
+  if (type->getDecl()->isOptionalDecl()) {
+    auto argType = type->getGenericArgs()[0]->getCanonicalType();
+    auto innerTy = convert(argType);
+    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
+        argType->isForeignReferenceType())
+      return innerTy;
+    return clang::QualType();
+  }
+
   // Special case: Uninhabited enums are not @objc, so we don't
   // know what to do below, but we can just convert to 'void'.
   if (type->isUninhabited())
@@ -1000,6 +990,23 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
             decl->getASTContext().Id_ObjectiveC)
       return clang::QualType();
 
+    // Reverse the pointer and SIMD types.
+    if (structType->getGenericArgs().size() == 1) {
+      auto argType = structType->getGenericArgs()[0]->getCanonicalType();
+
+      if (auto kind = classifyPointer(structType))
+        return withCache([&]() {
+          return convertPointerType</*templateArgument=*/true>(argType,
+                                                               kind.value());
+        });
+
+      if (auto width = classifySIMD(structType))
+        return withCache([&]() {
+          return convertSIMDType</*templateArgument=*/true>(argType,
+                                                            width.value());
+        });
+    }
+
     auto importedType =
         withCache([&]() { return reverseImportedTypeMapping(structType); });
 
@@ -1009,63 +1016,43 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
     return withCache([&]() { return reverseBuiltinTypeMapping(structType); });
   }
 
-  if (auto boundGenericType = type->getAs<BoundGenericType>()) {
-    if (boundGenericType->getGenericArgs().size() != 1)
-      // Must've got something other than a T?, *Pointer<T>, or SIMD*<T>
-      return clang::QualType();
-
-    auto argType = boundGenericType->getGenericArgs()[0]->getCanonicalType();
-
-    if (boundGenericType->getDecl()->isOptionalDecl()) {
-      if (auto kind = classifyPointer(argType))
-        return withCache([&]() {
-          auto pointeeType = argType->getAs<BoundGenericType>()
-                                 ->getGenericArgs()[0]
-                                 ->getCanonicalType();
-          return convertPointerType</*templateArgument=*/true>(pointeeType,
-                                                               kind.value());
-        });
-
-      // Optional<FRT> maps to a nullable pointer so the instantiated
-      // function re-imports with an optional return type. Otherwise, it would
-      // be re-imported as non-optional FRT.
-      if (argType->isForeignReferenceType()) {
-        return withCache([&]() {
-          if (auto nominal = argType->getAs<NominalType>()) {
-            if (auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(
-                    nominal->getDecl()->getClangDecl())) {
-              auto ptrTy = ClangASTContext.getPointerType(
-                  ClangASTContext.getTypeDeclType(clangTypeDecl));
-              auto nullableAttr = new (ClangASTContext) clang::TypeNullableAttr(
-                  ClangASTContext,
-                  clang::AttributeCommonInfo(
-                      clang::SourceRange(),
-                      clang::AttributeCommonInfo::AT_TypeNullable,
-                      clang::AttributeCommonInfo::Form::Implicit()));
-              return ClangASTContext.getAttributedType(nullableAttr, ptrTy,
-                                                       ptrTy);
-            }
-          }
-          return clang::QualType();
-        });
-      }
-
-      // Arbitrary optional types are not (yet) supported
-      return clang::QualType();
-    }
-
-    if (auto kind = classifyPointer(boundGenericType))
+  // We might have a level of optionality on the Swift side that doesn't
+  // exist on the C++ side.
+  if (auto argType = type->getOptionalObjectType()) {
+    if (auto kind = classifyPointer(argType))
       return withCache([&]() {
-        return convertPointerType</*templateArgument=*/true>(argType,
+        auto pointeeType = argType->castTo<NominalType>()
+                               ->getGenericArgs()[0]
+                               ->getCanonicalType();
+        return convertPointerType</*templateArgument=*/true>(pointeeType,
                                                              kind.value());
       });
 
-    if (auto width = classifySIMD(boundGenericType))
+    // Optional<FRT> maps to a nullable pointer so the instantiated
+    // function re-imports with an optional return type. Otherwise, it would
+    // be re-imported as non-optional FRT.
+    if (argType->isForeignReferenceType()) {
       return withCache([&]() {
-        return convertSIMDType</*templateArgument=*/true>(argType,
-                                                          width.value());
+        if (auto nominal = argType->getAs<NominalType>()) {
+          if (auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(
+                  nominal->getDecl()->getClangDecl())) {
+            auto ptrTy = ClangASTContext.getPointerType(
+                ClangASTContext.getTypeDeclType(clangTypeDecl));
+            auto nullableAttr = new (ClangASTContext) clang::TypeNullableAttr(
+                ClangASTContext,
+                clang::AttributeCommonInfo(
+                    clang::SourceRange(),
+                    clang::AttributeCommonInfo::AT_TypeNullable,
+                    clang::AttributeCommonInfo::Form::Implicit()));
+            return ClangASTContext.getAttributedType(nullableAttr, ptrTy,
+                                                     ptrTy);
+          }
+        }
+        return clang::QualType();
       });
+    }
 
+    // Arbitrary optional types are not (yet) supported
     return clang::QualType();
   }
 
@@ -1129,7 +1116,7 @@ ClangTypeConverter::getClangTemplateArguments(
 
 std::optional<ClangTypeConverter::PointerKind>
 ClangTypeConverter::classifyPointer(Type type) {
-  auto generic = type->getAs<BoundGenericType>();
+  auto generic = type->getAs<StructType>();
   if (!generic || generic->getGenericArgs().size() != 1)
     // Must have got something other than a *Pointer<T>
     return std::nullopt;
@@ -1146,7 +1133,7 @@ ClangTypeConverter::classifyPointer(Type type) {
 }
 
 std::optional<unsigned> ClangTypeConverter::classifySIMD(Type type) {
-  auto generic = type->getAs<BoundGenericType>();
+  auto generic = type->getAs<StructType>();
   if (!generic || generic->getGenericArgs().size() != 1)
     // Must have got something other than a SIMD*<T>
     return std::nullopt;

@@ -135,12 +135,10 @@ class EqualUpToABIModuleName
 
 public:
   bool visitNominalType(CanNominalType t1, CanNominalType t2) {
-    return !sameMangledDecl(t1->getDecl(), t2->getDecl());
-  }
-  bool visitBoundGenericType(CanBoundGenericType t1, CanBoundGenericType t2) {
     if (t1->getDecl() != t2->getDecl() &&
         !sameMangledDecl(t1->getDecl(), t2->getDecl()))
       return visitDifferentTypeStructure(t1, t2);
+    // FIXME: parent types
     return visitComponentArray(t1, t2, t1.getGenericArgs(),
                                t2.getGenericArgs());
   }
@@ -1307,7 +1305,7 @@ private:
   }
 
   llvm::DICompositeType *createStructType(
-      NominalOrBoundGenericNominalType *Type, NominalTypeDecl *Decl,
+      NominalType *Type, NominalTypeDecl *Decl,
       llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
       StringRef MangledName, llvm::DIType *SpecificationOf = nullptr) {
@@ -1424,7 +1422,7 @@ private:
   }
 
   llvm::DIType *
-  createSpecializedEnumType(NominalOrBoundGenericNominalType *EnumTy,
+  createSpecializedEnumType(NominalType *EnumTy,
                             EnumDecl *Decl, StringRef MangledName,
                             unsigned SizeInBits, unsigned AlignInBits,
                             llvm::DIScope *Scope, llvm::DIFile *File,
@@ -1453,7 +1451,7 @@ private:
   /// Create a DICompositeType from a specialized struct. A specialized type
   /// is a generic type, or a child type whose parent is generic.
   llvm::DIType *createSpecializedStructOrClassType(
-      NominalOrBoundGenericNominalType *Type,
+      NominalType *Type,
       llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
       StringRef MangledName, bool IsClass = false) {
@@ -1485,7 +1483,8 @@ private:
     // directly so it goes through all the caching/verification logic.
     auto UnsubstitutedDITy = getOrCreateType(UnsubstitutedDbgTy);
 
-    if (auto *ClassTy = llvm::dyn_cast<BoundGenericClassType>(Type)) {
+    if (auto *ClassTy = llvm::dyn_cast<ClassType>(Type);
+        ClassTy && ClassTy->hasGenericArgs()) {
       auto SuperClassTy = ClassTy->getSuperclass();
       if (SuperClassTy) {
         auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
@@ -1744,14 +1743,15 @@ private:
   /// Collect the type parameters of a bound generic type. This is needed to
   /// anchor any typedefs that may appear in parameters so they can be
   /// resolved in the debugger without needing to query the Swift module.
-  llvm::DINodeArray collectGenericParams(NominalOrBoundGenericNominalType *BGT,
+  llvm::DINodeArray collectGenericParams(NominalType *BGT,
                                          bool AsForwardDeclarations = false) {
 
     // Collect the generic args from the type and its parent.
     std::vector<Type> GenericArgs;
     Type CurrentType = BGT;
     while (CurrentType && CurrentType->getAnyNominal()) {
-      if (auto *BGT = CurrentType->getAs<BoundGenericType>())
+      if (auto *BGT = CurrentType->getAs<NominalType>();
+          BGT && BGT->hasGenericArgs())
         GenericArgs.insert(GenericArgs.end(), BGT->getGenericArgs().begin(),
                            BGT->getGenericArgs().end());
       CurrentType = CurrentType->getNominalParent();
@@ -1781,7 +1781,7 @@ private:
   }
 
   /// Create a sized container for a sizeless type. Used to represent
-  /// BoundGenericEnums that may have different sizes depending on what they are
+  /// generic enums that may have different sizes depending on what they are
   /// bound to, but still share a mangled name.
   llvm::DIType *createOpaqueStructWithSizedContainer(
       llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
@@ -2206,6 +2206,14 @@ private:
         return createStructType(StructTy, Decl, Scope, L.File, L.Line,
                                 SizeInBits, AlignInBits, Flags, MangledName);
       }
+
+      if (StructTy->hasGenericArgs()) {
+        return createOpaqueStructWithSizedContainer(
+            Scope, Decl ? Decl->getNameStr() : "", L.File, FwdDeclLine,
+            SizeInBits, AlignInBits, Flags, MangledName,
+            collectGenericParams(StructTy), SpecificationOf);
+      }
+
       StringRef Name = Decl->getName().str();
       if (!SizeInBitsOrNull)
         return DBuilder.createForwardDecl(
@@ -2227,9 +2235,19 @@ private:
       auto *ClassTy = BaseTy->castTo<ClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
       assert(SizeInBits ==
              CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
+
+      // FIXME: I preserved the existing behavior here when I eliminated
+      // BoundGenericClassType, but I'm not sure there's a good reason
+      // why generic classes get this treatment unconditionally. --rjmccall
+      if (ClassTy->hasGenericArgs()) {
+        return createSpecializedStructOrClassType(ClassTy, Scope, L.File,
+                                                  L.Line, SizeInBits, AlignInBits,
+                                                  Flags, MangledName);
+      }
+
+      unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         if (ClassTy->isSpecialized())
           return createSpecializedStructOrClassType(
@@ -2369,31 +2387,6 @@ private:
                                       L.File, FwdDeclLine, Flags, MangledName);
     }
 
-    case TypeKind::BoundGenericStruct: {
-      auto *StructTy = BaseTy->castTo<BoundGenericStructType>();
-      auto *Decl = StructTy->getDecl();
-      auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createSpecializedStructOrClassType(
-            StructTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
-            Flags, MangledName);
-
-      return createOpaqueStructWithSizedContainer(
-          Scope, Decl ? Decl->getNameStr() : "", L.File, FwdDeclLine,
-          SizeInBits, AlignInBits, Flags, MangledName,
-          collectGenericParams(StructTy), SpecificationOf);
-    }
-
-    case TypeKind::BoundGenericClass: {
-      auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
-      auto *Decl = ClassTy->getDecl();
-      auto L = getFileAndLocation(Decl);
-      return createSpecializedStructOrClassType(ClassTy, Scope, L.File,
-                                                L.Line, SizeInBits, AlignInBits,
-                                                Flags, MangledName);
-    }
-
     case TypeKind::Pack:
     case TypeKind::PackElement:
     case TypeKind::SILPack:
@@ -2498,43 +2491,36 @@ private:
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        if (EnumTy->isSpecialized() && !Decl->hasRawType())
+        if (EnumTy->isSpecialized() && !Decl->hasRawType() &&
+            !EnumTy->hasTypeParameter() &&
+            !EnumTy->hasPrimaryArchetype())
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
+
+        // If we do not know the size of this type, pass a size of 0.
+        // FIXME: createEnumType should not require a sized debug info type.
+        //
+        //   This was the existing behavior of the BoundGenericEnumType
+        //   case. --rjmccall
+        if (!CompletedDbgTy && EnumTy->hasGenericArgs())
+          CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy, 0);
 
         if (CompletedDbgTy)
           return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
                                 Scope, L.File, L.Line, Flags);
       }
+
+      if (EnumTy->hasGenericArgs()) {
+        return createOpaqueStructWithSizedContainer(
+            Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
+            AlignInBits, Flags, MangledName, collectGenericParams(EnumTy),
+            SpecificationOf);
+      }
+
       return createOpaqueStruct(Scope, Decl->getName().str(), L.File,
                                 FwdDeclLine, SizeInBits, AlignInBits, Flags,
                                 MangledName, {}, SpecificationOf);
-    }
-
-    case TypeKind::BoundGenericEnum: {
-      auto *EnumTy = BaseTy->castTo<BoundGenericEnumType>();
-      auto *Decl = EnumTy->getDecl();
-      auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
-
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        if (EnumTy->isSpecialized() && !EnumTy->hasTypeParameter() &&
-            !EnumTy->hasPrimaryArchetype())
-          return createSpecializedEnumType(EnumTy, Decl, MangledName,
-                                           SizeInBits, AlignInBits, Scope, File,
-                                           FwdDeclLine, Flags);
-        // If we do not know the size of this type, pass a size of 0.
-        // FIXME: createEnumType should not require a sized debug info type.
-        if (!CompletedDbgTy)
-          CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy, 0);
-        return createEnumType(*CompletedDbgTy, Decl, MangledName, AlignInBits,
-                              Scope, L.File, L.Line, Flags);
-      }
-      return createOpaqueStructWithSizedContainer(
-          Scope, Decl->getName().str(), L.File, FwdDeclLine, SizeInBits,
-          AlignInBits, Flags, MangledName, collectGenericParams(EnumTy),
-          SpecificationOf);
     }
 
     case TypeKind::BuiltinVector: {
@@ -2857,9 +2843,8 @@ private:
       DeclContext *D = nullptr;
       if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T.getPointer()))
         D = TAT->getDecl()->getDeclContext();
-      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(
-                   T.getPointer()))
-        D = NT->getDecl()->getDeclContext();
+      else if (auto *ND = T->getNominalDecl())
+        D = ND->getDeclContext();
 
       // A type inside a function uses that function's signature as part of
       // its mangling, so check if any types in the generic signature are
@@ -2986,8 +2971,8 @@ private:
     // Force the generation of the generic type parameters as forward
     // declarations, as those types might be annotated with
     // @_originallyDefinedIn.
-    if (auto *BoundDecl = llvm::dyn_cast<BoundGenericType>(DbgTy.getType()))
-      collectGenericParams(BoundDecl, /*AsForwardDeclarations=*/true);
+    if (auto *BoundType = llvm::dyn_cast<NominalType>(DbgTy.getType()))
+      collectGenericParams(BoundType, /*AsForwardDeclarations=*/true);
 
     NominalTypeDecl *OriginallyDefinedInDecl = getDeclAnnotatedByOriginallyDefinedIn(DbgTy);
     if (!OriginallyDefinedInDecl)

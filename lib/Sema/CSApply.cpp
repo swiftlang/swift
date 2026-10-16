@@ -2357,7 +2357,8 @@ namespace {
         Type baseTy;
         bool resultIsLValue;
         
-        if (auto nom = keyPathTy->getAs<NominalType>()) {
+        if (auto nom = keyPathTy->getAs<NominalType>();
+            nom && !nom->hasGenericArgs()) {
           // AnyKeyPath is <T> rvalue T -> rvalue Any?
           if (nom->isAnyKeyPath()) {
             valueTy = ctx.getAnyExistentialType();
@@ -2389,7 +2390,7 @@ namespace {
             ASSERT(keyPathTy);
           }
 
-          auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
+          auto keyPathBGT = keyPathTy->castTo<NominalType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
 
           // Coerce the index to the key path's type
@@ -3906,7 +3907,7 @@ namespace {
 
       if (arrayTy->isInlineArray() || arrayTy->is_InlineArray()) {
         // <let count: Int, Element>
-        elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
+        elementType = arrayTy->castTo<StructType>()->getGenericArgs()[1];
       } else {
         ProtocolDecl *arrayProto = TypeChecker::getProtocol(
             ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -5174,10 +5175,10 @@ namespace {
         isFunctionType = true;
       } else if (auto *existential = exprType->getAs<ExistentialType>()) {
         auto layout = existential->getExistentialLayout();
-        auto keyPathTy = layout.explicitSuperclass->castTo<BoundGenericType>();
+        auto keyPathTy = layout.explicitSuperclass->castTo<NominalType>();
         leafTy = keyPathTy->getGenericArgs()[1];
       } else {
-        auto keyPathTy = exprType->castTo<BoundGenericType>();
+        auto keyPathTy = exprType->castTo<NominalType>();
         leafTy = keyPathTy->getGenericArgs()[1];
       }
 
@@ -5329,7 +5330,8 @@ namespace {
       // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
       auto kpDecl = ctx.getKeyPathDecl();
       auto keyPathTy =
-          BoundGenericType::get(kpDecl, nullptr, { baseTy, kpResultTy });
+          NominalType::get(kpDecl, nullptr, { baseTy, kpResultTy },
+                           cs.getASTContext());
       E->setType(keyPathTy);
       cs.cacheType(E);
 
@@ -7005,8 +7007,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
     return expr;
 
   // Build the first value conversion.
-  auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
-  auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
+  auto fromArgs = cs.getType(expr)->castTo<NominalType>()->getGenericArgs();
+  auto toArgs = toType->castTo<NominalType>()->getGenericArgs();
   auto conv =
     buildOpaqueElementConversion(*this, expr->getLoc(),
                                  fromArgs[0], toArgs[0],
@@ -7310,7 +7312,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
         
     case ConversionRestrictionKind::ValueToOptional: {
-      auto toGenericType = toType->castTo<BoundGenericType>();
+      auto toGenericType = toType->castTo<EnumType>();
       assert(toGenericType->getDecl()->isOptionalDecl());
       TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
 
@@ -7672,7 +7674,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // FIXME: Can we rig things up so that we always have a Superclass
   // conversion restriction in this case?
   case TypeKind::DynamicSelf:
-  case TypeKind::BoundGenericClass:
   case TypeKind::Class: {
     if (!toType->getClassDecl())
       break;
@@ -8020,8 +8021,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::ProtocolComposition:
   case TypeKind::ParameterizedProtocol:
   case TypeKind::Existential:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
@@ -8045,8 +8044,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceExistential(expr, toType, locator);
 
   // Coercion to Optional<T>.
-  case TypeKind::BoundGenericEnum: {
-    auto toGenericType = cast<BoundGenericEnumType>(desugaredToType);
+  case TypeKind::Enum: {
+    auto toGenericType = cast<EnumType>(desugaredToType);
     if (!toGenericType->getDecl()->isOptionalDecl())
       break;
     TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
@@ -8063,8 +8062,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return result;
   }
 
-  case TypeKind::BoundGenericStruct: {
-    auto toStruct = cast<BoundGenericStructType>(desugaredToType);
+  case TypeKind::Struct: {
+    auto toStruct = cast<StructType>(desugaredToType);
     if (!toStruct->isArray() && !toStruct->isDictionary())
       break;
 
@@ -8084,10 +8083,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Error:
   case TypeKind::Module:
   case TypeKind::Tuple:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
   case TypeKind::Metatype:
   case TypeKind::DynamicSelf:
   case TypeKind::PrimaryArchetype:

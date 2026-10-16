@@ -657,9 +657,9 @@ emitIdempotentClassMetadataInitialization(IRGenFunction &IGF,
 ///
 /// In any other case, a metadata accessor should be called instead.
 static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
-                                               NominalTypeDecl *theDecl,
-                                               CanType theType,
+                                               CanNominalType theType,
                                                DynamicMetadataRequest request) {
+  NominalTypeDecl *theDecl = theType->getDecl();
   assert(!isa<ProtocolDecl>(theDecl));
 
   if (!theDecl->isGenericContext()) {
@@ -872,7 +872,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
 bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
     IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality) {
-  if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
+  if (isa<ClassType>(type)) {
     if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       if (type->hasArchetype()) {
         llvm::errs() << "Cannot get metadata of generic class for type "
@@ -888,8 +888,7 @@ bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
   }
 
   if (IGM.isEmbeddedWithExistentials() &&
-      (isa<StructType>(type) || isa<BoundGenericStructType>(type) ||
-       isa<EnumType>(type) || isa<BoundGenericEnumType>(type))) {
+      (isa<StructType>(type) || isa<EnumType>(type))) {
     if (type->hasArchetype()) {
       llvm::errs() << "Cannot get metadata of generic class for type "
                    << type << "\n";
@@ -943,9 +942,15 @@ bool irgen::isNoncanonicalCompleteTypeMetadataStaticallyAddressable(
     return false;
   }
 
-  if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
+  if (isa<StructType>(type) || isa<EnumType>(type)) {
+    auto nominalType = cast<NominalType>(type);
+    if (!nominalType->hasGenericArgs())
+      return false;
+
+    auto decl = nominalType->getDecl();
+
     // Imported type metadata always requires an accessor.
-    if (isa<ClangModuleUnit>(type->getAnyNominal()->getModuleScopeContext()))
+    if (isa<ClangModuleUnit>(decl->getModuleScopeContext()))
       return false;
 
     return isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
@@ -994,11 +999,6 @@ bool irgen::isCanonicalCompleteTypeMetadataStaticallyAddressable(
   // we use the NativeObject metadata.
   if (isa<SILBoxType>(type))
     return true;
-
-  if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
-    return isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
-        IGM, type, CanonicalSpecializedMetadata);
-  }
 
   return false;
 }
@@ -1049,7 +1049,8 @@ static bool shouldTypeMetadataAccessUseAccessor(IRGenModule &IGM, CanType type){
   // through the accessor to outline the ObjC realization.
   // TODO: On non-Apple platforms, fixed classes should not need any
   // initialization so should be directly addressable.
-  if (isa<ClassType>(type)) {
+  if (auto classType = dyn_cast<ClassType>(type);
+      classType && !classType->hasGenericArgs()) {
     return true;
   }
   
@@ -2022,13 +2023,7 @@ namespace {
     MetadataResponse visitNominalType(CanNominalType type,
                                       DynamicMetadataRequest request) {
       assert(!type->isExistentialType());
-      return emitNominalMetadataRef(IGF, type->getDecl(), type, request);
-    }
-
-    MetadataResponse visitBoundGenericType(CanBoundGenericType type,
-                                           DynamicMetadataRequest request) {
-      assert(!type->isExistentialType());
-      return emitNominalMetadataRef(IGF, type->getDecl(), type, request);
+      return emitNominalMetadataRef(IGF, type, request);
     }
 
     MetadataResponse visitPackType(CanPackType type,
@@ -2909,7 +2904,7 @@ static llvm::Function *getAccessFunctionPrototype(IRGenModule &IGM,
   assert(!type->hasArchetype());
   // Type should be bound unless it's type erased.
   assert(type.isTypeErasedGenericClassType()
-           ? !isa<BoundGenericType>(type)
+           ? !isa<NominalType>(type)
            : !isa<UnboundGenericType>(type));
 
   return IGM.getAddrOfTypeMetadataAccessFunction(type, forDefinition);
@@ -3058,27 +3053,23 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
     OpenCodedMetadataAccessWeightVisitor(IRGenModule &IGM)
       : IGM(IGM) {}
     
-    void visitBoundGenericType(CanBoundGenericType bgt) {
-      // Need to materialize all the arguments, then call the metadata
-      // accessor.
-      //
-      // TODO: Also need to count the parent type's generic arguments.
-      for (auto arg : bgt->getGenericArgs()) {
+    void visitNominalType(CanNominalType nom) {
+      // Some nominal types have trivially-referenceable metadata symbols.
+      bool specialized = nom->isSpecialized();
+      if (!specialized && !shouldCacheTypeMetadataAccess(IGM, nom)) {
+        NumAddresses += 1;
+        return;
+      }
+
+      // Otherwise, we need to call the metadata accessor, and that will
+      // also require materializing all the arguments.
+      NumCalls += 1;
+
+      for (auto arg : nom.getGenericArgs()) {
         visit(arg);
       }
-      NumCalls += 1;
-    }
 
-    void visitNominalType(CanNominalType nom) {
-      // Some nominal types have trivially-referenceable metadata symbols,
-      // others may require accessors to trigger instantiation.
-      //
       // TODO: Also need to count the parent type's generic arguments.
-      if (!shouldCacheTypeMetadataAccess(IGM, nom)) {
-        NumAddresses += 1;
-      } else {
-        NumCalls += 1;
-      }
     }
 
     void visitPackType(CanPackType tup) {
@@ -3540,7 +3531,7 @@ public:
   /// For most types, we can just emit the usual metadata.
   CanType visitType(CanType t) { return t; }
 
-  CanType visitBoundGenericEnumType(CanBoundGenericEnumType ty) {
+  CanType visitEnumType(CanEnumType ty) {
     // Optionals have a lowered payload type, so we recurse here.
     if (auto objectTy = ty.getOptionalObjectType()) {
       auto payloadTy = visit(objectTy);
@@ -3548,10 +3539,10 @@ public:
         return ty;
       auto &C = ty->getASTContext();
       auto optDecl = C.getOptionalDecl();
-      return CanType(BoundGenericEnumType::get(optDecl, Type(), payloadTy));
+      return CanEnumType::get(optDecl, CanType(), payloadTy, C);
     }
 
-    // Otherwise, generic arguments are not lowered.
+    // Otherwise, enums are not lowered.
     return ty;
   }
 

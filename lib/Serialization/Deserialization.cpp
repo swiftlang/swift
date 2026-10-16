@@ -8582,10 +8582,12 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
     genericArgs.push_back(argTy.get());
   }
 
+  auto &ctx = MF.getContext();
+
   if (auto clangDecl = nominal->getClangDecl()) {
     if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
       auto clangImporter = static_cast<ClangImporter *>(
-          nominal->getASTContext().getClangModuleLoader());
+          ctx.getClangModuleLoader());
 
       SmallVector<Type, 2> typesOfGenericArgs;
       for (auto arg : genericArgs) {
@@ -8594,7 +8596,7 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
 
       SmallVector<clang::TemplateArgument, 2> templateArguments;
       std::unique_ptr<TemplateInstantiationError> error =
-          MF.getContext().getClangTemplateArguments(
+          ctx.getClangTemplateArguments(
               ctd->getTemplateParameters(), typesOfGenericArgs,
               templateArguments);
 
@@ -8602,12 +8604,12 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
           const_cast<clang::ClassTemplateDecl *>(ctd), templateArguments);
 
       instantiation->setTemplateInstantiationType(
-          BoundGenericType::get(nominal, parentTy, genericArgs));
+          NominalType::get(nominal, parentTy, genericArgs, ctx));
       return instantiation->getDeclaredInterfaceType();
     }
   }
 
-  return BoundGenericType::get(nominal, parentTy, genericArgs);
+  return NominalType::get(nominal, parentTy, genericArgs, ctx);
 }
 
 Expected<Type> DESERIALIZE_TYPE(SIL_BLOCK_STORAGE_TYPE)(

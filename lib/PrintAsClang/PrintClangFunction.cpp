@@ -66,12 +66,14 @@ KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
 
   const TypeDecl *typeDecl;
   auto *tPtr = t->lookThroughSingleOptionalType()->getDesugaredType();
-  if (auto *bgt = dyn_cast<BoundGenericStructType>(tPtr)) {
-    return (bgt->isUnsafePointer() || bgt->isUnsafeMutablePointer())
-               ? KnownTypeKind::Known
-               : KnownTypeKind::Unknown;
-  }
   if (auto *structType = dyn_cast<StructType>(tPtr)) {
+    if (structType->hasGenericArgs()) {
+      return (structType->isUnsafePointer() ||
+              structType->isUnsafeMutablePointer())
+                ? KnownTypeKind::Known
+                : KnownTypeKind::Unknown;
+    }
+
     auto nullableInfo =
         getKnownTypeInfo(structType->getDecl(), typeMapping, languageMode);
     if (nullableInfo && nullableInfo->canBeNullable)
@@ -402,6 +404,9 @@ public:
   ClangRepresentation
   visitEnumType(EnumType *ET, std::optional<OptionalTypeKind> optionalKind,
                 bool isInOutParam) {
+    if (ET->hasGenericArgs())
+      return visitBoundGenericEnumType(ET, optionalKind, isInOutParam);
+
     return visitValueType(ET, ET->getNominalDecl(),
                           optionalKind, isInOutParam);
   }
@@ -409,6 +414,9 @@ public:
   ClangRepresentation
   visitStructType(StructType *ST, std::optional<OptionalTypeKind> optionalKind,
                   bool isInOutParam) {
+    if (ST->hasGenericArgs())
+      return visitBoundGenericStructType(ST, optionalKind, isInOutParam);
+
     return visitValueType(ST, ST->getNominalDecl(),
                           optionalKind, isInOutParam);
   }
@@ -503,10 +511,10 @@ public:
   }
 
   std::optional<ClangRepresentation>
-  printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+  printIfKnownGenericStruct(const StructType *BGT,
                             std::optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
-    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
+    auto bgsTy = Type(const_cast<StructType *>(BGT));
     bool isConst;
     if (bgsTy->isUnsafePointer())
       isConst = true;
@@ -544,7 +552,7 @@ public:
   }
 
   ClangRepresentation
-  visitBoundGenericStructType(BoundGenericStructType *BGT,
+  visitBoundGenericStructType(StructType *BGT,
                               std::optional<OptionalTypeKind> optionalKind,
                               bool isInOutParam) {
     if (auto result =
@@ -555,7 +563,7 @@ public:
   }
 
   ClangRepresentation
-  visitBoundGenericEnumType(BoundGenericEnumType *BGT,
+  visitBoundGenericEnumType(EnumType *BGT,
                             std::optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
     if (optionalKind == OTK_None) {

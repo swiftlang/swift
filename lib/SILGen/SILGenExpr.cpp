@@ -1593,8 +1593,8 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
                                                 SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
-  auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
-  auto toArgs = cast<BoundGenericType>(toCollection)->getGenericArgs();
+  auto fromArgs = cast<NominalType>(fromCollection)->getGenericArgs();
+  auto toArgs = cast<NominalType>(toCollection)->getGenericArgs();
   replacementTypes.insert(replacementTypes.end(),
                           fromArgs.begin(), fromArgs.end());
   replacementTypes.insert(replacementTypes.end(),
@@ -2756,7 +2756,7 @@ static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation 
            "Array or its internal structs should have exactly one stored property");
     auto *se = SGF.getBuilder().createStructExtract(loc, v, v->getType().getFieldDecl(0));
     if (se->getType() == SILType::getBridgeObjectType(SGF.getASTContext())) {
-      auto bridgeObjTy = cast<BoundGenericStructType>(v->getType().getASTType());
+      auto bridgeObjTy = cast<StructType>(v->getType().getASTType());
       CanType ct = CanType(bridgeObjTy->getGenericArgs()[0]);
       storageType = SILType::getPrimitiveObjectType(ct);
     }
@@ -5388,7 +5388,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
                                      SGFContext C) {
   ArgumentScope scope(SGF, E);
 
-  auto iaTy = E->getType()->castTo<BoundGenericStructType>();
+  auto iaTy = E->getType()->castTo<StructType>();
   auto loweredIAType = SGF.getLoweredType(iaTy);
 
   // If this is an empty InlineArray literal and it's loadable, then create an
@@ -5486,7 +5486,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     arrayType = ArraySliceType::get(elementType)->getCanonicalType();
   } else {
     arrayType = E->getType()->getCanonicalType();
-    auto genericType = cast<BoundGenericStructType>(arrayType);
+    auto genericType = cast<StructType>(arrayType);
     assert(genericType->isArray());
     elementType = genericType.getGenericArgs()[0];
   }
@@ -7308,7 +7308,7 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   SmallVector<Type, 2> replacementTypes;
   replacementTypes.push_back(
-      accessInfo.ArrayType->castTo<BoundGenericStructType>()->getGenericArgs()[0]);
+      accessInfo.ArrayType->castTo<StructType>()->getGenericArgs()[0]);
   replacementTypes.push_back(accessInfo.PointerType);
 
   auto genericSig = converter->getGenericSignature();

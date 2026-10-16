@@ -243,9 +243,7 @@ public:
 
   /// Whether the type is an enum, struct, or tuple.
   bool isAggregate() const {
-    return is<TupleType>() || is<StructType>() ||
-           is<BoundGenericStructType>() || is<EnumType>() ||
-           is<BoundGenericEnumType>();
+    return is<TupleType>() || is<StructType>() || is<EnumType>();
   }
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or

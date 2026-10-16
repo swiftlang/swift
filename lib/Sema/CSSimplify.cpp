@@ -4133,30 +4133,17 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return SolutionKind::Solved;
   }
 
-  // Handle nominal types that are not directly generic.
-  if (auto nominal1 = type1->getAs<NominalType>()) {
-    auto nominal2 = type2->castTo<NominalType>();
+  auto nominal1 = type1->castTo<NominalType>();
+  auto nominal2 = type2->castTo<NominalType>();
 
-    assert((bool)nominal1->getParent() == (bool)nominal2->getParent() &&
-           "Mismatched parents of nominal types");
+  assert((bool)nominal1->getParent() == (bool)nominal2->getParent() &&
+         "Mismatched parents of nominal types");
+  assert((bool)nominal1->hasGenericArgs() == (bool)nominal2->hasGenericArgs() &&
+         "Mismatched genericity of nominal types");
 
-    if (!nominal1->getParent())
-      return SolutionKind::Solved;
-
+  if (nominal1->getParent()) {
     // Match up the parents, exactly.
-    return matchTypes(nominal1->getParent(), nominal2->getParent(),
-                      ConstraintKind::Bind, subflags,
-                      locator.withPathElement(ConstraintLocator::ParentType));
-  }
-
-  auto bound1 = type1->castTo<BoundGenericType>();
-  auto bound2 = type2->castTo<BoundGenericType>();
-
-  // Match up the parents, exactly, if there are parents.
-  assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
-         "Mismatched parents of bound generics");
-  if (bound1->getParent()) {
-    auto result = matchTypes(bound1->getParent(), bound2->getParent(),
+    auto result = matchTypes(nominal1->getParent(), nominal2->getParent(),
                              ConstraintKind::Bind, subflags,
                              locator.withPathElement(
                                                 ConstraintLocator::ParentType));
@@ -4164,10 +4151,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return result;
   }
 
-  auto args1 = bound1->getGenericArgs();
-  auto args2 = bound2->getGenericArgs();
+  if (!nominal1->hasGenericArgs())
+    return SolutionKind::Solved;
 
   // Match up the generic arguments, exactly.
+  auto args1 = nominal1->getGenericArgs();
+  auto args2 = nominal2->getGenericArgs();
 
   if (shouldAttemptFixes()) {
     auto *baseLoc =
@@ -4177,7 +4166,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     // Optionals have a lot of special diagnostics and only one
     // generic argument so if we're dealing with one, let's allow
     // `repairFailures` to take care of it.
-    if (bound1->getDecl()->isOptionalDecl())
+    if (nominal1->getDecl()->isOptionalDecl())
       return matchDeepTypeArguments(*this, subflags, args1, args2, baseLoc);
 
     auto argMatchingFlags = subflags;
@@ -6768,7 +6757,7 @@ bool ConstraintSystem::repairFailures(
       if (loc->directlyAt<ArrayExpr>() && lhs->isArray() &&
           (rhs->isInlineArray() || rhs->is_InlineArray())) {
         auto literalCount = castToExpr<ArrayExpr>(anchor)->getNumElements();
-        if (auto inlineCount = rhs->castTo<BoundGenericStructType>()
+        if (auto inlineCount = rhs->castTo<StructType>()
                                    ->getGenericArgs()[0]
                                    ->getAs<IntegerType>()) {
           if (inlineCount->getValue() != literalCount) {
@@ -7926,8 +7915,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
-      if (nominal1->getDecl() == nominal2->getDecl())
-        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      if (nominal1->getDecl() == nominal2->getDecl()) {
+        if (kind >= ConstraintKind::Subtype &&
+            nominal1->getDecl()->isOptionalDecl() &&
+            getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::OptionalToOptional);
+        } else {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+        }
+      }
 
       // Check for CF <-> ObjectiveC bridging.
       if (isa<ClassType>(desugar1) &&
@@ -8094,24 +8090,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Bind, subflags,
                   locator.withPathElement(ConstraintLocator::LValueConversion));
-
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct: {
-      auto bound1 = cast<BoundGenericType>(desugar1);
-      auto bound2 = cast<BoundGenericType>(desugar2);
-
-      if (bound1->getDecl() == bound2->getDecl()) {
-        if (kind >= ConstraintKind::Subtype &&
-            bound1->getDecl()->isOptionalDecl() &&
-            getASTContext().TypeCheckerOpts.SolverEnableShortConversions) {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::OptionalToOptional);
-        } else {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-        }
-      }
-      break;
-    }
 
     // Opaque archetypes are globally bound, so we can match them for deep
     // equality.
@@ -8808,9 +8786,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::PrimaryArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
@@ -9306,7 +9281,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         protocol == arrayLiteralProto &&
         (type->isInlineArray() || type->is_InlineArray()) &&
         arrayLiteral) {
-      auto iaTy = type->castTo<BoundGenericStructType>();
+      auto iaTy = type->castTo<StructType>();
 
       // <let count: Int, Element>
       // Attempt to bind the number of elements in the literal with the
@@ -9660,12 +9635,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
       switch (ptrKind) {
       case PTK_UnsafePointer:
         assert(elementTy);
-        return BoundGenericType::get(ctx.getUnsafePointerDecl(),
-                                     /*parent=*/Type(), {*elementTy});
+        return NominalType::get(ctx.getUnsafePointerDecl(),
+                                /*parent=*/Type(), {*elementTy}, ctx);
       case PTK_UnsafeMutablePointer:
         assert(elementTy);
-        return BoundGenericType::get(ctx.getUnsafeMutablePointerDecl(),
-                                     /*parent=*/Type(), {*elementTy});
+        return NominalType::get(ctx.getUnsafeMutablePointerDecl(),
+                                /*parent=*/Type(), {*elementTy}, ctx);
 
       case PTK_UnsafeRawPointer:
         return ctx.getUnsafeRawPointerDecl()->getDeclaredInterfaceType();
@@ -10519,12 +10494,12 @@ static bool isSelfRecursiveKeyPathDynamicMemberLookup(
 
     // If it's `Foo<Int>` vs. `Foo<String>` it doesn't really matter
     // for dynamic lookup because it's going to be performed on `Foo`.
-    if (baseTy->is<BoundGenericType>() &&
-        keyPathRootTy->is<BoundGenericType>()) {
-      auto *baseDecl = baseTy->castTo<BoundGenericType>()->getDecl();
-      auto *keyPathRootDecl =
-          keyPathRootTy->castTo<BoundGenericType>()->getDecl();
-      return baseDecl == keyPathRootDecl;
+    if (auto nominalBaseTy = baseTy->getAs<NominalType>()) {
+      if (auto nominalKeyPathRootTy = keyPathRootTy->getAs<NominalType>()) {
+        auto *baseDecl = nominalBaseTy->getDecl();
+        auto *keyPathRootDecl = nominalKeyPathRootTy->getDecl();
+        return baseDecl == keyPathRootDecl;
+      }
     }
 
     // Previous base type could be r-value because that could be
@@ -12734,7 +12709,7 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
   // The solver cannot account for that during inference because Root
   // and Value types are required to be only resolved enough to infer
   // a capability of a key path itself.
-  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
+  if (auto *BGT = contextualType->getAs<NominalType>()) {
     auto keyPathTy = openUnboundGenericType(
         BGT->getDecl(), BGT->getParent(), locator, /*isTypeResolution=*/false);
 
@@ -13049,7 +13024,8 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // must either match or be bridged.
       // FIXME: This should be an associated type of the protocol.
       auto &ctx = getASTContext();
-      if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
+      if (auto fromBGT = unwrappedToType->getAs<NominalType>();
+          fromBGT && fromBGT->hasGenericArgs()) {
         if (fromBGT->isArray()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
@@ -13231,7 +13207,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
         return true;
     }
 
-    if (auto bgt = contextualTy->getAs<BoundGenericType>()) {
+    if (auto bgt = contextualTy->getAs<NominalType>();
+        bgt && bgt->hasGenericArgs()) {
       // We can get root and value from a concrete key path type.
       if (!(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
             bgt->isReferenceWritableKeyPath())) {
@@ -13274,7 +13251,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
                 /*parent=*/Type(),
                 locator.withPathElement(LocatorPathElt::KeyPathType()),
                 /*isTypeResolution=*/false)
-                ->castTo<BoundGenericType>();
+                ->castTo<NominalType>();
         addConstraint(ConstraintKind::Bind, keyPathTy->getGenericArgs()[0],
                       rootTy,
                       locator.withPathElement(LocatorPathElt::KeyPathRoot()));
@@ -13391,15 +13368,6 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       keyPathTy = superclassTy;
   }
 
-  if (keyPathTy->isAnyKeyPath()) {
-    // Read-only keypath, whose projected value is upcast to `Any?`.
-    // The root type can be anything.
-    Type resultTy = getASTContext().getAnyExistentialType();
-    resultTy = OptionalType::get(resultTy);
-    return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
-                      subflags, locator);
-  }
-
   if (keyPathTy->is<HoleType>()) {
     if (rootTy->hasTypeVariable()) {
       recordAnyTypeVarAsPotentialHole(rootTy);
@@ -13410,9 +13378,27 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Solved;
   }
 
-  if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
+  // Helper function for handling nominal potential key path types.
+  // Returns nullopt if the type is not actually a key path type.
+  auto handleNominal = [&](NominalType *keyPathTy) ->
+                          std::optional<ConstraintSystem::SolutionKind> {
     // We have the key path type. Match it to the other ends of the constraint.
-    auto kpRootTy = bgt->getGenericArgs()[0];
+
+    auto numGenericArgs = keyPathTy->getGenericArgs().size();
+    if (numGenericArgs == 0 && keyPathTy->isAnyKeyPath()) {
+      // Read-only keypath, whose projected value is upcast to `Any?`.
+      // The root type can be anything.
+      Type resultTy = getASTContext().getAnyExistentialType();
+      resultTy = OptionalType::get(resultTy);
+      return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
+                        subflags, locator);
+    }
+
+    // All the remaining key path types have generic arguments.
+    if (numGenericArgs == 0)
+      return std::nullopt;
+
+    auto kpRootTy = keyPathTy->getGenericArgs()[0];
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
@@ -13432,7 +13418,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       llvm_unreachable("unhandled match");
     };
 
-    if (bgt->isPartialKeyPath()) {
+    if (numGenericArgs == 1 && keyPathTy->isPartialKeyPath()) {
       // Read-only keypath, whose projected value is upcast to `Any`.
       auto resultTy = getASTContext().getAnyExistentialType();
 
@@ -13443,9 +13429,11 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                         ConstraintKind::Bind, subflags, locator);
     }
 
-    if (bgt->getGenericArgs().size() < 2)
-      return SolutionKind::Error;
-    auto kpValueTy = bgt->getGenericArgs()[1];
+    // All the remaining key path types have exactly 2 generic arguments.
+    if (numGenericArgs != 2)
+      return std::nullopt;
+
+    auto kpValueTy = keyPathTy->getGenericArgs()[1];
 
     bool isKnownRValue = !valueTy->isTypeVariableOrMember() &&
                          !valueTy->is<LValueType>();
@@ -13469,14 +13457,14 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                         ConstraintKind::Bind, subflags, locator);
     };
 
-    if (bgt->isKeyPath()) {
+    if (keyPathTy->isKeyPath()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
       return solveRValue();
     }
-    if (bgt->isWritableKeyPath()) {
+    if (keyPathTy->isWritableKeyPath()) {
       kpRootTy = getFixedTypeRecursive(kpRootTy, flags, /*wantRValueType=*/true);
 
       // We might not know if the value is ultimately going to be used as an
@@ -13509,7 +13497,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
       return solveRValue();
     }
-    if (bgt->isReferenceWritableKeyPath()) {
+    if (keyPathTy->isReferenceWritableKeyPath()) {
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
@@ -13518,8 +13506,17 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
       return solveLValue();
     }
-    // Otherwise, we don't have a key path type at all.
-    return SolutionKind::Error;
+
+    // Otherwise, it's not a key path type at all.
+    return std::nullopt;
+  };
+
+  if (auto nomKeyPathTy = keyPathTy->getAs<NominalType>()) {
+    if (auto result = handleNominal(nomKeyPathTy))
+      return *result;
+
+    // Continue into recovery if the potential key path is not
+    // any kind of key path type.
   }
 
   if (!keyPathTy->isTypeVariableOrMember()) {
@@ -14559,8 +14556,8 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
       openedTypes.push_back({genericParam, typeVar});
     }
   } else if (locator.directlyAt<TypeExpr>()) {
-    auto *BGT = type1->getAs<BoundGenericType>();
-    if (!BGT)
+    auto *BGT = type1->getAs<NominalType>();
+    if (!BGT || !BGT->hasGenericArgs())
       return SolutionKind::Error;
 
     decl = BGT->getDecl();
@@ -14847,22 +14844,22 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!(result == SolutionKind::Error && shouldAttemptFixes()))
       return result;
 
-    BoundGenericType *ptr1 = nullptr;
-    BoundGenericType *ptr2 = nullptr;
+    NominalType *ptr1 = nullptr;
+    NominalType *ptr2 = nullptr;
 
     switch (restriction) {
     case ConversionRestrictionKind::ArrayToPointer:
     case ConversionRestrictionKind::InoutToPointer: {
-      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
-      ptr1 = BoundGenericType::get(ptr2->getDecl(), ptr2->getParent(),
-                                   {baseType1.getPointer()});
+      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<NominalType>();
+      ptr1 = NominalType::get(ptr2->getDecl(), ptr2->getParent(),
+                              {baseType1.getPointer()}, getASTContext());
       break;
     }
 
     case ConversionRestrictionKind::PointerToPointer:
       // Original types could be wrapped into a different number of optional.
-      ptr1 = type1->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
-      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
+      ptr1 = type1->lookThroughAllOptionalTypes()->castTo<NominalType>();
+      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<NominalType>();
       break;
 
     default:
@@ -14933,8 +14930,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (fromType->isKnownKeyPathType() && toType->isKnownKeyPathType() &&
             !fromType->isAnyKeyPath()) {
-          auto fromKeyPath = fromType->castTo<BoundGenericType>();
-          auto toKeyPath = toType->castTo<BoundGenericType>();
+          auto fromKeyPath = fromType->castTo<NominalType>();
+          auto toKeyPath = toType->castTo<NominalType>();
 
           auto flags = subflags;
           flags |= TMF_ApplyingFix;
@@ -15033,7 +15030,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     increaseScore(SK_ValueToOptional, locator);
 
     assert(matchKind >= ConstraintKind::Subtype);
-    if (auto generic2 = type2->getAs<BoundGenericType>()) {
+    if (auto generic2 = type2->getAs<NominalType>()) {
       if (generic2->getDecl()->isOptionalDecl()) {
         auto result = matchTypes(
             type1, generic2->getGenericArgs()[0], matchKind, subflags,
@@ -15062,8 +15059,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       addContextualScore();
 
     assert(matchKind >= ConstraintKind::Subtype);
-    if (auto generic1 = type1->getAs<BoundGenericType>()) {
-      if (auto generic2 = type2->getAs<BoundGenericType>()) {
+    if (auto generic1 = type1->getAs<NominalType>()) {
+      if (auto generic2 = type2->getAs<NominalType>()) {
         if (generic1->getDecl()->isOptionalDecl() &&
             generic2->getDecl()->isOptionalDecl()) {
           auto result = matchTypes(
@@ -15226,8 +15223,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // for the `inout` type.
     if (pointerKind == PTK_UnsafeRawPointer ||
         pointerKind == PTK_UnsafeMutableRawPointer) {
-      ptr1 = BoundGenericType::get(Context.getUnsafeMutablePointerDecl(),
-                                   /*parent=*/nullptr, {baseType1});
+      ptr1 = NominalType::get(Context.getUnsafeMutablePointerDecl(),
+                              /*parent=*/nullptr, {baseType1}, Context);
     } else {
       ptr1 = baseType1->wrapInPointer(pointerKind);
     }

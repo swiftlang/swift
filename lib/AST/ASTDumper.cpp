@@ -6518,31 +6518,18 @@ namespace {
                                                            \
       if (T->getParent())                                  \
         printRec(T->getParent(), Label::always("parent")); \
+      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
+        printRec(arg, label);                              \
+      }, Label::optional("generic_args"));                 \
                                                            \
       printFoot();                                         \
     }
 
-#define VISIT_BINDABLE_NOMINAL_TYPE(TypeClass, Name)       \
-    VISIT_NOMINAL_TYPE(TypeClass, Name)                    \
-    void visitBoundGeneric##TypeClass(                     \
-        BoundGeneric##TypeClass *T, Label label) {         \
-      printCommon("bound_generic_" #Name, label);          \
-      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
-      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
-      if (T->getParent())                                  \
-        printRec(T->getParent(), Label::always("parent")); \
-      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
-        printRec(arg, label);                              \
-      }, Label::optional("generic_args"));                 \
-      printFoot();                                         \
-    }
-
-    VISIT_BINDABLE_NOMINAL_TYPE(EnumType, enum_type)
-    VISIT_BINDABLE_NOMINAL_TYPE(StructType, struct_type)
-    VISIT_BINDABLE_NOMINAL_TYPE(ClassType, class_type)
+    VISIT_NOMINAL_TYPE(EnumType, enum_type)
+    VISIT_NOMINAL_TYPE(StructType, struct_type)
+    VISIT_NOMINAL_TYPE(ClassType, class_type)
     VISIT_NOMINAL_TYPE(ProtocolType, protocol_type)
 
-#undef VISIT_BINDABLE_NOMINAL_TYPE
 #undef VISIT_NOMINAL_TYPE
 
     void visitBuiltinTupleType(BuiltinTupleType *T, Label label) {

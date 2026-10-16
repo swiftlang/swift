@@ -384,7 +384,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         }
 
         auto boundRCAType =
-            BoundGenericType::get(RCA, Type(), {paramTy});
+            NominalType::get(RCA, Type(), {paramTy}, C);
         auto remoteCallArgumentInitDeclRef =
             TypeExpr::createImplicit(boundRCAType, C);
 

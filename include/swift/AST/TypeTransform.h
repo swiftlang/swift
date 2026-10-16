@@ -216,16 +216,52 @@ case TypeKind::Id:
     case TypeKind::Class:
     case TypeKind::Protocol: {
       auto nominalTy = cast<NominalType>(base);
+      SmallVector<Type, 4> substArgs;
+      bool anyChanged = false;
+      Type substParentTy;
+
       if (auto parentTy = nominalTy->getParent()) {
-        parentTy = doIt(parentTy, pos);
-        if (!parentTy)
+        substParentTy = doIt(parentTy, pos);
+        if (!substParentTy)
           return Type();
 
-        if (parentTy.getPointer() == nominalTy->getParent().getPointer())
-          return t;
-
-        return NominalType::get(nominalTy->getDecl(), parentTy, ctx);
+        if (substParentTy.getPointer() != parentTy.getPointer())
+          anyChanged = true;
       }
+
+      const auto transformGenArg = [&](Type arg, TypePosition p) -> bool {
+        Type substArg = doIt(arg, p);
+        if (!substArg)
+          return true;
+        substArgs.push_back(substArg);
+        if (substArg.getPointer() != arg.getPointer())
+          anyChanged = true;
+
+        return false;
+      };
+
+      if (nominalTy->isArray() || nominalTy->isOptional()) {
+        // Swift.Array preserves variance in its 'Element' type.
+        // Swift.Optional preserves variance in its 'Wrapped' type.
+        if (transformGenArg(nominalTy->getGenericArgs().front(), pos))
+          return Type();
+      } else if (nominalTy->isDictionary()) {
+        // Swift.Dictionary preserves variance in its 'Value' type,
+        // but not its 'Key' type.
+        if (transformGenArg(nominalTy->getGenericArgs().front(),
+                            TypePosition::Invariant) ||
+            transformGenArg(nominalTy->getGenericArgs().back(), pos))
+          return Type();
+      } else {
+        for (auto arg : nominalTy->getGenericArgs()) {
+          if (transformGenArg(arg, TypePosition::Invariant))
+            return Type();
+        }
+      }
+
+      if (anyChanged)
+        return NominalType::get(nominalTy->getDecl(), substParentTy,
+                                substArgs, ctx);
 
       return t;
     }
@@ -420,57 +456,6 @@ case TypeKind::Id:
       }
 
       return t;
-    }
-
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct: {
-      auto bound = cast<BoundGenericType>(base);
-      SmallVector<Type, 4> substArgs;
-      bool anyChanged = false;
-      Type substParentTy;
-      if (auto parentTy = bound->getParent()) {
-        substParentTy = doIt(parentTy, pos);
-        if (!substParentTy)
-          return Type();
-
-        if (substParentTy.getPointer() != parentTy.getPointer())
-          anyChanged = true;
-      }
-
-      const auto transformGenArg = [&](Type arg, TypePosition p) -> bool {
-        Type substArg = doIt(arg, p);
-        if (!substArg)
-          return true;
-        substArgs.push_back(substArg);
-        if (substArg.getPointer() != arg.getPointer())
-          anyChanged = true;
-
-        return false;
-      };
-
-      if (bound->isArray() || bound->isOptional()) {
-        // Swift.Array preserves variance in its 'Value' type.
-        // Swift.Optional preserves variance in its 'Wrapped' type.
-        if (transformGenArg(bound->getGenericArgs().front(), pos))
-          return Type();
-      } else if (bound->isDictionary()) {
-        // Swift.Dictionary preserves variance in its 'Element' type.
-        if (transformGenArg(bound->getGenericArgs().front(),
-                            TypePosition::Invariant) ||
-            transformGenArg(bound->getGenericArgs().back(), pos))
-          return Type();
-      } else {
-        for (auto arg : bound->getGenericArgs()) {
-          if (transformGenArg(arg, TypePosition::Invariant))
-            return Type();
-        }
-      }
-
-      if (!anyChanged)
-        return t;
-
-      return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
     }
 
     case TypeKind::ExistentialMetatype: {

@@ -1224,8 +1224,8 @@ protected:
       : ContextualMismatch(cs, FixKind::GenericArgumentsMismatch, actual,
                            required, locator),
         NumMismatches(mismatches.size()) {
-    assert(actual->is<BoundGenericType>());
-    assert(required->is<BoundGenericType>());
+    assert(actual->is<NominalType>());
+    assert(required->is<NominalType>());
     std::uninitialized_copy(mismatches.begin(), mismatches.end(),
                             getMismatchesBuf().begin());
   }
