@@ -287,21 +287,56 @@ suite.test("InlineArray initialization throws")
 suite.test("OutputSpan.withUnsafeMutableBufferPointer")
 .require(.stdlib_6_2).code {
   let c = 10
-  var a = Allocation(of: c, [Int].self)
+  var a = Allocation(of: c, LifetimeTracked.self)
   a.initialize {
-    $0.withUnsafeMutableBufferPointer {
+    let result = unsafe $0.withUnsafeMutableBufferPointer {
       expectEqual($0.count, c)
-      for i in $0.indices {
-        $0.initializeElement(at: i, to: .init(repeating: i, count: i))
+      expectEqual($1, 0)
+      for i in 0..<c - 1 {
+        $0.initializeElement(at: i, to: LifetimeTracked(i))
         $1 += 1
       }
+      return "initialized \($1)"
     }
+    expectEqual(result, "initialized \(c - 1)")
+    expectEqual($0.count, c - 1)
+    expectEqual(LifetimeTracked.instances, c - 1)
+
+    do throws(MyTestError) {
+      try unsafe $0.withUnsafeMutableBufferPointer {
+        (buffer, count) throws(MyTestError) -> Void in
+        buffer.initializeElement(at: count, to: LifetimeTracked(-1))
+        count += 1
+        throw MyTestError.error
+      }
+      expectUnreachable("withUnsafeMutableBufferPointer should have thrown")
+    } catch {
+      expectEqual(error, MyTestError.error)
+    }
+    expectEqual($0.count, c)
+    expectEqual(LifetimeTracked.instances, c)
   }
   a.withSpan {
     expectEqual($0.count, c)
-    for i in $0.indices {
-      expectEqual($0[i], Array(repeating: i, count: i))
+    for i in 0..<c - 1 {
+      expectEqual($0[i].value, i)
     }
+    expectEqual($0[c - 1].value, -1)
+  }
+  _ = consume a
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("OutputSpan.withUnsafeMutableBufferPointer capacity overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { b.deallocate() }
+
+  var span = OutputSpan(buffer: b, initializedCount: 0)
+  expectCrashLater(withDebugMessage: "OutputSpan capacity overflow")
+  unsafe span.withUnsafeMutableBufferPointer { buffer, count in
+    count = buffer.count + 1
   }
 }
 
