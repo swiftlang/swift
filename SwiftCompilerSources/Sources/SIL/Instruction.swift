@@ -616,6 +616,9 @@ final public class DiagnoseInst : Instruction, UnaryInstruction {
 
     /// The marked value is a copy that is not permitted by the language (use-after-consume, noncopyable, etc)
     case unpermittedCopy
+
+    /// The marked address is the destination of a second initialization of immutable storage.
+    case letReinit
   }
 
   public var kind: DiagnoseKind { DiagnoseKind(rawValue: bridged.Diagnose_getKind())! }
