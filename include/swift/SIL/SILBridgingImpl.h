@@ -471,8 +471,14 @@ SwiftInt BridgedType::getNumNominalFields() const {
 }
 
 
-BridgedType BridgedType::getFieldType(SwiftInt idx, BridgedFunction f) const {
-  return unbridged().getFieldType(idx, f.getFunction());
+BridgedType BridgedType::getFieldType(SwiftInt idx, BridgedFunction f,
+                                      bool withMinimalTypeExpansion) const {
+  swift::SILType ty = unbridged();
+  if (withMinimalTypeExpansion) {
+    return ty.getFieldType(ty.getFieldDecl(idx), f.getFunction()->getModule(),
+                           swift::TypeExpansionContext::minimal());
+  }
+  return ty.getFieldType(idx, f.getFunction());
 }
 
 SwiftInt BridgedType::getFieldIdxOfNominalType(BridgedStringRef name) const {
