@@ -4861,14 +4861,12 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
     assert((isBorrowAccess(accessKind) || isConsumeAccess(accessKind))
            && "should only see a (force_value (load)) lvalue as part of a "
               "borrow or consume");
-    // Borrow the storage in place.
-    if (isBorrowAccess(accessKind))
-      subExpr = load->getSubExpr();
+    subExpr = load->getSubExpr();
   }
                                          
   // Like BindOptional, this is a read even if we only write to the result.
   // (But it's unnecessary to use a force this way!)
-  LValue lv = visitRec(subExpr,
+  LValue lv = visitRec(e->getSubExpr(),
                        getBaseAccessKindForStorage(accessKind),
                        options.forComputedBaseLValue());
   LValueTypeData typeData =
