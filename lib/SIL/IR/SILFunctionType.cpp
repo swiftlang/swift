@@ -1803,6 +1803,18 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
                                        AbstractionPattern origType,
                                        CanType substType,
                                        const TypeLowering &substTL) {
+  // C++ passes its non-trivial String wrapper indirectly, even though the
+  // native Swift String is loadable.
+  if (origType.isClangType()) {
+    if (auto *record = origType.getClangType()->getAsCXXRecordDecl()) {
+      if (importer::isSwiftStringType(record)) {
+        auto stringTy = TC.Context.getStringType();
+        if (stringTy && substType->isEqual(stringTy))
+          return true;
+      }
+    }
+  }
+
   // If this is a native Swift class that's passed directly to C/C++, treat it
   // as indirect.
   if (origType.isClangType()) {

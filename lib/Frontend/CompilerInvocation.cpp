@@ -1427,6 +1427,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
 
+  // Swift value wrappers need the original C++ types for ABI lowering.
+  Opts.UseClangFunctionTypes |= Opts.hasFeature(Feature::CxxSwiftValueTypes);
+
   // SuppressedAssociatedTypesWithDefaults is now always-on by default.
   // If the old prototype version of the feature has been requested, honor it.
   if (Opts.hasFeature(SuppressedAssociatedTypes) &&

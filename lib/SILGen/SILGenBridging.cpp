@@ -2391,6 +2391,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         if (useLoweredAddresses() &&
             (foreignParam.getConvention() == ParameterConvention::Indirect_In ||
              foreignParam.getConvention() ==
+                 ParameterConvention::Indirect_In_CXX ||
+             foreignParam.getConvention() ==
                  ParameterConvention::Indirect_In_Guaranteed)) {
           auto temp = emitTemporaryAllocation(fd, bridged.getType());
           bridged.forwardInto(*this, fd, temp);

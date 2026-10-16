@@ -1155,6 +1155,27 @@ static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
          decl->hasUserDeclaredMoveConstructor();
 }
 
+bool importer::isSwiftStringType(const clang::CXXRecordDecl *decl) {
+  auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  auto *definition = decl->getDefinition();
+  if (!attr || !attr->getGeneratedDeclaration() ||
+      attr->getLanguage() != "Swift" || attr->getDefinedIn() != "swift" ||
+      attr->getUSR() != "s:SS" || !definition ||
+      definition->canPassInRegisters() || definition->getNumBases() ||
+      definition->isPolymorphic())
+    return false;
+
+  // The generated wrapper for frozen String stores the value inline.
+  auto fields = definition->fields();
+  if (!llvm::hasSingleElement(fields))
+    return false;
+  auto *storage = *fields.begin();
+  auto *array =
+      definition->getASTContext().getAsConstantArrayType(storage->getType());
+  return storage->getName() == "_storage" && array &&
+         array->getElementType()->isCharType();
+}
+
 bool importer::isSwiftClassType(const clang::CXXRecordDecl *decl) {
   // Swift type must be annotated with external_source_symbol attribute.
   auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
