@@ -1766,8 +1766,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   modifiers.isNoexcept = !FD->hasThrows();
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
-  modifiers.isConst = !isa<ClassDecl>(typeDeclContext) && !isMutating &&
-                      !isConstructor && !isStatic;
+  // Const qualifies the class reference, so the Swift object can still mutate.
+  // Consuming methods receive a copy of the reference in printCxxThunkBody.
+  bool canBeConst = !isa<ClassDecl>(typeDeclContext) ||
+                    FD->getASTContext().LangOpts.hasFeature(
+                        Feature::GenerateConstClassMembersInCXX);
+  modifiers.isConst = canBeConst && !isMutating && !isConstructor && !isStatic;
   modifiers.hasSymbolUSR = !isDefinition;
   auto result = printFunctionSignature(
       FD, signature, cxx_translation::getNameForCxx(FD), resultTy,
@@ -1842,8 +1846,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   modifiers.isStatic = isStatic && !isDefinition;
   modifiers.isInline = true;
   modifiers.isNoexcept = !accessor->hasThrows();
-  modifiers.isConst =
-      !isStatic && accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
+  // Class setters mutate the referenced object without replacing the handle.
+  bool canBeConst = isa<ClassDecl>(typeDeclContext)
+                        ? accessor->getASTContext().LangOpts.hasFeature(
+                              Feature::GenerateConstClassMembersInCXX) &&
+                              !accessor->isMutating()
+                        : accessor->isGetter();
+  modifiers.isConst = !isStatic && canBeConst;
   modifiers.hasSymbolUSR = !isDefinition;
   modifiers.symbolUSROverride = accessor->getStorage();
   auto result =
