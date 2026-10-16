@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt \
 // RUN:   -lifetime-dependence-insertion \
-// RUN:   -enable-address-dependencies \
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
