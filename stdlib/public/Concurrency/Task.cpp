@@ -2618,9 +2618,12 @@ static void swift_task_removeCancellationHandlerImpl(
   auto task = swift_task_getCurrent();
   assert(task->_private()._status().load(std::memory_order_relaxed).getInnermostRecord() == record &&
     "We expect that the popped record will be exactly first as well as that it is of the expected type");
-  if (popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
-    swift_task_dealloc(record);
-  }
+  // The record is the innermost one, so removeStatusRecord can unlink it
+  // with one CAS when nobody holds the status record lock. If a canceller
+  // holds it (and may be running this handler) it waits for the lock, as
+  // popStatusRecordOfType did; that took the lock every time.
+  removeStatusRecord(task, record);
+  swift_task_dealloc(record);
 }
 
 SWIFT_CC(swift)
