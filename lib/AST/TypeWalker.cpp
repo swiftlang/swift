@@ -98,7 +98,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitNominalType(NominalType *ty) {
     if (auto parent = ty->getParent())
-      return doIt(parent);
+      if (doIt(parent))
+        return true;
+
+    for (auto arg : ty->getGenericArgs())
+      if (doIt(arg))
+        return true;
+
     return false;
   }
 
@@ -241,18 +247,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitUnboundGenericType(UnboundGenericType *ty) {
     if (auto parent = ty->getParent())
       return doIt(parent);
-    return false;
-  }
-
-  bool visitBoundGenericType(BoundGenericType *ty) {
-    if (auto parent = ty->getParent())
-      if (doIt(parent))
-        return true;
-
-    for (auto arg : ty->getGenericArgs())
-      if (doIt(arg))
-        return true;
-
     return false;
   }
 

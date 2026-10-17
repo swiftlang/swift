@@ -228,8 +228,9 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     return;
   }
 
-  // Special diagnostic for enums.
-  if (T->is<EnumType>()) {
+  // Special diagnostic for non-generic enums.
+  if (auto enumTy = T->getAs<EnumType>();
+      enumTy && !enumTy->hasGenericArgs()) {
     // New dialog mentioning @c.
     diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
                    language)
@@ -673,10 +674,8 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   case ForeignRepresentableKind::None:
     // Special case: If the type is Unmanaged<T>, then return true, because
     // Unmanaged<T> can be represented in Objective-C (if T can be).
-    if (auto BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->isUnmanaged()) {
-        return true;
-      }
+    if (type->isUnmanaged()) {
+      return true;
     }
     return false;
 
@@ -1069,10 +1068,10 @@ bool swift::isRepresentableInLanguage(
     if (nsErrorTy) {
       errorParameterType = OptionalType::get(nsErrorTy);
       errorParameterType
-        = BoundGenericType::get(
+        = NominalType::get(
             ctx.getAutoreleasingUnsafeMutablePointerDecl(),
             nullptr,
-            errorParameterType);
+            errorParameterType, ctx);
       errorParameterType = OptionalType::get(errorParameterType);
     }
 
@@ -4055,7 +4054,7 @@ private:
     if (!implTy->isUnmanaged() || !reqTy->isAnyClassReferenceType())
       return false;
 
-    auto boundGenericType = implTy->getAs<BoundGenericType>();
+    auto boundGenericType = implTy->getAs<NominalType>();
     if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
       return false;
 

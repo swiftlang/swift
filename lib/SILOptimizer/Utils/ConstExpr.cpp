@@ -745,7 +745,7 @@ extractStringOrStaticStringValue(SymbolicValue stringValue) {
 /// If the specified type is a Swift.Array of some element type, then return the
 /// element type.  Otherwise, return a null Type.
 static Type getArrayElementType(Type ty) {
-  if (auto bgst = ty->getAs<BoundGenericStructType>())
+  if (auto bgst = ty->getAs<StructType>())
     if (bgst->isArray())
       return bgst->getGenericArgs()[0];
   return Type();

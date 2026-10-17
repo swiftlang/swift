@@ -89,7 +89,31 @@ class ReferencedTypeFinder : public TypeDeclFinder {
     : Callback(callback) {}
 
   Action visitNominalType(NominalType *nominal) override {
-    Callback(*this, nominal->getDecl());
+    auto *decl = nominal->getDecl();
+
+    if (nominal->hasGenericArgs()) {
+      NeedsDefinition = true;
+      Callback(*this, decl);
+      NeedsDefinition = false;
+    } else {
+      Callback(*this, decl);  
+    }
+
+    if (nominal->hasGenericArgs()) {
+      bool isObjCGeneric = decl->hasClangNode();
+      auto sig = decl->getGenericSignature();
+
+      for_each(nominal->getGenericArgs(),
+               sig.getInnermostGenericParams(),
+               [&](Type argTy, GenericTypeParamType *paramTy) {
+        // FIXME: I think there's a bug here with recursive generic types.
+        if (isObjCGeneric && isConstrained(sig, paramTy))
+          NeedsDefinition = true;
+        argTy.walk(*this);
+        NeedsDefinition = false;
+      });
+    }
+    
     return Action::SkipNode;
   }
 
@@ -109,28 +133,6 @@ class ReferencedTypeFinder : public TypeDeclFinder {
                             GenericTypeParamType *paramTy) {
     auto existentialTy = sig->getExistentialType(paramTy);
     return !(existentialTy->isAny() || existentialTy->isAnyObject());
-  }
-
-  Action visitBoundGenericType(BoundGenericType *boundGeneric) override {
-    auto *decl = boundGeneric->getDecl();
-
-    NeedsDefinition = true;
-    Callback(*this, decl);
-    NeedsDefinition = false;
-
-    bool isObjCGeneric = decl->hasClangNode();
-    auto sig = decl->getGenericSignature();
-
-    for_each(boundGeneric->getGenericArgs(),
-             sig.getInnermostGenericParams(),
-             [&](Type argTy, GenericTypeParamType *paramTy) {
-      // FIXME: I think there's a bug here with recursive generic types.
-      if (isObjCGeneric && isConstrained(sig, paramTy))
-        NeedsDefinition = true;
-      argTy.walk(*this);
-      NeedsDefinition = false;
-    });
-    return Action::SkipNode;
   }
 
 public:

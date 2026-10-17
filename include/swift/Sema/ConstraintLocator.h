@@ -665,7 +665,7 @@ class LocatorPathElt::GenericType : public StoredPointerElement<TypeBase> {
 public:
   GenericType(Type type)
       : StoredPointerElement(PathElementKind::GenericType, type.getPointer()) {
-    assert(type->getDesugaredType()->is<BoundGenericType>());
+    assert(type->getDesugaredType()->is<NominalType>());
   }
 
   Type getType() const { return getStoredPointer(); }

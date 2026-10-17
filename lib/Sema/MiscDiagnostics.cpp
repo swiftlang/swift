@@ -7321,7 +7321,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   // Nominal types.
   if (auto nominal = type->getAnyNominal()) {
     // If we have a collection, get the element type.
-    if (auto bound = type->getAs<BoundGenericType>()) {
+    if (auto bound = type->getAs<NominalType>()) {
       auto args = bound->getGenericArgs();
       if (!args.empty() && (bound->isArray() || bound->isSet())) {
         return OmissionTypeName(nominal->getName().str(),

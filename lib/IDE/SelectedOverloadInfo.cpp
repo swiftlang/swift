@@ -59,9 +59,9 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
         auto *KPDecl = CS.getASTContext().getKeyPathDecl();
         Type KPTy =
             KPDecl->mapTypeIntoEnvironment(KPDecl->getDeclaredInterfaceType());
-        Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
-        KPTy =
-            BoundGenericType::get(KPDecl, Type(), {Result.BaseTy, KPValueTy});
+        Type KPValueTy = KPTy->castTo<NominalType>()->getGenericArgs()[1];
+        KPTy = NominalType::get(KPDecl, Type(), {Result.BaseTy, KPValueTy},
+                                CS.getASTContext());
         Result.ValueTy = FunctionType::get({Params[0].withType(KPTy)},
                                            /* yields */ {}, KPValueTy);
       }
@@ -75,7 +75,7 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
     auto keyPathTy =
-        fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
+        fnType->getParams()[0].getPlainType()->castTo<NominalType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
     assert(keyPathTy->isKnownKeyPathType() &&

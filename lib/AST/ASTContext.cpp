@@ -594,13 +594,10 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ErrorUnionType> ErrorUnionTypes;
     llvm::DenseMap<Type, HoleType *> HoleTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
-    llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
-    llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
-    llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
     llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
-    llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    llvm::FoldingSet<NominalType> NominalTypes;
     llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
     llvm::FoldingSet<BuiltinBorrowType> BuiltinBorrowTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
@@ -3775,16 +3772,13 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
-    llvm::capacity_in_bytes(EnumTypes) +
-    llvm::capacity_in_bytes(StructTypes) +
-    llvm::capacity_in_bytes(ClassTypes) +
     llvm::capacity_in_bytes(ProtocolTypes) +
     llvm::capacity_in_bytes(DynamicSelfTypes) +
     OpaqueArchetypeEnvironments.getMemorySize() +
     OpenedExistentialEnvironments.getMemorySize();
     // FunctionTypes ?
     // UnboundGenericTypes ?
-    // BoundGenericTypes ?
+    // NominalTypes ?
     // SpecializedConformances ?
     // InheritedConformances ?
     // BuiltinConformances ?
@@ -3816,13 +3810,10 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE(ErrorUnionTypes);
     SIZE_AND_BYTES(HoleTypes);
     SIZE_AND_BYTES(DynamicSelfTypes);
-    SIZE_AND_BYTES(EnumTypes);
-    SIZE_AND_BYTES(StructTypes);
-    SIZE_AND_BYTES(ClassTypes);
     SIZE_AND_BYTES(ProtocolTypes);
     SIZE_AND_BYTES(ExistentialTypes);
     SIZE(UnboundGenericTypes);
-    SIZE(BoundGenericTypes);
+    SIZE(NominalTypes);
     SIZE(ProtocolCompositionTypes);
     SIZE(ParameterizedProtocolTypes);
     SIZE(LayoutConstraints);
@@ -4701,13 +4692,11 @@ static RecursiveTypeProperties getRecursivePropertiesAsParent(Type type) {
   // Check generic arguments of parent types.
   while (type) {
     // Merge from the generic arguments.
-    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-      for (auto genericArg : boundGeneric->getGenericArgs())
+    if (auto nominal = type->getAs<NominalType>()) {
+      for (auto genericArg : nominal->getGenericArgs())
         properties |= genericArg->getRecursiveProperties();
-    }
 
-    if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>()) {
-      type = nominalOrBound->getParent();
+      type = nominal->getParent();
       continue;
     }
 
@@ -4744,173 +4733,173 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   return result;
 }
 
-void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
-                               NominalTypeDecl *TheDecl, Type Parent,
-                               ArrayRef<Type> GenericArgs) {
-  ID.AddPointer(TheDecl);
-  ID.AddPointer(Parent.getPointer());
-  ID.AddInteger(GenericArgs.size());
-  for (Type Arg : GenericArgs) {
-    ID.AddPointer(Arg.getPointer());
+void NominalType::Profile(llvm::FoldingSetNodeID &ID,
+                          NominalTypeDecl *D, Type parent,
+                          ArrayRef<Type> genericArgs) {
+  ID.AddPointer(D);
+  ID.AddPointer(parent.getPointer());
+  ID.AddInteger(genericArgs.size());
+  for (Type arg : genericArgs) {
+    ID.AddPointer(arg.getPointer());
   }
 }
 
-BoundGenericType::BoundGenericType(TypeKind theKind,
-                                   NominalTypeDecl *theDecl,
-                                   Type parent,
-                                   ArrayRef<Type> genericArgs,
-                                   const ASTContext *context,
-                                   RecursiveTypeProperties properties)
-    : NominalOrBoundGenericNominalType(theDecl, parent, theKind, context,
-                                       properties) {
-  Bits.BoundGenericType.GenericArgCount = genericArgs.size();
-  // Subtypes are required to provide storage for the generic arguments
-  std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
-                          getTrailingObjectsPointer());
+NominalType::NominalType(TypeKind theKind,
+                         NominalTypeDecl *theDecl,
+                         Type parent,
+                         ArrayRef<Type> genericArgs,
+                         const ASTContext *context,
+                         RecursiveTypeProperties properties)
+    : AnyGenericType(theDecl, parent, theKind, context, properties) {
+  Bits.NominalType.GenericArgCount = genericArgs.size();
+  if (!genericArgs.empty()) {
+    // Subtypes are required to provide storage for the generic arguments
+    std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
+                            getTrailingObjectsPointer());
+  }
 }
 
-BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
-                                        Type Parent,
-                                        ArrayRef<Type> GenericArgs) {
-  assert(TheDecl->getGenericParams() && "must be a generic type decl");
-  assert((!Parent || Parent->is<NominalType>() ||
-          Parent->is<BoundGenericType>() ||
-          Parent->is<UnboundGenericType>()) &&
-         "parent must be a nominal type");
+NominalType *NominalType::get(NominalTypeDecl *D,
+                              Type parent,
+                              ArrayRef<Type> genericArgs,
+                              const ASTContext &C) {
+  switch (D->getKind()) {
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+    break;
 
-  ASTContext &C = TheDecl->getDeclContext()->getASTContext();
+  case DeclKind::Protocol:
+    assert(genericArgs.empty());
+    return ProtocolType::get(cast<ProtocolDecl>(D), parent, C);
+
+  case DeclKind::BuiltinTuple:
+    assert(genericArgs.empty());
+    return BuiltinTupleType::get(cast<BuiltinTupleDecl>(D), parent, C);
+
+  default:
+    llvm_unreachable("not a nominal type declaration");
+  }
+
+#ifndef NDEBUG
+  {
+    auto genericParams = D->getGenericParams();
+    assert(genericArgs.empty() == (genericParams == nullptr) &&
+           "params and args must match in presence");
+    if (genericParams) {
+      assert(genericArgs.size() == genericParams->getParams().size() &&
+             "params and args must match in number");
+    }
+  }
+  assert((!parent || parent->is<NominalType>() ||
+          parent->is<UnboundGenericType>()) &&
+         "parent must be a nominal type");
+#endif
+
   llvm::FoldingSetNodeID ID;
-  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
+  NominalType::Profile(ID, D, parent, genericArgs);
   RecursiveTypeProperties properties;
-  if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  properties |= getRecursivePropertiesAsParent(Parent);
-  for (Type Arg : GenericArgs) {
-    properties |= Arg->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(parent);
+  for (Type arg : genericArgs) {
+    properties |= arg->getRecursiveProperties();
   }
 
   auto arena = getArena(properties);
 
-  llvm::FoldingSetInsertToken InsertToken;
-  if (BoundGenericType *BGT =
-          C.getImpl().getArena(arena).BoundGenericTypes.lookup(ID, InsertToken))
-    return BGT;
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *existingType =
+          C.getImpl().getArena(arena).NominalTypes.lookup(ID, insertToken))
+    return existingType;
 
-  bool IsCanonical = !Parent || Parent->isCanonical();
-  if (IsCanonical) {
-    for (Type Arg : GenericArgs) {
-      if (!Arg->isCanonical()) {
-        IsCanonical = false;
+  bool isCanonical = !parent || parent->isCanonical();
+  if (isCanonical) {
+    for (Type arg : genericArgs) {
+      if (!arg->isCanonical()) {
+        isCanonical = false;
         break;
       }
     }
   }
 
-  BoundGenericType *newType;
-  if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
-    auto sz = BoundGenericClassType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto mem = C.Allocate(sz, alignof(BoundGenericClassType), arena);
-    newType = new (mem) BoundGenericClassType(
-        theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
-  } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
-    auto sz = BoundGenericStructType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto mem = C.Allocate(sz, alignof(BoundGenericStructType), arena);
-    newType = new (mem) BoundGenericStructType(
-        theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
-  } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
-    auto sz = BoundGenericEnumType::totalSizeToAlloc<Type>(GenericArgs.size());
-    auto mem = C.Allocate(sz, alignof(BoundGenericEnumType), arena);
-    newType = new (mem) BoundGenericEnumType(
-        theEnum, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
+  NominalType *newType;
+  if (auto theClass = dyn_cast<ClassDecl>(D)) {
+    auto sz = ClassType::totalSizeToAlloc<Type>(genericArgs.size());
+    auto mem = C.Allocate(sz, alignof(ClassType), arena);
+    newType = new (mem) ClassType(
+        theClass, parent, genericArgs, isCanonical ? &C : nullptr, properties);
+  } else if (auto theStruct = dyn_cast<StructDecl>(D)) {
+    auto sz = StructType::totalSizeToAlloc<Type>(genericArgs.size());
+    auto mem = C.Allocate(sz, alignof(StructType), arena);
+    newType = new (mem) StructType(
+        theStruct, parent, genericArgs, isCanonical ? &C : nullptr, properties);
+  } else if (auto theEnum = dyn_cast<EnumDecl>(D)) {
+    auto sz = EnumType::totalSizeToAlloc<Type>(genericArgs.size());
+    auto mem = C.Allocate(sz, alignof(EnumType), arena);
+    newType = new (mem) EnumType(
+        theEnum, parent, genericArgs, isCanonical ? &C : nullptr, properties);
   } else {
     llvm_unreachable("Unhandled NominalTypeDecl");
   }
-  C.getImpl().getArena(arena).BoundGenericTypes.insert(newType, InsertToken);
+  C.getImpl().getArena(arena).NominalTypes.insert(newType, insertToken);
 
   return newType;
 }
 
-NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
-  assert((isa<ProtocolDecl>(D) ||
-          isa<BuiltinTupleDecl>(D) ||
-          !D->getGenericParams()) &&
-         "must be a non-generic type decl");
-  assert((!Parent || Parent->is<NominalType>() ||
-          Parent->is<BoundGenericType>() ||
-          Parent->is<UnboundGenericType>()) &&
-         "parent must be a nominal type");
-
-  switch (D->getKind()) {
-  case DeclKind::Enum:
-    return EnumType::get(cast<EnumDecl>(D), Parent, C);
-  case DeclKind::Struct:
-    return StructType::get(cast<StructDecl>(D), Parent, C);
-  case DeclKind::Class:
-    return ClassType::get(cast<ClassDecl>(D), Parent, C);
-  case DeclKind::Protocol: {
-    return ProtocolType::get(cast<ProtocolDecl>(D), Parent, C);
-  case DeclKind::BuiltinTuple:
-    return BuiltinTupleType::get(cast<BuiltinTupleDecl>(D), Parent, C);
-  }
-
-  default:
-    llvm_unreachable("Not a nominal declaration!");
-  }
+CanEnumType CanEnumType::get(EnumDecl *D, CanType parent,
+                             ArrayRef<CanType> args,
+                             const ASTContext &C) {
+  SmallVector<Type> ncArgs(args.begin(), args.end());
+  return CanEnumType(EnumType::get(D, parent, ncArgs, C));
 }
 
-EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
-                     RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Enum, &C, TheDecl, Parent, properties) { }
-
-EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
-  RecursiveTypeProperties properties;
-  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  properties |= getRecursivePropertiesAsParent(Parent);
-  auto arena = getArena(properties);
-
-  auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
-  if (!known) {
-    known = new (C, arena) EnumType(D, Parent, C, properties);
-  }
-  return known;
+EnumType *EnumType::get(EnumDecl *D, Type parent,
+                        ArrayRef<Type> genericArgs,
+                        const ASTContext &C) {
+  return cast<EnumType>(NominalType::get(D, parent, genericArgs, C));
 }
 
-StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
+EnumType::EnumType(EnumDecl *D, Type parent, ArrayRef<Type> args,
+                   const ASTContext *ctx,
+                   RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Enum, D, parent, args, ctx, properties) {}
+
+CanStructType CanStructType::get(StructDecl *D, CanType parent,
+                                 ArrayRef<CanType> args,
+                                 const ASTContext &C) {
+  SmallVector<Type> ncArgs(args.begin(), args.end());
+  return CanStructType(StructType::get(D, parent, ncArgs, C));
+}
+
+StructType *StructType::get(StructDecl *D, Type parent,
+                            ArrayRef<Type> genericArgs,
+                            const ASTContext &C) {
+  return cast<StructType>(NominalType::get(D, parent, genericArgs, C));
+}
+
+StructType::StructType(StructDecl *D, Type parent, ArrayRef<Type> args,
+                       const ASTContext *ctx,
                        RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Struct, &C, TheDecl, Parent, properties) { }
+  : NominalType(TypeKind::Struct, D, parent, args, ctx, properties) {}
 
-StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
-  RecursiveTypeProperties properties;
-  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  properties |= getRecursivePropertiesAsParent(Parent);
-  auto arena = getArena(properties);
-
-  auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
-  if (!known) {
-    known = new (C, arena) StructType(D, Parent, C, properties);
-  }
-  return known;
+CanClassType CanClassType::get(ClassDecl *D, CanType parent,
+                               ArrayRef<CanType> args,
+                               const ASTContext &C) {
+  SmallVector<Type> ncArgs(args.begin(), args.end());
+  return CanClassType(ClassType::get(D, parent, ncArgs, C));
 }
 
-ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
+ClassType *ClassType::get(ClassDecl *D, Type parent,
+                          ArrayRef<Type> genericArgs,
+                          const ASTContext &C) {
+  return cast<ClassType>(NominalType::get(D, parent, genericArgs, C));
+}
+
+ClassType::ClassType(ClassDecl *D, Type parent, ArrayRef<Type> args,
+                     const ASTContext *ctx,
                      RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Class, &C, TheDecl, Parent, properties) { }
-
-ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
-  RecursiveTypeProperties properties;
-  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  properties |= getRecursivePropertiesAsParent(Parent);
-  auto arena = getArena(properties);
-
-  auto *&known = C.getImpl().getArena(arena).ClassTypes[{D, Parent}];
-  if (!known) {
-    known = new (C, arena) ClassType(D, Parent, C, properties);
-  }
-  return known;
-}
+  : NominalType(TypeKind::Class, D, parent, args, ctx, properties) {}
 
 ProtocolCompositionType *
 ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
@@ -5261,7 +5250,7 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
     else if (type->is<PackType>())
       return type;
     else if (forCanonical)
-      type = BoundGenericType::get(arrayDecl, Type(), {type});
+      type = NominalType::get(arrayDecl, Type(), {type}, *ctx);
     else
       type = VariadicSequenceType::get(type);
   }
@@ -6208,7 +6197,8 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            const ASTContext &Ctx,
                            RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
+  : NominalType(TypeKind::Protocol, TheDecl, Parent, /*args*/ {},
+                &Ctx, properties) {}
 
 Type ExistentialType::get(Type constraint) {
   auto &C = constraint->getASTContext();
@@ -6235,8 +6225,8 @@ Type ExistentialType::get(Type constraint) {
 
 BuiltinTupleType::BuiltinTupleType(BuiltinTupleDecl *TheDecl,
                                    const ASTContext &Ctx)
-  : NominalType(TypeKind::BuiltinTuple, &Ctx, TheDecl, Type(),
-                RecursiveTypeProperties()) { }
+  : NominalType(TypeKind::BuiltinTuple, TheDecl, Type(), /*args*/{},
+                &Ctx, RecursiveTypeProperties()) { }
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&

@@ -74,8 +74,8 @@ static bool isDirectRequirement(ConstraintSystem &cs,
 ///
 /// $T1 bind (x: Int, y: String)
 static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
-  auto *boundTy = containerTy->getAs<BoundGenericStructType>();
-  if (!boundTy)
+  auto *boundTy = containerTy->getAs<StructType>();
+  if (!boundTy || !boundTy->hasGenericArgs())
     return containerTy;
 
   // We should never form a type like Array<@noescape () -> ()>, because
@@ -90,7 +90,7 @@ static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
   if (decl == ctx.getArrayDecl())
     return ArraySliceType::get(elementTy);
   else if (decl == ctx.getSetDecl())
-    return BoundGenericType::get(decl, /*parent=*/Type(), {elementTy});
+    return NominalType::get(decl, /*parent=*/Type(), {elementTy}, ctx);
 
   return containerTy;
 }
@@ -1050,7 +1050,7 @@ void BindingSet::inferTransitiveKeyPathBindingFrom(
     if (bindingTy->isAnyKeyPath())
       return;
 
-    auto *BGT = bindingTy->castTo<BoundGenericType>();
+    auto *BGT = bindingTy->castTo<NominalType>();
     inferredRootTy = BGT->getGenericArgs()[0];
 
     // The generic argument of a keypath type is invariant.
@@ -1374,18 +1374,21 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   Type keyPathTy;
   switch (mutability) {
   case KeyPathMutability::ReadOnly:
-    keyPathTy = BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
-                                      {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
 
   case KeyPathMutability::Writable:
-    keyPathTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                      /*parent=*/Type(), {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getWritableKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
 
   case KeyPathMutability::ReferenceWritable:
-    keyPathTy = BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
-                                      /*parent=*/Type(), {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getReferenceWritableKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
   }
 

@@ -5167,7 +5167,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
     base = copyOptionalityFromDerivedToBase(tc, derived, base);
 
     auto optDecl = tc.Context.getOptionalDecl();
-    return CanType(BoundGenericEnumType::get(optDecl, Type(), base));
+    return CanType(EnumType::get(optDecl, Type(), base, tc.Context));
   }
 
   // (T1, T2, ...) +> (S1, S2, ...) = (T1 +> S1, T2 +> S2, ...)

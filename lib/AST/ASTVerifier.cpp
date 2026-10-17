@@ -2430,7 +2430,7 @@ public:
           abort();
         }
         return;
-      } else if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
+      } else if (auto bgt = keyPathTy->getAs<NominalType>()) {
         if (keyPathTy->isPartialKeyPath()) {
           // PartialKeyPath<T> application is rvalue T -> rvalue Any
           if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {

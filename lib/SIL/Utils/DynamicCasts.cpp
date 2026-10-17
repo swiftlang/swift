@@ -903,8 +903,8 @@ swift::classifyDynamicCast(SILFunction *function,
   }
 
   // Check for a viable collection cast.
-  if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
-    if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
+  if (auto sourceStruct = dyn_cast<StructType>(source)) {
+    if (auto targetStruct = dyn_cast<StructType>(target)) {
       // Both types have to be the same kind of collection.
       if (sourceStruct->getDecl() == targetStruct->getDecl()) {
         auto sourceArgs = sourceStruct.getGenericArgs();

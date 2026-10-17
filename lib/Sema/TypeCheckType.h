@@ -577,7 +577,7 @@ public:
 };
 
 /// A function reference used to "open" the given unbound generic type
-/// by introducing generic arguments and constructing a \c BoundGenericType
+/// by introducing generic arguments and constructing a \c NominalType
 /// out of them.
 ///
 /// \returns the \c null type on failure.
@@ -758,7 +758,7 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param genericArgs The list of generic arguments to apply.
   ///
-  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// \returns A NominalType bound to the given arguments, or null on
   /// error.
   ///
   /// \see applyGenericArguments

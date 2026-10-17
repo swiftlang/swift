@@ -500,7 +500,7 @@ static void checkInheritanceClause(
           if (auto behavior = shouldDiagnoseEmbeddedLimitations(
                   classDecl, inherited.getSourceRange().Start,
                   /*wasAlwaysEmbeddedError=*/true)) {
-            if (auto superBGT = inheritedTy->getAs<BoundGenericClassType>()) {
+            if (auto superBGT = inheritedTy->getAs<ClassType>()) {
               for (auto arg : superBGT->getGenericArgs()) {
                 if (auto *nominal = arg->getAnyNominal()) {
                   if (nominal == classDecl) {

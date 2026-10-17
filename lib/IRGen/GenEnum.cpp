@@ -7202,7 +7202,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
          && "c-compatible enum didn't come from clang!");
   assert(theEnum->hasRawType()
          && "c-compatible enum doesn't have raw type!");
-  assert(!theEnum->getDeclaredTypeInContext()->is<BoundGenericType>()
+  assert(!theEnum->isGenericContext()
          && "c-compatible enum is generic!");
 
   // The raw type should be a C integer type, which should have a single

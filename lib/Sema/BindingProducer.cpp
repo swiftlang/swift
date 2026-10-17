@@ -356,7 +356,7 @@ bool TypeVarBindingProducer::computeNext() {
       // using temporary type variables substituted for element
       // types, that's going to ensure that subtype relationship is
       // always preserved.
-      auto *BGT = type->castTo<BoundGenericType>();
+      auto *BGT = type->castTo<StructType>();
       auto dstLocator = TypeVar->getImpl().getLocator();
       auto newType =
           CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),

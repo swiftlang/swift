@@ -32,7 +32,7 @@ extension AST.`Type` {
     if !self.isOptional {
       return self
     }
-    return self.genericArgumentsOfBoundGenericType[0].fullyUnwrappedType
+    return self.genericArgumentsOfNominalType[0].fullyUnwrappedType
   }
 }
 

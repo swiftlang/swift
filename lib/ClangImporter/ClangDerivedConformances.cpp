@@ -999,7 +999,7 @@ static void conformToCxxIterableIfNeeded(
   // Substitute generic `Self` parameter.
   auto declSelfTy = decl->getDeclaredInterfaceType();
   auto borrowingIteratorTy =
-      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
+      NominalType::get(borrowingIteratorNominal, Type(), {declSelfTy}, ctx);
 
   auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
       ctx.getIdentifier("DereferenceResult"));

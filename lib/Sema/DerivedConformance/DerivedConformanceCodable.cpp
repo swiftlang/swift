@@ -565,9 +565,8 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
                                      VarDecl::Introducer introducer,
                                      Identifier identifier) {
   // Bind Keyed*Container to Keyed*Container<KeyType>
-  Type boundType[1] = {keyType};
-  auto containerType = BoundGenericType::get(keyedContainerDecl, Type(),
-                                             C.AllocateCopy(boundType));
+  auto containerType = NominalType::get(keyedContainerDecl, Type(),
+                                        {keyType}, C);
 
   // let container : Keyed*Container<KeyType>
   VarDecl *containerDecl = VarDeclBuilder(DC, identifier)

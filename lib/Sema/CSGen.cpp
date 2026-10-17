@@ -3447,7 +3447,8 @@ namespace {
       // capability inference when there is no context.
       CS.addUnsolvedConstraint(Constraint::create(
           CS, ConstraintKind::FallbackType, kpTy,
-          BoundGenericType::get(kpDecl, /*parent=*/Type(), {root, value}),
+          NominalType::get(kpDecl, /*parent=*/Type(), {root, value},
+                           CS.getASTContext()),
           CS.getConstraintLocator(E, ConstraintLocator::FallbackType)));
 
       return kpTy;

@@ -283,7 +283,20 @@ swift::constraints::getConversionBehavior(Type type) {
     auto structTy = cast<StructType>(canType);
     auto *decl = structTy->getDecl();
 
-    if (decl == ctx.getAnyHashableDecl())
+    // These are all non-generic declarations.
+    if (decl == ctx.getArrayDecl())
+      return ConversionBehavior::Array;
+    else if (decl == ctx.getDictionaryDecl())
+      return ConversionBehavior::Dictionary;
+    else if (decl == ctx.getSetDecl())
+      return ConversionBehavior::Set;
+    else if (decl == ctx.getUnsafePointerDecl() ||
+             decl == ctx.getUnsafeMutablePointerDecl() ||
+             decl == ctx.getAutoreleasingUnsafeMutablePointerDecl())
+      return ConversionBehavior::Pointer;
+
+    // These are all generic declarations.
+    else if (decl == ctx.getAnyHashableDecl())
       return ConversionBehavior::AnyHashable;
     else if (decl == ctx.getStringDecl())
       return ConversionBehavior::String;
@@ -297,34 +310,12 @@ swift::constraints::getConversionBehavior(Type type) {
     return ConversionBehavior::None;
   }
 
-  case TypeKind::BoundGenericStruct: {
-    auto structTy = cast<BoundGenericStructType>(canType);
-    auto *decl = structTy->getDecl();
-
-    if (decl == ctx.getArrayDecl())
-      return ConversionBehavior::Array;
-    else if (decl == ctx.getDictionaryDecl())
-      return ConversionBehavior::Dictionary;
-    else if (decl == ctx.getSetDecl())
-      return ConversionBehavior::Set;
-    else if (decl == ctx.getUnsafePointerDecl() ||
-             decl == ctx.getUnsafeMutablePointerDecl() ||
-             decl == ctx.getAutoreleasingUnsafeMutablePointerDecl())
-      return ConversionBehavior::Pointer;
-
-    return ConversionBehavior::None;
-  }
-
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
   case TypeKind::DynamicSelf:
     return ConversionBehavior::Class;
 
-  case TypeKind::Enum:
-    return ConversionBehavior::None;
-
-  case TypeKind::BoundGenericEnum: {
-    auto enumTy = cast<BoundGenericEnumType>(canType);
+  case TypeKind::Enum: {
+    auto enumTy = cast<EnumType>(canType);
     if (enumTy->getDecl() == ctx.getOptionalDecl())
       return ConversionBehavior::Optional;
 
@@ -1406,7 +1397,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto result = rec(lhsElt, rhsElt);
 
       auto &ctx = lhs->getASTContext();
-      return BoundGenericType::get(ctx.getSetDecl(), Type(), result);
+      return NominalType::get(ctx.getSetDecl(), Type(), result, ctx);
     }
 
     case ConversionBehavior::Double:
@@ -1784,14 +1775,14 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
   }
 
   case ConversionBehavior::Array: {
-    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto *boundTy = type->castTo<StructType>();
     auto result = rec(boundTy->getGenericArgs()[0],
                       LocatorPathElt::GenericArgument(0));
     return ArraySliceType::get(result);
   }
 
   case ConversionBehavior::Dictionary: {
-    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto *boundTy = type->castTo<StructType>();
     auto keyTy = rec(boundTy->getGenericArgs()[0],
                      LocatorPathElt::GenericArgument(0));
     auto valueTy = rec(boundTy->getGenericArgs()[1],
@@ -1800,12 +1791,12 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
   }
 
   case ConversionBehavior::Set: {
-    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto *boundTy = type->castTo<StructType>();
     auto eltTy = rec(boundTy->getGenericArgs()[0],
                      LocatorPathElt::GenericArgument(0));
 
     auto &ctx = cs.getASTContext();
-    return BoundGenericType::get(ctx.getSetDecl(), Type(), eltTy);
+    return NominalType::get(ctx.getSetDecl(), Type(), eltTy, ctx);
   }
 
   case ConversionBehavior::Function: {

@@ -6085,6 +6085,9 @@ public:
   }
 
   void visitNominalType(const NominalType *nominalTy) {
+    if (nominalTy->hasGenericArgs())
+      return serializeBoundGenericType(nominalTy);
+
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
     NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -6536,7 +6539,7 @@ public:
         S.addTypeRef(generic->getParent()));
   }
 
-  void visitBoundGenericType(const BoundGenericType *generic) {
+  void serializeBoundGenericType(const NominalType *generic) {
     using namespace decls_block;
     SmallVector<TypeID, 8> genericArgIDs;
 

@@ -69,7 +69,6 @@ namespace swift {
   class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
-  class BoundGenericType;
   class BuiltinTupleDecl;
   class CASOptions;
   class ClangModuleLoader;

@@ -911,8 +911,10 @@ public:
                                   ConstraintLocator *locator)
       : ContextualFailure(solution, actualType, requiredType, locator),
         Mismatches(mismatches) {
-    assert(actualType->is<BoundGenericType>());
-    assert(requiredType->is<BoundGenericType>());
+    assert(actualType->is<NominalType>() &&
+           actualType->castTo<NominalType>()->hasGenericArgs());
+    assert(requiredType->is<NominalType>() &&
+           requiredType->castTo<NominalType>()->hasGenericArgs());
   }
 
   bool diagnoseAsError() override;
@@ -930,13 +932,13 @@ private:
   getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
-  BoundGenericType *getActual() const {
-    return getFromType()->castTo<BoundGenericType>();
+  NominalType *getActual() const {
+    return getFromType()->castTo<NominalType>();
   }
 
   /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const {
-    return getToType()->castTo<BoundGenericType>();
+  NominalType *getRequired() const {
+    return getToType()->castTo<NominalType>();
   }
 };
 

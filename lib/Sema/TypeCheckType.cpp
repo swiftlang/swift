@@ -1119,7 +1119,7 @@ TypeResolver::resolveDependentMemberType(Type baseTy,
 static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   if (Ty.isNull())
     return false;
-  auto *BGT = Ty->getAs<BoundGenericType>();
+  auto *BGT = Ty->getAs<NominalType>();
   if (!BGT)
     return false;
   if (!BGT->isUnsafePointer() && !BGT->isUnsafeMutablePointer())
@@ -1129,6 +1129,11 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
+/// Given a nested type declaration that doesn't introduce its own
+/// generic parameters, check that the given parent type satisfies the
+/// requirements of the nested type's generic signature. This can
+/// happen if the nested type adds extra requirements on its
+/// enclosing type parameters.
 bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
                                               Type parentTy, SourceLoc loc,
                                               GenericSignature contextSig) {
@@ -1150,15 +1155,37 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   if (!nominalParent)
     return true;
 
+  // Type definitions cannot be validly nested within protocols, and
+  // the possibility messes up our check below about matching genericity,
+  // so just skip checking requirements when we see this. But we do get
+  // here when naming protocol associated types, so we need to check
+  // specifically for a nominal member type.
+  if (isa<ProtocolDecl>(nominalParent) && isa<NominalTypeDecl>(decl))
+    return true;
+
   const auto genericSig = decl->getGenericSignature();
 
+  // The common case is that the nested type doesn't add any generic
+  // requirements, in which case its generic signature should perfectly
+  // match the signature of the parent type. In this case, we have nothing
+  // new to check.
   if (genericSig.getPointer() ==
       nominalParent->getGenericSignature().getPointer()) {
     return true;
   }
 
-  // Otherwise, our decl has a where clause of its own, or its inside of a
-  // constrained extension.
+  // Otherwise, our declaration either has a where clause of its own or
+  // is inside of a constrained extension. We'd better not be adding
+  // to the set of generic parameters, though, because we won't have
+  // a binding for the new ones that we can check.
+  assert(nominalParent->getGenericSignature().getGenericParams().size()
+           == genericSig.getGenericParams().size() &&
+         "expected nested type to be non-generic");
+
+  // Use a source location associated with the declaration unless we're
+  // inside a constrained extension and the signature of the declaration
+  // matches the signature of the extension (in which case we didn't
+  // add meaningful requirements on the declaration).
   SourceLoc noteLoc;
   {
     const auto ext = dyn_cast<ExtensionDecl>(dc);
@@ -1464,7 +1491,9 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
 
 /// Apply generic arguments to the given type.
 ///
-/// If the type is itself not generic, this does nothing.
+/// If the type is not itself generic, we just check to check whether it's
+/// a nested type that might have imposed any new requirements on the
+/// outer generic parameters.
 ///
 /// This function emits diagnostics about an invalid type or the wrong number
 /// of generic arguments, whereas
@@ -1474,7 +1503,7 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
 /// \param type The generic type to which to apply arguments.
 /// \param repr The syntactic representation of \p type, with a possible
 /// generic argument list to apply.
-/// \returns A BoundGenericType bound to the given arguments, or ErrorType on
+/// \returns A NominalType bound to the given arguments, or ErrorType on
 /// error.
 ///
 /// \see TypeResolution::applyUnboundGenericArguments
@@ -1509,7 +1538,8 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
     if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
       decl = aliasTy->getDecl();
       parentTy = aliasTy->getParent();
-    } else if (auto *nominalTy = type->getAs<NominalType>()) {
+    } else if (auto *nominalTy = type->getAs<NominalType>();
+               nominalTy && !nominalTy->hasGenericArgs()) {
       decl = nominalTy->getDecl();
       parentTy = nominalTy->getParent();
     } else {
@@ -1754,7 +1784,7 @@ Type TypeResolution::applyUnboundGenericArguments(
       // If we're working with a nominal type declaration, just construct
       // a bound generic type without checking the generic arguments.
       if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl)) {
-        return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
+        return NominalType::get(nominalDecl, parentTy, genericArgs, ctx);
       }
 
       if (resultType->hasTypeParameter()) {

@@ -65,7 +65,7 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var optionalObjectType: Type {
     assert(self.isOptional)
-    return genericArgumentsOfBoundGenericType[0]
+    return genericArgumentsOfNominalType[0]
   }
 
   public var optionalType: Type {
@@ -102,8 +102,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     bridged.GenericTypeParam_getParamKind()
   }
 
-  public var genericArgumentsOfBoundGenericType: TypeArray {
-    TypeArray(bridged: bridged.BoundGenericType_getGenericArgs())
+  public var genericArgumentsOfNominalType: TypeArray {
+    TypeArray(bridged: bridged.NominalType_getGenericArgs())
   }
 
   public var elementTypesOfPackType: TypeArray {

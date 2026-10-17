@@ -731,8 +731,8 @@ public:
     auto *unsafeContinuationDecl = ctx.getUnsafeContinuationDecl();
     auto errorTy = throws ? ctx.getErrorExistentialType() : ctx.getNeverType();
     auto continuationTy =
-        BoundGenericType::get(unsafeContinuationDecl, /*parent=*/Type(),
-                              {calleeTypeInfo.substResultType, errorTy})
+        NominalType::get(unsafeContinuationDecl, /*parent=*/Type(),
+                         {calleeTypeInfo.substResultType, errorTy}, ctx)
             ->getCanonicalType();
 
     auto wrappedContinuation = SGF.B.createStruct(
@@ -745,8 +745,8 @@ public:
     if (checkedBridging) {
       auto *checkedContinuationDecl = ctx.getCheckedContinuationDecl();
       continuationTy =
-          BoundGenericType::get(checkedContinuationDecl, /*parent=*/Type(),
-                                {calleeTypeInfo.substResultType, errorTy})
+          NominalType::get(checkedContinuationDecl, /*parent=*/Type(),
+                           {calleeTypeInfo.substResultType, errorTy}, ctx)
               ->getCanonicalType();
     }
 
@@ -961,7 +961,7 @@ public:
         auto mappedOutContinuationTy =
             continuationTy->mapTypeOutOfEnvironment()->getCanonicalType();
         auto resumeType =
-            cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
+            cast<NominalType>(mappedOutContinuationTy).getGenericArgs()[0];
 
         auto errorIntrinsic =
             checkedBridging

@@ -4082,8 +4082,7 @@ public:
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
-    require(IUAI->getOperand()->getType().is<EnumType>()
-              || IUAI->getOperand()->getType().is<BoundGenericEnumType>(),
+    require(IUAI->getOperand()->getType().is<EnumType>(),
             "InjectEnumAddrInst must take an enum operand");
     require(IUAI->getElement()->getParentEnum()
               == IUAI->getOperand()->getType().getEnumDecl(),

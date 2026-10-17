@@ -1775,7 +1775,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   // Compute the concrete key-path class and get its metadata.
   NominalTypeDecl *keyPathClass = pickStaticKeyPathClass(*this, KPI);
   auto concreteKeyPathTy =
-      BoundGenericType::get(keyPathClass, Type(), {rootTy, valueTy})
+      NominalType::get(keyPathClass, Type(), {rootTy, valueTy}, Context)
           ->getCanonicalType();
   llvm::Constant *metadata = getAddrOfTypeMetadata(concreteKeyPathTy);
 

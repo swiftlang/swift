@@ -4054,7 +4054,7 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
     SILValue arrayAdjoint, int eltIndex, SILLocation loc) {
   auto &ctx = builder.getASTContext();
   auto arrayTanType = cast<StructType>(arrayAdjoint->getType().getASTType());
-  auto arrayType = arrayTanType->getParent()->castTo<BoundGenericStructType>();
+  auto arrayType = arrayTanType->getParent()->castTo<StructType>();
   auto eltTanType = arrayType->getGenericArgs().front()->getCanonicalType();
   auto eltTanSILType = remapType(SILType::getPrimitiveAddressType(eltTanType));
   // Get `function_ref` and generic signature of

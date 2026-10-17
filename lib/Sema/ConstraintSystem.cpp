@@ -1078,7 +1078,7 @@ ConstraintSystem::getExprDepthAndParent(Expr *expr) {
 
 std::optional<std::pair<Type, Type>>
 ConstraintSystem::isDictionaryType(Type type) {
-  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
+  if (auto boundStruct = type->getAs<StructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getDictionaryDecl()) {
       auto genericArgs = boundStruct->getGenericArgs();
       return std::make_pair(genericArgs[0], genericArgs[1]);
@@ -1089,7 +1089,7 @@ ConstraintSystem::isDictionaryType(Type type) {
 }
 
 std::optional<Type> ConstraintSystem::isSetType(Type type) {
-  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
+  if (auto boundStruct = type->getAs<StructType>()) {
     if (boundStruct->getDecl() == type->getASTContext().getSetDecl())
       return boundStruct->getGenericArgs()[0];
   }
