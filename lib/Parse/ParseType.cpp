@@ -25,8 +25,10 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/ParserResult.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -396,7 +398,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
       diagnose(Tok, diag::sil_box_expected_r_angle);
       return makeParserError();
     }
-    
+
     RAngleLoc = consumeStartingGreater();
   }
   
@@ -550,18 +552,42 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     TupleTypeRepr *argsTyR = nullptr;
     if (auto *TTArgs = dyn_cast<TupleTypeRepr>(tyR)) {
       argsTyR = TTArgs;
-    } else if (tyR->isSimpleUnqualifiedIdentifier(Context.Id_Void)) {
-      diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
-          .fixItReplace(tyR->getStartLoc(), "()");
-      argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
     } else {
-      diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
-          .highlight(tyR->getSourceRange())
-          .fixItInsert(tyR->getStartLoc(), "(")
-          .fixItInsertAfter(tyR->getEndLoc(), ")");
-      argsTyR = TupleTypeRepr::create(Context, {tyR}, tyR->getSourceRange());
+      if (FunctionWhereClauseWithoutReturnLoc.isValid() &&
+          Tok.isAny(tok::l_brace, tok::r_brace, tok::semi, tok::eof)) {
+        auto resultEnd = Lexer::getLocForEndOfToken(
+            SourceMgr, SecondHalf.get()->getEndLoc());
+        auto whereClauseText =
+            SourceMgr
+                .extractText(CharSourceRange(
+                    SourceMgr, FunctionWhereClauseWithoutReturnLoc, arrowLoc))
+                .rtrim();
+        auto returnTypeText = SourceMgr.extractText(
+            CharSourceRange(SourceMgr, arrowLoc, resultEnd));
+
+        SmallString<128> replacement;
+        llvm::raw_svector_ostream replacementStream(replacement);
+        replacementStream << returnTypeText << ' ' << whereClauseText;
+
+        diagnose(FunctionWhereClauseWithoutReturnLoc,
+                 diag::where_clause_before_function_return_type)
+            .fixItReplaceChars(FunctionWhereClauseWithoutReturnLoc, resultEnd,
+                               replacement);
+      }
+
+      if (tyR->isSimpleUnqualifiedIdentifier(Context.Id_Void)) {
+        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+            .fixItReplace(tyR->getStartLoc(), "()");
+        argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
+      } else {
+        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+            .highlight(tyR->getSourceRange())
+            .fixItInsert(tyR->getStartLoc(), "(")
+            .fixItInsertAfter(tyR->getEndLoc(), ")");
+        argsTyR = TupleTypeRepr::create(Context, {tyR}, tyR->getSourceRange());
+      }
     }
-    
+
     // Parse substitutions for substituted SIL types.
     MutableArrayRef<TypeRepr *> invocationSubsTypes;
     MutableArrayRef<TypeRepr *> patternSubsTypes;
