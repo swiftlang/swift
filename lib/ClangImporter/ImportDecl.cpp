@@ -3072,6 +3072,9 @@ namespace {
 
         if (auto CD = dyn_cast<ConstructorDecl>(member)) {
           ctors.push_back(CD);
+          if (auto *legacyCD =
+                  importer::getDeclForCounterpartCArrayProjection(CD))
+            ctors.push_back(legacyCD);
           continue;
         }
 

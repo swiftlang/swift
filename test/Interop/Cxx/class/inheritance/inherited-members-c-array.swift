@@ -45,6 +45,20 @@ struct UsingDerived : private Base {
   using Base::takesArrayPointer;
 };
 
+// MEMBERS-LABEL: struct CtorBase {
+struct CtorBase {
+  // MEMBERS-LEGACY: init(_ array: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>!)
+  // MEMBERS-MODERN: init(_ array: UnsafeMutablePointer<[4 of CInt]>!)
+  CtorBase(int (*array)[4]);
+};
+
+// MEMBERS-LABEL: struct CtorDerived {
+struct CtorDerived : CtorBase {
+  // MEMBERS-LEGACY: init(_: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>!)
+  // MEMBERS-MODERN: init(_: UnsafeMutablePointer<[4 of CInt]>!)
+  using CtorBase::CtorBase;
+};
+
 //--- typecheck.swift
 import CArrays
 
@@ -74,6 +88,20 @@ func test(
   usingDerived.takesArrayPointer(array)
   // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  _ = CtorBase(tuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  _ = CtorBase(array)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  _ = CtorDerived(tuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  _ = CtorDerived(array)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
 }
 
 //--- codegen.swift
@@ -93,4 +121,7 @@ func test(
   base.takesArrayPointer(pointer)
   publicDerived.takesArrayPointer(pointer)
   usingDerived.takesArrayPointer(pointer)
+
+  _ = CtorBase(pointer)
+  _ = CtorDerived(pointer)
 }
