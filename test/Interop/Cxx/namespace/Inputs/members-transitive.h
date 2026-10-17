@@ -11,6 +11,14 @@ struct TransitiveStruct {
 
 } // namespace CommonNamespace
 
+namespace CommonNamespace::NestedNamespace {
+
+struct TransitiveNestedStruct {
+  bool memberVar;
+};
+
+} // namespace CommonNamespace::NestedNamespace
+
 struct TopLevelTransitiveStruct {
   bool memberVar;
 };
