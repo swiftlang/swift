@@ -2860,6 +2860,13 @@ tryCast(
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
   bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
+  // Every strategy dereferences both types, and the shortcut below treats two
+  // null types as equal, so this has to come first.
+  if (!destType)
+    TARGET_TYPE_IS_NULL();
+  if (!srcType)
+    SOURCE_TYPE_IS_NULL();
+
   // Sanity: test-only is incompatible with deferred checks
   // Failure indicates a structural problem with the cast logic in this file.
   assert(!(isTestOnlyCast(destLocation) && mayDeferChecks) &&
@@ -3212,6 +3219,12 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
                       const Metadata *destType,
                       DynamicCastFlags flags)
 {
+  // Check before anything below looks at either type.
+  if (!destType)
+    TARGET_TYPE_IS_NULL();
+  if (!srcType)
+    SOURCE_TYPE_IS_NULL();
+
   // If the compiler has asked for a "take", we can
   // move pointers without ref-counting overhead.
   bool takeOnSuccess = flags & DynamicCastFlags::TakeOnSuccess;
@@ -3279,6 +3292,11 @@ swift_dynamicCastTestImpl(OpaqueValue *srcValue,
                           const Metadata *srcType,
                           const Metadata *targetType,
                           DynamicCastFlags flags) {
+  if (!targetType)
+    TARGET_TYPE_IS_NULL();
+  if (!srcType)
+    SOURCE_TYPE_IS_NULL();
+
   // A test never takes the source and never destroys it on failure, so the
   // corresponding flags are meaningless here. Unconditional is meaningless too:
   // there is no value to produce, so there is nothing to defer checking on.

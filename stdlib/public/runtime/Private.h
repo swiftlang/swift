@@ -753,6 +753,18 @@ public:
       const WitnessTable **conformance,
       bool prohibitIsolatedConformances);
 
+  /// Abort because a dynamic cast was handed a null type.
+  ///
+  /// The compiler emits these types, and a null one means it emitted a bad
+  /// reference (for example a mangled name the runtime could not resolve). The
+  /// resulting crash would otherwise be a bare null dereference somewhere inside
+  /// the casting machinery. These are deliberately out of line and not inlined,
+  /// so that the function name appears in the backtrace and says what happened.
+  SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+  void TARGET_TYPE_IS_NULL();
+  SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+  void SOURCE_TYPE_IS_NULL();
+
   /// Construct type metadata for the given protocol.
   const Metadata *
   _getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol);
