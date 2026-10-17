@@ -188,6 +188,21 @@ class swift::SourceLookupCache {
   /// Top-level macros that produce arbitrary names.
   SmallVector<MissingDecl *, 4> TopLevelArbitraryMacros;
 
+  /// Declarations produced by the top-level macros that can introduce unique
+  /// names, i.e. the entries of TopLevelAuxiliaryDecls under
+  /// UniqueMacroNamePlaceholder, indexed by base name. Populated lazily by
+  /// getUniqueNameMacroExpandedDecls().
+  llvm::DenseMap<DeclBaseName, TinyPtrVector<ValueDecl *>>
+      UniqueNameMacroExpandedDecls;
+
+  /// The number of macros under UniqueMacroNamePlaceholder whose expanded
+  /// declarations have been added to UniqueNameMacroExpandedDecls.
+  unsigned NumIndexedUniqueNameMacros = 0;
+
+  /// Returns the declarations named \p name produced by the top-level macros
+  /// that can introduce unique names, expanding the macros not yet indexed.
+  ArrayRef<ValueDecl *> getUniqueNameMacroExpandedDecls(DeclBaseName name);
+
   SmallVector<llvm::PointerUnion<Decl *, MacroExpansionExpr *>, 4>
       MayHaveAuxiliaryDecls;
   void populateAuxiliaryDeclCache();
@@ -561,16 +576,29 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   // FIXME: We need to not consider auxiliary decls if we're doing lookup
   // from inside a macro argument at module scope.
   populateAuxiliaryDeclCache();
-  DeclName keyName = MacroDecl::isUniqueMacroName(Name.getBaseName())
-    ? UniqueMacroNamePlaceholder
-    : Name;
-  auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
+
+  // Add matching expanded peers and freestanding declarations to the results.
+  SmallPtrSet<ValueDecl *, 4> macroExpandedDecls;
+  auto addMacroExpandedDecl = [&](ValueDecl *decl) {
+    if (decl->getName().matchesRef(Name)) {
+      if (macroExpandedDecls.insert(decl).second)
+        Result.push_back(decl);
+    }
+  };
 
   // Check macro expansions that could produce this name.
   SmallVector<MissingDecl *, 4> unexpandedDecls;
-  if (auxDecls != TopLevelAuxiliaryDecls.end()) {
-    unexpandedDecls.insert(
-      unexpandedDecls.end(), auxDecls->second.begin(), auxDecls->second.end());
+  if (MacroDecl::isUniqueMacroName(Name.getBaseName())) {
+    // Any macro that can introduce declarations can produce a unique name, so
+    // use the index of their expansions rather than checking each of them.
+    for (auto *decl : getUniqueNameMacroExpandedDecls(Name.getBaseName()))
+      addMacroExpandedDecl(decl);
+  } else {
+    auto auxDecls = TopLevelAuxiliaryDecls.find(Name);
+    if (auxDecls != TopLevelAuxiliaryDecls.end()) {
+      unexpandedDecls.insert(unexpandedDecls.end(), auxDecls->second.begin(),
+                             auxDecls->second.end());
+    }
   }
 
   // Check macro expansions that can produce arbitrary names.
@@ -578,20 +606,34 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
       unexpandedDecls.end(),
       TopLevelArbitraryMacros.begin(), TopLevelArbitraryMacros.end());
 
-  if (unexpandedDecls.empty())
-    return;
+  for (auto *unexpandedDecl : unexpandedDecls)
+    unexpandedDecl->forEachMacroExpandedDecl(addMacroExpandedDecl);
+}
 
-  // Add matching expanded peers and freestanding declarations to the results.
-  SmallPtrSet<ValueDecl *, 4> macroExpandedDecls;
-  for (auto *unexpandedDecl : unexpandedDecls) {
-    unexpandedDecl->forEachMacroExpandedDecl(
-        [&](ValueDecl *decl) {
-          if (decl->getName().matchesRef(Name)) {
-            if (macroExpandedDecls.insert(decl).second)
-              Result.push_back(decl);
-          }
-        });
+ArrayRef<ValueDecl *>
+SourceLookupCache::getUniqueNameMacroExpandedDecls(DeclBaseName name) {
+  // Expand the macros that haven't been indexed yet, and index their
+  // declarations. Advance the count before expanding so that a lookup during
+  // the expansion doesn't expand the same macro again. Look up the entry each
+  // time, because such a lookup can add entries.
+  while (true) {
+    auto found = TopLevelAuxiliaryDecls.find(UniqueMacroNamePlaceholder);
+    if (found == TopLevelAuxiliaryDecls.end() ||
+        NumIndexedUniqueNameMacros >= found->second.size())
+      break;
+
+    MissingDecl *unexpandedDecl = found->second[NumIndexedUniqueNameMacros++];
+    unexpandedDecl->forEachMacroExpandedDecl([&](ValueDecl *decl) {
+      auto &decls = UniqueNameMacroExpandedDecls[decl->getBaseName()];
+      if (!llvm::is_contained(decls, decl))
+        decls.push_back(decl);
+    });
   }
+
+  auto found = UniqueNameMacroExpandedDecls.find(name);
+  if (found == UniqueNameMacroExpandedDecls.end())
+    return {};
+  return found->second;
 }
 
 void SourceLookupCache::getPrecedenceGroups(
