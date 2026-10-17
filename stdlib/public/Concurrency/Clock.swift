@@ -41,7 +41,48 @@ public protocol Clock<Duration>: Sendable {
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
 #endif
+
+#if $Embedded
+  /// Decompose a deadline for the global executor fallback in `Task._sleep`.
+  ///
+  /// The fallback needs the deadline as a runtime clock ID plus seconds and
+  /// nanoseconds. Outside Embedded Swift it recovers that by dynamic casting
+  /// the clock to `ContinuousClock` or `SuspendingClock`; those casts are
+  /// outside the Embedded Swift language subset, so each clock supplies its
+  /// own decomposition instead and generic specialization turns this into a
+  /// direct call.
+  ///
+  /// A clock with no runtime timebase returns nil, which preserves the
+  /// "unknown clock in fallback path" behavior of the non-embedded fallback.
+  ///
+  /// The clock ID is an `Int32` rather than the runtime's `_ClockID` because
+  /// this is a requirement of a public protocol and `_ClockID` is internal.
+  func _timestampComponents(for instant: Instant)
+    -> (clockID: Int32, seconds: Int64, nanoseconds: Int64)?
+
+  /// Decompose a tolerance for the global executor fallback in `Task._sleep`,
+  /// as with `_timestampComponents(for:)`.
+  func _durationComponents(for duration: Instant.Duration)
+    -> (seconds: Int64, nanoseconds: Int64)?
+#endif
 }
+
+#if $Embedded
+@available(StdlibDeploymentTarget 5.7, *)
+extension Clock {
+  @available(StdlibDeploymentTarget 5.7, *)
+  public func _timestampComponents(for instant: Instant)
+    -> (clockID: Int32, seconds: Int64, nanoseconds: Int64)? {
+    nil
+  }
+
+  @available(StdlibDeploymentTarget 5.7, *)
+  public func _durationComponents(for duration: Instant.Duration)
+    -> (seconds: Int64, nanoseconds: Int64)? {
+    nil
+  }
+}
+#endif
 
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {

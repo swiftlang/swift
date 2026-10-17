@@ -13,7 +13,6 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@_unavailableInEmbedded
 extension ContinuousClock {
   func timestamp(for instant: Instant)
     -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
@@ -31,7 +30,6 @@ extension ContinuousClock {
   }
 }
 
-@_unavailableInEmbedded
 extension SuspendingClock {
   func timestamp(for instant: Instant)
     -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
@@ -49,9 +47,53 @@ extension SuspendingClock {
   }
 }
 
+#if $Embedded
+// The witnesses for the Clock requirements that stand in for the dynamic
+// casts below. Full specialization turns each of these into a direct call.
+@available(StdlibDeploymentTarget 5.7, *)
+extension ContinuousClock {
+  @available(StdlibDeploymentTarget 5.7, *)
+  public func _timestampComponents(for instant: Instant)
+    -> (clockID: Int32, seconds: Int64, nanoseconds: Int64)? {
+    let stamp = timestamp(for: instant)
+    return (clockID: stamp.clockID.rawValue, seconds: stamp.seconds,
+            nanoseconds: stamp.nanoseconds)
+  }
+
+  @available(StdlibDeploymentTarget 5.7, *)
+  public func _durationComponents(for duration: Instant.Duration)
+    -> (seconds: Int64, nanoseconds: Int64)? {
+    durationComponents(for: duration)
+  }
+}
+
+@available(StdlibDeploymentTarget 5.7, *)
+extension SuspendingClock {
+  @available(StdlibDeploymentTarget 5.7, *)
+  public func _timestampComponents(for instant: Instant)
+    -> (clockID: Int32, seconds: Int64, nanoseconds: Int64)? {
+    let stamp = timestamp(for: instant)
+    return (clockID: stamp.clockID.rawValue, seconds: stamp.seconds,
+            nanoseconds: stamp.nanoseconds)
+  }
+
+  @available(StdlibDeploymentTarget 5.7, *)
+  public func _durationComponents(for duration: Instant.Duration)
+    -> (seconds: Int64, nanoseconds: Int64)? {
+    durationComponents(for: duration)
+  }
+}
+#endif
+
 fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
-  #if !$Embedded
+  #if $Embedded
+  if let components = clock._timestampComponents(for: instant),
+     let clockID = _ClockID(rawValue: components.clockID) {
+    return (clockID: clockID, seconds: components.seconds,
+            nanoseconds: components.nanoseconds)
+  }
+  #else
   if let continuousClock = clock as? ContinuousClock {
     return continuousClock.timestamp(for: instant as! ContinuousClock.Instant)
   } else if let suspendingClock = clock as? SuspendingClock {
@@ -63,7 +105,11 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
 
 fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C)
   -> (seconds: Int64, nanoseconds: Int64) {
-  #if !$Embedded
+  #if $Embedded
+  if let components = clock._durationComponents(for: duration) {
+    return components
+  }
+  #else
   if let continuousClock = clock as? ContinuousClock {
     return continuousClock.durationComponents(for: duration as! ContinuousClock.Duration)
   } else if let suspendingClock = clock as? SuspendingClock {
@@ -74,7 +120,6 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 5.7, *)
   @diagnose(UselessAvailabilityCheck, as: ignored)
@@ -207,7 +252,6 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  #if !$Embedded
   /// Suspends the current task until the given deadline within a tolerance.
   ///
   /// If the task is canceled before the time ends, this function throws
@@ -244,7 +288,6 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     try await clock.sleep(for: duration, tolerance: tolerance)
   }
-  #endif
 }
 #else
 @available(SwiftStdlib 5.7, *)
