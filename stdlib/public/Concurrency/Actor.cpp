@@ -422,6 +422,35 @@ TaskExecutorRef _swift_getPreferredTaskExecutor() {
   return task->getPreferredTaskExecutor();
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
+extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnTaskExecutor(
+    Job *job, HeapObject *executor, const Metadata *selfType,
+    const TaskExecutorWitnessTable *wtable);
+
+/// Enqueue `job` on the executor `Task.currentExecutor` would return, in the
+/// same order of preference, without materializing it as an existential:
+/// that copy retains and releases the executor object, which every thread
+/// yielding to the same executor contends on.
+extern "C" SWIFT_CC(swift)
+void _swift_task_enqueueOnCurrentExecutor(Job *job) {
+  SerialExecutorRef active = _swift_getActiveExecutor();
+  if (!active.isGeneric())
+    return swift_task_enqueue(job, active);
+
+  TaskExecutorRef taskExecutor = _swift_getPreferredTaskExecutor();
+  if (!taskExecutor.isDefined())
+    taskExecutor = _swift_getCurrentTaskExecutor();
+  if (taskExecutor.isDefined()) {
+    auto identity = taskExecutor.getIdentity();
+    return _swift_task_enqueueOnTaskExecutor(
+        job, identity, swift_getObjectType(identity),
+        taskExecutor.getTaskExecutorWitnessTable());
+  }
+
+  swift_task_enqueueGlobal(job);
+}
+#endif
+
 #pragma clang diagnostic pop
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
