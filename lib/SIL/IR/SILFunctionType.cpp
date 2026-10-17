@@ -2863,6 +2863,13 @@ static CanSILFunctionType getSILFunctionType(
       valueType = valueType.subst(*reqtSubs);
       coroutineSubstYieldType = valueType->getReducedType(
           genericSig);
+    } else if (constant != origConstant) {
+      // A class override takes its yield from the formal type it's lowered
+      // with, which may be the overridden coroutine's.
+      auto yields = substFnInterfaceType.getYields();
+      assert(yields.size() == 1 && "coroutine accessor without a yield?");
+      coroutineSubstYieldType =
+          yields[0].getType()->getReducedType(genericSig);
     } else {
       coroutineSubstYieldType = valueType->getReducedType(
           accessor->getGenericSignature());
@@ -5143,8 +5150,12 @@ TypeConverter::getConstantSelfParameter(TypeExpansionContext context,
 // is OK; we don't want a new entry if an @in parameter became
 // @guaranteed or whatever.
 static bool checkASTTypeForABIDifferences(CanType type1,
-                                          CanType type2) {
-  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible);
+                                          CanType type2,
+                                          unsigned numParameterLists) {
+  return !type1->matches(type2,
+                         {TypeMatchFlags::AllowABICompatible,
+                          TypeMatchFlags::RequireMatchingNestedParamOwnership},
+                         numParameterLists);
 }
 
 // FIXME: This makes me very upset. Can we do without this?
@@ -5193,8 +5204,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       SmallVector<FunctionType::Param, 8> params;
       for (auto [baseParam, derivedParam] :
            llvm::zip_equal(baseFunc.getParams(), derivedFunc.getParams())) {
-        assert(derivedParam.getParameterFlags() ==
-               baseParam.getParameterFlags());
+        assert(derivedParam.isOwned() == baseParam.isOwned());
         params.emplace_back(
             copyOptionalityFromDerivedToBase(tc, derivedParam.getPlainType(),
                                              baseParam.getPlainType()),
@@ -5221,6 +5231,30 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   }
 
   return base;
+}
+
+/// Rebuilds \p derived with the parameter flags of \p base in each of its
+/// first \p numParameterLists curried parameter lists. Lowering takes
+/// parameter conventions from these flags, and a vtable entry must keep the
+/// conventions of the method that introduced it.
+static CanAnyFunctionType
+copyParameterFlagsFromBaseToDerived(CanAnyFunctionType derived,
+                                    CanAnyFunctionType base,
+                                    unsigned numParameterLists) {
+  SmallVector<AnyFunctionType::Param, 8> params;
+  for (auto [baseParam, derivedParam] :
+       llvm::zip_equal(base.getParams(), derived.getParams()))
+    params.push_back(derivedParam.withFlags(baseParam.getParameterFlags()));
+
+  auto result = derived.getResult();
+  if (numParameterLists > 1)
+    result = copyParameterFlagsFromBaseToDerived(
+        cast<AnyFunctionType>(result), cast<AnyFunctionType>(base.getResult()),
+        numParameterLists - 1);
+
+  return CanAnyFunctionType::get(derived.getOptGenericSignature(),
+                                 llvm::ArrayRef(params), derived.getYields(),
+                                 result, derived->getExtInfo());
 }
 
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
@@ -5269,16 +5303,22 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
 
   if (!hasGenericRequirementDifference &&
       !checkASTTypeForABIDifferences(derivedInfo.FormalType,
-                                     overrideInterfaceTy)) {
+                                     overrideInterfaceTy,
+                                     derived.getParameterListCount())) {
 
     // The derived method is ABI-compatible with the base method. Let's
-    // just use the derived method's formal type.
+    // just use the derived method's formal type, with the base method's
+    // parameter conventions.
     basePattern = AbstractionPattern(
       copyOptionalityFromDerivedToBase(
         *this,
-        derivedInfo.LoweredType,
+        copyParameterFlagsFromBaseToDerived(derivedInfo.LoweredType,
+                                            baseInfo.LoweredType,
+                                            /*numParameterLists=*/1),
         baseInfo.LoweredType));
-    overrideInterfaceTy = derivedInfo.FormalType;
+    overrideInterfaceTy = copyParameterFlagsFromBaseToDerived(
+        derivedInfo.FormalType, overrideInterfaceTy,
+        derived.getParameterListCount());
   }
 
   if (genericSig && !genericSig->areAllParamsConcrete()) {
