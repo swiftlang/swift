@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
@@ -567,14 +568,26 @@ public:
   }
 };
 
-class StringWriter {
+class PathWriter {
+  const SerializationOptions &Options;
   llvm::StringMap<uint32_t> IndexMap;
   llvm::SmallString<1024> Buffer;
+
 public:
-  uint32_t getTextOffset(StringRef Text) {
-    auto IterAndIsNew = IndexMap.insert({Text, Buffer.size()});
+  explicit PathWriter(const SerializationOptions &Options)
+      : Options(Options) {}
+
+  uint32_t getPathOffset(StringRef Path) {
+    std::string RemappedPath;
+    if (Options.PrefixMapSourceInfo && !Path.empty()) {
+      RemappedPath = Options.PathObfuscator.obfuscate(
+          Options.SourceInfoPrefixMap.remapPath(Path));
+      Path = RemappedPath;
+    }
+
+    auto IterAndIsNew = IndexMap.insert({Path, Buffer.size()});
     if (IterAndIsNew.second) {
-      Buffer.append(Text);
+      Buffer.append(Path);
       Buffer.push_back('\0');
     }
     return IterAndIsNew.first->getValue();
@@ -588,7 +601,7 @@ public:
 };
 
 static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
-                        endian::Writer &Writer, StringWriter &Strings) {
+                        endian::Writer &Writer, PathWriter &Strings) {
   Writer.write<uint32_t>(Loc.Offset);
   Writer.write<uint32_t>(Loc.Line);
   Writer.write<uint32_t>(Loc.Column);
@@ -596,7 +609,7 @@ static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
   Writer.write<uint32_t>(Loc.Directive.Offset);
   Writer.write<int32_t>(Loc.Directive.LineOffset);
   Writer.write<uint32_t>(Loc.Directive.Length);
-  Writer.write<uint32_t>(Strings.getTextOffset(Loc.Directive.Name));
+  Writer.write<uint32_t>(Strings.getPathOffset(Loc.Directive.Name));
 }
 
 /**
@@ -606,11 +619,11 @@ static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
  See: \c decl_locs_block::DocRangesLayout
  */
 class DocRangeWriter {
-  StringWriter &Strings;
+  PathWriter &Strings;
   llvm::DenseMap<const Decl *, uint32_t> DeclOffsetMap;
   llvm::SmallString<1024> Buffer;
 public:
-  DocRangeWriter(StringWriter &Strings) : Strings(Strings) {
+  DocRangeWriter(PathWriter &Strings) : Strings(Strings) {
     /**
      Offset 0 is reserved to mean "no offset", meaning that a declaration
      didn't have a doc comment.
@@ -657,10 +670,10 @@ public:
 struct BasicDeclLocsTableWriter : public ASTWalker {
   llvm::SmallString<1024> Buffer;
   DeclUSRsTableWriter &USRWriter;
-  StringWriter &FWriter;
+  PathWriter &FWriter;
   DocRangeWriter &DocWriter;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
-                           StringWriter &FWriter,
+                           PathWriter &FWriter,
                            DocRangeWriter &DocWriter): USRWriter(USRWriter),
                            FWriter(FWriter),
                            DocWriter(DocWriter) {}
@@ -720,7 +733,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 
     llvm::raw_svector_ostream Out(Buffer);
     endian::Writer Writer(Out, llvm::endianness::little);
-    Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
+    Writer.write<uint32_t>(FWriter.getPathOffset(AbsolutePath.str()));
     Writer.write<uint32_t>(
         DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
     writeRawLoc(RawLocs->Loc, Writer, FWriter);
@@ -734,7 +747,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
                                 ModuleOrSourceFile MSF,
                                 DeclUSRsTableWriter &USRWriter,
-                                StringWriter &FWriter,
+                                PathWriter &FWriter,
                                 DocRangeWriter &DocWriter) {
   assert(MSF);
   const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
@@ -750,16 +763,16 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
 }
 
 static void emitFileListRecord(llvm::BitstreamWriter &Out,
-                               ModuleOrSourceFile MSF, StringWriter &FWriter,
+                               ModuleOrSourceFile MSF, PathWriter &FWriter,
                                const SerializationOptions &options) {
   assert(MSF);
 
   struct SourceFileListWriter {
-    StringWriter &FWriter;
+    PathWriter &FWriter;
     const SerializationOptions &options;
 
     llvm::SmallString<0> Buffer;
-    llvm::StringSet<> seenFilenames;
+    llvm::DenseSet<uint32_t> seenFileIDs;
 
     void emitSourceFileInfo(const BasicSourceFileInfo &info) {
       if (info.getFilePath().empty())
@@ -768,19 +781,10 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       SmallString<128> absolutePath = info.getFilePath();
       llvm::sys::fs::make_absolute(absolutePath);
 
-      std::string remappedPath = std::string(absolutePath);
-      if (options.PrefixMapSourceInfo) {
-        const auto &PathRemapper = options.SourceInfoPrefixMap;
-        const auto &PathObfuscator = options.PathObfuscator;
-        remappedPath =
-            PathObfuscator.obfuscate(PathRemapper.remapPath(absolutePath));
-      }
-
-      // Don't emit duplicated files.
-      if (!seenFilenames.insert(remappedPath).second)
+      // Don't emit duplicated files after applying path mappings.
+      auto fileID = FWriter.getPathOffset(absolutePath);
+      if (!seenFileIDs.insert(fileID).second)
         return;
-
-      auto fileID = FWriter.getTextOffset(remappedPath);
 
       auto fingerprintStrIncludingTypeMembers =
         info.getInterfaceHashIncludingTypeMembers().getRawValue();
@@ -813,7 +817,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       writer.write<uint64_t>(info.getFileSize());
     }
 
-    SourceFileListWriter(StringWriter &FWriter, const SerializationOptions &options)
+    SourceFileListWriter(PathWriter &FWriter, const SerializationOptions &options)
         : FWriter(FWriter), options(options) {
       Buffer.reserve(1024);
     }
@@ -904,7 +908,7 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
     {
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
-      StringWriter FPWriter;
+      PathWriter FPWriter(options);
       DocRangeWriter DocWriter(FPWriter);
       emitFileListRecord(S.Out, DC, FPWriter, options);
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
