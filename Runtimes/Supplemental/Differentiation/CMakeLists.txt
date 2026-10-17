@@ -65,6 +65,8 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_VECTOR_TYPES "Enable vector support"
   ${SwiftCore_ENABLE_VECTOR_TYPES})
 
+set(Swift_MODULE_CACHE_DIR "" CACHE STRING "Module cache to use for Swift files")
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
@@ -76,7 +78,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
-  $<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>)
+  $<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>
+  "$<$<AND:$<BOOL:${Swift_MODULE_CACHE_DIR}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${Swift_MODULE_CACHE_DIR}>")
 
 find_package(SwiftSwiftDirectRuntime)
 

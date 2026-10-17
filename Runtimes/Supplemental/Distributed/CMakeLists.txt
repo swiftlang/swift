@@ -61,6 +61,7 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+set(Swift_MODULE_CACHE_DIR "" CACHE STRING "Module cache to use for Swift files")
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -76,7 +77,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
+  "$<$<AND:$<BOOL:${Swift_MODULE_CACHE_DIR}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${Swift_MODULE_CACHE_DIR}>")
 
 find_package(SwiftSwiftDirectRuntime)
 

@@ -132,6 +132,8 @@ defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError 
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
 defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
 
+defaulted_set(Swift_MODULE_CACHE_DIR STRING "Module cache to use for Swift files")
+
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 option(SwiftCore_ENABLE_INTERNAL_CHECKS "" OFF)
@@ -206,7 +208,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
+  "$<$<AND:$<BOOL:${Swift_MODULE_CACHE_DIR}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${Swift_MODULE_CACHE_DIR}>")
 
 find_package(SwiftSwiftDirectRuntime)
 
