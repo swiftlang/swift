@@ -253,7 +253,7 @@ bb0(%out : $*Pair<T>):
   // CHECK-NEXT:    call swiftcc void @swift_asyncLet_begin({{.*}}, ptr [[METADATA]], {{.*}})
   %asyncLet = builtin "startAsyncLetWithLocalBuffer"<Pair<T>>(%scratch, %fn, %outPtr) : $Builtin.RawPointer
 
-  // CHECK:         musttail call swifttailcc void @swift_asyncLet_finish
+  // CHECK:         musttail call swifttailcc void @swift_asyncLet_finish(ptr swiftasync {{%[^,]+}},
   %t0 = builtin "finishAsyncLet"(%asyncLet, %outPtr) : $()
   %t1 = builtin "endAsyncLetLifetime"(%asyncLet, %fn) : $()
   %result = tuple ()
@@ -264,6 +264,8 @@ sil private @async_let_generic_helper : $@convention(thin) @Sendable @async <T> 
 bb0(%out : $*Pair<T>):
   unreachable
 }
+
+// CHECK: declare{{( dllimport)?}} swifttailcc void @swift_asyncLet_finish(ptr swiftasync, ptr, ptr, ptr, ptr)
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy
 sil hidden [ossa] @task_group_create_destroy : $@async () -> () {

@@ -822,6 +822,7 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  const auto FirstParamSwiftAsync = llvm::Attribute::SwiftAsync;
   const auto WillReturn = llvm::Attribute::WillReturn;
 
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
@@ -1134,10 +1135,10 @@ namespace RuntimeConstants {
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::ZExt;
 }
-// Similar to the 'return' attribute we assume that the 'returned' attributed is
-// associated with the first function parameter.
-static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
-  return Attr == llvm::Attribute::Returned;
+// These runtime-function attributes apply to the first parameter.
+static bool isFirstParameterAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::Returned ||
+         Attr == llvm::Attribute::SwiftAsync;
 }
 
 static llvm::MemoryEffects mergeMemoryEffects(ArrayRef<llvm::MemoryEffects> effects) {
@@ -1246,7 +1247,7 @@ llvm::Constant *swift::getRuntimeFn(
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
-      else if (isReturnedAttribute(Attr))
+      else if (isFirstParameterAttribute(Attr))
         buildFirstParamAttr.addAttribute(Attr);
       else
         buildFnAttr.addAttribute(Attr);
@@ -1382,7 +1383,7 @@ llvm::Function *IRGenModule::getOrCreateDeadMethodErrorAsyncStub() {
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
-static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr);
+static bool isFirstParameterAttribute(llvm::Attribute::AttrKind Attr);
 
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
 void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
@@ -1434,7 +1435,7 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
     for (auto Attr : theAttrs) {                                               \
       if (isReturnAttribute(Attr))                                             \
         attrs = attrs.addRetAttribute(getLLVMContext(), Attr);                 \
-      else if (isReturnedAttribute(Attr))                                      \
+      else if (isFirstParameterAttribute(Attr))                                \
         attrs = attrs.addParamAttribute(getLLVMContext(), 0, Attr);            \
       else                                                                     \
         attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
