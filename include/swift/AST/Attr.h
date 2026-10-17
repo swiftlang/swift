@@ -4874,18 +4874,39 @@ public:
 class IsolatedTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Isolated> {
 public:
   enum class IsolationKind : uint8_t {
-    Dynamic
+    /// `@isolated(any)`
+    Dynamic,
+
+    /// `@isolated(G)`, where `G` is a global actor type
+    GlobalActor
   };
 
 private:
   SourceLoc KindLoc;
+  TypeExpr *GlobalActorType = nullptr;
 
 public:
   IsolatedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
                    Located<IsolationKind> kind)
     : SimpleTypeAttr(atLoc, kwLoc, parensRange), KindLoc(kind.Loc) {
+    assert(kind.Item != IsolationKind::GlobalActor &&
+           "use the global actor type constructor");
     Bits.IsolatedTypeAttr.Kind = uint8_t(kind.Item);
   }
+
+  IsolatedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                   TypeExpr *globalActorType);
+
+  /// The global actor type of an `@isolated(G)` attribute, as an expression
+  /// so that it can be used as the global actor of an isolated conformance,
+  /// like the type of a `@G` custom attribute
+  TypeExpr *getGlobalActorTypeExpr() const {
+    assert(getIsolationKind() == IsolationKind::GlobalActor);
+    return GlobalActorType;
+  }
+
+  /// The global actor type of an `@isolated(G)` attribute
+  TypeRepr *getGlobalActorTypeRepr() const;
 
   IsolationKind getIsolationKind() const {
     return IsolationKind(Bits.IsolatedTypeAttr.Kind);

@@ -87,3 +87,78 @@ extension GlobalActor {
   }
 }
 
+#if $AllowIsolatedGlobalActorAttribute
+@available(SwiftStdlib 5.1, *)
+extension GlobalActor {
+  /// Assume that the current task is executing on this global actor's
+  /// serial executor, or stop program execution.
+  ///
+  /// This method allows to *assume and verify* that the currently
+  /// executing synchronous function is actually executing on the serial
+  /// executor of this global actor.
+  ///
+  /// If that is the case, the operation is invoked with an `isolated` version
+  /// of the global actor, allowing synchronous access to its isolated state.
+  ///
+  /// If the current context is not running on the global actor's serial
+  /// executor, or if the actor is a reference to a remote actor, this method
+  /// will crash with a fatal error (similar to ``preconditionIsolated()``).
+  ///
+  /// This method can only be used from synchronous functions, as asynchronous
+  /// functions should instead perform a normal method call to the actor, which
+  /// will hop task execution to the target actor if necessary.
+  ///
+  /// - Note: This check is performed against the global actor's serial
+  ///   executor, meaning that if another actor uses the same serial executor
+  ///   then the check will succeed.
+  ///
+  /// - Parameters:
+  ///   - operation: the operation that will be executed if the current context
+  ///                is executing on the global actor's serial executor.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  /// - Returns: the return value of the `operation`
+  /// - Throws: the error thrown by the operation, if it threw
+  @export(implementation)
+  @_unavailableFromAsync(message: "await the call to the global actor isolated closure directly")
+  public static func assumeIsolated<T: Sendable & ~Copyable, E: Error>(
+      _ operation: @isolated(Self) () throws(E) -> T,
+      file: StaticString = #fileID, line: UInt = #line
+  ) throws(E) -> T {
+    /// This is guaranteed to be fatal if the check fails,
+    /// as this is our "safe" version of this API.
+    let executor: Builtin.Executor = unsafe Self.sharedUnownedExecutor.executor
+    guard _taskIsCurrentExecutor(executor) else {
+      // TODO: offer information which executor we actually got
+      #if !$Embedded
+      fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
+      #else
+      Builtin.int_trap()
+      #endif
+    }
+
+
+#if $BuiltinApplyIsolatedUnchecked
+    // Apply the closure directly, ignoring its isolation: no escaping
+    // conversion, so no closure context allocation and no escape check
+    return try Builtin.applyGlobalActorIsolatedUnchecked(operation)
+#else
+    typealias YesActor = @isolated(Self) () throws(E) -> T
+    typealias NoActor = () throws(E) -> T
+
+    // To do the unsafe cast, we have to pretend it's @escaping
+    // Use a builtin cast rather than unsafeBitCast, which would require runtime
+    // metadata for the typed throws function type (only available since
+    // Swift 6.0 runtimes)
+    return try withoutActuallyEscaping(operation) {
+      (_ fn: @escaping YesActor) throws(E) -> T in
+      let rawFn: NoActor = Builtin.reinterpretCast(fn)
+      return try rawFn()
+    }
+#endif
+  }
+}
+#endif
+
