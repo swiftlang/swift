@@ -1,11 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature CalledAttribute -Xllvm -sil-disable-pass=implicit-destroy-checker -Onone %s -o %t/onone.out
-// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature CalledAttribute -Xllvm -sil-disable-pass=implicit-destroy-checker -O -DOPTIMIZED %s -o %t/opt.out
+// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature CalledAttribute -Onone %s -o %t/onone.out
+// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature CalledAttribute -O -DOPTIMIZED %s -o %t/opt.out
 // RUN: %target-codesign %t/onone.out %t/opt.out
 
 // Each case that calls a closure runs to completion, and each case that drops
-// one terminates the program. There is no safe way to drop an exactly-once
-// closure yet, so these tests disable the implicit destroy checker.
+// one terminates the program. Dropping goes through
+// withoutActuallyDiscarding, which is the only way to drop an exactly-once
+// closure.
 //
 // RUN: %target-run %t/onone.out call | %FileCheck %s --check-prefix=CALL-call
 // RUN: %target-run %t/opt.out call | %FileCheck %s --check-prefix=CALL-call
@@ -96,10 +97,14 @@ func callEscaping(_ f: @escaping @called(exactlyOnce) () -> Void) {
 }
 
 @inline(never)
-func drop(_ f: @called(exactlyOnce) () -> Void) {}
+func drop(_ f: consuming @called(exactlyOnce) () -> Void) {
+  withoutActuallyDiscarding(f) { _ in }
+}
 
 @inline(never)
-func dropEscaping(_ f: @escaping @called(exactlyOnce) () -> Void) {}
+func dropEscaping(_ f: consuming @escaping @called(exactlyOnce) () -> Void) {
+  withoutActuallyDiscarding(f) { _ in }
+}
 
 @inline(never)
 func hello() { print("hello") }

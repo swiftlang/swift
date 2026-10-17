@@ -3398,6 +3398,19 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an argument to \c withoutActuallyDiscarding(_:do:) that isn't an
+/// exactly-once function.
+class NonExactlyOnceDiscardArgumentFailure final : public FailureDiagnostic {
+  Type ArgType;
+
+public:
+  NonExactlyOnceDiscardArgumentFailure(const Solution &solution, Type argType,
+                                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose attempts to specialize with invalid number of generic arguments:
 ///
 /// \code

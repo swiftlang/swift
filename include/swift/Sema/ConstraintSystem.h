@@ -3553,6 +3553,12 @@ private:
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify the given DiscardableFunctionOf constraint.
+  SolutionKind
+  simplifyDiscardableFunctionOfConstraint(Type type1, Type type2,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the given OpenedExistentialOf constraint.
   SolutionKind simplifyOpenedExistentialOfConstraint(
                                          Type type1, Type type2,

@@ -624,6 +624,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
 
   case DeclTypeCheckingSemantics::Normal:
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
+  case DeclTypeCheckingSemantics::WithoutActuallyDiscarding:
     break;
   }
 

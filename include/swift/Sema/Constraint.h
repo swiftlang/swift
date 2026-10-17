@@ -135,6 +135,9 @@ enum class ConstraintKind : char {
   /// The first type is the same function type as the second type, but
   /// made @escaping.
   EscapableFunctionOf,
+  /// The first type is the same function type as the second type, but
+  /// converted from exactly-once to at-most-once execution semantics.
+  DiscardableFunctionOf,
   /// The first type is an opened type from the second type (which is
   /// an existential).
   OpenedExistentialOf,
@@ -710,6 +713,7 @@ public:
 
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::DiscardableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:

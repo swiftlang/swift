@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-swift-6.4-abi-triple -enable-experimental-feature CalledAttribute -Xllvm -sil-disable-pass=implicit-destroy-checker %s -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-6.4-abi-triple -enable-experimental-feature CalledAttribute %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/a.out
 
@@ -16,7 +16,9 @@ final class Box {
 }
 
 @inline(never)
-func drop(_ f: @called(exactlyOnce) () -> Void) {}
+func drop(_ f: consuming @called(exactlyOnce) () -> Void) {
+  withoutActuallyDiscarding(f) { _ in }
+}
 
 @inline(never)
 func run(_ box: Box) {
