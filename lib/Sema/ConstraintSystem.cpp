@@ -4608,6 +4608,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
     return ConversionEphemeralness::Ephemeral;
   }
   case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::TuplePack:
   case ConversionRestrictionKind::Superclass:
   case ConversionRestrictionKind::Existential:
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:

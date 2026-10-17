@@ -548,6 +548,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   switch (kind) {
   case ConversionRestrictionKind::DeepEquality:
     return "[deep equality]";
+  case ConversionRestrictionKind::TuplePack:
+    return "[tuple pack]";
   case ConversionRestrictionKind::Superclass:
     return "[superclass]";
   case ConversionRestrictionKind::Existential:

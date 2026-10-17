@@ -8424,6 +8424,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
                        diag::ephemeral_use_with_unsafe_pointer, *alternative);
     break;
   case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::TuplePack:
   case ConversionRestrictionKind::Superclass:
   case ConversionRestrictionKind::Existential:
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
