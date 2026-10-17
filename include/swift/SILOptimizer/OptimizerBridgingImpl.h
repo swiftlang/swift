@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -118,6 +119,16 @@ OptionalBridgedBasicBlock BridgedDomChildrenIterator::next() {
   this->node = *(++DomTreeNodeBase::iterator(node));
 
   return {node->getBlock()};
+}
+
+//===----------------------------------------------------------------------===//
+//                              BridgedPostOrder
+//===----------------------------------------------------------------------===//
+
+BridgedBasicBlock BridgedPostOrder::getBlock(SwiftInt index) const {
+  ASSERT(poa->getEpoch() == epoch &&
+         "PostOrder used after PostOrderAnalysis was invalidated; copy it to iterate across invalidation");
+  return {poi->getPostOrder().begin()[index]};
 }
 
 //===----------------------------------------------------------------------===//
@@ -215,6 +226,12 @@ BridgedDomTree BridgedPassContext::getDomTree() const {
 BridgedPostDomTree BridgedPassContext::getPostDomTree() const {
   auto *pda = invocation->getPassManager()->getAnalysis<swift::PostDominanceAnalysis>();
   return {pda->get(invocation->getFunction())};
+}
+
+BridgedPostOrder BridgedPassContext::getPostOrder() const {
+  auto *poa = invocation->getPassManager()->getAnalysis<swift::PostOrderAnalysis>();
+  auto *poi = poa->get(invocation->getFunction());
+  return {poa, poi, poa->getEpoch(), (SwiftInt)poi->size()};
 }
 
 BridgedLoopTree BridgedPassContext::getLoopTree() const {

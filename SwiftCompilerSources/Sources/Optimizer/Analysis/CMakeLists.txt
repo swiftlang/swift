@@ -12,4 +12,5 @@ swift_compiler_sources(Optimizer
   LoopTree.swift
   DeadEndBlocksAnalysis.swift
   DominatorTree.swift
-  PostDominatorTree.swift)
+  PostDominatorTree.swift
+  PostOrder.swift)

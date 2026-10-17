@@ -44,6 +44,8 @@ class CalleeList;
 class DeadEndBlocks;
 class DominanceInfo;
 class PostDominanceInfo;
+class PostOrderAnalysis;
+class PostOrderFunctionInfo;
 class SILLoopInfo;
 class SILLoop;
 class SwiftPassInvocation;
@@ -135,6 +137,15 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
+struct BridgedPostOrder {
+  swift::PostOrderAnalysis * _Nonnull poa;
+  swift::PostOrderFunctionInfo * _Nonnull poi;
+  uint64_t epoch;
+  SwiftInt count;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getBlock(SwiftInt index) const;
+};
+
 struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
@@ -172,6 +183,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostOrder getPostOrder() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLoopTree getLoopTree() const;
