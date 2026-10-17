@@ -399,12 +399,13 @@ extension ScopeExtension {
 private struct ExtendableScope {
   enum Introducer {
     case scoped(ScopedInstruction)
-    case stack(Instruction)
+    // A singly-initialized temporary stack location whose entire lifetime, including its destroys and deallocs, can be
+    // extended. scope.allocStackInstruction is always valid for Introducer.stackTemporary, but is also valid for
+    // Introducer.scoped when ScopedInstruction is a store_borrow.
+    case stackTemporary(Instruction)
     case owned(Value)
   }
 
-  // scope.allocStackInstruction is always valid for Introducer.allocStack and is valid for Introducer.scoped when
-  // ScopedInstruction is a store_borrow.
   let scope: LifetimeDependence.Scope
   let introducer: Introducer
 
@@ -412,7 +413,7 @@ private struct ExtendableScope {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst
-    case let .stack(initializingStore):
+    case let .stackTemporary(initializingStore):
       return initializingStore
     case let .owned(value):
       if let definingInst = value.definingInstructionOrTerminator {
@@ -426,24 +427,16 @@ private struct ExtendableScope {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst.scopeEndingOperands.users
-    case .stack:
+    case .stackTemporary:
       // For alloc_stack without a store-borrow scope, include the deallocs in its scope to ensure that we never shorten
-      // the original allocation. It's possible that some other use depends on the address.
-      //
-      // Same as 'AllocStackInst.deallocations' but as an Instruction list...
+      // the original allocation. It's possible that some other use depends on the address. Also include the destroys of
+      // a temporary, which end its scope if it is non-trivial.
       return scope.allocStackInstruction!.uses.lazy.filter
-      { $0.instruction is DeallocStackInst }.lazy.map { $0.instruction }
+      { $0.instruction is DeallocStackInst || $0.instruction is DestroyAddrInst }.lazy.map { $0.instruction }
 
     case let .owned(value):
       return value.uses.endingLifetime.users
     }
-  }
-
-  var deallocs: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst>? {
-    guard let allocStack = scope.allocStackInstruction else {
-      return nil
-    }
-    return allocStack.deallocations
   }
 
   // Allow scope extension as long as `beginInst` does not define a variable scope and is either a scoped instruction or
@@ -458,11 +451,50 @@ private struct ExtendableScope {
       self.introducer = .scoped(scopedInst)
       return
     }
-    if scope.allocStackInstruction != nil {
-      self.introducer = .stack(beginInst)
+    if Self.isExtendableTemporary(scope) {
+      self.introducer = .stackTemporary(beginInst)
       return
     }
     return nil
+  }
+
+  // Allow extension of a singly-initialized stack location that is either trivial or is a temporary that
+  // (a) is Escapable
+  // (b) does not define a variable
+  // (c) is only deinitialized by destroy_addr
+  //
+  // A trivial value's scope ends at its dealloc_stack, which is always safe to extend. Otherwise, the scope ends at the
+  // destroy_addr, and this is the in-memory equivalent of extending an owned temporary. Extending only the dealloc_stack
+  // of a non-trivial value would not extend its scope, so there is no partial extension.
+  private static func isExtendableTemporary(_ scope: LifetimeDependence.Scope) -> Bool {
+    guard case let .initialized(.store(initializingStore, _)) = scope,
+          let allocStack = scope.allocStackInstruction else {
+      return false
+    }
+    let function = allocStack.parentFunction
+    if allocStack.type.isTrivial(in: function) {
+      return true
+    }
+    guard allocStack.type.isEscapable(in: function), allocStack.varDecl == nil else {
+      return false
+    }
+    for use in allocStack.uses {
+      switch use.instruction {
+      case initializingStore, is DestroyAddrInst, is DeallocStackInst, is DebugValueInst, is LoadBorrowInst:
+        break
+      case let markDep as MarkDependenceInstruction where use == markDep.baseOperand:
+        break
+      case let load as LoadInst where load.loadOwnership != .take:
+        break
+      case let copy as CopyAddrInst where use == copy.sourceOperand && !copy.isTakeOfSource:
+        break
+      case let apply as FullApplySite where apply.convention(of: use)?.isGuaranteed ?? false:
+        break
+      default:
+        return false
+      }
+    }
+    return true
   }
 
   // Allow extension of owned temporaries that
@@ -532,8 +564,8 @@ extension ScopeExtension {
           // Follow the stored value since the owner of the borrowed value needs to cover this allocation.
           gatherExtensions(valueOrAddress: sb.source)
         }
-        if scope.allocStackInstruction != nil {
-          scopes.push(ExtendableScope(scope, beginInst: store)!)
+        if let extScope = ExtendableScope(scope, beginInst: store) {
+          scopes.push(extScope)
           return
         }
         break
@@ -921,12 +953,14 @@ extension ExtendableScope {
     }
     defer { unreusedEnds.deinitialize() }
 
-    // Never reuse dealloc_stack to avoid running data flow.
+    // Never reuse a stack location's destroy_addr or dealloc_stack to avoid running data flow. createEndInstructions
+    // recreates them at the new scope ends. For a store_borrow, they are not among the scope's end instructions, but
+    // they are recreated along with its end_borrow.
     var endsToErase = [Instruction]()
-    if let deallocs = self.deallocs {
-      endsToErase.append(contentsOf: deallocs.map { $0 })
-      for dealloc in deallocs {
-        unreusedEnds.erase(dealloc)
+    if let allocStack = scope.allocStackInstruction {
+      for use in allocStack.uses where use.instruction is DestroyAddrInst || use.instruction is DeallocStackInst {
+        endsToErase.append(use.instruction)
+        unreusedEnds.erase(use.instruction)
       }
     }
 
@@ -985,6 +1019,10 @@ extension ExtendableScope {
           endInsts.append(builder.createEndBorrow(of: sb))
         }
         if let allocStack = self.scope.allocStackInstruction {
+          // A trivial value does not need to be destroyed.
+          if case .stackTemporary = introducer, !allocStack.type.isTrivial(in: allocStack.parentFunction) {
+            endInsts.append(builder.createDestroyAddr(address: allocStack))
+          }
           endInsts.append(builder.createDeallocStack(allocStack))
           return endInsts
         }
