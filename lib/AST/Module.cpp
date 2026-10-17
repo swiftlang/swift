@@ -660,12 +660,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
 
   populateAuxiliaryDeclCache();
   SmallVector<MissingDecl *, 4> unexpandedDecls;
-  for (auto &entry : TopLevelAuxiliaryDecls) {
-    for (auto &decl : entry.second) {
-      (void) decl;
-      unexpandedDecls.append(entry.second.begin(), entry.second.end());
-    }
-  }
+  for (auto &entry : TopLevelAuxiliaryDecls)
+    unexpandedDecls.append(entry.second.begin(), entry.second.end());
 
   // Store macro expanded decls in a 'SmallSetVector' because different
   // MissingDecls might be created by a single macro expansion. (e.g. multiple
