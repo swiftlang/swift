@@ -1014,8 +1014,10 @@ public:
   static StackSlotKey getShadowStackSlotKey(const SILDebugScope *Scope,
                                             const SILDebugVariable &VarInfo) {
     llvm::SmallVector<uint64_t, 4> Fragment;
-    for (const SILDIExprElement &Elt :
-         VarInfo.DIExpr.getFragmentPart().elements()) {
+    // getFragmentPart() returns a temporary. Bind it to a local so the
+    // elements we iterate over stay alive for the whole loop.
+    SILDebugInfoExpression FragmentPart = VarInfo.DIExpr.getFragmentPart();
+    for (const SILDIExprElement &Elt : FragmentPart.elements()) {
       Fragment.push_back(Elt.getKind());
       switch (Elt.getKind()) {
       case SILDIExprElement::OperatorKind:
