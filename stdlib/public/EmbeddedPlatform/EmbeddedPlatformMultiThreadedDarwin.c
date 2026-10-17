@@ -10,7 +10,7 @@
  *
  *===----------------------------------------------------------------------===*
  *
- * A Darwin-only implementation of the Embedded Swift platform mutex hooks:
+ * A Darwin-only implementation of the Embedded Swift platform hooks:
  *
  *   - The non-recursive `_swift_mutex_*` family (with or without the CHECKED
  *     flag) uses `os_unfair_lock` (see <os/lock.h>), stored fully inline in
@@ -21,13 +21,20 @@
  *     no reentrant mode and building one on top of it would duplicate what
  *     pthreads already provides.
  *
+ *   - The `_swift_sem_*` family keeps its count in an atomic and enters the
+ *     kernel, through a Mach semaphore, only to block or wake a waiter. A
+ *     dispatch semaphore traps when destroyed with its count below its initial
+ *     value, which `_swift_sem_destroy` allows.
+ *
  *===----------------------------------------------------------------------===*/
 
 #include "swift/EmbeddedPlatform.h"
 #include "swift/Runtime/ConcurrencyDebug.h"
 
+#include <mach/mach.h>
 #include <os/lock.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -79,6 +86,19 @@ _Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WOR
 _Static_assert(_Alignof(pthread_mutex_t) <= _Alignof(void *),
                "pthread_mutex_t requires stronger alignment than the "
                "Embedded Swift Platform recursive mutex storage provides");
+
+// A negative `count` is minus the number of threads blocked on `port`.
+typedef struct {
+  _Atomic(__swift_ptrdiff_t) count;
+  semaphore_t port;
+} swift_darwin_semaphore_t;
+
+_Static_assert(sizeof(swift_darwin_semaphore_t) <= EMBEDDED_SWIFT_SEMAPHORE_NUM_WORDS * sizeof(void *),
+               "swift_darwin_semaphore_t does not fit in the Embedded Swift "
+               "Platform semaphore storage");
+_Static_assert(_Alignof(swift_darwin_semaphore_t) <= _Alignof(void *),
+               "swift_darwin_semaphore_t requires stronger alignment than the "
+               "Embedded Swift Platform semaphore storage provides");
 
 static void trap_if(int failed) {
   if (failed) {
@@ -161,4 +181,54 @@ void _swift_tls_set(__swift_tls_key_t key, void *value) {
 
 __swift_ptrdiff_t _swift_thread_isMain(void) {
   return pthread_main_np() != 0;
+}
+
+__swift_ptrdiff_t _swift_thread_create(__swift_thread_t *thread,
+                                       __swift_thread_start_t start,
+                                       void *arg) {
+  pthread_t handle;
+  if (pthread_create(&handle, NULL, start, arg) != 0) {
+    return 0;
+  }
+  *thread = handle;
+  return 1;
+}
+
+void _swift_thread_join(__swift_thread_t thread) {
+  trap_if(pthread_join((pthread_t)thread, NULL) != 0);
+}
+
+void _swift_sem_init(void *sem, __swift_size_t value) {
+  swift_darwin_semaphore_t *s = (swift_darwin_semaphore_t *)sem;
+  trap_if(value > PTRDIFF_MAX);
+  atomic_init(&s->count, (__swift_ptrdiff_t)value);
+  trap_if(semaphore_create(mach_task_self(), &s->port, SYNC_POLICY_FIFO, 0) !=
+          KERN_SUCCESS);
+}
+
+void _swift_sem_destroy(void *sem) {
+  swift_darwin_semaphore_t *s = (swift_darwin_semaphore_t *)sem;
+  trap_if(semaphore_destroy(mach_task_self(), s->port) != KERN_SUCCESS);
+}
+
+void _swift_sem_wait(void *sem) {
+  swift_darwin_semaphore_t *s = (swift_darwin_semaphore_t *)sem;
+  if (atomic_fetch_sub_explicit(&s->count, 1, memory_order_acquire) > 0) {
+    return;
+  }
+  kern_return_t result;
+  do {
+    result = semaphore_wait(s->port);
+  } while (result == KERN_ABORTED);
+  trap_if(result != KERN_SUCCESS);
+}
+
+void _swift_sem_post(void *sem) {
+  swift_darwin_semaphore_t *s = (swift_darwin_semaphore_t *)sem;
+  __swift_ptrdiff_t previous =
+      atomic_fetch_add_explicit(&s->count, 1, memory_order_release);
+  trap_if(previous == PTRDIFF_MAX);
+  if (previous < 0) {
+    trap_if(semaphore_signal(s->port) != KERN_SUCCESS);
+  }
 }

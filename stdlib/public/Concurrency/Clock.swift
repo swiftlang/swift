@@ -159,3 +159,25 @@ internal func _getClockRes(
 internal func _sleep(
   seconds: Int64,
   nanoseconds: Int64)
+
+#if $Embedded
+@_extern(c, "_swift_clockContinuous_getTime")
+internal func _platformContinuousTime(
+  _ seconds: UnsafeMutablePointer<Int64>,
+  _ nanoseconds: UnsafeMutablePointer<Int64>)
+
+@_extern(c, "_swift_clockContinuous_getResolution")
+internal func _platformContinuousResolution(
+  _ seconds: UnsafeMutablePointer<Int64>,
+  _ nanoseconds: UnsafeMutablePointer<Int64>)
+
+@_extern(c, "_swift_clockSuspending_getTime")
+internal func _platformSuspendingTime(
+  _ seconds: UnsafeMutablePointer<Int64>,
+  _ nanoseconds: UnsafeMutablePointer<Int64>)
+
+@_extern(c, "_swift_clockSuspending_getResolution")
+internal func _platformSuspendingResolution(
+  _ seconds: UnsafeMutablePointer<Int64>,
+  _ nanoseconds: UnsafeMutablePointer<Int64>)
+#endif
