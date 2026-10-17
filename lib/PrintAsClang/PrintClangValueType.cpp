@@ -233,6 +233,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   assert((!isNoncopyable || !isOpaqueLayout) &&
          "noncopyable types with an opaque layout are not exposed to C++");
 
+  bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
+                   interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
+
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
@@ -311,15 +314,20 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
-    os << '~' << baseName << "() noexcept {\n";
-    if (isNoncopyable)
-      os << "    if (_isMovedFrom) return;\n";
-    // A moved-from object with an opaque layout has no allocation.
-    if (isOpaqueLayout)
-      os << "    if (!_storage.isAllocated()) return;\n";
-    printVWTable(os);
-    os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
-    os << "  }\n";
+    os << '~' << baseName << "() noexcept";
+    if (isTrivial) {
+      os << " = default;\n";
+    } else {
+      os << " {\n";
+      if (isNoncopyable)
+        os << "    if (_isMovedFrom) return;\n";
+      // A moved-from object with an opaque layout has no allocation.
+      if (isOpaqueLayout)
+        os << "    if (!_storage.isAllocated()) return;\n";
+      printVWTable(os);
+      os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "  }\n";
+    }
 
     if (isNoncopyable) {
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
@@ -368,41 +376,52 @@ void ClangValueTypePrinter::printValueTypeDecl(
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
-      os << baseName << "(const " << baseName << " &other) noexcept {\n";
-      // A copy of a moved-from object is moved from too.
-      if (isOpaqueLayout)
-        os << "    if (!other._storage.isAllocated()) return;\n";
-      printVWTable(os);
-      if (isOpaqueLayout) {
-        os << "    _storage = ";
-        printer.printSwiftImplQualifier();
-        os << cxx_synthesis::getCxxOpaqueStorageClassName()
-           << "(vwTable->size, vwTable->getAlignment());\n";
+      os << baseName << "(const " << baseName << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        // A copy of a moved-from object is moved from too.
+        if (isOpaqueLayout)
+          os << "    if (!other._storage.isAllocated()) return;\n";
+        printVWTable(os);
+        if (isOpaqueLayout) {
+          os << "    _storage = ";
+          printer.printSwiftImplQualifier();
+          os << cxx_synthesis::getCxxOpaqueStorageClassName()
+             << "(vwTable->size, vwTable->getAlignment());\n";
+        }
+        os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  }\n";
       }
-      os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-            "const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
-      os << "  }\n";
 
       // copy assignment.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
-         << " &other) noexcept {\n";
-      // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
-      // source into a new object and move that in.
-      if (isOpaqueLayout) {
-        os << "    if (!_storage.isAllocated() || "
-              "!other._storage.isAllocated()) {\n";
-        os << "      *this = " << baseName << "(other);\n";
-        os << "      return *this;\n";
-        os << "    }\n";
+         << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
+        // source into a new object and move that in.
+        if (isOpaqueLayout) {
+          os << "    if (!_storage.isAllocated() || "
+                "!other._storage.isAllocated()) {\n";
+          os << "      *this = " << baseName << "(other);\n";
+          os << "      return *this;\n";
+          os << "    }\n";
+        }
+        printVWTable(os);
+        os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  return *this;\n";
+        os << "  }\n";
       }
-      printVWTable(os);
-      os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
-      os << "  return *this;\n";
-      os << "  }\n";
     }
 
     if (isOpaqueLayout) {
@@ -451,6 +470,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
             "_storage(vwTable->size, "
             "vwTable->getAlignment()) {}\n";
+    } else if (isTrivial) {
+      // A user-provided default constructor would make the C++ type nontrivial.
+      os << "() noexcept = default;\n";
     } else {
       os << "() noexcept {}\n";
     }
@@ -588,9 +610,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
-          printVWTable(os);
-          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
-                "metadata._0);\n";
+          if (isTrivial) {
+            os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
+               << ");\n";
+          } else {
+            printVWTable(os);
+            os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+                  "metadata._0);\n";
+          }
           os << "  }\n";
           os << "};\n";
         });
