@@ -964,6 +964,10 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     "-x", "ir"
   );
+  bool bareMetalEmbedded = ctx.LangOpts.hasFeature(Feature::Embedded) &&
+                           ctx.LangOpts.Target.getOSName() == "none";
+  if (!ctx.LangOpts.Target.isOSWindows() && !bareMetalEmbedded)
+    llvm::append_values(invocationArgStrs, "-fPIC");
 }
 
 void importer::addCommonInvocationArguments(
