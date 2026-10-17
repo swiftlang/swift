@@ -83,27 +83,21 @@ int main() {
 }
 ```
 
-The header is installed with the Swift standard library. In the default
-toolchain layout, add
-`<toolchain>/usr/lib/swift/<platform>/<arch>` to the C++ header search path.
-For example, a macOS arm64 program uses
-`<toolchain>/usr/lib/swift/macosx/arm64`. Also add
-`<toolchain>/usr/lib/swift` for the C++ interoperability support headers when
-compiling with a Clang installation outside that toolchain.
+The header is installed with the Swift standard library. Add
+`<toolchain>/usr/lib/swift` to the C++ header search path. The header selects
+bindings for the compiler's target operating system and architecture.
 
-Use the header for the same toolchain, operating system, and architecture as the
-Swift runtime you link. Builds that provide a static standard library install
-its header under `lib/swift_static` instead of `lib/swift`; use that copy when
-linking the static runtime. Custom runtime installations can change the library
-directory. The shared header is for the regular Swift runtime and does not
-support Embedded Swift.
+Use headers and runtime libraries from the same toolchain. Builds that provide
+a static standard library install its headers under `lib/swift_static` instead
+of `lib/swift`; use that copy when linking the static runtime. Custom runtime
+installations can change the library directory. The shared header is for the
+regular Swift runtime and does not support Embedded Swift.
 
 The program must link the Swift runtime and the C++ standard library. For
 example, using the tools from a macOS toolchain:
 
 ```sh
-clang++ -std=c++17 -I /path/to/toolchain/usr/lib/swift/macosx/arm64 \
-  -I /path/to/toolchain/usr/lib/swift -c main.cpp -o main.o
+clang++ -std=c++17 -I /path/to/toolchain/usr/lib/swift -c main.cpp -o main.o
 swiftc main.o -o example -lswiftCore -lc++
 ```
 
@@ -111,25 +105,23 @@ Use the same target and SDK settings for compilation and linking. Runtime
 library search paths and the C++ standard library linker option depend on the
 target platform.
 
-A generated module header can reuse this header by explicitly mapping the
-Swift module to it:
+Generated C++ module headers include `<swift/Swift.h>` automatically. They
+contain the module's declarations and reuse the standard library bindings and
+common ABI support from the shared header:
 
 ```sh
 swiftc -frontend MyModule.swift -module-name MyModule -typecheck \
   -cxx-interoperability-mode=default \
-  -clang-header-expose-module Swift=swift/Swift.h \
   -emit-clang-header-path MyModule-Swift.h
 ```
 
-`MyModule-Swift.h` then includes `<swift/Swift.h>` and contains the module's
-declarations instead of repeating the standard library bindings and common ABI
-support. C++ consumers need the same include paths as the standalone example.
-They can include the two headers in either order, and can use a module's type
-as an argument to `swift::Array` or `swift::Optional` after including its header.
-Without the mapping, the compiler continues to emit the standard library
-bindings into the module header as needed. C and Objective-C consumers of an
-opted-in module header also need the shared header's include path; its C++
-declarations are guarded by `__cplusplus`.
+Generated headers find `<swift/Swift.h>` through the root include path shown
+above or the matching toolchain's Clang resource directory layout. Consumers
+can include `<swift/Swift.h>` and `MyModule-Swift.h` in either order, and can use
+a module's type as an argument to `swift::Array` or `swift::Optional` after
+including its header. C and Objective-C consumers of a header generated with
+C++ interoperability enabled use the same header discovery; the shared
+header's C++ declarations are guarded by `__cplusplus`.
 
 ## Calling Swift Functions
 

@@ -430,12 +430,28 @@ install(TARGETS swiftCore
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
-# Emit the public C++ header from the completed module, without enabling C++
-# interoperability while compiling the standard library itself.
+# Install the public C++ header and emit its target-specific internal bindings
+# from the completed module, without enabling C++ interoperability while
+# compiling the standard library itself.
+set(cxx_header_source_dir "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/PrintAsClang")
+set(cxx_header_install_root "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>")
+configure_file("${cxx_header_source_dir}/Swift.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/Swift.h" COPYONLY)
+install(FILES "${cxx_header_source_dir}/Swift.h"
+  DESTINATION "${cxx_header_install_root}/swift"
+  COMPONENT SwiftCore_development)
+foreach(header _SwiftCxxInteroperability.h _SwiftStdlibCxxOverlay.h _SwiftValueWitnessTable.h)
+  configure_file("${cxx_header_source_dir}/${header}"
+    "${CMAKE_CURRENT_BINARY_DIR}/cxx/swiftToCxx/${header}" COPYONLY)
+  install(FILES "${cxx_header_source_dir}/${header}"
+    DESTINATION "${cxx_header_install_root}/swiftToCxx"
+    COMPONENT SwiftCore_development)
+endforeach()
+
 function(emit_stdlib_cxx_header module_triple target_triple output_directory install_directory)
   add_custom_command(TARGET swiftCore POST_BUILD
-    BYPRODUCTS "${output_directory}/swift/Swift.h"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_directory}/swift"
+    BYPRODUCTS "${output_directory}/_SwiftStdlib.h"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_directory}"
     COMMAND "${CMAKE_Swift_COMPILER}" -frontend -typecheck -parse-as-library
       -parse-stdlib -module-name Swift -cxx-interoperability-mode=default
       -clang-header-expose-decls=has-expose-attr-or-stdlib
@@ -449,12 +465,12 @@ function(emit_stdlib_cxx_header module_triple target_triple output_directory ins
       -Xcc "-fmodule-map-file=${PROJECT_SOURCE_DIR}/SwiftShims/swift/shims/module.modulemap"
       "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:-Xcc>"
       "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:-DSWIFT_STATIC_STDLIB>"
-      -emit-clang-header-path "${output_directory}/swift/Swift.h"
+      -emit-clang-header-path "${output_directory}/_SwiftStdlib.h"
       "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule/${module_triple}.swiftmodule"
-    COMMENT "Generating ${output_directory}/swift/Swift.h"
+    COMMENT "Generating ${output_directory}/_SwiftStdlib.h"
     COMMAND_EXPAND_LISTS VERBATIM)
-  install(FILES "${output_directory}/swift/Swift.h"
-    DESTINATION "${install_directory}/swift"
+  install(FILES "${output_directory}/_SwiftStdlib.h"
+    DESTINATION "${install_directory}"
     COMPONENT SwiftCore_development)
 endfunction()
 
@@ -463,13 +479,15 @@ if(CMAKE_Swift_COMPILER_TARGET)
 else()
   set(cxx_header_target "${SwiftCore_MODULE_TRIPLE}")
 endif()
+# The C++ header layout is independent of the runtime library layout.
 emit_stdlib_cxx_header("${SwiftCore_MODULE_TRIPLE}" "${cxx_header_target}"
-  "${CMAKE_CURRENT_BINARY_DIR}/cxx" "${SwiftCore_INSTALL_LIBDIR}")
+  "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+  "${cxx_header_install_root}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}")
 if(SwiftCore_VARIANT_MODULE_TRIPLE)
   emit_stdlib_cxx_header("${SwiftCore_VARIANT_MODULE_TRIPLE}"
     "${SwiftCore_COMPILER_VARIANT_TARGET}"
-    "${CMAKE_CURRENT_BINARY_DIR}/cxx-maccatalyst"
-    "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/maccatalyst/${SwiftCore_ARCH_SUBDIR}")
+    "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/maccatalyst/${SwiftCore_ARCH_SUBDIR}"
+    "${cxx_header_install_root}/swift/maccatalyst/${SwiftCore_ARCH_SUBDIR}")
 endif()
 
 # Configure plist creation for Darwin platforms.

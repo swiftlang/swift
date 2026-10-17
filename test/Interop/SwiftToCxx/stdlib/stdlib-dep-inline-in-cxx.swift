@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend %s -module-name UseOptional -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/stdlib.h
-// RUN: %FileCheck %s < %t/stdlib.h
+// RUN: %FileCheck %s --implicit-check-not='class SWIFT_SYMBOL' --implicit-check-not=SWIFT_PRINTED_CORE < %t/stdlib.h
 
 // RUN: %target-swift-frontend %s -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -typecheck -verify -emit-clang-header-path %t/stdlib_expose_flag.h
-// RUN: %FileCheck %s < %t/stdlib_expose_flag.h
+// RUN: %FileCheck %s --implicit-check-not='class SWIFT_SYMBOL' --implicit-check-not=SWIFT_PRINTED_CORE < %t/stdlib_expose_flag.h
 
 // RUN: %target-swift-frontend %s -module-name UseOptional2 -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/stdlib2.h
 
@@ -22,5 +22,6 @@ public func testIntArray() -> [Int] {
     return []
 }
 
-// CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
-// CHECK: class SWIFT_SYMBOL("{{.*}}") String final {
+// CHECK: #include <swift/Swift.h>
+// CHECK: swift::String test()
+// CHECK: swift::Array<swift::Int> testIntArray()

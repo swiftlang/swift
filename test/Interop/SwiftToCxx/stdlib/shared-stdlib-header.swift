@@ -1,31 +1,24 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %empty-directory(%t/include/swift)
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/include/swift/Swift.h
-// RUN: %check-interop-cxx-header-in-clang(%t/include/swift/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%test-resource-dir/swift/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function)
 
 // A module with no stdlib wrapper in its interface must also use the shared
 // header, so its consumers can instantiate stdlib templates with its types.
-// RUN: %target-swift-frontend %t/Record.swift -module-name Record -typecheck -verify -cxx-interoperability-mode=default -clang-header-expose-module Swift=swift/Swift.h -emit-clang-header-path %t/Record.h
+// RUN: %target-swift-frontend %t/Record.swift -module-name Record -typecheck -verify -cxx-interoperability-mode=default -emit-clang-header-path %t/Record.h
 // RUN: %FileCheck %s --check-prefix=RECORD --implicit-check-not=SWIFT_PRINTED_CORE --implicit-check-not=SWIFT_SWIFT_H --implicit-check-not=_SwiftCxxInteroperability.h --implicit-check-not='define SWIFT_TYPEDEFS' --implicit-check-not='define SWIFT_CLASS' < %t/Record.h
-// RUN: %target-swift-frontend %t/Text.swift -module-name Text -typecheck -verify -cxx-interoperability-mode=default -clang-header-expose-module Swift=swift/Swift.h -emit-clang-header-path %t/Text.h
+// RUN: %target-swift-frontend %t/Text.swift -module-name Text -typecheck -verify -cxx-interoperability-mode=default -emit-clang-header-path %t/Text.h
 // RUN: %FileCheck %s --check-prefix=TEXT --implicit-check-not=SWIFT_PRINTED_CORE --implicit-check-not=SWIFT_SWIFT_H --implicit-check-not=_SwiftCxxInteroperability.h --implicit-check-not='define SWIFT_TYPEDEFS' --implicit-check-not='define SWIFT_CLASS' < %t/Text.h
-// RUN: %check-interop-cxx-header-in-clang(%t/Record.h -I %t/include -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
-// RUN: %check-interop-cxx-header-in-clang(%t/Text.h -I %t/include -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %check-interop-cxx-header-in-clang(%t/Record.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %check-interop-cxx-header-in-clang(%t/Text.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // The shared header's C++ declarations remain guarded in C and Objective-C.
-// RUN: %check-interop-c-header-in-clang(%t/Record.h -I %t/include)
-// RUN: %check-interop-c-header-in-clang(%t/Text.h -I %t/include)
-// RUN: %target-interop-build-clang -std=c11 -fsyntax-only %t/client.c -I %t -I %t/include
-// RUN: %if objc_interop %{ %target-clang -x objective-c -Werror=implicit-function-declaration -fsyntax-only %t/client.c -I %t -I %t/include %}
+// RUN: %check-interop-c-header-in-clang(%t/Record.h)
+// RUN: %check-interop-c-header-in-clang(%t/Text.h)
+// RUN: %target-interop-build-clang -std=c11 -fsyntax-only %t/client.c -I %t
+// RUN: %if objc_interop %{ %target-interop-build-clang -x objective-c -fsyntax-only %t/client.c -I %t %}
 
-// RUN: %target-interop-build-clangxx -std=c++17 -fsyntax-only %t/mixed.cpp -I %t/include -I %t -DSWIFT_HEADER_FIRST
-// RUN: %target-interop-build-clangxx -std=c++20 -fsyntax-only %t/mixed.cpp -I %t/include -I %t
-
-// A header that still embeds the stdlib must coexist with the shared header.
-// RUN: %target-swift-frontend %t/Text.swift -module-name Legacy -typecheck -verify -cxx-interoperability-mode=default -emit-clang-header-path %t/Legacy.h
-// RUN: %target-interop-build-clangxx -std=c++17 -fsyntax-only %t/legacy.cpp -I %t/include -I %t -DSWIFT_HEADER_FIRST
-// RUN: %target-interop-build-clangxx -std=c++20 -fsyntax-only %t/legacy.cpp -I %t/include -I %t
+// RUN: %target-interop-build-clangxx -std=c++17 -fsyntax-only %t/mixed.cpp -I %t -DSWIFT_HEADER_FIRST
+// RUN: %target-interop-build-clangxx -std=c++20 -fsyntax-only %t/mixed.cpp -I %t
 
 // RECORD: #include <swift/Swift.h>
 // RECORD: namespace Record SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Record") {
@@ -111,17 +104,4 @@ int main() {
   assert(copy.getValue() == 7);
   assert(std::string(Text::greeting()) == "hello");
   assert(sharedAnswer() == 42);
-}
-
-//--- legacy.cpp
-#ifdef SWIFT_HEADER_FIRST
-#include <swift/Swift.h>
-#endif
-#include "Legacy.h"
-#include <swift/Swift.h>
-
-int main() {
-  auto messages = swift::Array<swift::String>::init();
-  messages.append(Legacy::greeting());
-  return messages[0].getCount() == 5 ? 0 : 1;
 }

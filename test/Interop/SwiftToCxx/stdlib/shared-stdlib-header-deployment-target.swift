@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %empty-directory(%t/include/swift)
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -target %target-cpu-apple-macosx12 -emit-clang-header-path %t/include/swift/Swift.h
+// RUN: %empty-directory(%t/include/swift/macosx/%target-cpu)
+// RUN: cp %test-resource-dir/swift/Swift.h %t/include/swift/Swift.h
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -target %target-cpu-apple-macosx12 -emit-clang-header-path %t/include/swift/macosx/%target-cpu/_SwiftStdlib.h
 
 // The same header selects primitive metadata traits for the C++ deployment target.
 // RUN: %target-interop-build-clangxx -std=c++17 -target %target-cpu-apple-macosx12 -DDEBUG=1 -c %t/client.cpp -I %t/include -o %t/old.o
@@ -17,7 +19,8 @@
 // NEW: $ss7UInt128VN
 
 //--- client.cpp
-#include <swift/Swift.h>
+// Use the regenerated bindings rather than the toolchain copy.
+#include "include/swift/Swift.h"
 
 static_assert(swift::isUsableInGenericContext<swift::Int>, "Int metadata is available");
 

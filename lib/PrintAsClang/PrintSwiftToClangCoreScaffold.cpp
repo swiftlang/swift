@@ -14,7 +14,6 @@
 #include "ClangSyntaxPrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
@@ -60,86 +59,6 @@ static void printKnownType(ASTContext &astContext,
   printKnownStruct(astContext, typeMapping, os, name, typeRecord);
 }
 
-static void
-printValueWitnessTableFunctionType(raw_ostream &os, StringRef prefix,
-                                   StringRef name, StringRef returnType,
-                                   std::string paramTypes,
-                                   uint16_t ptrauthDisc) {
-  os << "using " << prefix << name << "Ty = " << returnType
-     << "(* __ptrauth_swift_value_witness_function_pointer(" << ptrauthDisc
-     << "))(" << paramTypes << ") SWIFT_NOEXCEPT_FUNCTION_PTR;\n";
-}
-
-static std::string makeParams(const char *arg) { return arg; }
-
-template <class... T>
-static std::string makeParams(const char *arg, const T... args) {
-  return std::string(arg) + ", " + makeParams(args...);
-}
-
-static void printValueWitnessTable(raw_ostream &os) {
-  std::string members;
-  llvm::raw_string_ostream membersOS(members);
-
-  // C++ only supports noexcept on `using` function types in C++17.
-  os << "#if __cplusplus > 201402L\n";
-  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept\n";
-  os << "#else\n";
-  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR\n";
-  os << "#endif\n\n";
-
-#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
-#define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
-  membersOS << "  " << type << " " << #lowerId << ";\n";
-#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
-  printValueWitnessTableFunctionType(                                          \
-      os, "ValueWitness", #upperId, returnType, makeParams paramTypes,         \
-      SpecialPointerAuthDiscriminators::upperId);                              \
-  membersOS << "  ValueWitness" << #upperId << "Ty _Nonnull " << #lowerId      \
-            << ";\n";
-#define MUTABLE_VALUE_TYPE "void * _Nonnull"
-#define IMMUTABLE_VALUE_TYPE "const void * _Nonnull"
-#define MUTABLE_BUFFER_TYPE "void * _Nonnull"
-#define IMMUTABLE_BUFFER_TYPE "const void * _Nonnull"
-#define TYPE_TYPE "void * _Nonnull"
-#define SIZE_TYPE "size_t"
-#define INT_TYPE "int"
-#define UINT_TYPE "unsigned"
-#define VOID_TYPE "void"
-#include "swift/ABI/ValueWitness.def"
-
-  membersOS << "\n  constexpr size_t getAlignment() const { return (flags & "
-            << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1; }\n";
-  os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n\n";
-  membersOS.str().clear();
-
-#define WANT_ONLY_ENUM_VALUE_WITNESSES
-#define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
-  membersOS << "  " << type << " " << #lowerId << ";\n";
-#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
-  printValueWitnessTableFunctionType(                                          \
-      os, "EnumValueWitness", #upperId, returnType, makeParams paramTypes,     \
-      SpecialPointerAuthDiscriminators::upperId);                              \
-  membersOS << "  EnumValueWitness" << #upperId << "Ty _Nonnull " << #lowerId  \
-            << ";\n";
-#define MUTABLE_VALUE_TYPE "void * _Nonnull"
-#define IMMUTABLE_VALUE_TYPE "const void * _Nonnull"
-#define MUTABLE_BUFFER_TYPE "void * _Nonnull"
-#define IMMUTABLE_BUFFER_TYPE "const void * _Nonnull"
-#define TYPE_TYPE "void * _Nonnull"
-#define SIZE_TYPE "size_t"
-#define INT_TYPE "int"
-#define UINT_TYPE "unsigned"
-#define VOID_TYPE "void"
-#include "swift/ABI/ValueWitness.def"
-
-  os << "\nstruct EnumValueWitnessTable {\n"
-     << "  ValueWitnessTable vwTable;\n"
-     << membersOS.str() << "};\n\n";
-
-  os << "#undef SWIFT_NOEXCEPT_FUNCTION_PTR\n\n";
-}
-
 static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
@@ -155,8 +74,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 
 void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
                                      PrimitiveTypeMapping &typeMapping,
-                                     bool isCForwardDefinition,
-                                     bool useClangDeploymentTarget) {
+                                     bool isCForwardDefinition) {
   SmallVector<Type, 16> supportedPrimitiveTypes = {
       astContext.getBoolType(),
 
@@ -202,8 +120,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // - Generic requirement parameters
   // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
-  bool guardAvailability = useClangDeploymentTarget && !embedded &&
-                           astContext.LangOpts.Target.isOSDarwin();
+  bool guardAvailability = !embedded && astContext.LangOpts.Target.isOSDarwin();
 
   // Some of these types were introduced after the oldest runtime that the
   // deployment target supports. Referencing their type metadata from the
@@ -299,8 +216,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
-                                          raw_ostream &os,
-                                          bool useClangDeploymentTarget) {
+                                          raw_ostream &os) {
   ClangSyntaxPrinter printer(astContext, os);
   printer.printNamespace(
       cxx_synthesis::getCxxSwiftNamespaceName(),
@@ -310,11 +226,8 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
               printer.printExternC([&](raw_ostream &os) {
                 printTypeMetadataResponseType(ctx, typeMapping, os);
                 os << "\n";
-                printValueWitnessTable(os);
-                os << "\n";
                 printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                                /*isCForwardDefinition=*/true,
-                                                useClangDeploymentTarget);
+                                                /*isCForwardDefinition=*/true);
               });
               os << "\n";
             });
@@ -323,8 +236,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
         ClangSyntaxPrinter(astContext, os)
             .printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
               printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                              /*isCForwardDefinition=*/false,
-                                              useClangDeploymentTarget);
+                                              /*isCForwardDefinition=*/false);
             });
       },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);

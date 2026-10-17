@@ -1261,8 +1261,7 @@ bool swift::printModuleContentsAsC(
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     AccessLevel minAccess, bool requiresExposedAttribute,
-    llvm::StringSet<> &exposedModules, bool emitCoreScaffold,
-    bool useClangDeploymentTarget) {
+    llvm::StringSet<> &exposedModules) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -1300,12 +1299,13 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
   }
 
-  if (emitCoreScaffold) {
+  if (M.isStdlibModule() || context.LangOpts.hasFeature(Feature::Embedded)) {
     os << "#ifndef SWIFT_PRINTED_CORE\n";
     os << "#define SWIFT_PRINTED_CORE\n";
+    ClangSyntaxPrinter(context, os)
+        .printIncludeForShimHeader("_SwiftValueWitnessTable.h");
     printSwiftToClangCoreScaffold(interopContext, context,
-                                  writer.getTypeMapping(), os,
-                                  useClangDeploymentTarget);
+                                  writer.getTypeMapping(), os);
     os << "#endif\n";
   }
 

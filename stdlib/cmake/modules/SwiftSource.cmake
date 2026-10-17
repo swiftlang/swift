@@ -1291,8 +1291,9 @@ function(_compile_swift_files
       endif()
     endif()
 
-    # Keep the public C++ view of Swift beside the matching runtime. Its ABI
-    # depends on the target, so each platform and architecture gets a header.
+    # Generate the internal C++ bindings selected by the public Swift.h.
+    # Their ABI depends on the target, so keep each platform and architecture
+    # under the common compiler header root.
     if(SWIFTFILE_IS_STDLIB_CORE AND NOT SWIFTFILE_SDK STREQUAL "embedded"
         AND "${SWIFTFILE_BOOTSTRAPPING}" STREQUAL "")
       if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
@@ -1313,8 +1314,8 @@ function(_compile_swift_files
           remove_given_flag(cxx_header_flags "target-variant")
           list(APPEND cxx_header_flags "-target" "${ios_like_target_triple}")
         endif()
-        set(cxx_header_dir "${lib_dir}/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift")
-        set(cxx_header "${cxx_header_dir}/Swift.h")
+        set(cxx_header_dir "${lib_dir}/swift/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}")
+        set(cxx_header "${cxx_header_dir}/_SwiftStdlib.h")
         add_custom_command_target(cxx_header_dependency_target
           COMMAND "${CMAKE_COMMAND}" -E make_directory "${cxx_header_dir}"
           COMMAND ${set_environment_args}
@@ -1328,19 +1329,19 @@ function(_compile_swift_files
           COMMENT "Generating ${cxx_header}")
         list(APPEND module_dependency_targets "${cxx_header_dependency_target}")
         swift_install_in_component(FILES "${cxx_header}"
-          DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift"
+          DESTINATION "lib/swift/swift/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}"
           COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
         if(SWIFTFILE_STATIC)
-          set(cxx_header_static_dir "${SWIFTSTATICLIB_DIR}/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift")
+          set(cxx_header_static_dir "${SWIFTSTATICLIB_DIR}/swift/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}")
           add_custom_command_target(cxx_header_static_dependency_target
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${cxx_header_static_dir}"
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${cxx_header}" "${cxx_header_static_dir}/Swift.h"
-            OUTPUT "${cxx_header_static_dir}/Swift.h"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${cxx_header}" "${cxx_header_static_dir}/_SwiftStdlib.h"
+            OUTPUT "${cxx_header_static_dir}/_SwiftStdlib.h"
             DEPENDS "${cxx_header}"
-            COMMENT "Copying ${cxx_header_static_dir}/Swift.h")
+            COMMENT "Copying ${cxx_header_static_dir}/_SwiftStdlib.h")
           list(APPEND module_dependency_targets "${cxx_header_static_dependency_target}")
-          swift_install_in_component(FILES "${cxx_header_static_dir}/Swift.h"
-            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}/swift"
+          swift_install_in_component(FILES "${cxx_header_static_dir}/_SwiftStdlib.h"
+            DESTINATION "lib/swift_static/swift/${cxx_header_library_subdir}/${SWIFTFILE_ARCHITECTURE}"
             COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
         endif()
       endforeach()

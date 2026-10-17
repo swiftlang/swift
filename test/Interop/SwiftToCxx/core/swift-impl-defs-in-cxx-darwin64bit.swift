@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Core -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/core.h
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/core.h
 // RUN: %FileCheck %s < %t/core.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/core.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/core.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function)
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
@@ -37,12 +37,18 @@
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSuN;
 // CHECK-NEXT: // type metadata address for CChar32.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UnicodeO6ScalarVN;
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
 // CHECK-NEXT: // type metadata address for Int128.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6Int128VN;
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
 // CHECK-NEXT: // type metadata address for UInt128.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UInt128VN;
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 110000
 // CHECK-NEXT: // type metadata address for Float16.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7Float16VN;
+// CHECK-NEXT: #endif
 // CHECK-EMPTY:
 // CHECK-NEXT: #ifdef __cplusplus
 // CHECK-NEXT: }
@@ -87,6 +93,7 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
 // CHECK-NEXT: template<>
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<__int128> = true;
 // CHECK-EMPTY:
@@ -97,6 +104,8 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
 // CHECK-NEXT: template<>
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<unsigned __int128> = true;
 // CHECK-EMPTY:
@@ -107,6 +116,8 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 110000
 // CHECK-NEXT: template<>
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<_Float16> = true;
 // CHECK-EMPTY:
@@ -117,6 +128,7 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
+// CHECK-NEXT: #endif
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace swift
