@@ -6566,14 +6566,25 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
-  /// submodule; otherwise just return the parent module.
+  /// Returns true if clients of the interface being printed can refer to
+  /// \p clangModule by name, because the interface imports it, directly or
+  /// through re-exports.
+  bool isClangModuleVisibleFromInterface(const clang::Module *clangModule) {
+    return getVisibleClangModules().count(clangModule);
+  }
+
+  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
+  /// for that submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        return importer->getWrapperForModule(clangMod);
+        // Explicit submodules are only visible if specifically imported;
+        // everything else has the visibility of its top-level module.
+        if (clangMod->isSubModule() && clangMod->IsExplicit) {
+          return importer->getWrapperForModule(clangMod);
+        }
       }
     }
 
@@ -6598,6 +6609,12 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
                                 ctx.getIdentifier(exportedModuleName));
       if (!exportAsModule)
         return false;
+
+      // Modules backed by a Clang module must also be visible from the
+      // interface. Swift modules aren't tracked by getVisibleClangModules().
+      if (auto exportAsClangModule = exportAsModule->findUnderlyingClangModule())
+        if (!isClangModuleVisibleFromInterface(exportAsClangModule))
+          return false;
 
       // Is the specific submodule TyDecl belongs to actually visible through
       // exportAsModule? There are some subtleties about re-exports from
