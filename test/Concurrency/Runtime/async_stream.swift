@@ -21,6 +21,10 @@ struct SomeError: Error, Equatable {
 
 class NotSendable {}
 
+final class Expectation: @unchecked Sendable {
+  var fulfilled = false
+}
+
 @MainActor func testWarnings() {
   var x = 0
   _ = AsyncStream {
@@ -34,6 +38,27 @@ class NotSendable {}
   }
 }
 
+@MainActor func testContinuationInitAnyError() {
+  _ = AsyncThrowingStream<Void, Error> { _ in }
+  _ = AsyncThrowingStream { continuation in
+    continuation.yield()
+  }
+}
+
+@MainActor func testUnfoldingInitAnyError() {
+  // `onCancel` is missing for `Failure == any Error` overload
+  _ = AsyncThrowingStream<Void, Error>.init(unfolding: {})
+  _ = AsyncThrowingStream.init(unfolding: {
+    return Void()
+  })
+}
+
+@MainActor func testMakeStreamAnyError() {
+  _ = AsyncThrowingStream.makeStream(of: Void.self)
+  _ = AsyncThrowingStream.makeStream(of: Void.self, throwing: Error.self)
+  _ = AsyncThrowingStream<Void, Error>.makeStream()
+}
+
 @available(SwiftStdlib 6.5, *)
 @MainActor func testContinuationInitTypedThrows() {
   _ = AsyncThrowingStream<Void, SomeError> { _ in }
@@ -41,6 +66,7 @@ class NotSendable {}
 
 @available(SwiftStdlib 6.5, *)
 @MainActor func testUnfoldingInitTypedThrows() {
+  _ = AsyncThrowingStream<Void, SomeError>.init(unfolding: {}, onCancel: {})
   _ = AsyncThrowingStream<Void, SomeError>.init(unfolding: {})
 }
 
@@ -96,13 +122,40 @@ class NotSendable {}
         })
         for await _ in stream {}
       }
+
+      tests.test("unfolding init onCancel called on task cancel throwing") {
+        let expectation = Expectation()
+
+        var counter = 0
+        let stream = AsyncThrowingStream<Int, Never>(unfolding: { @MainActor in
+          counter += 1
+          if counter == 2 {
+            withUnsafeCurrentTask { $0?.cancel() }
+          }
+          return counter
+        }, onCancel: { @Sendable in
+          expectation.fulfilled = true
+        })
+
+        let task = Task { @MainActor in
+          var it = stream.makeAsyncIterator()
+          let one = await it.next(isolation: #isolation)
+          expectEqual(one, 1)
+
+          let two = await it.next(isolation: #isolation)
+          expectTrue(expectation.fulfilled)
+          expectEqual(two, 2)
+
+          // Now we should be terminated
+          let three = await it.next(isolation: #isolation)
+          expectNil(three)
+        }
+
+        await task.value
+      }
     }
 
     if #available(SwiftStdlib 6.2, *) {
-      final class Expectation: @unchecked Sendable {
-        var fulfilled = false
-      }
-
       tests.test("factory method") {
         let (stream, continuation) = AsyncStream.makeStream(of: String.self)
         continuation.yield("hello")

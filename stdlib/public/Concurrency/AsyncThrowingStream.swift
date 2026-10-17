@@ -526,7 +526,12 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
         }
         return result
       } onCancel: {
-        storage.value = nil
+        // This handler also runs immediately for every next() on an
+        // already-cancelled task; call `onCancel` at most once, and not at all
+        // if the stream already finished.
+        if storage.take() != nil {
+          onCancel?()
+        }
       }
     }
   }
