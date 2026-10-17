@@ -21,29 +21,23 @@ import Test
 import CxxStdlib
 
 public func test(v: V) {
-  // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
-  // CHECK: note: do you want to use a for-in loop instead?
-  // CHECK: ^~~~~
-  // CHECK: makeIterator
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: unsafe
+  // CHECK: note: reference to unsafe instance method 'begin()'
   _ = v.begin()
-  
-  // CHECK: note: C++ method 'end' that returns an iterator is unavailable
-  // CHECK: note: do you want to compare against 'nil' instead?
-  // CHECK: ^~~~
-  // CHECK: nil
+
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: unsafe
+  // CHECK: note: reference to unsafe instance method 'end()'
   _ = v.end()
 
-  // CHECK: note: C++ method 'front' that returns a reference of type 'UnsafePointer' is unavailable
-  // CHECK: note: C++ method 'front' may return an interior pointer
-  // CHECK: note: do you want to get the first element instead?
-  // CHECK: ^~~~~~~
-  // CHECK: first
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: unsafe
+  // CHECK: note: reference to unsafe instance method 'front()'
   _ = v.front()
-  
-  // CHECK: note: C++ method 'back' that returns a reference of type 'UnsafePointer' is unavailable
-  // CHECK: note: C++ method 'back' may return an interior pointer
-  // CHECK: note: do you want to get the last element instead?
-  // CHECK: ^~~~~~
-  // CHECK: last
+
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: unsafe
+  // CHECK: note: reference to unsafe instance method 'back()'
   _ = v.back()
 }

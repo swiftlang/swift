@@ -1,15 +1,14 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
 // 'Container.insert' returns an unsafe projection, so it is renamed to
 // '__insertUnsafe()'. The recommended way to make such a method usable is to
 // hand-write a same-named safe wrapper that calls the renamed spelling -- this
 // is what the C++ standard library overlay does for 'CxxSet.insert(_:)'.
 //
-// With ImportUnsafeCxxMethodsAsAlwaysUnsafe the C++ method also keeps its
-// original name (as '@unsafe(always)'), which would collide with such a
-// wrapper. The unsafe import is '@_disfavoredOverload' so that it doesn't.
+// The C++ method also keeps its original name (as '@unsafe(always)'), which
+// would collide with such a wrapper. The unsafe import is '@_disfavoredOverload'
+// so that it doesn't.
 
 import AlwaysUnsafeSafeWrapper
 
