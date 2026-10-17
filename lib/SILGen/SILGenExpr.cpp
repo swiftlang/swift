@@ -3427,20 +3427,27 @@ static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure
   if (!canEmitClosureFunctionUnderConversion(closureType, destType))
     return false;
 
+  auto destThrownError = destType.getThrownError();
+  bool thrownErrorDiffers = closureType.getThrownError() != destThrownError;
+
   // If the abstraction pattern has an abstract thrown error, we are
   // currently unable to emit the literal with a difference in the thrown
   // error type.
   if (hasOpaqueThrownError(contextInfo.OrigType) &&
       (closureType->isThrowing() != destType->isThrowing() ||
-       closureType.getThrownError() != destType.getThrownError()))
+       thrownErrorDiffers))
     return false;
 
   // If the closure has a different thrown error type than the destination,
   // we cannot emit the closure directly because the SIL function type
   // (derived from the closure's own type) will have a different error
   // type than what the body expects (derived from the destination type).
-  if (closureType.getThrownError() != destType.getThrownError() &&
-      !isa<ClosureExpr>(closure))
+  if (thrownErrorDiffers && !isa<ClosureExpr>(closure))
+    return false;
+
+  // The destination's thrown error type is contextual, so it cannot become
+  // part of the closure's lowered type if it mentions archetypes.
+  if (thrownErrorDiffers && destThrownError && destThrownError->hasArchetype())
     return false;
 
   return true;
