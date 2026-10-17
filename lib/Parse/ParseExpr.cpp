@@ -3352,6 +3352,52 @@ bool listElementIsBinaryOperator(Parser &P, tok rightTok) {
   return P.Tok.isBinaryOperator() && P.peekToken().isAny(rightTok, tok::comma);
 }
 
+ParserResult<ArgumentList> Parser::parseDeploymentTargetArgumentList() {
+  SourceLoc leftLoc = consumeToken(tok::l_paren);
+  SourceLoc rightLoc;
+  SmallVector<Argument, 8> args;
+
+  auto status = parseList(
+      tok::r_paren, leftLoc, rightLoc, /*AllowSepAfterLast=*/true,
+      diag::expected_rparen_expr_list, [&]() -> ParserStatus {
+        if (listElementIsBinaryOperator(*this, tok::r_paren)) {
+          DeclNameLoc loc;
+          auto operatorName = parseDeclNameRef(
+              loc, diag::expected_operator_ref,
+              DeclNameFlag::AllowOperators |
+                  DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+          if (!operatorName)
+            return makeParserError();
+
+          auto *operatorRef = new (Context)
+              UnresolvedDeclRefExpr(operatorName, DeclRefKind::Ordinary, loc);
+          args.push_back(Argument::unlabeled(operatorRef));
+          return makeParserSuccess();
+        }
+
+        if (!Tok.canBeArgumentLabel()) {
+          auto argument = parseExpr(diag::expected_expr_in_expr_list);
+          if (argument.isNull())
+            return makeParserError();
+          args.push_back(Argument::unlabeled(argument.get()));
+          return argument;
+        }
+
+        Identifier platform;
+        SourceLoc platformLoc =
+            consumeArgumentLabel(platform, /*diagnoseDollarPrefix=*/false);
+        auto version = parseExpr(diag::expected_expr_in_expr_list);
+        if (version.isNull())
+          return makeParserError();
+        args.emplace_back(platformLoc, platform, version.get());
+        return version;
+      });
+
+  return makeParserResult(status,
+                          ArgumentList::createParsed(Context, leftLoc, args,
+                                                     rightLoc, std::nullopt));
+}
+
 ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts) {
   Identifier FieldName;
   SourceLoc FieldNameLoc;
@@ -3598,7 +3644,18 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
   assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
   // Parse the argument list.
-  auto argList = parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic);
+  bool isDeploymentTargetAtLeast = false;
+  if (InPoundIfEnvironment) {
+    if (auto *reference = dyn_cast<UnresolvedDeclRefExpr>(fn.get())) {
+      isDeploymentTargetAtLeast =
+          reference->getName().getBaseName().userFacingName() ==
+          "deploymentTargetAtLeast";
+    }
+  }
+  auto argList =
+      isDeploymentTargetAtLeast
+          ? parseDeploymentTargetArgumentList()
+          : parseArgumentList(tok::l_paren, tok::r_paren, isExprBasic);
 
   // Form the call.
   return makeParserResult(ParserStatus(argList) | fn,
