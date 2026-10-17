@@ -1261,7 +1261,7 @@ bool swift::printModuleContentsAsC(
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     AccessLevel minAccess, bool requiresExposedAttribute,
-    llvm::StringSet<> &exposedModules) {
+    llvm::StringSet<> &exposedModules, bool useClangDeploymentTarget) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -1302,7 +1302,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
   printSwiftToClangCoreScaffold(interopContext, context,
-                                writer.getTypeMapping(), os);
+                                writer.getTypeMapping(), os,
+                                useClangDeploymentTarget);
   os << "#endif\n";
 
   // FIXME: refactor.
