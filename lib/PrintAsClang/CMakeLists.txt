@@ -1,6 +1,7 @@
 set(datafiles
     _SwiftCxxInteroperability.h
     _SwiftStdlibCxxOverlay.h
+    _SwiftValueWitnessTable.h
     experimental-interoperability-version.json
 )
 

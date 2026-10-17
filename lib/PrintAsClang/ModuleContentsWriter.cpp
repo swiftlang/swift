@@ -1301,6 +1301,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
+  ClangSyntaxPrinter(context, os)
+      .printIncludeForShimHeader("_SwiftValueWitnessTable.h");
   printSwiftToClangCoreScaffold(interopContext, context,
                                 writer.getTypeMapping(), os,
                                 useClangDeploymentTarget);
