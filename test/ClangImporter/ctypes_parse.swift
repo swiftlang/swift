@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix legacy-c-array-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix modern-c-array- -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple
+
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 import ctypes
 
@@ -263,8 +266,330 @@ extension StructWithForwardDeclaredStruct: HasOptionalPointer {}
 
 typealias IntTuple4096 = (Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8)
 
-func testBigArrayInStruct(_ maxSize: IntTuple4096) {
+@available(anyAppleOS 26, *)
+typealias IntArray4096 = [4096 of Int8]
+
+@available(anyAppleOS 26, *)
+func testBigArrayInStruct(_ maxSizeTuple: IntTuple4096, _ maxSizeArray: IntArray4096) {
   var structWithBigArray = StructWithBigArray()
-  structWithBigArray.max_size = maxSize
-  structWithBigArray.max_size_plus_one // expected-error {{value of type 'StructWithBigArray' has no member 'max_size_plus_one'}}
-} 
+  structWithBigArray.max_size = maxSizeTuple    // expected-modern-c-array-error {{cannot assign value of type 'IntTuple4096' (aka '(Int8 /* ... repeated 4096 times ... */)') to type '[4096 of CChar]' (aka 'InlineArray<4096, Int8>')}}
+  structWithBigArray.max_size = maxSizeArray    // expected-legacy-c-array-error {{cannot assign value of type 'IntArray4096' (aka 'InlineArray<4096, Int8>') to type '(CChar /* ... repeated 4096 times ... */)' (aka '(Int8 /* ... repeated 4096 times ... */)')}}
+  _ = structWithBigArray.max_size_plus_one      // expected-legacy-c-array-error {{property 'max_size_plus_one' was not imported because its C array type could not be represented as a tuple}}
+}
+
+// Test the initializers and properties available in structs and unions with
+// various combinations of ordinary members, C array members small enough to
+// have a legacy projection, and large C array members with only a modern
+// projection. Some lines are only expected to work in legacy mode, others only
+// in modern mode.
+
+@available(anyAppleOS 26, *)
+func testStructWithPlainAndArrayFields(
+    smallTuple: (Int32, Int32, Int32, Int32), smallArray: InlineArray<4, Int32>,
+    s: StructWithPlainAndArrayFields
+) {
+  _ = StructWithPlainAndArrayFields(plain: 1, small: smallTuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '(Int32, Int32, Int32, Int32)' to expected argument type '[4 of CInt]' (aka 'InlineArray<4, Int32>')}}
+
+  _ = StructWithPlainAndArrayFields(plain: 1, small: smallArray)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<4, Int32>' to expected argument type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')}}
+
+  let _: Int32 = s.plain
+
+  let _: (Int32, Int32, Int32, Int32) = s.small
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+
+  let _: InlineArray<4, Int32> = s.small
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithSmallAndHugeArrayFields(
+    smallTuple: (Int32, Int32, Int32, Int32), smallArray: InlineArray<4, Int32>,
+    huge: InlineArray<5000, Int32>, s: StructWithSmallAndHugeArrayFields
+) {
+  _ = StructWithSmallAndHugeArrayFields(small: smallTuple)
+  // expected-modern-c-array-error@-1 {{initializer expects 2 separate arguments}}
+  // expected-modern-c-array-error@-2 {{cannot convert value of type '(Int32, Int32, Int32, Int32)' to expected argument type '[4 of CInt]' (aka 'InlineArray<4, Int32>')}}
+
+  _ = StructWithSmallAndHugeArrayFields(small: smallArray, huge: huge)
+  // expected-legacy-c-array-error@-1 {{extra argument 'huge' in call}}
+  // expected-legacy-c-array-error@-2 {{cannot convert value of type 'InlineArray<4, Int32>' to expected argument type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')}}
+
+  let _: (Int32, Int32, Int32, Int32) = s.small
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+
+  let _: InlineArray<4, Int32> = s.small
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+
+  let _: InlineArray<5000, Int32> = s.huge
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithAllHugeArrayFields(
+    huge1: InlineArray<5000, Int32>, huge2: InlineArray<6000, Int32>,
+    s: StructWithAllHugeArrayFields
+) {
+  _ = StructWithAllHugeArrayFields(huge1: huge1, huge2: huge2)
+  // expected-legacy-c-array-error@-1 {{argument passed to call that takes no arguments}}
+
+  _ = StructWithAllHugeArrayFields()
+
+  let _: InlineArray<5000, Int32> = s.huge1
+  // expected-legacy-c-array-error@-1 {{property 'huge1' was not imported because its C array type could not be represented as a tuple}}
+
+  let _: InlineArray<6000, Int32> = s.huge2
+  // expected-legacy-c-array-error@-1 {{property 'huge2' was not imported because its C array type could not be represented as a tuple}}
+}
+
+@available(anyAppleOS 26, *)
+func testUnionWithSmallAndHugeArrayFields(
+    smallTuple: (Int32, Int32, Int32, Int32), smallArray: InlineArray<4, Int32>,
+    huge: InlineArray<5000, Int32>, u: UnionWithSmallAndHugeArrayFields
+) {
+  _ = UnionWithSmallAndHugeArrayFields(small: smallTuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '(Int32, Int32, Int32, Int32)' to expected argument type '[4 of CInt]' (aka 'InlineArray<4, Int32>')}}
+
+  _ = UnionWithSmallAndHugeArrayFields(small: smallArray)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<4, Int32>' to expected argument type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')}}
+
+  _ = UnionWithSmallAndHugeArrayFields(huge: huge)
+  // expected-legacy-c-array-error@-1 {{argument passed to call that takes no arguments}}
+
+  let _: (Int32, Int32, Int32, Int32) = u.small
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+
+  let _: InlineArray<4, Int32> = u.small
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+
+  let _: InlineArray<5000, Int32> = u.huge
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithNestedArrayField(
+    tupleTuple: ((Int32, Int32), (Int32, Int32)), arrArr: InlineArray<2, InlineArray<2, Int32>>,
+    s: StructWithNestedArrayField
+) {
+  _ = StructWithNestedArrayField(elems: tupleTuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '((Int32, Int32), (Int32, Int32))' to expected argument type '[2 of [2 of CInt]]' (aka 'InlineArray<2, InlineArray<2, Int32>>')}}
+
+  _ = StructWithNestedArrayField(elems: arrArr)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<2, InlineArray<2, Int32>>' to expected argument type '((CInt, CInt), (CInt, CInt))' (aka '((Int32, Int32), (Int32, Int32))')}}
+
+  let _: ((Int32, Int32), (Int32, Int32)) = s.elems
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[2 of [2 of CInt]]' (aka 'InlineArray<2, InlineArray<2, Int32>>') to specified type '((Int32, Int32), (Int32, Int32))'}}
+
+  let _: InlineArray<2, InlineArray<2, Int32>> = s.elems
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '((CInt, CInt), (CInt, CInt))' (aka '((Int32, Int32), (Int32, Int32))') to specified type 'InlineArray<2, InlineArray<2, Int32>>'}}
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithArrayTypedefField(
+    smallTuple: (Int32, Int32, Int32, Int32), smallArray: InlineArray<4, Int32>,
+    s: StructWithArrayTypedefField
+) {
+  _ = StructWithArrayTypedefField(small: smallTuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '(Int32, Int32, Int32, Int32)' to expected argument type 'SmallArrayTypedef' (aka 'InlineArray<4, Int32>')}}
+
+  _ = StructWithArrayTypedefField(small: smallArray)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<4, Int32>' to expected argument type 'SmallArrayTypedef' (aka '(Int32, Int32, Int32, Int32)')}}
+
+  let _: (Int32, Int32, Int32, Int32) = s.small
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+
+  let _: InlineArray<4, Int32> = s.small
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithHugeArrayTypedefField(s: StructWithHugeArrayTypedefField) {
+  let _: InlineArray<5000, Int32> = s.huge
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
+}
+
+// Check that a struct field whose type is a `swift_newtype` doesn't have a
+// legacy/modern distinction of its own (only the newtype's `rawValue` does),
+// so it works the same way in both modes.
+
+@available(anyAppleOS 26, *)
+func testStructWithSmallArrayNewtypeField(
+    small: SmallArrayNewtype, s: StructWithSmallArrayNewtypeField
+) {
+  _ = StructWithSmallArrayNewtypeField(small: small)
+  let _: SmallArrayNewtype = s.small
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithHugeArrayNewtypeField(s: StructWithHugeArrayNewtypeField) {
+  // `HugeArrayNewtype`'s raw value can't be imported in legacy mode, so both
+  // the property and the type itself are marked as modern projections and are
+  // not available in legacy mode.
+  let _: HugeArrayNewtype = s.huge
+  // expected-legacy-c-array-error@-1 {{cannot find type 'HugeArrayNewtype' in scope}}
+  // expected-legacy-c-array-error@-2 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
+
+  let _: InlineArray<9000, Int32> = s.huge.rawValue
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
+}
+
+@available(anyAppleOS 26, *)
+func testStructWithStructArrayFields(
+    smallTuple: (FooStruct1, FooStruct1, FooStruct1, FooStruct1), smallArray: InlineArray<4, FooStruct1>,
+    huge: InlineArray<5000, FooStruct1>, s: StructWithStructArrayFields
+) {
+  _ = StructWithStructArrayFields(small: smallTuple)
+  // expected-modern-c-array-error@-1 {{initializer expects 2 separate arguments}}
+  // expected-modern-c-array-error@-2 {{cannot convert value of type '(FooStruct1, FooStruct1, FooStruct1, FooStruct1)' to expected argument type '[4 of FooStruct1]'}}
+
+  _ = StructWithStructArrayFields(small: smallArray, huge: huge)
+  // expected-legacy-c-array-error@-1 {{extra argument 'huge' in call}}
+  // expected-legacy-c-array-error@-2 {{cannot convert value of type 'InlineArray<4, FooStruct1>' to expected argument type '(FooStruct1, FooStruct1, FooStruct1, FooStruct1)'}}
+
+  let _: (FooStruct1, FooStruct1, FooStruct1, FooStruct1) = s.small
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[4 of FooStruct1]' to specified type '(FooStruct1, FooStruct1, FooStruct1, FooStruct1)'}}
+
+  let _: InlineArray<4, FooStruct1> = s.small
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(FooStruct1, FooStruct1, FooStruct1, FooStruct1)' to specified type 'InlineArray<4, FooStruct1>'}}
+
+  let _: InlineArray<5000, FooStruct1> = s.huge
+  // expected-legacy-c-array-error@-1 {{property 'huge' was not imported because its C array type could not be represented as a tuple}}
+}
+
+@available(anyAppleOS 26, *)
+func testSmallArrayNewtype(small: SmallArrayNewtype) {
+  let _: (Int32, Int32, Int32, Int32) = small.rawValue
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+
+  let _: InlineArray<4, Int32> = small.rawValue
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+
+  _ = SmallArrayNewtype(rawValue: (0, 0, 0, 0))
+  // expected-modern-c-array-error@-1 {{array of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') cannot be used with tuple}}
+  // expected-modern-c-array-note@-2 {{did you mean to use an array literal instead?}}
+
+  _ = SmallArrayNewtype(rawValue: [0, 0, 0, 0])
+  // expected-legacy-c-array-error@-1 {{tuple of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') cannot be used with array literal}}
+  // expected-legacy-c-array-note@-2 {{did you mean to use a tuple instead?}}
+}
+
+@available(anyAppleOS 26, *)
+func testHugeArrayNewtype(huge: HugeArrayNewtype) {
+  // expected-legacy-c-array-error@-1 {{cannot find type 'HugeArrayNewtype' in scope}}
+  // expected-legacy-c-array-note@-2 {{did you mean 'testHugeArrayNewtype'?}}
+
+  let _: InlineArray<9000, Int32> = huge.rawValue
+
+  _ = SmallArrayNewtype(rawValue: InlineArray<9000, Int32>(repeating: 0))
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<9000, Int32>' to expected argument type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')}}
+  // expected-modern-c-array-error@-2 {{cannot convert value of type 'InlineArray<9000, Int32>' to expected argument type '[4 of CInt]' (aka 'InlineArray<4, Int32>')}}
+  // expected-modern-c-array-note@-3 {{arguments to generic parameter 'count' ('9000' and '4') are expected to be equal}}
+}
+
+// Check that a global array too large to have a legacy projection is simply
+// not visible in legacy mode, rather than being invalid or causing a crash.
+
+@available(anyAppleOS 26, *)
+func testHugeGlobalArray() {
+  let _: InlineArray<5000, Int32> = hugeGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot find 'hugeGlobalArray' in scope}}
+  // expected-legacy-c-array-note@-3 {{did you mean 'testHugeGlobalArray'?}}
+}
+
+@available(anyAppleOS 26, *)
+func testSmallGlobalArray() {
+  let _: InlineArray<4, Int32> = smallGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+
+  let _: (Int32, Int32, Int32, Int32) = smallGlobalArray
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+}
+
+@available(anyAppleOS 26, *)
+func testSmallNestedGlobalArray() {
+  let _: InlineArray<2, InlineArray<2, Int32>> = smallNestedGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '((CInt, CInt), (CInt, CInt))' (aka '((Int32, Int32), (Int32, Int32))') to specified type 'InlineArray<2, InlineArray<2, Int32>>'}}
+
+  let _: ((Int32, Int32), (Int32, Int32)) = smallNestedGlobalArray
+  // expected-modern-c-array-error@-1 {{cannot convert value of type '[2 of [2 of CInt]]' (aka 'InlineArray<2, InlineArray<2, Int32>>') to specified type '((Int32, Int32), (Int32, Int32))'}}
+}
+
+@available(anyAppleOS 26, *)
+func testHugeNestedGlobalArray() {
+  let _: InlineArray<2, InlineArray<5000, Int32>> = hugeNestedGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot find 'hugeNestedGlobalArray' in scope}}
+  // expected-legacy-c-array-note@-3 {{did you mean 'testHugeNestedGlobalArray'?}}
+}
+
+@available(anyAppleOS 26, *)
+func testHugeOuterNestedGlobalArray() {
+  let _: InlineArray<5000, InlineArray<2, Int32>> = hugeOuterNestedGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot find 'hugeOuterNestedGlobalArray' in scope}}
+  // expected-legacy-c-array-note@-3 {{'testHugeOuterNestedGlobalArray' declared here}}
+}
+
+@available(anyAppleOS 26, *)
+func testHugeTypedefGlobalArray() {
+  let _: InlineArray<5000, Int32> = hugeTypedefGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot find 'hugeTypedefGlobalArray' in scope}}
+  // expected-legacy-c-array-note@-3 {{did you mean 'testHugeTypedefGlobalArray'?}}
+}
+
+@available(anyAppleOS 26, *)
+func testSmallTypedefGlobalArray() {
+  let _: InlineArray<4, Int32> = smallTypedefGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+
+  let _: (Int32, Int32, Int32, Int32) = smallTypedefGlobalArray
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
+}
+
+@available(anyAppleOS 26, *)
+func testSmallNewtypeGlobalArray() {
+  let _: SmallArrayNewtype = SmallArrayNewtype.smallNewtypeGlobalArray
+
+  let _: SmallArrayNewtype = smallNewtypeGlobalArray
+  // expected-error@-1 {{'smallNewtypeGlobalArray' has been renamed to 'SmallArrayNewtype.smallNewtypeGlobalArray'}}
+}
+
+@available(anyAppleOS 26, *)
+func testHugeNewtypeGlobalArray() {
+  // expected-legacy-c-array-note@-1 {{did you mean 'testHugeNewtypeGlobalArray'?}}
+
+  // Expected for `HugeArrayNewtype` to be invisible in legacy mode--it's
+  // unimportable.
+
+  let _: HugeArrayNewtype = HugeArrayNewtype.hugeNewtypeGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot find type 'HugeArrayNewtype' in scope}}
+  // expected-legacy-c-array-error@-2 {{cannot find 'HugeArrayNewtype' in scope}}
+
+  let _: HugeArrayNewtype = hugeNewtypeGlobalArray
+  // expected-legacy-c-array-error@-1 {{cannot find type 'HugeArrayNewtype' in scope}}
+  // expected-legacy-c-array-error@-2 {{cannot find 'hugeNewtypeGlobalArray' in scope}}
+  // expected-modern-c-array-error@-3 {{'hugeNewtypeGlobalArray' has been renamed to 'HugeArrayNewtype.hugeNewtypeGlobalArray'}}
+}
+
+@available(anyAppleOS 26, *)
+func testPointerToHugeGlobalArray() {
+  // FIXME: Type checker emits diag::failed_to_produce_diagnostic unless these types are Optional
+
+  let _: UnsafeMutablePointer<InlineArray<5000, Int32>>? = globalPointerToHugeArray
+  // expected-legacy-c-array-error@-1 {{cannot assign value of type 'OpaquePointer?' to type 'UnsafeMutablePointer<InlineArray<5000, Int32>>?'}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Wrapped' ('OpaquePointer' and 'UnsafeMutablePointer<InlineArray<5000, Int32>>') are expected to be equal}}
+
+  let _: OpaquePointer? = globalPointerToHugeArray
+  // expected-modern-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<[5000 of CInt]>?' (aka 'Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>') to type 'OpaquePointer?'}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Wrapped' ('UnsafeMutablePointer<[5000 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<5000, Int32>>') and 'OpaquePointer') are expected to be equal}}
+}
+
+@available(anyAppleOS 26, *)
+func testFunctionPointerWithHugeArrayParam() {
+  let _: ((UnsafeMutablePointer<InlineArray<5000, Int32>>?) -> Void)? = globalFunctionPointerWithHugeArrayParam
+  // expected-legacy-c-array-error@-1 {{cannot assign value of type '(@convention(c) (OpaquePointer?) -> Void)?' to type '((UnsafeMutablePointer<InlineArray<5000, Int32>>?) -> Void)?'}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c) (OpaquePointer?) -> Void' and '(UnsafeMutablePointer<InlineArray<5000, Int32>>?) -> Void') are expected to be equal}}
+
+  let _: ((OpaquePointer?) -> Void)? = globalFunctionPointerWithHugeArrayParam
+  // expected-modern-c-array-error@-1 {{cannot assign value of type '(@convention(c) (UnsafeMutablePointer<[5000 of CInt]>?) -> Void)?' (aka 'Optional<@convention(c) (Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>) -> ()>') to type '((OpaquePointer?) -> Void)?'}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c) (UnsafeMutablePointer<[5000 of CInt]>?) -> Void' (aka '@convention(c) (Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>) -> ()') and '(OpaquePointer?) -> Void') are expected to be equal}}
+}

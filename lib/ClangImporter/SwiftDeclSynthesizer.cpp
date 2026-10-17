@@ -12,6 +12,7 @@
 
 #include "SwiftDeclSynthesizer.h"
 #include "CXXMethodBridging.h"
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -46,6 +47,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/TrailingObjects.h"
 
 using namespace swift;
 using namespace importer;
@@ -163,7 +165,7 @@ createForwardingParamRefExprs(AbstractFunctionDecl *funcDecl,
 }
 
 static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+                                         DeclContext *dc,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
@@ -178,7 +180,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      params, getterType, importedDecl, clangNode);
+      params, getterType, dc, clangNode);
   getterDecl->setAccess(importedFieldDecl->getFormalAccess());
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -187,12 +189,12 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
 }
 
 static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+                                         DeclContext *dc,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
   auto newValueDecl = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
-                                        SourceLoc(), C.Id_value, importedDecl);
+                                        SourceLoc(), C.Id_value, dc);
   newValueDecl->setSpecifier(ParamSpecifier::Default);
   newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
 
@@ -207,10 +209,10 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      params, voidTy, importedDecl, clangNode);
+      params, voidTy, dc, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
-  if (!isa<ClassDecl>(importedDecl))
+  if (!isa<ClassDecl>(dc))
     setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   setterDecl->setAccess(importedFieldDecl->getSetterFormalAccess());
 
@@ -296,12 +298,12 @@ bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
          found->second->isUnicodeScalar();
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                const clang::APValue &value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              const clang::APValue &value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   // Create the integer literal value.
   Expr *expr = nullptr;
   switch (value.getKind()) {
@@ -394,12 +396,12 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                         access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                StringRef value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              StringRef value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   ASTContext &ctx = ImporterImpl.SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
@@ -483,12 +485,12 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   return createSingleReturnBody(ctx, expr);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                Expr *valueExpr,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   auto &C = ImporterImpl.SwiftContext;
 
   VarDecl *var = nullptr;
@@ -536,28 +538,20 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
 // MARK: Struct default initializers
 
-/// Synthesize the body for an struct default initializer.
-static std::pair<BraceStmt *, bool>
-synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
-                                       void *context) {
-  auto constructor = cast<ConstructorDecl>(afd);
+/// Synthesize a statement that assigns `Builtin.zeroInitializer()` to self,
+/// zero-filling all of its storage.
+static ASTNode createZeroInitializeSelfStmt(ConstructorDecl *constructor) {
   ASTContext &ctx = constructor->getASTContext();
-  auto structDecl = static_cast<StructDecl *>(context);
-
-  // Use a builtin to produce a zero initializer, and assign it to self.
 
   // Construct the left-hand reference to self.
   auto *selfDecl = constructor->getImplicitSelfDecl();
   Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit=*/true);
-  auto selfType = structDecl->getDeclaredInterfaceType();
+  auto selfType = selfDecl->getTypeInContext();
   lhs->setType(LValueType::get(selfType));
 
-  auto emptyTuple = TupleType::getEmpty(ctx);
-
-  // Construct the right-hand call to Builtin.zeroInitializer.
-  Identifier zeroInitID = ctx.getIdentifier("zeroInitializer");
+  // Construct the call to Builtin.zeroInitializer.
   auto zeroInitializerFunc =
-      cast<FuncDecl>(getBuiltinValueDecl(ctx, zeroInitID));
+      cast<FuncDecl>(getBuiltinValueDecl(ctx, "zeroInitializer"));
   SubstitutionMap subMap = SubstitutionMap::get(
       zeroInitializerFunc->getGenericSignature(), llvm::ArrayRef(selfType),
       LookUpConformanceInModule());
@@ -573,8 +567,18 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   call->setThrows(nullptr);
 
   auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
-  assign->setType(emptyTuple);
+  assign->setType(TupleType::getEmpty(ctx));
+  return assign;
+}
 
+/// Synthesize the body for an struct default initializer.
+static std::pair<BraceStmt *, bool>
+synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
+                                       void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  ASTContext &ctx = constructor->getASTContext();
+
+  auto assign = createZeroInitializeSelfStmt(constructor);
   auto *ret = ReturnStmt::createImplicit(ctx, /*expr*/ nullptr);
 
   // Create the function body.
@@ -603,8 +607,7 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
-  constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
-                                  structDecl);
+  constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody);
 
   // We're done.
   return constructor;
@@ -612,12 +615,46 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
 
 // MARK: Struct value initializers
 
+/// Context blob for \c synthesizeValueConstructorBody , with the
+/// constructor's members stored as a trailing array.
+class ValueConstructorBodyContext final
+    : public ASTAllocated<ValueConstructorBodyContext>,
+      private llvm::TrailingObjects<ValueConstructorBodyContext, VarDecl *> {
+  friend TrailingObjects;
+
+  size_t ShouldZeroInit : 1;
+  size_t NumMembers : std::numeric_limits<size_t>::digits - 1;
+
+  ValueConstructorBodyContext(ArrayRef<VarDecl *> members, bool shouldZeroInit)
+      : ShouldZeroInit(shouldZeroInit), NumMembers(members.size()) {
+    std::uninitialized_copy(members.begin(), members.end(),
+                            getTrailingObjects());
+  }
+
+  size_t numTrailingObjects(OverloadToken<VarDecl *>) const {
+    return NumMembers;
+  }
+
+public:
+  static ValueConstructorBodyContext *
+  create(ASTContext &ctx, ArrayRef<VarDecl *> members, bool shouldZeroInit) {
+    auto size = totalSizeToAlloc<VarDecl *>(members.size());
+    auto mem = ctx.Allocate(size, alignof(ValueConstructorBodyContext));
+    return ::new (mem) ValueConstructorBodyContext(members, shouldZeroInit);
+  }
+
+  bool shouldZeroInit() const { return ShouldZeroInit; }
+
+  ArrayRef<VarDecl *> getMembers() const {
+    return {getTrailingObjects(), NumMembers};
+  }
+};
+
 /// Synthesizer callback for the body of a struct value constructor.
 static std::pair<BraceStmt *, bool>
 synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto constructor = cast<ConstructorDecl>(afd);
-  ArrayRef<VarDecl *> members(static_cast<VarDecl **>(context) + 1,
-                              static_cast<uintptr_t *>(context)[0]);
+  auto *bodyContext = static_cast<ValueConstructorBodyContext *>(context);
 
   ASTContext &ctx = constructor->getASTContext();
 
@@ -626,11 +663,14 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   auto *selfDecl = constructor->getImplicitSelfDecl();
 
+  if (bodyContext->shouldZeroInit())
+    stmts.push_back(createZeroInitializeSelfStmt(constructor));
+
   // To keep DI happy, initialize stored properties before computed.
   for (unsigned pass = 0; pass < 2; ++pass) {
     unsigned paramPos = 0;
 
-    for (auto var : members) {
+    for (auto var : bodyContext->getMembers()) {
 
       if (isa_and_nonnull<clang::IndirectFieldDecl>(var->getClangDecl()))
         continue;
@@ -674,8 +714,11 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
 ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
     NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
-    bool wantCtorParamNames, bool wantBody) {
+    ValueConstructorOptions options,
+    AccessLevel maxAccess) {
   auto &context = ImporterImpl.SwiftContext;
+  bool wantCtorParamNames =
+      options.contains(ValueConstructorFlags::WantParamNames);
 
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
@@ -725,19 +768,18 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+  if (constructor->getFormalAccess() > maxAccess)
+    constructor->overwriteAccess(maxAccess);
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
-  if (wantBody) {
-    auto memberMemory =
-        context.AllocateUninitialized<uintptr_t>(members.size() + 1);
-    memberMemory[0] = members.size();
-    for (unsigned i : indices(members)) {
-      memberMemory[i + 1] = reinterpret_cast<uintptr_t>(members[i]);
-    }
+  if (options.contains(ValueConstructorFlags::WantBody)) {
+    auto *bodyContext = ValueConstructorBodyContext::create(
+        context, members,
+        options.contains(ValueConstructorFlags::WantZeroInitPrologue));
     constructor->setBodySynthesizer(synthesizeValueConstructorBody,
-                                    memberMemory.data());
+                                    bodyContext);
   }
 
   // We're done.
@@ -794,12 +836,11 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
     StructDecl *structDecl, VarDecl *computedRawValue, VarDecl *storedRawValue,
-    bool wantLabel, bool wantBody) {
+    ValueConstructorOptions options) {
   auto init = createValueConstructor(structDecl, computedRawValue,
-                                     /*wantCtorParamNames=*/wantLabel,
-                                     /*wantBody=*/false);
+                                     options - ValueConstructorFlags::WantBody);
   // Insert our custom init body
-  if (wantBody) {
+  if (options.contains(ValueConstructorFlags::WantBody)) {
     init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
                              storedRawValue);
   }
@@ -853,7 +894,7 @@ VarDecl *SwiftDeclSynthesizer::createSmartPtrBridgingProperty(
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    bool makeUnlabeledValueInit) {
+    MakeStructRawValuedOptions options) {
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
@@ -891,15 +932,15 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
       /*InitExpr*/ nullptr, structDecl);
 
   auto init =
-      createRawValueBridgingConstructor(structDecl, computedVar, storedVar,
-                                        /*wantLabel*/ true,
-                                        /*wantBody*/ true);
+      createRawValueBridgingConstructor(
+          structDecl, computedVar, storedVar,
+          {ValueConstructorFlags::WantParamNames,
+           ValueConstructorFlags::WantBody});
 
   ConstructorDecl *unlabeledCtor = nullptr;
-  if (makeUnlabeledValueInit)
+  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
     unlabeledCtor = createRawValueBridgingConstructor(
-        structDecl, computedVar, storedVar,
-        /*wantLabel*/ false, /*wantBody*/ true);
+        structDecl, computedVar, storedVar, ValueConstructorFlags::WantBody);
 
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
@@ -915,9 +956,32 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
 }
 
 void SwiftDeclSynthesizer::makeStructRawValued(
-    StructDecl *structDecl, Type underlyingType,
+    StructDecl *structDecl, Type underlyingType, Type legacyUnderlyingType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    MakeStructRawValuedOptions options, AccessLevel setterAccess) {
+    MakeStructRawValuedOptions options) {
+  bool needsCArrayProjections = legacyUnderlyingType.isNull()
+        || !underlyingType->isEqual(legacyUnderlyingType);
+
+  // `getMaxAccessLevel()` only returns a cap (and may be `Open`, which a
+  // struct member can never actually have), so clamp it against the
+  // struct's own formal access, same as `getAccessLevel()` does for
+  // ordinary members.
+  auto memberAccessLevel = std::min(
+      structDecl->getFormalAccess(),
+      ImporterImpl.getMaxAccessLevel(CArrayProjection::Modern,
+                                     needsCArrayProjections));
+
+  // We cannot dual-project RawValue, so use whichever type matches the current
+  // projection. If there's no legacy type at all (the array is too big to
+  // represent as a tuple), the modern type is all we have, regardless of
+  // which projection is visible -- the struct itself is marked Internal by
+  // the caller in that case, but RawValue still needs a real type.
+  Type visibleRawValueType = underlyingType;
+  if (needsCArrayProjections && !legacyUnderlyingType.isNull()
+        && ImporterImpl.VisibleCArrayProjection == CArrayProjection::Legacy)
+    visibleRawValueType = legacyUnderlyingType;
+
+  // Create the modern projections.
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
@@ -926,33 +990,85 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   // Create a variable to store the underlying value.
   VarDecl *var;
   PatternBindingDecl *patternBinding;
-  auto introducer = (options.contains(MakeStructRawValuedFlags::IsLet)
-                         ? VarDecl::Introducer::Let
-                         : VarDecl::Introducer::Var);
+  bool isReadOnly = options.contains(MakeStructRawValuedFlags::ReadOnly);
   std::tie(var, patternBinding) = createVarWithPattern(
-      structDecl, ctx.Id_rawValue, underlyingType, introducer,
+      structDecl, ctx.Id_rawValue, underlyingType,
+      isReadOnly ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
-      structDecl->getFormalAccess(), setterAccess);
+      memberAccessLevel, isReadOnly ? AccessLevel::Private : memberAccessLevel);
 
   assert(var->hasStorage());
 
   // Create constructors to initialize that value from a value of the
   // underlying type.
-  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
-    structDecl->addMember(createValueConstructor(structDecl, var,
-                                                 /*wantCtorParamNames=*/false,
-                                                 /*wantBody=*/true));
+  ConstructorDecl *unlabeledInit = nullptr;
+  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
+    unlabeledInit = createValueConstructor(
+        structDecl, var, ValueConstructorFlags::WantBody, memberAccessLevel);
+  }
 
-  auto *initRawValue = createValueConstructor(structDecl, var,
-                                              /*wantCtorParamNames=*/true,
-                                              /*wantBody=*/true);
+  auto *initRawValue = createValueConstructor(
+      structDecl, var,
+      {ValueConstructorFlags::WantParamNames, ValueConstructorFlags::WantBody},
+      memberAccessLevel);
+
+  if (unlabeledInit)
+    structDecl->addMember(unlabeledInit);
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
 
   ClangImporter::Implementation::addSynthesizedTypealias(
-      structDecl, ctx.Id_RawValue, underlyingType);
-  ImporterImpl.RawTypes[structDecl] = underlyingType;
+      structDecl, ctx.Id_RawValue, visibleRawValueType);
+  ImporterImpl.RawTypes[structDecl] = visibleRawValueType;
+
+  // Create the legacy projections, if needed
+  if (!needsCArrayProjections)
+    return;
+
+  VarDecl *legacyVar = nullptr;
+  ConstructorDecl *legacyInitRawValue = nullptr;
+  ConstructorDecl *legacyUnlabeledInit = nullptr;
+
+  // If we got here but `legacyUnderlyingType` is null, the legacy type is
+  // un-importable, so we don't need to create legacy projections but we do need
+  // to register the modern projections.
+  if (!legacyUnderlyingType.isNull()) {
+    auto legacyMemberAccessLevel = std::min(
+        structDecl->getFormalAccess(),
+        ImporterImpl.getMaxAccessLevel(CArrayProjection::Legacy,
+                                       needsCArrayProjections));
+
+    PatternBindingDecl *legacyPatternBinding;
+    std::tie(legacyVar, legacyPatternBinding) = createVarWithPattern(
+        structDecl, ctx.Id_rawValue, legacyUnderlyingType,
+        VarDecl::Introducer::Var, /*isImplicit=*/true, legacyMemberAccessLevel,
+        isReadOnly ? AccessLevel::Private : legacyMemberAccessLevel);
+
+    if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
+      legacyUnlabeledInit = createValueConstructor(structDecl, legacyVar, {},
+                                                   legacyMemberAccessLevel);
+      legacyUnlabeledInit->setIsMemberwiseInitializer(
+                                              MemberwiseInitKind::Regular);
+    }
+
+    legacyInitRawValue = createValueConstructor(
+        structDecl, legacyVar,
+        ValueConstructorFlags::WantParamNames, legacyMemberAccessLevel);
+    legacyInitRawValue->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+
+    if (legacyUnlabeledInit)
+      structDecl->addMember(legacyUnlabeledInit);
+    structDecl->addMember(legacyInitRawValue);
+    structDecl->addMember(legacyPatternBinding);
+    structDecl->addMember(legacyVar);
+  }
+
+  if (unlabeledInit)
+    registerCArrayProjections(unlabeledInit, legacyUnlabeledInit);
+  registerCArrayProjections(var, legacyVar);
+  // PBDs don't have their own attributes
+  registerCArrayProjections(initRawValue, legacyInitRawValue);
 }
 
 // MARK: Unions
@@ -1283,6 +1399,174 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
                                  anonymousFieldDecl);
 
   return {getterDecl, setterDecl};
+}
+
+// MARK: Legacy C array projections
+
+/// Synthesize the getter body for a legacy C array variable.
+static std::pair<BraceStmt *, bool>
+synthesizeLegacyCArrayGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  auto legacyDecl = cast<VarDecl>(getterDecl->getStorage());
+  auto modernDecl = static_cast<VarDecl *>(context);
+  ASTContext &ctx = getterDecl->getASTContext();
+
+  Expr *modernValueExpr;
+  if (modernDecl->getDeclContext()->getSelfNominalTypeDecl()) {
+    // auto selfDecl = `self`
+    auto selfDecl = getterDecl->getImplicitSelfDecl();
+    Expr *selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit=*/true);
+    selfExpr->setType(selfDecl->getInterfaceType());
+
+    // modernValueExpr = `\(selfDecl).\(modernDecl)`
+    modernValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), modernDecl,
+                                              DeclNameLoc(), /*implicit=*/true);
+  } else {
+    // modernValueExpr = `\(modernDecl)`
+    modernValueExpr = new (ctx) DeclRefExpr(modernDecl, DeclNameLoc(),
+                                            /*implicit=*/true);
+  }
+  modernValueExpr->setType(modernDecl->getInterfaceType());
+
+  // auto expr = `Builtin.reinterpretCast(\(modernValueExpr))`
+  //             (to type of legacyDecl)
+  auto expr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+                  ctx,
+                  modernValueExpr->getType(),
+                  legacyDecl->getInterfaceType(),
+                  modernValueExpr);
+
+  return createSingleReturnBody(ctx, expr);
+}
+
+/// Synthesize the setter body for a legacy C array variable.
+static std::pair<BraceStmt *, bool>
+synthesizeLegacyCArraySetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  auto modernDecl = static_cast<VarDecl *>(context);
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  Expr *modernValueExpr;
+  if (modernDecl->getDeclContext()->getSelfNominalTypeDecl()) {
+    // auto selfDecl = `self`
+    auto selfDecl = setterDecl->getImplicitSelfDecl();
+    Expr *selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit=*/true);
+    selfExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+    // modernValueExpr = `\(selfDecl).\(modernDecl)`
+    AccessSemantics semantics = setterDecl->isInitAccessor()
+                                  ? AccessSemantics::DirectToStorage
+                                  : AccessSemantics::Ordinary;
+    modernValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), modernDecl,
+                                              DeclNameLoc(), /*implicit=*/true,
+                                              semantics);
+  } else {
+    // modernValueExpr = `\(modernDecl)`
+    modernValueExpr = new (ctx) DeclRefExpr(modernDecl, DeclNameLoc(),
+                                            /*implicit=*/true);
+  }
+  modernValueExpr->setType(LValueType::get(modernDecl->getInterfaceType()));
+
+  // auto newValueExpr = `newValue`
+  auto newValueDecl = setterDecl->getParameters()->get(0);
+  auto newValueExpr = new (ctx) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                            /*implicit*/ true);
+  newValueExpr->setType(newValueDecl->getInterfaceType());
+
+  // auto expr = `Builtin.reinterpretCast(\(newValueExpr))`
+  //             (to type of modernDecl)
+  auto expr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+                  ctx,
+                  newValueDecl->getInterfaceType(),
+                  modernDecl->getInterfaceType(),
+                  newValueExpr);
+
+  // auto assign = `\(modernValueExpr) = \(expr)`
+  auto assign = new (ctx) AssignExpr(modernValueExpr, SourceLoc(), expr,
+                                     /*implicit*/ true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign}, SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+std::pair<AccessorDecl *, AccessorDecl *>
+SwiftDeclSynthesizer::makeLegacyCArrayAccessors(DeclContext *dc,
+                                                VarDecl *legacyDecl,
+                                                VarDecl *modernDecl) {
+  auto &ctx = ImporterImpl.SwiftContext;
+
+  auto getterDecl = makeFieldGetterDecl(ImporterImpl, dc, legacyDecl);
+  getterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+  getterDecl->setBodySynthesizer(synthesizeLegacyCArrayGetterBody, modernDecl);
+
+  // If the modern projection is read-only, don't install a setter on the
+  // legacy projection either.
+  AccessorDecl *setterDecl = nullptr;
+  if (!modernDecl->isLet()) {
+    setterDecl = makeFieldSetterDecl(ImporterImpl, dc, legacyDecl);
+    setterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+    setterDecl->setBodySynthesizer(synthesizeLegacyCArraySetterBody,
+                                   modernDecl);
+  }
+
+  ClangImporter::Implementation::makeComputed(legacyDecl, getterDecl,
+                                              setterDecl);
+
+  return {getterDecl, setterDecl};
+}
+
+void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
+                                                     Decl *legacy) {
+  auto &ctx = ImporterImpl.SwiftContext;
+  auto addAttrs = [&](ValueDecl *current, CArrayProjection projection,
+                      ValueDecl *counterpart) {
+    current->addAttribute(new (ctx)
+                            CArrayProjectionAttr(projection, counterpart));
+
+    if (ImporterImpl.VisibleCArrayProjection != projection
+            && !isa<AccessorDecl>(current))
+      current->addAttribute(new (ctx)
+                              UsableFromInlineAttr(/*implicit=*/true));
+  };
+
+  // In practice, we should only have dual projections for ValueDecls.
+  auto modernVD = cast<ValueDecl>(modern);
+  auto legacyVD = cast_or_null<ValueDecl>(legacy);
+
+  // Mark the modern projection even if there's no legacy projection so we give
+  // it the right availability.
+  addAttrs(modernVD, CArrayProjection::Modern, legacyVD);
+
+  if (!legacyVD)
+    return;
+
+  addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
+
+  ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+
+  // If we imported a stored property or global, we need to create
+  // accessors for the legacy decl to forward to the modern decl.
+  if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
+    auto legacyVar = cast<VarDecl>(legacyVD);
+    if (modernVar->hasStorage()) {
+      makeLegacyCArrayAccessors(legacyVar->getDeclContext(), legacyVar,
+                                modernVar);
+    }
+  }
+
+  // If we're using (computed) storage decls, register the accessors too.
+  if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
+    auto legacyASD = cast<AbstractStorageDecl>(legacyVD);
+
+    for (auto modernAD : modernASD->getAllAccessors()) {
+      auto legacyAD = legacyASD->getAccessor(modernAD->getAccessorKind());
+      registerCArrayProjections(modernAD, legacyAD);
+    }
+  }
 }
 
 // MARK: Enum RawValue initializers

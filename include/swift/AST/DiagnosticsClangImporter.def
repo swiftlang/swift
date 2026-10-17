@@ -51,6 +51,13 @@ ERROR(emit_pcm_error,Fatal,
 ERROR(dump_pcm_error,Fatal,
    "failed to dump precompiled module '%0'", (StringRef))
 
+GROUPED_WARNING(cannot_enable_modern_imported_c_arrays, ClangDeclarationImport,
+                none,
+                "feature 'ModernImportedCArrays' disabled: module can run on "
+                "%0 %1, but 'InlineArray' is not available until version %2",
+                (AvailabilityDomain, /*target=*/AvailabilityRange,
+                 /*minimum=*/AvailabilityRange))
+
 GROUPED_WARNING(invalid_swift_name_method, ClangDeclarationImport, none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
