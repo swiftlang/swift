@@ -30,6 +30,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -544,6 +545,16 @@ protected:
     GenericArgCount : 32;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+  );
+
+  SWIFT_INLINE_BITFIELD(EnumType, TypeBase, 1,
+    /// Whether this type stores scope arguments.
+    HasScopeArgs : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(StructType, TypeBase, 1,
+    /// Whether this type stores scope arguments.
+    HasScopeArgs : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+30,
@@ -1719,6 +1730,10 @@ public:
 
   /// Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return NomDecl; }
+
+  /// Returns the arguments for the declaration's scope parameters, or null if
+  /// this type has none.
+  const ScopeArgs *getScopeArgs() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3199,7 +3214,8 @@ protected:
                (!Parent || Parent->isCanonical())? C : nullptr, properties) {}
 
 public:
-  static NominalType *get(NominalTypeDecl *D, Type Parent, const ASTContext &C);
+  static NominalType *get(NominalTypeDecl *D, Type Parent, const ASTContext &C,
+                          const ScopeArgs *scopes = nullptr);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3210,7 +3226,10 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
-class EnumType : public NominalType {
+class EnumType final : public NominalType,
+    private llvm::TrailingObjects<EnumType, const ScopeArgs *> {
+  friend TrailingObjects;
+
 public:
   /// getDecl() - Returns the decl which declares this type.
   EnumDecl *getDecl() const {
@@ -3219,7 +3238,12 @@ public:
 
   /// Retrieve the type when we're referencing the given enum
   /// declaration in the parent type \c Parent.
-  static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
+  static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C,
+                       const ScopeArgs *scopes = nullptr);
+
+  const ScopeArgs *getScopeArgs() const {
+    return Bits.EnumType.HasScopeArgs ? *getTrailingObjects() : nullptr;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3227,13 +3251,16 @@ public:
   }
 
 private:
-  EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &Ctx,
-            RecursiveTypeProperties properties);
+  EnumType(EnumDecl *TheDecl, Type Parent, const ScopeArgs *scopes,
+           const ASTContext &Ctx, RecursiveTypeProperties properties);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public NominalType {
+class StructType final : public NominalType,
+    private llvm::TrailingObjects<StructType, const ScopeArgs *> {
+  friend TrailingObjects;
+
 public:
   /// getDecl() - Returns the decl which declares this type.
   StructDecl *getDecl() const {
@@ -3242,7 +3269,12 @@ public:
 
   /// Retrieve the type when we're referencing the given struct
   /// declaration in the parent type \c Parent.
-  static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
+  static StructType *get(StructDecl *D, Type Parent, const ASTContext &C,
+                         const ScopeArgs *scopes = nullptr);
+
+  const ScopeArgs *getScopeArgs() const {
+    return Bits.StructType.HasScopeArgs ? *getTrailingObjects() : nullptr;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3250,8 +3282,8 @@ public:
   }
   
 private:
-  StructType(StructDecl *TheDecl, Type Parent, const ASTContext &Ctx,
-             RecursiveTypeProperties properties);
+  StructType(StructDecl *TheDecl, Type Parent, const ScopeArgs *scopes,
+             const ASTContext &Ctx, RecursiveTypeProperties properties);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
@@ -8902,6 +8934,15 @@ inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
   if (auto ty = dyn_cast<BoundGenericClassType>(this))
     return ty->getTrailingObjects();
   llvm_unreachable("Unhandled BoundGenericType!");
+}
+
+inline const ScopeArgs *NominalOrBoundGenericNominalType::getScopeArgs() const {
+  if (auto *ty = dyn_cast<StructType>(this))
+    return ty->getScopeArgs();
+  if (auto *ty = dyn_cast<EnumType>(this))
+    return ty->getScopeArgs();
+  // TODO: Support scope arguments on bound generic types.
+  return nullptr;
 }
 
 inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {

@@ -137,6 +137,17 @@ ValueOwnership asValueOwnership(ParameterOwnership o);
 // Defined out-of-line in lib/AST/Ownership.cpp.
 llvm::StringRef getOwnershipSpelling(ValueOwnership ownership);
 
+class AbstractFunctionDecl;
+
+/// Determine the ownership a parameter has / will have after lowering.
+///
+/// \p fn is the function declaring the parameter, or null for a parameter of a
+/// function type, whose default doesn't depend on any declaration. \p isSelf is
+/// whether it's \p fn's `self`.
+ValueOwnership getLoweredOwnership(ValueOwnership written,
+                                   const AbstractFunctionDecl *fn,
+                                   bool isSelf);
+
 } // end namespace swift
 
 #endif

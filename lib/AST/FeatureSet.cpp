@@ -510,7 +510,8 @@ UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
 
-// FIXME: Detect `_scope` and `@_scoped()`.
+// TODO: Detect scope arguments anywhere in the declaration's interface type,
+// which are printed even when elided, and explicit scope parameters.
 static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {

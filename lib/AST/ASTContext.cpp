@@ -56,6 +56,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/RequirementMatch.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -594,8 +595,11 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ErrorUnionType> ErrorUnionTypes;
     llvm::DenseMap<Type, HoleType *> HoleTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
-    llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
-    llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
+    llvm::DenseMap<std::tuple<EnumDecl *, Type, const ScopeArgs *>, EnumType *>
+        EnumTypes;
+    llvm::DenseMap<std::tuple<StructDecl *, Type, const ScopeArgs *>,
+                   StructType *>
+        StructTypes;
     llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
     llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
@@ -674,6 +678,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
   llvm::DenseMap<uint64_t, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
+  llvm::FoldingSet<ScopeArgs> ScopeArgsSet;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
 
@@ -4830,7 +4835,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   return newType;
 }
 
-NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
+NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C,
+                              const ScopeArgs *scopes) {
   assert((isa<ProtocolDecl>(D) ||
           isa<BuiltinTupleDecl>(D) ||
           !D->getGenericParams()) &&
@@ -4839,12 +4845,14 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
           Parent->is<BoundGenericType>() ||
           Parent->is<UnboundGenericType>()) &&
          "parent must be a nominal type");
+  ASSERT((!scopes || isa<EnumDecl>(D) || isa<StructDecl>(D)) &&
+         "only structs and enums can be non-escapable");
 
   switch (D->getKind()) {
   case DeclKind::Enum:
-    return EnumType::get(cast<EnumDecl>(D), Parent, C);
+    return EnumType::get(cast<EnumDecl>(D), Parent, C, scopes);
   case DeclKind::Struct:
-    return StructType::get(cast<StructDecl>(D), Parent, C);
+    return StructType::get(cast<StructDecl>(D), Parent, C, scopes);
   case DeclKind::Class:
     return ClassType::get(cast<ClassDecl>(D), Parent, C);
   case DeclKind::Protocol: {
@@ -4858,38 +4866,57 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   }
 }
 
-EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
-                     RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Enum, &C, TheDecl, Parent, properties) { }
+EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ScopeArgs *scopes,
+                   const ASTContext &C, RecursiveTypeProperties properties)
+  : NominalType(TypeKind::Enum, &C, TheDecl, Parent, properties) {
+  Bits.EnumType.HasScopeArgs = scopes != nullptr;
+  if (scopes)
+    *getTrailingObjects() = scopes;
+}
 
-EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
+EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C,
+                        const ScopeArgs *scopes) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
   properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
-  auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
+  auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent, scopes}];
   if (!known) {
-    known = new (C, arena) EnumType(D, Parent, C, properties);
+    ASSERT((!scopes || scopes->getScopes().size() == getNumScopeParams(D)) &&
+           "a scoped type must be saturated");
+    auto *mem = C.Allocate(totalSizeToAlloc<const ScopeArgs *>(scopes ? 1 : 0),
+                           alignof(EnumType), arena);
+    known = new (mem) EnumType(D, Parent, scopes, C, properties);
   }
   return known;
 }
 
-StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
+StructType::StructType(StructDecl *TheDecl, Type Parent,
+                       const ScopeArgs *scopes, const ASTContext &C,
                        RecursiveTypeProperties properties)
-  : NominalType(TypeKind::Struct, &C, TheDecl, Parent, properties) { }
+  : NominalType(TypeKind::Struct, &C, TheDecl, Parent, properties) {
+  Bits.StructType.HasScopeArgs = scopes != nullptr;
+  if (scopes)
+    *getTrailingObjects() = scopes;
+}
 
-StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
+StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C,
+                            const ScopeArgs *scopes) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
   properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
-  auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
+  auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent, scopes}];
   if (!known) {
-    known = new (C, arena) StructType(D, Parent, C, properties);
+    ASSERT((!scopes || scopes->getScopes().size() == getNumScopeParams(D)) &&
+           "a scoped type must be saturated");
+    auto *mem = C.Allocate(totalSizeToAlloc<const ScopeArgs *>(scopes ? 1 : 0),
+                           alignof(StructType), arena);
+    known = new (mem) StructType(D, Parent, scopes, C, properties);
   }
   return known;
 }
@@ -7760,6 +7787,33 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
       ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
   auto *newNode = new (buf) IndexSubset(indices);
   foldingSet.insert(newNode, insertToken);
+  return newNode;
+}
+
+ScopeArgs::ScopeArgs(ArrayRef<ScopeRef> scopes) : NumScopes(scopes.size()) {
+  llvm::uninitialized_copy(scopes, getTrailingObjects());
+}
+
+void ScopeArgs::Profile(llvm::FoldingSetNodeID &ID,
+                        ArrayRef<ScopeRef> scopes) {
+  ID.AddInteger(scopes.size());
+  for (auto scope : scopes)
+    ID.AddInteger(scope.getOpaqueValue());
+}
+
+const ScopeArgs *ScopeArgs::get(const ASTContext &ctx,
+                                ArrayRef<ScopeRef> scopes) {
+  ASSERT(!scopes.empty());
+  auto &foldingSet = ctx.getImpl().ScopeArgsSet;
+  llvm::FoldingSetNodeID id;
+  Profile(id, scopes);
+  void *insertPos = nullptr;
+  if (auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos))
+    return existing;
+  auto *mem = ctx.Allocate(totalSizeToAlloc<ScopeRef>(scopes.size()),
+                           alignof(ScopeArgs));
+  auto *newNode = new (mem) ScopeArgs(scopes);
+  foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }
 

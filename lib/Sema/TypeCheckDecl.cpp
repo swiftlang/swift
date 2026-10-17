@@ -1958,9 +1958,17 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                    /*packElementOpener*/ nullptr)
           .resolveType(underlyingRepr);
 
+  auto &ctx = typeAlias->getASTContext();
   if (result->hasError()) {
     typeAlias->setInvalid();
-    return ErrorType::get(typeAlias->getASTContext());
+    return ErrorType::get(ctx);
+  }
+  if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+      hasScopeUnsaturatedType(result)) {
+    ctx.Diags.diagnose(underlyingRepr->getStartLoc(),
+                       diag::scoped_nonescapable_in_typealias);
+    typeAlias->setInvalid();
+    return ErrorType::get(ctx);
   }
   return result;
 }
@@ -2497,6 +2505,8 @@ static Type validateParameterType(ParamDecl *decl) {
   } else {
     Ty = resolution.resolveType(decl->getTypeRepr());
   }
+
+  Ty = fillElidedScopes(decl, Ty);
 
   if (Ty->hasError()) {
     decl->setInvalid();
@@ -3468,9 +3478,46 @@ forwardLifetimeDependencies(Evaluator &evaluator, ValueDecl *decl,
   return ctx.AllocateCopy(mappedDependencies);
 }
 
+/// Whether a written type has a `@_scoped` attribute anywhere within it.
+static bool hasScopedAttr(TypeRepr *repr) {
+  return repr && repr->findIf([](TypeRepr *repr) {
+    return repr->findAttrLoc(TypeAttrKind::Scoped).isValid();
+  });
+}
+
+/// Whether a parameter or result type in the function's signature has a
+/// `@_scoped` attribute.
+static bool hasScopedAttrInSignature(AbstractFunctionDecl *afd) {
+  for (auto *param : *afd->getParameters())
+    if (hasScopedAttr(param->getTypeRepr()))
+      return true;
+  if (auto *func = dyn_cast<FuncDecl>(afd))
+    return hasScopedAttr(func->getResultTypeRepr());
+  return false;
+}
+
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
                                         ValueDecl *decl) const {
+  // TODO: Translate lifetime dependencies into scope restrictions and stop
+  // using them, instead of dropping them here to avoid conflicts. Until then
+  // this leads to accepting invalid code when using both features.
+  // FIXME: This won't detect fully elided scopes...
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (hasScopedAttrInSignature(afd)) {
+        // Without a lifetime dependence, nothing restricts the result.
+        // FIXME: Diagnose the result of an initializer of a non-escapable type.
+        auto *func = dyn_cast<FuncDecl>(afd);
+        if (func && !hasScopedAttr(func->getResultTypeRepr()) &&
+            hasScopeUnsaturatedType(func->getResultInterfaceType()))
+          decl->getASTContext().Diags.diagnose(
+              func->getResultTypeRepr()->getLoc(), diag::scoped_elided_result);
+        return std::nullopt;
+      }
+    }
+  }
+
   // A declaration the C++ importer synthesized around another one -- a member
   // cloned into a derived class, an accessor, an operator function -- hands back
   // the value that declaration produces, so it depends on the same things. Only

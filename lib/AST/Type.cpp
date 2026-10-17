@@ -2083,7 +2083,8 @@ CanType TypeBase::computeCanonicalType() {
     auto nominalTy = cast<NominalType>(this);
     auto parentTy = nominalTy->getParent()->getCanonicalType();
     Result = NominalType::get(nominalTy->getDecl(), parentTy,
-                              parentTy->getASTContext());
+                              parentTy->getASTContext(),
+                              nominalTy->getScopeArgs());
     break;
   }
 
