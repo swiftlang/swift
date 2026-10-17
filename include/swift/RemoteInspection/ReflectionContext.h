@@ -143,6 +143,8 @@ class ReflectionContext
   typename super::StoredPointer target_future_adapter = 0;
   typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
   typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
+  typename super::StoredPointer target_task_future_wait_take_resume_adapter = 0;
+  typename super::StoredPointer target_task_wait_take_throwing_resume_adapter = 0;
   bool supportsPriorityEscalation = false;
   typename super::StoredSize asyncTaskSize = 0;
 
@@ -2182,13 +2184,15 @@ private:
       auto FutureFragmentObj =
           readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
       if (FutureFragmentObj) {
-        // The low 2 bits of WaitQueue are the status; the rest is the first
-        // waiting task pointer.
+        // The low 2 bits of WaitQueue are the status and bit 2 is the
+        // moved-out flag; the rest is the first waiting task pointer.
         // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
         const StoredPointer statusMask = 0x03;
+        const StoredPointer movedOutFlag = 0x04;
         StoredPointer WaitingTaskPtr =
             stripSignedPointer(
-                RemoteAddress(FutureFragmentObj->WaitQueue & ~statusMask,
+                RemoteAddress(FutureFragmentObj->WaitQueue &
+                                  ~(statusMask | movedOutFlag),
                               RemoteAddress::DefaultAddressSpace))
                 .getRawAddress();
 
@@ -2306,7 +2310,11 @@ private:
     } else if ((target_task_wait_throwing_resume_adapter &&
                 Fptr == target_task_wait_throwing_resume_adapter) ||
                (target_task_future_wait_resume_adapter &&
-                Fptr == target_task_future_wait_resume_adapter)) {
+                Fptr == target_task_future_wait_resume_adapter) ||
+               (target_task_future_wait_take_resume_adapter &&
+                Fptr == target_task_future_wait_take_resume_adapter) ||
+               (target_task_wait_take_throwing_resume_adapter &&
+                Fptr == target_task_wait_take_throwing_resume_adapter)) {
       // It's only safe to look through these adapters when there's a dependency
       // record. If there isn't a dependency record, then the task was resumed
       // and the pointers are potentially stale.
@@ -2348,6 +2356,10 @@ private:
         "_swift_concurrency_debug_task_wait_throwing_resume_adapter");
     target_task_future_wait_resume_adapter =
         getPointer("_swift_concurrency_debug_task_future_wait_resume_adapter");
+    target_task_future_wait_take_resume_adapter = getPointer(
+        "_swift_concurrency_debug_task_future_wait_take_resume_adapter");
+    target_task_wait_take_throwing_resume_adapter = getPointer(
+        "_swift_concurrency_debug_task_wait_take_throwing_resume_adapter");
     auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
         "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {
