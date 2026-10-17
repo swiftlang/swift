@@ -116,7 +116,7 @@ void swift::serializeToBuffers(
                                "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
-    serialization::writeSourceInfoToStream(stream, DC);
+    serialization::writeSourceInfoToStream(stream, DC, options);
     (void)withOutputPath(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
@@ -172,7 +172,7 @@ void swift::serialize(
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
           FrontendStatsTracer tracer(getContext(DC).Stats,
                                      "Serialization, swiftsourceinfo");
-          serialization::writeSourceInfoToStream(out, DC);
+          serialization::writeSourceInfoToStream(out, DC, options);
           return false;
         });
   }
