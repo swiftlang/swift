@@ -654,6 +654,58 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   return Limit::None;
 }
 
+/// Returns the imported declaration that the given `@implementation`
+/// declaration implements, or \c nullptr if there is none.
+///
+/// Implementing a foreign reference type's virtual method matches the
+/// importer's dispatch thunk; this looks through the thunk to the underlying
+/// method.
+static const Decl *getImplementedForeignDecl(const Decl *decl) {
+  const Decl *implemented = decl->getImplementedObjCDecl();
+  if (const auto *thunk = dyn_cast_or_null<FuncDecl>(implemented))
+    if (const auto *original = decl->getASTContext()
+                                   .getClangModuleLoader()
+                                   ->getOriginalForVirtualThunk(thunk))
+      implemented = original;
+  return implemented;
+}
+
+/// If the given constant is the C or C++ entry point of an `@c @implementation`
+/// or `@cxx @implementation` function that must not be exported, returns
+/// hidden linkage.
+static std::optional<SILLinkage>
+getCImplementationLinkage(SILDeclRef constant) {
+  if (!constant.isForeign || !constant.hasDecl())
+    return std::nullopt;
+
+  auto *decl = constant.getDecl();
+  if (!(decl->getAttrs().hasAttribute<CDeclAttr>() ||
+        decl->getAttrs().hasAttribute<CxxDeclAttr>()) ||
+      !decl->isObjCImplementation())
+    return std::nullopt;
+
+  auto *implemented = getImplementedForeignDecl(decl);
+  if (!implemented)
+    return std::nullopt;
+
+  auto *clangFn =
+      dyn_cast_or_null<clang::FunctionDecl>(implemented->getClangDecl());
+  if (!clangFn)
+    return std::nullopt;
+
+  auto lv = clangFn->getLinkageAndVisibility();
+  if (!clang::isExternallyVisible(lv.getLinkage()))
+    return std::nullopt;
+
+  if (lv.getVisibility() == clang::HiddenVisibility)
+    return SILLinkage::Hidden;
+
+  if (decl->getEffectiveAccess() <= AccessLevel::Internal)
+    return SILLinkage::Hidden;
+
+  return std::nullopt;
+}
+
 SILLinkage SILDeclRef::getDefinitionLinkage() const {
   using Limit = LinkageLimit;
 
@@ -689,6 +741,11 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // Declarations imported from Clang modules have shared linkage.
   if (isClangImported())
     return SILLinkage::Shared;
+
+  // The C/C++ entry point of an `@implementation` function is hidden if either
+  // the C/C++ declaration or the Swift declaration says it should be.
+  if (auto linkage = getCImplementationLinkage(*this))
+    return *linkage;
 
   const auto limit = getLinkageLimit(*this);
   if (limit == Limit::Private)
@@ -1570,17 +1627,8 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
     if (isNativeToForeignThunk() || isForeign) {
       auto decl = getDecl();
       const swift::Decl *hasClangDecl = decl;
-      if (!decl->getClangDecl()) {
-        hasClangDecl = decl->getImplementedObjCDecl();
-        // Implementing a foreign reference type's virtual method matches the
-        // importer's dispatch thunk. The body must define the underlying
-        // method's symbol.
-        if (const auto *thunk = dyn_cast<FuncDecl>(hasClangDecl))
-          if (const auto *original = decl->getASTContext()
-                                         .getClangModuleLoader()
-                                         ->getOriginalForVirtualThunk(thunk))
-            hasClangDecl = original;
-      }
+      if (!decl->getClangDecl())
+        hasClangDecl = getImplementedForeignDecl(decl);
       auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
       if (!clangMangling.empty())
         return clangMangling;
