@@ -8,6 +8,7 @@ public struct S {
 
 // CHECK: module
 // CHECK-NEXT: "name": "SymbolGraphModule"
+// CHECK-NEXT: "extended": "SymbolGraphModule"
 // CHECK-NEXT: platform
 // CHECK-NEXT:   architecture
 // CHECK:        vendor
