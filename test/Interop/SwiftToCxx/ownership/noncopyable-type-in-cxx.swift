@@ -74,17 +74,18 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 
 // The checks below follow the order in which the types are emitted.
 
-// Copyable types are unaffected.
+// A noncopyable type cannot be used as a Swift generic argument yet.
 // CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::CopyableStruct> = true;
+// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::MoveOnlyEnum> = false;
+// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::MoveOnlyStruct> = false;
+
+// Copyable types are unaffected.
 // CHECK: class SWIFT_SYMBOL({{.*}}) CopyableStruct final {
 // CHECK:   SWIFT_INLINE_THUNK ~CopyableStruct() noexcept {
 // CHECK-NOT:     if (_isMovedFrom) return;
 // CHECK:   SWIFT_INLINE_THUNK CopyableStruct(const CopyableStruct &other) noexcept {
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   friend class _impl::_impl_CopyableStruct;
-
-// A noncopyable type cannot be used as a Swift generic argument yet.
-// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::MoveOnlyEnum> = false;
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) MoveOnlyEnum final {
 // CHECK:   SWIFT_INLINE_THUNK ~MoveOnlyEnum() noexcept {
@@ -97,8 +98,6 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // Projecting a payload out of a borrowed noncopyable enum would need a copy.
 // CHECK-NOT: getA
 // CHECK:   SWIFT_INLINE_THUNK bool isB() const;
-
-// CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::MoveOnlyStruct> = false;
 
 // A noncopyable type is exposed as a move-only C++ class whose destructor is a
 // no-op once the value has been moved out of it.

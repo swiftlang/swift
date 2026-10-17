@@ -71,7 +71,6 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK-NEXT: protected:
 
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
-// CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
 // CHECK: SWIFT_INLINE_THUNK void supportedFunc(const T_0_0& x) noexcept SWIFT_SYMBOL("s:5Decls13supportedFuncyyxlF") {
 
 // CHECK: template<class T_0_0>
