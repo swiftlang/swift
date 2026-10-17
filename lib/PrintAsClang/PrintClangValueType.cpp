@@ -374,10 +374,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "    if (!other._storage.isAllocated()) return;\n";
       printVWTable(os);
       if (isOpaqueLayout) {
-        os << "    _storage = ";
-        printer.printSwiftImplQualifier();
-        os << cxx_synthesis::getCxxOpaqueStorageClassName()
-           << "(vwTable->size, vwTable->getAlignment());\n";
+        os << "    _storage.allocate(vwTable->size, "
+              "vwTable->getAlignment());\n";
       }
       os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
             "const_cast<char "
@@ -406,14 +404,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
 
     if (isOpaqueLayout) {
-      // move constructor. The Swift value stays in its allocation.
+      auto printMoveStorage = [&] {
+        os << "    _storage.moveFrom(other._storage, "
+              "[](char * _Nonnull destStorage, "
+              "char * _Nonnull srcStorage) {\n";
+        printVWTable(os);
+        os << "      vwTable->initializeWithTake(destStorage, srcStorage, "
+              "metadata._0);\n";
+        os << "    });\n";
+      };
+
+      // move constructor.
       os << "  ";
       printer.printInlineForThunk();
-      os << baseName << "(" << baseName << " &&other) noexcept : _storage("
-         << "static_cast<";
-      printer.printSwiftImplQualifier();
-      os << cxx_synthesis::getCxxOpaqueStorageClassName()
-         << " &&>(other._storage)) {}\n";
+      os << baseName << "(" << baseName << " &&other) noexcept {\n";
+      printMoveStorage();
+      os << "  }\n";
 
       // move assignment.
       os << "  ";
@@ -424,11 +430,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       printVWTable(os);
       os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
       os << "    }\n";
-      // This also frees the old allocation.
-      os << "    _storage = static_cast<";
-      printer.printSwiftImplQualifier();
-      os << cxx_synthesis::getCxxOpaqueStorageClassName()
-         << " &&>(other._storage);\n";
+      printMoveStorage();
       os << "  return *this;\n";
       os << "  }\n";
     }
@@ -446,28 +448,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
     printer.printInlineForThunk();
     printer.printBaseName(typeDecl);
     if (isOpaqueLayout) {
-      os << "(";
-      printer.printSwiftImplQualifier();
-      os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
-            "_storage(vwTable->size, "
-            "vwTable->getAlignment()) {}\n";
+      os << "() noexcept {\n";
+      printVWTable(os);
+      os << "    _storage.allocate(vwTable->size, "
+            "vwTable->getAlignment());\n";
+      os << "  }\n";
     } else {
       os << "() noexcept {}\n";
     }
-    // Print out '_make' function which returns an unitialized instance for
-    // passing to Swift.
-    os << "  static ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " _make() noexcept {";
-    if (isOpaqueLayout) {
-      os << "\n";
-      printVWTable(os);
-      os << "    return ";
+    // Opaque values must be constructed in place before Swift initializes
+    // them: returning uninitialized inline storage could move it in C++14.
+    if (!isOpaqueLayout) {
+      os << "  static ";
+      printer.printInlineForThunk();
       printer.printBaseName(typeDecl);
-      os << "(vwTable);\n  }\n";
-    } else {
-      os << " return ";
+      os << " _make() noexcept { return ";
       printer.printBaseName(typeDecl);
       os << "(); }\n";
     }
@@ -576,10 +571,17 @@ void ClangValueTypePrinter::printValueTypeDecl(
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << " returnNewValue(T callable) {\n";
-          os << "    auto result = ";
-          printCxxTypeName(os, typeDecl, moduleContext);
-          printGenericParamRefs(os);
-          os << "::_make();\n";
+          if (isOpaqueLayout) {
+            os << "    ";
+            printCxxTypeName(os, typeDecl, moduleContext);
+            printGenericParamRefs(os);
+            os << " result;\n";
+          } else {
+            os << "    auto result = ";
+            printCxxTypeName(os, typeDecl, moduleContext);
+            printGenericParamRefs(os);
+            os << "::_make();\n";
+          }
           os << "    callable(result._getOpaquePointer());\n";
           os << "    return result;\n";
           os << "  }\n";
