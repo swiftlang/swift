@@ -93,6 +93,16 @@ bool accessorMacroIntroducesInitAccessor(
 bool isInvalidAttachedMacro(MacroRole role,
                             Decl *attachedTo);
 
+/// If \p decl is a safe-interop `@c @implementation` (its signature uses
+/// safe-interop types), run the safe-mode processing: match the imported C
+/// declaration, synthesize and attach the `@_Unswiftify` peer macro invocation,
+/// and disable the corresponding `@_SwiftifyImport`-generated peer overload.
+///
+/// The sole caller is `ExpandPeerMacroRequest::evaluate`, whose cached result
+/// makes this run exactly once per decl (before peer-macro lookup inspects the
+/// attached macros), so no separate run-once guard is required.
+void attachUnswiftifyMacroIfNeeded(Decl *decl);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */

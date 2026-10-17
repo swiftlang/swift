@@ -31,6 +31,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -7087,6 +7088,22 @@ struct OrderDecls {
 };
 } // namespace
 
+static Decl *getUnswiftifyParent(Decl *decl) {
+  auto *sf = decl->getModuleContext()->getSourceFileContainingLocation(
+      decl->getLoc());
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  CustomAttr *attr = sf->getAttachedMacroAttribute();
+  MacroDecl *macro = attr ? attr->getResolvedMacro() : nullptr;
+  if (!macro)
+    return nullptr;
+  if (macro->getDefinition().kind == MacroDefinition::Kind::Internal &&
+      macro->getBaseName() ==
+          decl->getASTContext().getIdentifier("_Unswiftify"))
+    return sf->getMacroExpansion().dyn_cast<Decl *>();
+  return decl;
+}
+
 static ObjCInterfaceAndImplementation
 constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
                 llvm::TinyPtrVector<Decl *> &impls,
@@ -7095,6 +7112,12 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
     return ObjCInterfaceAndImplementation();
 
   if (impls.size() > 1) {
+    // Don't point to the _Unswiftify expansion in diagnostic: the real
+    // conflict is with the safe impl.
+    for (auto &impl : impls) {
+      if (Decl *parent = getUnswiftifyParent(impl))
+        impl = parent;
+    }
     llvm::sort(impls, OrderDecls());
 
     auto &diags = interfaces.front()->getASTContext().Diags;
@@ -7109,10 +7132,13 @@ constructResult(const llvm::TinyPtrVector<Decl *> &interfaces,
       // conflicts, so we're only concerned with main class bodies and
       // non-category implementations here.
       if (categoryName.empty() || !isa<ExtensionDecl>(impls.front())) {
-        diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
-                       diagnoseOn)
-          .fixItRemove(attr->getRangeWithAt());
-        diags.diagnose(impls.front(), diag::previous_objc_implementation);
+        InFlightDiagnostic D =
+            diags.diagnose(attr->getLocation(),
+                           diag::objc_implementation_two_impls, diagnoseOn);
+        D.fixItRemove(attr->getRangeWithAt());
+        diags.diagnoseWithNotes(std::move(D), [&]() {
+          diags.diagnose(impls.front(), diag::previous_objc_implementation);
+        });
       }
     }
   }
@@ -7367,11 +7393,29 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     return dyn_cast<AbstractFunctionDecl>(result);
   };
 
+  ASTContext &ctx = func->getASTContext();
+  bool safeImplEnabled =
+      ctx.LangOpts.hasFeature(Feature::SafeInteropImplementations);
+
   auto *clangLoader = func->getASTContext().getClangModuleLoader();
   for (ValueDecl *result : results) {
     AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
       continue;
+
+    // Remap _SwiftifyImport wrapper back to clang import
+    if (safeImplEnabled && resultFunc->isInMacroExpansionFromClangHeader() &&
+        resultFunc->getLoc().isValid()) {
+      const GeneratedSourceInfo *GSI = ctx.SourceMgr.getGeneratedSourceInfo(
+          ctx.SourceMgr.findBufferContainingLoc(resultFunc->getLoc()));
+      if (GSI && GSI->macroName == "_SwiftifyImport") {
+        if (auto headerFunc = dyn_cast_or_null<AbstractFunctionDecl>(
+                resultFunc->getMacroExpansionOriginatingDecl())) {
+          resultFunc = headerFunc;
+          result = resultFunc;
+        }
+      }
+    }
 
     // A virtual method of a foreign reference type is imported as a
     // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
@@ -7383,9 +7427,16 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     if (named->getCDeclName() != clangName)
       continue;
 
-    if (resultFunc->hasClangNode())
-      candidates.push_back(result);
-    else if (resultFunc->isObjCImplementation())
+    if (resultFunc->hasClangNode()) {
+      // The _SwiftifyImport remapping above can map a safe wrapper back to
+      // the same C decl that is also reached directly, so avoid registering it
+      // as a candidate twice. Note: finding both at the same time will only
+      // happen when they have the same number of parameters.
+      if (!llvm::is_contained(candidates, result))
+        candidates.push_back(result);
+    } else if (resultFunc->isObjCImplementation() &&
+               (resultFunc->hasSafeInteropSignature() ==
+                   func->hasSafeInteropSignature()))
       impls.push_back(result);
   }
 
@@ -8638,6 +8689,11 @@ bool ClangImporter::isSwiftFunctionWrapper(
 bool ClangImporter::Implementation::isSwiftFunctionWrapper(
     const clang::RecordDecl *decl) {
   return decl->getIdentifier() && decl->getName() == "__SwiftFunctionWrapper";
+}
+
+void ClangImporter::attachUnswiftifyForSafeImplementation(
+    AbstractFunctionDecl *safeSwiftDecl, DeclName introducedPeerName) {
+  Impl.attachUnswiftifyForSafeImplementation(safeSwiftDecl, introducedPeerName);
 }
 
 bool ClangImporter::isDeconstructedSwiftClosure(const clang::Type *type) const {
