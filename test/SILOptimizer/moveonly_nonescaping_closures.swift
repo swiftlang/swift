@@ -169,6 +169,32 @@ func invokesWithClosureWithArg() {
     m.borrow()
 }
 
+// FIXME: A nonescaping closure that borrows a noncopyable variable shouldn't
+// keep the variable in its box once the closure has been moved, copied, or
+// overwritten.
+func closureConsumed() {
+    let m = M()
+    let closure = { m.borrow() }
+    _ = consume closure
+    consume(m) // expected-error {{non-'Copyable' 'm' cannot be consumed when captured by an escaping closure}}
+}
+
+func closureCopied() {
+    let m = M()
+    let closure = { m.borrow() }
+    let other = closure
+    _ = other
+    consume(m) // expected-error {{non-'Copyable' 'm' cannot be consumed when captured by an escaping closure}}
+}
+
+func closureOverwritten() {
+    let m = M()
+    var closure: (() -> Void)? = { m.borrow() }
+    closure = nil
+    _ = closure
+    consume(m) // expected-error {{non-'Copyable' 'm' cannot be consumed when captured by an escaping closure}}
+}
+
 // need test cases for:
 // - capturing local let
 // - capturing local var

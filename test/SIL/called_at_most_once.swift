@@ -327,3 +327,28 @@ do {
     }
   }
 }
+
+// FIXME: [called-once] Passing an `inout` value of at-most-once function type
+// to a generic `inout T` parameter is rejected, eventhough nothing consumes it.
+func genericInout<T: ~Copyable>(_ x: inout T) {}
+func genericInoutOptional<T: ~Copyable>(_ x: inout T?) {}
+
+func testGenericInout(_ f: inout @called(atMostOnce) () -> Void) { // expected-error {{'f' used after consume}}
+  genericInout(&f) // expected-note {{consumed here}} expected-note {{used here}}
+}
+
+func testGenericInoutOptional(_ f: inout (@called(atMostOnce) () -> Void)?) { // expected-error {{'f' used after consume}}
+  genericInoutOptional(&f) // expected-note {{consumed here}} expected-note {{used here}}
+}
+
+func testOptionalTake(_ f: inout (@called(atMostOnce) () -> Void)?) { // expected-error {{'f' used after consume}}
+  _ = f.take() // expected-note {{consumed here}} expected-note {{used here}}
+}
+
+final class ClosureHolder {
+  var f: (@called(atMostOnce) () -> Void)?
+
+  func take() {
+    _ = f.take() // expected-error {{cannot consume non-'Copyable' stored property 'self.f' of a class}}
+  }
+}

@@ -181,6 +181,8 @@ func testNestedClosurePropagatesConsumedCapture(r: consuming Resource) {
   outer()
 }
 
+// FIXME: [called-once] The closures only borrow `r`, and nothing escapes, so `r`
+// should be promoted out of its box and this consume should be accepted.
 func testCaptureNotConsumedWhenOnlyBorrowedAcrossNesting(r: consuming Resource) {
   let inner = { @called(exactlyOnce) in r.peek() }
   let outer = { @called(exactlyOnce) in inner() }
