@@ -440,7 +440,8 @@ configure_file("${cxx_header_source_dir}/Swift.h"
 install(FILES "${cxx_header_source_dir}/Swift.h"
   DESTINATION "${cxx_header_install_root}/swift"
   COMPONENT SwiftCore_development)
-foreach(header _SwiftCxxInteroperability.h _SwiftStdlibCxxOverlay.h)
+foreach(header _SwiftCxxInteroperability.h _SwiftStdlibCxxOverlay.h
+    _SwiftValueWitnessTable.h)
   configure_file("${cxx_header_source_dir}/${header}"
     "${CMAKE_CURRENT_BINARY_DIR}/cxx/swiftToCxx/${header}" COPYONLY)
   install(FILES "${cxx_header_source_dir}/${header}"
