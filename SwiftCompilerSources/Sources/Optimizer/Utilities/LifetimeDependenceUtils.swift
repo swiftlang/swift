@@ -1613,6 +1613,10 @@ extension LifetimeDependenceUseDefAddressWalker {
     }
     if case let .store(store, _) = initializer {
       switch store {
+      case let store as StoreInst where store.storeOwnership != .trivial && !store.source.isOwnedCopy:
+        // The store consumes the stored value, ending its lifetime before any use of the temporary. Unless that value
+        // is a copy, its lifetime is not a valid scope, so the temporary itself introduces the scope.
+        return addressIntroducer(address, access: access)
       case let store as StoringInstruction:
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
@@ -1626,6 +1630,20 @@ extension LifetimeDependenceUseDefAddressWalker {
       }
     }
     return addressIntroducer(address, access: access)
+  }
+}
+
+private extension Value {
+  /// True if this owned value is a copy whose lifetime is independent of the value it was copied from.
+  var isOwnedCopy: Bool {
+    switch definingInstruction {
+    case is CopyValueInst, is ExplicitCopyValueInst:
+      return true
+    case let load as LoadInst:
+      return load.loadOwnership == .copy
+    default:
+      return false
+    }
   }
 }
 
