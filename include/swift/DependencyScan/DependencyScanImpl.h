@@ -237,6 +237,7 @@ struct swiftscan_import_set_s {
 struct swiftscan_scan_invocation_s {
   swiftscan_string_ref_t working_directory;
   swiftscan_string_set_t *argv;
+  swiftscan_string_ref_t main_executable_path;
 };
 
 struct swiftscan_diagnostic_info_s {

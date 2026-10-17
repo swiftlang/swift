@@ -62,6 +62,10 @@ llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
 llvm::cl::list<std::string> InvalidatedPaths("invalidated-path",
                                              llvm::cl::desc("<path>"),
                                              llvm::cl::cat(Category));
+llvm::cl::opt<std::string> MainExecutablePath(
+    "main-executable-path",
+    llvm::cl::desc("<path of the compiler that runs the scanned jobs>"),
+    llvm::cl::cat(Category));
 llvm::cl::opt<bool>
     NonRecursive("non-recursive",
                  llvm::cl::desc("avoid recursing when ingesting a directory"),
@@ -311,6 +315,9 @@ static int action_scan_dependency(swiftscan_scanner_t scanner,
   swiftscan_scan_invocation_set_working_directory(
       invocation, WorkingDirectory.str().c_str());
   swiftscan_scan_invocation_set_argv(invocation, Args.size(), Args.data());
+  if (!MainExecutablePath.empty())
+    swiftscan_scan_invocation_set_main_executable_path(
+        invocation, MainExecutablePath.c_str());
 
   auto graph = swiftscan_dependency_graph_create(scanner, invocation);
   if (!graph)
