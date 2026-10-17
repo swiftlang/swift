@@ -1,9 +1,9 @@
-// The cases a noncopyable Swift type is not yet exposed to C++ in, and the one
-// resilience case it is.
+// The cases a noncopyable Swift type is not yet exposed to C++ in, and the
+// layouts that are boxed.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Unsup -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/unsup.h
-// RUN: %FileCheck --implicit-check-not=NestedMO %s < %t/unsup.h
+// RUN: %FileCheck --implicit-check-not=NestedMO --implicit-check-not=InnerMO %s < %t/unsup.h
 // RUN: %check-interop-cxx-header-in-clang(%t/unsup.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %target-swift-frontend %s -module-name Unsup -enable-library-evolution -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/unsup-evo.h
@@ -23,19 +23,21 @@ public enum EnumWithMOPayload: ~Copyable {
     case b
 }
 
-// A generic noncopyable type is not exposed.
+// A generic noncopyable type with a noncopyable generic parameter is not
+// exposed.
 public struct Box<T: ~Copyable>: ~Copyable {
     public var t: T
     public init(t: consuming T) { self.t = t }
 }
 
-// A 'Mirror' field is resilient, which leaves the layout opaque.
+// A 'Mirror' field is resilient, which leaves the layout opaque. The value is
+// boxed, so a moved-from object needs no flag.
 public struct OpaqueMO: ~Copyable {
     public var o: Mirror
     public init(o: Mirror) { self.o = o }
 }
 
-public func makeOpaqueMO(_ o: Mirror) -> OpaqueMO { return OpaqueMO(o: o) }
+public func makeOpaqueMO() -> OpaqueMO { return OpaqueMO(o: Mirror(reflecting: 0)) }
 
 // Using a noncopyable type as a Swift generic argument, 'Optional' included.
 public func optMO() -> MO? { return nil }
@@ -54,14 +56,39 @@ public func takeWrapperMO(_ w: borrowing Wrapper<MO>) {}
 public func makeWrapperMO() -> Wrapper<MO> { return Wrapper(n: 0) }
 public func takeWrapperInt(_ w: Wrapper<Int>) {}
 
-// A type nested in a generic one has no layout C++ can know either. It is
-// dropped without a stub, as it is never visited as a top-level declaration.
+// A type nested in a generic one is not exposed. It is dropped without a stub,
+// as it is never visited as a top-level declaration.
 public struct Generic<T> {
     public var t: T
     public init(t: T) { self.t = t }
     public struct NestedMO: ~Copyable {
         public var n: Int
         public init(n: Int) { self.n = n }
+    }
+}
+
+public struct GenericMO<T>: ~Copyable {
+    public var t: T
+    public init(t: T) { self.t = t }
+}
+
+public struct Two<A, B: Sendable>: ~Copyable {
+    public var a: A
+    public var b: B
+}
+
+// A payload of a generic noncopyable type would have to be moved too.
+public enum HoldsGenericMO<T>: ~Copyable {
+    case a(GenericMO<T>)
+}
+
+public func optGenericMO() -> GenericMO<Int>? { return nil }
+
+// A generic type nested in another type is not exposed yet.
+public struct Outer {
+    public var x: Int
+    public struct InnerMO<T>: ~Copyable {
+        public var t: T
     }
 }
 
@@ -78,25 +105,34 @@ public struct FrozenMO: ~Copyable {
     public init(x: Int) { self.x = x }
 }
 
-// The rejections below must not be because 'MO' itself is not exposed.
+// The rejections below must not be because 'GenericMO' or 'MO' itself is not
+// exposed.
+// CHECK: class SWIFT_SYMBOL({{.*}}) GenericMO final {
 // CHECK: class SWIFT_SYMBOL({{.*}}) MO final {
 
 // CHECK-DAG: class Box { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' generic struct 'Box' can not yet be represented in C++");
 // CHECK-DAG: class EnumWithMOPayload { } SWIFT_UNAVAILABLE_MSG("Swift enum 'EnumWithMOPayload' cannot be represented in C++");
-// CHECK-DAG: class OpaqueMO { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'OpaqueMO' can not yet be represented in C++");
-// CHECK-DAG: // Unavailable in C++: Swift global function 'makeOpaqueMO(_:)'. Return type 'OpaqueMO' is not representable in C++.
+// CHECK-DAG: SWIFT_INLINE_THUNK OpaqueMO(OpaqueMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// CHECK-DAG: SWIFT_INLINE_THUNK OpaqueMO makeOpaqueMO() noexcept
 // CHECK-DAG: // Unavailable in C++: Swift global function 'optMO()'. Return type 'MO?' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takeOptMO(_:)'. Parameter 'x' of type 'MO?' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takePtr(_:)'. Parameter 'p' of type 'UnsafeMutablePointer<MO>' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takeWrapperMO(_:)'. Parameter 'w' of type 'Wrapper<MO>' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'makeWrapperMO()'. Return type 'Wrapper<MO>' is not representable in C++.
 // CHECK-DAG: SWIFT_INLINE_THUNK void takeWrapperInt(const Wrapper<swift::Int>& w) noexcept
+// CHECK-DAG: inline const constexpr bool isUsableInGenericContext<Unsup::Two<T_0_0, T_0_1>> = false;
+// CHECK-DAG: class SWIFT_SYMBOL({{.*}}) Two final {
+// CHECK-DAG: class HoldsGenericMO { } SWIFT_UNAVAILABLE_MSG("Swift generic enum 'HoldsGenericMO' cannot be represented in C++");
+// CHECK-DAG: // Unavailable in C++: Swift global function 'optGenericMO()'. Return type 'GenericMO<Int>?' is not representable in C++.
 // CHECK-DAG: class EmptyMO { } SWIFT_UNAVAILABLE_MSG("'EmptyMO' is a zero sized value type, it cannot be exposed to C++ yet");
 // CHECK-DAG: class EmptyDeinitMO { } SWIFT_UNAVAILABLE_MSG("'EmptyDeinitMO' is a zero sized value type, it cannot be exposed to C++ yet");
 
-// Under library evolution a non-frozen type has no layout C++ can know, while
-// a frozen one is still exposed as a move-only class.
+// Under library evolution a non-frozen type is boxed, including a zero sized
+// one, while a frozen one keeps its inline layout.
+// EVO: class SWIFT_SYMBOL({{.*}}) EmptyMO final {
+// EVO: SWIFT_INLINE_THUNK EmptyMO(EmptyMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
 // EVO: class SWIFT_SYMBOL({{.*}}) FrozenMO final {
 // EVO: SWIFT_INLINE_THUNK FrozenMO(FrozenMO &&other) noexcept {
 // EVO: bool _isMovedFrom = false;
-// EVO: class MO { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'MO' can not yet be represented in C++");
+// EVO: class SWIFT_SYMBOL({{.*}}) MO final {
+// EVO: SWIFT_INLINE_THUNK MO(MO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}

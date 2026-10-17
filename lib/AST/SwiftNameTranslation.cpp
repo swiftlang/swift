@@ -322,9 +322,23 @@ bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(
   // per specialization, so only an always-noncopyable type qualifies.
   if (typeDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never)
     return false;
-  // The moved-from flag is stored next to the Swift value, so the layout has
-  // to be statically known.
-  return !typeDecl->isGenericContext() && !typeDecl->isResilient();
+  // Only a type's own generic parameters become C++ template parameters, and
+  // C++ instantiates them with copyable types only.
+  if (typeDecl->getDeclContext()->isGenericContext())
+    return false;
+  if (typeDecl->hasGenericParamList()) {
+    // FIXME: The member alias for a generic type nested in another type refers
+    // to generic parameters that are not in scope.
+    if (!typeDecl->getDeclContext()->isModuleScopeContext())
+      return false;
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    typeDecl->getGenericSignature()->getRequirementsWithInverses(reqs,
+                                                                 inverseReqs);
+    if (!inverseReqs.empty())
+      return false;
+  }
+  return true;
 }
 
 bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(Type type) {
@@ -365,10 +379,8 @@ swift::cxx_translation::getDeclRepresentation(
     }
     // A noncopyable type is exposed as a move-only C++ class. One imported from
     // C/C++ is exposed back as itself, as C++ already knows how to handle it.
-    // 'isOpaqueLayout' is asked last: it lowers the type in IRGen.
     if (!typeDecl->canBeCopyable() && !typeDecl->hasClangNode() &&
-        (!isNoncopyableValueTypeExposableToCxx(typeDecl) ||
-         (layoutQueries && layoutQueries->isOpaqueLayout(typeDecl))))
+        !isNoncopyableValueTypeExposableToCxx(typeDecl))
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
