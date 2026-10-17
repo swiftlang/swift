@@ -2354,6 +2354,11 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 
   // If the status is already Resumed, we can resume immediately.
   if (oldStatus == ContinuationStatus::Resumed) {
+    // The task won't go through an executor, where TSan would see the
+    // acquire that pairs with the release in resumeTaskAfterContinuation,
+    // so make it here.
+    if (swift::tsan::enabled())
+      _swift_tsan_acquire(static_cast<Job *>(swift_task_getCurrent()));
     if (context->isExecutorSwitchForced())
       return swift_task_switch(context, context->ResumeParent,
                                context->ResumeToExecutor);
@@ -2433,6 +2438,9 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 #else
   task->resumeRunningAfterFailedSuspend();
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+
+  // Resumed without suspending: pair with the resumer's release, as above.
+  _swift_tsan_acquire(static_cast<Job *>(task));
 
   if (context->isExecutorSwitchForced())
     return swift_task_switch(context, context->ResumeParent,
