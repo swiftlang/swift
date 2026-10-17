@@ -11,8 +11,6 @@
 
 // REQUIRES: swift_feature_Lifetimes
 
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
-
 // A borrowing for-each loop borrows its sequence in an implicit local
 // ('$<pattern>$sequence') whose scope encloses the loop. The binding is a
 // borrow whether or not the sequence is copyable, so it must be initialized
