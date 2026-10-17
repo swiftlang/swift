@@ -20,7 +20,7 @@ public func takesInt(_ x: Int) {}
 // OLD-NOT: $ss6Int128VN
 // OLD-NOT: $ss7UInt128VN
 // OLD-NOT: isUsableInGenericContext<__int128>
-// OLD: // type metadata address for CChar32.
+// OLD: // type metadata address for Unicode.Scalar.
 // OLD: struct TypeMetadataTrait<char32_t> {
 // OLD-NOT: $ss6Int128VN
 // OLD-NOT: $ss7UInt128VN

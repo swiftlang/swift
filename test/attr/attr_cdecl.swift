@@ -59,4 +59,15 @@ func hasNested() {
 @_cdecl("throwing") // expected-error{{raising errors from @_cdecl functions is not supported}}
 func throwing() throws { }
 
+// Unicode.Scalar parameters are mapped to char32_t in the generated C header,
+// but char32_t can hold values that are not valid Unicode scalars.
+@_cdecl("takesScalar")
+func takesScalar(x: Unicode.Scalar) {}
+// expected-warning@-1{{'Unicode.Scalar' parameter 'x' will be exposed as 'char32_t'}}
+// expected-note@-2{{use 'UInt32' and validate with 'Unicode.Scalar.init(_:)'}}{{21-35=UInt32}}
+
+// Returning Unicode.Scalar is sound (every valid scalar fits in char32_t).
+@_cdecl("returnsScalar")
+func returnsScalar() -> Unicode.Scalar { fatalError() }
+
 // TODO: cdecl name collisions
