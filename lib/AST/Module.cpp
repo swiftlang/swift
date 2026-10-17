@@ -48,6 +48,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -133,6 +134,63 @@ BuiltinUnit::BuiltinUnit(ModuleDecl &M)
 
 SourceFile::~SourceFile() = default;
 
+namespace {
+/// What a macro's unique name encodes about the expansion that introduced it.
+struct UniqueNameOrigin {
+  enum class Kind : uint8_t {
+    /// A peer macro expansion.
+    Peer,
+
+    /// A freestanding macro expansion.
+    Freestanding,
+  };
+
+  /// The kind of macro expansion.
+  Kind kind;
+
+  /// For a peer macro expansion, the name of the declaration the macro is
+  /// attached to. For a freestanding macro expansion, the name of the file
+  /// containing it.
+  Identifier anchorName;
+
+  /// The name of the macro.
+  Identifier macroName;
+
+  /// If \p name is a unique name introduced by a peer or freestanding macro
+  /// expansion, returns what it encodes about that expansion.
+  static std::optional<UniqueNameOrigin> fromUniqueName(ASTContext &ctx,
+                                                        DeclBaseName name);
+
+  /// Returns what the unique names introduced by the expansion of \p macroRef
+  /// would encode, if it's a peer macro attached to a value declaration or a
+  /// freestanding macro in a source file.
+  static std::optional<UniqueNameOrigin> fromMacroRef(
+      ASTContext &ctx,
+      llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *> macroRef,
+      Decl *anchorDecl);
+
+  friend bool operator==(const UniqueNameOrigin &lhs,
+                         const UniqueNameOrigin &rhs) {
+    return lhs.kind == rhs.kind && lhs.anchorName == rhs.anchorName &&
+           lhs.macroName == rhs.macroName;
+  }
+};
+} // end anonymous namespace
+
+namespace llvm {
+template <>
+struct DenseMapInfo<UniqueNameOrigin> {
+  static unsigned getHashValue(const UniqueNameOrigin &origin) {
+    return hash_combine(origin.kind, origin.anchorName.getAsOpaquePointer(),
+                        origin.macroName.getAsOpaquePointer());
+  }
+  static bool isEqual(const UniqueNameOrigin &lhs,
+                      const UniqueNameOrigin &rhs) {
+    return lhs == rhs;
+  }
+};
+} // end namespace llvm
+
 /// A utility for caching global lookups into SourceFiles and modules of
 /// SourceFiles. This is used for lookup of top-level declarations, as well
 /// as operator lookup (which looks into types) and AnyObject dynamic lookup
@@ -169,6 +227,7 @@ class swift::SourceLookupCache {
   ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
   llvm::SmallVector<AbstractFunctionDecl *, 0> CustomDerivatives;
+  ASTContext &Ctx;
   DeclName UniqueMacroNamePlaceholder;
 
   template<typename T>
@@ -195,9 +254,23 @@ class swift::SourceLookupCache {
   llvm::DenseMap<DeclBaseName, TinyPtrVector<ValueDecl *>>
       UniqueNameMacroExpandedDecls;
 
-  /// The number of macros under UniqueMacroNamePlaceholder whose expanded
-  /// declarations have been added to UniqueNameMacroExpandedDecls.
-  unsigned NumIndexedUniqueNameMacros = 0;
+  /// The macros under UniqueMacroNamePlaceholder whose expanded declarations
+  /// have been added to UniqueNameMacroExpandedDecls.
+  llvm::DenseSet<MissingDecl *> IndexedUniqueNameMacros;
+
+  /// The number of leading macros under UniqueMacroNamePlaceholder that are
+  /// all in IndexedUniqueNameMacros.
+  unsigned NumLeadingIndexedUniqueNameMacros = 0;
+
+  /// The macros under UniqueMacroNamePlaceholder, keyed by what the mangled
+  /// names of their expansions encode, which in turn is the prefix of the
+  /// unique names the expansions introduce.
+  llvm::DenseMap<UniqueNameOrigin, TinyPtrVector<MissingDecl *>>
+      UniqueNameMacros;
+
+  /// Expand \p unexpandedDecl and index its declarations, unless it has been
+  /// indexed already.
+  void indexUniqueNameMacro(MissingDecl *unexpandedDecl);
 
   /// Returns the declarations named \p name produced by the top-level macros
   /// that can introduce unique names, expanding the macros not yet indexed.
@@ -520,6 +593,13 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
       for (auto name : macroNames.getSecond()) {
         auto *placeholder = MissingDecl::forUnexpandedMacro(macroRef, anchorDecl);
         name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
+
+        // Also record a macro that can introduce unique names by what its
+        // expansion's mangled name encodes.
+        if (name == UniqueMacroNamePlaceholder)
+          if (auto origin =
+                  UniqueNameOrigin::fromMacroRef(Ctx, macroRef, anchorDecl))
+            UniqueNameMacros[*origin].push_back(placeholder);
       }
     }
   }
@@ -528,7 +608,8 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
 }
 
 SourceLookupCache::SourceLookupCache(ASTContext &ctx)
-  : UniqueMacroNamePlaceholder(MacroDecl::getUniqueNamePlaceholder(ctx)) { }
+    : Ctx(ctx),
+      UniqueMacroNamePlaceholder(MacroDecl::getUniqueNamePlaceholder(ctx)) {}
 
 /// Populate our cache on the first name lookup.
 SourceLookupCache::SourceLookupCache(const SourceFile &SF)
@@ -610,30 +691,148 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
     unexpandedDecl->forEachMacroExpandedDecl(addMacroExpandedDecl);
 }
 
+void SourceLookupCache::indexUniqueNameMacro(MissingDecl *unexpandedDecl) {
+  // Mark the macro as indexed before expanding it, so that a lookup during the
+  // expansion doesn't expand it again.
+  if (!IndexedUniqueNameMacros.insert(unexpandedDecl).second)
+    return;
+  unexpandedDecl->forEachMacroExpandedDecl([&](ValueDecl *decl) {
+    auto &decls = UniqueNameMacroExpandedDecls[decl->getBaseName()];
+    if (!llvm::is_contained(decls, decl))
+      decls.push_back(decl);
+  });
+}
+
+std::optional<UniqueNameOrigin> UniqueNameOrigin::fromMacroRef(
+    ASTContext &ctx,
+    llvm::PointerUnion<FreestandingMacroExpansion *, CustomAttr *> macroRef,
+    Decl *anchorDecl) {
+  // These must match what ASTMangler encodes in the mangled name of the
+  // expansion.
+  if (auto *attr = macroRef.dyn_cast<CustomAttr *>()) {
+    auto *valueDecl = dyn_cast_or_null<ValueDecl>(anchorDecl);
+    if (!valueDecl)
+      return std::nullopt;
+    return UniqueNameOrigin{
+        Kind::Peer,
+        ctx.getIdentifier(valueDecl->getBaseName().userFacingName()),
+        UnresolvedMacroReference(attr).getMacroName().getBaseIdentifier()};
+  }
+
+  if (auto *freestanding = macroRef.dyn_cast<FreestandingMacroExpansion *>()) {
+    auto *sourceFile = anchorDecl->getDeclContext()->getParentSourceFile();
+    if (!sourceFile)
+      return std::nullopt;
+    return UniqueNameOrigin{
+        Kind::Freestanding,
+        ctx.getIdentifier(llvm::sys::path::filename(sourceFile->getFilename())),
+        freestanding->getMacroName().getBaseIdentifier()};
+  }
+
+  return std::nullopt;
+}
+
+std::optional<UniqueNameOrigin>
+UniqueNameOrigin::fromUniqueName(ASTContext &ctx, DeclBaseName name) {
+  if (name.isSpecial())
+    return std::nullopt;
+
+  // Global > MacroExpansionUniqueName > (macro expansion).
+  using Demangle::Node;
+  Demangle::Context demangleCtx;
+  Node *node = demangleCtx.demangleSymbolAsNode(name.getIdentifier().str());
+  if (!node || node->getKind() != Node::Kind::Global ||
+      node->getNumChildren() == 0)
+    return std::nullopt;
+  node = node->getFirstChild();
+  if (node->getKind() != Node::Kind::MacroExpansionUniqueName ||
+      node->getNumChildren() == 0)
+    return std::nullopt;
+  node = node->getFirstChild();
+
+  switch (node->getKind()) {
+  case Node::Kind::PeerAttachedMacroExpansion: {
+    // (context, attached-to name, macro name, discriminator). The attached-to
+    // name may be wrapped in a private or local declaration name, in which
+    // case the identifier is the last child.
+    if (node->getNumChildren() < 3)
+      return std::nullopt;
+    Node *attachedToName = node->getChild(1);
+    if (attachedToName->getKind() == Node::Kind::PrivateDeclName ||
+        attachedToName->getKind() == Node::Kind::LocalDeclName) {
+      if (attachedToName->getNumChildren() == 0)
+        return std::nullopt;
+      attachedToName = attachedToName->getLastChild();
+    }
+    Node *macroName = node->getChild(2);
+    if (attachedToName->getKind() != Node::Kind::Identifier ||
+        macroName->getKind() != Node::Kind::Identifier)
+      return std::nullopt;
+    return UniqueNameOrigin{UniqueNameOrigin::Kind::Peer,
+                            ctx.getIdentifier(attachedToName->getText()),
+                            ctx.getIdentifier(macroName->getText())};
+  }
+
+  case Node::Kind::FreestandingMacroExpansion: {
+    // (MacroExpansionLoc(module, file name, line, column), macro name,
+    // discriminator, private discriminator).
+    if (node->getNumChildren() < 2)
+      return std::nullopt;
+    Node *loc = node->getChild(0);
+    Node *macroName = node->getChild(1);
+    if (loc->getKind() != Node::Kind::MacroExpansionLoc ||
+        loc->getNumChildren() < 2 ||
+        loc->getChild(1)->getKind() != Node::Kind::Identifier ||
+        macroName->getKind() != Node::Kind::Identifier)
+      return std::nullopt;
+    return UniqueNameOrigin{UniqueNameOrigin::Kind::Freestanding,
+                            ctx.getIdentifier(loc->getChild(1)->getText()),
+                            ctx.getIdentifier(macroName->getText())};
+  }
+
+  default:
+    return std::nullopt;
+  }
+}
+
 ArrayRef<ValueDecl *>
 SourceLookupCache::getUniqueNameMacroExpandedDecls(DeclBaseName name) {
-  // Expand the macros that haven't been indexed yet, and index their
-  // declarations. Advance the count before expanding so that a lookup during
-  // the expansion doesn't expand the same macro again. Look up the entry each
-  // time, because such a lookup can add entries.
+  auto findIndexed = [&]() -> ArrayRef<ValueDecl *> {
+    auto found = UniqueNameMacroExpandedDecls.find(name);
+    if (found == UniqueNameMacroExpandedDecls.end())
+      return {};
+    return found->second;
+  };
+
+  // A unique name starts with the mangled name of the macro expansion that
+  // introduced it. If that's a peer macro expansion, expand only the macros
+  // with the same name attached to declarations with the same name. If it's a
+  // freestanding macro expansion, expand only the macros with the same name
+  // in the file with the same name.
+  if (auto origin = UniqueNameOrigin::fromUniqueName(Ctx, name)) {
+    auto found = UniqueNameMacros.find(*origin);
+    if (found != UniqueNameMacros.end()) {
+      // Copy the macros, because a lookup during an expansion can add entries.
+      SmallVector<MissingDecl *, 2> candidates(found->second.begin(),
+                                               found->second.end());
+      for (auto *unexpandedDecl : candidates)
+        indexUniqueNameMacro(unexpandedDecl);
+      auto result = findIndexed();
+      if (!result.empty())
+        return result;
+    }
+  }
+
+  // Otherwise, expand all the macros that haven't been indexed yet. Look up
+  // the entry each time, because a lookup during an expansion can add entries.
   while (true) {
     auto found = TopLevelAuxiliaryDecls.find(UniqueMacroNamePlaceholder);
     if (found == TopLevelAuxiliaryDecls.end() ||
-        NumIndexedUniqueNameMacros >= found->second.size())
+        NumLeadingIndexedUniqueNameMacros >= found->second.size())
       break;
-
-    MissingDecl *unexpandedDecl = found->second[NumIndexedUniqueNameMacros++];
-    unexpandedDecl->forEachMacroExpandedDecl([&](ValueDecl *decl) {
-      auto &decls = UniqueNameMacroExpandedDecls[decl->getBaseName()];
-      if (!llvm::is_contained(decls, decl))
-        decls.push_back(decl);
-    });
+    indexUniqueNameMacro(found->second[NumLeadingIndexedUniqueNameMacros++]);
   }
-
-  auto found = UniqueNameMacroExpandedDecls.find(name);
-  if (found == UniqueNameMacroExpandedDecls.end())
-    return {};
-  return found->second;
+  return findIndexed();
 }
 
 void SourceLookupCache::getPrecedenceGroups(
