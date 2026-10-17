@@ -339,7 +339,12 @@ swift::cxx_translation::getDeclRepresentation(
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return getDeclRepresentation(abiRole.getCounterpart(), layoutQueries);
 
-  if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
+  // The isolation of a main-actor-isolated type only affects its members, which
+  // can be exposed through nonisolated thunks (see `@_ExposeMainActorToCxx`).
+  auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
+  if (isolation.isActorIsolated() &&
+      !(isolation.isMainActor() && isa<NominalTypeDecl>(VD) &&
+        !isa<ProtocolDecl>(VD)))
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
