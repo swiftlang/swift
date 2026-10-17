@@ -193,4 +193,43 @@ HashingTestSuite.test("Hashing/TopLevelHashing/UnsafeRawBufferPointer") {
   }
 }
 
+HashingTestSuite.test("Hashing/TopLevelHashing/RawSpan")
+.require(.minimumStdlib(.stdlib_6_2))
+.code {
+  func checkTopLevelHash(
+    for array: ContiguousArray<UInt8>,
+    seed: Int,
+    file: String = #file,
+    line: UInt = #line) {
+    var hasher = Hasher(_seed: seed)
+    hasher.combine(bytes: array.span.bytes)
+    let expected = hasher.finalize()
+    let actual = array.withUnsafeBytes { buffer in
+      Hasher._hash(seed: seed, bytes: buffer)
+    }
+    expectEqual(
+      actual,
+      expected,
+      "seed: \(seed), array: \(array)",
+      file: file,
+      line: line)
+  }
+  for seed: Int in [
+    0,
+    1,
+    2,
+    Int(truncatingIfNeeded: 0x1827364554637281 as UInt64),
+    Int(truncatingIfNeeded: 0xf9e8d7c6b5a49382 as UInt64)
+  ] {
+    var zeros: ContiguousArray<UInt8> = []
+    var integers: ContiguousArray<UInt8> = []
+    for i: UInt8 in 0 ..< 20 {
+      zeros.append(0)
+      checkTopLevelHash(for: zeros, seed: seed)
+      integers.append(i)
+      checkTopLevelHash(for: integers, seed: seed)
+    }
+  }
+}
+
 runAllTests()
