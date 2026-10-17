@@ -5,6 +5,18 @@
 // RUN: %target-swift-frontend -typecheck -verify %t/main.swift -I %t \
 // RUN:   -module-name main -package-name pkg -enable-testing
 
+// The warning belongs to the CImplementationVisibility group.
+// RUN: %target-swift-frontend -typecheck %t/main.swift -I %t \
+// RUN:   -module-name main -package-name pkg 2>&1 \
+// RUN:   | %FileCheck %s --check-prefix=GROUP
+// RUN: not %target-swift-frontend -typecheck %t/main.swift -I %t \
+// RUN:   -module-name main -package-name pkg \
+// RUN:   -Werror CImplementationVisibility 2>&1 \
+// RUN:   | %FileCheck %s --check-prefix=WERROR
+
+// GROUP: warning: global function 'hiddenPublic()' is declared 'public' but will not be exported, because C function 'hiddenPublic' has hidden visibility [#CImplementationVisibility]
+// WERROR: error: global function 'hiddenPublic()' is declared 'public' but will not be exported, because C function 'hiddenPublic' has hidden visibility [#CImplementationVisibility]
+
 // UNSUPPORTED: OS=windows-msvc
 
 //--- module.modulemap

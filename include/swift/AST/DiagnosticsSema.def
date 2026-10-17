@@ -2254,10 +2254,11 @@ ERROR(cdecl_unretained_result_unsupported,none,
       "'SWIFT_RETURNS_RETAINED' annotation|unretained "
       "('SWIFT_RETURNS_UNRETAINED')}3, which is not yet supported",
       (ValueDecl *, bool, StringRef, unsigned))
-WARNING(cdecl_implementation_hidden_visibility,none,
-        "%kind0 is declared '%1' but will not be exported, because "
-        "%select{C|C++}2 function '%3' has hidden visibility",
-        (ValueDecl *, StringRef, bool, StringRef))
+GROUPED_WARNING(cdecl_implementation_hidden_visibility,
+                CImplementationVisibility,none,
+                "%kind0 is declared '%1' but will not be exported, because "
+                "%select{C|C++}2 function '%3' has hidden visibility",
+                (ValueDecl *, StringRef, bool, StringRef))
 
 // @cxx
 ERROR(cxx_attr_requires_cxx_interop,none,
