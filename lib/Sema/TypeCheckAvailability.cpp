@@ -1916,7 +1916,7 @@ static bool diagnoseTypedThrowsAvailability(
 ///          one of the generic arguments, or none if all are present for
 ///          every generic argument.
 static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
-    BoundGenericType *boundTy) {
+    NominalType *boundTy) {
   for (auto arg : boundTy->getGenericArgs()) {
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       switch (ip) {
@@ -1980,7 +1980,8 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   // Both need a runtime that understands `InvertedProtocols` requirements.
   std::optional<InvertibleProtocolKind> missing;
   bool fromExistential = false;
-  if (auto boundTy = dyn_cast<BoundGenericType>(type))
+  if (auto boundTy = dyn_cast<NominalType>(type);
+      boundTy && boundTy->hasGenericArgs())
     missing = checkGenericArgsForInvertibleReqs(boundTy);
   if (!missing) {
     missing = checkExistentialForInvertibleReqs(type);
@@ -3354,14 +3355,6 @@ public:
       return Action::Continue;
 
     auto subs = ty->getContextSubstitutionMap();
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
-    return Action::Continue;
-  }
-
-  Action visitBoundGenericType(BoundGenericType *ty) override {
-    visitTypeDecl(ty->getDecl());
-
-    auto subs = ty->getContextSubstitutionMap();
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),
@@ -3369,6 +3362,7 @@ public:
         /*warnIfConformanceUnavailablePreSwift6=*/false,
         /*suppressParameterizationCheckForOptional=*/ty->isOptional(),
         /*preconcurrency*/ty->getAnyNominal()->preconcurrency());
+
     return Action::Continue;
   }
 

@@ -8613,7 +8613,7 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
   // conformance. We pass getDeclaredInterfaceType() to find the normal
   // conformance.
   Type lookupTy = ConformingTy;
-  if (auto bound = lookupTy->getAs<BoundGenericType>())
+  if (auto bound = lookupTy->getAs<NominalType>())
     lookupTy = bound->getDecl()->getDeclaredInterfaceType();
   auto lookup = lookupConformance(lookupTy, proto);
   if (lookup.isInvalid()) {

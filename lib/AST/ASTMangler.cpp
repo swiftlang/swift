@@ -1742,9 +1742,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Class:
     case TypeKind::Enum:
     case TypeKind::Struct:
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct:
     case TypeKind::BuiltinTuple: {
       GenericTypeDecl *Decl;
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
@@ -1760,7 +1757,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return;
 
         if (Decl->isStdlibDecl() && Decl->getName().str() == "Optional") {
-          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          auto GenArgs = type->castTo<NominalType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0], sig, forDecl);
           appendOperator("Sg");
@@ -2067,14 +2064,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
-    if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
-                             forDecl);
-  } else {
-    auto boundType = cast<BoundGenericType>(typePtr);
-    genericArgs = boundType->getGenericArgs();
-    if (Type parent = boundType->getParent()) {
-      GenericTypeDecl *decl = boundType->getAnyGeneric();
+    genericArgs = nominalType->getGenericArgs();
+    if (Type parent = nominalType->getParent()) {
+      GenericTypeDecl *decl = nominalType->getAnyGeneric();
       if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))
         appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                                forDecl);

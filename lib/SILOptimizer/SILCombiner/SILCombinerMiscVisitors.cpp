@@ -1270,7 +1270,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
   if (!storageTy->is_ContiguousArrayStorage())
     return std::nullopt;
 
-  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  auto boundGenericTy = dyn_cast<NominalType>(storageTy);
   if (!boundGenericTy)
     return std::nullopt;
 
@@ -1294,8 +1294,8 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
 
   auto anyObjectTy = ctxt.getAnyObjectType();
   auto arrayStorageTy =
-      BoundGenericClassType::get(ctxt.get_ContiguousArrayStorageDecl(), nullptr,
-                                 {anyObjectTy})
+      ClassType::get(ctxt.get_ContiguousArrayStorageDecl(), nullptr,
+                     {anyObjectTy}, ctxt)
           ->getCanonicalType();
   return F.getTypeLowering(arrayStorageTy).getLoweredType();
 }

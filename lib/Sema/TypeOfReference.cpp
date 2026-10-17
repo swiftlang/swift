@@ -107,7 +107,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
   // FIXME: For some reason we can end up with unbound->getDecl()
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
-  // call to BoundGenericType::get().
+  // call to NominalType::get().
   auto result =
       TypeResolution::forInterface(
           DC, std::nullopt,
@@ -238,13 +238,16 @@ public:
     openReqs(D, QuerySubstitutionMap{subs});
   }
 
-  Type transformBoundGenericType(BoundGenericType *genericTy) {
+  Type transformGenericType(NominalType *genericTy) {
+    assert(genericTy->hasGenericArgs());
+
     SmallVector<Type, 4> genericArgs;
     for (auto arg : genericTy->getGenericArgs())
       genericArgs.push_back(transform(arg));
 
-    auto substTy = BoundGenericType::get(
-        genericTy->getDecl(), transform(genericTy->getParent()), genericArgs);
+    auto substTy = NominalType::get(
+        genericTy->getDecl(), transform(genericTy->getParent()), genericArgs,
+        cs.getASTContext());
 
     openGenericTypeRequirements(substTy->getDecl(),
                                 substTy->getContextSubstitutionMap());
@@ -321,8 +324,9 @@ public:
         return transformUnboundGenericType(unbound);
       if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr))
         return transformPlaceholderType(placeholderTy);
-      if (auto *genericTy = dyn_cast<BoundGenericType>(tyPtr))
-        return transformBoundGenericType(genericTy);
+      if (auto *genericTy = dyn_cast<NominalType>(tyPtr);
+          genericTy && genericTy->hasGenericArgs())
+        return transformGenericType(genericTy);
       if (auto *aliasTy = dyn_cast<TypeAliasType>(tyPtr))
         return transformTypeAliasType(aliasTy);
       if (auto *errTy = dyn_cast<ErrorType>(tyPtr))
@@ -2462,9 +2466,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       assert(paramTy->isKnownKeyPathType());
     }
 
-    auto keyPathTy = paramTy->castTo<BoundGenericType>();
+    auto keyPathTy = paramTy->castTo<NominalType>();
 
-    auto *keyPathDecl = keyPathTy->getAnyNominal();
+    auto *keyPathDecl = keyPathTy->getDecl();
     assert(keyPathTy->isKnownKeyPathType() &&
            "parameter is supposed to be a keypath");
 

@@ -905,8 +905,8 @@ bool BridgedASTType::Tuple_containsPackExpansionType() const {
   return llvm::cast<swift::TupleType>(type)->containsPackExpansionType();
 }
 
-BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
-  return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
+BridgedASTTypeArray BridgedASTType::NominalType_getGenericArgs() const {
+  return {llvm::cast<swift::NominalType>(type)->getGenericArgs()};
 }
 
 BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {

@@ -3184,17 +3184,14 @@ void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
                                                    CanType type) {
   switch (type->getKind()) {
   case TypeKind::Struct:
-  case TypeKind::BoundGenericStruct:
     emitSpecializedGenericStructMetadata(IGM, type,
                                          *type.getStructDecl());
     break;
   case TypeKind::Enum:
-  case TypeKind::BoundGenericEnum:
     emitSpecializedGenericEnumMetadata(IGM, type,
                                        *type.getEnumDecl());
     break;
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
     emitSpecializedGenericClassMetadata(IGM, type,
                                         *type.getClassDecl());
     break;

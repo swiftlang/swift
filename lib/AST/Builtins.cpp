@@ -1970,8 +1970,8 @@ static ValueDecl *getAutoDiffAllocateSubcontext(ASTContext &ctx,
 
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
-  auto optionalRawPointerType = BoundGenericEnumType::get(
-      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
+  auto optionalRawPointerType = EnumType::get(
+      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType}, Context);
   return getBuiltinFunction(Id, {int1Type, optionalRawPointerType},
                             Context.TheEmptyTupleType);
 }

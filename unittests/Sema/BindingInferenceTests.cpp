@@ -429,8 +429,9 @@ TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {
 
   // KeyPath<String, Int> i.e. \.utf8.count or something similar
   auto keyPath =
-      BoundGenericType::get(Context.getKeyPathDecl(), /*parent=*/Type(),
-                            {getStdlibType("String"), getStdlibType("Int")});
+      NominalType::get(Context.getKeyPathDecl(), /*parent=*/Type(),
+                       {getStdlibType("String"), getStdlibType("Int")},
+                       Context);
 
   cs.addConstraint(ConstraintKind::Conversion, keyPath, genericArg,
                    cs.getConstraintLocator({}));

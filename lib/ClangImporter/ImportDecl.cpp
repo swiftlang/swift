@@ -6533,8 +6533,7 @@ namespace {
             ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
             isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (superclassType) {
-          assert(superclassType->is<ClassType>() ||
-                 superclassType->is<BoundGenericClassType>());
+          assert(superclassType->is<ClassType>());
           inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
         }
       }
@@ -7168,7 +7167,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // If the type is Unmanaged, that is it is not CF ARC audited,
   // we will store the underlying type and leave it up to the use site
   // to determine whether to use this new_type, or an Unmanaged<CF...> type.
-  if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
+  if (auto genericType = storedUnderlyingType->getAs<NominalType>()) {
     if (genericType->isUnmanaged()) {
       assert(genericType->getGenericArgs().size() == 1 && "other args?");
       storedUnderlyingType = genericType->getGenericArgs()[0];

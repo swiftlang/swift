@@ -2469,10 +2469,11 @@ emitUpcastToKeyPath(SILGenFunction &SGF, SILLocation loc,
   assert(typeKind == KPTK_WritableKeyPath ||
          typeKind == KPTK_ReferenceWritableKeyPath);
 
-  auto derivedKeyPathTy = keyPath.getType().castTo<BoundGenericType>();
+  auto &ctx = SGF.getASTContext();
+  auto derivedKeyPathTy = keyPath.getType().castTo<NominalType>();
   auto baseKeyPathTy =
-    BoundGenericType::get(SGF.getASTContext().getKeyPathDecl(),
-                          Type(), derivedKeyPathTy->getGenericArgs())
+    NominalType::get(ctx.getKeyPathDecl(), Type(),
+                     derivedKeyPathTy->getGenericArgs(), ctx)
       ->getCanonicalType();
   return SGF.B.createUpcast(loc, keyPath,
                             SILType::getPrimitiveObjectType(baseKeyPathTy));
@@ -2520,7 +2521,7 @@ namespace {
         projectFn = SGF.getASTContext().getGetAtKeyPath();
         sig = projectFn->getGenericSignature();
 
-        auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
+        auto keyPathTy = keyPathValue.getType().castTo<NominalType>();
         assert(keyPathTy->getGenericArgs().size() == 2);
         assert(keyPathTy->getGenericArgs()[0]->getCanonicalType() ==
                BaseFormalType->getCanonicalType());
@@ -2557,7 +2558,7 @@ namespace {
         llvm_unreachable("bad writable type kind");
       }
 
-      auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
+      auto keyPathTy = keyPathValue.getType().castTo<NominalType>();
       auto subs = keyPathTy->getContextSubstitutionMap();
 
       auto origType = AbstractionPattern::getOpaque();
@@ -2631,7 +2632,7 @@ namespace {
       auto projectFnRef = SGF.B.createManagedFunctionRef(loc, projectFn);
       auto projectFnType = projectFn->getLoweredFunctionType();
 
-      auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
+      auto keyPathTy = keyPathValue.getType().castTo<NominalType>();
       auto subs = keyPathTy->getContextSubstitutionMap();
 
       auto substFnType = projectFnType->substGenericArgs(
@@ -5907,7 +5908,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
   if (field->isStatic()) {
     auto baseMeta = base.getType().castTo<MetatypeType>().getInstanceType();
     (void)baseMeta;
-    assert(!baseMeta->is<BoundGenericType>() &&
+    assert(!baseMeta->isSpecialized() &&
            "generic static stored properties not implemented");
     if (field->getDeclContext()->getSelfClassDecl() &&
         field->hasStorage())

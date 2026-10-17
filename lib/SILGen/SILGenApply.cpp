@@ -8297,7 +8297,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
-    result->getType().castTo<BoundGenericStructType>()->getDecl();
+    result->getType().castTo<StructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
   assert(props.size() == 1);
   VarDecl *rawPointerField = props[0];

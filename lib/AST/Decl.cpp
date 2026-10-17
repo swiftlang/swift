@@ -6506,7 +6506,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
         args.push_back(argTy);
       }
 
-      return BoundGenericType::get(decl, ParentTy, args);
+      return NominalType::get(decl, ParentTy, args, ctx);
     }
     }
 
@@ -10087,10 +10087,8 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
   if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
-  if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
-    // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
-  }
+  if (T->isArray())
+    return T->castTo<NominalType>()->getGenericArgs()[0];
   return T;
 }
 
@@ -10581,7 +10579,7 @@ void SubscriptDecl::setElementInterfaceType(Type type) {
                                         std::move(type));
 }
 
-BoundGenericType *
+NominalType *
 SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
   // Allow composing a key path type with a `Sendable` protocol as a way to
   // express sendability requirements.
@@ -10608,7 +10606,7 @@ SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
     return nullptr;
   }
 
-  return paramTy->getAs<BoundGenericType>();
+  return paramTy->getAs<NominalType>();
 }
 
 SubscriptDecl *
@@ -10720,7 +10718,7 @@ SubscriptDecl::getDynamicMemberLookupKind() const {
   return eligibility.getDynamicMemberKind();
 }
 
-BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType() const {
+NominalType *SubscriptDecl::getDynamicMemberLookupKeyPathType() const {
   if (getDynamicMemberLookupKind() != DynamicMemberLookupKind::KeyPath) {
     return nullptr;
   }

@@ -253,11 +253,21 @@ private:
           return mismatch(firstNominal.getPointer(), secondNominal,
                           sugaredFirstType);
 
-        if (firstNominal.getParent())
-          return this->visit(firstNominal.getParent(),
-                             secondNominal->getParent(),
-                             sugaredFirstType->castTo<NominalType>()
-                               ->getParent());
+        auto sugaredFirstNominal = sugaredFirstType->castTo<NominalType>();
+        if (auto firstParent = firstNominal.getParent()) {
+          if (!this->visit(firstParent,
+                           secondNominal->getParent(),
+                           sugaredFirstNominal->getParent()))
+            return false;
+        }
+
+        for (unsigned i = 0, n = firstNominal->getGenericArgs().size();
+             i != n; ++i) {
+          if (!this->visit(firstNominal.getGenericArgs()[i],
+                           secondNominal->getGenericArgs()[i],
+                           sugaredFirstNominal->getGenericArgs()[i]))
+            return false;
+        }
 
         return true;
       }
@@ -516,33 +526,6 @@ private:
       }
 
       return mismatch(firstInOut.getPointer(), secondType, sugaredFirstType);
-    }
-
-    bool visitBoundGenericType(CanBoundGenericType firstBGT,
-                               Type secondType, Type sugaredFirstType) {
-      if (firstBGT->getKind() == secondType->getDesugaredType()->getKind()) {
-        auto secondBGT = secondType->castTo<BoundGenericType>();
-        if (firstBGT->getDecl() != secondBGT->getDecl())
-          return mismatch(firstBGT.getPointer(), secondBGT, sugaredFirstType);
-
-        auto sugaredFirstBGT = sugaredFirstType->castTo<BoundGenericType>();
-        if (firstBGT->getParent() &&
-            !this->visit(firstBGT.getParent(), secondBGT->getParent(),
-                         sugaredFirstBGT->getParent()))
-          return false;
-
-        for (unsigned i = 0, n = firstBGT->getGenericArgs().size();
-             i != n; ++i) {
-          if (!this->visit(firstBGT.getGenericArgs()[i],
-                           secondBGT->getGenericArgs()[i],
-                           sugaredFirstBGT->getGenericArgs()[i]))
-            return false;
-        }
-
-        return true;
-      }
-
-      return mismatch(firstBGT.getPointer(), secondType, sugaredFirstType);
     }
 
 #undef TRIVIAL_CASE

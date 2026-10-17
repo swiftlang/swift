@@ -3326,7 +3326,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
-  BoundGenericType_getGenericArgs() const;
+  NominalType_getGenericArgs() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
   PackType_getElementTypes() const;
 };

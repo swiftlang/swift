@@ -1779,11 +1779,8 @@ void IRGenerator::noteUseOfCanonicalSpecializedMetadataAccessor(
 static bool typeKindCanBePrespecialized(TypeKind theKind) {
   switch (theKind) {
   case TypeKind::Struct:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::Enum:
-  case TypeKind::BoundGenericEnum:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
     return true;
   default:
     return false;

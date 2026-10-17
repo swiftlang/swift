@@ -102,11 +102,11 @@ struct PackReferenceCollector: TypeWalker {
       return Action::Continue;
     }
 
-    if (auto *boundGenericType = dyn_cast<BoundGenericType>(t.getPointer())) {
-      if (auto parentType = boundGenericType->getParent())
+    if (auto *nominalType = dyn_cast<NominalType>(t.getPointer())) {
+      if (auto parentType = nominalType->getParent())
         parentType.walk(*this);
 
-      for (auto type : boundGenericType->getExpandedGenericArgs())
+      for (auto type : nominalType->getExpandedGenericArgs())
         type.walk(*this);
 
       return Action::SkipNode;
@@ -388,12 +388,19 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
-SmallVector<Type, 2> BoundGenericType::getExpandedGenericArgs() {
+SmallVector<Type, 2> NominalType::getExpandedGenericArgs() {
+  if (isa<ProtocolType>(this) || isa<BuiltinTupleType>(this))
+    return {};
+
+  auto paramList = getDecl()->getGenericParams();
+  if (!paramList)
+    return {};
+
   // It would be nicer to use genericSig.getInnermostGenericParams() here,
   // but that triggers a request cycle if we're in the middle of computing
   // the generic signature already.
   SmallVector<GenericTypeParamType *, 2> params;
-  for (auto *paramDecl : getDecl()->getGenericParams()->getParams()) {
+  for (auto *paramDecl : paramList->getParams()) {
     params.push_back(paramDecl->getDeclaredInterfaceType()
                          ->castTo<GenericTypeParamType>());
   }
@@ -425,7 +432,7 @@ PackType::getExpandedGenericArgs(ArrayRef<GenericTypeParamType *> params,
     if (params[i]->isParameterPack()) {
       // FIXME: A temporary fix to make it possible to debug expressions
       // with partially resolved variadic generic types. The issue stems
-      // from the fact that `BoundGenericType` is allowed to have pack
+      // from the fact that `NominalType` is allowed to have pack
       // parameters directly represented by type variables, as soon as
       // that is no longer the case this check should be removed.
       if (arg->is<TypeVariableType>()) {

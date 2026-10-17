@@ -763,8 +763,9 @@ namespace {
             // All checks passed: the imported element type is SIMDScalar,
             // and a generic SIMDn type exists with n == count. Construct the
             // bound generic type and return that.
-            return BoundGenericType::get(
-              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element }
+            return NominalType::get(
+              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element },
+              Impl.SwiftContext
             );
           }
         }
@@ -1247,8 +1248,8 @@ namespace {
             }
           }
           assert(importedTypeArgs.size() == typeParamCount);
-          importedType = BoundGenericClassType::get(
-            imported, parentTy, importedTypeArgs);
+          importedType = ClassType::get(
+            imported, parentTy, importedTypeArgs, Impl.SwiftContext);
         } else {
           importedType = imported->getDeclaredInterfaceType();
         }
@@ -1367,8 +1368,9 @@ namespace {
             } else {
               // Everything else.
               bridgedType =
-                  BoundGenericType::get(cast<NominalTypeDecl>(unboundDecl),
-                                        Type(), importedTypeArgs);
+                  NominalType::get(cast<NominalTypeDecl>(unboundDecl),
+                                   Type(), importedTypeArgs,
+                                   Impl.SwiftContext);
             }
           }
 
@@ -1484,9 +1486,10 @@ static Type getUnmanagedType(ClangImporter::Implementation &impl,
   if (!unmanagedDecl || unmanagedDecl->getGenericParams()->size() != 1)
     return payloadType;
 
-  Type unmanagedClassType = BoundGenericType::get(unmanagedDecl,
-                                                  /*parent*/ Type(),
-                                                  payloadType);
+  Type unmanagedClassType = NominalType::get(unmanagedDecl,
+                                             /*parent*/ Type(),
+                                             payloadType,
+                                             impl.SwiftContext);
   return unmanagedClassType;
 }
 
@@ -1556,7 +1559,7 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
   if (!insideOptionalType)
     insideOptionalType = elementType;
 
-  auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
+  auto boundGenericTy = insideOptionalType->getAs<NominalType>();
   if (!boundGenericTy)
     return Type();
 
@@ -2159,14 +2162,7 @@ private:
 
   NEVER_VISIT(ReferenceStorageType)
 
-  VISIT(EnumType, pass)
-  VISIT(StructType, pass)
-  VISIT(ClassType, compose)
-  VISIT(ProtocolType, compose)
-
-  Result visitBoundGenericType(BoundGenericType *ty) {
-    assert(!isa<BoundGenericClassType>(ty) && "classes handled elsewhere");
-
+  Result visitNominalType(NominalType *ty) {
     // These types are produced during bridging and have conditional
     // conformances to Sendable depending on their generic parameters, so we
     // want to make their generic parameters `Sendable`.
@@ -2177,11 +2173,13 @@ private:
         ty->isDictionary())
       return recurse(ty);
 
-    // Other non-class generic types (e.g. pointers) cannot be made Sendable.
-    return pass(ty);
+    if (isa<EnumType>(ty) || isa<StructType>(ty))
+      return pass(ty);
+    if (isa<ClassType>(ty) || isa<ProtocolType>(ty))
+      return compose(ty);
+    llvm_unreachable("unknown nominal type kind");
   }
 
-  VISIT(BoundGenericClassType, compose)
   NEVER_VISIT(UnboundGenericType)
 
   VISIT(AnyMetatypeType, recurse)

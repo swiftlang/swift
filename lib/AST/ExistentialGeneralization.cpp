@@ -113,9 +113,6 @@ private:
   }
 
   // Generalize the type arguments of nominal types.
-  Type visitBoundGenericType(CanBoundGenericType origType) {
-    return generalizeGenericArguments(origType->getDecl(), origType);
-  }
   Type visitNominalType(CanNominalType origType) {
     auto decl = origType->getDecl();
     if (decl->isGenericContext())
