@@ -212,33 +212,26 @@ class Demangler {
 
   NodePointer demangleConstrainedExistentialType(
       const ConstrainedExistentialTypeSpecifier &spec) {
-    // Demangle the base protocol and then wrap it up like the tree expects,
-    // which for some reason is this.
     auto base = demangleProtocol(spec.base);
     base = node(Kind::Type,
                 {node(Kind::ProtocolList,
-                      {node(Kind::Type,
-                            {base})})});
+                      {node(Kind::TypeList,
+                            {node(Kind::Type, {base})})})});
 
     std::vector<NodePointer> reqVector;
-    bool firstReq = false;
     for (auto &arg: spec.args) {
       auto depType =
           node(Kind::Type,
                {node(Kind::DependentMemberType,
                        {node(Kind::Type,
-                             {factory.createNode(Kind::ConstrainedExistentialSelf),
+                             {factory.createNode(Kind::ConstrainedExistentialSelf)}),
                          node(Kind::DependentAssociatedTypeRef,
                              {factory.createNode(Kind::Identifier, arg.first),
                                node(Kind::Type,
-                                   {demangleProtocol(spec.base)})})})})});
+                                   {demangleProtocol(spec.base)})})})});
       auto constraintType = demangleType(arg.second);
       reqVector.push_back(node(Kind::DependentGenericSameTypeRequirement,
                                {depType, constraintType}));
-      if (firstReq) {
-        reqVector.push_back(node(Kind::FirstElementMarker, {}));
-        firstReq = false;
-      }
     }
     NodePointer constraints =
         node(Node::Kind::ConstrainedExistentialRequirementList, reqVector);
@@ -269,7 +262,7 @@ createMangledTypeString(AnyObjectBuilder &builder, const TypeSpecifier &spec) {
   Demangler demangler;
   auto node = demangler.demangleType(spec);
   auto nameBuilder = builder.createSubobject<const char>(/*align*/ 2);
-  nameBuilder.addString(Demangle::nodeToString(node));
+  nameBuilder.addString(Demangle::mangleNode(node).result());
   return nameBuilder.ref();
 }
 
