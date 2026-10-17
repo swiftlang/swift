@@ -8138,6 +8138,17 @@ ERROR(specialize_attr_unsupported_kind_of_req,none,
       "only same-type and layout requirements are supported by '_specialize' attribute", ())
 ERROR(specialized_attr_unsupported_kind_of_req,none,
       "only same-type are supported by 'specialized' attribute", ())
+ERROR(specialized_attr_exported_experimental,none,
+      "'@specialized(exported: true)' requires "
+      "'-enable-experimental-feature ExtendedSpecializedAttribute'", ())
+ERROR(specialized_attr_exported_library_evolution,none,
+      "'@specialized(exported: true)' is not supported in a module built "
+      "with library evolution", ())
+ERROR(specialized_attr_exported_emitted_into_client,none,
+      "'@specialized(exported: true)' cannot be combined with "
+      "%select{'@export(implementation)'|'@_alwaysEmitIntoClient'|"
+      "'@_transparent'|the 'implementation' code generation model}0",
+      (unsigned))
 ERROR(specialize_target_function_not_found, none,
      "target function %0 could not be found", (DeclNameRef))
 ERROR(specialize_target_function_of_type_not_found, none,

@@ -583,9 +583,12 @@ bool Parser::parseSpecializeAttributeArguments(
                  ParamLabel, isPublic);
       }
 
-      // The non-underscored '@specialize' mode currently does not support any
-      // parameters.
-      if (isPublic) {
+      // The non-underscored '@specialized' attribute only supports 'exported',
+      // and only with the ExtendedSpecializedAttribute feature.
+      if (isPublic &&
+          (ParamLabel != "exported" ||
+           !Context.LangOpts.hasFeature(
+               Feature::ExtendedSpecializedAttribute))) {
         diagnose(Tok.getLoc(), diag::attr_specialize_unsupported_parameter_name,
                  ParamLabel);
         DiscardAttribute = true;

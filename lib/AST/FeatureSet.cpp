@@ -229,6 +229,13 @@ static bool usesFeatureTargetAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<TargetAttr>();
 }
 
+static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
+    if (attr->isExported())
+      return true;
+  return false;
+}
+
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
   auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
