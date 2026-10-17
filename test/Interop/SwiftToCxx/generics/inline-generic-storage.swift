@@ -1,4 +1,6 @@
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/stdlib.h
+// RUN: %FileCheck %s --check-prefix=STDLIB < %t/stdlib.h
 // RUN: %target-swift-frontend %s -module-name InlineStorage -cxx-interoperability-mode=default \
 // RUN:   -typecheck -verify -emit-clang-header-path %t/fragile.h
 // RUN: %FileCheck %s --check-prefixes=COMMON,FRAGILE < %t/fragile.h
@@ -8,12 +10,12 @@
 // RUN: %FileCheck %s --check-prefixes=COMMON,RESILIENT < %t/resilient.h
 // RUN: %check-interop-cxx-header-in-clang(%t/resilient.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// COMMON-LABEL: class SWIFT_SYMBOL("s:Sa") Array final {
-// COMMON: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
-// COMMON-NEXT: friend class _impl::_impl_Array<T_0_0>;
-// COMMON-LABEL: class SWIFT_SYMBOL("s:Sq") Optional final {
-// COMMON: swift::_impl::OpaqueStorage _storage;
-// COMMON-NEXT: friend class _impl::_impl_Optional<T_0_0>;
+// STDLIB-LABEL: class SWIFT_SYMBOL("s:Sa") Array final {
+// STDLIB: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// STDLIB-NEXT: friend class _impl::_impl_Array<T_0_0>;
+// STDLIB-LABEL: class SWIFT_SYMBOL("s:Sq") Optional final {
+// STDLIB: swift::_impl::OpaqueStorage _storage;
+// STDLIB-NEXT: friend class _impl::_impl_Optional<T_0_0>;
 
 @frozen public struct Dependent<T> {
   public var value: T
