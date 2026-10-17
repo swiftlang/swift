@@ -298,6 +298,14 @@ static bool usesGenerics(SILFunction *F,
         tvi->getParamType().visit(FindArchetypesAndGenericTypes);
       }
 
+      // Scan the formal types of a conditional cast.
+      // (In particular, `test_only` casts have a formal target type
+      // but no destination.)
+      if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(&I)) {
+        Type(CCABI->getSourceFormalType()).visit(FindArchetypesAndGenericTypes);
+        Type(CCABI->getTargetFormalType()).visit(FindArchetypesAndGenericTypes);
+      }
+
       // Scan the result type of the instruction.
       for (auto V : I.getResults()) {
         V->getType().getASTType().visit(FindArchetypesAndGenericTypes);
