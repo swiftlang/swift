@@ -8000,7 +8000,10 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to;
   to.add(Builder.CreateBitCast(from.claimNext(), IGM.FunctionPtrTy));
-  if (i->getType().castTo<SILFunctionType>()->isTrivialNoEscape())
+  auto fnTy = i->getType().castTo<SILFunctionType>();
+  if (fnTy->isCalledOnce())
+    to.add(IGM.getAddrOfExactlyOnceSharedContext());
+  else if (fnTy->isTrivialNoEscape())
     to.add(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy));
   else
     to.add(IGM.RefCountedNull);
