@@ -119,9 +119,9 @@ Generated headers find `<swift/Swift.h>` through the root include path shown
 above or the matching toolchain's Clang resource directory layout. Consumers
 can include `<swift/Swift.h>` and `MyModule-Swift.h` in either order, and can use
 a module's type as an argument to `swift::Array` or `swift::Optional` after
-including its header. C and Objective-C consumers of a header generated with
-C++ interoperability enabled use the same header discovery; the shared
-header's C++ declarations are guarded by `__cplusplus`.
+including its header. The shared header is included only in C++ and Objective-C++
+mode. C and Objective-C consumers use the generated header's own preamble and do
+not need the Swift C++ header search path.
 
 ## Calling Swift Functions
 

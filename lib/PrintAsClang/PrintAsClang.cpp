@@ -668,11 +668,18 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
      << "\n#pragma clang diagnostic push\n"
         "#pragma clang diagnostic ignored \"-Wgcc-compat\"\n\n";
   if (includesStdlib) {
-    ClangSyntaxPrinter(context, os).printIncludeForSwiftHeader("swift/Swift.h");
-    os << "#pragma clang diagnostic ignored \"-Wauto-import\"\n"
-          "#if __has_feature(nullability) && !defined(__OBJC__)\n"
-          "#pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
-          "#endif\n";
+    emitCxxConditional(
+        os,
+        [&] {
+          ClangSyntaxPrinter(context, os)
+              .printIncludeForSwiftHeader("swift/Swift.h");
+          os << "#pragma clang diagnostic ignored \"-Wauto-import\"\n"
+                "#if __has_feature(nullability) && !defined(__OBJC__)\n"
+                "#pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
+                "#endif\n";
+        },
+        // C and Objective-C consumers do not need Swift's C++ support headers.
+        [&] { writePrologue(os, context); });
   } else {
     writePrologue(os, context);
   }

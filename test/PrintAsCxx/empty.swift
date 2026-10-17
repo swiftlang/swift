@@ -1,12 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -clang-header-expose-decls=all-public -emit-clang-header-path %t/empty.h
-// RUN: %FileCheck %s --check-prefix=MODULE --implicit-check-not=SWIFT_PRINTED_CORE --implicit-check-not='define SWIFT_TYPEDEFS' --implicit-check-not=_SwiftCxxInteroperability.h < %t/empty.h
+// RUN: %FileCheck %s --check-prefix=MODULE --implicit-check-not=SWIFT_PRINTED_CORE --implicit-check-not=_SwiftCxxInteroperability.h < %t/empty.h
 // RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/stdlib.h
 // RUN: %FileCheck %s < %t/stdlib.h
 
 // MODULE-LABEL: #ifndef EMPTY_SWIFT_H
 // MODULE-NEXT:  #define EMPTY_SWIFT_H
 // MODULE:       #include <swift/Swift.h>
+// Skip the C and Objective-C preamble in the #else branch.
+// MODULE-LABEL: #if !__has_feature(nullability_nullable_result)
+// MODULE-NEXT:  # define _Nullable_result _Nullable
+// MODULE-NEXT:  #endif
+// MODULE-NEXT:  #endif
 // MODULE-LABEL: #if defined(__OBJC__)
 // MODULE-NEXT:  #if __has_feature(objc_modules)
 // MODULE-LABEL: #if defined(__OBJC__)
@@ -20,7 +25,7 @@
 // MODULE:       #endif
 // MODULE-NOT:   @
 
-// Common definitions are emitted once, in the standard library header.
+// C++ consumers get the common definitions from the standard library header.
 // CHECK-LABEL: #if !defined(__has_include)
 // CHECK-NEXT: # define __has_include(x) 0
 // CHECK-NEXT: #endif
