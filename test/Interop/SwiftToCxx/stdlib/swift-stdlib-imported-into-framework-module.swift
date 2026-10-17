@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend %t/TestFmSwift.swift -module-name TestFm -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/TestFm.framework/Headers/TestFm-Swift.h
+// RUN: %target-swift-frontend %t/TestFmSwift.swift -module-name TestFm -cxx-interoperability-mode=default -typecheck -verify -emit-clang-header-path %t/TestFm.framework/Headers/TestFm-Swift.h
 
-// RUN: %target-swift-frontend %t/SecondSwift.swift -module-name Second -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/Second.framework/Headers/Second-Swift.h
+// RUN: %target-swift-frontend %t/SecondSwift.swift -module-name Second -cxx-interoperability-mode=default -typecheck -verify -emit-clang-header-path %t/Second.framework/Headers/Second-Swift.h
 
-// RUN: %target-interop-build-clangxx -std=gnu++17 -fmodules -fcxx-modules -c %t/consumer.cpp -F %t -fsyntax-only -Werror=non-modular-include-in-framework-module
+// RUN: %target-interop-build-clangxx -std=c++17 -fmodules -fcxx-modules -fmodules-cache-path=%t/cache -fsyntax-only %t/consumer.cpp -F %t -Werror=non-modular-include-in-framework-module
 
 // Check that a client C++ file can use Swift stdlib APIs from two
 // mixed-language C++ and Swift frameworks.

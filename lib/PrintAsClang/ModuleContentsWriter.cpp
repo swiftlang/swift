@@ -1261,7 +1261,7 @@ bool swift::printModuleContentsAsC(
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     AccessLevel minAccess, bool requiresExposedAttribute,
-    llvm::StringSet<> &exposedModules, bool useClangDeploymentTarget) {
+    llvm::StringSet<> &exposedModules) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -1299,12 +1299,13 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
   }
 
-  os << "#ifndef SWIFT_PRINTED_CORE\n";
-  os << "#define SWIFT_PRINTED_CORE\n";
-  printSwiftToClangCoreScaffold(interopContext, context,
-                                writer.getTypeMapping(), os,
-                                useClangDeploymentTarget);
-  os << "#endif\n";
+  if (M.isStdlibModule() || context.LangOpts.hasFeature(Feature::Embedded)) {
+    os << "#ifndef SWIFT_PRINTED_CORE\n";
+    os << "#define SWIFT_PRINTED_CORE\n";
+    printSwiftToClangCoreScaffold(interopContext, context,
+                                  writer.getTypeMapping(), os);
+    os << "#endif\n";
+  }
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {

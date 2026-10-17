@@ -155,8 +155,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 
 void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
                                      PrimitiveTypeMapping &typeMapping,
-                                     bool isCForwardDefinition,
-                                     bool useClangDeploymentTarget) {
+                                     bool isCForwardDefinition) {
   SmallVector<Type, 16> supportedPrimitiveTypes = {
       astContext.getBoolType(),
 
@@ -202,8 +201,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // - Generic requirement parameters
   // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
-  bool guardAvailability = useClangDeploymentTarget && !embedded &&
-                           astContext.LangOpts.Target.isOSDarwin();
+  bool guardAvailability = !embedded && astContext.LangOpts.Target.isOSDarwin();
 
   // Some of these types were introduced after the oldest runtime that the
   // deployment target supports. Referencing their type metadata from the
@@ -299,8 +297,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
-                                          raw_ostream &os,
-                                          bool useClangDeploymentTarget) {
+                                          raw_ostream &os) {
   ClangSyntaxPrinter printer(astContext, os);
   printer.printNamespace(
       cxx_synthesis::getCxxSwiftNamespaceName(),
@@ -313,8 +310,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                 printValueWitnessTable(os);
                 os << "\n";
                 printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                                /*isCForwardDefinition=*/true,
-                                                useClangDeploymentTarget);
+                                                /*isCForwardDefinition=*/true);
               });
               os << "\n";
             });
@@ -323,8 +319,7 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
         ClangSyntaxPrinter(astContext, os)
             .printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
               printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                              /*isCForwardDefinition=*/false,
-                                              useClangDeploymentTarget);
+                                              /*isCForwardDefinition=*/false);
             });
       },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);

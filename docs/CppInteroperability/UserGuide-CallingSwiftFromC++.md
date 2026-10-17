@@ -105,8 +105,23 @@ Use the same target and SDK settings for compilation and linking. Runtime
 library search paths and the C++ standard library linker option depend on the
 target platform.
 
-Generated module headers keep their existing standard library bindings. The
-public header can be included alongside them in either order.
+Generated C++ module headers include `<swift/Swift.h>` automatically. They
+contain the module's declarations and reuse the standard library bindings and
+common ABI support from the shared header:
+
+```sh
+swiftc -frontend MyModule.swift -module-name MyModule -typecheck \
+  -cxx-interoperability-mode=default \
+  -emit-clang-header-path MyModule-Swift.h
+```
+
+Generated headers find `<swift/Swift.h>` through the root include path shown
+above or the matching toolchain's Clang resource directory layout. Consumers
+can include `<swift/Swift.h>` and `MyModule-Swift.h` in either order, and can use
+a module's type as an argument to `swift::Array` or `swift::Optional` after
+including its header. The shared header is included only in C++ and Objective-C++
+mode. C and Objective-C consumers use the generated header's own preamble and do
+not need the Swift C++ header search path.
 
 ## Calling Swift Functions
 
