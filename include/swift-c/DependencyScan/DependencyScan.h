@@ -421,8 +421,18 @@ SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_set_argv(swiftscan_scan_invocation_t invocation,
                                    int argc, const char **argv);
 
+/// Set the path of the compiler executable (e.g. \c swift-frontend) that will
+/// run the scanned jobs, so the scanner resolves toolchain-relative paths from
+/// the same directory.
+SWIFTSCAN_PUBLIC void swiftscan_scan_invocation_set_main_executable_path(
+    swiftscan_scan_invocation_t invocation, const char *main_executable_path);
+
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_scan_invocation_get_working_directory(
+    swiftscan_scan_invocation_t invocation);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_scan_invocation_get_main_executable_path(
     swiftscan_scan_invocation_t invocation);
 
 SWIFTSCAN_PUBLIC int

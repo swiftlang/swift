@@ -120,22 +120,28 @@ public:
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_dependency_result_t otherwise.
   llvm::ErrorOr<swiftscan_dependency_graph_t>
-  getDependencies(ArrayRef<const char *> Command,
-                  StringRef WorkingDirectory);
+  getDependencies(ArrayRef<const char *> Command, StringRef WorkingDirectory,
+                  StringRef MainExecutablePath = {});
 
   /// Collect the set of imports for the input module
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_prescan_result_t otherwise.
   llvm::ErrorOr<swiftscan_import_set_t>
-  getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
+  getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory,
+             StringRef MainExecutablePath = {});
 
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
+  ///
+  /// \param MainExecutablePath Path to the compiler executable that will run
+  /// the scanned jobs, used to resolve toolchain-relative paths (defaults to
+  /// \c "swiftc" when empty).
   llvm::ErrorOr<ScanQueryContext> createScanQueryContext(
       ArrayRef<const char *> Command, StringRef WorkingDirectory,
       std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
-          &initializationDiagnostics);
+          &initializationDiagnostics,
+      StringRef MainExecutablePath = {});
 
   /// Report that \p Path changed since the previous build.
   void addInvalidatedPath(StringRef Path);
