@@ -4546,6 +4546,35 @@ private:
     }
   }
 
+  /// Warn about a `public` or `package` `@c` or `@cxx @implementation` whose
+  /// C or C++ declaration has hidden visibility. The header wins, so the
+  /// symbol will not be exported despite the Swift access level.
+  void diagnoseHiddenVisibility(ValueDecl *req, ValueDecl *cand) {
+    bool isCxx = cand->getAttrs().hasAttribute<CxxDeclAttr>();
+    if (!isCxx && !cand->getAttrs().hasAttribute<CDeclAttr>())
+      return;
+
+    auto access = cand->getFormalAccess();
+    if (access < AccessLevel::Package)
+      return;
+
+    const auto *clangFD = dyn_cast_or_null<clang::FunctionDecl>(
+        getCxxInterface(req)->getClangDecl());
+    if (!clangFD ||
+        clangFD->getLinkageAndVisibility().getVisibility() !=
+            clang::HiddenVisibility)
+      return;
+
+    // The diagnostic only holds a reference to the name, so keep it alive
+    // until the diagnostic is emitted.
+    std::string clangName = clangFD->getQualifiedNameAsString();
+    auto diag = diagnose(cand, diag::cdecl_implementation_hidden_visibility,
+                         cand, getAccessLevelSpelling(access), isCxx,
+                         clangName);
+    if (auto *accessAttr = cand->getAttrs().getAttribute<AccessControlAttr>())
+      diag.fixItRemove(accessAttr->getRange());
+  }
+
   /// Reject a matched `@c` or `@cxx @implementation` pair whose C or C++
   /// declaration returns a reference-counted foreign reference type at +0.
   /// Returns true if an error was diagnosed (the match is invalid).
@@ -4605,6 +4634,7 @@ private:
           diagnoseUnretainedForeignResult(req, cand))
         return;
       diagnoseCxxOverrideKeyword(req, cand);
+      diagnoseHiddenVisibility(req, cand);
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
       // The storage matched, but its accessors may not have.
