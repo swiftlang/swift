@@ -2185,7 +2185,9 @@ function Build-CMakeProject {
     [switch] $AddAndroidCMakeEnv = $false,
     [string] $SwiftSDK = $null,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
-    [string[]] $BuildTargets = @()
+    [string[]] $BuildTargets = @(),
+    # Reuse the configuration of an existing build tree.
+    [switch] $SkipConfigure = $false
   )
 
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
@@ -2594,8 +2596,10 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$CMakeBin $cmakeGenerateArgs"
-    Invoke-Program $CMakeBin @cmakeGenerateArgs
+    if (-not $SkipConfigure) {
+      Write-Host "$CMakeBin $cmakeGenerateArgs"
+      Invoke-Program $CMakeBin @cmakeGenerateArgs
+    }
 
     # Build all requested targets in one invocation. Test targets such as
     # ExperimentalTest do not depend on the default target, so build it first.
@@ -3552,18 +3556,19 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
+    # The build tree is already configured with these arguments above.
+    Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets @("swift-test-stdlib")
     if ($Targets) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+      Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $Targets
     }
     if ($TestSwift) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+      Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets @("check-swift")
     }
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {
         $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+        Build-CMakeProject @BuildCMakeArgs -SkipConfigure -BuildTargets $LLDBTargets
       }
     }
   }
