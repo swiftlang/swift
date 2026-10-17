@@ -7,6 +7,9 @@
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
 
+// Int128 availability depends on the standard library's deployment configuration.
+// Its metadata declarations and generic traits must use the same version guard.
+
 // CHECK: // type metadata address for Bool.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSbN;
 // CHECK-NEXT: // type metadata address for Int8.
@@ -37,11 +40,11 @@
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSuN;
 // CHECK-NEXT: // type metadata address for CChar32.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UnicodeO6ScalarVN;
-// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= [[INT128_VERSION:[0-9]+]]
 // CHECK-NEXT: // type metadata address for Int128.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6Int128VN;
 // CHECK-NEXT: #endif
-// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= [[INT128_VERSION]]
 // CHECK-NEXT: // type metadata address for UInt128.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UInt128VN;
 // CHECK-NEXT: #endif
@@ -93,7 +96,7 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
-// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= [[INT128_VERSION]]
 // CHECK-NEXT: template<>
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<__int128> = true;
 // CHECK-EMPTY:
@@ -105,7 +108,7 @@
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: #endif
-// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= 130000
+// CHECK-NEXT: #if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= [[INT128_VERSION]]
 // CHECK-NEXT: template<>
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<unsigned __int128> = true;
 // CHECK-EMPTY:

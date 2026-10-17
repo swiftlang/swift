@@ -153,7 +153,7 @@
 #elif defined(__x86_64__) || defined(_M_X64)
 #define SWIFT_STDLIB_HEADER_ARCH x86_64
 #elif defined(__i386__) || defined(_M_IX86)
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(__APPLE__)
 #define SWIFT_STDLIB_HEADER_ARCH i386
 #else
 #define SWIFT_STDLIB_HEADER_ARCH i686

@@ -480,14 +480,19 @@ else()
   set(cxx_header_target "${SwiftCore_MODULE_TRIPLE}")
 endif()
 # The C++ header layout is independent of the runtime library layout.
+set(cxx_header_arch "${SwiftCore_ARCH_SUBDIR}")
+if(SwiftCore_PLATFORM_SUBDIR STREQUAL "windows" AND cxx_header_arch STREQUAL "thumbv7")
+  # Match the public header's ARM architecture name and the legacy build layout.
+  set(cxx_header_arch armv7)
+endif()
 emit_stdlib_cxx_header("${SwiftCore_MODULE_TRIPLE}" "${cxx_header_target}"
-  "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
-  "${cxx_header_install_root}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}")
+  "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/${SwiftCore_PLATFORM_SUBDIR}/${cxx_header_arch}"
+  "${cxx_header_install_root}/swift/${SwiftCore_PLATFORM_SUBDIR}/${cxx_header_arch}")
 if(SwiftCore_VARIANT_MODULE_TRIPLE)
   emit_stdlib_cxx_header("${SwiftCore_VARIANT_MODULE_TRIPLE}"
     "${SwiftCore_COMPILER_VARIANT_TARGET}"
-    "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/maccatalyst/${SwiftCore_ARCH_SUBDIR}"
-    "${cxx_header_install_root}/swift/maccatalyst/${SwiftCore_ARCH_SUBDIR}")
+    "${CMAKE_CURRENT_BINARY_DIR}/cxx/swift/maccatalyst/${cxx_header_arch}"
+    "${cxx_header_install_root}/swift/maccatalyst/${cxx_header_arch}")
 endif()
 
 # Configure plist creation for Darwin platforms.

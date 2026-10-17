@@ -21,6 +21,8 @@
 // RUN: %target-clang -E -P -x c++ -nostdinc -target aarch64-swift-linux-musl %t/client.cpp -I %t | %FileCheck %s --check-prefix=LINUX-STATIC
 // RUN: %target-clang -E -P -x c++ -nostdinc -target armv7-unknown-linux-androideabi %t/client.cpp -I %t | %FileCheck %s --check-prefix=ANDROID
 // RUN: %target-clang -E -P -x c++ -nostdinc -target aarch64-unknown-windows-msvc %t/client.cpp -I %t | %FileCheck %s --check-prefix=WINDOWS
+// RUN: %target-clang -E -P -x c++ -nostdinc -target i686-unknown-windows-msvc %t/client.cpp -I %t | %FileCheck %s --check-prefix=WINDOWS-X86
+// RUN: %target-clang -E -P -x c++ -nostdinc -target thumbv7-unknown-windows-msvc %t/client.cpp -I %t | %FileCheck %s --check-prefix=WINDOWS-ARM
 // RUN: %target-clang -E -P -x c++ -nostdinc -target arm64ec-unknown-windows-msvc %t/client.cpp -I %t | %FileCheck %s --check-prefix=ARM64EC
 // RUN: %target-clang -E -P -x c -nostdinc -target x86_64-unknown-freebsd -U__clang__ %t/client.cpp -I %t | %FileCheck %s --check-prefix=FREEBSD
 // A missing target must not find bindings in a neighboring installation.
@@ -41,6 +43,8 @@
 // LINUX-STATIC: selected_linux_static
 // ANDROID: selected_android
 // WINDOWS: selected_windows_aarch64
+// WINDOWS-X86: selected_windows_i686
+// WINDOWS-ARM: selected_windows_armv7
 // ARM64EC: selected_windows_arm64ec
 // FREEBSD: selected_freebsd
 // MISSING: Swift standard library C++ bindings are not installed for this target
@@ -79,6 +83,10 @@ selected_linux_static
 selected_android
 //--- swift/windows/aarch64/_SwiftStdlib.h
 selected_windows_aarch64
+//--- swift/windows/i686/_SwiftStdlib.h
+selected_windows_i686
+//--- swift/windows/armv7/_SwiftStdlib.h
+selected_windows_armv7
 //--- swift/windows/arm64ec/_SwiftStdlib.h
 selected_windows_arm64ec
 //--- swift/freebsd/x86_64/_SwiftStdlib.h
