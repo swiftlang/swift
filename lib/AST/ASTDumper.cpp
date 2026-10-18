@@ -5264,6 +5264,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
   TRIVIAL_ATTR_PRINTER(UnsafeSelfDependentResult, unsafe_self_dependent_result)
+  TRIVIAL_ATTR_PRINTER(NonTransferable, nontransferable)
 
 #undef TRIVIAL_ATTR_PRINTER
 
