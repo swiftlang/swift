@@ -499,7 +499,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///             throw MyRandomNumberError()
   ///         }
   ///         return random
-  ///     }
+  ///     } onCancel: { @Sendable () in print("Canceled.") }
   ///
   ///     // Call point:
   ///     do {
@@ -510,6 +510,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   ///         print(error)
   ///     }
   ///
+  /// - Note: Because the system might call the `onCancel` callback as
+  /// part of task cancellation, it's subject to the same considerations for
+  /// avoiding deadlock as outlined in the documentation for
+  /// ``withTaskCancellationHandler(operation:onCancel:)``.
   @available(SwiftStdlib 6.5, *)
   @preconcurrency
   public init(
