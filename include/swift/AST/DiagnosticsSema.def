@@ -7189,6 +7189,9 @@ ERROR(invalid_isolated_and_convention_attributes,none,
 ERROR(invalid_execution_semantics_and_attr_attributes,none,
       "%0 attribute is not allowed on '%1' types",
       (TypeAttribute *, StringRef))
+ERROR(invalid_use_of_nontransferable_and_sendable_attributes,none,
+      "'@Sendable' attribute is not allowed on non-'Transferable' types",
+      ())
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(non_inferrable_opaque_generic_parameter,none,

@@ -7440,6 +7440,11 @@ public:
         printExecutionSemanticsAttr(*semantics);
     }
 
+    if (!Options.excludeAttrKind(TypeAttrKind::NonTransferable) &&
+        info.isNonTransferable()) {
+      Printer.printSimpleAttr("@nontransferable") << " ";
+    }
+
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
