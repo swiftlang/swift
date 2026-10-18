@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s %if objc_interop %{ --check-prefixes=CHECK,CHECK-OBJC %} %else %{ --check-prefixes=CHECK,CHECK-NOOBJC %}
 
 // We want to check two things here:
 // - Correctness
@@ -734,7 +734,10 @@ func test28_3() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test29SbyF
 // CHECK: bb0
-// CHECK: checked_cast
+// WITH Objective-C interop the source might contain a metatype
+// represented as an ObjC object, so the runtime cast is not eliminated.
+// CHECK-OBJC: checked_cast
+// CHECK-NOOBJC-NOT: checked_cast
 // CHECK: return
 @inline(never)
 func test29() -> Bool {
@@ -752,7 +755,10 @@ func test30() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test32SbyF
 // CHECK: bb0
-// CHECK: checked_cast
+// WITH Objective-C interop the source might contain a metatype
+// represented as an ObjC object, so the runtime cast is not eliminated.
+// CHECK-OBJC: checked_cast
+// CHECK-NOOBJC-NOT: checked_cast
 // CHECK: return
 @inline(never)
 func test32() -> Bool {
@@ -763,7 +769,10 @@ func test32() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test33SbyF
 // CHECK: bb0
-// CHECK: checked_cast
+// WITH Objective-C interop the source might contain a metatype
+// represented as an ObjC object, so the runtime cast is not eliminated.
+// CHECK-OBJC: checked_cast
+// CHECK-NOOBJC-NOT: checked_cast
 // CHECK: return
 @inline(never)
 func test33() -> Bool {
