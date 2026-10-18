@@ -669,3 +669,145 @@ suite.test("ContiguousArray.append underflow")
   }
   expectUnreachable("ContiguousArray.append should have trapped.")
 }
+
+private struct NCTracked: ~Copyable {
+  let tracked: LifetimeTracked
+  init(_ value: Int) { tracked = LifetimeTracked(value) }
+  var value: Int { tracked.value }
+}
+
+suite.test("OutputSpan.consumeAll()")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  do {
+    var input = output.consumeAll()
+    expectEqual(input.count, 5)
+    expectEqual(input.capacity, 5)
+    expectTrue(input.isFull)
+    expectEqual(input.removeFirst().value, 0)
+    expectEqual(input.removeFirst().value, 1)
+    expectEqual(input[0].value, 2)
+    expectEqual(LifetimeTracked.instances, 3)
+    _ = consume input
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+}
+
+suite.test("OutputSpan.consumeAll() on an empty span")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var nothing = OutputSpan<Int>()
+  do {
+    let input = nothing.consumeAll()
+    expectTrue(input.isEmpty)
+    expectEqual(input.capacity, 0)
+  }
+
+  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { buffer.deallocate() }
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  do {
+    let input = output.consumeAll()
+    expectTrue(input.isEmpty)
+    expectEqual(input.capacity, 0)
+  }
+}
+
+suite.test("OutputSpan.consumeAll(consumingWith:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  var calls = 0
+  let remaining = output.consumeAll {
+    (input: consuming InputSpan<NCTracked>) -> [Int] in
+    calls += 1
+    expectEqual(input.count, 5)
+    expectEqual(input.capacity, 5)
+    expectEqual(input.removeFirst().value, 0)
+    expectEqual(input.removeFirst().value, 1)
+    expectEqual(input[0].value, 2)
+    expectEqual(LifetimeTracked.instances, 3)
+    var values: [Int] = []
+    for i in input.indices {
+      values.append(input[i].value)
+    }
+    return values
+  }
+  expectEqual(calls, 1)
+  expectEqual(remaining, [2, 3, 4])
+  expectEqual(LifetimeTracked.instances, 0)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+}
+
+suite.test("OutputSpan.consumeAll(consumingWith:) returning a noncopyable value")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  let first = output.consumeAll {
+    (input: consuming InputSpan<NCTracked>) -> NCTracked in
+    input.removeFirst()
+  }
+  expectEqual(first.value, 0)
+  expectEqual(LifetimeTracked.instances, 1)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+  _ = consume first
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("OutputSpan.consumeAll(consumingWith:) throwing")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  do throws(MyTestError) {
+    try output.consumeAll {
+      (input: consuming InputSpan<NCTracked>) throws(MyTestError) in
+      expectEqual(input.removeFirst().value, 0)
+      expectEqual(LifetimeTracked.instances, 4)
+      throw MyTestError.error
+    }
+    expectUnreachable("consumeAll should have thrown")
+  } catch {
+    expectEqual(error, MyTestError.error)
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+}
