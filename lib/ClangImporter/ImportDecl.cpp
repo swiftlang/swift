@@ -1152,6 +1152,12 @@ namespace {
       return std::nullopt;
     }
 
+    std::optional<Decl *> importDeclCachedForProjection(
+        const clang::NamedDecl *decl) {
+      return findImportedForProjection(
+          Impl.getImportedDeclsKey(decl, getVersion()));
+    }
+
     /// The actual language version the user requested we compile for.
     ImportNameVersion getActiveSwiftVersion() const {
       return Impl.CurrentVersion;
@@ -5408,7 +5414,7 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      auto known = Impl.importDeclCached(decl, getVersion());
+      auto known = importDeclCachedForProjection(decl);
       if (known.has_value())
         return known.value();
 
@@ -5768,7 +5774,7 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      auto known = Impl.importDeclCached(decl, getVersion());
+      auto known = importDeclCachedForProjection(decl);
       if (known.has_value())
         return known.value();
 
@@ -5882,7 +5888,7 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      auto Known = Impl.importDeclCached(decl, getVersion());
+      auto Known = importDeclCachedForProjection(decl);
       if (Known.has_value())
         return Known.value();
 
@@ -6084,10 +6090,8 @@ namespace {
           dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         // FIXME: Should also be able to do this for forced class
         // methods.
-        auto known = Impl.ImportedDecls.find(
-            Impl.getImportedDeclsKey(decl, getVersion()));
-        if (known != Impl.ImportedDecls.end()) {
-          auto decl = known->second;
+        if (auto known = importDeclCachedForProjection(decl)) {
+          auto decl = *known;
           if (isAcceptableResultOrNull(decl, accessorInfo))
             return decl;
         }
@@ -6235,10 +6239,8 @@ namespace {
           dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         // FIXME: Should also be able to do this for forced class
         // methods.
-        auto known = Impl.ImportedDecls.find(
-            Impl.getImportedDeclsKey(decl, getVersion()));
-        if (known != Impl.ImportedDecls.end()) {
-          auto decl = known->second;
+        if (auto known = importDeclCachedForProjection(decl)) {
+          auto decl = *known;
           if (isAcceptableResultOrNull(decl, accessorInfo))
             return decl;
         }
@@ -7066,7 +7068,7 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      auto Known = Impl.importDeclCached(decl, getVersion());
+      auto Known = importDeclCachedForProjection(decl);
       if (Known.has_value())
         return Known.value();
 
@@ -7199,10 +7201,8 @@ namespace {
 
       // Check whether the property already got imported.
       if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
-        auto known = Impl.ImportedDecls.find(
-            Impl.getImportedDeclsKey(decl, getVersion()));
-        if (known != Impl.ImportedDecls.end())
-          return known->second;
+        if (auto known = importDeclCachedForProjection(decl))
+          return *known;
       }
 
       auto type = importedType.getType();
