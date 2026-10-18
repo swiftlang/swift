@@ -24,6 +24,7 @@ namespace llvm {
   template <class T> class ArrayRef;
   class Constant;
   class Function;
+  class FunctionType;
   class GlobalVariable;
   class Value;
 }
@@ -53,6 +54,20 @@ namespace irgen {
 
   bool requiresForeignTypeMetadata(CanType type);
   bool requiresForeignTypeMetadata(NominalTypeDecl *decl);
+
+  /// Emit a reference to the canonical type context descriptor among the
+  /// copies of a back-deployed type that images in the process emit: the
+  /// descriptor that every image that emits a copy agrees to use.
+  llvm::Value *emitCanonicalBackDeploymentCopyDescriptor(IRGenFunction &IGF,
+                                                         NominalTypeDecl *decl);
+
+  /// Get a weak reference to the metadata access function of a back-deployed
+  /// type in its defining module, as opposed to this module's copy of it. It
+  /// is null when that module doesn't provide the type at runtime.
+  llvm::Function *
+  getDefiningModuleTypeMetadataAccessFunction(IRGenModule &IGM,
+                                              NominalTypeDecl *decl,
+                                              llvm::FunctionType *fnType);
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,

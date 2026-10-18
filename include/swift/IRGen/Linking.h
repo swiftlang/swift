@@ -1861,6 +1861,11 @@ public:
   /// definitions (e.g., with @used).
   bool hasNonUniqueDefinition() const;
 
+  /// Whether this entity belongs to a back-deployed type from another module,
+  /// or to a conformance declared alongside it, which the module being
+  /// compiled emits on demand.
+  bool isBackDeployedIntoClient() const;
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 
