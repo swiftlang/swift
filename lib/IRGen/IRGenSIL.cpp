@@ -2782,6 +2782,10 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
   }
 
+  // Mark as llvm.used if @used.
+  if (f->markedAsUsed())
+    addUsedGlobal(llvmF);
+
   IRGenSILFunction(*this, f, llvmF).emitSILFunction();
 
   emitCxxVirtualMethodTables(*this, f);
