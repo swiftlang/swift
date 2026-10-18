@@ -1006,6 +1006,18 @@ bool IRGenModule::isResilientConformance(
       conformance->getProtocol()->getAlternateModuleName())
     return false;
 
+  // A copy of a conformance declared alongside a back-deployed type from
+  // another module doesn't get the optimizations below, which assume the
+  // conformance is emitted by its own module.
+  if (conformanceModule != getSwiftModule()) {
+    if (auto *nominal =
+            conformance->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->isBackDeployedIntoClient() &&
+          conformanceModule == nominal->getParentModule())
+        return true;
+    }
+  }
+
   // If the protocol and the conformance are in the same module and the
   // conforming type is not generic, they're not resilient.
   //
@@ -1066,6 +1078,19 @@ static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
   return false;
 }
 
+/// Whether this is a conformance, declared alongside a back-deployed type from
+/// another module, that this module emits a copy of along with the type.
+static bool isBackDeployedIntoClient(
+    const RootProtocolConformance *conformance) {
+  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normal)
+    return false;
+  auto nominal = normal->getType()->getAnyNominal();
+  return nominal && nominal->isBackDeployedIntoClient() &&
+         normal->getDeclContext()->getParentModule() ==
+             nominal->getParentModule();
+}
+
 /// Determine whether a protocol can ever have a dependent conformance.
 static bool protocolCanHaveDependentConformance(
     ProtocolDecl *proto,
@@ -1116,7 +1141,8 @@ static bool isDependentConformance(
 
   // If the conformance is resilient or synthesized, this is always true.
   if (IGM.isResilientConformance(conformance)
-      || isSynthesizedNonUnique(conformance))
+      || isSynthesizedNonUnique(conformance)
+      || isBackDeployedIntoClient(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1420,6 +1446,45 @@ public:
   llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
                                       CanType conformingType) const override {
     return IGM.getAddrOfWitnessTable(Conformance);
+  }
+};
+
+/// Conformance info for a copy of a conformance declared alongside a
+/// back-deployed type from another module.
+///
+/// Each image that emits a copy of the type has its own copy of the
+/// conformance, and generic metadata caches compare witness tables by address.
+/// Ask the runtime for the witness table, so that every image uses the one the
+/// runtime's own conformance lookup picks: the defining module's when it
+/// provides the type, and otherwise one of the copies.
+class RuntimeLookupConformanceInfo : public ConformanceInfo {
+  const ProtocolConformance *Conformance;
+
+public:
+  RuntimeLookupConformanceInfo(const ProtocolConformance *C)
+      : Conformance(C) {}
+
+  llvm::Value *getTable(IRGenFunction &IGF,
+                        llvm::Value **typeMetadataCache) const override {
+    llvm::Value *metadata = typeMetadataCache ? *typeMetadataCache : nullptr;
+    if (!metadata) {
+      auto conformingType = Conformance->getType()->getCanonicalType();
+      metadata = IGF.emitTypeMetadataRef(conformingType);
+      if (typeMetadataCache)
+        *typeMetadataCache = metadata;
+    }
+
+    auto protocol = IGF.IGM.getAddrOfProtocolDescriptor(
+        Conformance->getProtocol());
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getConformsToProtocolFunctionPointer(), {metadata, protocol});
+    call->setDoesNotThrow();
+    return call;
+  }
+
+  llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                      CanType conformingType) const override {
+    return nullptr;
   }
 };
 
@@ -2710,6 +2775,10 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
   if (!IRGen.Opts.UseRelativeProtocolWitnessTables &&
+      isBackDeployedIntoClient(rootConformance)) {
+    info = new RuntimeLookupConformanceInfo(conformance);
+    Conformances.try_emplace(conformance, info);
+  } else if (!IRGen.Opts.UseRelativeProtocolWitnessTables &&
       (isDependentConformance(rootConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
