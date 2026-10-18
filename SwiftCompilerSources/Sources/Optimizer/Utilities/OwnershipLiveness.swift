@@ -401,7 +401,7 @@ extension OwnershipUseVisitor {
   // This is only called for uses in the outer lifetime.
   private mutating func classifyOwned(operand: Operand) -> WalkResult {
     switch operand.ownership {
-    case .nonUse:
+    case .nonUse, .debugUse:
       return .continueWalk
 
     case .destroyingConsume:
@@ -416,7 +416,7 @@ extension OwnershipUseVisitor {
       }
       return pointerEscapingUse(of: operand)
 
-    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .debugUse, .bitwiseEscape:
+    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape:
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
@@ -435,7 +435,7 @@ extension OwnershipUseVisitor {
   private mutating func classifyGuaranteed(operand: Operand)
     -> WalkResult {
     switch operand.ownership {
-    case .nonUse:
+    case .nonUse, .debugUse:
       return .continueWalk
 
     case .pointerEscape:
@@ -448,7 +448,7 @@ extension OwnershipUseVisitor {
       }
       return pointerEscapingUse(of: operand)
 
-    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .debugUse, .bitwiseEscape, .endBorrow, .reborrow:
+    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape, .endBorrow, .reborrow:
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .guaranteedForwarding:

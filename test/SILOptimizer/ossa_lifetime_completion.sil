@@ -829,3 +829,30 @@ bb0:
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @test_debug_value_past_consume_availability :
+// CHECK:      bb2([[PAYLOAD:%.*]] : @owned $C):
+// CHECK-NEXT:   debug_value %0 : $FakeOptional<C>
+// CHECK-NEXT:   destroy_value [[PAYLOAD]] : $C
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NEXT:   [[R:%.*]] = tuple ()
+// CHECK-NEXT:   return [[R]] : $()
+// CHECK-LABEL: } // end sil function 'test_debug_value_past_consume_availability'
+sil [ossa] @test_debug_value_past_consume_availability : $@convention(thin) (@owned FakeOptional<C>) -> () {
+bb0(%0 : @owned $FakeOptional<C>):
+  specify_test "ossa_complete_lifetime @argument availability"
+  switch_enum %0 : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb2, case #FakeOptional.none!enumelt: bb1
+
+bb1:
+  br bb3
+
+bb2(%payload : @owned $C):
+  debug_value %0 : $FakeOptional<C>
+  destroy_value %payload : $C
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
