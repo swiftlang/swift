@@ -20,15 +20,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// The -O line above becomes -O *plus* opaque values in this mode, and that
-// combination trips a SILCombine debug-info bug: after a move-only box is
-// promoted away, the address-based debug_value describing it is left on an
-// undef alongside the object-based one recording the folded value, and the two
-// conflict. Unrelated to casting -- the cast folds correctly -- and reproduced
-// standalone in swift-test-baselines/bugs/ov-O-duplicate-debug-value.swift.
-// The -Onone line passes under opaque values; it is only the pairing with -O.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 protocol P: ~Copyable, ~Escapable {}
 
 /// Neither copyable nor escapable.
