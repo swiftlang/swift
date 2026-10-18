@@ -143,6 +143,12 @@ public:
     return mangleTypeSymbol(type, "Ma");
   }
 
+  /// A module's copy of the metadata access function for a back-deployed
+  /// type from another module.
+  std::string mangleBackDeploymentCopyTypeMetadataAccessFunction(Type type) {
+    return mangleTypeSymbol(type, "MaTwa");
+  }
+
   std::string
   mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(Type type) {
     return mangleTypeSymbol(type, "Mb");

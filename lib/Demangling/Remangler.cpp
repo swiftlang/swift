@@ -1921,6 +1921,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AccessibleFunctionRecord:
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
+      case Node::Kind::BackDeploymentCopy:
       case Node::Kind::HasSymbolQuery:
       case Node::Kind::CoroFunctionPointer:
       case Node::Kind::DefaultOverride:
@@ -4173,6 +4174,12 @@ ManglingError Remangler::mangleBackDeploymentThunk(Node *node,
 ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
                                                       unsigned depth) {
   Buffer << "TwB";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentCopy(Node *node,
+                                                   unsigned depth) {
+  Buffer << "Twa";
   return ManglingError::Success;
 }
 

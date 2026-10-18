@@ -258,7 +258,7 @@ public actor CannotBackDeployActorDesignatedInit {
   public init(x: Int) {}
 }
 
-@backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' attribute cannot be applied to this declaration}}
+@backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' requires that struct 'CannotBackDeployStruct' be '@frozen'}}
 public struct CannotBackDeployStruct {
   @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' must not be used on stored properties}}
   public var cannotBackDeployStoredProperty: Int = 83
@@ -267,10 +267,20 @@ public struct CannotBackDeployStruct {
   public lazy var cannotBackDeployLazyStoredProperty: Int = 15
 }
 
-@backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' attribute cannot be applied to this declaration}}
+@backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' requires that enum 'CannotBackDeployEnum' be '@frozen'}}
 public enum CannotBackDeployEnum {
   @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' attribute cannot be applied to this declaration}}
   case cannotBackDeployEnumCase
+}
+
+@backDeployed(before: macOS 12.0) // OK
+@frozen public struct BackDeployedFrozenStruct {
+  public var storedProperty: Int
+}
+
+@backDeployed(before: macOS 12.0) // OK
+@frozen public enum BackDeployedFrozenEnum {
+  case a
 }
 
 @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' must not be used on stored properties}}

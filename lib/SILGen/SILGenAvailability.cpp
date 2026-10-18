@@ -108,39 +108,6 @@ static Type getResultInterfaceType(AbstractFunctionDecl *AFD) {
   llvm_unreachable("Unhandled AbstractFunctionDecl type");
 }
 
-static std::optional<AvailabilityQuery>
-getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
-  auto &ctx = AFD->getASTContext();
-  if (ctx.LangOpts.TargetVariant) {
-    auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange();
-    auto variantAttrAndRange =
-        AFD->getBackDeployedAttrAndRange(/*forTargetVariant=*/true);
-
-    if (!primaryAttrAndRange && !variantAttrAndRange)
-      return std::nullopt;
-
-    auto attr = primaryAttrAndRange ? primaryAttrAndRange->first
-                                    : variantAttrAndRange->first;
-    std::optional<AvailabilityRange> primaryRange;
-    if (primaryAttrAndRange)
-      primaryRange = primaryAttrAndRange->second;
-
-    std::optional<AvailabilityRange> variantRange;
-    if (variantAttrAndRange)
-      variantRange = variantAttrAndRange->second;
-
-    return AvailabilityQuery::dynamic(attr->getAvailabilityDomain(),
-                                      primaryRange, variantRange);
-  }
-
-  if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange())
-    return AvailabilityQuery::dynamic(
-        primaryAttrAndRange->first->getAvailabilityDomain(),
-        primaryAttrAndRange->second, std::nullopt);
-
-  return std::nullopt;
-}
-
 /// Emit the following branch SIL instruction:
 /// \verbatim
 /// if #available(OSVersion) {
@@ -156,7 +123,7 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
                                                SILBasicBlock *unavailableBB) {
   auto &B = SGF.B;
   SILValue booleanTestValue;
-  if (auto query = getAvailabilityQueryForBackDeployment(AFD)) {
+  if (auto query = AFD->getBackDeploymentAvailabilityQuery()) {
     booleanTestValue = emitAvailabilityCheck(SGF, loc, *query);
   } else {
     // Some logic has gone wrong if we've gotten here but lets fail gracefully
@@ -319,12 +286,32 @@ SILValue SILGenFunction::emitAvailabilityQuery(SILLocation loc,
   return emitAvailabilityCheck(*this, loc, query);
 }
 
+/// Whether \p decl is back-deployed because it is a member of a back-deployed
+/// type, rather than because it is marked \c @backDeployed itself.
+static bool inheritsBackDeployment(ValueDecl *decl) {
+  const Decl *owner = decl;
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl))
+    owner = accessor->getStorage();
+  return !owner->getAttrs().hasAttribute<BackDeployedAttr>();
+}
+
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
                                                ResilienceExpansion expansion) {
   auto &ctx = getASTContext();
   auto attrAndRange = decl->getBackDeployedAttrAndRange();
-  if (!attrAndRange)
+
+  // A member of a back-deployed type needs the thunk unless the deployment
+  // targets guarantee that its original is available, on the primary target
+  // and on any target variant, consistent with whether this module emits its
+  // own copy of the type.
+  std::optional<AvailabilityQuery> inheritedQuery;
+  if (inheritsBackDeployment(decl)) {
+    inheritedQuery = decl->getBackDeploymentAvailabilityQuery();
+    if (!inheritedQuery)
+      return false;
+  } else if (!attrAndRange) {
     return false;
+  }
 
   switch (expansion) {
   case ResilienceExpansion::Minimal:
@@ -336,6 +323,9 @@ bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
     // FIXME: We can skip thunking if we're in the same module.
     break;
   }
+
+  if (inheritedQuery)
+    return !inheritedQuery->isAlwaysTrueForDeploymentTargets(ctx);
 
   // Use of a back deployment thunk is unnecessary if the deployment target is
   // high enough that the ABI implementation of the back deployed declaration is

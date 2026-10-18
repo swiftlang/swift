@@ -8680,6 +8680,11 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 ERROR(attr_incompatible_with_back_deployed,none,
       "'%0' cannot be applied to a back deployed %kind1",
       (DeclAttribute, const Decl *))
+NOTE(back_deployed_along_with_type,none,
+      "%kind0 is back deployed along with %kind1 unless it is only available "
+      "in %2 %3 or newer",
+      (const ValueDecl *, const ValueDecl *, AvailabilityDomain,
+       AvailabilityRange))
 
 WARNING(back_deployed_opaque_result_not_supported,none,
       "'%0' cannot be applied to %kind1 because it has a 'some' return type",
@@ -8688,6 +8693,33 @@ WARNING(back_deployed_opaque_result_not_supported,none,
 ERROR(back_deployed_requires_body,none,
       "'%0' requires that %kind1 have a body",
       (DeclAttribute, const ValueDecl *))
+
+ERROR(back_deployed_requires_frozen,none,
+      "'%0' requires that %kind1 be '@frozen'",
+      (DeclAttribute, const ValueDecl *))
+
+ERROR(back_deployed_type_resilient_layout,none,
+      "%kind0 of back-deployed %kind1 cannot have type %2, whose layout is "
+      "resilient",
+      (const ValueDecl *, const ValueDecl *, Type))
+ERROR(back_deployed_type_static_stored_property,none,
+      "back-deployed %kind0 cannot have static stored property %1",
+      (const ValueDecl *, const ValueDecl *))
+ERROR(back_deployed_type_nested_type_kind,none,
+      "%kind0 cannot be nested in back-deployed %kind1",
+      (const ValueDecl *, const ValueDecl *))
+ERROR(back_deployed_type_nested_requires_frozen,none,
+      "%kind0 nested in back-deployed %kind1 must be '@frozen'",
+      (const ValueDecl *, const ValueDecl *))
+
+ERROR(conformance_back_deployed_type_availability,none,
+      "conformance of back-deployed type %0 to resilient protocol %1 must "
+      "not be available before %2 %3",
+      (Type, const ProtocolDecl *, AvailabilityDomain, AvailabilityRange))
+NOTE(conformance_back_deployed_type_availability_note,none,
+      "this module uses its own copy of %0 before %1 %2, and the conformance "
+      "would not apply to %0 from %3",
+      (Type, AvailabilityDomain, AvailabilityRange, const ModuleDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types

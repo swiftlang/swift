@@ -627,6 +627,12 @@ public:
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(SILInstruction *inst, SubstitutionMap subs);
 
+  /// Whether the given conformance is declared alongside a back-deployed type
+  /// from another module, and so is emitted into this module along with the
+  /// type.
+  static bool
+  isBackDeployedIntoClient(const NormalProtocolConformance *conformance);
+
   /// Mark _ObjectiveCBridgeable conformances as used for any imported types
   /// mentioned by the given type.
   void useConformancesFromObjectiveCType(SILInstruction *inst, CanType type);

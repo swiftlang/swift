@@ -468,6 +468,7 @@ public:
   void visitOptimizeAttr(OptimizeAttr *attr);
   void visitExclusivityAttr(ExclusivityAttr *attr);
   void visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr);
+  void diagnoseNeverEmittedIntoClientInBackDeployedType(DeclAttribute *attr);
   void visitExportAttr(ExportAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
@@ -4077,6 +4078,9 @@ void AttributeChecker::visitExportAttr(ExportAttr *attr) {
   if (auto other = D->getAttrs().getAttribute<ExternAttr>())
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
 
+  if (attr->exportKind == ExportKind::Interface)
+    diagnoseNeverEmittedIntoClientInBackDeployedType(attr);
+
   // In Embedded Swift, @export(interface) is not supported on generic types,
   // extensions of generic types, or generic functions: IRGen emits a unique
   // strong definition of the type metadata / conformance witness tables /
@@ -4098,6 +4102,51 @@ void AttributeChecker::visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *att
   Ctx.Diags.diagnose(attr->getStartLoc(), diag::attr_renamed_warning,
                      "_neverEmitIntoClient", "export(interface)")
     .fixItReplace(attr->getRangeWithAt(), "@export(interface)");
+
+  diagnoseNeverEmittedIntoClientInBackDeployedType(attr);
+}
+
+/// Diagnose an attribute that keeps clients from emitting the body of a
+/// declaration that is back deployed along with its enclosing type, which
+/// clients need to emit in case the type's module doesn't provide it.
+void AttributeChecker::diagnoseNeverEmittedIntoClientInBackDeployedType(
+    DeclAttribute *attr) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  // A declaration that is marked @backDeployed itself is diagnosed along with
+  // that attribute.
+  const Decl *owner = D;
+  if (auto *accessor = dyn_cast<AccessorDecl>(D))
+    owner = accessor->getStorage();
+  if (owner->getAttrs().hasAttribute<BackDeployedAttr>())
+    return;
+
+  if (!D->isBackDeployed())
+    return;
+
+  auto *nominal = D->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
+  auto attrAndRange = nominal->getBackDeployedAttrAndRange();
+  if (!attrAndRange && Ctx.LangOpts.TargetVariant)
+    attrAndRange =
+        nominal->getBackDeployedAttrAndRange(/*forTargetVariant=*/true);
+  if (!attrAndRange)
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_back_deployed, attr,
+                        D);
+
+  auto *backDeployedAttr = attrAndRange->first;
+  auto domainAndRange =
+      backDeployedAttr->getAvailabilityDomain().getRemappedDomainAndRange(
+          backDeployedAttr->getVersion(), AvailabilityVersionKind::Introduced,
+          Ctx);
+  diagnose(D->getLoc(), diag::back_deployed_along_with_type, VD, nominal,
+           domainAndRange.getDomain(), domainAndRange.getRange());
 }
 
 void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
@@ -5890,8 +5939,8 @@ void AttributeChecker::checkBackDeployedAttrs(
                           D);
   }
 
-  // Only functions, methods, computed properties, and subscripts are
-  // back-deployable, so D should be ValueDecl.
+  // Only functions, methods, computed properties, subscripts, and frozen
+  // structs and enums are back-deployable, so D should be ValueDecl.
   auto *VD = cast<ValueDecl>(D);
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
@@ -5975,6 +6024,16 @@ void AttributeChecker::checkBackDeployedAttrs(
       // that they be computed in order to allow back deployment.
       if (VarD->hasStorageOrWrapsStorage()) {
         diagnoseAndRemoveAttr(Attr, diag::attr_not_on_stored_properties, Attr);
+        continue;
+      }
+    }
+
+    // A back-deployed type is emitted into its clients, so its layout must
+    // be fixed.
+    if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
+      if (!D->getAttrs().hasAttribute<FrozenAttr>()) {
+        diagnoseAndRemoveAttr(Attr, diag::back_deployed_requires_frozen, Attr,
+                              VD);
         continue;
       }
     }

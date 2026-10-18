@@ -7503,6 +7503,16 @@ getWitnessFunctionRef(SILGenFunction &SGF,
           NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
           diffFn);
     }
+    // A back-deployed witness from another module might not exist at runtime,
+    // so call through its back deployment thunk.
+    if (witness.backDeploymentKind == SILDeclRef::BackDeploymentKind::None &&
+        witness.getDecl()->getModuleContext() != SGF.SGM.M.getSwiftModule() &&
+        SGF.SGM.requiresBackDeploymentThunk(witness.getDecl(),
+                                            SGF.F.getResilienceExpansion())) {
+      return SGF.emitGlobalFunctionRef(
+          loc, witness.asBackDeploymentKind(
+                   SILDeclRef::BackDeploymentKind::Thunk));
+    }
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
     assert(!witness.getDerivativeFunctionIdentifier());

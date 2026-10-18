@@ -754,6 +754,10 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
     return false;
   }
 
+  // Prespecialized metadata would be specific to one image.
+  if (nominal->isBackDeployedIntoClient())
+    return false;
+
   if (type->hasArchetype()) {
     return false;
   }
@@ -967,6 +971,11 @@ bool irgen::isCanonicalCompleteTypeMetadataStaticallyAddressable(
 
     // Imported type metadata always requires an accessor.
     if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
+      return false;
+
+    // A copy of a back-deployed type's metadata must be uniqued by the
+    // accessor.
+    if (nominalDecl->isBackDeployedIntoClient())
       return false;
 
     if (nominalDecl->isGenericContext())
@@ -2594,8 +2603,40 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     GenericArguments &genericArgs) {
   auto &IGM = IGF.IGM;
   
+  // If the defining module of a back-deployed type provides it, defer to that
+  // module's access function.
+  if (nominal->isBackDeployedIntoClient()) {
+    auto *accessor = IGF.CurFn;
+    auto *definingAccessor = getDefiningModuleTypeMetadataAccessFunction(
+        IGM, nominal, accessor->getFunctionType());
+    auto definingBB = IGF.createBasicBlock("defining_module");
+    auto copyBB = IGF.createBasicBlock("copy");
+    IGF.Builder.CreateCondBr(IGF.Builder.CreateIsNotNull(definingAccessor),
+                             definingBB, copyBB);
+
+    IGF.Builder.emitBlock(definingBB);
+    SmallVector<llvm::Value *, 4> args;
+    for (auto &arg : accessor->args())
+      args.push_back(&arg);
+    auto call = IGF.Builder.CreateCall(
+        FunctionPointer::createUnsigned(
+            FunctionPointer::Kind::Function, definingAccessor,
+            Signature(accessor->getFunctionType(), llvm::AttributeList(),
+                      IGM.SwiftCC)),
+        args);
+    call->setDoesNotThrow();
+    IGF.Builder.CreateRet(call);
+
+    IGF.Builder.emitBlock(copyBB);
+  }
+
+  // Instantiate a copy of a back-deployed type's metadata from the canonical
+  // descriptor among the copies, so that every image shares its instantiation
+  // cache.
   llvm::Value *descriptor =
-    IGM.getAddrOfTypeContextDescriptor(nominal, RequireMetadata);
+    nominal->isBackDeployedIntoClient()
+      ? emitCanonicalBackDeploymentCopyDescriptor(IGF, nominal)
+      : IGM.getAddrOfTypeContextDescriptor(nominal, RequireMetadata);
 
   // Sign the descriptor.
   auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
@@ -2842,6 +2883,85 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
   return MetadataResponse::forComplete(initializedMetadata);
 }
 
+/// Emit the body of the metadata accessor function for a copy of a non-generic
+/// back-deployed type.
+///
+/// If the type's defining module provides it, defer to that module's access
+/// function. Otherwise, if this image's type context descriptor is the
+/// canonical one among the copies, this image's metadata is the canonical
+/// metadata; if not, defer to the access function of the canonical
+/// descriptor.
+static MetadataResponse
+emitBackDeploymentCopyMetadataAccessFunctionBody(IRGenFunction &IGF,
+                                            CanType type) {
+  auto &IGM = IGF.IGM;
+  auto *decl = type->getAnyNominal();
+  assert(!decl->isGenericContext());
+  assert(IGM.getTypeInfoForUnlowered(type).isFixedSize(
+             ResilienceExpansion::Maximal) &&
+         "back-deployed types requiring initialization are unsupported");
+
+  auto accessFnTy =
+      llvm::FunctionType::get(IGM.TypeMetadataResponseTy, {IGM.SizeTy},
+                              /*isVarArg*/ false);
+  auto completeRequest =
+      DynamicMetadataRequest(MetadataState::Complete).get(IGF);
+  auto contBB = IGF.createBasicBlock("cont");
+
+  auto *definingAccessor =
+      getDefiningModuleTypeMetadataAccessFunction(IGM, decl, accessFnTy);
+  auto definingBB = IGF.createBasicBlock("defining_module");
+  auto copyBB = IGF.createBasicBlock("copy");
+  IGF.Builder.CreateCondBr(IGF.Builder.CreateIsNotNull(definingAccessor),
+                           definingBB, copyBB);
+
+  IGF.Builder.emitBlock(definingBB);
+  auto definingCall = IGF.Builder.CreateCall(
+      FunctionPointer::createUnsigned(
+          FunctionPointer::Kind::Function, definingAccessor,
+          Signature(accessFnTy, llvm::AttributeList(), IGM.SwiftCC)),
+      {completeRequest});
+  definingCall->setDoesNotThrow();
+  auto definingMetadata = IGF.Builder.CreateExtractValue(definingCall, 0);
+  IGF.Builder.CreateBr(contBB);
+
+  IGF.Builder.emitBlock(copyBB);
+  auto *canonical = emitCanonicalBackDeploymentCopyDescriptor(IGF, decl);
+  auto *own = IGM.getAddrOfTypeContextDescriptor(decl, RequireMetadata);
+  auto ownBB = IGF.createBasicBlock("own");
+  auto forwardBB = IGF.createBasicBlock("forward");
+  IGF.Builder.CreateCondBr(IGF.Builder.CreateICmpEQ(canonical, own), ownBB,
+                           forwardBB);
+
+  IGF.Builder.emitBlock(ownBB);
+  llvm::Value *ownMetadata = IGM.getAddrOfTypeMetadata(type);
+  IGF.Builder.CreateBr(contBB);
+
+  // The access function is the fourth field of a type context descriptor,
+  // after the flags, parent, and name.
+  IGF.Builder.emitBlock(forwardBB);
+  auto accessFnField =
+      IGF.Builder.CreateConstInBoundsGEP1_32(IGM.Int32Ty, canonical, 3);
+  auto accessFn = IGF.emitLoadOfCompactFunctionPointer(
+      Address(accessFnField, IGM.RelativeAddressTy, Alignment(4)),
+      /*isFar*/ false, IGM.Int8Ty);
+  auto accessFnPtr = FunctionPointer::createUnsigned(
+      FunctionPointer::Kind::Function, accessFn,
+      Signature(accessFnTy, llvm::AttributeList(), IGM.SwiftCC));
+  auto call = IGF.Builder.CreateCall(accessFnPtr, {completeRequest});
+  call->setDoesNotThrow();
+  auto forwardedMetadata = IGF.Builder.CreateExtractValue(call, 0);
+  auto forwardEndBB = IGF.Builder.GetInsertBlock();
+  IGF.Builder.CreateBr(contBB);
+
+  IGF.Builder.emitBlock(contBB);
+  auto phi = IGF.Builder.CreatePHI(IGM.TypeMetadataPtrTy, 3);
+  phi->addIncoming(definingMetadata, definingBB);
+  phi->addIncoming(ownMetadata, ownBB);
+  phi->addIncoming(forwardedMetadata, forwardEndBB);
+  return MetadataResponse::forComplete(phi);
+}
+
 /// Emit the body of a metadata accessor function for the given type.
 ///
 /// This function is appropriate for ordinary situations where the
@@ -2893,6 +3013,9 @@ emitDirectTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
     // access pattern.
     return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
   }
+
+  if (typeDecl->isBackDeployedIntoClient())
+    return emitBackDeploymentCopyMetadataAccessFunctionBody(IGF, type);
 
   // We should not be doing more serious work along this path.
   assert(isCanonicalCompleteTypeMetadataStaticallyAddressable(IGF.IGM, type));

@@ -25,6 +25,8 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
@@ -677,7 +679,123 @@ Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
   if (auto *AD = dyn_cast<AccessorDecl>(this))
     return AD->getStorage()->getBackDeployedAttrAndRange(forTargetVariant);
 
+  // A struct or enum nested in a back-deployed struct or enum is back-deployed
+  // along with it, unless it is only available where the outer type's
+  // defining module provides it.
+  if (isa<StructDecl>(this) || isa<EnumDecl>(this)) {
+    auto *outer = getDeclContext()->getSelfNominalTypeDecl();
+    if (outer && (isa<StructDecl>(outer) || isa<EnumDecl>(outer)) &&
+        outer->getModuleContext() == getModuleContext()) {
+      auto attrAndRange = outer->getBackDeployedAttrAndRange(forTargetVariant);
+      if (attrAndRange &&
+          isOnlyAvailableWithinBackDeployedRange(attrAndRange->second,
+                                                 forTargetVariant))
+        return std::nullopt;
+      return attrAndRange;
+    }
+    return std::nullopt;
+  }
+
+  // Members of a back-deployed struct or enum are back-deployed along with
+  // it, unless they have storage or are always emitted into clients anyway.
+  if (isa<AbstractFunctionDecl>(this) || isa<AbstractStorageDecl>(this)) {
+    if (auto *var = dyn_cast<VarDecl>(this))
+      if (var->hasStorageOrWrapsStorage())
+        return std::nullopt;
+
+    if (isAlwaysEmittedIntoClient() ||
+        getAttrs().hasAttribute<TransparentAttr>())
+      return std::nullopt;
+
+    // A member that is only available where the type's defining module
+    // provides the type doesn't need to be back-deployed.
+    auto *nominal = getDeclContext()->getSelfNominalTypeDecl();
+    if (nominal && (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
+        nominal->getModuleContext() == getModuleContext()) {
+      auto attrAndRange = nominal->getBackDeployedAttrAndRange(forTargetVariant);
+      if (attrAndRange &&
+          isOnlyAvailableWithinBackDeployedRange(attrAndRange->second,
+                                                 forTargetVariant))
+        return std::nullopt;
+      return attrAndRange;
+    }
+  }
+
   return std::nullopt;
+}
+
+/// The range of versions of the primary target's platform, or of the target
+/// variant's, in which the declaration itself is annotated as available.
+static std::optional<AvailabilityRange>
+getAnnotatedAvailableRange(const Decl *decl, bool forTargetVariant) {
+  auto &ctx = decl->getASTContext();
+  if (!forTargetVariant) {
+    if (auto attr = decl->getAvailableAttrForPlatformIntroduction(
+            /*checkExtension=*/false))
+      return attr->getIntroducedRange(ctx);
+    return std::nullopt;
+  }
+
+  // Find the most specific attribute for the target variant's platform, e.g.
+  // macCatalyst rather than iOS.
+  std::optional<SemanticAvailableAttr> best;
+  for (auto attr : decl->getAbstractSyntaxDeclForAttributes()
+                       ->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+    if (!attr.isPlatformSpecific() || !attr.getIntroduced() ||
+        !attr.getDomain().isActive(ctx, /*forTargetVariant=*/true))
+      continue;
+
+    if (!best ||
+        inheritsAvailabilityFromPlatform(*attr.getPlatform(),
+                                         *best->getPlatform()) ||
+        (attr.getPlatform() == best->getPlatform() &&
+         *best->getIntroduced() < *attr.getIntroduced()))
+      best.emplace(attr);
+  }
+
+  if (!best)
+    return std::nullopt;
+  return best->getIntroducedRange(ctx);
+}
+
+bool Decl::isOnlyAvailableWithinBackDeployedRange(
+    AvailabilityRange backDeployedRange, bool forTargetVariant) const {
+  // Look at the declaration's own availability, and then at that of its
+  // enclosing extension, if any.
+  const Decl *decl = this;
+  while (decl) {
+    if (auto range = getAnnotatedAvailableRange(decl, forTargetVariant))
+      return range->isContainedIn(backDeployedRange);
+
+    decl = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+  }
+  return false;
+}
+
+std::optional<AvailabilityQuery>
+Decl::getBackDeploymentAvailabilityQuery() const {
+  auto &ctx = getASTContext();
+  auto primaryAttrAndRange = getBackDeployedAttrAndRange();
+  std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
+      variantAttrAndRange;
+  if (ctx.LangOpts.TargetVariant)
+    variantAttrAndRange =
+        getBackDeployedAttrAndRange(/*forTargetVariant=*/true);
+
+  if (!primaryAttrAndRange && !variantAttrAndRange)
+    return std::nullopt;
+
+  auto *attr = primaryAttrAndRange ? primaryAttrAndRange->first
+                                   : variantAttrAndRange->first;
+  std::optional<AvailabilityRange> primaryRange;
+  if (primaryAttrAndRange)
+    primaryRange = primaryAttrAndRange->second;
+  std::optional<AvailabilityRange> variantRange;
+  if (variantAttrAndRange)
+    variantRange = variantAttrAndRange->second;
+
+  return AvailabilityQuery::dynamic(attr->getAvailabilityDomain(),
+                                    primaryRange, variantRange);
 }
 
 bool Decl::isBackDeployed() const {
@@ -6371,6 +6489,27 @@ bool NominalTypeDecl::isResilient() const {
   if (!isFormallyResilient())
     return false;
   return getModuleContext()->isResilient();
+}
+
+bool NominalTypeDecl::isBackDeployedIntoClient() const {
+  if (!isa<StructDecl>(this) && !isa<EnumDecl>(this))
+    return false;
+
+  // The module being compiled provides its own types. This checks the
+  // module itself rather than ASTContext::MainModule, which isn't set by every
+  // client of the compiler that generates code, such as LLDB's expression
+  // evaluator.
+  if (getModuleContext()->isMainModule())
+    return false;
+
+  if (!isBackDeployed())
+    return false;
+
+  // If the deployment targets guarantee that the type's module provides the
+  // type, on the primary target and on any target variant, use that module's
+  // definition.
+  auto query = getBackDeploymentAvailabilityQuery();
+  return query && !query->isAlwaysTrueForDeploymentTargets(getASTContext());
 }
 
 bool NominalTypeDecl::isStrictlyResilient() const {

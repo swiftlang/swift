@@ -39,6 +39,11 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (SILDeclRef::declHasNonUniqueDefinition(D))
     return FormalLinkage::PublicUnique;
 
+  // A back-deployed type is emitted into each client that uses it.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+    if (nominal->isBackDeployedIntoClient())
+      return FormalLinkage::PublicNonUnique;
+
   if (D->getModuleContext()->isAggressiveCMOEnabled())
     return FormalLinkage::PublicUnique;
 
@@ -89,6 +94,12 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
+
+  // The conformances declared alongside a back-deployed type are emitted
+  // into each client that uses the type.
+  if (typeDecl->isBackDeployedIntoClient() &&
+      C->getDeclContext()->getParentModule() == typeDecl->getParentModule())
+    return SILLinkage::Shared;
 
   // In embedded Swift, conformances get special treatment.
   auto &ctx = typeDecl->getASTContext();

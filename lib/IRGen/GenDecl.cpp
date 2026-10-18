@@ -1615,6 +1615,11 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
 
   auto canBeLazy = [&]() -> bool {
     auto *dc = type->getDeclContext();
+    // A back-deployed type from another module is emitted wherever it is used.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(type))
+      if (nominal->isBackDeployedIntoClient())
+        return true;
+
     if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
         return requiresForeignTypeMetadata(nominal);
@@ -4274,7 +4279,10 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
 
   if (auto *entityDC = entity.getDeclContextForEmission()) {
     auto *entitySF = entityDC->getModuleScopeContext();
-    bool clangImportedEntity = isa<ClangModuleUnit>(entitySF);
+    // Entities of back-deployed types from other modules are emitted on
+    // demand, like imported entities.
+    bool clangImportedEntity = isa<ClangModuleUnit>(entitySF) ||
+                               entity.isBackDeployedIntoClient();
 
     auto &mod = getSILModule();
 

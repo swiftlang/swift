@@ -1747,7 +1747,8 @@ namespace {
     }
       
     bool isUniqueDescriptor() {
-      return !isa<ClangModuleUnit>(Type->getModuleScopeContext());
+      return !isa<ClangModuleUnit>(Type->getModuleScopeContext()) &&
+             !Type->isBackDeployedIntoClient();
     }
     
     llvm::Constant *emit() {
@@ -4183,8 +4184,12 @@ static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
   }
 
   // Otherwise, use the lazy pattern, which should be emitted using a
-  // direct reference to the metadata.
-  createDirectTypeMetadataAccessFunction(IGM, type, /*allow existing*/ false);
+  // direct reference to the metadata. A back-deployed type from another
+  // module has a non-unique accessor, which might already be emitted on
+  // demand.
+  createDirectTypeMetadataAccessFunction(
+      IGM, type,
+      /*allow existing*/ typeDecl->isBackDeployedIntoClient());
 }
 
 // Classes
@@ -7540,6 +7545,165 @@ bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
 
   return isa<ClangModuleUnit>(decl->getModuleScopeContext()) &&
     !isa<ProtocolDecl>(decl);
+}
+
+llvm::Function *
+irgen::getDefiningModuleTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                   NominalTypeDecl *decl,
+                                                   llvm::FunctionType *fnType) {
+  // This module's copy of the access function has a different name.
+  IRGenMangler mangler(IGM.Context);
+  auto name = mangler.mangleTypeMetadataAccessFunction(
+      decl->getDeclaredType()->getCanonicalType());
+  if (auto existing = IGM.Module.getFunction(name))
+    return existing;
+
+  auto fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalWeakLinkage,
+                                   name, IGM.Module);
+  fn->setCallingConv(IGM.SwiftCC);
+  return fn;
+}
+
+/// Emit the "anchor" used to unique the copies of a back-deployed type.
+///
+/// The anchor is a non-generic foreign struct metadata candidate whose
+/// trailing payload word is the address of this image's type context
+/// descriptor. Passing it to swift_getForeignTypeMetadata returns the first
+/// candidate registered with that identity in the process, whose payload is
+/// then the canonical descriptor for the type.
+///
+/// The foreign metadata cache identifies a type by its name plus its import
+/// info, ignoring the parent context. The anchor's name is the mangled
+/// symbol of the type's descriptor, and it carries a symbol namespace that no
+/// imported C type uses, so it cannot collide with a real foreign type.
+static llvm::Constant *getBackDeploymentCopyAnchor(IRGenModule &IGM,
+                                              NominalTypeDecl *decl) {
+  auto descriptorName =
+      LinkEntity::forNominalTypeDescriptor(decl).mangleAsString(
+          IGM.Context);
+  auto anchorName = "__swift_back_deployment_anchor_" + descriptorName;
+  if (auto existing = IGM.Module.getNamedGlobal(anchorName))
+    return llvm::ConstantExpr::getInBoundsGetElementPtr(
+        existing->getValueType(), existing,
+        llvm::ArrayRef<llvm::Constant *>{
+            llvm::ConstantInt::get(IGM.Int32Ty, 0),
+            llvm::ConstantInt::get(IGM.Int32Ty, 1)});
+
+  // The name, followed by the import info: a symbol namespace component and
+  // the terminating empty string.
+  SmallString<64> nameBytes(descriptorName);
+  nameBytes.push_back('\0');
+  nameBytes.push_back(char(TypeImportComponent::SymbolNamespace));
+  nameBytes.append("swift.back_deployment");
+  nameBytes.push_back('\0');
+  auto nameInit =
+      llvm::ConstantDataArray::getString(IGM.getLLVMContext(), nameBytes,
+                                         /*AddNull=*/true);
+  auto nameVar = new llvm::GlobalVariable(
+      IGM.Module, nameInit->getType(), /*constant*/ true,
+      llvm::GlobalValue::PrivateLinkage, nameInit,
+      "__swift_back_deployment_anchor_name_" + descriptorName);
+  nameVar->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+
+  // The anchor's type context descriptor.
+  ConstantInitBuilder descBuilder(IGM);
+  auto desc = descBuilder.beginStruct();
+  TypeContextDescriptorFlags typeFlags;
+  typeFlags.setMetadataInitialization(
+      TypeContextDescriptorFlags::ForeignMetadataInitialization);
+  typeFlags.setHasImportInfo(true);
+  desc.addInt32(ContextDescriptorFlags(ContextDescriptorKind::Struct,
+                                       /*generic*/ false, /*unique*/ false,
+                                       /*hasInvertibleProtocols*/ false,
+                                       typeFlags.getOpaqueValue())
+                    .getIntValue());
+  desc.addRelativeAddress(
+      IGM.getAddrOfModuleContextDescriptor(decl->getParentModule()));
+  desc.addRelativeAddress(nameVar);
+  desc.addInt32(0); // access function
+  desc.addInt32(0); // field descriptor
+  desc.addInt32(0); // number of fields
+  desc.addInt32(0); // field offset vector offset
+  desc.addInt32(0); // foreign metadata initialization: completion function
+  auto descVar = desc.finishAndCreateGlobal(
+      "__swift_back_deployment_anchor_descriptor_" + descriptorName,
+      Alignment(4), /*constant*/ true, llvm::GlobalValue::PrivateLinkage);
+
+  // The anchor's metadata candidate.
+  ConstantInitBuilder mdBuilder(IGM);
+  auto md = mdBuilder.beginStruct();
+  auto emptyTuple = TupleType::getEmpty(IGM.Context)->getCanonicalType();
+  md.addSignedPointer(IGM.getAddrOfValueWitnessTable(emptyTuple),
+                      IGM.getOptions().PointerAuth.ValueWitnessTable,
+                      PointerAuthEntity());
+  md.addInt(IGM.MetadataKindTy, unsigned(MetadataKind::Struct));
+  md.addSignedPointer(descVar, IGM.getOptions().PointerAuth.TypeDescriptors,
+                      PointerAuthEntity::Special::TypeDescriptor);
+  md.add(IGM.getAddrOfTypeContextDescriptor(decl, RequireMetadata));
+  (void)md.finishAndCreateGlobal(anchorName, IGM.getPointerAlignment(),
+                                 /*constant*/ false,
+                                 llvm::GlobalValue::PrivateLinkage);
+  return getBackDeploymentCopyAnchor(IGM, decl);
+}
+
+llvm::Value *irgen::emitCanonicalBackDeploymentCopyDescriptor(IRGenFunction &IGF,
+                                                         NominalTypeDecl *decl) {
+  assert(decl->isBackDeployedIntoClient());
+  auto &IGM = IGF.IGM;
+  auto descriptorName =
+      LinkEntity::forNominalTypeDescriptor(decl).mangleAsString(
+          IGM.Context);
+  auto helper = IGM.getOrCreateHelperFunction(
+      "__swift_back_deployment_canonical_descriptor_" + descriptorName,
+      IGM.TypeContextDescriptorPtrTy, {},
+      [&](IRGenFunction &subIGF) {
+        auto &Builder = subIGF.Builder;
+        auto cacheName =
+            "__swift_back_deployment_canonical_descriptor_cache_" + descriptorName;
+        auto cache = new llvm::GlobalVariable(
+            IGM.Module, IGM.TypeContextDescriptorPtrTy, /*constant*/ false,
+            llvm::GlobalValue::PrivateLinkage,
+            llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+            cacheName);
+        Address cacheAddr(cache, IGM.TypeContextDescriptorPtrTy,
+                          IGM.getPointerAlignment());
+
+        auto cached = Builder.CreateLoad(cacheAddr);
+        cached->setAtomic(llvm::AtomicOrdering::Acquire);
+        auto isNull = Builder.CreateIsNull(cached);
+        auto missBB = subIGF.createBasicBlock("miss");
+        auto hitBB = subIGF.createBasicBlock("hit");
+        Builder.CreateCondBr(isNull, missBB, hitBB);
+
+        Builder.emitBlock(hitBB);
+        Builder.CreateRet(cached);
+
+        // On a miss, ask the runtime which anchor is canonical and read the
+        // descriptor out of its payload.
+        Builder.emitBlock(missBB);
+        auto request =
+            DynamicMetadataRequest(MetadataState::Complete).get(subIGF);
+        auto call = Builder.CreateCall(
+            IGM.getGetForeignTypeMetadataFunctionPointer(),
+            {request, getBackDeploymentCopyAnchor(IGM, decl)});
+        call->setDoesNotThrow();
+        call->setCallingConv(IGM.SwiftCC);
+        auto anchor = Builder.CreateExtractValue(call, 0);
+        auto payloadAddr = Builder.CreateConstInBoundsGEP1_32(
+            IGM.Int8PtrTy, anchor, 2);
+        auto canonical = Builder.CreateLoad(
+            Address(payloadAddr, IGM.TypeContextDescriptorPtrTy,
+                    IGM.getPointerAlignment()));
+        auto store = Builder.CreateStore(canonical, cacheAddr);
+        store->setAtomic(llvm::AtomicOrdering::Release);
+        Builder.CreateRet(canonical);
+      },
+      /*setIsNoInline*/ true);
+
+  auto call = IGF.Builder.CreateCall(
+      cast<llvm::Function>(helper)->getFunctionType(), helper, {});
+  call->setDoesNotThrow();
+  return call;
 }
 
 void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {

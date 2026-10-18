@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "swift/Basic/Platform.h"
 #include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
@@ -1839,6 +1840,179 @@ static void collectProtocolsFromInheritedEntry(
 /// it's not supported to declare these conformances because any other framework
 /// (including the source framework) can declare this conformance, which would
 /// result in duplicate symbols at runtime.
+/// Find a type within the type of a stored property or enum payload whose
+/// layout is resilient, so that the layout of the containing type isn't fixed.
+static Type findResilientLayoutType(Type type) {
+  auto canType = type->getCanonicalType();
+
+  if (auto tuple = dyn_cast<TupleType>(canType)) {
+    for (auto elt : tuple->getElements())
+      if (auto found = findResilientLayoutType(elt.getType()))
+        return found;
+    return Type();
+  }
+
+  // References to classes have a fixed layout.
+  auto *nominal = canType->getAnyNominal();
+  if (!nominal || isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
+    return Type();
+
+  if (nominal->isResilient())
+    return type;
+
+  if (auto nominalType = dyn_cast<NominalType>(canType)) {
+    for (auto arg : nominalType->getGenericArgs())
+      if (auto found = findResilientLayoutType(arg))
+        return found;
+  }
+  if (auto parent = canType->getNominalParent())
+    return findResilientLayoutType(parent);
+
+  return Type();
+}
+
+/// Whether \p decl, nested in the back-deployed type \p outer, is back-deployed
+/// along with it, on the primary target or on the target variant.
+static bool isBackDeployedAlongWith(const Decl *decl,
+                                    const NominalTypeDecl *outer) {
+  auto &ctx = decl->getASTContext();
+  for (bool forTargetVariant : {false, true}) {
+    if (forTargetVariant && !ctx.LangOpts.TargetVariant)
+      continue;
+    if (auto attrAndRange = outer->getBackDeployedAttrAndRange(forTargetVariant))
+      if (!decl->isOnlyAvailableWithinBackDeployedRange(attrAndRange->second,
+                                                        forTargetVariant))
+        return true;
+  }
+  return false;
+}
+
+/// Check the requirements on a back-deployed type, whose metadata is emitted
+/// into clients and so can't require runtime initialization, and on the
+/// types nested in it.
+static void checkBackDeployedType(NominalTypeDecl *NTD) {
+  auto &ctx = NTD->getASTContext();
+
+  // A public struct or enum nested in a back-deployed type is back-deployed
+  // along with it, unless it is only available where the outer type's
+  // defining module provides it. Other kinds of types can't be.
+  if (!NTD->getAttrs().getBackDeployed(ctx, /*forTargetVariant*/ false)) {
+    auto *outer = NTD->getDeclContext()->getSelfNominalTypeDecl();
+    if (outer && (isa<StructDecl>(outer) || isa<EnumDecl>(outer)) &&
+        outer->getModuleContext() == NTD->getModuleContext() &&
+        outer->isBackDeployed() && isBackDeployedAlongWith(NTD, outer) &&
+        NTD->getFormalAccessScope(/*useDC*/ nullptr,
+                                  /*treatUsableFromInlineAsPublic*/ true)
+            .isPublic()) {
+      if (!isa<StructDecl>(NTD) && !isa<EnumDecl>(NTD)) {
+        NTD->diagnose(diag::back_deployed_type_nested_type_kind, NTD, outer);
+        return;
+      }
+
+      if (!NTD->getAttrs().hasAttribute<FrozenAttr>()) {
+        NTD->diagnose(diag::back_deployed_type_nested_requires_frozen, NTD,
+                      outer);
+        return;
+      }
+    }
+  }
+
+  if (!(isa<StructDecl>(NTD) || isa<EnumDecl>(NTD)) ||
+      !NTD->isBackDeployed() || !NTD->getAttrs().hasAttribute<FrozenAttr>())
+    return;
+
+  if (auto *SD = dyn_cast<StructDecl>(NTD)) {
+    for (auto *var : SD->getStoredProperties()) {
+      if (auto found = findResilientLayoutType(var->getInterfaceType()))
+        var->diagnose(diag::back_deployed_type_resilient_layout, var, SD,
+                      found);
+    }
+  } else {
+    auto *ED = cast<EnumDecl>(NTD);
+    if (ED->isIndirect())
+      return;
+    for (auto *elt : ED->getAllElements()) {
+      if (elt->isIndirect() || !elt->hasAssociatedValues())
+        continue;
+      if (auto found = findResilientLayoutType(elt->getPayloadInterfaceType()))
+        elt->diagnose(diag::back_deployed_type_resilient_layout, elt, ED,
+                      found);
+    }
+  }
+}
+
+/// Diagnose conformances of a back-deployed type, declared outside of the
+/// type's defining module, that are available where this module emits its
+/// own copy of the type.
+///
+/// When the type's defining module provides the type at runtime, its metadata
+/// is canonical, and the runtime does not consider conformances declared for
+/// a copy of the type to apply to it.
+static void diagnoseBackDeployedTypeConformances(ExtensionDecl *ext) {
+  auto *nominal = ext->getExtendedNominal();
+  if (!nominal || !(isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)))
+    return;
+
+  if (nominal->getParentModule() == ext->getParentModule() ||
+      !nominal->isBackDeployed())
+    return;
+
+  auto &ctx = ext->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return;
+
+  // Conformances that are only available once the defining module provides
+  // the type are fine, on the primary target and on any target variant.
+  std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
+      attrAndRange;
+  for (bool forTargetVariant : {false, true}) {
+    if (forTargetVariant && !ctx.LangOpts.TargetVariant)
+      continue;
+
+    auto targetAttrAndRange =
+        nominal->getBackDeployedAttrAndRange(forTargetVariant);
+    if (!targetAttrAndRange)
+      continue;
+
+    auto deploymentRange =
+        forTargetVariant
+            ? AvailabilityRange(getVersionForTriple(*ctx.LangOpts.TargetVariant))
+            : AvailabilityRange::forDeploymentTarget(ctx);
+    if (deploymentRange.isContainedIn(targetAttrAndRange->second) ||
+        ext->isOnlyAvailableWithinBackDeployedRange(targetAttrAndRange->second,
+                                                    forTargetVariant))
+      continue;
+
+    attrAndRange = targetAttrAndRange;
+    break;
+  }
+  if (!attrAndRange)
+    return;
+
+  auto *attr = attrAndRange->first;
+  auto domainAndRange = attr->getAvailabilityDomain().getRemappedDomainAndRange(
+      attr->getVersion(), AvailabilityVersionKind::Introduced, ctx);
+  auto type = nominal->getDeclaredInterfaceType();
+  for (auto *conformance : ext->getLocalConformances()) {
+    // An implied conformance is diagnosed with the one that implies it.
+    if (conformance->getSourceKind() == ConformanceEntryKind::Implied)
+      continue;
+
+    // Marker protocols have no conformance records, and non-resilient
+    // protocols cannot be used by clients deploying to older OSes.
+    auto *proto = conformance->getProtocol();
+    if (proto->isMarkerProtocol() || !proto->isResilient())
+      continue;
+
+    ext->diagnose(diag::conformance_back_deployed_type_availability, type,
+                  proto, domainAndRange.getDomain(), domainAndRange.getRange());
+    ext->diagnose(diag::conformance_back_deployed_type_availability_note, type,
+                  domainAndRange.getDomain(), domainAndRange.getRange(),
+                  nominal->getParentModule());
+    fixAvailability(ext->getSourceRange(), ext, domainAndRange, ctx);
+  }
+}
+
 static void diagnoseRetroactiveConformances(
     ExtensionDecl *ext, DiagnosticEngine &diags) {
   ModuleDecl *module = ext->getParentModule();
@@ -2668,6 +2842,18 @@ public:
           if (StaticSpelling != StaticSpellingKind::KeywordStatic)
             unimplementedStatic(Classes);
         }
+
+        // A back-deployed type is emitted into clients, each of which would
+        // have its own storage, unless the property is only available where
+        // the type's defining module provides it.
+        if (auto *nominal = DC->getSelfNominalTypeDecl()) {
+          if ((isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
+              nominal->getModuleContext() == VD->getModuleContext() &&
+              nominal->isBackDeployed() &&
+              isBackDeployedAlongWith(VD, nominal))
+            VD->diagnose(diag::back_deployed_type_static_stored_property,
+                         nominal, VD);
+        }
       }
     }
 
@@ -3194,6 +3380,8 @@ public:
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
     auto *DC = NTD->getDeclContext();
+
+    checkBackDeployedType(NTD);
 
     // We don't allow nested types inside inlinable contexts.
     auto kind = DC->getFragileFunctionKind();
@@ -4170,6 +4358,7 @@ public:
     checkInheritanceClause(ED);
 
     diagnoseRetroactiveConformances(ED, Ctx.Diags);
+    diagnoseBackDeployedTypeConformances(ED);
 
     // Only generic and protocol types are permitted to have
     // trailing where clauses.
