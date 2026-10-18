@@ -8,7 +8,8 @@
 // because casting out of a non-`Copyable` existential is diagnosed at this
 // deployment target -- which is exactly what makes the fallback's copy safe.
 
-// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature NoncopyableCasting | %FileCheck %s --check-prefix=IR
+// The IR check tests back-deployment on ABI-stable platforms
+// RUN: %if VENDOR=apple %{ %target-swift-frontend -emit-ir %s -enable-experimental-feature NoncopyableCasting | %FileCheck %s --check-prefix=IR %}
 // RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableCasting) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -enable-experimental-feature NoncopyableCasting) | %FileCheck %s
 
