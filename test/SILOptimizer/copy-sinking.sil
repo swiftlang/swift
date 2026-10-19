@@ -722,3 +722,120 @@ bb2:
 bb3(%8 : @owned $Optional<C>):
   return %8
 }
+
+// CHECK-LABEL: sil [ossa] @remove_copy_of_owned_cast_operand :
+// CHECK:       bb0(%0 : @owned $AnyObject):
+// CHECK-NEXT:    checked_cast_br AnyObject in %0 to C, bb1, bb2
+// CHECK:       bb1([[S:%.*]] : @owned $C):
+// CHECK-NEXT:    destroy_value [[S]]
+// CHECK:       bb2([[F:%.*]] : @owned $AnyObject):
+// CHECK-NEXT:    checked_cast_br AnyObject in [[F]] to SubKlass, bb3, bb4
+// CHECK:       bb3([[S2:%.*]] : @owned $SubKlass):
+// CHECK-NEXT:    destroy_value [[S2]]
+// CHECK:       bb4([[F2:%.*]] : @owned $AnyObject):
+// CHECK-NEXT:    destroy_value [[F2]]
+// CHECK:       } // end sil function 'remove_copy_of_owned_cast_operand'
+sil [ossa] @remove_copy_of_owned_cast_operand : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = copy_value %0
+  checked_cast_br AnyObject in %1 to C, bb1, bb2
+
+bb1(%3 : @owned $C):
+  destroy_value %0
+  destroy_value %3
+  br bb5
+
+bb2(%5 : @owned $AnyObject):
+  destroy_value %5
+  %6 = copy_value %0
+  checked_cast_br AnyObject in %6 to SubKlass, bb3, bb4
+
+bb3(%8 : @owned $SubKlass):
+  destroy_value %0
+  destroy_value %8
+  br bb5
+
+bb4(%10 : @owned $AnyObject):
+  destroy_value %10
+  destroy_value %0
+  br bb5
+
+bb5:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_of_owned_cast_operand_used_in_success_block :
+// CHECK:         copy_value %0
+// CHECK-NEXT:    checked_cast_br AnyObject in %1 to C, bb1, bb2
+// CHECK:       } // end sil function 'dont_remove_copy_of_owned_cast_operand_used_in_success_block'
+sil [ossa] @dont_remove_copy_of_owned_cast_operand_used_in_success_block : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = copy_value %0
+  checked_cast_br AnyObject in %1 to C, bb1, bb2
+
+bb1(%3 : @owned $C):
+  destroy_value %3
+  br bb3(%0)
+
+bb2(%5 : @owned $AnyObject):
+  destroy_value %5
+  br bb3(%0)
+
+bb3(%7 : @owned $AnyObject):
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_of_owned_cast_operand_in_loop :
+// CHECK:         copy_value %0
+// CHECK:       } // end sil function 'dont_remove_copy_of_owned_cast_operand_in_loop'
+sil [ossa] @dont_remove_copy_of_owned_cast_operand_in_loop : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  br bb1
+
+bb1:
+  %1 = copy_value %0
+  checked_cast_br AnyObject in %1 to C, bb2, bb3
+
+bb2(%3 : @owned $C):
+  destroy_value %0
+  destroy_value %3
+  %r = tuple ()
+  return %r
+
+bb3(%5 : @owned $AnyObject):
+  destroy_value %5
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_of_owned_cast_operand_used_in_merge_block :
+// CHECK:         copy_value %0
+// CHECK:       } // end sil function 'dont_remove_copy_of_owned_cast_operand_used_in_merge_block'
+sil [ossa] @dont_remove_copy_of_owned_cast_operand_used_in_merge_block : $@convention(thin) (@owned AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @owned $AnyObject, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb4
+
+bb1:
+  %2 = copy_value %0
+  checked_cast_br AnyObject in %2 to C, bb2, bb3
+
+bb2(%4 : @owned $C):
+  destroy_value %0
+  destroy_value %4
+  br bb6
+
+bb3(%6 : @owned $AnyObject):
+  destroy_value %6
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  destroy_value %0
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r
+}

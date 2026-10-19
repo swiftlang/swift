@@ -149,6 +149,32 @@ import SIL
 /// Like the non-OSSA RetainSinking pass, this avoids a retain/release pair on the paths where
 /// the copy is not needed.
 ///
+/// 7. Removes a `copy_value` of an owned value which is consumed by a `checked_cast_br` if the
+///    owned value is destroyed in the success block. In the failure block the original value is
+///    available as the failure argument, because the cast forwards its operand unchanged on failure:
+///
+/// ```
+///   %1 = copy_value %0                // %0 is owned
+///   checked_cast_br %1, bb1, bb2
+///   bb1(%2 : @owned):
+///     destroy_value %0
+///     // uses of %2
+///   bb2(%3 : @owned):
+///     destroy_value %3
+///     // uses of %0
+/// ```
+/// ->
+/// ```
+///   checked_cast_br %0, bb1, bb2
+///   bb1(%2 : @owned):
+///     // uses of %2
+///   bb2(%3 : @owned):
+///     // uses of %3
+/// ```
+///
+/// Unlike case 3, this also works for casts which don't preserve reference counts, e.g. casts
+/// from `AnyObject`.
+///
 /// The optimization can be done if:
 /// * The `copy_value` or `load [copy]` has a single use.
 /// * The source operand has guaranteed ownership. In case 2 the source is a phi of the same block
@@ -199,6 +225,10 @@ let copySinking = FunctionPass(name: "copy-sinking") {
         changed = true
       }
     case let cast as CheckedCastBranchInst:
+      if tryRemoveCopyOfOwnedValue(consumedBy: cast, context) {
+        changed = true
+        break
+      }
       guard cast.preservesReferenceCounts else {
         break
       }
@@ -511,6 +541,75 @@ private func trySinkCopiesOver(terminator: ForwardingInstruction & UnaryInstruct
   default:
     return false
   }
+}
+
+private func tryRemoveCopyOfOwnedValue(consumedBy cast: CheckedCastBranchInst,
+                                       _ context: FunctionPassContext) -> Bool
+{
+  guard let copy = cast.operand.value as? CopyValueInst,
+        copy.uses.isSingleUse,
+        copy.parentBlock == cast.parentBlock,
+        copy.fromValue.ownership == .owned,
+        let failureArg = cast.failureBlock.arguments.first,
+        let failureDestroy = failureArg.uses.singleUse?.instruction as? DestroyValueInst
+  else {
+    return false
+  }
+  let ownedValue = copy.fromValue
+  let domTree = context.dominatorTree
+
+  var successDestroy: DestroyValueInst? = nil
+  var failureUses = Stack<Operand>(context)
+  defer { failureUses.deinitialize() }
+  var otherUseBlocks = BasicBlockSet(context)
+  defer { otherUseBlocks.deinitialize() }
+  otherUseBlocks.insert(cast.parentBlock)
+
+  for use in ownedValue.uses where use.instruction != copy {
+    let user = use.instruction
+    if user.parentBlock == cast.parentBlock {
+      // There must not be any uses between the copy and the cast.
+      guard user.strictlyDominatesInBlock(copy) else {
+        return false
+      }
+    } else if cast.successBlock.dominates(user.parentBlock, domTree) {
+      // The lifetime of the owned value must end in the success block - with a single `destroy_value`.
+      guard successDestroy == nil,
+            let destroy = user as? DestroyValueInst,
+            destroy.parentBlock == cast.successBlock
+      else {
+        return false
+      }
+      successDestroy = destroy
+    } else if cast.failureBlock.dominates(user.parentBlock, domTree) {
+      failureUses.append(use)
+    } else {
+      otherUseBlocks.insert(user.parentBlock)
+    }
+  }
+  guard let successDestroy else {
+    return false
+  }
+
+  // After the transformation the owned value is consumed by the cast. Therefore none of its other uses
+  // (including the cast itself) must be reachable from the failure block, e.g. via a loop back-edge.
+  var worklist = BasicBlockWorklist(context)
+  defer { worklist.deinitialize() }
+  worklist.pushIfNotVisited(cast.failureBlock)
+  while let block = worklist.pop() {
+    if otherUseBlocks.contains(block) {
+      return false
+    }
+    worklist.pushIfNotVisited(contentsOf: block.successors)
+  }
+
+  copy.replace(with: ownedValue, context)
+  context.erase(instruction: successDestroy)
+  context.erase(instruction: failureDestroy)
+  for use in failureUses {
+    use.set(to: failureArg, context)
+  }
+  return true
 }
 
 private func isContainedInBorrowScope(from copy: CopyValueInst,
