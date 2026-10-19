@@ -34,8 +34,12 @@ takesSpan(s1)
 
 let s2 = makeSpanOfNonCopyable()
 for _ in s2 {}
-// expected-darwin-error@-1 {{conform to 'Iterable', which is only available in}}
-// expected-darwin-note@-2 {{add 'if #available' version check}}
+// expected-darwin-error@-1 {{conform to 'Sequence'}} 
+
+if #available(SwiftStdlib 6.4, *) {
+for _ in s2 {} // no error
+}
+
 takesSequence(s2)
 // expected-error@-1 {{global function 'takesSequence' requires that 'SpanOfNonCopyable'}} conform to 'Sequence'
 takesIterable(s2)
