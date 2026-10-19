@@ -838,6 +838,19 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 flags, otherDefinitions);
+
+    // A unique macro name is only visible inside the macro expansion that
+    // introduced it, so it can only conflict with declarations there.
+    if (MacroDecl::isUniqueMacroName(current->getBaseName())) {
+      SmallVector<ValueDecl *, 1> expansionDefinitions;
+      currentFile->getParentModule()
+          ->lookupUniqueMacroNameInEnclosingExpansions(
+              current->getBaseName(), current->getLoc(), expansionDefinitions);
+      for (auto *other : expansionDefinitions) {
+        if (ABIRoleInfo(other).matchesOptions(flags))
+          otherDefinitions.push_back(other);
+      }
+    }
   }
 
   // Compare this signature against the signature of other
