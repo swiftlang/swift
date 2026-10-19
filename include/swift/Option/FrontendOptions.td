@@ -131,6 +131,10 @@ def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
 
+def prefix_map_sourceinfo : Flag<["-"], "prefix-map-sourceinfo">,
+  HelpText<"Apply path remapping from -file-prefix-map to generated "
+           " swiftsourceinfo files and sets the last modified timestamp to 0">;
+
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
     HelpText<"Merge the input modules without otherwise processing them">;
