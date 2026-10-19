@@ -106,7 +106,9 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
   if (!VD)
     return;
 
-  if (!shouldCopyAssociatedUSRForDecl(VD))
+  // Avoid verifying for invalid decls since there's no way to map the USR back
+  // to the right decl.
+  if (!shouldCopyAssociatedUSRForDecl(VD) || VD->isInvalid())
     return;
 
   SmallString<128> SwiftUSR;
