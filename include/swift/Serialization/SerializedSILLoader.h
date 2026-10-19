@@ -32,7 +32,7 @@ class SILFunction;
 class SILGlobalVariable;
 class SILProperty;
 class SILModule;
-enum class SILStage;
+enum class SILStage : uint8_t;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;

@@ -292,10 +292,10 @@ void SILFunction::init(
   this->NeedBreakInfiniteLoops = false;
   this->NeedCompleteLifetimes = false;
   this->HasInfiniteSpecializationLoop = false;
-  // Set by AddressLowering when it lowers this function in the Raw-stage
-  // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
-  // born after the module advances past Raw are reported lowered by the
-  // stage term in hasLoweredAddresses(), so no creation-time seed is needed.
+  // Set whenever the body is in lowered-address form before the stage says so:
+  // by the pass that lowers it (AddressLowering), and by a copy of a function
+  // that has it (clones, snapshots). A body at a stage past Raw is reported
+  // lowered by the stage term in hasLoweredAddresses() and needs no flag.
   this->HasLoweredAddresses = false;
   this->HasOwnershipForTrivialValues = false;
 
@@ -328,11 +328,9 @@ bool SILFunction::hasLoweredAddresses() const {
          getFunctionStage() != SILStage::Raw;
 }
 
-SILStage SILFunction::getFunctionStage() const {
-  return SILStage(FunctionStage);
-}
-
 void SILFunction::setFunctionStage(SILStage stage) {
+  static_assert(unsigned(LastSILStage) < (1u << NumFunctionStageBits),
+                "SILStage does not fit in SILFunction::FunctionStage");
   assert(stage >= getFunctionStage() && "regressing per-function stage?!");
   assert(stage >= getModule().getStageFloor() &&
          "per-function stage below the module stage floor?!");
