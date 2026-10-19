@@ -2710,9 +2710,37 @@ bool DeclContext::lookupQualified(Type type,
                          loc, options, decls);
 }
 
+/// Swift imports all redeclarations of a C++ namespace as one enum, but the
+/// namespace can be declared in several Clang modules. Treat it as imported if
+/// any module that declares it is imported.
+static bool isCxxNamespaceImported(const Decl *decl, const DeclContext *dc) {
+  auto *clangNamespace =
+      dyn_cast_or_null<clang::NamespaceDecl>(decl->getClangDecl());
+  if (!clangNamespace)
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto *clangModuleLoader = ctx.getClangModuleLoader();
+  ASSERT(clangModuleLoader && "ClangImporter required");
+  for (auto *redecl : clangNamespace->redecls()) {
+    // A redeclaration outside of any Clang module, e.g. in a bridging header,
+    // has no owning module.
+    auto *clangModule = clangModuleLoader->getClangOwningModule(redecl);
+    if (!clangModule)
+      continue;
+    auto *module = clangModuleLoader->getWrapperForModule(
+        clangModule->getTopLevelModule());
+    if (ctx.getImportCache().isImportedBy(module, dc))
+      return true;
+  }
+  return false;
+}
+
 bool DeclContext::isDeclImported(const Decl *decl) const {
   auto declModule = decl->getModuleContextForNameLookup();
-  return getASTContext().getImportCache().isImportedBy(declModule, this);
+  if (getASTContext().getImportCache().isImportedBy(declModule, this))
+    return true;
+  return isCxxNamespaceImported(decl, this);
 }
 
 static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
