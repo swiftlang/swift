@@ -38,6 +38,11 @@ void deleteAllDebugUses(SILInstruction *inst, InstModCallbacks &callbacks,
 /// Pass \p salvage as false when the instruction already has been salvaged.
 void deleteAllDebugUses(SILInstruction *inst, bool salvage = true);
 
+/// Turns \p debugValue into a variable of empty tuple type. Used when the type
+/// of the variable can no longer be described, because it uses an archetype
+/// that is being removed. \p debugValue is erased as a new one is created.
+void replaceWithVoidVariable(DebugValueInst *debugValue);
+
 /// Transfer debug info associated with (the result of) \p I to a
 /// new `debug_value` instruction before \p I is deleted.
 void salvageDebugInfo(SILInstruction *I);
