@@ -1,14 +1,21 @@
 # ``Swift``
 
-Build apps using a powerful open language.
+@Metadata {
+    @DisplayName("Standard Library")
+}
+
+Browse the essential types provided by Swift’s standard library.
 
 ## Overview
 
-Swift includes modern features like type inference, optionals, and closures, which
-make the syntax concise yet expressive. Swift ensures your code is fast and efficient,
-while its memory safety and native error handling make the language safe by design.
-Writing Swift code is interactive and fun in Swift Playgrounds, playgrounds in Xcode,
-and the REPL.
+The Swift standard library defines a base layer of functionality for writing Swift
+programs, including:
+
+- Fundamental data types such as ``Swift/Int``, ``Swift/Double``, and ``Swift/String``
+- Common data structures such as ``Swift/Array``, ``Swift/Dictionary``, and ``Swift/Set``
+- Global functions such as ``Swift/print(_:separator:terminator:)`` and ``Swift/abs(_:)``
+- Protocols, such as ``Swift/Collection`` and ``Swift/Equatable``, that describe
+common abstractions, customize operations, or replace boilerplate code
 
 ```swift
 var interestingNumbers = [
@@ -25,47 +32,60 @@ print(interestingNumbers["primes"]!)
 // Prints "[17, 13, 11, 7, 5, 3, 2]"
 ```
 
-### Learn Swift
-
-If you're new to Swift, read [The Swift Programming Language](https://docs.swift.org/swift-book/)
-for a quick tour, a comprehensive language guide, and a full reference manual. If
-you're new to programming, check out [Swift Playgrounds](https://www.apple.com/swift/playgrounds/)
-on iPad.
-
-Swift is developed in the open. To learn more about the open source Swift project
-and community, visit [Swift.org](https://swift.org).
+> Note: Experiment with Swift standard library types and learn high-level concepts
+using visualizations and practical examples. Learn how the Swift standard library
+uses protocols and generics to express powerful constraints. Download the playground
+below to get started.
+>
+> [Swift Standard Library.playground](https://developer.apple.com/sample-code/swift/downloads/standard-library.zip)
 
 ## Topics
 
-### Standard Library
+### Values and collections
 
-- <doc:swift-standard-library>
+- <doc:numbers-and-basic-values>
+- <doc:strings-and-text>
+- <doc:collections>
+- <doc:time-and-duration>
 
-### Observation
+### Tools for your types
 
-- <doc:Observation-collection>
+- <doc:basic-behaviors>
+- <doc:encoding-decoding-and-serialization>
+- <doc:initialization-with-literals>
 
-### Distributed Actors
-
-- <doc:Distributed-collection>
-
-### Regular Expression DSL
-
-- <doc:RegexBuilder-collection>
-
-### Low-Level Atomic Operations
-
-- <doc:Synchronization-collection>
-
-### Data Modeling
+### Data modeling
 
 - <doc:choosing-between-structures-and-classes>
 - <doc:adopting-common-protocols>
 
-### Language Interoperability with C and C++
+### Programming tasks
 
+- <doc:input-and-output>
+- <doc:debugging-and-reflection>
+- <doc:macros>
+- <doc:concurrency>
+- <doc:key-path-expressions>
+- <doc:manual-memory-management>
+- <doc:type-casting-and-existential-types>
+- <doc:operator-declarations>
+
+### Language interoperability
+
+- <doc:c-interoperability>
+- <doc:cxx-interoperability>
 - <doc:customizing-your-c-code-for-swift>
 - <doc:using-imported-c-structs-and-unions-in-swift>
 - <doc:using-imported-c-functions-in-swift>
 - <doc:using-imported-c-macros-in-swift>
- 
+
+### Related frameworks
+
+- <doc:Observation-collection>
+- <doc:Distributed-collection>
+- <doc:RegexBuilder-collection>
+- <doc:Synchronization-collection>
+
+### Deprecated
+
+- <doc:deprecated>
