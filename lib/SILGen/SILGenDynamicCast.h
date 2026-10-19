@@ -48,6 +48,14 @@ SILValue emitIsa(SILGenFunction &SGF, SILLocation loc,
                  Expr *operand, Type targetType,
                  CheckedCastKind castKind);
 
+/// True if \p pattern wants nothing from the matched value, so a cast pattern
+/// only has to answer yes or no.
+///
+/// Formally, `case is T` has the same meaning as `case _ as T`; they both
+/// verify the type without binding any payload in the result. `case is T` has
+/// no sub-pattern at all, which is why a null \p pattern is accepted.
+bool patternNeedsNoPayload(const Pattern *pattern);
+
 /// True if an `is` check from \p sourceType to \p targetType should lower to a
 /// non-consuming type test rather than to the value-producing machinery `as?`
 /// uses.

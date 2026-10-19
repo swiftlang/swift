@@ -1736,19 +1736,6 @@ public:
 
 namespace {
 
-/// Formally, `case is T` has the same meaning as `case _ as T`;
-/// they both verify the type without binding any payload in the result.
-///
-/// Duplicated from SILGenPattern.cpp, which asks the same thing of `switch`
-/// cases; the two should be unified.
-static bool patternNeedsNoPayload(const Pattern *pattern) {
-  // True for `case is T`
-  if (!pattern)
-    return true;
-  // True for `case _ as T` (and variations thereof)
-  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
-}
-
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
 /// Initialization representing the needed initializations.

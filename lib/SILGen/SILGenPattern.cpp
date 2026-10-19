@@ -1964,16 +1964,6 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   return ConsumableManagedValue::forOwned(init->getManagedAddress());
 }
 
-/// Formally, `case is T` has the same meaning as `case _ as T`;
-/// they both verify the type without binding any payload in the result.
-static bool patternNeedsNoPayload(const Pattern *pattern) {
-  // True for `case is T`
-  if (!pattern)
-    return true;
-  // True for `case _ as T` (and variations thereof)
-  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
-}
-
 /// Try to dispatch a cast pattern by testing the subject's type
 /// in place instead of extracting its payload.  This supports
 /// noncopyable types and will also permit using more efficient
