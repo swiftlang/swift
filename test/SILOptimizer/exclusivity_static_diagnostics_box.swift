@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-sil -verify -Onone -target %target-swift-6.2-abi-triple %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -verify -O -target %target-swift-6.2-abi-triple %s -o /dev/null
 
 // Static diagnostics for variables captured by box: by a closure that may
@@ -5,7 +6,8 @@
 // unless MandatoryAllocBoxToStack promotes the box, which it only does if a
 // conflict either can't happen or happens on every path through the call. So
 // a conflict is only diagnosed statically if dynamic enforcement would fail
-// every time the call executes. rdar://179406916
+// every time the call executes. The diagnostics must be the same at every
+// optimization level. rdar://179406916
 
 func use(_: Span<Int>) {}
 func use(_: Int) {}

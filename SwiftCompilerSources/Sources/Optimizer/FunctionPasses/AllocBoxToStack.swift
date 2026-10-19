@@ -84,7 +84,10 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 
   /// This is needed because box-promotion is mandatory for non-copyable types. Without removing the
   /// original, un-specialized versions of closures we risk getting false errors in diagnostic passes.
-  eraseIfDead(functions: originalsOfSpecializedFunctions.functions, moduleContext)
+  /// At -Onone, closures and local functions are kept for the debugger. Erase them anyway, so that
+  /// diagnostics don't differ between -Onone and -O.
+  eraseIfDead(functions: originalsOfSpecializedFunctions.functions, moduleContext,
+              ignoringDebuggerPreservation: true)
 }
 
 /// Converts all non-escaping `alloc_box` to `alloc_stack` and specializes called functions if a
@@ -502,13 +505,16 @@ private extension ApplySite {
        callee.isDefinition,
        callee.canBeInlinedIntoCaller(withSerializedKind: parentFunction.serializedKind)
     {
-      if self is FullApplySite,
-         // If the function is inlined later, there is no point in specializing it.
-         !callee.shouldOptimize || callee.inlineStrategy == .heuristicAlways ||
-         callee.inlineStrategy == .always
-      {
-        return nil
-      }
+      // Always specialize the callee, regardless of the optimization mode or inlining strategy
+      // (`shouldOptimize`, `inlineStrategy`).
+      //
+      // This is extra work if the callee will be inlined later anyway. We do it to signify to
+      // downstream diagnostics (DiagnoseStaticExclusivity) that the argument was already assumed
+      // to be non-escaping: the specialized function takes the captured address as
+      // `@inout_aliasable`.
+      //
+      // This must not depend on optimization options. SIL in the diagnostic pipeline cannot
+      // deviate based on -O options, otherwise diagnostics would differ between -Onone and -O.
       return callee
     }
     return nil
