@@ -5127,6 +5127,10 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
 
   allocator.finalizeOpaqueStorage();
 
+  // Debug-value salvage during cleanup must preserve address-only operands as
+  // addresses, including when replacing deleted storage with undef.
+  function->setHasLoweredAddresses(true);
+
   allocator.sinkProjections();
 
   deleteRewrittenInstructions(pass);
@@ -5137,11 +5141,6 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   // createStackAllocation or StackNesting.
   pm->invalidateAnalysis(
       function, SILAnalysis::InvalidationKind::BranchesAndInstructions);
-
-  // Mark the function lowered now, so its conventions and verification see
-  // address form immediately (the module stage only reaches Canonical after all
-  // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
-  function->setHasLoweredAddresses(true);
 }
 
 //===----------------------------------------------------------------------===//
