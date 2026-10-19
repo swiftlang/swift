@@ -2089,7 +2089,6 @@ private:
     case TypeKind::Meet:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
-    case TypeKind::BuiltinBorrow:
       ABORT([&](llvm::raw_ostream &out) {
         out << "Don't know how to emit debug info for type:\n";
         BaseTy->dump(out);
@@ -2120,6 +2119,13 @@ private:
       return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile,
                                 FwdDeclLine, SizeInBits, AlignInBits, Flags,
                                 MangledName);
+    }
+
+    case TypeKind::BuiltinBorrow: {
+      unsigned FwdDeclLine = 0;
+      return createOpaqueStruct(Scope, "Builtin.Borrow", MainFile, FwdDeclLine,
+                                SizeInBits, AlignInBits, Flags, MangledName,
+                                {}, nullptr, nullptr, NumExtraInhabitants);
     }
 
     case TypeKind::BuiltinPackIndex:
