@@ -3,7 +3,7 @@
 // RUN: %target-codesign %t/%target-library-name(Lib)
 // RUN: %target-build-swift %s -O -target %target-future-triple -I %t -L %t -lLib -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(Lib) | %FileCheck %s
 
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
