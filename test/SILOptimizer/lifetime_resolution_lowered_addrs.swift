@@ -48,7 +48,11 @@ func ConsumeThenBorrow() {
   Use(x)
 }
 
-func takeClosureEscape(_ f: @escaping () -> ()) {}
+var escapedClosure: (() -> ())?
+
+func takeClosureEscape(_ f: @escaping () -> ()) {
+  escapedClosure = f
+}
 
 // An escaping `var` stays in a box.
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}EscapeVarReassign
