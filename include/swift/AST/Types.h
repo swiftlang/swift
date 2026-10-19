@@ -3147,7 +3147,7 @@ END_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
 class ClassType final : public NominalType,
-                        private llvm::TrailingObjects<StructType, Type> {
+                        private llvm::TrailingObjects<ClassType, Type> {
   friend TrailingObjects;
   friend class NominalType; // to access the trailing objects
 
