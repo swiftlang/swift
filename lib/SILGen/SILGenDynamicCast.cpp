@@ -659,6 +659,13 @@ bool Lowering::patternNeedsNoPayload(const Pattern *pattern) {
   return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
 }
 
+/// A coercion cannot fail, and with no payload bound there is nothing left for
+/// the pattern to do, so it matches every value just as `_` does.
+bool Lowering::isWildcardIsPattern(const IsPattern *pattern) {
+  return pattern->getCastKind() == CheckedCastKind::Coercion &&
+         patternNeedsNoPayload(pattern->getSubPattern());
+}
+
 /// True if a cast from \p sourceType to \p targetType can be answered by a
 /// non-consuming type test rather than going through the full dynamic
 /// cast machinery used by `as?`

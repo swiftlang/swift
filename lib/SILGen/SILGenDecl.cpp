@@ -1822,6 +1822,11 @@ struct InitializationForPattern
     return InitializationPtr(res);
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
+    // A statically-satisfied test that binds nothing matches any value, so it
+    // needs no test and no storage -- it behaves exactly like `_`.
+    if (isWildcardIsPattern(P))
+      return InitializationPtr(new BlackHoleInitialization());
+
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
       if (!patternNeedsNoPayload(subP)) {
