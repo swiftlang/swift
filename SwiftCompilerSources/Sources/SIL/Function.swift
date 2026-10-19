@@ -87,7 +87,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// This function's SIL stage. Prefer this over `Context.stageFloor` for a
   /// per-function query.
   public var silStage: SILStage {
-    guard let stage = SILStage(rawValue: bridged.getStage()) else {
+    guard let stage = SILStage(rawValue: bridged.getFunctionStage()) else {
       fatalError("unhandled SILStage")
     }
     return stage

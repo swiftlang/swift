@@ -121,7 +121,7 @@ class SILGenModule;
 } // namespace Lowering
 
 /// A stage of SIL processing.
-enum class SILStage {
+enum class SILStage : uint8_t {
   /// "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
   /// optimization and diagnostic passes.
   ///
@@ -365,7 +365,8 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// A module-wide lower bound on the stage of every function in the module.
+  /// A lower bound on the stage of every function in the module's function
+  /// list. Erased (zombie) functions are not in the list and are not covered.
   SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
@@ -1045,6 +1046,10 @@ public:
   /// verifier type-equality check must be skipped. It changes large loadable
   /// parameters and results to indirect, rewriting a nested function type
   /// wherever it appears, an aggregate field included.
+  ///
+  /// This is a conservative approximation keyed to the stage floor. Under
+  /// -enable-sil-opaque-values, AddressLowering also rewrites function types,
+  /// before the floor reaches Lowered, and this still answers false then.
   bool haveFunctionTypesBeenRewritten() const {
     return StageFloor >= SILStage::Lowered;
   }

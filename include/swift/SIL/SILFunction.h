@@ -38,7 +38,7 @@ class ActorIsolation;
 enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
-enum class SILStage;
+enum class SILStage : uint8_t;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
@@ -531,9 +531,11 @@ private:
   /// Set when this function gives trivial values explicit ownership.
   unsigned HasOwnershipForTrivialValues : 1;
 
+  static constexpr unsigned NumFunctionStageBits = 2;
+
   /// This function's pipeline stage. Seeded at creation to the module's stage
   /// floor, so it is never below the floor. It may be ahead of the floor.
-  unsigned FunctionStage : 2;
+  unsigned FunctionStage : NumFunctionStageBits;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -816,7 +818,7 @@ public:
   /// - AddressLowering has individually lowered this function
   /// - The function arrived already canonical via deserialization
   /// - In a non-opaque-values build,
-  /// - Once the module has committed past SILStage::Raw.
+  /// - Once this function's stage is past SILStage::Raw.
   bool hasLoweredAddresses() const;
 
   void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
@@ -831,7 +833,7 @@ public:
   /// This function's SIL stage. Read this for a per-function legality query,
   /// such as whether an instruction is still legal here. It is never below the
   /// module's stage floor, and may be ahead of it.
-  SILStage getFunctionStage() const;
+  SILStage getFunctionStage() const { return SILStage(FunctionStage); }
 
   /// Advance this function's stage. A stage only ever moves forward.
   void setFunctionStage(SILStage stage);

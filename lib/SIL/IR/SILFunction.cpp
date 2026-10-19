@@ -328,11 +328,9 @@ bool SILFunction::hasLoweredAddresses() const {
          getFunctionStage() != SILStage::Raw;
 }
 
-SILStage SILFunction::getFunctionStage() const {
-  return SILStage(FunctionStage);
-}
-
 void SILFunction::setFunctionStage(SILStage stage) {
+  static_assert(unsigned(SILStage::Lowered) < (1u << NumFunctionStageBits),
+                "SILStage does not fit in SILFunction::FunctionStage");
   assert(stage >= getFunctionStage() && "regressing per-function stage?!");
   assert(stage >= getModule().getStageFloor() &&
          "per-function stage below the module stage floor?!");
