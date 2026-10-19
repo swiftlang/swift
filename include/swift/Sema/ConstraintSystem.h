@@ -3128,6 +3128,8 @@ public:
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
+  bool isCGFloatDoubleConversionSupported(ConstraintLocatorBuilder locator);
+
   SolutionKind
   matchPackTypes(PackType *pack1, PackType *pack2,
                  ConstraintKind kind, TypeMatchOptions flags,
