@@ -960,6 +960,22 @@ ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
+/// Returns the module that wraps the top-level Clang module owning `node`, or
+/// null if `node` has no owning module.
+static ModuleDecl *
+getWrapperForClangOwningModule(ClangModuleLoader *clangImporter,
+                               ClangNode node) {
+  auto clangModule = clangImporter->getClangOwningModule(node);
+  if (!clangModule)
+    return nullptr;
+
+  // Swift groups all submodules of a Clang module together, and imports them as
+  // a single top-level module.
+  clangModule = clangModule->getTopLevelModule();
+
+  return clangImporter->getWrapperForModule(clangModule);
+}
+
 /// If `decl` is an imported Cxx decl, returns the actual module that the decl
 /// was imported from. This is necessary to compensate for the way that
 /// Cxx `namespace` declarations are imported. Since namespaces can span
@@ -998,15 +1014,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
     return nullptr;
   }
 
-  auto clangModule = clangImporter->getClangOwningModule(decl->getClangNode());
-  if (!clangModule)
-    return nullptr;
-
-  // Swift groups all submodules of a Clang module together, and imports them as
-  // a single top-level module.
-  clangModule = clangModule->getTopLevelModule();
-
-  return clangImporter->getWrapperForModule(clangModule);
+  return getWrapperForClangOwningModule(clangImporter, decl->getClangNode());
 }
 
 ModuleDecl *Decl::getModuleContextForNameLookup() const {
@@ -1014,6 +1022,28 @@ ModuleDecl *Decl::getModuleContextForNameLookup() const {
     return parentModule;
 
   return getModuleContext();
+}
+
+void Decl::getModuleContextsForNameLookup(
+    SmallVectorImpl<ModuleDecl *> &modules) const {
+  // The Clang node of a namespace is just one of its redeclarations, and the
+  // other redeclarations may belong to other Clang modules.
+  auto namespaceDecl = dyn_cast_or_null<clang::NamespaceDecl>(getClangDecl());
+  if (!namespaceDecl ||
+      !getModuleContext()->isClangBridgingHeaderImportModule()) {
+    modules.push_back(getModuleContextForNameLookup());
+    return;
+  }
+
+  auto clangImporter = getASTContext().getClangModuleLoader();
+  for (auto redecl : namespaceDecl->redecls()) {
+    auto module = getWrapperForClangOwningModule(clangImporter, redecl);
+    if (!module)
+      module = getModuleContext();
+
+    if (!llvm::is_contained(modules, module))
+      modules.push_back(module);
+  }
 }
 
 /// Retrieve the diagnostic engine for diagnostics emission.
