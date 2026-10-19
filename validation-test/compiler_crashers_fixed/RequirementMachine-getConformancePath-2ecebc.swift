@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"b0513da5","signature":"swift::rewriting::RequirementMachine::getConformancePath(swift::Type, swift::ProtocolDecl*)","signatureNext":"SubstitutionMap::lookupConformance"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol a {
   struct b: a
     protocol c {

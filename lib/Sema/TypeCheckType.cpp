@@ -6598,12 +6598,16 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   }
 
   if (resolution.getStage() == TypeResolutionStage::Interface) {
+    bool hadError = false;
     for (auto type : rootParameterPacks) {
       if (!genericSig->haveSameShape(type, shapeType)) {
         diagnose(repr->getLoc(), diag::expansion_not_same_shape, result,
                  shapeType, type);
+        hadError = true;
       }
     }
+    if (hadError)
+      return ErrorType::get(ctx);
   }
 
   return result;
@@ -6638,7 +6642,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
           Lexer::getLocForEndOfToken(ctx.SourceMgr, eachLoc);
       diag.fixItRemoveChars(eachLoc, eachLocEnd);
     }
-    return packReference;
+    return ErrorType::get(ctx);
   }
 
   if (!options.contains(TypeResolutionFlags::AllowPackReferences) &&

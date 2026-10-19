@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"c6df5cd3","signature":"swift::ASTContext::setSideCachedPropertyWrapperBackingPropertyType(swift::VarDecl*, swift::Type)","signatureAssert":"Assertion failed: (!getImpl().PropertyWrapperBackingVarTypes[var] || getImpl().PropertyWrapperBackingVarTypes[var]->isEqual(type)), function setSideCachedPropertyWrapperBackingPropertyType","signatureNext":"applySolutionToInitialization"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b
 }
