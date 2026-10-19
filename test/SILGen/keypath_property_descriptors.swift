@@ -194,3 +194,17 @@ public extension StaticInExtensionEnum {
   // RESILIENT-LABEL: sil_property #StaticInExtensionEnum.staticVar (settable_property
   static var staticVar = "hello"
 }
+
+public struct StaticInConcreteExtension<Base> {}
+
+public struct ConcreteBase {}
+
+public extension StaticInConcreteExtension where Base == ConcreteBase {
+  // CHECK-LABEL: sil_property #StaticInConcreteExtension.staticLet<τ_0_0 where τ_0_0 == ConcreteBase> ()
+  static let staticLet = "hello"
+
+  // NONRESILIENT-LABEL: sil_property #StaticInConcreteExtension.staticVar<τ_0_0 where τ_0_0 == ConcreteBase> ()
+  // PRIVATEIMPORTS-LABEL: sil_property #StaticInConcreteExtension.staticVar<τ_0_0 where τ_0_0 == ConcreteBase> ()
+  // RESILIENT-LABEL: sil_property #StaticInConcreteExtension.staticVar<τ_0_0 where τ_0_0 == ConcreteBase> (settable_property
+  static var staticVar = "hello"
+}

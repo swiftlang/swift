@@ -5908,7 +5908,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
   if (field->isStatic()) {
     auto baseMeta = base.getType().castTo<MetatypeType>().getInstanceType();
     (void)baseMeta;
-    assert(!baseMeta->isSpecialized() &&
+    assert(!baseMeta->hasTypeParameter() && !baseMeta->hasArchetype() &&
            "generic static stored properties not implemented");
     if (field->getDeclContext()->getSelfClassDecl() &&
         field->hasStorage())
