@@ -32,6 +32,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
@@ -3395,8 +3396,10 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   // tail-calling the implementation.
   if (auto *clangDecl = fn->getClangDecl()) {
     if (auto *objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      swift::ClangImporter *CI =
+          static_cast<ClangImporter *>(IGM.Context.getClangModuleLoader());
       if (objcMethodDecl->isDirectMethod() &&
-          IGM.getClangCGM().getCodeGenOpts().ObjCDirectPreconditionThunk) {
+          CI->getCodeGenOpts().ObjCDirectPreconditionThunk) {
         const auto *cd = objcMethodDecl->getClassInterface();
         bool receiverCanBeNull = true;
         bool classObjectCanBeUnrealized = objcMethodDecl->isClassMethod();
