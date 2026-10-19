@@ -218,27 +218,14 @@ fileprivate func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
+#if !$Embedded
+  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
+#else
   let total = roundUp(numHeaderBytes + growTailBytes)
+#endif
   let totalTailBytes = total - numHeaderBytes
 
-  let object = tailAllocator(totalTailBytes)
-
-  let allocSize: Int?
-  #if !$Embedded
-    allocSize = unsafe _mallocSize(ofAllocation: UnsafeRawPointer(Builtin.bridgeToRawPointer(object)))
-  #else
-    allocSize = nil
-  #endif
-  if let allocSize {
-    _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
-
-    let realNumTailBytes = allocSize - numHeaderBytes
-    _internalInvariant(realNumTailBytes >= numTailBytes)
-
-    return (object, realNumTailBytes)
-  } else {
-    return (object, totalTailBytes)
-  }
+  return (tailAllocator(totalTailBytes), totalTailBytes)
 }
 
 fileprivate func _allocateStringStorage(
