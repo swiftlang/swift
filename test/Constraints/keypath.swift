@@ -395,3 +395,19 @@ func rdar174707424() {
     f($0, \.i)
   }
 }
+
+// Regression test for rdar://190454958
+func key_path_application_vs_pattern_binding() {
+  enum CacheState {
+    case loaded(Int)
+    case unloaded
+  }
+
+  struct State {}
+
+  func test(state: State, keyPath: WritableKeyPath<State, CacheState>) {
+    if case .loaded(let value) = state[keyPath: keyPath] {
+      _ = value
+    }
+  }
+}
