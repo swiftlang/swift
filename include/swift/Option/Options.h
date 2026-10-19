@@ -40,6 +40,7 @@ namespace options {
     ArgumentIsFileList = (1 << 19),
     CacheInvariant = (1 << 20),
     ArgumentIsCASID = (1 << 21),
+    ArgumentIsEqualKeyedPath = (1 << 22),
   };
 
   enum ID {
