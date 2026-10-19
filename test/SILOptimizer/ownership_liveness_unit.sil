@@ -1892,6 +1892,52 @@ bb4(%phi : @owned $Optional<@callee_guaranteed () -> ()>):
 }
 
 // =============================================================================
+// InteriorLiveness and debug_value uses
+// =============================================================================
+
+// A debug_value use is not a use point of an OSSA lifetime, so it must not
+// extend interior liveness. Instruction salvaging can leave a debug_value
+// after the lifetime-ending destroy_value of its operand.
+
+// CHECK-LABEL: testInteriorDebugValueOwned: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: begin:      bb0
+// CHECK-NEXT: ends:       destroy_value %0 : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   destroy_value %0 : $C
+// CHECK-NEXT: testInteriorDebugValueOwned: interior_liveness_swift with: @argument[0]
+sil [ossa] @testInteriorDebugValueOwned : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "interior_liveness_swift @argument[0]"
+  destroy_value %0 : $C
+  debug_value %0 : $C, let, name "c"
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Likewise, a debug_value use of a borrowed value is not a use point of the
+// enclosing borrow scope, even if it appears after the end_borrow.
+
+// CHECK-LABEL: testInteriorDebugValueGuaranteed: interior_liveness_swift with: %1
+// CHECK: Interior liveness:   %1 = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %1 = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %1 : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   end_borrow %1 : $C
+// CHECK-NEXT: testInteriorDebugValueGuaranteed: interior_liveness_swift with: %1
+sil [ossa] @testInteriorDebugValueGuaranteed : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  specify_test "interior_liveness_swift %1"
+  end_borrow %1 : $C
+  debug_value %1 : $C, let, name "c"
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// =============================================================================
 // ExtendedLiveness
 // =============================================================================
 

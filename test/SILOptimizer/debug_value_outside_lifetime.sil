@@ -1,0 +1,114 @@
+// RUN: %target-sil-opt %s -copy-propagation -enable-sil-verify-all -o /dev/null
+// RUN: %target-sil-opt %s -sil-combine -enable-sil-verify-all -o /dev/null
+// RUN: %target-sil-opt %s -semantic-arc-opts -enable-sil-verify-all -o /dev/null
+// RUN: %target-sil-opt %s -dead-object-elimination -enable-sil-verify-all -o /dev/null
+// RUN: %target-sil-opt %s -dce -enable-sil-verify-all -o /dev/null
+// RUN: %target-sil-opt %s -destroy-hoisting -enable-sil-verify-all -o /dev/null
+// RUN: %target-sil-opt %s -semantic-arc-opts -enable-sil-verify-all | %FileCheck %s
+
+// Passes which compute OSSA liveness (OwnershipUseVisitor, InteriorLiveness,
+// PrunedLiveRange) must not extend a value's lifetime to a debug_value use: a
+// debug_value is an OperandOwnership::DebugUse and is allowed to live outside
+// its operand's lifetime, e.g. after salvaging rewrote it. Before that was
+// fixed, a stale debug use made the passes below see an extra use point past
+// the lifetime end, so they moved the lifetime boundary over the debug use or
+// inserted copies/borrows and produced unverifiable SIL (or crashed).
+//
+// The first six RUN lines assert that none of those passes crashes or leaves
+// the module in a state which fails the SIL verifier: sil-opt verifies after
+// every pass by default and aborts on failure, which fails the RUN line. The
+// last RUN line checks that the functions and their debug info survive.
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+class KlassUser {
+  var field: Klass
+}
+
+enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+sil [ossa] @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// A debug_value of a borrowed value which appears after the end_borrow and
+// after the destroy of an unrelated value. The root is still alive at the
+// debug use, so this is the pattern left behind by DCE salvaging.
+// CHECK-LABEL: sil [ossa] @debug_value_after_destroy :
+// CHECK:         debug_value %
+// CHECK:       } // end sil function 'debug_value_after_destroy'
+sil [ossa] @debug_value_after_destroy : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = begin_borrow %0
+  end_borrow %2
+  destroy_value %1
+  debug_value %2, let, name "k"
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A debug_value of a value loaded from an interior pointer of a borrow scope,
+// after the borrow scope ended. This goes through the interior pointer use
+// handling of OwnershipUseVisitor and checkAndUpdateInteriorPointer.
+// CHECK-LABEL: sil [ossa] @debug_value_of_load_borrow_after_end_borrow :
+// CHECK:         debug_value %
+// CHECK:       } // end sil function 'debug_value_of_load_borrow_after_end_borrow'
+sil [ossa] @debug_value_of_load_borrow_after_end_borrow : $@convention(thin) (@owned KlassUser) -> () {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #KlassUser.field
+  %3 = load_borrow %2
+  %4 = apply %useKlass(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
+  end_borrow %1
+  debug_value %3, let, name "field"
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A debug_value of an owned value which was consumed by switch_enum. The
+// availability boundary of the value must end at the switch_enum, not at the
+// debug use.
+// CHECK-LABEL: sil [ossa] @debug_value_after_consume :
+// CHECK:         debug_value %
+// CHECK:       } // end sil function 'debug_value_after_consume'
+sil [ossa] @debug_value_after_consume : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%payload : @owned $Klass):
+  debug_value %0, let, name "value"
+  destroy_value %payload
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// A copy of a borrowed value whose borrow scope has a debug use after the
+// end_borrow. This drives the OSSACanonicalizeOwned based rewriting in
+// copy-propagation and sil-combine, which computes interior liveness for the
+// copy and the borrow scope.
+// CHECK-LABEL: sil [ossa] @copy_value_with_debug_use_after_end_borrow :
+// CHECK:         debug_value %
+// CHECK:       } // end sil function 'copy_value_with_debug_use_after_end_borrow'
+sil [ossa] @copy_value_with_debug_use_after_end_borrow : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = copy_value %1
+  end_borrow %1
+  debug_value %1, let, name "k"
+  destroy_value %0
+  return %2
+}
