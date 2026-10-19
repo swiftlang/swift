@@ -56,6 +56,9 @@ SILValue emitIsa(SILGenFunction &SGF, SILLocation loc,
 /// no sub-pattern at all, which is why a null \p pattern is accepted.
 bool patternNeedsNoPayload(const Pattern *pattern);
 
+/// True if \p pattern matches any value, exactly like `_`.
+bool isWildcardIsPattern(const IsPattern *pattern);
+
 /// True if an `is` check from \p sourceType to \p targetType should lower to a
 /// non-consuming type test rather than to the value-producing machinery `as?`
 /// uses.

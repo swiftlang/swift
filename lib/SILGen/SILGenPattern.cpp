@@ -171,6 +171,8 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
+    if (isWildcardIsPattern(isa))
+      return n;
     ++n;
     if (auto sub = isa->getSubPattern())
       return getNumSpecializationsRecursive(sub, n);
@@ -224,10 +226,13 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Expr:
   case PatternKind::Named:
     return true;
-  
+
+  // A statically-satisfied `is` that binds nothing is a wildcard too.
+  case PatternKind::Is:
+    return isWildcardIsPattern(cast<IsPattern>(p));
+
   // Non-wildcards.
   case PatternKind::Tuple:
-  case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
@@ -1249,6 +1254,9 @@ bindRefutablePatterns(const ClauseRow &row, ArgArray args,
       break;
     case PatternKind::Named:
       break;
+    case PatternKind::Is:
+      assert(isWildcardIsPattern(cast<IsPattern>(pattern)));
+      break;
 
     case PatternKind::Expr: {
       ExprPattern *exprPattern = cast<ExprPattern>(pattern);
@@ -1289,6 +1297,9 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
     case PatternKind::Expr: // Ignore expression patterns, which we should have
                             // bound in an earlier pass.
       break;
+    case PatternKind::Is:
+      assert(isWildcardIsPattern(cast<IsPattern>(pattern)));
+      break;
     case PatternKind::Named: {
       NamedPattern *named = cast<NamedPattern>(pattern);
       bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
@@ -1317,6 +1328,9 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
       break;
     case PatternKind::Expr: // Ignore expression patterns, which we should have
                             // bound in an earlier pass.
+      break;
+    case PatternKind::Is:
+      assert(isWildcardIsPattern(cast<IsPattern>(pattern)));
       break;
     case PatternKind::Named: {
       NamedPattern *named = cast<NamedPattern>(pattern);
