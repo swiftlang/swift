@@ -4432,6 +4432,8 @@ NeverNullType
 TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                       unsigned ordinal,
                                       TypeResolutionOptions options) {
+  auto loc = repr->getLoc();
+
   // Use type reconstruction to summon the opaque type decl.
   Demangler demangle;
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
@@ -4473,8 +4475,11 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
       // This matches the old behavior of the ASTPrinter.
       auto *unqualIdentRepr = cast<UnqualifiedIdentTypeRepr>(repr);
 
+      auto argOptions = options.withoutContext().withContext(
+          TypeResolverContext::ValueGenericArgument);
+
       for (auto argRepr : unqualIdentRepr->getGenericArgs()) {
-        auto argTy = resolveType(argRepr, options);
+        auto argTy = resolveType(argRepr, argOptions);
         // If we cannot resolve the generic parameter, propagate the error out.
         if (argTy->hasError()) {
           return ErrorType::get(getASTContext());
@@ -4520,6 +4525,27 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
         args.append(subArgs.begin(), subArgs.end());
       }
     }
+
+    // Values may only be passed for value parameters, and vice versa.
+    bool hadError = false;
+    for (auto [paramTy, argTy] :
+         llvm::zip(genericSig.getGenericParams(), args)) {
+      // For parameter packs, check each element in the pack individually.
+      if (auto *packTy = argTy->getAs<PackType>()) {
+        for (auto eltTy : packTy->getElementTypes()) {
+          // Look through pack expansions to the pattern type.
+          if (auto *expTy = eltTy->getAs<PackExpansionType>())
+            eltTy = expTy->getPatternType();
+          if (ValueMatchVisitor::check(getASTContext(), paramTy, eltTy, loc))
+            hadError = true;
+        }
+      } else if (ValueMatchVisitor::check(getASTContext(), paramTy, argTy,
+                                          loc)) {
+        hadError = true;
+      }
+    }
+    if (hadError)
+      return ErrorType::get(getASTContext());
 
     subs = SubstitutionMap::get(genericSig, args,
                                 LookUpConformanceInModule());
