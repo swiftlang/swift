@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import shutil
 
 from . import product
 from . import swiftdocc
@@ -57,26 +56,17 @@ def symbol_graph_module_name(filename):
     return stem.split('@', 1)[0]
 
 
-def filter_symbol_graphs(source_dir, dest_dir):
-    """Copy symbol graphs from source_dir to dest_dir, skipping excluded modules.
+def remove_excluded_symbol_graphs(symbol_graph_dir):
+    """Delete symbol graphs of excluded modules from symbol_graph_dir.
 
-    Replaces dest_dir if it already exists. The directory layout is preserved.
+    This edits the directory in place. Anything that later runs docc against
+    it, including scripts outside this repository, sees only the kept graphs.
     """
-    if os.path.exists(dest_dir):
-        shutil.rmtree(dest_dir)
-    os.makedirs(dest_dir)
-
-    for root, _, files in os.walk(source_dir):
-        relative_root = os.path.relpath(root, source_dir)
+    for root, _, files in os.walk(symbol_graph_dir):
         for name in files:
             module = symbol_graph_module_name(name)
-            if module is None or module in EXCLUDED_SYMBOL_GRAPH_MODULES:
-                continue
-            target_dir = os.path.normpath(
-                os.path.join(dest_dir, relative_root))
-            os.makedirs(target_dir, exist_ok=True)
-            shutil.copy2(os.path.join(root, name),
-                         os.path.join(target_dir, name))
+            if module in EXCLUDED_SYMBOL_GRAPH_MODULES:
+                os.remove(os.path.join(root, name))
 
 
 class StdlibDocs(product.Product):
@@ -111,11 +101,8 @@ class StdlibDocs(product.Product):
             "stdlib.docc"
         )
 
-        raw_symbol_graph_dir = os.path.join(
-            swift_build_dir, "lib", "symbol-graph")
-        symbol_graph_dir = os.path.join(
-            swift_build_dir, "lib", "symbol-graph-filtered")
-        filter_symbol_graphs(raw_symbol_graph_dir, symbol_graph_dir)
+        symbol_graph_dir = os.path.join(swift_build_dir, "lib", "symbol-graph")
+        remove_excluded_symbol_graphs(symbol_graph_dir)
         output_path = os.path.join(swift_build_dir, "Swift.doccarchive")
 
         docc_action = 'preview' if self.args.preview_stdlib_docs else 'convert'
