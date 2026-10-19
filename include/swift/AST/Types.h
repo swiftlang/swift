@@ -222,7 +222,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 19 };
+  enum { NumAFTExtInfoBits = 20 };
   enum { NumSILExtInfoBits = 17 };
 
   // clang-format off
@@ -3978,6 +3978,12 @@ public:
 
   /// Returns true if calling a value of this function type consumes the value.
   bool isCallConsuming() const { return hasCalledAtMostOnceSemantics(); }
+
+  /// Returns true if values of this function type cannot cross an isolation
+  /// boundary without also being consumed.
+  bool isNonTransferable() const {
+    return hasExtInfo() && getExtInfo().isNonTransferable();
+  }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.

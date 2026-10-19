@@ -1121,6 +1121,9 @@ private:
       if (auto *nominal = type->getAnyNominal())
         return nominalUses(nominal);
 
+      if (auto *funcType = type->getAs<AnyFunctionType>())
+        return funcType->isNonTransferable();
+
       return false;
     });
   }

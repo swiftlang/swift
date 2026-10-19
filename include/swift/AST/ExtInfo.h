@@ -645,8 +645,8 @@ class ASTExtInfoBuilder {
   // and NumMaskBits must be updated, and they must match.
   //
   // clang-format off
-  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|execution_semantics| coroutine |
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |      16 .. 17     |    18     |
+  //   |representation|noEscape|concurrent|async|throws|isolation|differentiability| SendingResult |inout_result|execution_semantics| coroutine | nontransferable |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  | 8 .. 10 |     11 .. 13    |         14    |     15     |      16 .. 17     |    18     |       19        |
   // clang-format on
   //
   enum : unsigned {
@@ -664,7 +664,8 @@ class ASTExtInfoBuilder {
     ExecutionSemanticsMaskOffset = 16,
     ExecutionSemanticsMask = 0x3 << ExecutionSemanticsMaskOffset,
     CoroutineMask = 1 << 18,
-    NumMaskBits = 19
+    NonTransferableMask = 1 << 19,
+    NumMaskBits = 20
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -809,6 +810,10 @@ public:
   }
 
   constexpr bool isCoroutine() const { return bits & CoroutineMask; }
+
+  constexpr bool isNonTransferable() const {
+    return bits & NonTransferableMask;
+  }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
     return DifferentiabilityKind((bits & DifferentiabilityMask) >>
@@ -969,6 +974,15 @@ public:
         coroutine ? (bits | CoroutineMask) : (bits & ~CoroutineMask),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
         lifetimeDependencies, scopeSignature);
+  }
+
+  [[nodiscard]] ASTExtInfoBuilder
+  withNonTransferable(bool nontransferable = true) const {
+    return ASTExtInfoBuilder(nontransferable ? (bits | NonTransferableMask)
+                                             : (bits & ~NonTransferableMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             typeDependencies, lifetimeDependencies,
+                             scopeSignature);
   }
 
   [[nodiscard]]
@@ -1196,6 +1210,10 @@ public:
   /// Returns true if calling a value of this function type consumes the value.
   constexpr bool isCallConsuming() const { return builder.isCallConsuming(); }
 
+  /// Returns true if values of this function type cannot cross an isolation
+  /// boundary without also being consumed.
+  constexpr bool isNonTransferable() const { return builder.isNonTransferable(); }
+
   /// Helper method for changing the representation.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withRepresentation for chaining.
@@ -1294,6 +1312,10 @@ public:
   [[nodiscard]] ASTExtInfo withExecutionSemantics(
       std::optional<ExecutionSemantics> executionSemantics) const {
     return builder.withExecutionSemantics(executionSemantics).build();
+  }
+
+  [[nodiscard]] ASTExtInfo withNonTransferable(bool nontransferable = true) const {
+    return builder.withNonTransferable(nontransferable);
   }
 
   [[nodiscard]] ASTExtInfo
