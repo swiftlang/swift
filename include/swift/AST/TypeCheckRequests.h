@@ -4129,9 +4129,6 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
 
-  static Type evaluate(const TypeResolution &resolution,
-                       TypeRepr *repr);
-
 private:
   friend SimpleRequest;
 
