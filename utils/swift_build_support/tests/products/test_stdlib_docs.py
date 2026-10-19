@@ -16,7 +16,7 @@ import unittest
 
 from swift_build_support.products.stdlib_docs import (
     EXCLUDED_SYMBOL_GRAPH_MODULES,
-    filter_symbol_graphs,
+    remove_excluded_symbol_graphs,
     symbol_graph_module_name,
 )
 
@@ -36,41 +36,38 @@ class SymbolGraphModuleNameTestCase(unittest.TestCase):
         self.assertIsNone(symbol_graph_module_name('README.txt'))
 
 
-class FilterSymbolGraphsTestCase(unittest.TestCase):
+class RemoveExcludedSymbolGraphsTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.source = os.path.realpath(tempfile.mkdtemp())
-        self.dest = os.path.join(
-            os.path.realpath(tempfile.mkdtemp()), 'staged')
+        self.root = os.path.realpath(tempfile.mkdtemp())
 
     def tearDown(self):
-        shutil.rmtree(self.source, ignore_errors=True)
-        shutil.rmtree(os.path.dirname(self.dest), ignore_errors=True)
+        shutil.rmtree(self.root, ignore_errors=True)
 
     def _touch(self, variant, filename):
-        directory = os.path.join(self.source, variant)
+        directory = os.path.join(self.root, variant)
         os.makedirs(directory, exist_ok=True)
         with open(os.path.join(directory, filename), 'w') as f:
             f.write('{}')
 
-    def _staged(self):
+    def _remaining(self):
         found = set()
-        for root, _, files in os.walk(self.dest):
+        for root, _, files in os.walk(self.root):
             for name in files:
-                found.add(os.path.relpath(os.path.join(root, name), self.dest))
+                found.add(os.path.relpath(os.path.join(root, name), self.root))
         return found
 
     def test_keeps_public_modules(self):
         self._touch('swiftCore-macosx-arm64', 'Swift.symbols.json')
         self._touch('swift_Concurrency-macosx-arm64',
                     '_Concurrency@Swift.symbols.json')
-        filter_symbol_graphs(self.source, self.dest)
-        self.assertEqual(self._staged(), {
+        remove_excluded_symbol_graphs(self.root)
+        self.assertEqual(self._remaining(), {
             'swiftCore-macosx-arm64/Swift.symbols.json',
             'swift_Concurrency-macosx-arm64/_Concurrency@Swift.symbols.json',
         })
 
-    def test_drops_excluded_modules_and_their_extensions(self):
+    def test_removes_excluded_modules_and_their_extensions(self):
         self._touch('swiftCore-macosx-arm64', 'Swift.symbols.json')
         self._touch('swift_RegexParser-macosx-arm64',
                     '_RegexParser.symbols.json')
@@ -80,18 +77,17 @@ class FilterSymbolGraphsTestCase(unittest.TestCase):
                     'SwiftOnoneSupport.symbols.json')
         self._touch('swiftStdlibUnittestFoundationExtras-macosx-arm64',
                     'StdlibUnittestFoundationExtras@Foundation.symbols.json')
-        filter_symbol_graphs(self.source, self.dest)
+        remove_excluded_symbol_graphs(self.root)
         self.assertEqual(
-            self._staged(), {'swiftCore-macosx-arm64/Swift.symbols.json'})
+            self._remaining(), {'swiftCore-macosx-arm64/Swift.symbols.json'})
 
-    def test_replaces_stale_staging_directory(self):
-        os.makedirs(self.dest)
-        with open(os.path.join(self.dest, 'stale.symbols.json'), 'w') as f:
-            f.write('{}')
-        self._touch('swiftCore-macosx-arm64', 'Swift.symbols.json')
-        filter_symbol_graphs(self.source, self.dest)
-        self.assertEqual(
-            self._staged(), {'swiftCore-macosx-arm64/Swift.symbols.json'})
+    def test_ignores_non_symbol_graph_files(self):
+        self._touch('swiftCore-macosx-arm64', 'notes.txt')
+        remove_excluded_symbol_graphs(self.root)
+        self.assertEqual(self._remaining(), {'swiftCore-macosx-arm64/notes.txt'})
+
+    def test_missing_directory_is_not_an_error(self):
+        remove_excluded_symbol_graphs(os.path.join(self.root, 'absent'))
 
     def test_exclusion_list_covers_known_extraneous_modules(self):
         for module in ('_RegexParser', 'SwiftOnoneSupport', 'StdlibUnittest',
