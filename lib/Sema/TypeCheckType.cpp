@@ -3649,6 +3649,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::Once,
       TypeAttrKind::Callable,
       TypeAttrKind::ScopeParams,
+      TypeAttrKind::NonTransferable,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -4727,7 +4728,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  bool sendable = claim<SendableTypeAttr>(attrs);
+  const bool isExplicitlySendable = claim<SendableTypeAttr>(attrs);
+  bool sendable = isExplicitlySendable;
   bool coroutine = claim<YieldOnceTypeAttr>(attrs);
 
   auto isolation = FunctionTypeIsolation::forNonIsolated();
@@ -5041,6 +5043,32 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  bool isNonTransferable = false;
+  if (auto nontransferable = claim<NonTransferableTypeAttr>(attrs)) {
+    if (ctx.LangOpts.hasFeature(Feature::NontransferableTypes)) {
+      if (isExplicitlySendable) {
+        diagnoseInvalid(
+            repr, nontransferable->getAtLoc(),
+            diag::invalid_use_of_nontransferable_and_sendable_attributes);
+      }
+
+      if (representation != FunctionTypeRepresentation::Swift) {
+        diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                        diag::invalid_non_transferable_and_attr_combination,
+                        conventionAttr);
+        representation = FunctionType::Representation::Swift;
+        parsedClangFunctionType = nullptr;
+      }
+
+      isNonTransferable = true;
+      sendable = false;
+    } else {
+      diagnoseInvalid(repr, nontransferable->getAttrLoc(),
+                      diag::requires_experimental_feature, "@nontransferable",
+                      false, Feature::NontransferableTypes.getName());
+    }
+  }
+
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
@@ -5061,6 +5089,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withClangFunctionType(clangFnType)
                      .withCoroutine(coroutine)
                      .withScopeSignature(scopeSignature)
+                     .withNonTransferable(isNonTransferable)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.

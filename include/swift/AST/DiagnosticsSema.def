@@ -10009,6 +10009,14 @@ ERROR(conformance_repression_only_on_struct_class_enum,none,
       (const ProtocolDecl *))
 
 //===----------------------------------------------------------------------===//
+// MARK: `~Transferable`
+//===----------------------------------------------------------------------===//
+
+ERROR(invalid_non_transferable_and_attr_combination,none,
+      "%0 attribute is not allowed on '@nontransferable' types",
+      (TypeAttribute *))
+
+//===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//
 
