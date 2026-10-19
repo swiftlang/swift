@@ -2064,7 +2064,10 @@ namespace {
       }();
       extInfo = extInfo.withIsolation(isolation);
       if (isolation.isGlobalActor() &&
-          CS.getASTContext().LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+          CS.getASTContext().LangOpts.hasFeature(
+              Feature::GlobalActorIsolatedTypesUsability) &&
+          // ~Transferable values cannot be Sendable.
+          !extInfo.isNonTransferable()) {
         extInfo = extInfo.withSendable();
       }
 

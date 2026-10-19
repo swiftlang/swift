@@ -3351,6 +3351,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return SolutionKind::Error;
   }
 
+  if (func1->isNonTransferable() != func2->isNonTransferable() &&
+      (func1->isNonTransferable() || kind < ConstraintKind::Subtype)) {
+    return SolutionKind::Error;
+  }
+
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
   if (func1->hasSendingResult() != func2->hasSendingResult() &&
       (!func1->hasSendingResult() || kind < ConstraintKind::Subtype)) {
@@ -12672,6 +12677,17 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       } else if (auto semantics = contextualFnType->getExecutionSemantics()) {
         closureExtInfo = closureExtInfo.withExecutionSemantics(semantics);
       }
+    }
+
+    // ~Transferable cannot be Sendable at the same time but an explicitly
+    // Sendable closure could be converted to a ~Transferable one. Inferred
+    // Sendable (e.g. for global actor isolated closures) yields to the
+    // contextual type. Sendable-dependent types are not an issue here because
+    // they are used for partial applications and ~Transferable base type is
+    // non-Sendable.
+    if (contextualFnType->isNonTransferable() &&
+        !closure->getAttrs().hasAttribute<SendableAttr>()) {
+      closureExtInfo = closureExtInfo.withSendable(false).withNonTransferable();
     }
   }
 

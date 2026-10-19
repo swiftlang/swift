@@ -1441,12 +1441,18 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool nontransferable = false;
   std::optional<ExecutionSemantics> executionSemantics;
 
   if (auto *attr = getExecutionSemanticsAttr(expr->getAttrs(),
                                              expr->getASTContext().SourceMgr)) {
     executionSemantics = isa<OnceAttr>(attr) ? ExecutionSemantics::Once
                                              : ExecutionSemantics::AtMostOnce;
+  }
+
+  if (auto *nontransferableAttr =
+          expr->getAttrs().getAttribute<NonTransferableAttr>()) {
+    nontransferable = nontransferableAttr->isValid();
   }
 
   if (throws || async) {
@@ -1467,6 +1473,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
         .withAsync(async)
         .withSendable(sendable)
         .withExecutionSemantics(executionSemantics)
+        .withNonTransferable(nontransferable)
         .build();
   }
 
@@ -1482,6 +1489,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withAsync(bool(findAsyncNode(expr)))
       .withSendable(sendable)
       .withExecutionSemantics(executionSemantics)
+      .withNonTransferable(nontransferable)
       .build();
 }
 
