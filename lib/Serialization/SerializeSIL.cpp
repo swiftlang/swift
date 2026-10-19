@@ -15,6 +15,7 @@
 #include "SILFormat.h"
 #include "Serialization.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -866,7 +867,14 @@ void SILSerializer::writeDebugReconstructionBlock(const SILBasicBlock &DebugBB) 
 /// deserialization.
 static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<uint64_t> &ListOfValues) {
-  ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
+  ValueDecl *decl = Ref.getDecl();
+  // A distributed thunk cannot be found by cross-reference lookup, so
+  // serialize the decl it was synthesized for; the reader re-derives it.
+  if (auto *thunk = Ref.getDistributedThunk())
+    if (thunk->isDistributedThunk())
+      if (auto *original = getDistributedThunkOriginalDecl(thunk))
+        decl = original;
+  ListOfValues.push_back(S.addDeclRef(decl));
   ListOfValues.push_back((unsigned)Ref.kind);
   ListOfValues.push_back(Ref.isForeign);
 }
