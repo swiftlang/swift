@@ -333,6 +333,14 @@ static bool isDeinitableFunctionType(EitherFunctionType eitherFnTy) {
   return !cast<const SILFunctionType *>(eitherFnTy)->isNondeinitable();
 }
 
+static bool isTransferableFunctionType(EitherFunctionType eitherFnTy) {
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
+    return !fnTy->isNonTransferable();
+
+  // TODO: SILFunctionType support for ~Transferable.
+  return true;
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -421,10 +429,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
     case KnownProtocolKind::SendableMetatype:
       return synthesizeConformance();
     case KnownProtocolKind::Transferable:
-      // FIXME: Not all of the function types are Transferable, it
-      //        depends on whether or not they capture any ~Transferable
-      //        values.
-      return synthesizeConformance();
+      if (isTransferableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     default:
       break;
     }
