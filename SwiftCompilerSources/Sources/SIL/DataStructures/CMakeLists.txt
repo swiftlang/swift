@@ -9,6 +9,7 @@
 swift_compiler_sources(SIL
   BasicBlockRange.swift
   InstructionRange.swift
+  PostOrderBlocks.swift
   Set.swift
   Stack.swift
   Worklist.swift)
