@@ -1295,6 +1295,39 @@ void swift::findClosuresForFunctionValue(
   }
 }
 
+bool swift::isNonEscapingClosure(CanSILFunctionType funcTy) {
+  auto isInoutAliasable = [](SILParameterInfo paramInfo) {
+    return paramInfo.getConvention()
+    == ParameterConvention::Indirect_InoutAliasable;
+  };
+  return llvm::any_of(funcTy->getParameters(), isInoutAliasable);
+}
+
+void swift::findNonEscapingClosuresForFunctionValue(
+    SILValue funcVal, TinyPtrVector<PartialApplyInst *> &results) {
+  SILType funcTy = funcVal->getType();
+  // Handle `Optional<@convention(block) @noescape (_)->(_)>`
+  if (auto optionalObjTy = funcTy.getOptionalObjectType())
+    funcTy = optionalObjTy;
+  auto fnType = funcTy.getAs<SILFunctionType>();
+  if (!fnType)
+    return;
+
+  if (fnType->isNoEscape()) {
+    findClosuresForFunctionValue(funcVal, results);
+    return;
+  }
+  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Block)
+    return;
+
+  TinyPtrVector<PartialApplyInst *> closures;
+  findClosuresForFunctionValue(funcVal, closures);
+  for (auto *closure : closures) {
+    if (isNonEscapingClosure(closure->getOrigCalleeType()))
+      results.push_back(closure);
+  }
+}
+
 bool PolymorphicBuiltinSpecializedOverloadInfo::init(
     SILFunction *fn, BuiltinValueKind builtinKind,
     ArrayRef<SILType> oldOperandTypes, SILType oldResultType) {
