@@ -1,6 +1,7 @@
 // Test various ObjC-specific features with C arrays.
 
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
 // REQUIRES: swift_feature_ModernImportedCArrays
 
 // RUN: %empty-directory(%t)
@@ -77,6 +78,20 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface QAdopter : NSObject <Q>
+@end
+
+@interface Svc : NSObject
+- (void)fetchWithBuf:(int (*)[4])buf
+   completionHandler:(void (^)(int (*)[4], NSError *_Nullable))handler;
+- (void)resultWithCompletionHandler:(void (^)(int (*_Nullable)[4]))handler;
+@end
+
+@protocol AP
+- (void)pFetchWithBuf:(int (*)[4])buf
+    completionHandler:(void (^)(int (*_Nullable)[4]))handler;
+@end
+
+@interface SvcP : NSObject <AP>
 @end
 
 // Parameters declared as arrays decay to pointers to arrays, however they are
@@ -193,6 +208,63 @@ func test(
 }
 
 @available(anyAppleOS 26, *)
+func testAsync(
+    tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
+    array: UnsafeMutablePointer<InlineArray<4, Int32>>,
+    svc: Svc
+) async throws {
+  _ = try await svc.fetch(withBuf: tuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  _ = try await svc.fetch(withBuf: array)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  let _: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>? = await svc.result()
+  // expected-modern-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<[4 of CInt]>?' (aka 'Optional<UnsafeMutablePointer<InlineArray<4, Int32>>>') to type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>?'}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('[4 of CInt]' (aka 'InlineArray<4, Int32>') and '(Int32, Int32, Int32, Int32)') are expected to be equal}}
+  let _: UnsafeMutablePointer<InlineArray<4, Int32>>? = await svc.result()
+  // expected-legacy-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>?' (aka 'Optional<UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>>') to type 'UnsafeMutablePointer<InlineArray<4, Int32>>?'}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') and 'InlineArray<4, Int32>') are expected to be equal}}
+}
+
+@available(anyAppleOS 26, *)
+func testProtocolAsync(
+    tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
+    array: UnsafeMutablePointer<InlineArray<4, Int32>>,
+    svcP: SvcP, proto: any AP
+) async {
+  _ = await svcP.pFetch(withBuf: tuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  _ = await svcP.pFetch(withBuf: array)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  _ = await proto.pFetch(withBuf: tuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  _ = await proto.pFetch(withBuf: array)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+}
+
+// The completion handler form is not affected
+@available(anyAppleOS 26, *)
+func testCompletionHandler(
+    tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
+    array: UnsafeMutablePointer<InlineArray<4, Int32>>,
+    svc: Svc
+) {
+  svc.fetch(withBuf: tuple) { _, _ in }
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  svc.fetch(withBuf: array) { _, _ in }
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+}
+
+@available(anyAppleOS 26, *)
 func testDecayedArrayParameters(
     tuple: UnsafeMutablePointer<(Float, Float, Float, Float, Float, Float)>,
     array: UnsafeMutablePointer<InlineArray<6, Float>>,
@@ -234,6 +306,26 @@ func test(
 
   qAdopter.protoBuf = pointer
   let _: UnsafeMutablePointer<CArray>? = qAdopter.protoBuf
+}
+
+@available(anyAppleOS 26, *)
+func testAsync(
+    _ pointer: UnsafeMutablePointer<CArray>,
+    _ svc: Svc, _ svcP: SvcP, _ proto: any AP
+) async throws {
+  // Array in the completion handler's parameters
+  let _: UnsafeMutablePointer<CArray> = try await svc.fetch(withBuf: pointer)
+  let _: UnsafeMutablePointer<CArray>? = await svc.result()
+
+  // Protocol requirement
+  let _: UnsafeMutablePointer<CArray>? = await svcP.pFetch(withBuf: pointer)
+  let _: UnsafeMutablePointer<CArray>? = await proto.pFetch(withBuf: pointer)
+}
+
+// The completion handler form is not affected
+@available(anyAppleOS 26, *)
+func testCompletionHandler(_ pointer: UnsafeMutablePointer<CArray>, _ svc: Svc) {
+  svc.fetch(withBuf: pointer) { _, _ in }
 }
 
 #if MODERN_C_ARRAYS

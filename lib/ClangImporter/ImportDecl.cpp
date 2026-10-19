@@ -1318,7 +1318,8 @@ namespace {
     /// \returns A null type if the type, or one of the parameters, cannot be
     ///          represented in the legacy projection.
     ImportedType didImportType(ImportedType result,
-                               ParameterList **params = nullptr) {
+                               ParameterList **params = nullptr,
+                               ForeignAsyncConvention *asyncConv = nullptr) {
       if (currentCArrayProjection != CArrayProjection::Legacy)
         return result;
 
@@ -1331,6 +1332,18 @@ namespace {
 
           param->setInterfaceType(newParamType.getType());
         }
+      }
+
+      // If there is an async convention, rewrite its completion handler type.
+      if (asyncConv) {
+        auto newHandlerType = importer::computeLegacyCArrayType(
+                                   {asyncConv->CompletionHandlerType, false});
+
+        if (!newHandlerType)
+          return ImportedType();
+
+        asyncConv->CompletionHandlerType =
+            newHandlerType.getType()->getCanonicalType();
       }
 
       return importer::computeLegacyCArrayType(result);
@@ -1542,7 +1555,8 @@ namespace {
           dc, clangDecl, params, isVariadic, isFromSystemModule, bodyParams,
           importedName, asyncConv, errorConv, kind);
 
-      return didImportType(result, bodyParams);
+      return didImportType(result, bodyParams,
+                           asyncConv ? &asyncConv.value() : nullptr);
     }
 
     /// Import the given function type.

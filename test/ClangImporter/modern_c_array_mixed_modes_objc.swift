@@ -6,19 +6,22 @@
 // REQUIRES: swift_feature_ModernImportedCArrays
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: concurrency
 
 // Checks for SIL output. Each call goes through the projection of the module
 // that wrote it, whichever projection the module being built uses:
 
-// LEGACY-LABEL: sil @main
+// LEGACY-LABEL: sil private @async_Main
 // LEGACY: objc_method {{%.*}}, #Adopter.showBuf!foreign : (Adopter) -> (UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()
 // LEGACY: objc_method {{%.*}}, #P.showBuf!foreign : <Self where Self : P> (Self) -> (UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()
-// LEGACY: } // end sil function 'main'
+// LEGACY: objc_method {{%.*}}, #Svc.fetch!foreign : (Svc) -> (UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) async -> UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>
+// LEGACY: } // end sil function 'async_Main'
 
-// MODERN-LABEL: sil @main
+// MODERN-LABEL: sil private @async_Main
 // MODERN: objc_method {{%.*}}, #Adopter.showBuf!foreign : (Adopter) -> (UnsafeMutablePointer<[4 of Int32]>) -> ()
 // MODERN: objc_method {{%.*}}, #P.showBuf!foreign : <Self where Self : P> (Self) -> (UnsafeMutablePointer<[4 of Int32]>) -> ()
-// MODERN: } // end sil function 'main'
+// MODERN: objc_method {{%.*}}, #Svc.fetch!foreign : (Svc) -> (UnsafeMutablePointer<[4 of Int32]>) async -> UnsafeMutablePointer<[4 of Int32]>
+// MODERN: } // end sil function 'async_Main'
 
 // SIL-LABEL: sil shared {{.*}}@$s9LegacyLib10legacyFuncyyF
 // SIL: objc_method {{%.*}}, #Adopter.showBuf!foreign : (Adopter) -> (UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()
@@ -29,6 +32,16 @@
 // SIL: objc_method {{%.*}}, #Adopter.showBuf!foreign : (Adopter) -> (UnsafeMutablePointer<[4 of Int32]>) -> ()
 // SIL: objc_method {{%.*}}, #P.showBuf!foreign : <Self where Self : P> (Self) -> (UnsafeMutablePointer<[4 of Int32]>) -> ()
 // SIL: } // end sil function '$s9ModernLib10modernFuncyyF'
+
+// SIL-LABEL: sil shared {{.*}}@$s9LegacyLib15legacyAsyncFuncyyYaF
+// SIL: objc_method {{%.*}}, #Svc.fetch!foreign : (Svc) -> (UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) async -> UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>
+// SIL: init_block_storage_header {{.*}} type $@convention(block) @Sendable (UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()
+// SIL: } // end sil function '$s9LegacyLib15legacyAsyncFuncyyYaF'
+
+// SIL-LABEL: sil shared {{.*}}@$s9ModernLib15modernAsyncFuncyyYaF
+// SIL: objc_method {{%.*}}, #Svc.fetch!foreign : (Svc) -> (UnsafeMutablePointer<[4 of Int32]>) async -> UnsafeMutablePointer<[4 of Int32]>
+// SIL: init_block_storage_header {{.*}} type $@convention(block) @Sendable (UnsafeMutablePointer<InlineArray<4, Int32>>) -> ()
+// SIL: } // end sil function '$s9ModernLib15modernAsyncFuncyyYaF'
 
 // RUN: %empty-directory(%t/include)
 // RUN: %empty-directory(%t/src)
@@ -46,6 +59,11 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface Adopter : NSObject <P>
+@end
+
+@interface Svc : NSObject
+- (void)fetchWithBuf:(int (*)[4])buf
+   completionHandler:(void (^)(int (*)[4]))handler;
 @end
 
 NS_ASSUME_NONNULL_END
@@ -71,6 +89,14 @@ module CLib {
 }
 @end
 
+@implementation Svc
+- (void)fetchWithBuf:(int (*)[4])buf
+   completionHandler:(void (^)(int (*)[4]))handler {
+  (*buf)[0] += 1;
+  handler(buf);
+}
+@end
+
 //--- src/LegacyLib.swift
 
 // RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/fragile/LegacyLib.o -emit-module-path %t/fragile/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
@@ -85,6 +111,12 @@ import CLib
   proto.showBuf(&array)
 }
 
+@export(implementation) public func legacyAsyncFunc() async {
+  var array: (Int32, Int32, Int32, Int32) = (1, 2, 3, 4)
+  let result = await Svc().fetch(withBuf: &array)
+  print("Svc", result.pointee.0, result.pointee.1, result.pointee.2, result.pointee.3)
+}
+
 //--- src/ModernLib.swift
 
 // RUN: %target-swift-frontend %t/src/ModernLib.swift -I %t/include -c -module-name ModernLib -o %t/fragile/ModernLib.o -emit-module-path %t/fragile/ModernLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple
@@ -97,6 +129,12 @@ import CLib
   adopter.showBuf(&array)
   let proto: any P = adopter
   proto.showBuf(&array)
+}
+
+@export(implementation) public func modernAsyncFunc() async {
+  var array: InlineArray<4, Int32> = [1, 2, 3, 4]
+  let result = await Svc().fetch(withBuf: &array)
+  print("Svc", result.pointee[0], result.pointee[1], result.pointee[2], result.pointee[3])
 }
 
 //--- src/LegacyExec.swift
@@ -125,6 +163,17 @@ adopter.showBuf(&array)
 let proto: any P = adopter
 proto.showBuf(&array)
 
+print("legacyAsyncFunc:")
+await legacyAsyncFunc()
+
+print("modernAsyncFunc:")
+await modernAsyncFunc()
+
+print("main async:")
+var asyncArray: (Int32, Int32, Int32, Int32) = (1, 2, 3, 4)
+let asyncResult = await Svc().fetch(withBuf: &asyncArray)
+print("Svc", asyncResult.pointee.0, asyncResult.pointee.1, asyncResult.pointee.2, asyncResult.pointee.3)
+
 //--- src/ModernExec.swift
 
 // RUN: %target-build-swift -emit-sil %t/src/ModernExec.swift -g -o %t/fragile/ModernExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
@@ -151,6 +200,17 @@ adopter.showBuf(&array)
 let proto: any P = adopter
 proto.showBuf(&array)
 
+print("legacyAsyncFunc:")
+await legacyAsyncFunc()
+
+print("modernAsyncFunc:")
+await modernAsyncFunc()
+
+print("main async:")
+var asyncArray: InlineArray<4, Int32> = [1, 2, 3, 4]
+let asyncResult = await Svc().fetch(withBuf: &asyncArray)
+print("Svc", asyncResult.pointee[0], asyncResult.pointee[1], asyncResult.pointee[2], asyncResult.pointee[3])
+
 //--- src/Output.txt
 
 // OUTPUT: legacyFunc:
@@ -162,3 +222,9 @@ proto.showBuf(&array)
 // OUTPUT-NEXT: main:
 // OUTPUT-NEXT: Adopter 2147483647 1 2 3
 // OUTPUT-NEXT: Adopter 2147483647 1 2 3
+// OUTPUT-NEXT: legacyAsyncFunc:
+// OUTPUT-NEXT: Svc 2 2 3 4
+// OUTPUT-NEXT: modernAsyncFunc:
+// OUTPUT-NEXT: Svc 2 2 3 4
+// OUTPUT-NEXT: main async:
+// OUTPUT-NEXT: Svc 2 2 3 4
