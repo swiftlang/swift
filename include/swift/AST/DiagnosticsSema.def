@@ -2510,6 +2510,8 @@ ERROR(expose_unsupported_client_emission_to_cxx,none,
       "%kind0 can not be exposed to C++ as it requires code to be emitted into client", (ValueDecl *))
 ERROR(expose_generic_decl_to_cxx,none,
       "generic %kind0 can not yet be exposed to C++", (ValueDecl *))
+ERROR(expose_generic_superclass_to_cxx,none,
+      "%kind0 inherits from a generic class and can not yet be exposed to C++", (ValueDecl *))
 ERROR(expose_generic_requirement_to_cxx,none,
       "generic requirements for %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_throwing_to_cxx,none,
