@@ -114,6 +114,7 @@ struct CFunctionSignatureTypePrinterModifierDelegate {
       ClangValueTypePrinter::TypeUseKind)>>
       mapValueTypeUseKind = std::nullopt;
   bool printParamAsRValueReference = false;
+  bool printParamByValue = false;
 };
 
 class ClangTypeHandler {
@@ -262,7 +263,8 @@ public:
       return false;
     bool shouldPrintOptional = optionalKind && *optionalKind != OTK_None &&
                                !knownTypeInfo->canBeNullable;
-    if (!isInOutParam && shouldPrintOptional &&
+    if (!isInOutParam && !modifiersDelegate.printParamByValue &&
+        shouldPrintOptional &&
         typeUseKind == FunctionSignatureTypeUse::ParamType)
       os << "const ";
     printOptional(shouldPrintOptional ? optionalKind : std::nullopt, [&]() {
@@ -271,7 +273,8 @@ public:
         printNullability(optionalKind);
       }
     });
-    if (!isInOutParam && shouldPrintOptional &&
+    if (!isInOutParam && !modifiersDelegate.printParamByValue &&
+        shouldPrintOptional &&
         typeUseKind == FunctionSignatureTypeUse::ParamType) {
       printReferenceTypeModifier();
     }
@@ -390,13 +393,15 @@ public:
         os << " * _Nonnull";
       return ClangRepresentation::representable;
     }
-    if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam &&
+        !modifiersDelegate.printParamByValue)
       os << "const ";
     printOptional(optionalKind, [&]() {
       ClangSyntaxPrinter(CT->getASTContext(), os)
           .printPrimaryCxxTypeName(cd, moduleContext);
     });
-    if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
+        !modifiersDelegate.printParamByValue)
       printReferenceTypeModifier();
     return ClangRepresentation::representable;
   }
@@ -469,18 +474,20 @@ public:
       ClangTypeHandler handler(decl->getClangDecl());
       if (!handler.isRepresentable())
         return ClangRepresentation::unsupported;
-      if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
-          !isInOutParam)
+      if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam &&
+          !modifiersDelegate.printParamByValue)
         os << "const ";
       printOptional(optionalKind, [&]() { handler.printTypeName(decl->getASTContext(), os); });
-      if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
+      if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
+          !modifiersDelegate.printParamByValue) {
         printReferenceTypeModifier();
       }
       return ClangRepresentation::representable;
     }
 
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
-      if (!isInOutParam && !modifiersDelegate.printParamAsRValueReference) {
+      if (!isInOutParam && !modifiersDelegate.printParamAsRValueReference &&
+          !modifiersDelegate.printParamByValue) {
         os << "const ";
       }
       ClangRepresentation result = ClangRepresentation::representable;
@@ -488,7 +495,8 @@ public:
         ClangSyntaxPrinter(decl->getASTContext(), os).printPrimaryCxxTypeName(decl, moduleContext);
         result = visitGenericArgs(genericArgs);
       });
-      printReferenceTypeModifier();
+      if (!modifiersDelegate.printParamByValue)
+        printReferenceTypeModifier();
       // A second '&' makes it an rvalue reference.
       if (modifiersDelegate.printParamAsRValueReference)
         os << '&';
@@ -579,7 +587,7 @@ public:
                             std::optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
     bool isParam = typeUseKind == FunctionSignatureTypeUse::ParamType;
-    if (isParam && !isInOutParam)
+    if (isParam && !isInOutParam && !modifiersDelegate.printParamByValue)
       os << "const ";
 
     if (languageMode != OutputLanguageMode::Cxx) {
@@ -595,7 +603,7 @@ public:
       ClangSyntaxPrinter(genericTpt->getASTContext(), os).printGenericTypeParamTypeName(genericTpt);
     });
     // Pass a reference to the template type.
-    if (isParam) {
+    if (isParam && !modifiersDelegate.printParamByValue) {
       printReferenceTypeModifier();
     }
     return ClangRepresentation::representable;
@@ -854,8 +862,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef name, Type resultTy, FunctionSignatureKind kind,
     FunctionSignatureModifiers modifiers) {
-  // Swift takes ownership of a consumed parameter, so C++ hands over a value
-  // it owns: a copy, or a move for a move-only type.
+  // Swift takes ownership of a consumed parameter. Noncopyable values require
+  // rvalues; copyable values can also copy an lvalue at the C++ call boundary.
   llvm::SmallPtrSet<const ParamDecl *, 4> consumedParams;
   collectConsumedParameters(signature, consumedParams);
   llvm::SmallPtrSet<const ParamDecl *, 4> movedParams;
@@ -1180,6 +1188,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           bool printedAsReference = false;
           CFunctionSignatureTypePrinterModifierDelegate delegate;
           delegate.printParamAsRValueReference = movedParams.contains(param);
+          delegate.printParamByValue =
+              consumedParams.contains(param) &&
+              shouldPassConsumedParameterByValue(*param);
           resultingRepresentation.merge(print(objTy, argKind, paramName,
                                               param->isInOut(), delegate,
                                               &printedAsReference));
@@ -1465,6 +1476,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   llvm::SmallPtrSet<const ParamDecl *, 4> consumedParams;
   collectConsumedParameters(signature, consumedParams);
   size_t paramIndex = 1;
+  bool guardUnconsumedValues = FD->getASTContext().LangOpts.hasFeature(
+      Feature::GenerateConsumingValueParametersInCXX);
+  SmallVector<std::string, 4> storageGuards;
   auto emitParamCopyForConsume = [&](const ParamDecl &param) {
     auto name = getParamName(param, paramIndex, /*isConsumed=*/false);
     auto consumedName = getParamName(param, paramIndex, /*isConsumed=*/true);
@@ -1485,7 +1499,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
        << consumedName << "[sizeof(" << paramType << ")];\n";
     os << "  auto &" << consumedName << " = *(new(copyBuffer_" << consumedName
        << ") " << paramType << "(";
-    if (cxx_translation::isNoncopyableValueTypeExposableToCxx(
+    // A by-value argument already owns its payload. Move it into storage whose
+    // Swift payload will be destroyed by the callee, while its C++ allocation
+    // is freed by the storage guard on both the success and error paths.
+    if (shouldPassConsumedParameterByValue(param) ||
+        cxx_translation::isNoncopyableValueTypeExposableToCxx(
             param.getInterfaceType()))
       os << "static_cast<" << paramType << " &&>(" << name << ")";
     else
@@ -1493,7 +1511,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << "));\n";
     os << "  swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::ConsumedValueStorageDestroyer<" << paramType << "> storageGuard_"
-       << consumedName << "(" << consumedName << ");\n";
+       << consumedName << "(" << consumedName;
+    if (guardUnconsumedValues) {
+      // A later C++ argument copy or move can throw before Swift is called.
+      os << ", false";
+      storageGuards.push_back("storageGuard_" + consumedName);
+    }
+    os << ");\n";
   };
   signature.visitParameterList(
       [&](const LoweredFunctionSignature::IndirectResultValue &) {},
@@ -1515,6 +1539,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       [&](const LoweredFunctionSignature::ErrorResultValue &) {});
 
   auto printCallToCFunc = [&](std::optional<StringRef> additionalParam) {
+    if (!storageGuards.empty()) {
+      os << '(';
+      for (const auto &guard : storageGuards)
+        os << guard << ".markConsumed(), ";
+    }
     if (indirectFunctionVar)
       os << "(* " << *indirectFunctionVar << ')';
     else {
@@ -1617,6 +1646,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           os << "&opaqueError";
         });
     os << ')';
+    if (!storageGuards.empty())
+      os << ')';
   };
 
   // Values types are returned either direcly in their C representation, or
@@ -1959,6 +1990,22 @@ void DeclAndTypeClangFunctionPrinter::collectConsumedParameters(
       [](const LoweredFunctionSignature::MetadataSourceParameter &) {},
       [](const LoweredFunctionSignature::ContextParameter &) {},
       [](const LoweredFunctionSignature::ErrorResultValue &) {});
+}
+
+bool DeclAndTypeClangFunctionPrinter::shouldPassConsumedParameterByValue(
+    const ParamDecl &param) {
+  if (!param.getASTContext().LangOpts.hasFeature(
+          Feature::GenerateConsumingValueParametersInCXX) ||
+      param.isSelfParameter())
+    return false;
+
+  auto type = param.getInterfaceType();
+  if (type->is<GenericTypeParamType>())
+    return true;
+  const auto *nominal = type->getNominalDecl();
+  return nominal && !nominal->hasClangNode() &&
+         (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
+         nominal->canBeCopyable();
 }
 
 void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(

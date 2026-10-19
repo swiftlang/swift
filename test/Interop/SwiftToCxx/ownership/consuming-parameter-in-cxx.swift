@@ -7,6 +7,15 @@
 // RUN: %FileCheck %s < %t/inits-evo.h
 // RUN: %check-interop-cxx-header-in-clang(%t/inits-evo.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
+// RUN: %target-swift-frontend %s -module-name Init -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves.h -enable-experimental-feature GenerateConsumingValueParametersInCXX
+// RUN: %FileCheck --check-prefix=MOVE %s < %t/moves.h
+// RUN: %check-interop-cxx-header-in-clang(%t/moves.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %target-swift-frontend %s -module-name Init -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves-evo.h -enable-library-evolution -enable-experimental-feature GenerateConsumingValueParametersInCXX
+// RUN: %FileCheck --check-prefix=MOVE %s < %t/moves-evo.h
+// RUN: %check-interop-cxx-header-in-clang(%t/moves-evo.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+
+// REQUIRES: swift_feature_GenerateConsumingValueParametersInCXX
+
 public final class AKlass {
     public init() {}
     deinit {
@@ -101,6 +110,83 @@ public struct TheGenericContainerInitNonTriv {
 
     let x: Int
 }
+
+private var liveHandoffTokens = 0
+
+private final class HandoffToken {
+    init() { liveHandoffTokens += 1 }
+    deinit { liveHandoffTokens -= 1 }
+}
+
+public struct HandoffValue {
+    fileprivate var token = HandoffToken()
+    public init() {}
+}
+
+public func handoffTokenCount() -> Int { liveHandoffTokens }
+
+public func isHandoffUnique(_ value: inout HandoffValue) -> Bool {
+    isKnownUniquelyReferenced(&value.token)
+}
+
+public func consumeHandoff(_ value: consuming HandoffValue) -> Bool {
+    var value = consume value
+    return isHandoffUnique(&value)
+}
+
+public func borrowHandoff(_ value: borrowing HandoffValue) -> Int {
+    liveHandoffTokens
+}
+
+public func consumeHandoffs(_ first: consuming HandoffValue,
+                           _ second: consuming HandoffValue) -> Int {
+    var first = consume first
+    var second = consume second
+    return (isHandoffUnique(&first) ? 1 : 0) |
+           (isHandoffUnique(&second) ? 2 : 0)
+}
+
+public func initializeSwiftValue<T>(_ destination: UnsafeMutableRawPointer,
+                                   _ value: consuming T) {
+    destination.assumingMemoryBound(to: T.self).initialize(to: consume value)
+}
+
+public func consumeOptional(_ value: consuming HandoffValue?) {}
+public func consumeOptionalInt(_ value: consuming Int?) {}
+public func consumeOptionalClass(_ value: consuming AKlass?) {}
+
+public enum HandoffError: Error {
+    case failed
+}
+
+public func consumeHandoffThrowing(_ value: consuming HandoffValue,
+                                  _ fail: Bool) throws -> Bool {
+    var value = consume value
+    if fail { throw HandoffError.failed }
+    return isHandoffUnique(&value)
+}
+
+// MOVE: SWIFT_INLINE_THUNK {{.*}}consumeHandoff(HandoffValue value) noexcept
+// MOVE: SWIFT_INLINE_THUNK {{.*}}consumeHandoffs(HandoffValue first, HandoffValue second) noexcept
+// MOVE: SWIFT_INLINE_THUNK {{.*}}consumeOptional(swift::Optional<HandoffValue> value) noexcept
+// MOVE: SWIFT_INLINE_THUNK {{.*}}consumeOptionalClass(swift::Optional<AKlass> value) noexcept
+// Trivial optionals are not consumed by the lowered calling convention.
+// MOVE: SWIFT_INLINE_THUNK void consumeOptionalInt(const swift::Optional<swift::Int>& value) noexcept
+// MOVE: SWIFT_INLINE_THUNK {{.*}}initializeSwiftValue(void * _Nonnull destination, T_0_0 value) noexcept
+// MOVE: auto &consumedParamCopy_value = *(new(copyBuffer_consumedParamCopy_value) T_0_0(static_cast<T_0_0 &&>(value)));
+// MOVE-NEXT: swift::_impl::ConsumedValueStorageDestroyer<T_0_0> storageGuard_consumedParamCopy_value(consumedParamCopy_value, false);
+// MOVE-NEXT: (storageGuard_consumedParamCopy_value.markConsumed(), Init::_impl::
+
+// MOVE: SWIFT_INLINE_THUNK InitFromEnumNonTrivial InitFromEnumNonTrivial::init(EnumNonTrivial x) noexcept {
+// MOVE: EnumNonTrivial(static_cast<EnumNonTrivial &&>(x))
+// MOVE: SWIFT_INLINE_THUNK InitFromKlass InitFromKlass::init(const AKlass& x) noexcept {
+// MOVE: SWIFT_INLINE_THUNK void InitFromSmall::takeSmallLarge(SmallStructNonTrivial _1, LargeStructNonTrivial _2) const noexcept {
+// MOVE: SmallStructNonTrivial(static_cast<SmallStructNonTrivial &&>(_1))
+// MOVE: LargeStructNonTrivial(static_cast<LargeStructNonTrivial &&>(_2))
+// MOVE: SWIFT_INLINE_THUNK void LargeStructNonTrivial::takeMe() const noexcept {
+// MOVE: LargeStructNonTrivial(*this)
+// MOVE: SWIFT_INLINE_THUNK TheGenericContainer<T_0_0> TheGenericContainer<T_0_0>::init(T_0_0 x) noexcept {
+// MOVE: T_0_0(static_cast<T_0_0 &&>(x))
 
 // CHECK: SWIFT_INLINE_THUNK void AKlass::takeKlass() noexcept {
 // CHECK-NEXT: alignas(alignof(AKlass)) char copyBuffer_consumedParamCopy_this[sizeof(AKlass)];

@@ -310,35 +310,45 @@ template <class T> static inline const constexpr bool isOpaqueLayout = false;
 template <class T>
 static inline const constexpr bool isSwiftBridgedCxxRecord = false;
 
-/// Returns the opaque pointer to the given value.
+/// Returns the opaque pointer to the given value. A Swift value type's own
+/// accessor traps if the value was moved from.
 template <class T>
 SWIFT_INLINE_THUNK const void *_Nonnull getOpaquePointer(const T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<const void *>(&value);
 }
 
 template <class T>
 SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<void *>(&value);
 }
 
 /// Helper struct that destroys any additional storage allocated (e.g. for
 /// resilient value types) for a Swift value owned by C++ code after the Swift
 /// value was consumed and thus the original C++ destructor is not ran.
+/// When constructed with 'wasConsumed' false, it owns the Swift payload until
+/// markConsumed() transfers it to Swift. This handles failure while preparing
+/// another argument to the call.
 template <class T> class ConsumedValueStorageDestroyer {
 public:
-  SWIFT_INLINE_THUNK ConsumedValueStorageDestroyer(T &val) noexcept
-      : value(val) {}
+  SWIFT_INLINE_THUNK
+  ConsumedValueStorageDestroyer(T &val, bool wasConsumed = true) noexcept
+      : value(val), consumed(wasConsumed) {}
   SWIFT_INLINE_THUNK ~ConsumedValueStorageDestroyer() noexcept {
-    if constexpr (isOpaqueLayout<T>)
+    if (!consumed)
+      value.~T();
+    else if constexpr (isOpaqueLayout<T>)
       reinterpret_cast<OpaqueStorage &>(value).~OpaqueStorage();
   }
 
+  SWIFT_INLINE_THUNK void markConsumed() noexcept { consumed = true; }
+
 private:
   T &value;
+  bool consumed;
 };
 
 } // namespace _impl

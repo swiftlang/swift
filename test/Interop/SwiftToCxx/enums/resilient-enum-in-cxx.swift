@@ -84,13 +84,13 @@ public enum Empty {
 // CHECK-NEXT:      return cases::unknownDefault;
 // CHECK-NEXT:    }
 // CHECK:         SWIFT_INLINE_THUNK Foo Foo::_impl_a::operator()(double val) const {
-// CHECK-NEXT:      auto result = Foo::_make();
+// CHECK-NEXT:      Foo result;
 // CHECK-NEXT:      memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // CHECK-NEXT:      result._destructiveInjectEnumTag(_impl::$s5Enums3FooO1ayACSdcACmFWC);
 // CHECK-NEXT:      return result;
 // CHECK-NEXT:    }
 // NEW_CASE:      SWIFT_INLINE_THUNK Foo Foo::_impl_b::operator()(swift::Int val) const {
-// NEW_CASE-NEXT:   auto result = Foo::_make();
+// NEW_CASE-NEXT:   Foo result;
 // NEW_CASE-NEXT:   memcpy(result._getOpaquePointer(), &val, sizeof(val));
 // NEW_CASE-NEXT:   result._destructiveInjectEnumTag(_impl::$s5Enums3FooO1byACSicACmFWC);
 // NEW_CASE-NEXT:   return result;
