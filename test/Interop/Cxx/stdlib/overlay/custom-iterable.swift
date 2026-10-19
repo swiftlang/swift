@@ -92,4 +92,30 @@ CxxIterableTestSuite.test("ContiguousNonCopyableSequence as Swift.Iterable, with
   expectEqual(outerCounter, 2)
 }
 
+CxxIterableTestSuite.test("ContiguousNonCopyableSequence borrowing for loop") {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+  let seq = ContiguousNonCopyableSequence()
+  let arr : [Int32] = [10, 20, 30, 40, 50]
+
+  var counter = 0
+  for el in seq {
+    expectEqual(el, arr[counter])
+    counter += 1
+  }
+  expectEqual(counter, 5)
+}
+
+CxxIterableTestSuite.test("DifferentResultsDereferenceOperatorSequence borrowing for loop") {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+  let seq = DifferentResultsDereferenceOperatorSequence()
+  let arr : [Int32] = [2, 3, 4, 5]
+
+  var counter = 0
+  for el in seq {
+    expectEqual(el, arr[counter])
+    counter += 1
+  }
+  expectEqual(counter, 4)
+}
+
 runAllTests()
