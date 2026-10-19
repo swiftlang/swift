@@ -17,8 +17,7 @@ function(emit_symbol_graph target)
 
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph>"
-    "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph-dir>"
-    "$<$<COMPILE_LANGUAGE:Swift>:${symbol_graph_dir}>"
+    "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph-dir$<SEMICOLON>${symbol_graph_dir}>"
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -symbol-graph-allow-availability-platforms -Xfrontend Swift>")
   set_property(TARGET ${target} APPEND PROPERTY ADDITIONAL_CLEAN_FILES
     "${symbol_graph_dir}/${module_name}.symbols.json")
