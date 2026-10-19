@@ -537,6 +537,9 @@ checkExtInfoConversion(ConformanceCache &cache,
   if (lhsInfo.isAsync() && !rhsInfo.isAsync())
     return ConflictFlag::FunctionAsync;
 
+  if (lhsInfo.isNonTransferable() && !rhsInfo.isNonTransferable())
+    return ConflictFlag::FunctionNonTransferable;
+
   auto lhsThrows = lhsFunc->getEffectiveThrownErrorType();
   auto rhsThrows = rhsFunc->getEffectiveThrownErrorType();
   if (lhsThrows.has_value() && !rhsThrows.has_value()) {
@@ -1262,7 +1265,7 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, throwing, async;
+  bool noEscape, throwing, async, nontransferable;
   Type thrownError;
 
   // Concurrency is too hard to reason about here.
@@ -1272,6 +1275,7 @@ extInfoJoinMeetImpl(Operation op,
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
     async = lhsInfo.isAsync() || rhsInfo.isAsync();
+    nontransferable = lhsInfo.isNonTransferable() || rhsInfo.isNonTransferable();
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
     if (throwing) {
@@ -1287,6 +1291,7 @@ extInfoJoinMeetImpl(Operation op,
   } else {
     noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
     async = lhsInfo.isAsync() && rhsInfo.isAsync();
+    nontransferable = lhsInfo.isNonTransferable() && rhsInfo.isNonTransferable();
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
     if (throwing) {
@@ -1314,7 +1319,8 @@ extInfoJoinMeetImpl(Operation op,
   auto result = lhsInfo.intoBuilder()
                     .withNoEscape(noEscape)
                     .withThrows(throwing, thrownError)
-                    .withAsync(async);
+                    .withAsync(async)
+                    .withNonTransferable(nontransferable);
 
   auto combined = joinMeetTypeDependencies(op, lhsInfo, rhsInfo, result);
   if (!combined)
@@ -1979,4 +1985,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " function_sendable";
   if (reason.contains(ConflictFlag::FunctionTupleSplat))
     out << " function_tuple_splat";
+  if (reason.contains(ConflictFlag::FunctionNonTransferable))
+    out << " function_non_transferable";
 }
