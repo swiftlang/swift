@@ -7958,6 +7958,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
+    // If we have a non-Sendable ClosureExpr, then we can safely propagate the
+    // '@nontransferable' bit to the closure without invalidating prior
+    // analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.isNonTransferable() &&
+        (!fromEI.isNonTransferable() && !fromEI.isSendable())) {
+      auto newFromFuncType =
+          fromFunc->withExtInfo(fromEI.withNonTransferable());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating '@nontransferable' might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
     if (ctx.LangOpts.isDynamicActorIsolationCheckingEnabled()) {
       // Passing a synchronous global actor-isolated function value and
       // parameter that expects a synchronous nonisolated function type could
