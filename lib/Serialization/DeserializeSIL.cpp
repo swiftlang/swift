@@ -1067,10 +1067,17 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setWasDeserializedCanonical();
 
   // Seed the stage from what the container recorded for this function, not from
-  // the container kind. 
+  // the container kind. The stage itself is committed only once the body is
+  // built (seedRecordedStage below), so that construction-time reads such as
+  // the move-only assert in SILBuilder::createCopyValue see the client's floor
+  // while instructions are created.
   auto recordedStage = SILStage(serializedStage);
-  if (recordedStage > fn->getFunctionStage())
-    fn->setFunctionStage(recordedStage);
+  if (recordedStage != SILStage::Raw)
+    fn->setHasLoweredAddresses();
+  auto seedRecordedStage = [&] {
+    if (recordedStage > fn->getFunctionStage())
+      fn->setFunctionStage(recordedStage);
+  };
 
   fn->setBare(IsBare);
   if (!fn->getDebugScope()) {
@@ -1238,6 +1245,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   if (isEmptyFunction || declarationOnly) {
     if (genericEnv)
       fn->setGenericEnvironment(genericEnv);
+    seedRecordedStage();
     return fn;
   }
 
@@ -1313,8 +1321,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       // assumes that such a situation means that fn is a declaration. Thus it
       // is using return false to mean two different things, error a failure
       // occurred and this is a declaration. Work around that for now.
-      if (!CurrentBB)
+      if (!CurrentBB) {
+        seedRecordedStage();
         return fn;
+      }
       Builder.setInsertionPoint(CurrentBB);
 
       // Handle a SILInstruction record.
@@ -1375,6 +1385,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       return maybeKind.takeError();
     kind = maybeKind.get();
   }
+
+  // The body is built: commit the recorded stage before anyone observes the
+  // function as deserialized.
+  seedRecordedStage();
 
   // If fn is empty, we failed to deserialize its body. Return nullptr to signal
   // error.
