@@ -676,8 +676,17 @@ Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
   }
 
   // Accessors may inherit `@backDeployed`.
-  if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedAttrAndRange(forTargetVariant);
+  if (auto *AD = dyn_cast<AccessorDecl>(this)) {
+    // An accessor that is always emitted into clients doesn't inherit back
+    // deployment that its storage inherits from a back-deployed type.
+    auto *storage = AD->getStorage();
+    if (!storage->getAttrs().getBackDeployed(ctx, forTargetVariant) &&
+        (AD->isAlwaysEmittedIntoClient() ||
+         AD->getAttrs().hasAttribute<TransparentAttr>()))
+      return std::nullopt;
+
+    return storage->getBackDeployedAttrAndRange(forTargetVariant);
+  }
 
   // A struct or enum nested in a back-deployed struct or enum is back-deployed
   // along with it, unless it is only available where the outer type's

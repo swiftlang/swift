@@ -35,6 +35,18 @@ extension Box: Equatable where T: Equatable {}
 
   @_alwaysEmitIntoClient
   public func historical() -> Int { x }
+
+  // The same goes for accessors that are always emitted into clients, even
+  // though their storage is back-deployed.
+  public var doubled: Int {
+    @export(implementation)
+    get { x * 2 }
+  }
+
+  public var tripled: Int {
+    @_transparent
+    get { x * 3 }
+  }
 }
 
 // Members are back-deployed with the type unless they are only available
@@ -45,6 +57,8 @@ extension Box: Equatable where T: Equatable {}
 // SILGEN-NOT: $s1M5PointV5newerSiyFTw
 // SILGEN-NOT: $s1M5PointV8exportedSiyFTw
 // SILGEN-NOT: $s1M5PointV10historicalSiyFTw
+// SILGEN-NOT: $s1M5PointV7doubledSivgTw
+// SILGEN-NOT: $s1M5PointV7tripledSivgTw
 
 // The type context descriptors are unique: flags are the kind (struct) plus
 // the unique bit (0x40), and the generic bit (0x80) for Box.
