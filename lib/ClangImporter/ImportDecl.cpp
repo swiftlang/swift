@@ -1662,21 +1662,26 @@ namespace {
       return didImportType(result);
     }
 
-    /// Determine the Swift access level for a given clang decl.
-    ///
-    /// This wrapper adds logic for handling dual C array projections.
-    AccessLevel getAccessLevel(const clang::Decl *decl) {
+    /// Restrict the access level of an Objective-C declaration so that it's
+    /// hidden if it's not the visible projection of its C arrays.
+    AccessLevel limitAccessForCArrayProjection(AccessLevel access) {
       // Make sure we don't change `hasLegacyCArrayType` after we've called
       // this method.
       hasComputedAccessLevel = true;
 
-      auto naturalAccessLevel = convertClangAccess(decl->getAccess());
-      auto maxAccessLevel =
-          Impl.getMaxAccessLevel(currentCArrayProjection,
-                            currentCArrayProjection == CArrayProjection::Legacy
-                                || needsLegacyCArrayProjection());
+      auto maxAccess = Impl.getMaxAccessLevel(
+          currentCArrayProjection,
+          currentCArrayProjection == CArrayProjection::Legacy ||
+              needsLegacyCArrayProjection());
 
-      return std::min(naturalAccessLevel, maxAccessLevel);
+      return std::min(access, maxAccess);
+    }
+
+    /// Determine the Swift access level for a given clang decl, taking into
+    /// account the current C array projection.
+    AccessLevel getAccessLevel(const clang::Decl *decl) {
+      auto declAccess = convertClangAccess(decl->getAccess());
+      return limitAccessForCArrayProjection(declAccess);
     }
 
     /// Add an \c @available attribute with the minimum version to be able to
@@ -6017,7 +6022,8 @@ namespace {
         return nullptr;
 
       auto type = importedType.getType();
-      const auto access = getOverridableAccessLevel(dc);
+      const auto access =
+          limitAccessForCArrayProjection(getOverridableAccessLevel(dc));
       auto ident = name.getBaseIdentifier(Impl.SwiftContext);
       auto propDecl = Impl.createDeclWithClangNode<VarDecl>(decl, access,
           /*IsStatic*/decl->isClassMethod(), VarDecl::Introducer::Var,
@@ -6286,8 +6292,9 @@ namespace {
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 
-      result->setAccess(decl->isDirectMethod() ? AccessLevel::Public
-                                               : getOverridableAccessLevel(dc));
+      result->setAccess(limitAccessForCArrayProjection(
+          decl->isDirectMethod() ? AccessLevel::Public
+                                 : getOverridableAccessLevel(dc)));
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() ==
@@ -7206,8 +7213,9 @@ namespace {
       }
 
       auto type = importedType.getType();
-      const auto access = decl->isDirectProperty() ? AccessLevel::Public
-                                                   : getOverridableAccessLevel(dc);
+      const auto access = limitAccessForCArrayProjection(
+          decl->isDirectProperty() ? AccessLevel::Public
+                                   : getOverridableAccessLevel(dc));
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl, access,
           /*IsStatic*/decl->isClassProperty(), VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
@@ -9049,8 +9057,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   if (auto objCDecl = dyn_cast<clang::ObjCMethodDecl>(getter->getClangDecl())) {
     IsObjCDirect = objCDecl->isDirectMethod();
   }
-  const auto access = IsObjCDirect ? AccessLevel::Public
-                                   : getOverridableAccessLevel(dc);
+  const auto access = limitAccessForCArrayProjection(
+      IsObjCDirect ? AccessLevel::Public : getOverridableAccessLevel(dc));
   subscript->setAccess(access);
   subscript->setSetterAccess(access);
 
