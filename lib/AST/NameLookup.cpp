@@ -404,8 +404,7 @@ bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
   decls.erase(
     std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) -> bool {
       bool inScope = llvm::any_of(visibleFrom, [&](ModuleDecl *visibleFromMod) {
-        return ctx.getImportCache().isImportedBy(
-                       decl->getModuleContextForNameLookup(), visibleFromMod);
+        return visibleFromMod->isDeclImported(decl);
       });
 
       LLVM_DEBUG(decl->dumpRef(llvm::dbgs()));
@@ -2711,8 +2710,12 @@ bool DeclContext::lookupQualified(Type type,
 }
 
 bool DeclContext::isDeclImported(const Decl *decl) const {
-  auto declModule = decl->getModuleContextForNameLookup();
-  return getASTContext().getImportCache().isImportedBy(declModule, this);
+  auto &importCache = getASTContext().getImportCache();
+  SmallVector<ModuleDecl *, 1> declModules;
+  decl->getModuleContextsForNameLookup(declModules);
+  return llvm::any_of(declModules, [&](ModuleDecl *declModule) {
+    return importCache.isImportedBy(declModule, this);
+  });
 }
 
 static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,

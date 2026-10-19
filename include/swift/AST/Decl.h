@@ -1052,6 +1052,13 @@ public:
   LLVM_READONLY
   ModuleDecl *getModuleContextForNameLookup() const;
 
+  /// Retrieve every module in which this declaration would be found by name
+  /// lookup queries. A Cxx `namespace` can be declared in more than one Clang
+  /// module and is found through each of them. For any other declaration, the
+  /// only result is `getModuleContextForNameLookup()`.
+  void
+  getModuleContextsForNameLookup(SmallVectorImpl<ModuleDecl *> &modules) const;
+
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
   ASTContext &getASTContext() const {
