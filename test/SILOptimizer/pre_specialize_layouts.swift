@@ -100,8 +100,8 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT: [[F7:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> ()
 // OPT: [[A1:%.*]] = unchecked_ref_cast {{%.*}} : $SomeClass to $AnyObject
 // OPT: apply [[F7]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
-// OPT: [[A2:%.*]] = unchecked_bitwise_cast [[P1]] : $ReferenceWrapperStruct to $AnyObject
-// OPT: apply [[F7]]([[A2]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
+// OPT: [[A2:%.*]] = alloc_stack $ReferenceWrapperStruct
+// OPT: apply {{%.*}}<ReferenceWrapperStruct>([[A2]])
 // OPT: [[A3:%.*]] = alloc_stack $OveralignedReferenceWrapperStruct
 // OPT: apply {{%.*}}<OveralignedReferenceWrapperStruct>([[A3]])
 // OPT-macosx: [[F8:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFBb_Ts5 : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
@@ -169,6 +169,7 @@ public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, 
   publicPrespecialized(TwoInt32())
   publicPrespecialized(SomeData())
   publicPrespecialized(SomeClass())
+  // should not apply _Class specialization for a struct wrapping a reference
   publicPrespecialized(wrapperStruct)
   // should not apply _Class specialization for overaligned struct
   publicPrespecialized(overaligned)
