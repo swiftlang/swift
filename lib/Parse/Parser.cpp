@@ -334,7 +334,11 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState)
-    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
+    : Parser(BufferID, SF,
+             SF.shouldSuppressParserDiagnostics()
+                 ? nullptr
+                 : &SF.getASTContext().Diags,
+             SIL, PersistentState) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
@@ -472,7 +476,15 @@ public:
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
-    : SourceMgr(SF.getASTContext().SourceMgr), Diags(SF.getASTContext().Diags),
+    : SuppressedDiagQueue(
+          SF.shouldSuppressParserDiagnostics()
+              ? std::optional<DiagnosticQueue>(
+                    std::in_place, SF.getASTContext().Diags,
+                    /*emitOnDestruction=*/false)
+              : std::nullopt),
+      SourceMgr(SF.getASTContext().SourceMgr),
+      Diags(SuppressedDiagQueue ? SuppressedDiagQueue->getDiags()
+                                : SF.getASTContext().Diags),
       SF(SF), L(Lex.release()), SIL(SIL), CurDeclContext(&SF),
       Context(SF.getASTContext()),
       TokReceiver(SF.shouldCollectTokens()

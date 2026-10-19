@@ -822,9 +822,16 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
   auto conditionCharRange = Lexer::getCharSourceRangeFromSourceRange(sourceMgr, conditionRange);
   StringRef conditionText = sourceMgr.extractText(conditionCharRange, bufferID);
 
+  std::optional<DiagnosticQueue> suppressedDiagQueue;
+  if (sourceFile->shouldSuppressParserDiagnostics()) {
+    suppressedDiagQueue.emplace(ctx.Diags, /*emitOnDestruction=*/false);
+  }
+  DiagnosticEngine &diags =
+      suppressedDiagQueue ? suppressedDiagQueue->getDiags() : ctx.Diags;
+
   // Evaluate the condition.
   intptr_t evalResult = swift_ASTGen_evaluatePoundIfCondition(
-      ctx, &ctx.Diags, sourceFileText, conditionText, shouldEvaluate
+      ctx, &diags, sourceFileText, conditionText, shouldEvaluate
   );
 
   bool isActive = (evalResult & 0x01) != 0;

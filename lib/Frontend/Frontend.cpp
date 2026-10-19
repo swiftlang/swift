@@ -1878,6 +1878,11 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     opts |= ParsingFlags::SuppressWarnings;
   }
 
+  if (action == ActionType::ScanDependencies) {
+    // Leave source-file parse diagnostics to the compile job.
+    opts |= ParsingFlags::SuppressParserDiagnostics;
+  }
+
   // Turn off new parser round-trip and diagnostics checking for
   //   - secondary files
   //     - Only want to verify on primary files, no point checking more than
