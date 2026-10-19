@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import shutil
 
 from . import product
 from . import swiftdocc
@@ -18,6 +19,65 @@ from . import swiftdoccrender
 from .. import shell
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+
+# Modules whose symbol graphs must not reach the standard library docs.
+# This is a deny-list, so a newly added module appears in the docs by default.
+EXCLUDED_SYMBOL_GRAPH_MODULES = frozenset([
+    # Test support and private helpers.
+    'StdlibUnittest',
+    'StdlibUnittestFoundationExtras',
+    'RuntimeUnittest',
+    'SwiftReflectionTest',
+    'OSLogTestHelper',
+    'SwiftPrivate',
+    'SwiftPrivateThreadExtras',
+    'SwiftPrivateLibcExtras',
+    'DifferentiationUnittest',
+    # Not part of the public documentation.
+    'SwiftOnoneSupport',
+    # Implementation-only. Its extensions of Swift (Unicode.Script and
+    # friends) are not visible to clients.
+    '_RegexParser',
+    # Not emitted today (they crash SymbolGraphGen), but never document them.
+    'Darwin',
+])
+
+_SYMBOL_GRAPH_SUFFIX = '.symbols.json'
+
+
+def symbol_graph_module_name(filename):
+    """Return the module a symbol graph file describes, or None.
+
+    `Foo.symbols.json` describes `Foo`. `Foo@Bar.symbols.json` describes
+    extensions that module `Foo` makes to `Bar`, so it also belongs to `Foo`.
+    """
+    if not filename.endswith(_SYMBOL_GRAPH_SUFFIX):
+        return None
+    stem = filename[:-len(_SYMBOL_GRAPH_SUFFIX)]
+    return stem.split('@', 1)[0]
+
+
+def filter_symbol_graphs(source_dir, dest_dir):
+    """Copy symbol graphs from source_dir to dest_dir, skipping excluded modules.
+
+    Replaces dest_dir if it already exists. The directory layout is preserved.
+    """
+    if os.path.exists(dest_dir):
+        shutil.rmtree(dest_dir)
+    os.makedirs(dest_dir)
+
+    for root, _, files in os.walk(source_dir):
+        relative_root = os.path.relpath(root, source_dir)
+        for name in files:
+            module = symbol_graph_module_name(name)
+            if module is None or module in EXCLUDED_SYMBOL_GRAPH_MODULES:
+                continue
+            target_dir = os.path.normpath(
+                os.path.join(dest_dir, relative_root))
+            os.makedirs(target_dir, exist_ok=True)
+            shutil.copy2(os.path.join(root, name),
+                         os.path.join(target_dir, name))
+
 
 class StdlibDocs(product.Product):
     @classmethod
@@ -51,7 +111,11 @@ class StdlibDocs(product.Product):
             "stdlib.docc"
         )
 
-        symbol_graph_dir = os.path.join(swift_build_dir, "lib", "symbol-graph")
+        raw_symbol_graph_dir = os.path.join(
+            swift_build_dir, "lib", "symbol-graph")
+        symbol_graph_dir = os.path.join(
+            swift_build_dir, "lib", "symbol-graph-filtered")
+        filter_symbol_graphs(raw_symbol_graph_dir, symbol_graph_dir)
         output_path = os.path.join(swift_build_dir, "Swift.doccarchive")
 
         docc_action = 'preview' if self.args.preview_stdlib_docs else 'convert'
