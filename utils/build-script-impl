@@ -876,7 +876,7 @@ function set_build_options_for_host() {
     lldb_lit_args+=" --xunit-xml-output=$(lldb_test_results_directory ${host})/results.xml"
     if test "${ENABLE_ASAN}" -o "$(echo ${LLDB_EXTRA_CMAKE_ARGS}|grep Address)"; then
         # Limit the number of parallel tests
-        lldb_lit_args+=" -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < int($2/1.5)) ? N : int($2/1.5) }')"
+        lldb_lit_args+=" -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ m = int($2/3); if (m < 1) m = 1; print (m < N) ? m : N }')"
     fi
     lldb_cmake_options+=(
         -DLLVM_LIT_ARGS="${lldb_lit_args}"

@@ -1409,6 +1409,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::ErrorUnion:
+    case TypeKind::Hole:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::PrimaryArchetype:
@@ -1741,9 +1742,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Class:
     case TypeKind::Enum:
     case TypeKind::Struct:
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct:
     case TypeKind::BuiltinTuple: {
       GenericTypeDecl *Decl;
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
@@ -1759,7 +1757,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return;
 
         if (Decl->isStdlibDecl() && Decl->getName().str() == "Optional") {
-          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          auto GenArgs = type->castTo<NominalType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0], sig, forDecl);
           appendOperator("Sg");
@@ -2066,14 +2064,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
-    if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
-                             forDecl);
-  } else {
-    auto boundType = cast<BoundGenericType>(typePtr);
-    genericArgs = boundType->getGenericArgs();
-    if (Type parent = boundType->getParent()) {
-      GenericTypeDecl *decl = boundType->getAnyGeneric();
+    genericArgs = nominalType->getGenericArgs();
+    if (Type parent = nominalType->getParent()) {
+      GenericTypeDecl *decl = nominalType->getAnyGeneric();
       if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))
         appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                                forDecl);
@@ -2351,8 +2344,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
-  if (fn->isCalledOnce())
+  if (auto semantics = fn->getExecutionSemantics()) {
     OpArgs.push_back('O');
+    if (*semantics == ExecutionSemantics::AtMostOnce)
+      OpArgs.push_back('o');
+  }
 
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
@@ -3389,7 +3385,9 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
-    } else if (fn->isCalledOnce()) {
+    } else if (auto semantics = fn->getExecutionSemantics()) {
+      if (*semantics == ExecutionSemantics::AtMostOnce)
+        return appendOperator("XOo");
       return appendOperator("XO");
     }
     return appendOperator("c");
@@ -4326,7 +4324,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   //
   // `dropIsolation` is set here as a workaround because `dropGlobalActor`
   // used to call `withoutIsolation` unconditionally before.
-  if (decl->preconcurrency()) {
+  if (decl->preconcurrencyIncludingInferred()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
                               /*dropIsolation=*/true);
   }
@@ -5031,6 +5029,7 @@ void ASTMangler::appendMacroExpansionContext(
   }
 
   SourceManager &sourceMgr = Context.SourceMgr;
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
 
   auto appendMacroExpansionLoc = [&]() {
     appendIdentifier(origDC->getParentModule()->getName().str());
@@ -5038,11 +5037,10 @@ void ASTMangler::appendMacroExpansionContext(
     auto *SF = origDC->getParentSourceFile();
     appendIdentifier(llvm::sys::path::filename(SF->getFilename()), /*allowRawIdentifiers=*/false);
 
-    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
+    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc, bufferID);
     appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));
   };
 
-  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
   auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
   if (!generatedSourceInfo) {
     return appendMacroExpansionLoc();

@@ -456,7 +456,7 @@ RValue Transform::transform(RValue &&input,
 // Single @objc protocol value metatypes can be converted to the ObjC
 // Protocol class type.
 static bool isProtocolClass(Type t) {
-  auto classDecl = t->getClassOrBoundGenericClass();
+  auto classDecl = t->getClassDecl();
   if (!classDecl)
     return false;
 
@@ -531,25 +531,6 @@ ManagedValue Transform::transform(ManagedValue v,
         });
   }
 
-  // If the value is an optional, but the desired formal type isn't an
-  // optional or Any, force it.
-  if (inputIsOptional && !outputIsOptional &&
-      !outputSubstType->isExistentialType()) {
-    // isImplicitUnwrap is hardcoded true because the looseness in types of
-    // @objc witnesses/overrides that we're handling here only allows IUOs,
-    // not explicit Optionals.
-    v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
-                                            /*isImplicitUnwrap*/ true, 
-                                            SGF.getTypeLowering(v.getType()),
-                                            SGFContext());
-
-    // Check if we have any more conversions remaining.
-    if (v.getType() == loweredResultTy)
-      return v;
-
-    inputIsOptional = false;
-  }
-
   // Optional-to-optional conversion.
   if (inputIsOptional && outputIsOptional) {
     // If the conversion is trivial, just cast.
@@ -612,10 +593,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - casts for classes
-  if (outputSubstType->getClassOrBoundGenericClass() &&
-      inputSubstType->getClassOrBoundGenericClass()) {
-    auto class1 = inputSubstType->getClassOrBoundGenericClass();
-    auto class2 = outputSubstType->getClassOrBoundGenericClass();
+  if (outputSubstType->getClassDecl() &&
+      inputSubstType->getClassDecl()) {
+    auto class1 = inputSubstType->getClassDecl();
+    auto class2 = outputSubstType->getClassDecl();
 
     // CF <-> Objective-C via toll-free bridging.
     if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
@@ -637,10 +618,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // - upcasts for collections
-  if (outputSubstType->getStructOrBoundGenericStruct() &&
-      inputSubstType->getStructOrBoundGenericStruct()) {
-    auto *inputStruct = inputSubstType->getStructOrBoundGenericStruct();
-    auto *outputStruct = outputSubstType->getStructOrBoundGenericStruct();
+  if (outputSubstType->getStructDecl() &&
+      inputSubstType->getStructDecl()) {
+    auto *inputStruct = inputSubstType->getStructDecl();
+    auto *outputStruct = outputSubstType->getStructDecl();
 
     // Attempt collection upcast only if input and output declarations match.
     if (inputStruct == outputStruct) {
@@ -668,7 +649,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - upcasts from an archetype
-  if (outputSubstType->getClassOrBoundGenericClass()) {
+  if (outputSubstType->getClassDecl()) {
     if (auto archetypeType = dyn_cast<ArchetypeType>(inputSubstType)) {
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
@@ -718,7 +699,7 @@ ManagedValue Transform::transform(ManagedValue v,
     auto inputLoweredTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
                                              inputSubstType);
     // FIXME: Gross workaround for incorrect opaque type erasure
-    if (loweredTy.getNominalOrBoundGenericNominal() &&
+    if (loweredTy.getNominalDecl() &&
         inputLoweredTy.is<OpaqueTypeArchetypeType>()) {
       // Woohoo!
       inputSubstType = loweredTy.getASTType();
@@ -737,7 +718,9 @@ ManagedValue Transform::transform(ManagedValue v,
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
     auto conformance = lookupConformance(inputSubstType, protocol);
-    auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
+    auto addr = v;
+    if (SGF.silConv.useLoweredAddresses() && !v.getType().isAddress())
+      addr = v.materialize(SGF, Loc);
     auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,
                                              conformance, ctxt);
     if (result.isInContext())
@@ -828,6 +811,23 @@ ManagedValue Transform::transform(ManagedValue v,
         return SGF.emitOptionalTangentVectorToTangentVector(
             Loc, v, wrappedType, inputSubstType, outputSubstType, ctxt);
     }
+  }
+
+  // IUO unwrapping. This only comes up in a handful of situations. Check for
+  // this last, to avoid accidentally missing some other conversion from an
+  // optional type to a non-optional, of which there are several.
+  if (inputIsOptional && !outputIsOptional) {
+    // isImplicitUnwrap is hardcoded true because the looseness in types of
+    // @objc witnesses/overrides that we're handling here only allows IUOs,
+    // not explicit Optionals.
+    v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
+                                            /*isImplicitUnwrap*/ true,
+                                            SGF.getTypeLowering(v.getType()),
+                                            SGFContext());
+
+    return transform(v, inputOrigType.getOptionalObjectType(), inputObjectType,
+                     outputOrigType, outputObjectType, loweredResultTy,
+                     SGFContext());
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -2953,8 +2953,8 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
   if (innerASTTy == outerASTTy) {
     return innerValue;
   }
-  if (innerASTTy->getClassOrBoundGenericClass()
-      && outerASTTy->getClassOrBoundGenericClass()) {
+  if (innerASTTy->getClassDecl()
+      && outerASTTy->getClassDecl()) {
     if (outerASTTy->isExactSuperclassOf(innerASTTy)) {
       return SGF.B.createUpcast(loc, innerValue, outerType);
     } else if (innerASTTy->isExactSuperclassOf(outerASTTy)) {
@@ -5841,12 +5841,9 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
     thunkArgs.push_back(ManagedValue::forObjectRValueWithoutOwnership(value));
   }
 
-  return
-    SGF.B.createPartialApply(loc, thunkValue,
-                             interfaceSubs, thunkArgs,
-                             toType->getCalleeConvention(),
-                             toType->getIsolation(),
-                             toType->isCalledOnce());
+  return SGF.B.createPartialApply(
+      loc, thunkValue, interfaceSubs, thunkArgs, toType->getCalleeConvention(),
+      toType->getIsolation(), toType->getExecutionSemantics());
 }
 
 static ManagedValue createDifferentiableFunctionThunk(
@@ -6336,8 +6333,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     if (linearMapFnType != linearMapUnsubstFnType) {
       auto unsubstType =
           SILType::getPrimitiveObjectType(linearMapUnsubstFnType);
-      linearMap = B.createConvertFunction(loc, linearMap, unsubstType,
-                                          /*withoutActuallyEscaping*/ false);
+      linearMap = B.createConvertFunction(loc, linearMap, unsubstType);
     }
     auto thunkedFn = createPartialApplyOfThunk(
         *this, loc, thunk, interfaceSubs, dynamicSelfType, toType, linearMap,
@@ -6744,7 +6740,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     auto *classDecl = thunkFnTy->getParameters()
                           .back()
                           .getInterfaceType()
-                          ->getClassOrBoundGenericClass();
+                          ->getClassDecl();
     assert(classDecl && "Expected last argument to have class type");
     auto classMetatype = MetatypeType::get(
         classDecl->getDeclaredInterfaceType(), MetatypeRepresentation::Thick);
@@ -6777,6 +6773,12 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       return false;
     auto selfParamIndex = origFnTy->getNumParameters() - 1;
     if (!config.parameterIndices->contains(selfParamIndex))
+      return false;
+    // A mutating self tangent is not returned from the reverse-mode pullback
+    // but passed as inout, so there is no self result to reorder.
+    // Forward-mode differentials still need this self-reordering.
+    if (kind == AutoDiffDerivativeFunctionKind::VJP &&
+        origFnTy->getSelfParameter().isIndirectMutating())
       return false;
     return config.parameterIndices->getNumIndices() > 1;
   };
@@ -6842,9 +6844,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto targetLinearMapUnsubstFnType =
       SILType::getPrimitiveObjectType(targetLinearMapFnType);
   if (linearMap.getType() != targetLinearMapUnsubstFnType) {
-    linearMap = thunkSGF.B.createConvertFunction(
-        loc, linearMap, targetLinearMapUnsubstFnType,
-        /*withoutActuallyEscaping*/ false);
+    linearMap = thunkSGF.B.createConvertFunction(loc, linearMap,
+                                                 targetLinearMapUnsubstFnType);
   }
 
   // Return original results and thunked differential/pullback.
@@ -6917,13 +6918,19 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   }
 
   // We do not, conversion is trivial.
+  //
+  // Only a thick function can have execution semantics; thin-to-thick adds
+  // them.
   auto expectedEI = expectedFnType->getExtInfo().intoBuilder();
-  auto newEI = expectedEI.withRepresentation(fnType->getRepresentation())
-                   .withNoEscape(fnType->getRepresentation() ==
-                                         SILFunctionType::Representation::Thick
-                                     ? fnType->isNoEscape()
-                                     : expectedFnType->isNoEscape())
-                   .build();
+  bool isThick =
+      fnType->getRepresentation() == SILFunctionType::Representation::Thick;
+  auto newEI =
+      expectedEI.withRepresentation(fnType->getRepresentation())
+          .withNoEscape(isThick ? fnType->isNoEscape()
+                                : expectedFnType->isNoEscape())
+          .withExecutionSemantics(
+              isThick ? expectedFnType->getExecutionSemantics() : std::nullopt)
+          .build();
   auto newFnType =
       adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
                          fnType->getWitnessMethodConformanceOrInvalid());

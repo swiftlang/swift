@@ -108,7 +108,12 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable() || !T->hasPlaceholder());
+  if (T) {
+    // TypeJoinExpr is only present during solving and so can use type variables
+    ASSERT(isa<TypeJoinExpr>(this) || !T->hasTypeVariableOrHole());
+    // TypeExprs can have placeholder types, they get opened in CSGen.
+    ASSERT(isa<TypeExpr>(this) || !T->hasPlaceholder());
+  }
   Ty = T;
 }
 
@@ -2112,8 +2117,8 @@ bool AbstractClosureExpr::isBodyAsync() const {
   return getOrComputeExtInfo(this).isAsync();
 }
 
-bool AbstractClosureExpr::isCalledOnce() const {
-  return getOrComputeExtInfo(this).isCalledOnce();
+bool AbstractClosureExpr::hasCalledAtMostOnceSemantics() const {
+  return getOrComputeExtInfo(this).hasCalledAtMostOnceSemantics();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -2199,7 +2204,7 @@ Type ClosureExpr::getExplicitThrownType() const {
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
+  assert(ty && !ty->hasTypeVariableOrHole() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }
@@ -2547,7 +2552,7 @@ std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   return std::nullopt;
 }
 
-BoundGenericType *KeyPathExpr::getKeyPathType() const {
+NominalType *KeyPathExpr::getKeyPathType() const {
   auto type = getType();
   if (!type)
     return nullptr;
@@ -2561,7 +2566,7 @@ BoundGenericType *KeyPathExpr::getKeyPathType() const {
            type->isReferenceWritableKeyPath());
   }
 
-  return type->castTo<BoundGenericType>();
+  return type->castTo<NominalType>();
 }
 
 Type KeyPathExpr::getRootType() const {

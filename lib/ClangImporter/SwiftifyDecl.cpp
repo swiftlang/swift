@@ -487,7 +487,9 @@ struct UnaliasedInstantiationVisitor
     : clang::RecursiveASTVisitor<UnaliasedInstantiationVisitor> {
   bool hasUnaliasedInstantiation = false;
 
-  bool TraverseTypedefType(const clang::TypedefType *) { return true; }
+  bool TraverseTypedefType(const clang::TypedefType *, bool TraverseQualifier) {
+    return true;
+  }
 
   bool
   VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
@@ -661,9 +663,10 @@ static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {
   return ParentClass->getForeignClassKind() != ClassDecl::ForeignKind::Normal;
 }
 
-template<typename T>
-static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
-    return false; // Only C++ methods have implicit params
+template <typename T>
+static bool
+getFirstImplicitObjectParamAnnotation(const clang::ObjCMethodDecl *D) {
+  return false; // Only C++ methods have implicit params
 }
 
 static bool shouldSkipModule(ModuleDecl *M) {
@@ -743,7 +746,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
     bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
     bool returnHasLifetimeInfo = false;
-    if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
+    if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+            ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
       if (Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
         if (!dependsOnClass(
@@ -948,12 +952,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   }
 
   auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
-  auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
-  if (!ClangFuncDecl && !ClangObjCMethodDecl)
-    return;
-  ASSERT(!ClangFuncDecl || !ClangObjCMethodDecl);
-
-  if (isa<ProtocolDecl>(MappedDecl->getParent()))
+  if (!ClangFuncDecl)
     return;
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
@@ -1016,10 +1015,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
         typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
-    bool foundInfo = ClangFuncDecl ?
-      swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
-      swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
-    if (!foundInfo) {
+    if (!swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl)) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
@@ -1035,8 +1031,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     return;
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
-  if (clang::RawComment *raw =
-          getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+  if (const clang::RawComment *raw =
+          getClangASTContext().getRawCommentForAnyRedecl(ClangDecl)) {
     // swift::RawDocCommentAttr doesn't contain its text directly, but instead
     // references the source range of the parsed comment. Instead of creating
     // a new source file just to parse the doc comment, we can add the

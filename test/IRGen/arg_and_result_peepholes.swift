@@ -9,7 +9,7 @@
 // CHECK:   [[ARG_MEM:%.*]] = alloca %TSo9BigStructV
 // CHECK:   [[TMP2:%.*]] = alloca %TSo9BigStructV
 // CHECK:   [[CALL:%.*]] = alloca %TSo9BigStructV
-// CHECK:   call void @llvm.lifetime.start.p0(i64 32, ptr [[TMP]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr [[TMP]])
 // CHECK:   [[A1:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i64 }, ptr [[TMP]], i32 0, i32 0
 // CHECK:   store i64 %0, ptr [[A1]]
 // CHECK:   [[A2:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i64 }, ptr [[TMP]], i32 0, i32 1
@@ -19,14 +19,14 @@
 // CHECK:   [[A4:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i64 }, ptr [[TMP]], i32 0, i32 3
 // CHECK:   store i64 %3, ptr [[A4]]
 
-// CHECK:  call void @llvm.lifetime.start.p0(i64 32, ptr [[ARG_MEM]])
+// CHECK:  call void @llvm.lifetime.start.p0(ptr [[ARG_MEM]])
 // CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr{{.*}} [[ARG_MEM]], ptr{{.*}} [[TMP]], i64 32, i1 false)
 
-// CHECK:  call void @llvm.lifetime.start.p0(i64 32, ptr [[TMP2]])
+// CHECK:  call void @llvm.lifetime.start.p0(ptr [[TMP2]])
 // CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr{{.*}} [[TMP2]], ptr{{.*}} [[ARG_MEM]], i64 32, i1 false)
-// CHECK:  call void @llvm.lifetime.start.p0(i64 32, ptr [[CALL]])
+// CHECK:  call void @llvm.lifetime.start.p0(ptr [[CALL]])
 // CHECK:  call void @useBigStruct(ptr{{.*}} [[CALL]], ptr{{.*}} [[TMP2]])
-// CHECK:  call void @llvm.lifetime.end.p0(i64 32, ptr [[TMP2]])
+// CHECK:  call void @llvm.lifetime.end.p0(ptr [[TMP2]])
 
 // CHECK: call void @llvm.memcpy.p0.p0.i64(ptr{{.*}} [[RES_MEM]], ptr{{.*}} [[CALL]], i64 32, i1 false)
 
@@ -38,8 +38,8 @@
 // CHECK:  [[R3:%.*]] = load i64, ptr [[A7]]
 // CHECK:  [[A8:%.*]] = getelementptr inbounds{{.*}} { i64, i64, i64, i64 }, ptr [[RES_MEM]], i32 0, i32 3
 // CHECK:  [[R4:%.*]] = load i64, ptr [[A8]]
-// CHECK:  call void @llvm.lifetime.end.p0(i64 32, ptr [[ARG_MEM]])
-// CHECK:  call void @llvm.lifetime.end.p0(i64 32, ptr [[RES_MEM]])
+// CHECK:  call void @llvm.lifetime.end.p0(ptr [[ARG_MEM]])
+// CHECK:  call void @llvm.lifetime.end.p0(ptr [[RES_MEM]])
 
 // CHECK:  [[R5:%.*]] = insertvalue { i64, i64, i64, i64 } undef, i64 [[R1]], 0
 // CHECK:  [[R6:%.*]] = insertvalue { i64, i64, i64, i64 } [[R5]], i64 [[R2]], 1

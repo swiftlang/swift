@@ -443,11 +443,6 @@ bool BridgedPassContext::noAllocations() const {
   return mod->getOptions().NoAllocations;
 }
 
-bool BridgedPassContext::enableAddressDependencies() const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return mod->getOptions().EnableAddressDependencies;
-}
-
 static_assert((int)BridgedPassContext::AssertConfiguration::Debug == (int)swift::SILOptions::Debug);
 static_assert((int)BridgedPassContext::AssertConfiguration::Release == (int)swift::SILOptions::Release);
 static_assert((int)BridgedPassContext::AssertConfiguration::Unchecked == (int)swift::SILOptions::Unchecked);

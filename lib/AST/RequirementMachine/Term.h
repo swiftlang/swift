@@ -226,14 +226,6 @@ public:
 
 namespace llvm {
   template<> struct DenseMapInfo<swift::rewriting::Term> {
-    static swift::rewriting::Term getEmptyKey() {
-      return swift::rewriting::Term::fromOpaquePointer(
-        llvm::DenseMapInfo<void *>::getEmptyKey());
-    }
-    static swift::rewriting::Term getTombstoneKey() {
-      return swift::rewriting::Term::fromOpaquePointer(
-        llvm::DenseMapInfo<void *>::getTombstoneKey());
-    }
     static unsigned getHashValue(swift::rewriting::Term Val) {
       return DenseMapInfo<void *>::getHashValue(Val.getOpaquePointer());
     }

@@ -146,7 +146,8 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) NonexhaustiveMode : uint8_t {
 };
 
 enum class ENUM_EXTENSIBILITY_ATTR(closed) ExecutionSemantics : uint8_t {
-  Once SWIFT_NAME("once") = 0,
+  AtMostOnce SWIFT_NAME("atMostOnce") = 0,
+  Once SWIFT_NAME("once") = 1,
   Last_ExecutionSemantics = Once
 };
 

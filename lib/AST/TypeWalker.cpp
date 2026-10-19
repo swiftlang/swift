@@ -36,6 +36,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitErrorType(ErrorType *ty) { return false; }
   bool visitPlaceholderType(PlaceholderType *ty) { return false; }
+  bool visitHoleType(HoleType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitIntegerType(IntegerType *ty) { return false; }
   bool visitHiddenType(HiddenType *ty) { return false; }
@@ -97,7 +98,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitNominalType(NominalType *ty) {
     if (auto parent = ty->getParent())
-      return doIt(parent);
+      if (doIt(parent))
+        return true;
+
+    for (auto arg : ty->getGenericArgs())
+      if (doIt(arg))
+        return true;
+
     return false;
   }
 
@@ -131,8 +138,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
-    if (auto calledOnceDep = ty->getCalledOnceDependentType()) {
-      if (doIt(calledOnceDep))
+    if (auto executionSemanticsDep = ty->getExecutionSemanticsDependentType()) {
+      if (doIt(executionSemanticsDep))
         return true;
     }
 
@@ -240,18 +247,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitUnboundGenericType(UnboundGenericType *ty) {
     if (auto parent = ty->getParent())
       return doIt(parent);
-    return false;
-  }
-
-  bool visitBoundGenericType(BoundGenericType *ty) {
-    if (auto parent = ty->getParent())
-      if (doIt(parent))
-        return true;
-
-    for (auto arg : ty->getGenericArgs())
-      if (doIt(arg))
-        return true;
-
     return false;
   }
 

@@ -166,7 +166,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   // lowered-address form. Record that (matching the caller) so the per-function
   // conventions used here -- and read by later passes -- don't treat the
   // thunk's address arguments as opaque values.
-  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+  thunk->inheritDerivedFrom(caller);
 
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
@@ -380,17 +380,14 @@ SILValue reabstractCoroutine(
   
   if (fromType != unsubstFromType)
     fn = builder.createConvertFunction(
-        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
-        /*withoutActuallyEscaping*/ false);
+        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType));
 
-  fn = builder.createConvertFunction(loc, fn,
-                                     SILType::getPrimitiveObjectType(unsubstToType),
-                                     /*withoutActuallyEscaping*/ false);
-  
+  fn = builder.createConvertFunction(
+      loc, fn, SILType::getPrimitiveObjectType(unsubstToType));
+
   if (toType != unsubstToType)
     fn = builder.createConvertFunction(loc, fn,
-                                       SILType::getPrimitiveObjectType(toType),
-                                       /*withoutActuallyEscaping*/ false);
+                                       SILType::getPrimitiveObjectType(toType));
 
   return fn;
 }
@@ -411,8 +408,7 @@ SILValue reabstractFunction(
 
   if (fromType != unsubstFromType)
     fn = builder.createConvertFunction(
-        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
-        /*withoutActuallyEscaping*/ false);
+        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType));
 
   fn = builder.createPartialApply(
       loc, thunkRef, remapSubstitutions(thunk->getForwardingSubstitutionMap()),
@@ -420,8 +416,7 @@ SILValue reabstractFunction(
 
   if (toType != unsubstToType)
     fn = builder.createConvertFunction(loc, fn,
-                                       SILType::getPrimitiveObjectType(toType),
-                                       /*withoutActuallyEscaping*/ false);
+                                       SILType::getPrimitiveObjectType(toType));
 
   return fn;
 }
@@ -466,7 +461,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->setHasLoweredAddresses(parentThunk->hasLoweredAddresses());
+  thunk->inheritDerivedFrom(parentThunk);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -818,7 +813,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+  thunk->inheritDerivedFrom(caller);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
@@ -899,8 +894,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (linearMapType != unsubstLinearMapType) {
     thunkedLinearMap = builder.createConvertFunction(
         loc, thunkedLinearMap,
-        SILType::getPrimitiveObjectType(unsubstLinearMapType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(unsubstLinearMapType));
   }
   thunkedLinearMap = builder.createPartialApply(
       loc, linearMapThunkFRI, linearMapSubs, {thunkedLinearMap},
@@ -908,8 +902,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (linearMapTargetType != unsubstLinearMapTargetType) {
     thunkedLinearMap = builder.createConvertFunction(
         loc, thunkedLinearMap,
-        SILType::getPrimitiveObjectType(linearMapTargetType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(linearMapTargetType));
   }
   assert(origFnType->getNumAutoDiffSemanticResults() > 0);
   if (origFnType->getNumResults() > 0 &&

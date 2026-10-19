@@ -653,7 +653,8 @@ public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
                                   llvm::Constant *captureDescriptor,
-                                  const HeapNonFixedOffsets *offsets = 0);
+                                  const HeapNonFixedOffsets *offsets = 0,
+                                  bool trapsOnDestroy = false);
 
   // Functions that don't care about the reference-counting style.
   void emitFixLifetime(llvm::Value *value);

@@ -80,13 +80,16 @@ private extension UnconditionalCheckedCastInst {
       return
     }
     
-    let instanceTy = targetFormalType.instanceTypeOfMetatype
-    guard let nominal = instanceTy.nominal,
+    let targetInstanceType = targetFormalType.instanceTypeOfMetatype
+    let sourceInstanceType = sourceFormalType.instanceTypeOfMetatype
+
+    guard let nominal = targetInstanceType.nominal,
           let proto = nominal as? ProtocolDecl
     else {
       return
     }
-    let conformance = sourceFormalType.instanceTypeOfMetatype.checkConformance(to: proto)
+
+    let conformance = sourceInstanceType.checkConformance(to: proto)
     guard conformance.isValid,
           conformance.matchesActorIsolation(in: parentFunction)
     else {
@@ -94,7 +97,8 @@ private extension UnconditionalCheckedCastInst {
     }
     
     let builder = Builder(before: self, context)
-    let iemt = builder.createInitExistentialMetatype(metatype: operand.value, existentialType: self.type, conformances: [conformance])
+    let conformances = sourceInstanceType.collectExistentialConformances(existentialType: targetInstanceType)
+    let iemt = builder.createInitExistentialMetatype(metatype: operand.value, existentialType: self.type, conformances: conformances)
     self.replace(with: iemt, context)
   }   
 }

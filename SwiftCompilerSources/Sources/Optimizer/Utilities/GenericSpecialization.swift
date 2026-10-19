@@ -15,22 +15,145 @@ import SIL
 
 func specializeVTable(forClassType classType: Type,
                       errorLocation: Location,
+                      history: inout SpecializationHistory,
                       _ context: ModulePassContext,
                       notifyNewFunction: (Function) -> ())
 {
-  var specializer = VTableSpecializer(errorLocation: errorLocation, context)
+  var specializer = VTableSpecializer(errorLocation: errorLocation, history: history, context)
   specializer.specializeVTable(forClassType: classType, notifyNewFunction)
+  history = specializer.history
+}
+
+/// Records the generic types for which vtables and witness tables are specialized, to detect
+/// infinitely growing specializations. For example:
+///
+///   class Box<T> {
+///     func wrap() -> AnyObject { Box<Optional<T>>() }
+///   }
+///
+/// Specializing the vtable of `Box<Int>` specializes `wrap`, which allocates a
+/// `Box<Optional<Int>>`, whose vtable must be specialized, and so on.
+/// The same can happen with witness tables, e.g. if a witness method creates an existential
+/// of a growing type.
+struct SpecializationHistory {
+  // Keyed by the class declaration.
+  private var vTables = GrowingSpecializations<ClassDecl, Type>()
+
+  // Keyed by the generic conformance.
+  private var witnessTables = GrowingSpecializations<Conformance, Conformance>()
+
+  init() {}
+
+  /// Returns false if the vtable of `classType` must not be specialized, because it is part of
+  /// an infinitely growing chain of specializations. In this case an error is emitted.
+  mutating func insertVTable(for classType: Type, of classDecl: ClassDecl,
+                             errorLocation: Location, _ context: ModulePassContext) -> Bool {
+    switch vTables.insert(classType.contextSubstitutionMap, of: classType, for: classDecl) {
+    case .accepted:
+      return true
+    case .refused:
+      return false
+    case .limitReached(let rootType):
+      context.diagnosticEngine.diagnose(.embedded_infinite_class_specialization, rootType, at: errorLocation)
+      return false
+    }
+  }
+
+  /// Returns false if the witness table of the specialized `conformance` must not be specialized,
+  /// because it is part of an infinitely growing chain of specializations. In this case an error
+  /// is emitted.
+  mutating func insertWitnessTable(for conformance: Conformance,
+                                   errorLocation: Location, _ context: ModulePassContext) -> Bool {
+    let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
+    switch witnessTables.insert(baseConf.specializedSubstitutions, of: conformance,
+                                for: baseConf.genericConformance) {
+    case .accepted:
+      return true
+    case .refused:
+      return false
+    case .limitReached(let rootConformance):
+      context.diagnosticEngine.diagnose(.embedded_infinite_conformance_specialization,
+                                        rootConformance.type, rootConformance.protocol.name,
+                                        at: errorLocation)
+      return false
+    }
+  }
+}
+
+/// Tracks the specializations of generic entities (classes or conformances) and the chains of
+/// growing substitutions between them.
+private struct GrowingSpecializations<Key: Hashable, Item> {
+  private struct Entry {
+    let substitutions: SubstitutionMap
+
+    // The length of the longest chain of growing specializations which leads to this entry.
+    let chainLength: Int
+
+    // The first item of that chain.
+    let root: Item
+  }
+
+  enum Result {
+    case accepted
+    case refused
+    case limitReached(root: Item)
+  }
+
+  /// The specializations of a single key.
+  private struct Entries {
+    // Like the limit for function specialization cycles in mandatory mode
+    // (see `createsInfiniteSpecializationLoop`).
+    private static var maxChainLength: Int { 10 }
+
+    private var entries: [Entry] = []
+
+    // True if the limit was reached. The limit applies to each chain separately. If
+    // specializations create multiple growing specializations, the number of specializations grows
+    // exponentially with the limit. Therefore no more growing specializations are accepted once
+    // the limit is reached.
+    private var exceeded = false
+
+    mutating func insert(_ substitutions: SubstitutionMap, of item: Item) -> Result {
+      var chainLength = 0
+      var root = item
+      for entry in entries
+        where entry.chainLength >= chainLength && substitutions.isGrowing(comparedTo: entry.substitutions)
+      {
+        chainLength = entry.chainLength + 1
+        root = entry.root
+      }
+      if chainLength > 0 && exceeded {
+        return .refused
+      }
+      if chainLength > Self.maxChainLength {
+        exceeded = true
+        return .limitReached(root: root)
+      }
+      entries.append(Entry(substitutions: substitutions, chainLength: chainLength, root: root))
+      return .accepted
+    }
+  }
+
+  private var entries = Dictionary<Key, Entries>()
+
+  init() {}
+
+  mutating func insert(_ substitutions: SubstitutionMap, of item: Item, for key: Key) -> Result {
+    return entries[key, default: Entries()].insert(substitutions, of: item)
+  }
 }
 
 private struct VTableSpecializer {
   let errorLocation: Location
   let context: ModulePassContext
+  var history: SpecializationHistory
 
   // The type of the first class in the hierarchy which implements a method
   private var baseTypesOfMethods = Dictionary<Function, Type>()
 
-  init(errorLocation: Location, _ context: ModulePassContext) {
+  init(errorLocation: Location, history: SpecializationHistory, _ context: ModulePassContext) {
     self.errorLocation = errorLocation
+    self.history = history
     self.context = context
   }
 
@@ -52,6 +175,11 @@ private struct VTableSpecializer {
       return
     }
     guard let origVTable = context.lookupVTable(for: classDecl) else {
+      // A class with a unique definition has its metadata, including its
+      // vtable, emitted in the module that defines it.
+      if !classDecl.hasNonUniqueDefinition {
+        return
+      }
       if context.enableWMORequiredDiagnostics {
         context.diagnosticEngine.diagnose(.cannot_specialize_class, classType, at: errorLocation)
       }
@@ -71,6 +199,9 @@ private struct VTableSpecializer {
     if classType.isGenericAtAnyLevel {
       if context.lookupSpecializedVTable(for: classType) != nil {
         // We already specialized the vtable
+        return
+      }
+      if !history.insertVTable(for: classType, of: classDecl, errorLocation: errorLocation, context) {
         return
       }
       let newEntries = specializeEntries(of: origVTable, notifyNewFunction)
@@ -223,24 +354,56 @@ private func specializeDeinit(forType type: Type,
 }
 
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
-func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassContext) {
-  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
-         existingSpecialization.isSpecialized
-  {
-    return
-  }
+/// Returns false if the witness table must not be specialized because it is part of an infinitely
+/// growing chain of specializations (see `SpecializationHistory`).
+@discardableResult
+func specializeWitnessTable(for conformance: Conformance,
+                            errorLocation: Location,
+                            history: inout SpecializationHistory,
+                            _ context: ModulePassContext) -> Bool
+{
+  var visited = Set<Conformance>()
+  return specializeWitnessTable(for: conformance, visited: &visited, errorLocation, &history, context)
+}
 
+@discardableResult
+private func specializeWitnessTable(for conformance: Conformance,
+                                    visited: inout Set<Conformance>,
+                                    _ errorLocation: Location,
+                                    _ history: inout SpecializationHistory,
+                                    _ context: ModulePassContext) -> Bool
+{
   guard conformance.isConcrete else {
     // If the conformance is abstract the witness table is specialized elsewhere - at the
     // place where the concrete conformance is referenced.
-    return
+    return true
+  }
+
+  // Conformances which only differ in type sugar share a witness table, so only deal with
+  // the canonical one. Otherwise the `visited` check below can miss a conformance and the
+  // same witness table is created twice.
+  let conformance = conformance.canonical
+
+  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
+         existingSpecialization.isSpecialized
+  {
+    return true
   }
 
   let baseConf = conformance.isInherited ? conformance.inheritedConformance: conformance
   if !baseConf.isSpecialized {
-    var visited = Set<Conformance>()
-    specializeDefaultMethods(for: conformance, visited: &visited, context)
-    return
+    specializeDefaultMethods(for: conformance, visited: &visited, errorLocation, &history, context)
+    return true
+  }
+
+  // Avoid infinite recursion, which may happen if an associated conformance is the
+  // conformance itself.
+  guard visited.insert(conformance).inserted else {
+    return true
+  }
+
+  guard history.insertWitnessTable(for: conformance, errorLocation: errorLocation, context) else {
+    return false
   }
 
   guard let witnessTable = context.lookupWitnessTable(for: baseConf.genericConformance) else {
@@ -263,6 +426,9 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
+            // The witness is not generic if all generic parameters of the conformance are
+            // bound to concrete types, e.g. `extension Array: P where Element == UInt8`.
+            methodSubs.hasAnySubstitutableParams,
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
                                                        convertIndirectToDirect: false, isMandatory: true)
       else {
@@ -272,7 +438,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
     case .baseProtocol(let requirement, _):
       let selfTy = requirement.selfInterfaceType
       let baseConf = conformance.getAssociatedConformance(ofAssociatedType: selfTy, to: requirement)
-      specializeWitnessTable(for: baseConf, context)
+      specializeWitnessTable(for: baseConf, visited: &visited, errorLocation, &history, context)
       return .baseProtocol(requirement: requirement, witness: baseConf)
     case .associatedType(let requirement, let witness):
       let substType = witness.subst(with: conformance.specializedSubstitutions)
@@ -285,16 +451,14 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       // The associated conformance is abstract if the associated type is an opaque result
       // type. Keep the abstract conformance in the entry - IRGen looks through the opaque
       // type - but make sure the underlying type's witness table exists.
-      let underlyingConf = concreteAssociateConf.lookingThroughOpaqueTypes(context)
-      if underlyingConf.isConcrete, underlyingConf.isSpecialized {
-        specializeWitnessTable(for: underlyingConf, context)
-      }
+      specializeNestedConformance(concreteAssociateConf, visited: &visited, errorLocation, &history, context)
       return .associatedConformance(requirement: requirement,
                                     witness: concreteAssociateConf)
     }
   }
   context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
                                         linkage: .shared, serialized: false)
+  return true
 }
 
 /// Specializes the default methods of a non-generic witness table.
@@ -303,6 +467,8 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
 /// specialize inherited conformances so that the concrete self type is correct, even for derived classes.
 private func specializeDefaultMethods(for conformance: Conformance,
                                       visited: inout Set<Conformance>,
+                                      _ errorLocation: Location,
+                                      _ history: inout SpecializationHistory,
                                       _ context: ModulePassContext)
 {
   // Avoid infinite recursion, which may happen if an associated conformance is the conformance itself.
@@ -344,14 +510,14 @@ private func specializeDefaultMethods(for conformance: Conformance,
     case .baseProtocol(let requirement, _):
       let baseConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.selfInterfaceType,
                                                           to: requirement)
-      specializeNestedConformance(baseConf, visited: &visited, context)
+      specializeNestedConformance(baseConf, visited: &visited, errorLocation, &history, context)
       return origEntry
     case .associatedType:
       return origEntry
     case .associatedConformance(let requirement, let assocConf):
       let concreteAssocConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType,
                                                                    to: assocConf.protocol)
-      specializeNestedConformance(concreteAssocConf, visited: &visited, context)
+      specializeNestedConformance(concreteAssocConf, visited: &visited, errorLocation, &history, context)
       return origEntry
     }
   }
@@ -370,6 +536,8 @@ private func specializeDefaultMethods(for conformance: Conformance,
 /// conformance. Nothing else creates it, because the outer conformance is not specialized.
 private func specializeNestedConformance(_ conformance: Conformance,
                                          visited: inout Set<Conformance>,
+                                         _ errorLocation: Location,
+                                         _ history: inout SpecializationHistory,
                                          _ context: ModulePassContext)
 {
   // If the associated type is an opaque result type the conformance is abstract. The witness
@@ -381,9 +549,9 @@ private func specializeNestedConformance(_ conformance: Conformance,
   }
   let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
   if baseConf.isSpecialized {
-    specializeWitnessTable(for: conformance, context)
+    specializeWitnessTable(for: conformance, visited: &visited, errorLocation, &history, context)
   } else {
-    specializeDefaultMethods(for: conformance, visited: &visited, context)
+    specializeDefaultMethods(for: conformance, visited: &visited, errorLocation, &history, context)
   }
 }
 

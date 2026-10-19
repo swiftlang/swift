@@ -1,18 +1,16 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name FileDefaultIsolation -swift-version 5 -emit-module-interface-path %t/v5.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -module-name FileDefaultIsolation -swift-version 5 -emit-module-interface-path %t/v5.swiftinterface %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/v5.swiftinterface -module-name FileDefaultIsolation
 // RUN: %FileCheck %s --input-file %t/v5.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name FileDefaultIsolation -swift-version 5 -strict-concurrency=complete -emit-module-interface-path %t/v5_complete.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -module-name FileDefaultIsolation -swift-version 5 -strict-concurrency=complete -emit-module-interface-path %t/v5_complete.swiftinterface %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/v5_complete.swiftinterface -module-name FileDefaultIsolation
 // RUN: %FileCheck %s --input-file %t/v5_complete.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature DefaultIsolationPerFile -module-name FileDefaultIsolation -swift-version 6 -emit-module-interface-path %t/v6.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -module-name FileDefaultIsolation -swift-version 6 -emit-module-interface-path %t/v6.swiftinterface %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/v6.swiftinterface -module-name FileDefaultIsolation
 // RUN: %FileCheck %s --input-file %t/v6.swiftinterface
-
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 // The `default` declaration itself must not appear in the emitted interface.
 // CHECK-NOT: default @MainActor

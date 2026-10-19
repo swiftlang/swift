@@ -72,14 +72,14 @@ static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDec
     // possibly custom log object. Those need not be constants, but every other
     // parameter must be.
     paramType = param->getTypeInContext();
-    nominal = paramType->getNominalOrBoundGenericNominal();
+    nominal = paramType->getNominalDecl();
     return !nominal || !isOSLogDynamicObject(nominal);
   }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
   paramType = param->getTypeInContext();
-  structDecl = paramType->getStructOrBoundGenericStruct();
+  structDecl = paramType->getStructDecl();
   if (!structDecl)
     return false;
   return isAtomicOrderingDecl(structDecl);
@@ -220,7 +220,7 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
   // Diagnose atomics ordering related error here.
   if (hasSemanticsAttr(funcDecl,
                        semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS)) {
-    NominalTypeDecl *nominalDecl = exprType->getNominalOrBoundGenericNominal();
+    NominalTypeDecl *nominalDecl = exprType->getNominalDecl();
     if (!nominalDecl) {
       // This case should normally not happen. This is a safe guard against
       // possible mismatch between the atomics library and the compiler.
@@ -258,12 +258,12 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_closure);
     return;
   }
-  if (EnumDecl *enumDecl = exprType->getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *enumDecl = exprType->getEnumDecl()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_enum_case,
                    enumDecl->getName());
     return;
   }
-  NominalTypeDecl *nominalDecl = exprType->getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = exprType->getNominalDecl();
   if (!nominalDecl) {
     // This case should normally not happen. This is a safe guard against
     // possible mismatch between the os overlay and the compiler.

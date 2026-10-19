@@ -11,16 +11,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
-#include "../../IRGen/IRGenModule.h"
 #include "../../IRGen/GenClass.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -28,6 +32,7 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
 using namespace swift;
 
@@ -71,6 +76,35 @@ void SILPassManager::runSwiftModuleVerification() {
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                     SIL bridging implemented in SILOptimizer
+//===----------------------------------------------------------------------===//
+
+void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
+  swift::salvageDebugInfo(inst.unbridged());
+}
+
+BridgedConstExprFunctionState BridgedConstExprFunctionState::create() {
+  auto allocator = new swift::SymbolicValueBumpAllocator();
+  auto evaluator = new swift::ConstExprEvaluator(*allocator, 0);
+  auto numEvaluatedSILInstructions = new unsigned int(0);
+  auto state = new swift::ConstExprFunctionState(*evaluator, nullptr, {},
+                                                 *numEvaluatedSILInstructions, true);
+  return {state, allocator, evaluator, numEvaluatedSILInstructions};
+}
+
+bool BridgedConstExprFunctionState::isConstantValue(BridgedValue bridgedValue) {
+  auto value = bridgedValue.getSILValue();
+  auto symbolicValue = state->getConstantValue(value);
+  return symbolicValue.isConstant();
+}
+
+void BridgedConstExprFunctionState::deinitialize() {
+  delete state;
+  delete numEvaluatedSILInstructions;
+  delete constantEvaluator;
+  delete allocator;
+}
 
 //===----------------------------------------------------------------------===//
 //                           BridgedPassContext
@@ -200,6 +234,34 @@ void BridgedPassContext::visitTypesWithEmittedMetadata(
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   for (SILType type : mod->getNonCopyableTypesWithEmittedMetadata())
     callback(context, {type});
+}
+
+void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
+    void *context,
+    void (*callback)(void *context, BridgedConformance conformance)) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  SmallVector<NormalProtocolConformance *, 8> conformances;
+  for (SILWitnessTable &wt : mod->getWitnessTables()) {
+    if (wt.isDeclaration() || wt.isSpecialized())
+      continue;
+    auto *normal = dyn_cast<NormalProtocolConformance>(wt.getConformance());
+    if (!normal ||
+        normal->getEffectiveCodeGenerationModel() !=
+            CodeGenerationModel::Interface ||
+        normal->getDeclContext()->getParentModule() != mod->getSwiftModule() ||
+        normal->getDeclContext()->isGenericContext())
+      continue;
+    conformances.push_back(normal);
+  }
+
+  for (auto *normal : conformances) {
+    // The entries of an eagerly emitted witness table point directly to the
+    // witness tables of the conformances it references, so deserialize those
+    // just like for a conformance that forms an existential.
+    mod->linkWitnessTable(normal, SILModule::LinkingMode::LinkNormal,
+                          /*referencedFromInitExistential=*/true);
+    callback(context, {ProtocolConformanceRef(normal)});
+  }
 }
 
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
@@ -509,8 +571,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // function.
   specializedApplySiteCallee->setSection(original->section());
 
-  specializedApplySiteCallee->setHasLoweredAddresses(
-      original->hasLoweredAddresses());
+  specializedApplySiteCallee->inheritDerivedFrom(original);
 
   return {specializedApplySiteCallee};
 }
@@ -527,6 +588,15 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
 
 bool BeginApply_canInline(BridgedInstruction beginApply) {
   return swift::SILInliner::canInlineBeginApply(beginApply.getAs<BeginApplyInst>());
+}
+
+BridgedInferredVariableName
+VariableNameInferrer_inferNameAndRoot(BridgedValue value) {
+  auto nameAndRoot =
+      VariableNameInferrer::inferNameAndRoot(value.getSILValue());
+  if (!nameAndRoot)
+    return {BridgedStringRef(), {nullptr}};
+  return {nameAndRoot->first.str(), {nameAndRoot->second}};
 }
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, BridgedCanType destTy,
@@ -611,7 +681,7 @@ bool BridgedFunction::isAutodiffSubsetParametersThunk() const {
 // See also ASTMangler::mangleAutoDiffGeneratedDeclaration.
 bool BridgedType::isAutodiffBranchTracingEnumInVJP(BridgedFunction vjp) const {
   assert(vjp.isAutodiffVJP());
-  EnumDecl *ed = unbridged().getEnumOrBoundGenericEnum();
+  EnumDecl *ed = unbridged().getEnumDecl();
   if (ed == nullptr)
     return false;
 

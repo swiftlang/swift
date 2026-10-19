@@ -97,6 +97,42 @@ internal func _jobSetPriority(_ job: Builtin.Job, _ priority: UInt8)
 @_silgen_name("swift_job_getKind")
 internal func _jobGetKind(_ job: Builtin.Job) -> UInt8
 
+/// Returns the job's flags; works for any job, not only tasks
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_silgen_name("swift_task_getJobFlags")
+internal func _jobGetFlags(_ job: Builtin.Job) -> Int
+
+/// Returns the task the job represents, or `nil` if the job is not a task
+@available(SwiftStdlib 6.4, *)
+@export(implementation)
+internal func _jobGetUnsafeCurrentTask(_ job: Builtin.Job) -> UnsafeCurrentTask? {
+  let rawJob: Builtin.RawPointer = Builtin.reinterpretCast(job)
+  let rawTask: Builtin.RawPointer
+  // The low 8 bits of the flags are the JobKind
+  switch _jobGetFlags(job) & 0xFF {
+  case 0: // JobKind::Task
+    // An AsyncTask is a Job, so the job pointer is also the task pointer
+    rawTask = rawJob
+  case 197: // JobKind::TaskStealer
+    // An AsyncTaskStealer runs a task on its behalf and stores the task
+    // pointer right after the Job fields, see TaskPrivate.h
+#if _pointerBitWidth(_64)
+    let taskOffset = 8 * MemoryLayout<Int>.size
+#else
+    // The Job fields end at 9 words, the Task pointer is laid out in the
+    // Job's alignment tail padding rather than after sizeof(Job)
+    let taskOffset = 9 * MemoryLayout<Int>.size
+#endif
+    rawTask = unsafe UnsafeRawPointer(rawJob).load(
+      fromByteOffset: taskOffset, as: UnsafeRawPointer.self)._rawValue
+  default:
+    return nil
+  }
+  let task: Builtin.NativeObject = Builtin.bridgeFromRawPointer(rawTask)
+  return unsafe UnsafeCurrentTask(task)
+}
+
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_job_getExecutorPrivateData")
 internal func _jobGetExecutorPrivateData(

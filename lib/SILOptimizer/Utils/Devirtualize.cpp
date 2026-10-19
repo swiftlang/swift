@@ -58,7 +58,7 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *cha, ClassDecl *cd,
 
   // FIXME: This is wrong -- we could have a non-generic class nested
   // inside a generic class
-  if (isa<BoundGenericClassType>(classType)) {
+  if (isa<ClassType>(classType)) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto removedIt =
@@ -225,7 +225,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue instance,
     if (!singlePred) {
       if (!isa<SILFunctionArgument>(arg))
         break;
-      auto *cd = arg->getType().getClassOrBoundGenericClass();
+      auto *cd = arg->getType().getClassDecl();
       // Check if this class is effectively final.
       if (!cd || !isKnownFinalClass(cd, module, cha))
         break;
@@ -321,7 +321,7 @@ SILType swift::getExactDynamicType(SILValue instance,
       if (fArg->getType().is<AnyMetatypeType>()) {
         return SILType();
       }
-      auto *cd = fArg->getType().getClassOrBoundGenericClass();
+      auto *cd = fArg->getType().getClassDecl();
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
       if (!cd && fArg->getType().isTrivial(*f)) {
@@ -444,7 +444,7 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
     //
     // The conformance Bar : Q is difficult to recover in the general case.
     //
-    // Some combination of storing substitution maps in BoundGenericTypes
+    // Some combination of storing substitution maps in NominalTypes
     // as well as for method overrides would solve this, but for now, just
     // punt to global lookup.
     LookUpConformanceInModule());
@@ -469,7 +469,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
     baseSelfType = metatypeType->getInstanceType();
 
-  auto *baseClassDecl = baseSelfType->getClassOrBoundGenericClass();
+  auto *baseClassDecl = baseSelfType->getClassDecl();
   assert(baseClassDecl && "not a class method");
 
   unsigned baseDepth = 0;
@@ -495,7 +495,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
           applySite.getFunction()->getTypeExpansionContext());
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
     calleeSelfType = metatypeType->getInstanceType();
-  auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
+  auto *calleeClassDecl = calleeSelfType->getClassDecl();
   assert(calleeClassDecl && "self is not a class type");
 
   // Add generic parameters from the method itself, ignoring any generic
@@ -776,7 +776,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   // Mandatory inlining does class method devirtualization. I'm not sure if this
   // is really needed, but some test rely on this.
   // So even for Onone functions we have to do it if the SILStage is raw.
-  if (f->getModule().getStage() != SILStage::Raw && !f->shouldOptimize()) {
+  // This asks whether the raw mandatory pipeline is still running, not what
+  // stage the callee is at. Mandatory inlining must devirtualize even Onone
+  // callees while the module is Raw, so read the floor.
+  if (f->getModule().getStageFloor() != SILStage::Raw && !f->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     LLVM_DEBUG(llvm::dbgs()
                << "        FAIL: Could not optimize function "
@@ -1411,7 +1414,7 @@ swift::tryDevirtualizeApply(SILPassManager *pm, ApplySite applySite, ClassHierar
   if (auto *cmi = dyn_cast<ClassMethodInst>(fas.getCallee())) {
     auto instance = stripUpCasts(cmi->getOperand());
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     if (isEffectivelyFinalMethod(fas, classType, cd, cha))
       return tryDevirtualizeClassMethod(pm, fas, instance, cd, classType, ore,
@@ -1424,7 +1427,7 @@ swift::tryDevirtualizeApply(SILPassManager *pm, ApplySite applySite, ClassHierar
       // in getInstanceWithExactDynamicType than in stripUpCasts.
       CanType classType = getSelfInstanceType(instance->getType().getASTType());
       // This should never be null - make the check just to be on the safe side.
-      if (ClassDecl *cd = classType.getClassOrBoundGenericClass())
+      if (ClassDecl *cd = classType.getClassDecl())
         return tryDevirtualizeClassMethod(pm, fas, instance, cd, classType, ore);
       return {ApplySite(), false};
     }
@@ -1439,7 +1442,7 @@ swift::tryDevirtualizeApply(SILPassManager *pm, ApplySite applySite, ClassHierar
   if (isa<SuperMethodInst>(fas.getCallee())) {
     auto instance = fas.getArguments().back();
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     return tryDevirtualizeClassMethod(pm, fas, instance, cd, classType, ore);
   }
@@ -1479,7 +1482,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
   if (auto *cmi = dyn_cast<ClassMethodInst>(applySite.getCallee())) {
     auto instance = stripUpCasts(cmi->getOperand());
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     if (isEffectivelyFinalMethod(applySite, classType, cd, cha))
       return canDevirtualizeClassMethod(applySite, cd, classType,
@@ -1490,7 +1493,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
     // known.
     if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
       CanType classType = getSelfInstanceType(instance->getType().getASTType());
-      ClassDecl *cd = classType.getClassOrBoundGenericClass();
+      ClassDecl *cd = classType.getClassDecl();
       return cd && canDevirtualizeClassMethod(applySite, cd, classType);
     }
 
@@ -1503,7 +1506,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
   if (isa<SuperMethodInst>(applySite.getCallee())) {
     auto instance = applySite.getArguments().back();
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     return canDevirtualizeClassMethod(applySite, cd, classType);
   }

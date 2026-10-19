@@ -161,17 +161,14 @@ extension DistributedActor {
   ///   - line: The line number to print if the assertion fails The default is
   ///           where this method was called.
   /// - Returns: the return value of the `operation`
-  /// - Throws: rethrows the `Error` thrown by the operation if it threw
+  /// - Throws: the error thrown by the operation, if it threw
   @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'distributed actor' instead")
   @export(implementation)
-  public nonisolated func assumeIsolated<T : Sendable>(
-      _ operation: (isolated Self) throws -> T,
+  public nonisolated func assumeIsolated<T: Sendable & ~Copyable, E: Error>(
+      _ operation: (isolated Self) throws(E) -> T,
       file: StaticString = #fileID, line: UInt = #line
-  ) rethrows -> T {
-    typealias YesActor = (isolated Self) throws -> T
-    typealias NoActor = (Self) throws -> T
-
+  ) throws(E) -> T {
     guard __isLocalActor(self) else {
       fatalError("Cannot assume to be 'isolated \(Self.self)' since distributed actor '\(self)' is a remote actor reference.")
     }
@@ -182,12 +179,24 @@ extension DistributedActor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
-    // To do the unsafe cast, we have to pretend it's @escaping.
+#if $BuiltinApplyIsolatedUnchecked
+    // Apply the closure directly, ignoring its isolation: no escaping
+    // conversion, so no closure context allocation and no escape check
+    return try Builtin.applyActorIsolatedUnchecked(operation, self)
+#else
+    typealias YesActor = (isolated Self) throws(E) -> T
+    typealias NoActor = (Self) throws(E) -> T
+
+    // To do the unsafe cast, we have to pretend it's @escaping
+    // Use a builtin cast rather than unsafeBitCast, which would require runtime
+    // metadata for the typed throws function type (only available since
+    // Swift 6.0 runtimes)
     return try withoutActuallyEscaping(operation) {
-      (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
+      (_ fn: @escaping YesActor) throws(E) -> T in
+      let rawFn: NoActor = Builtin.reinterpretCast(fn)
       return try rawFn(self)
     }
+#endif
   }
 
   @available(SwiftStdlib 5.9, *)

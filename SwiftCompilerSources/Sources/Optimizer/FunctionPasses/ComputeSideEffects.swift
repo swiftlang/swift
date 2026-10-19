@@ -237,6 +237,12 @@ private struct CollectedEffects {
       // releases moving above the fix_lifetime.
       addEffects(.read, to: fl.operand.value)
 
+    case let cast as UnconditionalCheckedCastInst:
+      if !cast.preservesReferenceCounts {
+        addEffects(.worstEffects, to: cast.operand.value)
+        globalEffects = .worstEffects
+      }
+
       // Instructions which have effects defined in SILNodes.def, but those effects are
       // not relevant for our purpose.
       // In most cases these conservative effects are there to prevent code re-scheduling within
@@ -246,7 +252,7 @@ private struct CollectedEffects {
       is BeginBorrowInst, is EndBorrowInst,
       is DebugValueInst, is KeyPathInst, is FixLifetimeInst,
       is EndApplyInst, is AbortApplyInst,
-      is EndCOWMutationInst, is UnconditionalCheckedCastInst,
+      is EndCOWMutationInst,
       is CondFailInst:
       break
 

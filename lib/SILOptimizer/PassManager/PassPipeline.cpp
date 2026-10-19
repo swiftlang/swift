@@ -164,6 +164,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly. This relies on the move-only
+  // checker having made every destroy explicit.
+  P.addImplicitDestroyChecker();
+
   // Check no uses after consume operator of a value in an address.
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
@@ -561,6 +566,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+  P.addPackTypeElimination();
 
   // Promote stack allocations to values and eliminate redundant
   // loads.
@@ -784,6 +790,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
+  // New specializations miss the earlier SILCombine before LetPropertiesOpt.
+  // Simplify their closure calls before running closure specialization.
+  P.addSILCombine();
   P.addClosureSpecialization();
   P.addDeadDebugVariableElimination();
 

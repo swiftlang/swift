@@ -62,7 +62,7 @@ extension ExpressibleByIntegerLiteral
 public protocol AdditiveArithmetic: Equatable {
   /// The zero value.
   ///
-  /// Zero is the identity element for addition. For any value,
+  /// Zero is the identity element for addition. For any number `x`,
   /// `x + .zero == x` and `.zero + x == x`.
   static var zero: Self { get }
 

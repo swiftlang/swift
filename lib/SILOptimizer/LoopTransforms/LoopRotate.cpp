@@ -172,10 +172,7 @@ static void updateSSAForUseOfValue(
   // Instead we collect uses wrapping uses in branches specially so that we
   // can reconstruct the use even after the branch has been modified.
   SmallVector<UseWrapper, 8> storedUses;
-  for (auto *use : Res->getUses())
-    storedUses.push_back(UseWrapper(use));
-  for (auto useWrapper : storedUses) {
-    Operand *use = useWrapper;
+  for (auto *use : Res->getUses()) {
     SILInstruction *user = use->getUser();
     assert(user && "Missing user");
 
@@ -185,8 +182,9 @@ static void updateSSAForUseOfValue(
 
     assert(user->getParent() != EntryCheckBlock &&
            "The entry check block should dominate the header");
-    updater.rewriteUse(*use);
+    storedUses.push_back(UseWrapper(use));
   }
+  updater.rewriteUses(storedUses);
 
   replacePhisWithIncomingValues(pm, insertedPhis);
 }
@@ -447,6 +445,9 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The rotation and the critical-edge splitting above changed the CFG
   // significantly. Recompute dominance rather than updating it incrementally.
+  // The blocks created above were given fresh numbers via
+  // SILFunction::assignFreshBlockNumber() without bumping the numbering epoch,
+  // so both this dominator tree and the live loop info remain consistent.
   domInfo->recalculate(*header->getParent());
 
   // Beautify the IR. Move the old header to after the old latch as it is now

@@ -96,24 +96,22 @@ public:
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
       const GenericSpecializationInformation *SpecializationInfo = nullptr,
-      bool IsCalledOnce = false);
+      std::optional<ExecutionSemantics> Semantics = std::nullopt);
 
-  ManagedValue createPartialApply(SILLocation loc, SILValue fn,
-                                  SubstitutionMap subs,
-                                  ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention,
-                                  SILFunctionTypeIsolation resultIsolation =
-                                      SILFunctionTypeIsolation::forUnknown(),
-                                  bool isCalledOnce = false);
-  ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
-                                  SubstitutionMap subs,
-                                  ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention,
-                                  SILFunctionTypeIsolation resultIsolation =
-                                      SILFunctionTypeIsolation::forUnknown(),
-                                  bool isCalledOnce = false) {
-    return createPartialApply(loc, fn.getValue(), subs, args,
-                              calleeConvention, resultIsolation, isCalledOnce);
+  ManagedValue createPartialApply(
+      SILLocation loc, SILValue fn, SubstitutionMap subs,
+      ArrayRef<ManagedValue> args, ParameterConvention calleeConvention,
+      SILFunctionTypeIsolation resultIsolation =
+          SILFunctionTypeIsolation::forUnknown(),
+      std::optional<ExecutionSemantics> executionSemantics = std::nullopt);
+  ManagedValue createPartialApply(
+      SILLocation loc, ManagedValue fn, SubstitutionMap subs,
+      ArrayRef<ManagedValue> args, ParameterConvention calleeConvention,
+      SILFunctionTypeIsolation resultIsolation =
+          SILFunctionTypeIsolation::forUnknown(),
+      std::optional<ExecutionSemantics> executionSemantics = std::nullopt) {
+    return createPartialApply(loc, fn.getValue(), subs, args, calleeConvention,
+                              resultIsolation, executionSemantics);
   }
 
   using SILBuilder::createStructExtract;
@@ -410,9 +408,9 @@ public:
   ManagedValue createManagedFunctionRef(SILLocation loc, SILFunction *f);
 
   using SILBuilder::createConvertFunction;
-  ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
-                                     SILType resultTy,
-                                     bool WithoutActuallyEscaping = false);
+  ManagedValue createConvertFunction(
+      SILLocation loc, ManagedValue fn, SILType resultTy,
+      ConvertFunctionInst::Kind kind = ConvertFunctionInst::Kind::Ordinary);
 
   using SILBuilder::createConvertEscapeToNoEscape;
   ManagedValue

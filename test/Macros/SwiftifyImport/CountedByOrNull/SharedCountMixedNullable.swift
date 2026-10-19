@@ -126,11 +126,17 @@ public func compoundAndSimpleMutSpans(_ p1: UnsafeMutablePointer<CInt>?, _ p2: U
 
 // Case 1: non-Optional sharer is first in declaration order.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func nonOptionalFirst(_ p1: UnsafeBufferPointer<CInt>, _ p2: UnsafeBufferPointer<CInt>?) {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = unsafe p2?.count, _p2Count != len {
-      fatalError("bounds check failure in nonOptionalFirst: expected \(len) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("nonOptionalFirst", expected, actual)
+      }
+      _boundsCheckFailure(len, _p2Count)
     }
     return unsafe nonOptionalFirst(p1.baseAddress, p2?.baseAddress, len)
 }
@@ -140,11 +146,17 @@ public func nonOptionalFirst(_ p1: UnsafeBufferPointer<CInt>, _ p2: UnsafeBuffer
 // Case 2: Optional sharer is first in declaration order. Generated code
 // should bind `len` from `p2` (the non-Optional one) anyway.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func optionalFirst(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPointer<CInt>) {
     let len = CInt(exactly: p2.count)!
     if let _p1Count = unsafe p1?.count, _p1Count != len {
-      fatalError("bounds check failure in optionalFirst: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("optionalFirst", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     return unsafe optionalFirst(p1?.baseAddress, p2.baseAddress, len)
 }
@@ -154,11 +166,17 @@ public func optionalFirst(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPo
 // Case 3: all sharers Optional — `??`-chain extraction, nil-aware checks on
 // every non-extractor sharer.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func allOptional(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPointer<CInt>?) {
     let len = CInt(exactly: unsafe p2?.count ?? p1?.count ?? 0)!
     if let _p1Count = unsafe p1?.count, _p1Count != len {
-      fatalError("bounds check failure in allOptional: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("allOptional", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     return unsafe allOptional(p1?.baseAddress, p2?.baseAddress, len)
 }
@@ -167,14 +185,26 @@ public func allOptional(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPoin
 ------------------------------
 // Case 4: three sharers with mixed nullability.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func threeMixed(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPointer<CInt>, _ p3: UnsafeBufferPointer<CInt>?) {
     let len = CInt(exactly: p2.count)!
     if let _p1Count = unsafe p1?.count, _p1Count != len {
-      fatalError("bounds check failure in threeMixed: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeMixed", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     if let _p3Count = unsafe p3?.count, _p3Count != len {
-      fatalError("bounds check failure in threeMixed: expected \(len) but got \(_p3Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeMixed", expected, actual)
+      }
+      _boundsCheckFailure(len, _p3Count)
     }
     return unsafe threeMixed(p1?.baseAddress, p2.baseAddress, p3?.baseAddress, len)
 }
@@ -183,14 +213,26 @@ public func threeMixed(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPoint
 ------------------------------
 // Case 5: three sharers, all Optional — `??`-chain across all three.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func threeAllOptional(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPointer<CInt>?, _ p3: UnsafeBufferPointer<CInt>?) {
     let len = CInt(exactly: unsafe p3?.count ?? p2?.count ?? p1?.count ?? 0)!
     if let _p1Count = unsafe p1?.count, _p1Count != len {
-      fatalError("bounds check failure in threeAllOptional: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeAllOptional", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     if let _p2Count = unsafe p2?.count, _p2Count != len {
-      fatalError("bounds check failure in threeAllOptional: expected \(len) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeAllOptional", expected, actual)
+      }
+      _boundsCheckFailure(len, _p2Count)
     }
     return unsafe threeAllOptional(p1?.baseAddress, p2?.baseAddress, p3?.baseAddress, len)
 }
@@ -200,7 +242,7 @@ public func threeAllOptional(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBuffe
 // Case 6: parameter + return value sharing a count, mixed nullability.
 // Return uses `len`; parameter extracts it.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func paramOptionalReturn(_ p1: UnsafeBufferPointer<CInt>?) -> UnsafeBufferPointer<CInt> {
     let len = CInt(exactly: unsafe p1?.count ?? 0)!
     return unsafe UnsafeBufferPointer<CInt>(start: unsafe paramOptionalReturn(p1?.baseAddress, len), count: Int(len))
@@ -210,11 +252,17 @@ public func paramOptionalReturn(_ p1: UnsafeBufferPointer<CInt>?) -> UnsafeBuffe
 ------------------------------
 // Case 7: two parameters and a return sharing a count, mixed.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func twoParamsAndReturn(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPointer<CInt>) -> UnsafeBufferPointer<CInt>? {
     let len = CInt(exactly: p2.count)!
     if let _p1Count = unsafe p1?.count, _p1Count != len {
-      fatalError("bounds check failure in twoParamsAndReturn: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("twoParamsAndReturn", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     let _resultValue = unsafe twoParamsAndReturn(p1?.baseAddress, p2.baseAddress, len)
     if unsafe _resultValue == nil {
@@ -228,11 +276,17 @@ public func twoParamsAndReturn(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBuf
 // Case 8: nonescaping (Span) variants — verifies that the unsafe-prefix
 // handling for ?.count differs for Span vs UBP.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func spansAllOptional(_ p1: Span<CInt>?, _ p2: Span<CInt>?) {
     let len = CInt(exactly: p2?.count ?? p1?.count ?? 0)!
     if let _p1Count = p1?.count, _p1Count != len {
-      fatalError("bounds check failure in spansAllOptional: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("spansAllOptional", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     let _p1Ptr = p1?.withUnsafeBufferPointer {
         unsafe $0
@@ -255,11 +309,17 @@ public func spansAllOptional(_ p1: Span<CInt>?, _ p2: Span<CInt>?) {
 // `.nonescaping` import as `inout MutableSpan<...>` (and `inout MutableSpan<...>?`
 // for the OrNull-Nullable variants).
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
 public func mutSpansMixed(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
-      fatalError("bounds check failure in mutSpansMixed: expected \(len) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("mutSpansMixed", expected, actual)
+      }
+      _boundsCheckFailure(len, _p2Count)
     }
     let _p1Ptr = p1.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -282,11 +342,17 @@ public func mutSpansMixed(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan
 // across MutableSpan? values, nil-aware checks (no `unsafe` prefix needed
 // because MutableSpan?.count is safe).
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
 public func mutSpansAllOrNull(_ p1: inout MutableSpan<CInt>?, _ p2: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: p2?.count ?? p1?.count ?? 0)!
     if let _p1Count = p1?.count, _p1Count != len {
-      fatalError("bounds check failure in mutSpansAllOrNull: expected \(len) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("mutSpansAllOrNull", expected, actual)
+      }
+      _boundsCheckFailure(len, _p1Count)
     }
     let _p1Ptr = p1?.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -310,11 +376,17 @@ public func mutSpansAllOrNull(_ p1: inout MutableSpan<CInt>?, _ p2: inout Mutabl
 // the extractor; the Optional sharer's check is nil-aware. Return is a
 // non-Optional MutableSpan (since `.countedBy` hides nullability).
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
 public func mutSpansMixedReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt> {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
-      fatalError("bounds check failure in mutSpansMixedReturn: expected \(len) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("mutSpansMixedReturn", expected, actual)
+      }
+      _boundsCheckFailure(len, _p2Count)
     }
     let _p1Ptr = p1.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -342,11 +414,17 @@ public func mutSpansMixedReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout Mutab
 // keeps the wrapper's return type Optional, exercising the early-return-nil
 // path alongside the shared-count infrastructure.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
 public func mutSpansMixedOrNullReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
-      fatalError("bounds check failure in mutSpansMixedOrNullReturn: expected \(len) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("mutSpansMixedOrNullReturn", expected, actual)
+      }
+      _boundsCheckFailure(len, _p2Count)
     }
     let _p1Ptr = p1.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -375,11 +453,17 @@ public func mutSpansMixedOrNullReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout
 // references the bound `len` in its nil-aware bounds check. Both buffers
 // are OrNull-Nullable, so both checks are nil-aware.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func compoundAndSimple(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBufferPointer<CInt>?, _ offset: CInt) {
     let len = CInt(exactly: unsafe p2?.count ?? 0)!
     if let _p1Count = unsafe p1?.count, _p1Count != len + offset {
-      fatalError("bounds check failure in compoundAndSimple: expected \(len + offset) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("compoundAndSimple", expected, actual)
+      }
+      _boundsCheckFailure(len + offset, _p1Count)
     }
     return unsafe compoundAndSimple(p1?.baseAddress, p2?.baseAddress, len, offset)
 }
@@ -390,11 +474,17 @@ public func compoundAndSimple(_ p1: UnsafeBufferPointer<CInt>?, _ p2: UnsafeBuff
 // render as Span? — exercises the nil-aware compound check on Span?
 // (where `?.count` is safe and no `unsafe` prefix is needed).
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func compoundAndSimpleSpans(_ p1: Span<CInt>?, _ p2: Span<CInt>?, _ offset: CInt) {
     let len = CInt(exactly: p2?.count ?? 0)!
     if let _p1Count = p1?.count, _p1Count != len + offset {
-      fatalError("bounds check failure in compoundAndSimpleSpans: expected \(len + offset) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("compoundAndSimpleSpans", expected, actual)
+      }
+      _boundsCheckFailure(len + offset, _p1Count)
     }
     let _p1Ptr = p1?.withUnsafeBufferPointer {
         unsafe $0
@@ -417,11 +507,17 @@ public func compoundAndSimpleSpans(_ p1: Span<CInt>?, _ p2: Span<CInt>?, _ offse
 // check works against an extracted simple-count basis when both buffers are
 // inout MutableSpan?.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
 public func compoundAndSimpleMutSpans(_ p1: inout MutableSpan<CInt>?, _ p2: inout MutableSpan<CInt>?, _ offset: CInt) {
     let len = CInt(exactly: p2?.count ?? 0)!
     if let _p1Count = p1?.count, _p1Count != len + offset {
-      fatalError("bounds check failure in compoundAndSimpleMutSpans: expected \(len + offset) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("compoundAndSimpleMutSpans", expected, actual)
+      }
+      _boundsCheckFailure(len + offset, _p1Count)
     }
     let _p1Ptr = p1?.withUnsafeMutableBufferPointer {
         unsafe $0

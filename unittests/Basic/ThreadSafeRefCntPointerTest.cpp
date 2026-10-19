@@ -26,6 +26,7 @@ TEST(ThreadSafeRefCountedBase, ReleaseSimple) {
   bool destroyed = false;
   {
     IntrusiveRefCntPtr<TestRelease> ref = new TestRelease(destroyed);
+    (void)ref;
   }
   EXPECT_TRUE(destroyed);
 }
@@ -49,6 +50,7 @@ TEST(ThreadSafeRefCountedBaseVPTR, ReleaseSimple) {
   bool destroyed = false;
   {
     IntrusiveRefCntPtr<TestReleaseVPTR> ref = new TestReleaseVPTR(destroyed);
+    (void)ref;
   }
   EXPECT_TRUE(destroyed);
 }

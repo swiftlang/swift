@@ -2074,9 +2074,8 @@ public:
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
 
-  /// Record all unbound type variables that occur in the given type
-  /// as being bound to "hole" type represented by \c PlaceholderType
-  /// in this constraint system.
+  /// Record all unbound type variables that occur in the given type as being
+  /// bound to "hole" type represented by \c HoleType in this constraint system.
   ///
   /// \param type The type on which to holeify.
   void recordTypeVariablesAsHoles(Type type);
@@ -3154,8 +3153,8 @@ public:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
-  /// Match the execution semantics between two functions currently
-  /// represented by `@called(once)` bit.
+  /// Match the execution semantics (exactly-once, at-most-once, or
+  /// unconstrained) between two functions.
   SolutionKind
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
@@ -4414,7 +4413,7 @@ class TypeVarRefCollector : public ASTWalker {
   DeclContext *DC;
   ConstraintLocator *Locator;
 
-  llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> TypeVars;
   unsigned DCDepth = 0;
 
 public:

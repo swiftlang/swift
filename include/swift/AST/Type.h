@@ -486,10 +486,10 @@ public:
     return isTypeErasedGenericClassTypeImpl(*this);
   }
 
-  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
-  StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
-  EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  ClassDecl *getClassDecl() const; // in Types.h
+  StructDecl *getStructDecl() const; // in Types.h
+  EnumDecl *getEnumDecl() const; // in Types.h
+  NominalTypeDecl *getNominalDecl() const; // in Types.h
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
@@ -624,12 +624,6 @@ namespace llvm {
 
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
-    static swift::Type getEmptyKey() {
-      return llvm::DenseMapInfo<swift::TypeBase*>::getEmptyKey();
-    }
-    static swift::Type getTombstoneKey() {
-      return llvm::DenseMapInfo<swift::TypeBase*>::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::Type Val) {
       return DenseMapInfo<swift::TypeBase*>::getHashValue(Val.getPointer());
     }
@@ -639,14 +633,6 @@ namespace llvm {
   };
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
-    static swift::CanType getEmptyKey() {
-      return swift::CanType(llvm::DenseMapInfo<swift::
-                              TypeBase*>::getEmptyKey());
-    }
-    static swift::CanType getTombstoneKey() {
-      return swift::CanType(llvm::DenseMapInfo<swift::
-                              TypeBase*>::getTombstoneKey());
-    }
   };
 
   // A Type is "pointer like".

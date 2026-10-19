@@ -5,6 +5,8 @@ import Builtin
 
 class C {}
 
+sil [ossa] @use : $@convention(thin) (@in_guaranteed C) -> ()
+
 // CHECK-LABEL: sil [ossa] @remove_dead_store_borrow
 // CHECK:         %1 = alloc_stack
 // CHECK-NEXT:    debug_value %0
@@ -35,3 +37,172 @@ bb0(%0 : @guaranteed $C):
   return %r
 }
 
+// rdar://187155913: Indexing a global InlineArray copies the entire array.
+//
+// CHECK-LABEL: sil [ossa] @remove_store_borrow_of_load_borrow : $@convention(thin) (@in_guaranteed C) -> () {
+// CHECK:       bb0(%0 : $*C):
+// CHECK:         load_borrow
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store_borrow
+// CHECK:         debug_value %0, let, name "x", expr op_deref
+// CHECK:         [[USE:%[0-9]+]] = function_ref @use : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK-NEXT:    apply [[USE]](%0) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK:       } // end sil function 'remove_store_borrow_of_load_borrow'
+sil [ossa] @remove_store_borrow_of_load_borrow : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = load_borrow %0
+  %2 = alloc_stack $C
+  %3 = store_borrow %1 to %2
+  debug_value %3, let, name "x", expr op_deref
+  %use = function_ref @use : $@convention(thin) (@in_guaranteed C) -> ()
+  apply %use(%3) : $@convention(thin) (@in_guaranteed C) -> ()
+  end_borrow %3
+  end_borrow %1
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_store_borrow_of_load_borrow_2 : $@convention(thin) (@in_guaranteed C) -> () {
+// CHECK:       bb0(%0 : $*C):
+// CHECK:         load_borrow
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store_borrow
+// CHECK:         debug_value %0, let, name "x", expr op_deref
+// CHECK:         [[USE:%[0-9]+]] = function_ref @use : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[USE]](%0) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    apply [[USE]](%0) : $@convention(thin) (@in_guaranteed C) -> ()
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK:       } // end sil function 'remove_store_borrow_of_load_borrow_2'
+sil [ossa] @remove_store_borrow_of_load_borrow_2 : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = load_borrow %0
+  %2 = alloc_stack $C
+  %3 = store_borrow %1 to %2
+  debug_value %3, let, name "x", expr op_deref
+  debug_value %3, let, name "x", expr op_deref
+  %use = function_ref @use : $@convention(thin) (@in_guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %use(%3) : $@convention(thin) (@in_guaranteed C) -> ()
+  end_borrow %3
+  end_borrow %1
+  dealloc_stack %2
+  br bb3
+  
+bb2:
+  apply %use(%3) : $@convention(thin) (@in_guaranteed C) -> ()
+  end_borrow %3
+  end_borrow %1
+  dealloc_stack %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_store_borrow_of_load_borrow_with_other_uses : $@convention(thin) (@in_guaranteed C) -> C {
+// CHECK:       bb0(%0 : $*C):
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store_borrow
+// CHECK:       } // end sil function 'remove_store_borrow_of_load_borrow_with_other_uses'
+sil [ossa] @remove_store_borrow_of_load_borrow_with_other_uses : $@convention(thin) (@in_guaranteed C) -> C {
+bb0(%0 : $*C):
+  %1 = load_borrow %0
+  %2 = alloc_stack $C
+  %3 = store_borrow %1 to %2
+  debug_value %3, let, name "x", expr op_deref
+  %use = function_ref @use : $@convention(thin) (@in_guaranteed C) -> ()
+  apply %use(%3) : $@convention(thin) (@in_guaranteed C) -> ()
+  end_borrow %3
+  %c = copy_value %1
+  end_borrow %1
+  dealloc_stack %2
+  return %c
+}
+
+// CHECK-LABEL: sil [ossa] @remove_reborrowed_store_borrow : $@convention(thin) (@in_guaranteed C) -> C {
+// CHECK: bb0(%0 : $*C):
+// CHECK-NEXT: load_borrow
+// CHECK-NEXT: load_borrow
+// CHECK-NEXT: copy_value
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function 'remove_reborrowed_store_borrow'
+sil [ossa] @remove_reborrowed_store_borrow : $@convention(thin) (@in_guaranteed C) -> C {
+bb0(%0 : $*C):
+  %1 = load_borrow %0
+  %2 = alloc_stack $C
+  %3 = store_borrow %1 to %2
+  %4 = load_borrow %3
+  %c = copy_value %4
+  end_borrow %4
+  end_borrow %3
+  end_borrow %1
+  dealloc_stack %2
+  return %c
+}
+
+sil [ossa] @use_throwing : $@convention(thin) (@in_guaranteed C) -> @error any Error
+
+// The alloc_stack is used by two store_borrows. Removing the alloc_stack must not delete
+// the other store_borrow and its users (including the try_apply terminator).
+//
+// CHECK-LABEL: sil [ossa] @two_store_borrows_to_same_alloc_stack :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store_borrow
+// CHECK:         try_apply %{{[0-9]+}}(%0) : {{.*}}, normal bb2, error bb1
+// CHECK:       bb2(%{{[0-9]+}} : $()):
+// CHECK-NEXT:    try_apply %{{[0-9]+}}(%1) : {{.*}}, normal bb4, error bb3
+// CHECK:       } // end sil function 'two_store_borrows_to_same_alloc_stack'
+sil [ossa] @two_store_borrows_to_same_alloc_stack : $@convention(thin) (@in_guaranteed C, @in_guaranteed C) -> () {
+bb0(%0 : $*C, %1 : $*C):
+  %2 = load_borrow %0
+  %3 = load_borrow %1
+  %f = function_ref @use_throwing : $@convention(thin) (@in_guaranteed C) -> @error any Error
+  %4 = alloc_stack $C
+  %5 = store_borrow %2 to %4
+  try_apply %f(%5) : $@convention(thin) (@in_guaranteed C) -> @error any Error, normal bb2, error bb1
+
+bb1(%e1 : @owned $any Error):
+  end_borrow %5
+  end_borrow %3
+  end_borrow %2
+  br bb5(%e1)
+
+bb2(%r1 : $()):
+  end_borrow %5
+  %6 = store_borrow %3 to %4
+  try_apply %f(%6) : $@convention(thin) (@in_guaranteed C) -> @error any Error, normal bb4, error bb3
+
+bb3(%e2 : @owned $any Error):
+  end_borrow %6
+  end_borrow %3
+  end_borrow %2
+  br bb5(%e2)
+
+bb4(%r2 : $()):
+  end_borrow %6
+  end_borrow %3
+  end_borrow %2
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+
+bb5(%e : @owned $any Error):
+  dealloc_stack %4
+  destroy_value [dead_end] %e
+  unreachable
+}

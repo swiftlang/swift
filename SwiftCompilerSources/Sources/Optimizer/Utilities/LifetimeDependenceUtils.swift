@@ -282,6 +282,18 @@ private func guaranteedResultBase(of value: Value) -> Value? {
   return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
 }
 
+/// If `value` is an address result of a call that returns `@guaranteed_address`,
+/// return the argument that the result is a borrow of.
+private func guaranteedAddressResultBase(of value: Value) -> Value? {
+  guard value.type.isAddress,
+        let apply = value.definingInstruction as? ApplyInst,
+        apply.hasGuaranteedAddressResult,
+        let selfArgument = apply.selfArgument else {
+    return nil
+  }
+  return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
+}
+
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -297,6 +309,11 @@ extension LifetimeDependence.Scope {
   /// multiple guaranteed values.
   init(base: Value, _ context: some Context) {
     if base.type.isAddress {
+      if let accessorBase = guaranteedAddressResultBase(of: base) {
+        // When `base` is @guaranteed_address result of a borrow accessor, root the dependence on the accessor's base.
+        self.init(base: accessorBase, context)
+        return
+      }
       self.init(enclosingAccess: base.enclosingAccessScope, address: base, context)
       return
     }
@@ -1596,6 +1613,10 @@ extension LifetimeDependenceUseDefAddressWalker {
     }
     if case let .store(store, _) = initializer {
       switch store {
+      case let store as StoreInst where store.storeOwnership != .trivial && !store.source.isOwnedCopy:
+        // The store consumes the stored value, ending its lifetime before any use of the temporary. Unless that value
+        // is a copy, its lifetime is not a valid scope, so the temporary itself introduces the scope.
+        return addressIntroducer(address, access: access)
       case let store as StoringInstruction:
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
@@ -1609,6 +1630,20 @@ extension LifetimeDependenceUseDefAddressWalker {
       }
     }
     return addressIntroducer(address, access: access)
+  }
+}
+
+private extension Value {
+  /// True if this owned value is a copy whose lifetime is independent of the value it was copied from.
+  var isOwnedCopy: Bool {
+    switch definingInstruction {
+    case is CopyValueInst, is ExplicitCopyValueInst:
+      return true
+    case let load as LoadInst:
+      return load.loadOwnership == .copy
+    default:
+      return false
+    }
   }
 }
 

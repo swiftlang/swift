@@ -1519,7 +1519,7 @@ operation. `%in_token` must be the result of `bind_memory` or
 ### begin_access
 
 ```
-sil-instruction ::= 'begin_access' '[' sil-access ']' '[' sil-enforcement ']' '[no_nested_conflict]'? '[builtin]'? sil-operand ':' sil-type
+sil-instruction ::= 'begin_access' '[' sil-access ']' '[' sil-enforcement ']' '[no_nested_conflict]'? '[builtin]'? '[unresolved]'? sil-operand ':' sil-type
 sil-access ::= init
 sil-access ::= read
 sil-access ::= modify
@@ -1550,10 +1550,15 @@ these instructions; they can only be applied to the result of a
 `begin_access` on them. For now, this rule will be conditional based on
 compiler settings and the SIL stage.
 
-An access is ended with a corresponding `end_access`. Accesses must be
-uniquely ended on every control flow path which leads to either a
-function exit or back to the `begin_access` instruction. The set of
-active accesses must be the same on every edge into a basic block.
+An access is ended with a corresponding `end_access`. Accesses must be uniquely
+ended on every control flow path which leads to either a function exit or back
+to the `begin_access` instruction. The set of active accesses must be the same
+on every edge into a basic block. However, in raw SIL, the instruction may carry
+the `[unresolved]` flag, indicating that the lifetime of the access and/or
+values dependent on the access has not yet been finalized, in which case the
+`end_access` instructions are either absent or not in their final positions.
+This is only possible in raw SIL emitted from SILGen prior to lifetime
+resolution.
 
 An `init` access takes uninitialized memory and initializes it. It must
 always use `static` enforcement.
@@ -2623,7 +2628,7 @@ with these generic substitutions applied.
 ### begin_apply
 
 ```
-sil-instruction ::= 'begin_apply' '[nothrow]'? sil-value
+sil-instruction ::= 'begin_apply' '[unresolved]'? '[nothrow]'? sil-value
                       sil-apply-substitution-list?
                       '(' (sil-value (',' sil-value)*)? ')'
                       ':' sil-type
@@ -2685,8 +2690,13 @@ begin_apply %0() : $@yield_once () -> (@yields Float, Int)
 Normal results of a coroutine are produced by the corresponding
 `end_apply` instruction.
 
-A `begin_apply` must be uniquely either ended or aborted before exiting
-the function or looping to an earlier portion of the function.
+A `begin_apply` must be uniquely either ended or aborted before exiting the
+function or looping to an earlier portion of the function. However, in raw SIL,
+the instruction may carry the `[unresolved]` flag, indicating that the lifetime
+of the yielded result(s) and/or values dependent on the result(s) has not yet
+been finalized, in which case the `end_apply` and `abort_apply` instructions are
+either absent or not in their final positions. This is only possible in raw SIL
+emitted from SILGen prior to lifetime resolution.
 
 When throwing coroutines are supported, there will need to be a
 `try_begin_apply` instruction.
@@ -2838,6 +2848,13 @@ signature). Instead:
     by other instruction independently of the `partial_apply`. The
     lifetime of the stack context of a `partial_apply [on_stack]` must
     be terminated with a `dealloc_stack`.
+
+    The context of a `partial_apply [on_stack] [called_at_most_once]`
+    owns the values that the closure consumes. This includes the values
+    that are passed directly and the noncopyable address-only values that
+    are passed as `@in` arguments. The `partial_apply` consumes such an 
+    `@in` argument, which leaves its memory uninitialized, and the caller
+    has nothing left to destroy.
 2.  If the `partial_apply` has an escaping function type (not
     `[on_stack]`) then the closure context will be heap allocated with a
     retain count of 1. Any closed over parameters (except for `@inout`
@@ -2983,6 +3000,12 @@ sil-instruction ::= 'existential_metatype' sil-type ',' sil-operand
 
 Obtains the metatype of the concrete value referenced by the existential
 container referenced by `%0`.
+
+For a COM existential, the result type must be `Any.Type`. The operation
+queries `ISwiftObject` for native class metadata, falling back to the static
+COM existential metadata when no valid Swift identity is available. It borrows
+its operand but may execute foreign code, retain, and release references; it
+must not be treated as a read-only metadata projection.
 
 ### objc_protocol
 
@@ -4728,7 +4751,8 @@ TODO
 
 ```
 sil-instruction ::= 'convert_function' sil-operand 'to'
-                    ('[' 'without_actually_escaping' ']')?
+                    ('[' 'without_actually_escaping' ']' |
+                     '[' 'without_actually_discarding' ']')?
                     sil-type
 
 %1 = convert_function %0 : $T -> U to $T' -> U'
@@ -4768,6 +4792,15 @@ type is escaping. (This only happens as a result of
 resulting function type must be escaping, but the operand's function
 type may or may not be @noescape. Note that a non-escaping closure may
 have unboxed captured even though its SIL function type is "escaping".
+
+With the `without_actually_discarding` attribute, the `convert_function`
+converts an exactly-once function into an at-most-once function. Without
+the attribute, a conversion cannot drop the guarantee that a function is
+called. This kind of conversion can only happen as a result of
+`withoutActuallyDiscarding()`.  The conversion is memory safe, because
+destroying the context of an exactly-once function terminates the program. The
+operand must be an exactly-once function, and the result must be an
+at-most-once function.
 
 ### convert_escape_to_noescape
 
@@ -5020,8 +5053,10 @@ sil-instruction ::= 'unconditional_checked_cast'
 ```
 
 Performs a checked scalar conversion, causing a runtime failure if the
-conversion fails. Casts that require changing representation or
-ownership are unsupported.
+conversion fails. For reference values, the cast consumes an owned operand and
+produces an owned result. It may forward a guaranteed operand only when the
+conversion preserves reference counts. In particular, COM casts can return a
+different interface or native object and must acquire ownership of the result.
 
 ### unconditional_checked_cast_addr
 
@@ -5724,6 +5759,38 @@ the move checker is told to check that the result of this instruction is
 consumed at most once. If the marker is `no_consume_or_assign`, then the
 move checker will validate that the result of this instruction is never
 consumed or assigned over.
+
+### diagnose
+
+```
+sil-instruction ::= 'diagnose' '[' sil-diagnose-kind ']' sil-operand
+
+sil-diagnose-kind ::= 'unpermitted_copy'
+                  ::= 'let_reinit'
+
+diagnose [unpermitted_copy] %1 : $T
+diagnose [let_reinit] %2 : $*T
+```
+
+Marks its operand as needing a diagnostic of the given kind, to be emitted
+by a later diagnostic pass. This separates the pass that detects a
+violation of the language rules from the pass that explains it to the user,
+which may require more expensive analysis. Valid only in Raw SIL. The
+diagnostic pass that emits the diagnostic must remove the instruction.
+
+`diagnose` is an instantaneous use of its operand: it does not consume
+the operand, and has no effect on the program's semantics. It is
+considered to have side effects so that it is not deleted before the
+diagnostic is emitted.
+
+If the kind is `unpermitted_copy`, then the operand is a copied value, or
+the address copied from, where the copy was required to make the SIL
+valid but is not permitted by the language rules, such as a copy of a
+noncopyable value.
+
+If the kind is `let_reinit`, then the operand is the address of immutable
+storage, and the `diagnose` precedes an initialization of that storage
+which may happen after it was already initialized.
 
 ### end_formal_scope
 

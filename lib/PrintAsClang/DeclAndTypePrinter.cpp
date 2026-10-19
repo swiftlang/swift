@@ -58,7 +58,7 @@ using namespace swift;
 using namespace swift::objc_translation;
 
 static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     return classDecl->getName()
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
@@ -186,8 +186,9 @@ public:
     os << "@end\n\n";
   }
 
-  bool shouldInclude(const ValueDecl *VD) {
-    return owningPrinter.shouldInclude(VD);
+  bool shouldInclude(const ValueDecl *VD,
+                     bool isImportedInheritedMember = false) {
+    return owningPrinter.shouldInclude(VD, isImportedInheritedMember);
   }
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
@@ -251,7 +252,7 @@ private:
 
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
-  void printMembers(R &&members) {
+  void printMembers(R &&members, ClassDecl *classDecl = nullptr) {
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
       for (const Decl *member : members) {
@@ -265,6 +266,7 @@ private:
       }
     }
     bool protocolMembersOptional = false;
+    SmallVector<const ValueDecl *, 4> delayedCxxMembers;
     for (const Decl *member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
@@ -272,9 +274,11 @@ private:
       if (isa<AccessorDecl>(VD))
         continue;
       if (!AllowDelayed && owningPrinter.objcDelayedMembers.count(VD)) {
-        os << "// '" << VD->getName()
-           << ((outputLang == OutputLanguageMode::Cxx) ? "' cannot be printed\n"
-                                                       : "' below\n");
+        if (outputLang == OutputLanguageMode::Cxx) {
+          delayedCxxMembers.push_back(VD);
+          continue;
+        }
+        os << "// '" << VD->getName() << "' below\n";
         continue;
       }
       if (VD->getAttrs().hasAttribute<OptionalAttr>() !=
@@ -283,6 +287,54 @@ private:
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
+    }
+    // Preserve existing overloads before adding members that previously could
+    // not be printed because they referenced a same-module generic type.
+    if (!delayedCxxMembers.empty()) {
+      if (classDecl)
+        preserveInheritedFunctionNames(classDecl);
+      printMembers</*AllowDelayed=*/true>(delayedCxxMembers);
+    }
+  }
+
+  void preserveInheritedFunctionNames(ClassDecl *classDecl) {
+    auto &scope = owningPrinter.getCxxDeclEmissionScope();
+    auto preserveName = [&](StringRef name) {
+      // Existing local members already hide inherited overloads of this name.
+      if (!scope.emittedFunctionOverloads.count(name))
+        scope.inheritedFunctionNamesToPreserve.insert(name);
+    };
+    for (auto *base = classDecl->getSuperclassDecl(); base;
+         base = base->getSuperclassDecl()) {
+      for (auto *member : base->getAllMembers()) {
+        auto *VD = dyn_cast<ValueDecl>(member);
+        if (!VD ||
+            !shouldInclude(VD, /*isImportedInheritedMember=*/
+                           VD->getModuleContext() != &owningPrinter.M) ||
+            owningPrinter.objcDelayedMembers.count(VD))
+          continue;
+        // Conservatively preserve exposable inherited names, including those
+        // whose signatures might subsequently be declined by ABI printing.
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+          if (!isa<AccessorDecl>(AFD) && !isa<DestructorDecl>(AFD) &&
+              !AFD->isOperator())
+            preserveName(cxx_translation::getNameForCxx(AFD));
+        } else if (auto *var = dyn_cast<VarDecl>(VD)) {
+          for (auto kind : {AccessorKind::Get, AccessorKind::Set}) {
+            if (auto *accessor = var->getOpaqueAccessor(kind)) {
+              auto *methodTy =
+                  accessor->getMethodInterfaceType()->castTo<FunctionType>();
+              auto resultTy = getForeignResultType(
+                  accessor, methodTy, accessor->getForeignAsyncConvention(),
+                  accessor->getForeignErrorConvention());
+              preserveName(remapPropertyName(accessor, resultTy));
+            }
+          }
+        } else if (auto *subscript = dyn_cast<SubscriptDecl>(VD)) {
+          if (subscript->isInstanceMember())
+            preserveName("operator[]");
+        }
+      }
     }
   }
 
@@ -374,7 +426,7 @@ private:
           CD,
           [&]() {
             CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
-            printMembers(CD->getAllMembers());
+            printMembers(CD->getAllMembers(), CD);
           },
           owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
@@ -569,6 +621,9 @@ private:
           associatedValueList->size() > 1) {
         return;
       }
+      // Projecting the payload out of a borrowed enum needs a copy of it.
+      if (cxx_translation::isNoncopyableValueTypeExposableToCxx(ED))
+        return;
       auto paramType = associatedValueList->front()->getInterfaceType();
 
       std::string declName, defName, name;
@@ -618,8 +673,8 @@ private:
             Type objectType;
             OptionalTypeKind optKind;
             std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-                paramType->getNominalOrBoundGenericNominal(), paramType);
-            auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+                paramType->getNominalDecl(), paramType);
+            auto objectTypeDecl = objectType->getNominalDecl();
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
             if (isTriviallyCopyable(objectTypeDecl, optKind)) {
@@ -631,7 +686,7 @@ private:
             } else {
               bool isOptional = false;
               if (!objectTypeDecl) {
-                objectTypeDecl = paramType->getNominalOrBoundGenericNominal();
+                objectTypeDecl = paramType->getNominalDecl();
                 isOptional = true;
               }
               outOfLineOS << "    return swift::";
@@ -785,7 +840,7 @@ private:
                       DeclAndTypePrinter::getObjectTypeAndOptionality(
                           ED, paramType);
                   auto objectTypeDecl =
-                      objectType->getNominalOrBoundGenericNominal();
+                      objectType->getNominalDecl();
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (isTriviallyCopyable(objectTypeDecl, optKind)) {
@@ -801,7 +856,7 @@ private:
                                    "&op, sizeof(op));\n";
                   } else {
                     objectTypeDecl =
-                        paramType->getNominalOrBoundGenericNominal();
+                        paramType->getNominalDecl();
                     outOfLineOS << "    alignas(";
                     owningPrinter.printTypeName(
                         outOfLineOS, paramType,
@@ -1054,9 +1109,6 @@ private:
 
   /// Returns true if \p clangTy is the typedef for NSUInteger.
   bool isNSUInteger(clang::QualType clangTy) {
-    if (const auto* elaboratedTy = dyn_cast<clang::ElaboratedType>(clangTy)) {
-      clangTy = elaboratedTy->desugar();
-    }
     const auto *typedefTy = dyn_cast<clang::TypedefType>(clangTy);
     if (!typedefTy)
       return false;
@@ -1137,6 +1189,17 @@ private:
     return result;
   }
 
+  bool canPrintInheritedFunctionName(const AbstractFunctionDecl *funcDecl,
+                                     StringRef cxxName) const {
+    auto &scope = owningPrinter.getCxxDeclEmissionScope();
+    if (!scope.inheritedFunctionNamesToPreserve.count(cxxName))
+      return true;
+    scope.additionalUnrepresentableDeclarations.insert(
+        {funcDecl,
+         "A newly printable member would hide an inherited C++ name"});
+    return false;
+  }
+
   /// Returns true if the given function overload is safe to emit in the current
   /// C++ lexical scope. If \p cxxNameOverride is non-empty, it is used as the
   /// C++ function name instead of the default name derived from the
@@ -1150,6 +1213,8 @@ private:
     auto cxxName = cxxNameOverride.empty()
                        ? cxx_translation::getNameForCxx(funcDecl)
                        : cxxNameOverride;
+    if (!canPrintInheritedFunctionName(funcDecl, cxxName))
+      return false;
     auto paramTypes = getCxxParamTypes(funcDecl);
     auto [overloadIt, inserted] = overloads.try_emplace(
         cxxName,
@@ -1215,7 +1280,12 @@ private:
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         // Subscript accessors emit as operator[] and cannot conflict with
         // named methods, so skip the overload check for them.
-        if (!SD) {
+        if (SD) {
+          if (!canPrintInheritedFunctionName(AFD, "operator[]"))
+            return;
+          owningPrinter.getCxxDeclEmissionScope()
+              .emittedFunctionOverloads.try_emplace("operator[]");
+        } else {
           std::string remappedName = remapPropertyName(accessor, resultTy);
           if (!canPrintOverloadOfFunction(AFD, remappedName)) {
             auto comment = ("  // skip emitting accessor method for \'" +
@@ -2032,14 +2102,14 @@ private:
     if (auto unwrapped = ty->getOptionalObjectType())
       ty = unwrapped;
 
-    auto genericTy = ty->getAs<BoundGenericStructType>();
+    auto genericTy = ty->getAs<StructType>();
     if (!genericTy || !genericTy->isArray())
       return false;
 
     assert(genericTy->getGenericArgs().size() == 1);
 
     auto argTy = genericTy->getGenericArgs().front();
-    if (auto classDecl = argTy->getClassOrBoundGenericClass())
+    if (auto classDecl = argTy->getClassDecl())
       os << "IBOutletCollection(" << getNameForObjC(classDecl) << ") ";
     else
       os << "IBOutletCollection(id) ";
@@ -2049,7 +2119,7 @@ private:
   /// Returns true if \p ty can be used with Objective-C reference-counting
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
-    if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+    if (auto classDecl = ty->getClassDecl()) {
       if (classDecl->isForeignReferenceType())
         return false;
 
@@ -2134,7 +2204,7 @@ private:
         copyTy = unwrappedTy;
       }
 
-      auto nominal = copyTy->getNominalOrBoundGenericNominal();
+      auto nominal = copyTy->getNominalDecl();
       if (isa_and_nonnull<StructDecl>(nominal)) {
         if (copyTy->isArray() ||
             copyTy->isDictionary() ||
@@ -2146,7 +2216,7 @@ private:
         } else if (copyTy->isUnmanaged()) {
           os << ", unsafe_unretained";
           // Don't print unsafe_unretained twice.
-          if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
+          if (auto boundTy = copyTy->castTo<NominalType>()) {
             ty = boundTy->getGenericArgs().front();
             if (isOptional)
               ty = OptionalType::get(ty);
@@ -2319,7 +2389,7 @@ public:
     Type objcType = conformance.getTypeWitnessByName(ctx.Id_ObjectiveCType);
 
     // Dig out the Objective-C class.
-    return objcType->getClassOrBoundGenericClass();
+    return objcType->getClassDecl();
   }
 
 private:
@@ -2523,7 +2593,10 @@ private:
 
   void visitStructType(StructType *ST,
                        std::optional<OptionalTypeKind> optionalKind) {
-    const StructDecl *SD = ST->getStructOrBoundGenericStruct();
+    if (ST->hasGenericArgs())
+      return printBoundGenericStructType(ST, optionalKind);
+
+    const StructDecl *SD = ST->getStructDecl();
 
     // Handle known type names.
     if (printIfKnownSimpleType(SD, optionalKind))
@@ -2559,7 +2632,7 @@ private:
 
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
-    const StructDecl *SD = ty->getStructOrBoundGenericStruct();
+    const StructDecl *SD = ty->getStructDecl();
     if (ty->isMarkerExistential()) {
       ty = ctx.getAnyObjectType();
     } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
@@ -2573,9 +2646,9 @@ private:
 
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
-  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+  bool printIfKnownGenericStruct(const StructType *BGT,
                                  std::optional<OptionalTypeKind> optionalKind) {
-    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
+    auto bgsTy = Type(const_cast<StructType *>(BGT));
 
     if (bgsTy->isUnmanaged()) {
       auto args = BGT->getGenericArgs();
@@ -2608,7 +2681,13 @@ private:
   }
 
   void
-  visitBoundGenericStructType(BoundGenericStructType *BGT,
+  printBoundGenericEnumType(EnumType *BGT,
+                            std::optional<OptionalTypeKind> optionalKind) {
+    printBoundGenericType(BGT, optionalKind);
+  }
+
+  void
+  printBoundGenericStructType(StructType *BGT,
                               std::optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
@@ -2618,10 +2697,10 @@ private:
     if (printIfKnownGenericStruct(BGT, optionalKind))
       return;
 
-    visitBoundGenericType(BGT, optionalKind);
+    printBoundGenericType(BGT, optionalKind);
   }
 
-  void printGenericArgs(BoundGenericType *BGT) {
+  void printGenericArgs(NominalType *BGT) {
     printGenericArgs(BGT->getGenericArgs());
   }
 
@@ -2634,10 +2713,10 @@ private:
   }
 
   void
-  visitBoundGenericClassType(BoundGenericClassType *BGT,
+  printBoundGenericClassType(ClassType *BGT,
                              std::optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
-    auto CD = BGT->getClassOrBoundGenericClass();
+    auto CD = BGT->getClassDecl();
     if (!CD->isObjC())
       return visitType(BGT, optionalKind);
 
@@ -2656,7 +2735,7 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitBoundGenericType(BoundGenericType *BGT,
+  void printBoundGenericType(NominalType *BGT,
                              std::optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (!isa<StructDecl>(BGT->getDecl()) &&
@@ -2672,6 +2751,9 @@ private:
 
   void visitEnumType(EnumType *ET,
                      std::optional<OptionalTypeKind> optionalKind) {
+    if (ET->hasGenericArgs())
+      return printBoundGenericEnumType(ET, optionalKind);
+
     const EnumDecl *ED = ET->getDecl();
 
     // Handle bridged types.
@@ -2684,7 +2766,10 @@ private:
 
   void visitClassType(ClassType *CT,
                       std::optional<OptionalTypeKind> optionalKind) {
-    const ClassDecl *CD = CT->getClassOrBoundGenericClass();
+    if (CT->hasGenericArgs())
+      return printBoundGenericClassType(CT, optionalKind);
+
+    const ClassDecl *CD = CT->getClassDecl();
     assert(CD->isObjC() || CD->isForeignReferenceType());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
     if (clangDecl) {
@@ -2718,13 +2803,14 @@ private:
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *CD = superclass->getClassOrBoundGenericClass();
+      auto *CD = superclass->getClassDecl();
       assert(CD->isObjC());
       if (isMetatype) {
         os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       } else {
         os << getNameForObjC(CD);
-        if (auto *BGT = superclass->getAs<BoundGenericClassType>())
+        if (auto *BGT = superclass->getAs<ClassType>();
+            BGT && BGT->hasGenericArgs())
           printGenericArgs(BGT);
       }
     } else {
@@ -3064,7 +3150,8 @@ bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeNotCxxAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+    if (const auto *NTD = ED->getExtendedNominal())
+      return hasExposeNotCxxAttr(NTD);
   return false;
 }
 
@@ -3100,6 +3187,10 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
       if (auto *params = elementDecl->getParameterList()) {
         for (const auto *param : *params) {
           auto paramType = param->getInterfaceType();
+          // A noncopyable payload would have to be moved into the case
+          // constructor and consumed back out of the enum.
+          if (!paramType->hasTypeParameter() && paramType->isNoncopyable())
+            return false;
           if (DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
                   printer.getTypeMapping(), printer.getInteropContext(),
                   printer, enumDecl->getModuleContext(), paramType)
@@ -3112,11 +3203,13 @@ static bool isEnumExposableToCxx(const ValueDecl *VD,
   return true;
 }
 
-bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
+bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
+                                       bool isImportedInheritedMember) {
   if (VD->isInvalid())
     return false;
 
-  if (requiresExposedAttribute && !hasExposeAttr(VD))
+  if (!isImportedInheritedMember && requiresExposedAttribute &&
+      !hasExposeAttr(VD))
     return false;
 
   if (hasExposeNotCxxAttr(VD))
@@ -3126,11 +3219,10 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     return false;
 
   if (outputLang == OutputLanguageMode::Cxx) {
-    if (!isExposedToThisModule(M, VD, exposedModules))
+    if (!isImportedInheritedMember &&
+        !isExposedToThisModule(M, VD, exposedModules))
       return false;
-    if (!cxx_translation::isExposableToCxx(
-            VD,
-            [this](const NominalTypeDecl *decl) { return isZeroSized(decl); }))
+    if (!cxx_translation::isExposableToCxx(VD, this))
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
@@ -3186,6 +3278,15 @@ bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {
   if (sizeAndAlignment)
     return sizeAndAlignment->size == 0;
   return false;
+}
+
+bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
+  if (decl->isResilient())
+    return true;
+  // The size and alignment are also unknown when a field is resilient.
+  return !interopContext.getIrABIDetails().getTypeSizeAlignment(
+      decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
+                                        : ResilienceExpansion::Maximal);
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {

@@ -4159,8 +4159,9 @@ public:
   /// Whether this closure is Sendable.
   bool isSendable() const;
 
-  /// Whether this closure could be called at most once.
-  bool isCalledOnce() const;
+  /// Whether this closure can be called at most once, which is true for both
+  /// `@called(atMostOnce)` and `@called(exactlyOnce)` closures.
+  bool hasCalledAtMostOnceSemantics() const;
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
@@ -6480,7 +6481,7 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   Type getRootType() const;
   Type getValueType() const;

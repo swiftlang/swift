@@ -1370,6 +1370,9 @@ Added: __swift_isRestrictedProcess
 // cannot be copied. See CastConsumptionKind::TestOnly.
 Added: _swift_dynamicCastTest
 
+// Crash when an exactly-once closure is destroyed without being called.
+Added: _swift_onceClosureDestroyedError
+
 // Setter for typed willThrow hook.
 Added: __swift_setWillThrowTypedHandler
 
@@ -1381,3 +1384,9 @@ Added: _swift_tupleWitnesses_pod_noninline
 
 // Recover the dynamic type of a COM interface through ISwiftObject.
 Added: _swift_getCOMDynamicType
+
+// Cell and ConstCell
+Added: _$ss4CellVMa
+Added: _$ss4CellVMn
+Added: _$ss9ConstCellVMa
+Added: _$ss9ConstCellVMn

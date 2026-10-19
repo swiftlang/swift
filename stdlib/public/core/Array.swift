@@ -814,7 +814,34 @@ extension Array: RandomAccessCollection, MutableCollection {
       }
     }
   }
-  
+
+  /// Exchanges the values at the specified indices of the array.
+  ///
+  /// Both parameters must be valid indices of the array and not
+  /// equal to `endIndex`. Passing the same index as both `i` and `j` has no
+  /// effect.
+  ///
+  /// - Parameters:
+  ///   - i: The index of the first value to swap.
+  ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
+  @export(implementation)
+  public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else {
+      return
+    }
+    _makeMutableAndUnique()
+    _checkSubscript_mutating(i)
+    _checkSubscript_mutating(j)
+    let pi = unsafe _buffer.mutableFirstElementAddress + i
+    let pj = unsafe _buffer.mutableFirstElementAddress + j
+    let tmp = unsafe pi.move()
+    unsafe pi.initialize(to: pj.move())
+    unsafe pj.initialize(to: tmp)
+    _endMutation()
+  }
+
   /// The number of elements in the array.
   @inlinable
   @_semantics("array.get_count")

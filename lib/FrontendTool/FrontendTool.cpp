@@ -405,7 +405,6 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
       Instance.getASTContext().getClangModuleLoader());
   auto &ImporterOpts = Invocation.getClangImporterOptions();
   auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
-  auto OutputBackend = Instance.getOutputBackend().clone();
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
@@ -1894,35 +1893,13 @@ static bool generateReproducer(CompilerInstance &Instance,
       diags.diagnose(SourceLoc(), diag::error_load_input_from_cas, key);
       return std::nullopt;
     }
-    // Import the entire key.
+    // Import the entire key. This also imports all the CAS objects referenced
+    // by the key, e.g. the include tree for the dependency.
     auto imported = db->first->importObject(upstream, *ref);
     if (!imported) {
       diags.diagnose(SourceLoc(), diag::error_cas, "import input dependency",
                      toString(imported.takeError()));
       return std::nullopt;
-    }
-    auto importedProxy = db->first->getProxy(*imported);
-    if (!importedProxy) {
-      diags.diagnose(SourceLoc(), diag::error_cas, "load imported dependency",
-                     toString(importedProxy.takeError()));
-      return std::nullopt;
-    }
-    // If not a binary module, check command-line and import some of its inputs.
-    // The command-line entries are stored in the format specified in
-    // Frontend/CompileJobCacheKey.cpp, where each command-line entry is
-    // space-separated option and its argument (if applicable).
-    if (importedProxy->getNumReferences() > 0) {
-      if (auto err = iterateCommandLine(
-              upstream, *ref, [&](StringRef arg) -> llvm::Error {
-                if (arg.consume_front("-clang-include-tree-root ") ||
-                    arg.consume_front("-clang-include-tree-filelist "))
-                  importID(arg);
-                return llvm::Error::success();
-              })) {
-        diags.diagnose(SourceLoc(), diag::error_cas, "import dependency cmd",
-                       toString(std::move(err)));
-        return std::nullopt;
-      }
     }
     // Import the value.
     auto result = Instance.getActionCache().get(*id);
@@ -2384,14 +2361,19 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
       return false;
     }
 
-    // Embedded Swift does not support TBD.
-    if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
+    // Embedded Swift only validates the TBD when explicitly requested. It
+    // always uses cross-module optimization, which can give strong
+    // definitions to internal declarations that TBDGen cannot predict.
+    bool isEmbedded = Invocation.getLangOptions().hasFeature(Feature::Embedded);
+    if (isEmbedded && mode == FrontendOptions::TBDValidationMode::Default) {
       return false;
     }
 
     // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive ||
-        Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Everything) {
+    if (!isEmbedded && (Invocation.getSILOptions().CMOMode ==
+                            CrossModuleOptimizationMode::Aggressive ||
+                        Invocation.getSILOptions().CMOMode ==
+                            CrossModuleOptimizationMode::Everything)) {
       return false;
     }
 

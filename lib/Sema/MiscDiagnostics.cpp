@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEmbedded.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTPrinter.h"
@@ -309,14 +310,19 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         diagnoseDuplicateLabels(tupleExpr->getLoc(),
                                 tupleExpr->getElementNames());
 
-        // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable()
-            && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
-          auto noncopyableTy = E->getType();
-          assert(noncopyableTy->is<TupleType>() && "will use poor wording");
-          Ctx.Diags.diagnose(E->getLoc(),
-                             diag::tuple_containing_move_only_not_supported,
-                             noncopyableTy);
+        // Diagnose the first element that a tuple can't contain. A nested
+        // tuple was already diagnosed when it was formed.
+        for (auto *elt : tupleExpr->getElements()) {
+          auto eltTy = elt->getType();
+          if (!eltTy || eltTy->hasError())
+            continue;
+
+          eltTy = eltTy->getWithoutSpecifierType();
+          if (eltTy->is<TupleType>())
+            continue;
+
+          if (diagnoseUnsupportedTupleElement(eltTy, elt->getLoc(), Ctx))
+            break;
         }
       }
 
@@ -971,7 +977,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       BNK_Double,
     };
     BitcastableNumberKind getBitcastableNumberKind(Type t) const {
-      auto decl = t->getNominalOrBoundGenericNominal();
+      auto decl = t->getNominalDecl();
 #define MATCH_DECL(type) \
       if (decl == Ctx.get##type##Decl()) \
         return BNK_##type;
@@ -1090,7 +1096,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           auto d = Ctx.Diags.diagnose(DRE->getLoc(),
                               diag::bitcasting_to_change_pointer_kind,
                               fromTy, toTy,
-                              toTy->getStructOrBoundGenericStruct()->getName());
+                              toTy->getStructDecl()->getName());
           if (subExpr) {
             StringRef before, after;
             switch (toPTK) {
@@ -2328,10 +2334,10 @@ public:
       return false;
     }
 
-    // Escaping `@called(once)` closures are allowed to implicitly capture
+    // Escaping `@called(atMostOnce)` closures are allowed to implicitly capture
     // `self` because the call (which is a consuming operation) would break
     // the cycle.
-    if (isCalledOnce(CE)) {
+    if (hasCalledAtMostOnceSemantics(CE)) {
       return false;
     }
 
@@ -2358,9 +2364,9 @@ public:
     return false;
   }
 
-  static bool isCalledOnce(const AbstractClosureExpr *ACE) {
+  static bool hasCalledAtMostOnceSemantics(const AbstractClosureExpr *ACE) {
     if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-      return funcTy->isCalledOnce();
+      return funcTy->hasCalledAtMostOnceSemantics();
     }
 
     return false;
@@ -2960,7 +2966,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 }
 
 /// Diagnose cases where a `sending` capture is associated with a
-/// non-`@called(once)` closure.
+/// non-`@called(atMostOnce)` closure.
 static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
                                                       const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -2986,13 +2992,59 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
             return Action::Stop();
           }
 
-          if (!captureList->getClosureBody()->isCalledOnce()) {
+          if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
             Ctx.Diags.diagnose(V->getLoc(),
-                               diag::sending_capture_decl_requires_called_once);
+                               diag::sending_capture_decl_requires_called_closure);
             V->setInvalid();
             continue;
           }
         }
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  CaptureWalker W(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(W);
+}
+
+/// A closure owns its capture list entries, and destroying a closure destroys
+/// what it owns. So a closure that can be destroyed without running can't own
+/// a value that can't be destroyed implicitly.
+static void diagnoseNondeinitableCaptureListEntries(const Expr *E,
+                                                    const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class CaptureWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    CaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *captureList = dyn_cast<CaptureListExpr>(E);
+      if (!captureList)
+        return Action::Continue(E);
+
+      auto closureType = captureList->getClosureBody()->getType();
+      if (!closureType || closureType->hasError() ||
+          !closureType->isDeinitable())
+        return Action::Continue(E);
+
+      for (const auto &capture : captureList->getCaptureList()) {
+        auto *V = capture.getVar();
+        if (V->isInvalid())
+          continue;
+
+        auto type = V->getTypeInContext();
+        if (type->hasError() || type->isDeinitable())
+          continue;
+
+        Ctx.Diags.diagnose(V->getLoc(),
+                           diag::deinitable_closure_nondeinitable_capture,
+                           /*captureList=*/1, V, type);
       }
 
       return Action::Continue(E);
@@ -6875,6 +6927,200 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   }
 }
 
+/// Diagnose each implicit force unwrap, which occurs when referencing an
+/// implicitly unwrapped optional or the result of a dynamic lookup in a
+/// context that requires a non-optional value.
+static void diagnoseImplicitForceUnwrap(const Expr *E, const DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  auto *sf = DC->getParentSourceFile();
+  if (!sf ||
+      !ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ImplicitForceUnwrap))
+    return;
+
+  class ImplicitForceUnwrapFinder : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    ImplicitForceUnwrapFinder(ASTContext &ctx) : Ctx(ctx) {}
+
+    void diagnoseForce(ForceValueExpr *force) {
+      auto *subExpr = force->getSubExpr();
+      SourceLoc endLoc = subExpr->getEndLoc();
+      if (endLoc.isInvalid())
+        return;
+
+      auto optionalTy = subExpr->getType()->getWithoutSpecifierType();
+
+      // Look through the implicit opening of an AnyObject base, which wraps
+      // the force of a dynamic lookup result.
+      while (auto *open = dyn_cast<OpenExistentialExpr>(subExpr)) {
+        if (!open->isImplicit())
+          break;
+        subExpr = open->getSubExpr();
+      }
+
+      auto *semanticSubExpr = subExpr->getSemanticsProvidingExpr();
+      bool isDynamicLookup = isa<DynamicMemberRefExpr>(semanticSubExpr) ||
+                             isa<DynamicSubscriptExpr>(semanticSubExpr);
+      auto diag = Ctx.Diags.diagnose(endLoc, diag::implicit_force_unwrap,
+                                     isDynamicLookup, optionalTy);
+      diag.highlight(subExpr->getSourceRange());
+      SourceLoc startLoc = subExpr->getStartLoc();
+      if (subExpr->canAppendPostfixExpression(
+              /*appendingPostfixOperator=*/true)) {
+        diag.fixItInsertAfter(endLoc, "!");
+      } else if (startLoc.isValid()) {
+        diag.fixItInsert(startLoc, "(").fixItInsertAfter(endLoc, ")!");
+      }
+    }
+
+    void diagnoseKeyPath(KeyPathExpr *keyPath) {
+      // An implicit force in a key path is an optional-force component that
+      // shares the location of the component it unwraps, whereas an explicit
+      // force has the location of its '!'.
+      auto components = keyPath->getComponents();
+      for (unsigned i = 1, n = components.size(); i != n; ++i) {
+        const auto &component = components[i];
+        if (component.getKind() != KeyPathExpr::Component::Kind::OptionalForce)
+          continue;
+
+        SourceLoc loc = component.getLoc();
+        if (loc.isInvalid() || loc != components[i - 1].getLoc())
+          continue;
+
+        // Find the component being unwrapped, skipping over any other
+        // implicit forces.
+        unsigned unwrappedIdx = i - 1;
+        while (unwrappedIdx > 0 &&
+               components[unwrappedIdx].getKind() ==
+                   KeyPathExpr::Component::Kind::OptionalForce &&
+               components[unwrappedIdx - 1].getLoc() == loc)
+          --unwrappedIdx;
+
+        auto optionalTy =
+            components[i - 1].getComponentType()->getWithoutSpecifierType();
+        SourceRange range = components[unwrappedIdx].getSourceRange();
+        Ctx.Diags
+            .diagnose(range.End, diag::implicit_force_unwrap,
+                      /*isDynamicLookup=*/false, optionalTy)
+            .highlight(range)
+            .fixItInsertAfter(range.End, "!");
+      }
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return Action::SkipNode(E);
+
+      if (auto *force = dyn_cast<ForceValueExpr>(E)) {
+        if (force->isImplicit() &&
+            force->isForceOfImplicitlyUnwrappedOptional())
+          diagnoseForce(force);
+      } else if (auto *keyPath = dyn_cast<KeyPathExpr>(E)) {
+        diagnoseKeyPath(keyPath);
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  ImplicitForceUnwrapFinder walker(ctx);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
+/// Diagnose a value of non-optional type described by \p repr that receives
+/// a value of the implicitly unwrapped optional type \p iuoType.
+static void diagnoseImplicitForceUnwrapOfIUOValue(ASTContext &ctx,
+                                                  SourceLoc fallbackLoc,
+                                                  TypeRepr *repr, Type iuoType,
+                                                  bool isParam, bool isWitness,
+                                                  const ValueDecl *baseDecl) {
+  SourceLoc loc = repr ? repr->getStartLoc() : fallbackLoc;
+  if (loc.isInvalid())
+    return;
+
+  auto diag = ctx.Diags.diagnose(loc, diag::implicit_force_unwrap_of_iuo_param,
+                                 !isParam, iuoType, isWitness, baseDecl);
+  if (!repr)
+    return;
+
+  diag.highlight(repr->getSourceRange());
+
+  // Add the '!' to the type itself, after any specifiers like 'sending'.
+  while (auto *specifier = dyn_cast<SpecifierTypeRepr>(repr))
+    repr = specifier->getBase();
+
+  // Optional function types are implicitly escaping, so '@escaping' needs to
+  // be removed. Don't attempt to rewrite any other attributes.
+  SourceLoc startLoc = repr->getStartLoc();
+  if (auto *attributed = dyn_cast<AttributedTypeRepr>(repr)) {
+    if (attributed->getAttrs().size() != 1 ||
+        !attributed->has(TypeAttrKind::Escaping))
+      return;
+
+    repr = attributed->getTypeRepr();
+    diag.fixItReplaceChars(startLoc, repr->getStartLoc(), "(")
+        .fixItInsertAfter(repr->getEndLoc(), ")!");
+    return;
+  }
+
+  if (repr->isSimple()) {
+    diag.fixItInsertAfter(repr->getEndLoc(), "!");
+  } else {
+    diag.fixItInsert(startLoc, "(").fixItInsertAfter(repr->getEndLoc(), ")!");
+  }
+}
+
+void swift::diagnoseImplicitForceUnwrapOfIUOParams(const ValueDecl *decl,
+                                                   const ValueDecl *baseDecl,
+                                                   bool isWitness) {
+  auto &ctx = decl->getASTContext();
+  auto *sf = decl->getDeclContext()->getParentSourceFile();
+  if (!sf ||
+      !ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ImplicitForceUnwrap))
+    return;
+
+  // Check each parameter that is an implicitly unwrapped optional in the base
+  // declaration but non-optional in the derived one.
+  auto *params = decl->getParameterList();
+  auto *baseParams = baseDecl->getParameterList();
+  if (params && baseParams && params->size() == baseParams->size()) {
+    for (unsigned i : indices(*params)) {
+      auto *param = params->get(i);
+      auto *baseParam = baseParams->get(i);
+      if (!baseParam->isImplicitlyUnwrappedOptional() || param->isInOut() ||
+          param->isVariadic() ||
+          param->getInterfaceType()->getOptionalObjectType())
+        continue;
+
+      diagnoseImplicitForceUnwrapOfIUOValue(
+          ctx, param->getStartLoc(), param->getTypeRepr(),
+          baseParam->getInterfaceType(), /*isParam=*/true, isWitness, baseDecl);
+    }
+  }
+
+  // A settable property or subscript requirement passes its new value to
+  // the witness's setter. Overrides can't do this, because a mutable
+  // property or subscript can't be overridden with a covariant type.
+  if (!isWitness || !baseDecl->isImplicitlyUnwrappedOptional())
+    return;
+
+  auto *storage = dyn_cast<AbstractStorageDecl>(decl);
+  auto *baseStorage = dyn_cast<AbstractStorageDecl>(baseDecl);
+  if (!storage || !baseStorage || !baseStorage->supportsMutation() ||
+      storage->getValueInterfaceType()->getOptionalObjectType())
+    return;
+
+  TypeRepr *repr = nullptr;
+  if (auto *var = dyn_cast<VarDecl>(storage))
+    repr = var->getTypeReprOrParentPatternTypeRepr();
+  else if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
+    repr = subscript->getElementTypeRepr();
+  diagnoseImplicitForceUnwrapOfIUOValue(ctx, storage->getLoc(), repr,
+                                        baseStorage->getValueInterfaceType(),
+                                        /*isParam=*/false, isWitness, baseDecl);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -6908,6 +7154,8 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseMissingMemberImports(E, DC);
   diagnoseCxxFunctionCalls(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
+  diagnoseNondeinitableCaptureListEntries(E, DC);
+  diagnoseImplicitForceUnwrap(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
@@ -7073,7 +7321,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   // Nominal types.
   if (auto nominal = type->getAnyNominal()) {
     // If we have a collection, get the element type.
-    if (auto bound = type->getAs<BoundGenericType>()) {
+    if (auto bound = type->getAs<NominalType>()) {
       auto args = bound->getGenericArgs();
       if (!args.empty() && (bound->isArray() || bound->isSet())) {
         return OmissionTypeName(nominal->getName().str(),

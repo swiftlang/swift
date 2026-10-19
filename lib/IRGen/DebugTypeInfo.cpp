@@ -158,8 +158,6 @@ TypeDecl *DebugTypeInfo::getDecl() const {
     return BTA->getDecl();
   if (auto *UBG = dyn_cast<UnboundGenericType>(Type))
     return UBG->getDecl();
-  if (auto *BG = dyn_cast<BoundGenericType>(Type))
-    return BG->getDecl();
   if (auto *PPT = dyn_cast<ParameterizedProtocolType>(Type))
     return PPT->getProtocol();
   if (auto *E = dyn_cast<ExistentialType>(Type))

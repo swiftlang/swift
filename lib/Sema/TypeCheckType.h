@@ -93,6 +93,11 @@ enum class TypeResolutionFlags : uint32_t {
 
   /// We are in @yield_once coroutine declaration
   Coroutine = 1 << 16,
+
+  /// Whether an 'is'/'as' pattern is being matched against a value whose
+  /// extra optionals are implicitly unwrapped, which makes the test
+  /// conditional even if the cast itself is a coercion.
+  ImplicitlyUnwrappedIsPattern = 1 << 17,
 };
 
 /// Type resolution contexts that require special handling.
@@ -572,7 +577,7 @@ public:
 };
 
 /// A function reference used to "open" the given unbound generic type
-/// by introducing generic arguments and constructing a \c BoundGenericType
+/// by introducing generic arguments and constructing a \c NominalType
 /// out of them.
 ///
 /// \returns the \c null type on failure.
@@ -753,7 +758,7 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param genericArgs The list of generic arguments to apply.
   ///
-  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// \returns A NominalType bound to the given arguments, or null on
   /// error.
   ///
   /// \see applyGenericArguments

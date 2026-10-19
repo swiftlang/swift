@@ -18,6 +18,7 @@
 
 #include "clang/AST/Type.h"
 #include "ForeignRepresentationInfo.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Concurrency.h"
@@ -61,7 +62,7 @@ using namespace swift;
 #include "swift/AST/TypeNodes.def"
 
 void TypeLoc::setType(Type Ty) {
-  assert(!Ty || !Ty->hasTypeVariable() || !Ty->hasPlaceholder());
+  assert(!Ty || !Ty->hasTypeVariableOrHole());
   this->Ty = Ty;
 }
 
@@ -171,10 +172,6 @@ bool TypeBase::isSendableExistential() {
   return constraint->getKnownProtocol() == KnownProtocolKind::Sendable;
 }
 
-bool TypeBase::isPlaceholder() {
-  return is<PlaceholderType>();
-}
-
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
@@ -208,7 +205,7 @@ Type TypeBase::findUnsafeType(
 
       // Do not recurse into nominal types, because we do not want to visit
       // their "parent" types.
-      if (isa<NominalOrBoundGenericNominalType>(type.getPointer()) ||
+      if (isa<NominalType>(type.getPointer()) ||
           isa<UnboundGenericType>(type.getPointer())) {
         // Recurse into the generic arguments. This operation is recursive,
         // because we also need to see the generic arguments of parent types.
@@ -232,13 +229,12 @@ Type TypeBase::findUnsafeType(
       if (!type)
         return;
 
-      if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-        for (auto genericArg : boundGeneric->getGenericArgs())
+      if (auto nominal = type->getAs<NominalType>()) {
+        for (auto genericArg : nominal->getGenericArgs())
           genericArg.walk(*this);
-      }
 
-      if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>())
-        return walkGenericArguments(nominalOrBound->getParent());
+        return walkGenericArguments(nominal->getParent());
+      }
 
       if (auto unbound = type->getAs<UnboundGenericType>())
         return walkGenericArguments(unbound->getParent());
@@ -262,12 +258,7 @@ Type TypeBase::findAlwaysUnsafeType() const {
 static std::optional<ReferenceCounting>
 getHiddenTypeReferenceCounting(CanHiddenType type) {
   auto *layoutInfoDecl = type->getLayoutInfoDecl();
-  // TODO: Remove this legacy fallback once every HiddenType carries an
-  // abstract layout.
-  if (!layoutInfoDecl)
-    return std::nullopt;
-
-  assert(layoutInfoDecl->Layout &&
+  assert(layoutInfoDecl && layoutInfoDecl->Layout &&
          "HiddenTypeLayoutInfoDecl should have abstract layout");
   return layoutInfoDecl->Layout->referenceCountingSystem;
 }
@@ -285,7 +276,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::BuiltinImplicitActor:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
   case TypeKind::SILBox:
     return true;
 
@@ -352,8 +342,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
+  case TypeKind::Hole:
   case TypeKind::SILToken:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
@@ -437,7 +426,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
 
   auto members = type.getMembers();
   if (!members.empty() &&
-      (members[0].getClassOrBoundGenericClass() ||
+      (members[0].getClassDecl() ||
        isa<UnboundGenericType>(members[0]))) {
     explicitSuperclass = members[0];
     members = members.slice(1);
@@ -706,8 +695,10 @@ bool TypeBase::isSpecialized() {
   for (;;) {
     if (!t || !t->getAnyNominal())
       return false;
-    if (t->is<BoundGenericType>())
-      return true;
+    if (auto nominalType = t->getAs<NominalType>()) {
+      if (nominalType->hasGenericArgs())
+        return true;
+    }
     t = t->getNominalParent();
   }
 
@@ -751,16 +742,16 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 }
 
 void TypeBase::getTypeVariables(
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (!hasTypeVariable())
     return;
 
   class Walker : public TypeWalker {
-    SmallPtrSetImpl<TypeVariableType *> &typeVariables;
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVariables;
 
   public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables)
+    explicit Walker(SmallPtrSetVector<TypeVariableType *, 4> &typeVariables)
         : typeVariables(typeVariables) {}
 
     Action walkToTypePre(Type ty) override {
@@ -768,9 +759,8 @@ void TypeBase::getTypeVariables(
       if (!ty->hasTypeVariable())
         return Action::SkipNode;
 
-      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
+      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer()))
         typeVariables.insert(tv);
-      }
 
       return Action::Continue;
     }
@@ -984,14 +974,14 @@ Type TypeBase::getRValueType() {
 }
 
 Type TypeBase::getOptionalObjectType() {
-  if (auto boundTy = getAs<BoundGenericEnumType>())
+  if (auto boundTy = getAs<EnumType>())
     if (boundTy->getDecl()->isOptionalDecl())
       return boundTy->getGenericArgs()[0];
   return Type();
 }
 
 CanType CanType::getOptionalObjectTypeImpl(CanType type) {
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
+  if (auto boundTy = dyn_cast<EnumType>(type))
     if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
   return CanType();
@@ -999,8 +989,8 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
 
 Type TypeBase::wrapInOptionalType() const {
   auto &ctx = getASTContext();
-  auto *result = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
-                                           { getCanonicalType() });
+  auto *result = EnumType::get(ctx.getOptionalDecl(), Type(),
+                               { getCanonicalType() }, ctx);
   return result;
 }
 
@@ -1012,24 +1002,24 @@ Type TypeBase::getArrayElementType() {
   if (!isArray())
     return Type();
 
-  if (!is<BoundGenericStructType>())
+  auto arrayType = getAs<StructType>();
+  if (!arrayType)
     return Type();
 
   // Array<T>
-  auto boundStruct = castTo<BoundGenericStructType>();
-  return boundStruct->getGenericArgs()[0];
+  return arrayType->getGenericArgs()[0];
 }
 
 Type TypeBase::getInlineArrayElementType() {
   if (!isInlineArray() && !is_InlineArray())
     return Type();
 
-  if (!is<BoundGenericStructType>())
+  auto arrayType = getAs<StructType>();
+  if (!arrayType)
     return Type();
 
   // InlineArray<n, T>
-  auto boundStruct = castTo<BoundGenericStructType>();
-  return boundStruct->getGenericArgs()[1];
+  return arrayType->getGenericArgs()[1];
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
@@ -1042,7 +1032,7 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
     PTK = PTK_UnsafeRawPointer;
     return C.TheEmptyTupleType;
   }
-  if (auto boundTy = getAs<BoundGenericType>()) {
+  if (auto boundTy = getAs<NominalType>()) {
     if (boundTy->isUnsafeMutablePointer()) {
       PTK = PTK_UnsafeMutablePointer;
     } else if (boundTy->isUnsafePointer()) {
@@ -1080,7 +1070,7 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
   if (!pointerDecl) {
     return Type();
   }
-  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
+  return NominalType::get(pointerDecl, /*parent*/nullptr, {Type(this)}, ctx);
 }
 
 Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
@@ -1093,7 +1083,7 @@ Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
     BPTK = BPTK_UnsafeRawBufferPointer;
     return C.TheEmptyTupleType;
   }
-  if (auto boundTy = getAs<BoundGenericType>()) {
+  if (auto boundTy = getAs<NominalType>()) {
     if (boundTy->isUnsafeMutableBufferPointer()) {
       BPTK = BPTK_UnsafeMutableBufferPointer;
     } else if (boundTy->isUnsafeBufferPointer()) {
@@ -1143,6 +1133,8 @@ unsigned int TypeBase::getOptionalityDepth() {
 
 Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
                                 bool dropIsolation) {
+  // FIXME: Can this not just be a recursive type transform?
+
   // Look through optionals.
   if (Type optionalObject = getOptionalObjectType()) {
     Type newOptionalObject = optionalObject->stripConcurrency(
@@ -1256,7 +1248,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
             existentialType->getConstraintType().getPointer())
       return Type(this);
 
-    if (newConstraintType->getClassOrBoundGenericClass())
+    if (newConstraintType->getClassDecl())
       return newConstraintType;
 
     return ExistentialType::get(newConstraintType);
@@ -1314,13 +1306,14 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
     return Type(this);
   }
 
-  if (auto *BGT = getAs<BoundGenericType>()) {
+  if (auto *NT = getAs<NominalType>();
+      NT && NT->hasGenericArgs()) {
     if (!recurse)
       return Type(this);
 
     bool anyChanged = false;
     SmallVector<Type, 2> genericArgs;
-    llvm::transform(BGT->getGenericArgs(), std::back_inserter(genericArgs),
+    llvm::transform(NT->getGenericArgs(), std::back_inserter(genericArgs),
                     [&](Type argTy) {
                       auto newArgTy = argTy->stripConcurrency(
                           recurse, dropGlobalActor, dropIsolation);
@@ -1328,8 +1321,10 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
                       return newArgTy;
                     });
 
-    return anyChanged ? BoundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                              genericArgs)
+    // FIXME: parent type
+
+    return anyChanged ? NominalType::get(NT->getDecl(), NT->getParent(),
+                                         genericArgs, NT->getASTContext())
                       : Type(this);
   }
 
@@ -1619,7 +1614,7 @@ Type TypeBase::withCovariantResultType() {
     resultType = objectType;
   }
 
-  ASSERT(resultType->getClassOrBoundGenericClass());
+  ASSERT(resultType->getClassDecl());
   resultType = DynamicSelfType::get(resultType, getASTContext());
 
   // Rebuild the inner function type.
@@ -1641,18 +1636,18 @@ Type TypeBase::withCovariantResultType() {
                            resultFnType, fnType->getExtInfo());
 }
 
-Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
-  if (!hasTypeVariableOrPlaceholder())
+Type TypeBase::replaceTypeVariablesAndHolesWithErrors() {
+  if (!hasTypeVariableOrHole())
     return Type(this);
 
   struct Transform : public TypeTransform<Transform> {
     Transform(ASTContext &ctx) : TypeTransform(ctx) {}
 
     std::optional<Type> transform(TypeBase *ty, TypePosition) {
-      if (!ty->hasTypeVariableOrPlaceholder())
+      if (!ty->hasTypeVariableOrHole())
         return ty;
 
-      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+      if (isa<TypeVariableType>(ty) || isa<HoleType>(ty))
         return ErrorType::get(ctx);
 
       return std::nullopt;
@@ -1662,10 +1657,11 @@ Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
       // just become non-Sendable.
       return std::make_pair(Type(), false);
     }
-    std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
-      // Fold away the @called(once) dependence if present, the function type will
-      // just become non-@called(once).
-      return std::make_pair(Type(), false);
+    std::pair<Type, std::optional<ExecutionSemantics>>
+    transformExecutionSemanticsDependentType(Type ty) {
+      // Fold away the @called(atMostOnce) dependence if present, the function
+      // type will just become non-@called(atMostOnce).
+      return std::make_pair(Type(), std::nullopt);
     }
   };
   return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
@@ -2053,6 +2049,7 @@ CanType TypeBase::computeCanonicalType() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::BuiltinTuple:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
@@ -2087,9 +2084,15 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::Class:
   case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(this);
-    auto parentTy = nominalTy->getParent()->getCanonicalType();
-    Result = NominalType::get(nominalTy->getDecl(), parentTy,
-                              parentTy->getASTContext());
+    auto parentTy = nominalTy->getParent();
+    if (parentTy) parentTy = parentTy->getCanonicalType();
+    SmallVector<Type, 4> args;
+    for (Type arg : nominalTy->getGenericArgs())
+      args.push_back(arg->getCanonicalType());
+
+    Result = NominalType::get(nominalTy->getDecl(), parentTy, args,
+                              parentTy ? parentTy->getASTContext()
+                                       : args[0]->getASTContext());
     break;
   }
 
@@ -2272,19 +2275,6 @@ CanType TypeBase::computeCanonicalType() {
                                      parentTy->getASTContext());
     break;
   }
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct: {
-    BoundGenericType *BGT = cast<BoundGenericType>(this);
-    Type parentTy;
-    if (BGT->getParent())
-      parentTy = BGT->getParent()->getCanonicalType();
-    SmallVector<Type, 4> CanGenericArgs;
-    for (Type Arg : BGT->getGenericArgs())
-      CanGenericArgs.push_back(Arg->getCanonicalType());
-    Result = BoundGenericType::get(BGT->getDecl(), parentTy, CanGenericArgs);
-    break;
-  }
   case TypeKind::ErrorUnion: {
     SmallVector<Type, 2> newTerms;
     for (auto term : cast<ErrorUnionType>(this)->getTerms()) {
@@ -2338,7 +2328,7 @@ CanType TypeBase::getMinimalCanonicalType() const {
       }
 
       const auto MinimalTy = PCT->getMinimalCanonicalType();
-      if (MinimalTy->getClassOrBoundGenericClass()) {
+      if (MinimalTy->getClassDecl()) {
         return MinimalTy;
       }
 
@@ -2352,7 +2342,7 @@ CanType TypeBase::getMinimalCanonicalType() const {
       }
 
       const auto MinimalTy = PCT->getMinimalCanonicalType();
-      if (MinimalTy->getClassOrBoundGenericClass()) {
+      if (MinimalTy->getClassDecl()) {
         return MetatypeType::get(MinimalTy);
       }
 
@@ -2371,20 +2361,22 @@ CanType TypeBase::getMinimalCanonicalType() const {
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
   auto Func = [Recursive](TypeBase *Ty) -> std::optional<Type> {
-    if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty)) {
+    if (auto nominal = dyn_cast<NominalType>(Ty)) {
+      if (!nominal->hasGenericArgs())
+        return std::nullopt;
 
       auto getGenericArg = [&](unsigned i) -> Type {
-        auto arg = boundGeneric->getGenericArgs()[i];
+        auto arg = nominal->getGenericArgs()[i];
         if (Recursive)
           arg = arg->reconstituteSugar(Recursive);
         return arg;
       };
 
-      if (boundGeneric->isArray())
+      if (nominal->isArray())
         return Type(ArraySliceType::get(getGenericArg(0)));
-      if (boundGeneric->isDictionary())
+      if (nominal->isDictionary())
         return Type(DictionaryType::get(getGenericArg(0), getGenericArg(1)));
-      if (boundGeneric->isOptional())
+      if (nominal->isOptional())
         return Type(OptionalType::get(getGenericArg(0)));
     }
     return std::nullopt;
@@ -2447,13 +2439,16 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 
   Bits.SugarType.HasCachedType = true;
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
-    UnderlyingType = BoundGenericType::get(implDecl, Type(), Ty->getBaseType());
+    UnderlyingType = NominalType::get(
+        implDecl, Type(), {Ty->getBaseType()}, *Context);
   } else if (auto Ty = dyn_cast<DictionaryType>(this)) {
-    UnderlyingType = BoundGenericType::get(
-        implDecl, Type(), {Ty->getKeyType(), Ty->getValueType()});
+    UnderlyingType = NominalType::get(
+        implDecl, Type(), {Ty->getKeyType(), Ty->getValueType()},
+        *Context);
   } else if (auto Ty = dyn_cast<InlineArrayType>(this)) {
-    UnderlyingType = BoundGenericType::get(
-        implDecl, Type(), {Ty->getCountType(), Ty->getElementType()});
+    UnderlyingType = NominalType::get(
+        implDecl, Type(), {Ty->getCountType(), Ty->getElementType()},
+        *Context);
   } else {
     llvm_unreachable("Not UnarySyntaxSugarType or DictionaryType?");
   }
@@ -2623,7 +2618,7 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
     return true;
 
   // Unresolved types that could potentially be callable.
-  if (isPlaceholder() || isTypeParameter() || isTypeVariableOrMember())
+  if (is<PlaceholderType>() || isTypeParameter() || isTypeVariableOrMember())
     return true;
 
   // Callable nominal types.
@@ -2634,7 +2629,7 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
 }
 
 bool TypeBase::mayHaveSuperclass() {
-  if (getClassOrBoundGenericClass())
+  if (getClassDecl())
     return true;
 
   if (auto archetype = getAs<ArchetypeType>())
@@ -2722,7 +2717,7 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
   // the potential subtype must be a class, superclass-bounded archetype,
   // or subclass existential involving an imported class and @objc
   // protocol.
-  if (!getClassOrBoundGenericClass() ||
+  if (!getClassDecl() ||
       !(ty->mayHaveSuperclass() ||
         (ty->isObjCExistentialType() &&
          ty->getSuperclass() &&
@@ -2731,7 +2726,7 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
 
   SmallPtrSet<ClassDecl *, 8> seen;
   do {
-    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+    if (auto *classDecl = ty->getClassDecl())
       if (!seen.insert(classDecl).second)
         return false;
     if (ty->isEqual(this))
@@ -2907,8 +2902,8 @@ public:
       if (nom->getDecl() != substNom->getDecl())
         return CanType();
       
-      // If the type is generic (because it's a nested type in a generic context),
-      // process the generic type bindings.
+      // If the type is generic (other than a protocol), process the
+      // generic type bindings.
       if (!isa<ProtocolDecl>(nomDecl) && nomDecl->isGenericContext()) {
         return handleGenericNominalType(nomDecl, CanType(nom), subst);
       }
@@ -3136,19 +3131,6 @@ public:
     
     return CanType();
   }
-  
-  CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst) {
-    auto substBGT = dyn_cast<BoundGenericType>(subst);
-    if (!substBGT)
-      return CanType();
-    
-    if (bgt->getDecl() != substBGT->getDecl())
-      return CanType();
-
-    auto *decl = bgt->getDecl();
-
-    return handleGenericNominalType(decl, CanType(bgt), subst);
-  }
 };
 }
 
@@ -3192,7 +3174,7 @@ bool TypeBase::isBindableToSuperclassOf(Type ty) {
 
   SmallPtrSet<ClassDecl *, 8> seen;
   do {
-    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+    if (auto *classDecl = ty->getClassDecl())
       if (!seen.insert(classDecl).second)
         return false;
     if (isBindableTo(ty))
@@ -3327,7 +3309,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Object;
 
   // @objc classes.
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;
   }
@@ -3525,7 +3507,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // Unmanaged<T> can be trivially represented in a foreign language if T
   // is trivially represented in that language.
   if (type->isUnmanaged()) {
-    auto boundGenericType = type->getAs<BoundGenericType>();
+    auto boundGenericType = type->getAs<NominalType>();
 
     // Note: works around a broken Unmanaged<> definition.
     if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
@@ -3661,7 +3643,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // representable as well. Because type arguments are not actually
   // translated separately, whether they are trivially representable
   // or bridged representable doesn't impact our final result.
-  if (auto boundGenericType = type->getAs<BoundGenericType>()) {
+  if (auto boundGenericType = type->getAs<NominalType>()) {
     for (auto typeArg : boundGenericType->getGenericArgs()) {
       // Type arguments cannot be optional.
       if (typeArg->getOptionalObjectType())
@@ -3771,8 +3753,8 @@ static bool isABICompatibleEvenAddingOptional(CanType t1, CanType t2) {
   // Class metatypes are ABI-compatible even under optionality change.
   if (auto metaTy1 = dyn_cast<MetatypeType>(t1)) {
     if (auto metaTy2 = dyn_cast<MetatypeType>(t2)) {
-      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
-          metaTy2.getInstanceType().getClassOrBoundGenericClass()) {
+      if (metaTy1.getInstanceType().getClassDecl() &&
+          metaTy2.getInstanceType().getClassDecl()) {
         return true;
       }
     }
@@ -3995,8 +3977,10 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (matchMode.contains(TypeMatchFlags::IgnoreSendability)) {
     // Support `any Sendable` -> `Any` matching inside generic types
     // e.g. collections and optionals (i.e. `[String: (any Sendable)?]`).
-    if (auto *generic1 = t1->getAs<BoundGenericType>()) {
-      if (auto *generic2 = t2->getAs<BoundGenericType>()) {
+    if (auto *generic1 = t1->getAs<NominalType>();
+        generic1 && generic1->hasGenericArgs()) {
+      if (auto *generic2 = t2->getAs<NominalType>();
+          generic2 && generic2->hasGenericArgs()) {
         if (generic1->getDecl() == generic2->getDecl()) {
           auto genericArgs1 = generic1->getGenericArgs();
           auto genericArgs2 = generic2->getGenericArgs();
@@ -4049,8 +4033,9 @@ bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects()[i].getName() == I)
+  auto elts = getElements();
+  for (auto i : indices(elts)) {
+    if (elts[i].getName() == I)
       return i;
   }
 
@@ -4114,6 +4099,12 @@ bool ArchetypeType::mayHaveIsolatedConformance() const {
   auto genericEnv = getGenericEnvironment();
   auto genericSig = genericEnv->getGenericSignature();
   return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
+}
+
+bool ArchetypeType::hasCOMInterfaceConstraint() const {
+  return llvm::any_of(getConformsTo(), [](ProtocolDecl *protocol) {
+    return protocol->isCOMInterface();
+  });
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -4217,7 +4208,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -4289,7 +4280,7 @@ PackArchetypeType::get(const ASTContext &Ctx,
                        Type InterfaceType, Type ShapeType,
                        SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                        Type Superclass, LayoutConstraint Layout) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(!Superclass || Superclass->getClassDecl());
   assert(GenericEnv && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -4453,7 +4444,10 @@ Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
 ///
 /// Note: This includes the inverse of all current invertible protocols.
 Type ProtocolCompositionType::theUnconstrainedAnyType(const ASTContext &C) {
-  return ProtocolCompositionType::get(C, {}, InvertibleProtocolSet::allKnown(),
+  // Nothing can suppress Deinitable yet.
+  auto inverses = InvertibleProtocolSet::allKnown();
+  inverses.remove(InvertibleProtocolKind::Deinitable);
+  return ProtocolCompositionType::get(C, {}, inverses,
                                       /*HasExplicitAnyObject=*/false);
 }
 
@@ -4605,10 +4599,10 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
-Type AnyFunctionType::getCalledOnceDependentType() const {
+Type AnyFunctionType::getExecutionSemanticsDependentType() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getCalledOnceDependentType();
+    return cast<FunctionType>(this)->getExecutionSemanticsDependentType();
   case TypeKind::GenericFunction:
     return Type();
   default:
@@ -4666,9 +4660,11 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
   return getLifetimeDependenceFor(resultIndex);
 }
 
-bool AnyFunctionType::isCalledOnce() const {
-  ASSERT(!hasCalledOnceDependentType() && "Query CalledOnce dependence first");
-  return getExtInfo().isCalledOnce();
+std::optional<ExecutionSemantics>
+AnyFunctionType::getExecutionSemantics() const {
+  ASSERT(!hasExecutionSemanticsDependentType() &&
+         "Query execution semantics dependence first");
+  return getExtInfo().getExecutionSemantics();
 }
 
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
@@ -4711,15 +4707,16 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   if (sendableDependentType)
     sendableDependentType = sendableDependentType->getCanonicalType();
 
-  Type calledOnceDependentType = getCalledOnceDependentType();
-  if (calledOnceDependentType)
-    calledOnceDependentType = calledOnceDependentType->getCanonicalType();
+  Type executionSemanticsDependentType = getExecutionSemanticsDependentType();
+  if (executionSemanticsDependentType)
+    executionSemanticsDependentType =
+        executionSemanticsDependentType->getCanonicalType();
 
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
                  globalActor, thrownError, sendableDependentType,
-                 calledOnceDependentType, getLifetimeDependencies());
+                 executionSemanticsDependentType, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4774,7 +4771,7 @@ DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   if (!hasTypeParameter()) return nullptr;
 
   DependentMemberType *unresolvedDepMemTy = nullptr;
-  Type(this).findIf([&](Type type) -> bool {
+  getCanonicalType().findIf([&](Type type) -> bool {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       if (depMemTy->getAssocType() == nullptr) {
         unresolvedDepMemTy = depMemTy;
@@ -4947,7 +4944,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   if (isForeignReferenceType())
     return lookThroughAllOptionalTypes()
-                   ->getClassOrBoundGenericClass()
+                   ->getClassDecl()
                    ->hasRefCountingAnnotations()
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
@@ -4961,7 +4958,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
     // It is still possible for an FRT to be involved in an archetype or
     // protocol type, so only short-circuit for cases other than those
-    if (!isa<ArchetypeType, ProtocolType, ProtocolCompositionType>(type))
+    if (!isa<ArchetypeType>(type) && !isa<ProtocolType>(type) &&
+        !isa<ProtocolCompositionType>(type))
       return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
                                                 : ReferenceCounting::Native;
   }
@@ -4982,8 +4980,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   case TypeKind::Class:
     return cast<ClassType>(type)->getDecl()->getObjectModel();
-  case TypeKind::BoundGenericClass:
-    return cast<BoundGenericClassType>(type)->getDecl()->getObjectModel();
   case TypeKind::UnboundGeneric:
     return cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl())
         ->getObjectModel();
@@ -5060,8 +5056,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
+  case TypeKind::Hole:
   case TypeKind::SILToken:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
@@ -5154,11 +5149,13 @@ AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   return withExtInfo(info);
 }
 
-AnyFunctionType *AnyFunctionType::withCalledOnce(bool newValue) const {
-  auto info = getExtInfo().intoBuilder().withCalledOnce(newValue).build();
+AnyFunctionType *AnyFunctionType::withExecutionSemantics(
+    std::optional<ExecutionSemantics> newValue) const {
+  auto info =
+      getExtInfo().intoBuilder().withExecutionSemantics(newValue).build();
   return withExtInfo(info);
 }
-  
+
 AnyFunctionType *AnyFunctionType::getWithoutYields() const {
   auto resultType = getResult();
   auto noCoroExtInfo = getExtInfo().intoBuilder()
@@ -5253,7 +5250,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 }
 
 bool TypeBase::isForeignReferenceType() {
-  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassDecl())
     return classDecl->isForeignReferenceType();
   return false;
 }
@@ -5347,7 +5344,7 @@ bool CanType::isErrorExistentialType() const {
 }
 
 bool CanType::isForeignReferenceType() {
-  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassDecl())
     return classDecl->isForeignReferenceType();
   return false;
 }
@@ -5697,7 +5694,7 @@ static std::optional<DiagnosticBehavior>
 getConcurrencyDiagnosticBehaviorLimitRec(
     Type type, DeclContext *declCtx,
     llvm::SmallPtrSetImpl<NominalTypeDecl *> &visited) {
-  if (auto *nomDecl = type->getNominalOrBoundGenericNominal()) {
+  if (auto *nomDecl = type->getNominalDecl()) {
     // If we have already seen this type, treat it as having no limit.
     if (!visited.insert(nomDecl).second)
       return std::nullopt;

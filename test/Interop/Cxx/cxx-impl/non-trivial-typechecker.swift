@@ -42,7 +42,8 @@ func takesMovable(_ m: Movable) -> Int32 { return m.value }
 func returnsMovable(_ v: Int32) -> Movable { return Movable(v) }
 
 // A move-only class can be returned. It cannot be taken by value: its
-// parameter needs an explicit ownership modifier, and those are rejected.
+// parameter needs an explicit ownership modifier, and those are rejected on a
+// by-value parameter.
 
 @cxx @implementation
 func returnsMoveOnly(_ v: Int32) -> MoveOnly { return MoveOnly(v) }
@@ -71,20 +72,45 @@ extension Box {
 }
 
 
+// References
+
+@unsafe @cxx @implementation
+func readTracked(_ t: borrowing Tracked) -> Int32 { return t.value }
+
+@unsafe @cxx @implementation
+func readMoveOnly(_ m: borrowing MoveOnly) -> Int32 { return m.value }
+
+@unsafe @cxx @implementation
+func bumpTracked(_ t: inout Tracked) { t.value += 1 }
+
+@unsafe @cxx @implementation
+func assignTracked(_ dst: inout Tracked, _ src: borrowing Tracked) {
+  dst = copy src
+}
+
+
 // Rejections
 
-// expected-error@+2{{global function cannot be marked '@cxx' because parameter 't' of non-trivial C++ class type is 'borrowing'}}
+// expected-error@+2{{global function 'takesTrackedBorrowing' cannot implement C++ function 'takesTrackedBorrowing' because parameter 't' of non-trivial C++ class type is 'borrowing'}}
 @cxx @implementation
 func takesTrackedBorrowing(_ t: borrowing Tracked) -> Int32 { return t.value }
 
-// expected-error@+2{{global function cannot be marked '@cxx' because parameter 't' of non-trivial C++ class type is 'consuming'}}
+// expected-error@+2{{global function 'takesTrackedConsuming' cannot implement C++ function 'takesTrackedConsuming' because parameter 't' of non-trivial C++ class type is 'consuming'}}
 @cxx @implementation
 func takesTrackedConsuming(_ t: consuming Tracked) -> Int32 { return t.value }
 
-// expected-error@+2{{global function cannot be marked '@cxx' because parameter 'm' of non-trivial C++ class type is 'borrowing'}}
+// expected-error@+2{{global function 'takesMoveOnlyBorrowing' cannot implement C++ function 'takesMoveOnlyBorrowing' because parameter 'm' of non-trivial C++ class type is 'borrowing'}}
 @cxx @implementation
 func takesMoveOnlyBorrowing(_ m: borrowing MoveOnly) -> Int32 { return m.value }
 
-// expected-error@+2{{global function cannot be marked '@cxx' because parameter 'm' of non-trivial C++ class type is 'consuming'}}
+// expected-error@+2{{global function 'takesMoveOnlyConsuming' cannot implement C++ function 'takesMoveOnlyConsuming' because parameter 'm' of non-trivial C++ class type is 'consuming'}}
 @cxx @implementation
 func takesMoveOnlyConsuming(_ m: consuming MoveOnly) -> Int32 { return m.value }
+
+// expected-error@+2{{global function 'consumesTrackedRef' cannot implement C++ function 'consumesTrackedRef' because parameter 't' must be 'borrowing' to match a C++ 'const' reference}}{{30-39=borrowing}}
+@unsafe @cxx @implementation
+func consumesTrackedRef(_ t: consuming Tracked) -> Int32 { return t.value }
+
+// expected-error@+2{{global function 'consumesMoveOnlyRef' cannot implement C++ function 'consumesMoveOnlyRef' because parameter 'm' must be 'borrowing' to match a C++ 'const' reference}}{{31-40=borrowing}}
+@unsafe @cxx @implementation
+func consumesMoveOnlyRef(_ m: consuming MoveOnly) -> Int32 { return m.value }

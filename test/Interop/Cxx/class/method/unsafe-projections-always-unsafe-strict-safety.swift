@@ -22,3 +22,21 @@ func useMigrationStub(_ sc: SelfContained) {
   // expected-note@-4 {{reference to unsafe instance method '__viewUnsafe()'}}
   // expected-note@-5 {{reference to parameter 'sc' involves unsafe type 'SelfContained'}}
 }
+
+func useCustomNamed(_ c: inout CustomNamed) {
+  // Only '@unsafe', but still unsafe.
+  _ = c.get() // expected-strict-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-strict-note@-1 {{reference to unsafe instance method 'get()'}}
+}
+
+func useTemplates(_ t: inout TemplateProjections) {
+  // Only '@unsafe', but still unsafe.
+  _ = t.__projectionUnsafe(CInt(0)) // expected-strict-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-strict-note@-1 {{reference to unsafe instance method '__projectionUnsafe'}}
+  // expected-warning@-2 {{'__projectionUnsafe' is deprecated: renamed to 'projection(_:)'}}
+  // expected-note@-3 {{use 'projection(_:)' instead}}
+  _ = t.__metatypeUnsafe(T: CInt.self) // expected-strict-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-strict-note@-1 {{reference to unsafe instance method '__metatypeUnsafe(T:)'}}
+  // expected-warning@-2 {{'__metatypeUnsafe(T:)' is deprecated: renamed to 'metatype(T:)'}}
+  // expected-note@-3 {{use 'metatype(T:)' instead}}
+}

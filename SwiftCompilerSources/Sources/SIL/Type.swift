@@ -46,6 +46,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isTrivial(function.bridged)
   }
 
+  /// False if a value of this type can't be destroyed implicitly, because the type doesn't conform to `Deinitable`.
+  public func isImplicitlyDestroyable(in function: Function) -> Bool {
+    bridged.isImplicitlyDestroyable(function.bridged)
+  }
+
   /// Returns true if the type is non-trivial only because it is non-Escapable.
   public func isNonTrivialOnlyBecauseNonEscapable(in function: Function) -> Bool {
     return bridged.isNonTrivialOnlyBecauseNonEscapable(function.bridged)
@@ -58,6 +63,13 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public func isLoadable(in function: Function) -> Bool {
     return bridged.isLoadable(function.bridged)
+  }
+
+  /// Returns true if value operations (e.g. destroys) can be done on this type in `function`.
+  /// This is not the case if the type is not fixed-size in the function's resilience domain
+  /// and its type metadata is not accessible, e.g. an internal type from another module.
+  public func isABIAccessible(in function: Function) -> Bool {
+    return bridged.isABIAccessible(function.bridged)
   }
 
   public func isReferenceCounted(in function: Function) -> Bool {
@@ -145,6 +157,21 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
 
+  /// Returns a function type with the given representation.
+  public func getFunctionType(withRepresentation representation: FunctionTypeRepresentation) -> Type {
+    bridged.getFunctionTypeWithRepresentation(representation.bridged).type
+  }
+
+  /// The convention under which the callee is passed.
+  public var calleeConvention: ArgumentConvention {
+    bridged.getCalleeConvention().convention
+  }
+
+  /// Returns a function type with the given callee convention.
+  public func getFunctionType(withCalleeConvention convention: ArgumentConvention) -> Type {
+    return bridged.getFunctionTypeWithCalleeConvention(convention.bridged).type
+  }
+
   /// True if a function with this type can be code-generated in Embedded Swift.
   /// These are basically all non-generic functions. But also certain generic functions are supported:
   /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for
@@ -187,14 +214,14 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
-  public func getNominalFields(in function: Function) -> NominalFieldsArray? {
+  public func getNominalFields(in function: Function, withMinimalTypeExpansion: Bool = false) -> NominalFieldsArray? {
     guard let nominal = nominal, !nominal.isResilient(in: function) else {
       return nil
     }
     if let structDecl = nominal as? StructDecl, structDecl.hasUnreferenceableStorage {
       return nil
     }
-    return NominalFieldsArray(type: self, function: function)
+    return NominalFieldsArray(type: self, function: function, withMinimalTypeExpansion: withMinimalTypeExpansion)
   }
 
   /// Returns nil if the enum is a resilient type because in this case the complete list
@@ -292,12 +319,13 @@ public struct TypeArray : RandomAccessCollection, CustomReflectable {
 public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
   fileprivate let function: Function
+  fileprivate let withMinimalTypeExpansion: Bool
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { Int(type.bridged.getNumNominalFields()) }
 
   public subscript(_ index: Int) -> Type {
-    type.bridged.getFieldType(index, function.bridged).type
+    type.bridged.getFieldType(index, function.bridged, withMinimalTypeExpansion).type
   }
 
   public func getIndexOfField(withName name: String) -> Int? {
@@ -309,6 +337,12 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
 
   public func getNameOfField(withIndex idx: Int) -> StringRef {
     StringRef(bridged: type.bridged.getFieldName(idx))
+  }
+
+  /// The field's declaration as the user wrote it: a property wrapper's backing storage
+  /// maps back to the wrapped property.
+  public func getUserFacingFieldDecl(withIndex idx: Int) -> VarDecl? {
+    type.bridged.getUserFacingFieldDecl(idx).getAs(VarDecl.self)
   }
 }
 
@@ -377,6 +411,11 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public func label(at index: Int) -> Identifier {
     type.bridged.getTupleElementLabel(index)
+  }
+
+  /// The element's label, or the empty string if it is unlabeled.
+  public func labelName(at index: Int) -> StringRef {
+    StringRef(bridged: type.bridged.getTupleElementLabelName(index))
   }
 }
 

@@ -414,7 +414,7 @@ public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
                clang::Sema &cSema)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()) {}
+        enumInfos(clangSema.getPreprocessor(), ctx.Stats) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -539,12 +539,6 @@ namespace llvm {
 template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
   using ImportNameVersion = swift::importer::ImportNameVersion;
   using DMIU = DenseMapInfo<unsigned>;
-  static inline ImportNameVersion getEmptyKey() {
-    return (ImportNameVersion)DMIU::getEmptyKey();
-  }
-  static inline ImportNameVersion getTombstoneKey() {
-    return (ImportNameVersion)DMIU::getTombstoneKey();
-  }
   static unsigned getHashValue(const ImportNameVersion &Val) {
     return DMIU::getHashValue(Val.rawValue);
   }

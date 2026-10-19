@@ -19,6 +19,7 @@
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/Attr.h"
@@ -26,11 +27,6 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/StringSwitch.h"
-
-#include "llvm/ADT/Statistic.h"
-#define DEBUG_TYPE "Enum Info"
-STATISTIC(EnumInfoNumCacheHits, "# of times the enum info cache was hit");
-STATISTIC(EnumInfoNumCacheMisses, "# of times the enum info cache was missed");
 
 using namespace swift;
 using namespace importer;
@@ -420,10 +416,12 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
 EnumInfo EnumInfoCache::getEnumInfo(const clang::EnumDecl *decl) {
   auto iter = enumInfos.find(decl);
   if (iter != enumInfos.end()) {
-    ++EnumInfoNumCacheHits;
+    if (Stats)
+      ++Stats->getFrontendCounters().ClangEnumInfoCacheHit;
     return iter->second;
   }
-  ++EnumInfoNumCacheMisses;
+  if (Stats)
+    ++Stats->getFrontendCounters().ClangEnumInfoCacheMiss;
   EnumInfo enumInfo(decl, clangPP);
   enumInfos[decl] = enumInfo;
   return enumInfo;

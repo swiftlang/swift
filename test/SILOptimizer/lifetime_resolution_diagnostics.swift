@@ -10,7 +10,7 @@ func take(_ c: __owned C) {}
 // A loadable noncopyable type: it just wraps a class reference.
 struct NC: ~Copyable { let c: C }
 func useNC(_ x: borrowing NC) {}
-func takeNC(_ x: consuming NC) {}
+func takeNC(_ x: consuming NC) {} // expected-note 5 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}}
 
 func useBeforeInitOnOnePath(_ b: Bool) {
   let x: C // expected-note {{constant defined here}}
@@ -84,7 +84,7 @@ func consumeOperatorInLoop(_ b: Bool) {
   let x: C
   x = C()
   while b {
-    _ = consume x  // expected-error {{'x' used after consume}} // expected-note {{consumed here}}
+    _ = consume x  // expected-error {{'x' consumed in a loop}}
   }
 }
 
@@ -133,12 +133,25 @@ func consumeOfCopyableLetIntoBinding() {
   use(q)
 }
 
+func inoutConsume_error(_ s: inout String) {
+  if .random() {
+    _ = consume s  // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  }
+}
+func inoutConsume_fixed(_ s: inout String) {
+  if .random() {
+    _ = consume s
+    s = ""
+  }
+  return
+}
+
 // --- simple ~Copyable (loadable), backed by alloc_box ---
 
 func ncUseAfterConsume() {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
-  takeNC(x)  // expected-note {{consumed here}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   useNC(x)   // expected-error {{'x' used after consume}}
 }
 
@@ -164,10 +177,10 @@ func ncVarReinitAfterConsume() {
 }
 
 func ncConsumeOnOneBranchUninitOnOther(_ b: Bool) {
-  let x: NC // expected-note {{constant defined here}}
+  let x: NC // expected-note {{constant defined here}} expected-note {{'x' declared here with noncopyable type 'NC'}}
   if b {
     x = NC(c: C())
-    takeNC(x)  // expected-note {{consumed here}}
+    takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
     useNC(x)   // expected-error {{'x' used after consume}}
   } else {
     useNC(x)   // expected-error {{constant 'x' used before being initialized}}
@@ -176,10 +189,10 @@ func ncConsumeOnOneBranchUninitOnOther(_ b: Bool) {
 
 // Consumed on only one path, then used at the merge: an error on the `b` path.
 func ncConditionalConsumeThenUse(_ b: Bool) {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
   if b {
-    takeNC(x)  // expected-note {{consumed here}}
+    takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   }
   useNC(x)     // expected-error {{'x' used after consume}}
 }
@@ -200,7 +213,7 @@ func ncConsumePerBranch(_ b: Bool) {
 
 // `consume x` ends x's lifetime; using it afterwards is an error.
 func ncConsumeOperatorThenUse() {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
   _ = consume x       // expected-note {{consumed here}}
   useNC(x)            // expected-error {{'x' used after consume}}
@@ -208,7 +221,7 @@ func ncConsumeOperatorThenUse() {
 
 // Binding the consumed value: still a use-after-consume of x; the new binding is fine.
 func ncConsumeOperatorLetBinding() {
-  let x: NC
+  let x: NC // expected-note {{'x' declared here with noncopyable type 'NC'}}
   x = NC(c: C())
   let y = consume x   // expected-note {{consumed here}}
   useNC(x)            // expected-error {{'x' used after consume}}
@@ -238,22 +251,22 @@ func ncConsumeOperatorLastUse() {
 // initial `store [init]` and no `mark_uninitialized`); the double consume must
 // still be diagnosed.
 func ncInitializedLetDoubleConsume() {
-  let x = NC(c: C())
-  takeNC(x)  // expected-note {{consumed here}}
-  takeNC(x)  // expected-error {{'x' used after consume}}
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  takeNC(x)  // expected-error {{'x' consumed more than once}}
 }
 
 func ncInitializedLetConsumeOperator() {
-  let x = NC(c: C())
+  let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   _ = consume x       // expected-note {{consumed here}}
   useNC(x)            // expected-error {{'x' used after consume}}
 }
 
 // A `consuming` parameter is likewise backed by an `alloc_box` initialized with
 // the incoming argument, with no `mark_uninitialized`.
-func ncConsumingParamDoubleConsume(_ x: consuming NC) {
-  takeNC(x)  // expected-note {{consumed here}}
-  takeNC(x)  // expected-error {{'x' used after consume}}
+func ncConsumingParamDoubleConsume(_ x: consuming NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  takeNC(x)  // expected-error {{'x' consumed more than once}}
 }
 
 // --- field sensitivity (copyable aggregates) ---
@@ -287,7 +300,7 @@ func fieldUseAfterConsume() {
   var p: Pair
   p = Pair(a: C(), b: C())
   _ = consume p.a   // expected-note {{consumed here}}
-  use(p.a)          // expected-error {{'p' used after consume}}
+  use(p.a)          // expected-error {{'p.a' used after consume}}
   use(p.b)          // valid: distinct field
 }
 
@@ -295,11 +308,85 @@ func tupleElementUseAfterConsume() {
   var t: (C, C)
   t = (C(), C())
   _ = consume t.0   // expected-note {{consumed here}}
-  use(t.0)          // expected-error {{'t' used after consume}}
+  use(t.0)          // expected-error {{'t.0' used after consume}}
   use(t.1)          // valid: distinct element
 }
 
-// FIXME: this case is still missing diagnostics!
+func trivialUseBeforeInit() {
+  var t: (Int, Int)  // expected-note {{variable defined here}}
+  t.0 = 1
+  _ = t.1  // expected-error {{variable 't.1' used before being initialized}}
+  _ = t.0
+
+
+  var control_flow: Int  // expected-note {{variable defined here}}
+  if .random() {
+    control_flow = 1
+  }
+  _ = control_flow  // expected-error {{variable 'control_flow' used before being initialized}}
+
+
+  let deferredLet: Int  // expected-note {{constant defined here}}
+  if .random() { deferredLet = 1 }
+  _ = 1 + deferredLet  // expected-error {{constant 'deferredLet' used before being initialized}}
+
+  // Until we have lifetimes for trivial types, we should expect a warning for any consumes
+  var x: Int
+  x = 5
+  _ = consume x  // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
+  _ = x
+}
+
+struct EmptyStruct {
+  init() {}
+}
+
+enum EmptyEnum {
+  init() {}  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
+
+class EmptyClass {
+  init() {}
+}
+
+func testEmpties_ubi() {
+  let s: EmptyStruct  // expected-note {{defined here}}
+  _ = s  // expected-error {{used before being initialized}}
+
+  let e: EmptyEnum // expected-note {{defined here}}
+  _ = e // expected-error {{used before being initialized}}
+
+  let c: EmptyClass // expected-note {{defined here}}
+  _ = c // expected-error {{used before being initialized}}
+}
+
+func testEmpties_uac() {
+  let s: EmptyStruct
+  s = EmptyStruct()
+  _ = consume s  // expected-warning {{has no effect}}
+  _ = s
+
+  let e: EmptyEnum
+  e = EmptyEnum()
+  _ = consume e  // expected-warning {{has no effect}}
+  _ = e
+
+  let c: EmptyClass
+  c = EmptyClass()
+  _ = consume c  // expected-note {{consumed here}}
+  _ = c          // expected-error {{'c' used after consume}}
+}
+
+struct Point {
+  var x: Int = 0
+  var y: Int // expected-note 2 {{'self.y' not initialized}}
+  init(oops: ()) {} // expected-error {{return from initializer without initializing all stored properties}}
+  init(stillOops: ()) { self.x = 0 }  // expected-error {{return from initializer without initializing all stored properties}}
+  init(correct: ()) { self.y = 0 }
+}
+
+
+// FIXME: this case is still missing diagnostics! (rdar://188752216)
 func consumeCopyableFields() {
   let p = Pair(a: C(), b: C())
   _ = consume p.a
@@ -317,4 +404,30 @@ func testStringSwitch(_ s: String) -> Int {
 
 func testArray(_ s: Array<String>) -> String {
   return s[0]
+}
+
+
+struct Initializers: ~Copyable {
+  let x: C
+  init(test: Void) throws {
+    self.x = try Self.f()
+    _ = self    // expected-note {{consumed here}}
+    try self.doStuff()  // expected-error {{'self' used after consume}}
+  }
+  private func doStuff() throws {}
+
+  private static func f() throws -> C { C() }
+}
+struct TrivialPair { var a: Int; var b: Int }
+struct TrivialNested { var p: TrivialPair; var c: Int }
+func useNested(_ n: TrivialNested) {}
+
+// A single use that reads several uninitialized leaves is diagnosed once.
+func multiLeafUseBeforeInit() {
+  let n: TrivialNested  // expected-note {{constant defined here}}
+  useNested(n)  // expected-error {{constant 'n' used before being initialized}}
+
+  var m: TrivialNested  // expected-note {{variable defined here}}
+  m.p.a = 1
+  useNested(m)  // expected-error {{variable 'm.p.b' used before being initialized}}
 }

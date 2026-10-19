@@ -139,12 +139,11 @@ struct DiagnosticSerializer {
     // they don't contain diagnostics because FileSpecificDiagConsumer need
     // has references to input files to find subconsumer.
     auto addInputToSourceMgr = [&](const InputFile &Input) {
-      auto Path = remapFilePath(Input.getFileName());
-      SrcMgr.getExternalSourceBufferID(Input.getFileName());
-
       // Fetch the source buffer from original SourceManager and create a
-      // serialized file from it.
-      auto Idx = SM.getExternalSourceBufferID(Path);
+      // serialized file from it. The original SourceManager knows the input
+      // by its name before prefix mapping, while the serializing SourceManager
+      // registers it with the remapped name.
+      auto Idx = SM.getExternalSourceBufferID(Input.getFileName());
       if (Idx != 0)
         getFileIDFromBufferID(SM, Idx);
 

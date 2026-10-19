@@ -284,9 +284,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     auto newOrigCalleeSILType =
         SILType::getPrimitiveObjectType(newOrigCalleeType);
     SILBuilderWithScope b(*ai);
-    auto *newCallee = b.createConvertFunction(
-        ai->getLoc(), ai.getCallee(), newOrigCalleeSILType,
-        false /*without actually escaping*/);
+    auto *newCallee = b.createConvertFunction(ai->getLoc(), ai.getCallee(),
+                                              newOrigCalleeSILType);
     ai.setCallee(newCallee);
 
     // Then fix up the subst function type.
@@ -433,7 +432,7 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     if (SILMoveOnlyWrappedTypeEliminator(getFunction())

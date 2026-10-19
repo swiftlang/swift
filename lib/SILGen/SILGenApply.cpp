@@ -442,21 +442,19 @@ private:
             getSubstFormalInterfaceType(substFormalType, subs)),
         Substitutions(subs), Loc(l) {}
 
-  /// Only opened COM existentials dispatch through the foreign interface.
-  /// Generic receivers continue to use Swift witness tables.
-  bool isCOMExistentialMethod() const {
+  /// COM requirements dispatch through the foreign interface, including when
+  /// the receiver's interface adjustment is supplied as a generic argument.
+  bool isCOMMethod() const {
     if (kind != Kind::WitnessMethod)
       return false;
 
     auto *proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
-    auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
-    return proto->isCOMInterface() &&
-           selfType.subst(Substitutions)->is<ExistentialArchetypeType>();
+    return proto->isCOMInterface();
   }
 
   SILType getWitnessMethodType(SILType type) const {
     ASSERT(kind == Kind::WitnessMethod);
-    if (!isCOMExistentialMethod())
+    if (!isCOMMethod())
       return type;
 
     auto FTy = Lowering::adjustFunctionType(
@@ -630,7 +628,7 @@ public:
     case Kind::WitnessMethod:
       if (Constant.isForeign)
         return true;
-      return isCOMExistentialMethod();
+      return isCOMMethod();
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::DynamicMethod:
@@ -759,7 +757,7 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (isCOMExistentialMethod()) {
+      if (isCOMMethod()) {
         auto SILTy = constantInfo.getSILType();
         fn = SGF.B.createCOMMethod(Loc, borrowedSelf->getValue(), *constant,
                                    getWitnessMethodType(SILTy));
@@ -3427,7 +3425,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // referenced is a move-only type.
 
   AbstractStorageDecl *storage = nullptr;
-  AccessSemantics accessSemantics;
+  AccessSemantics accessSemantics = AccessSemantics::Ordinary;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
     storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());
@@ -5466,6 +5464,19 @@ public:
     return (callee.kind == Callee::Kind::EnumElement);
   }
 
+  /// Is this call dispatched through a distributed thunk?
+  bool callsDistributedThunk() const {
+    if (callee.getMethodName().isDistributedThunk())
+      return true;
+    // A witness method callee still names the requirement; it is redirected
+    // to the requirement's distributed thunk only when the callee value is
+    // emitted (see Callee::getFnValue).
+    if (callee.kind == Callee::Kind::WitnessMethod)
+      if (auto *func = callee.getMethodName().getFuncDecl())
+        return SGF.shouldReplaceConstantForApplyWithDistributedThunk(func);
+    return false;
+  }
+
   /// Sets a flag that indicates whether this call be treated as being 
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
@@ -5940,14 +5951,29 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
   return RValue(SGF, uncurriedLoc, formalResultType, resultMV);
 }
 
+static void checkBuiltinOperandOwnership(SILGenFunction &SGF, BuiltinInst *bi,
+                                         ArrayRef<SILParameterInfo> params,
+                                         unsigned firstArgOperand) {
+#ifndef NDEBUG
+  if (!SGF.F.hasOwnership())
+    return;
+  for (auto param : llvm::enumerate(params)) {
+    const Operand &operand = bi->getOperandRef(firstArgOperand + param.index());
+    if (operand.get()->getOwnershipKind() == OwnershipKind::None)
+      continue;
+    assert(param.value().isConsumedInCaller() == operand.isConsuming() &&
+           "builtin's declared parameter ownership disagrees with its "
+           "OperandOwnership classification");
+  }
+#endif
+}
+
 RValue
 CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
                                       SGFContext C) {
   // We use the context emit-into initialization only for the
   // outermost call.
   SGFContext uncurriedContext = C;
-
-  ManagedValue mv;
 
   // Get the callee type information. We want to emit the arguments as
   // fully-substituted values because that's what the specialized emitters
@@ -6026,18 +6052,20 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   if (resultPlan.has_value())
     (*resultPlan)->gatherIndirectResultAddrs(SGF, loc, rawArgs);
 
-  // Then add all arguments to our array, copying them if they are not at +1
-  // yet.
-  for (auto arg : uncurriedArgs) {
-    // Nonescaping closures can't be forwarded so we pass them +0.
-    if (isTrivialNoEscapeType(arg.getType())) {
-      rawArgs.push_back(arg.getValue());
+  // Padded by the number of indirect results in the signature.
+  unsigned firstArgOperand = rawArgs.size();
+
+  // Then add all arguments to our array at the ownership their parameter
+  // declares. Forwarding a cleanup into a parameter the builtin does not
+  // consume leaks the value.
+  auto params = substFnType->getParameters();
+  assert(params.size() == uncurriedArgs.size() &&
+         "builtin argument does not correspond to a lowered parameter");
+  for (auto arg : llvm::enumerate(uncurriedArgs)) {
+    if (params[arg.index()].isConsumedInCaller()) {
+      rawArgs.push_back(arg.value().ensurePlusOne(SGF, loc).forward(SGF));
     } else {
-      // Named builtins are by default assumed to take other arguments at +1,
-      // as Owned or Trivial. Named builtins that don't follow this convention
-      // must use a specialized emitter.
-      auto maybePlusOne = arg.ensurePlusOne(SGF, loc);
-      rawArgs.push_back(maybePlusOne.forward(SGF));
+      rawArgs.push_back(arg.value().getValue());
     }
   }
 
@@ -6045,6 +6073,8 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
       loc, builtinName,
       substConv.getSILResultType(SGF.getTypeExpansionContext()),
       callee.getSubstitutions(), rawArgs);
+
+  checkBuiltinOperandOwnership(SGF, rawResult, params, firstArgOperand);
 
   // Handle some special cases for specific builtins.
   if (builtinName.is(getBuiltinName(BuiltinValueKind::AddTaskLocalValue))) {
@@ -6240,7 +6270,22 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
 
     // For an implicitly-async call, record the target of the actor hop.
     if (auto target = call->isImplicitlyAsync()) {
-      emission.setImplicitlyAsync(target);
+      // ... unless the call is dispatched through a distributed thunk.
+      //
+      // The thunk is '@concurrent' or 'nonisolated(nonsending)'
+      // and never needs to run on the target actor: its local branch calls the
+      // actor-isolated target, which hops onto 'self' in its own prologue, and
+      // its remote branch never runs on the target actor at all.
+      //
+      // For a 'nonisolated(nonsending)' thunk, hopping here would be unsound:
+      // the thunk receives the caller's isolation as its implicit argument, so
+      // it must actually be running on the caller's executor.
+      //
+      // Hopping back to the caller after the call is still handled by the
+      // executor breadcrumb emitted for async callees.
+      if (!emission.callsDistributedThunk()) {
+        emission.setImplicitlyAsync(target);
+      }
     } else {
       // If we are emitting a call to an `async` variant of an ObjC completion
       // handler API, we need to hop at the call site because there is no
@@ -8070,7 +8115,10 @@ RValue SILGenFunction::emitGetAccessor(
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
-  if (implicitActorHopTarget)
+  // A distributed thunk accessor performs its own hop onto 'self' on the local
+  // branch, so hopping to the target actor here would be redundant. See the
+  // matching comment in CallEmission::forApplyExpr
+  if (implicitActorHopTarget && !get.isDistributedThunk())
     emission.setImplicitlyAsync(implicitActorHopTarget);
 
   // Self ->
@@ -8249,7 +8297,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
-    result->getType().castTo<BoundGenericStructType>()->getDecl();
+    result->getType().castTo<StructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
   assert(props.size() == 1);
   VarDecl *rawPointerField = props[0];

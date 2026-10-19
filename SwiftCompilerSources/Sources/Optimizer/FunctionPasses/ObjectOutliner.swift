@@ -494,6 +494,14 @@ private extension AllocRefInstBase {
     if isObjC {
       return false
     }
+    // IRGen lays out class fields with the minimal type expansion, where a field of opaque type
+    // (e.g. `some View`) has no fixed offset. Such an object cannot be statically initialized
+    // because the offset is only known after the class metadata is initialized. Bail out outlining if
+    // the class fields are not known (resilient class) or if a field has an opaque type.
+    if type.getNominalFields(in: parentFunction, withMinimalTypeExpansion: true)?
+         .contains(where: { $0.hasOpaqueArchetype }) ?? true {
+      return false
+    }
     return true
   }
 

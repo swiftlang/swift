@@ -180,6 +180,14 @@ private:
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
+
+  /// Scan \p BufferID for 'expected-*' directives, appending them to
+  /// \p ExpectedDiagnostics. As a side effect this binds the '// #name@N'
+  /// markers defined in any expected-expansion block to their expansion buffer.
+  void
+  parseExpectedDiagnostics(unsigned BufferID,
+                           std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics);
+
   bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx);
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
@@ -319,6 +327,11 @@ private:
         return std::nullopt;
       return buffers[parsedCount++].second;
     }
+
+    // Rewind the parse cursor so a subsequent parse re-numbers this location's
+    // directives identically. Used after a marker-binding pre-pass that parses
+    // every buffer once before the real verification parse.
+    void resetParseCursor() { parsedCount = 0; }
   };
   private:
   llvm::DenseMap<SourceLoc, ExpansionContext> Expansions;

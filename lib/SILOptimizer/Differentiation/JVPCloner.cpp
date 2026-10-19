@@ -799,8 +799,7 @@ public:
                    ->isABICompatibleWith(differentialFnType, *jvp)
                    .isCompatible()) {
       differentialValue = builder.createConvertFunction(
-          loc, differentialPartialApply, differentialType,
-          /*withoutActuallyEscaping*/ false);
+          loc, differentialPartialApply, differentialType);
     } else {
       llvm::report_fatal_error("Differential value type is not ABI-compatible "
                                "with the returned differential type");
@@ -1797,7 +1796,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
-  differential->setHasLoweredAddresses(original->hasLoweredAddresses());
+  differential->inheritDerivedFrom(original);
 
   return differential;
 }

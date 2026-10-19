@@ -407,7 +407,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
       // the single known field, using undef for the remaining fields.
       SILBasicBlock *debugBB = dvi->getOrCreateDebugReconstructionBlock();
       SILType structType = initialArg->getType();
-      StructDecl *structDecl = structType.getStructOrBoundGenericStruct();
+      StructDecl *structDecl = structType.getStructDecl();
       SILFunction *fn = dvi->getFunction();
 
       // Create the struct with all-undef operands first.

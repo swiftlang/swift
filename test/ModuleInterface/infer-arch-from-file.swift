@@ -1,3 +1,5 @@
+// REQUIRES: OS=macosx
+
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Bar.swiftmodule)
 // RUN: echo "// swift-interface-format-version: 1.0" > %t/arm64.swiftinterface

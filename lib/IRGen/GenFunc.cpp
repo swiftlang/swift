@@ -227,6 +227,12 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -263,6 +269,12 @@ namespace {
                                   spareBits);
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -292,6 +304,12 @@ namespace {
                                       IsTriviallyDestroyable_t pod) {
       return new FuncTypeInfo(formalType, storageType, size, align,
                               std::move(spareBits), pod);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -494,6 +512,12 @@ namespace {
                      align),
         FuncSignatureInfo(ty) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -532,6 +556,12 @@ namespace {
         CaptureOffset(captureOffset)
     {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -559,6 +589,8 @@ namespace {
     Address projectCapture(IRGenFunction &IGF, Address storage) const {
       return IGF.Builder.CreateStructGEP(storage, 1, CaptureOffset);
     }
+
+    Size getCaptureOffset() const { return CaptureOffset; }
     
     // TODO
     // The frontend will currently never emit copy_addr or destroy_addr for
@@ -858,8 +890,30 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         out);
 }
 
+/// Whether the context of the closure that \c outType describes captures an
+/// indirect argument with the given convention and type by address, instead of
+/// owning the value.
+static bool capturesIndirectArgumentByAddress(CanSILFunctionType outType,
+                                              ParameterConvention convention,
+                                              SILType argType) {
+  // The context of an escaping closure owns its indirect arguments.
+  if (!outType->isNoEscape())
+    return false;
+
+  // A closure that is called at most once is the exception for a noncopyable
+  // argument that it consumes. Like the other consumed captures of such a
+  // closure, its context owns the value.
+  if (convention == ParameterConvention::Indirect_In &&
+      outType->hasCalledAtMostOnceSemantics() && argType.isMoveOnly())
+    return false;
+
+  // A stack-promoted closure doesn't own most of its indirect arguments, so it
+  // captures their addresses.
+  return true;
+}
+
 CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
-                                       bool isNoEscape) {
+                                       bool capturesIndirectByAddress) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.
   case ParameterConvention::Direct_Owned:
@@ -874,12 +928,12 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
     return type;
 
   // Capture indirect parameters if the closure is not [onstack]. [onstack]
-  // closures don't take ownership of their arguments so we just capture the
-  // address.
+  // closures don't take ownership of most of their arguments so we just capture
+  // the address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
-    if (isNoEscape)
+    if (capturesIndirectByAddress)
       return CanInOutType::get(type);
     else
       return type;
@@ -1809,6 +1863,23 @@ getPartialApplicationForwarderEmission(
   }
 }
 
+/// Returns the fields of a stack-promoted closure context that the context
+/// doesn't own. A borrowed `~Copyable` capture is a bitwise copy of a value
+/// that the enclosing function still owns, so nothing in the context may
+/// destroy it.
+llvm::BitVector
+getUnownedContextFields(HeapLayout const &layout,
+                        ArrayRef<ParameterConvention> conventions) {
+  llvm::BitVector unownedFields(conventions.size());
+  for (unsigned i : indices(conventions)) {
+    auto fieldTy = layout.getElementTypes()[i];
+    if (fieldTy && conventions[i] == ParameterConvention::Direct_Guaranteed &&
+        fieldTy.isMoveOnly())
+      unownedFields.set(i);
+  }
+  return unownedFields;
+}
+
 /// This is a parameter convention-aware version of \c createDtorFn.
 ///
 /// It's used by the partial application forwarder emitter to avoid
@@ -1817,16 +1888,22 @@ getPartialApplicationForwarderEmission(
 void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            HeapLayout const *layout, llvm::Value *rawContextPtr,
                            Address contextPtr,
-                           const llvm::BitVector &consumedFields) {
+                           const llvm::BitVector &consumedFields,
+                           const llvm::BitVector &unownedFields,
+                           bool contextIsOnStack, bool isCalledOnce) {
   if (!layout) {
+    assert(!isCalledOnce && "exactly-once contexts always have a layout");
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
     return;
   }
 
-  // If none of the parameters are owned, let's use release that would
-  // destroy all of the captures (fields of the closure context).
-  if (consumedFields.empty() || consumedFields.none()) {
+  // For a closure that doesn't have any owned fields to destroy, just
+  // release the context object. We can't do that for exaclty-once closures,
+  // though, because the destructor of an exactly-once context traps since
+  // reaching indicates that the closure was dropped. Proceed to deallocating
+  // the context as uninitialized instead of releasing it in that case.
+  if (!isCalledOnce && (consumedFields.empty() || consumedFields.none())) {
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
     return;
@@ -1839,6 +1916,10 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
   // context object and let us deallocate it as-if it was uninitialized.
   llvm::BitVector fieldsToDestroy(consumedFields);
   fieldsToDestroy.flip();
+
+  // A field that the context doesn't own is destroyed by its real owner.
+  if (!unownedFields.empty())
+    fieldsToDestroy.reset(unownedFields);
   for (unsigned elementIdx : fieldsToDestroy.set_bits()) {
     auto &field = layout->getElement(elementIdx);
     if (field.isTriviallyDestroyable())
@@ -1849,6 +1930,12 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
         forwarder, field.project(forwarder, contextPtr, offsets), fieldTy,
         /*isOutlined=*/true);
   }
+
+  // A stack-allocated context's storage is going to be deallocated by the
+  // caller via `dealloc_stack` in their frame. All fields have already been
+  // handled above so there's nothing left to release here.
+  if (contextIsOnStack)
+    return;
 
   emitDeallocateUninitializedHeapObject(
       forwarder, rawContextPtr, offsets.getSize(), offsets.getAlignMask(),
@@ -2047,6 +2134,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   Explosion witnessMethodSelfValue;
   llvm::Value *lastCapturedFieldPtr = nullptr;
   llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
+  llvm::BitVector unownedFields;
+  if (layout && outType->isNoEscape())
+    unownedFields = getUnownedContextFields(*layout, conventions);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2158,14 +2248,19 @@ static llvm::Value *emitPartialApplicationForwarder(
 
         auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
                               &subIGF](const TypeInfo &fieldTI, SILType fieldTy,
-                                       Address fieldAddr) {
-          // The +1 argument is passed indirectly, so we need to copy into a
-          // temporary.
+                                       Address fieldAddr, bool isTake) {
+          // The +1 argument is passed indirectly, so we need to copy or move
+          // into a temporary.
           needsAllocas = true;
           auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
           auto addressPointer = stackAddr.getAddress().getAddress();
-          fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
-                                     fieldTy, false);
+          if (isTake)
+            fieldTI.initializeWithTake(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false,
+                                       /*zeroizeIfSensitive=*/false);
+          else
+            fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false);
           param.add(addressPointer);
 
           // Remember to deallocate later.
@@ -2173,7 +2268,8 @@ static llvm::Value *emitPartialApplicationForwarder(
               AddressToDeallocate{fieldTy, fieldTI, stackAddr});
         };
 
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, fieldConvention,
+                                              fieldTy)) {
           // If the closure is [onstack] it only captured the address of the
           // value. Load that address from the context.
           Explosion addressExplosion;
@@ -2185,9 +2281,16 @@ static llvm::Value *emitPartialApplicationForwarder(
               subIGF.getTypeInfoForLowered(newFieldTy.getASTType());
           fieldAddr =
               newFieldTI.getAddressForPointer(addressExplosion.claimNext());
-          initStackCopy(newFieldTI, newFieldTy, fieldAddr);
+          initStackCopy(newFieldTI, newFieldTy, fieldAddr, /*isTake=*/false);
+        } else if (outType->hasCalledAtMostOnceSemantics() &&
+                   fieldConvention == ParameterConvention::Indirect_In &&
+                   fieldTy.isMoveOnly()) {
+          // The closure is called at most once, so move the value out of the
+          // context, which then must not destroy it.
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/true);
+          consumedFields.set(fieldIndex);
         } else {
-          initStackCopy(fieldTI, fieldTy, fieldAddr);
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/false);
         }
         break;
       }
@@ -2223,7 +2326,7 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        if (outType->isCalledOnce()) {
+        if (outType->hasCalledAtMostOnceSemantics()) {
           // Move value into the apply.
           cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
           consumedFields.set(fieldIndex);
@@ -2285,7 +2388,9 @@ static llvm::Value *emitPartialApplicationForwarder(
     if (consumesContext && !dependsOnContextLifetime && rawData) {
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
-      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
+      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
+                            unownedFields, outType->isNoEscape(),
+                            outType->isCalledOnce());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2407,7 +2512,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
-    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
+    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
+                          unownedFields, outType->isNoEscape(),
+                          outType->isCalledOnce());
   }
 
   emission->createReturn(call);
@@ -2450,8 +2557,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     if (!isa<FixedTypeInfo>(ti)) {
@@ -2464,14 +2573,16 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
 
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     // Empty values don't matter, unless they still require a nontrivial
     // destroy (e.g. a zero-sized `~Copyable` type with a user-defined
-    // deinit captured by a `@called(once)` closure).
+    // deinit captured by a `@called(atMostOnce)` closure).
     auto schema = ti.getSchema();
     if (schema.empty() && !param.isFormalIndirect() &&
         ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
@@ -2591,6 +2702,12 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
   }
 
+  // An exactly-once closure always gets a context of its own so that its
+  // destructor can trap when the closure is dropped. That means it can't take
+  // advantage of the single ref-counted object optimization.
+  if (outType->isCalledOnce())
+    hasSingleSwiftRefcountedContext = No;
+
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
   
   // If we have a single refcounted pointer context (and no polymorphic args
@@ -2692,7 +2809,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   if (args.empty() && layout.isKnownEmpty() &&
       layout.isTriviallyDestroyable()) {
-    if (outType->isNoEscape())
+    if (outType->isCalledOnce())
+      data = IGF.IGM.getAddrOfExactlyOnceSharedContext();
+    else if (outType->isNoEscape())
       data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
     else
       data = IGF.IGM.RefCountedNull;
@@ -2708,21 +2827,15 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();
 
-      // @called(once) closures always get a context even if they are
+      // @called(atMostOnce) closures always get a context even if they are
       // stack promoted because they can have consuming captures.
-      if (outType->isCalledOnce()) {
+      if (outType->hasCalledAtMostOnceSemantics()) {
         assert(!outType->isTrivialNoEscape());
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
         // and so they cannot be destroyed.
-        llvm::BitVector unownedFields(argConventions.size());
-        for (unsigned i : indices(argConventions)) {
-          auto fieldTy = layout.getElementTypes()[i];
-          if (fieldTy &&
-              argConventions[i] == ParameterConvention::Direct_Guaranteed &&
-              fieldTy.isMoveOnly())
-            unownedFields.set(i);
-        }
+        llvm::BitVector unownedFields =
+            getUnownedContextFields(layout, argConventions);
 
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
@@ -2730,7 +2843,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
         auto metadata = layout.getPrivateMetadata(
             IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields,
-            /*isStackAllocated=*/true);
+            /*isStackAllocated=*/true, outType->isCalledOnce());
         auto object = IGF.Builder.CreateBitCast(data, IGF.IGM.RefCountedPtrTy);
         object = IGF.emitInitStackObjectCall(metadata, object, "closure");
         data = IGF.Builder.CreateBitCast(object, IGF.IGM.OpaquePtrTy);
@@ -2740,7 +2853,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                        substType, subs,
                                                        layout);
 
-        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets,
+                                      outType->isCalledOnce());
     }
     Address dataAddr = layout.emitCastTo(IGF, data);
     
@@ -2784,7 +2898,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, argConventions[i],
+                                              argValTypes[i])) {
           cast<LoadableTypeInfo>(fieldLayout.getType())
               .initialize(IGF, args, fieldAddr, isOutlined);
         } else {
@@ -2903,6 +3018,149 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   return func;
 }
 
+/// Get the block runtime's class object with the given name, such as
+/// _NSConcreteStackBlock or _NSConcreteGlobalBlock.
+static llvm::Constant *getBlockIsa(IRGenModule &IGM, StringRef name) {
+  auto isa = IGM.getModule()->getOrInsertGlobal(name, IGM.ObjCClassStructTy);
+  swift::ClangImporter *CI =
+      static_cast<ClangImporter *>(IGM.Context.getClangModuleLoader());
+  if (!CI->getCodeGenOpts().StaticClosure)
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(isa));
+  return isa;
+}
+
+/// Compute the block flags and emit the block descriptor for a block
+/// with the given storage.
+///
+/// Global blocks are never copied or disposed, so they don't need copy
+/// and dispose helpers.
+static std::pair<uint32_t, llvm::Constant *>
+emitBlockFlagsAndDescriptor(IRGenModule &IGM,
+                            CanSILBlockStorageType blockTy,
+                            CanSILFunctionType invokeTy,
+                            ForeignFunctionInfo foreignInfo,
+                            bool isGlobal) {
+  auto &storageTL
+    = IGM.getTypeInfoForLowered(blockTy).as<BlockStorageTypeInfo>();
+
+  //
+  // Set the flags.
+  // - HAS_COPY_DISPOSE unless the capture type is POD or the block is global
+  uint32_t flags = 0;
+  auto &captureTL
+    = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
+  bool needsHelpers = !isGlobal &&
+    !captureTL.isTriviallyDestroyable(ResilienceExpansion::Maximal);
+  if (needsHelpers)
+    flags |= 1 << 25;
+
+  // - IS_GLOBAL, if the block is a global
+  if (isGlobal)
+    flags |= 1 << 28;
+
+  // - HAS_STRET, if the invoke function is sret
+  assert(foreignInfo.ClangInfo);
+  if (foreignInfo.ClangInfo->getReturnInfo().isIndirect())
+    flags |= 1 << 29;
+
+  // - HAS_SIGNATURE
+  flags |= 1 << 30;
+
+  // Build the block descriptor.
+  ConstantInitBuilder builder(IGM);
+  auto descriptorFields = builder.beginStruct();
+
+  const clang::ASTContext &ASTContext = IGM.getClangASTContext();
+  llvm::IntegerType *UnsignedLongTy =
+      llvm::IntegerType::get(IGM.getLLVMContext(),
+                             ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
+  descriptorFields.addInt(UnsignedLongTy, 0);
+  descriptorFields.addInt(UnsignedLongTy,
+                          storageTL.getFixedSize().getValue());
+
+  if (needsHelpers) {
+    // Define the copy and dispose helpers.
+    descriptorFields.addSignedPointer(
+                       emitBlockCopyHelper(IGM, blockTy, storageTL),
+                       IGM.getOptions().PointerAuth.BlockHelperFunctionPointers,
+                       PointerAuthEntity::Special::BlockCopyHelper);
+    descriptorFields.addSignedPointer(
+                       emitBlockDisposeHelper(IGM, blockTy, storageTL),
+                       IGM.getOptions().PointerAuth.BlockHelperFunctionPointers,
+                       PointerAuthEntity::Special::BlockDisposeHelper);
+  }
+
+  // Build the descriptor signature.
+  descriptorFields.add(getBlockTypeExtendedEncoding(IGM, invokeTy));
+
+  // Create the descriptor.
+  auto descriptor =
+    descriptorFields.finishAndCreateGlobal("block_descriptor",
+                                           IGM.getPointerAlignment(),
+                                           /*constant*/ true);
+
+  return {flags, descriptor};
+}
+
+bool irgen::canEmitGlobalBlocks(IRGenModule &IGM) {
+  // A reference to a dllimport'ed isa can't be used in a static initializer.
+  swift::ClangImporter *CI =
+      static_cast<ClangImporter *>(IGM.Context.getClangModuleLoader());
+  if (!CI->getCodeGenOpts().StaticClosure &&
+      IGM.Triple.isOSBinFormatCOFF() && !IGM.Triple.isOSCygMing())
+    return false;
+
+  return true;
+}
+
+llvm::Constant *irgen::emitGlobalBlock(IRGenModule &IGM,
+                                       CanSILBlockStorageType blockTy,
+                                       llvm::Constant *invokeFunction,
+                                       CanSILFunctionType invokeTy,
+                                       ForeignFunctionInfo foreignInfo,
+                                       llvm::Constant *capture) {
+  assert(canEmitGlobalBlocks(IGM));
+
+  auto &cachedBlock = IGM.GlobalBlocks[{invokeFunction, capture}];
+  if (cachedBlock)
+    return cachedBlock;
+
+  auto &storageTL
+    = IGM.getTypeInfoForLowered(blockTy).as<BlockStorageTypeInfo>();
+
+  auto [flags, descriptor] = emitBlockFlagsAndDescriptor(
+      IGM, blockTy, invokeTy, foreignInfo, /*isGlobal=*/true);
+
+  // Lay out the block header followed by the capture, matching the layout
+  // of the block storage.
+  ConstantInitBuilder builder(IGM);
+  auto blockFields = builder.beginStruct();
+
+  auto header = blockFields.beginStruct(IGM.ObjCBlockStructTy);
+  header.add(getBlockIsa(IGM, "_NSConcreteGlobalBlock"));
+  header.addInt32(flags);
+  header.addInt32(0);
+  header.addSignedPointer(
+      llvm::ConstantExpr::getBitCast(invokeFunction, IGM.FunctionPtrTy),
+      IGM.getOptions().PointerAuth.BlockInvocationFunctionPointers,
+      invokeTy);
+  header.add(descriptor);
+  header.finishAndAddTo(blockFields);
+
+  blockFields.addAlignmentPadding(storageTL.getFixedAlignment());
+  assert(blockFields.getNextOffsetFromGlobal() ==
+             storageTL.getCaptureOffset() &&
+         "global block capture doesn't match block storage layout");
+  blockFields.add(capture);
+
+  auto block = blockFields.finishAndCreateGlobal(
+      "block", storageTL.getFixedAlignment(), /*constant*/ true,
+      llvm::GlobalValue::PrivateLinkage);
+  cachedBlock = block;
+  return block;
+}
+
 /// Emit the block header into a block storage slot.
 void irgen::emitBlockHeader(IRGenFunction &IGF,
                             Address storage,
@@ -2917,76 +3175,20 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
   //
   // Initialize the "isa" pointer, which is _NSConcreteStackBlock.
-  auto NSConcreteStackBlock =
-      IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
-                                             IGF.IGM.ObjCClassStructTy);
-  swift::ClangImporter *CI =
-      static_cast<ClangImporter *>(IGF.IGM.Context.getClangModuleLoader());
-  if (!CI->getCodeGenOpts().StaticClosure)
-    ApplyIRLinkage(IRLinkage::ExternalImport)
-        .to(cast<llvm::GlobalVariable>(NSConcreteStackBlock));
+  auto NSConcreteStackBlock = getBlockIsa(IGF.IGM, "_NSConcreteStackBlock");
 
-  //
-  // Set the flags.
-  // - HAS_COPY_DISPOSE unless the capture type is POD
-  uint32_t flags = 0;
-  auto &captureTL
-    = IGF.getTypeInfoForLowered(blockTy->getCaptureType());
-  bool isTriviallyDestroyable = captureTL.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-  if (!isTriviallyDestroyable)
-    flags |= 1 << 25;
-  
-  // - HAS_STRET, if the invoke function is sret
-  assert(foreignInfo.ClangInfo);
-  if (foreignInfo.ClangInfo->getReturnInfo().isIndirect())
-    flags |= 1 << 29;
-  
-  // - HAS_SIGNATURE
-  flags |= 1 << 30;
-  
+  auto [flags, descriptor] = emitBlockFlagsAndDescriptor(
+      IGF.IGM, blockTy, invokeTy, foreignInfo, /*isGlobal=*/false);
   auto flagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags);
-  
+
   // Collect the reserved and invoke pointer fields.
   auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
   llvm::Value *invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
                                                       IGF.IGM.FunctionPtrTy);
-  
-  // Build the block descriptor.
-  ConstantInitBuilder builder(IGF.IGM);
-  auto descriptorFields = builder.beginStruct();
-
-  const clang::ASTContext &ASTContext = IGF.IGM.getClangASTContext();
-  llvm::IntegerType *UnsignedLongTy =
-      llvm::IntegerType::get(IGF.IGM.getLLVMContext(),
-                             ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
-  descriptorFields.addInt(UnsignedLongTy, 0);
-  descriptorFields.addInt(UnsignedLongTy,
-                          storageTL.getFixedSize().getValue());
-  
-  if (!isTriviallyDestroyable) {
-    // Define the copy and dispose helpers.
-    descriptorFields.addSignedPointer(
-                       emitBlockCopyHelper(IGF.IGM, blockTy, storageTL),
-                       IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
-                       PointerAuthEntity::Special::BlockCopyHelper);
-    descriptorFields.addSignedPointer(
-                       emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL),
-                       IGF.getOptions().PointerAuth.BlockHelperFunctionPointers,
-                       PointerAuthEntity::Special::BlockDisposeHelper);
-  }
-  
-  // Build the descriptor signature.
-  descriptorFields.add(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
-  
-  // Create the descriptor.
-  auto descriptor =
-    descriptorFields.finishAndCreateGlobal("block_descriptor",
-                                           IGF.IGM.getPointerAlignment(),
-                                           /*constant*/ true);
 
   auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
                                                       IGF.IGM.Int8PtrTy);
-  
+
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
   IGF.Builder.CreateStore(NSConcreteStackBlock,

@@ -234,6 +234,20 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @extract_then_hop :
+sil [ossa] @extract_then_hop : $@async (@guaranteed MyActor) -> Builtin.Executor {
+bb0(%0 : @guaranteed $MyActor):
+// CHECK:      bb0(%0 : @guaranteed $MyActor):
+// CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
+// CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
+// CHECK-NEXT:   return [[DEPEND]] : $Builtin.Executor
+  %1 = extract_executor %0 : $MyActor
+  hop_to_executor %0 : $MyActor
+  return %1 : $Builtin.Executor
+}
+
 // CHECK-LABEL: sil [ossa] @simple_optional_actor :
 sil [ossa] @simple_optional_actor : $@async (@guaranteed Optional<MyActor>) -> () {
 bb0(%0 : @guaranteed $Optional<MyActor>):

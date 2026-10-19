@@ -980,7 +980,7 @@ fileprivate func fastParse64(
     var explicitExponent = Int32(0)
     let firstExponentDigitOffset = i
     while i < input.count {
-      let t = unsafe input[unchecked: i] - 0x30
+      let t = unsafe input[unchecked: i] &- 0x30
       if t > 9 {
         break
       }

@@ -135,3 +135,39 @@ func constructThem() {
   _ = DefaultInitialized(1) // expected-error {{argument passed to call that takes no arguments}}
   _ = WithConvenienceInit() // expected-error {{missing argument for parameter 'a' in call}}
 }
+
+enum InitError: Error { case bad }
+
+final class ThrowingDesignatedInit: SharedConstructed {
+  let x: Int64
+  init(fail: Bool) throws { // expected-error {{initializer 'init(fail:)' cannot be throwing because it is declared in a class that subclasses a C++ foreign reference type}}
+    self.x = 1
+    if fail { throw InitError.bad }
+    super.init()
+  }
+}
+
+final class FailableDesignatedInit: SharedConstructed {
+  let x: Int64
+  init?(fail: Bool) { // expected-error {{initializer 'init(fail:)' cannot be failable because it is declared in a class that subclasses a C++ foreign reference type}}
+    self.x = 1
+    if fail { return nil }
+    super.init()
+  }
+}
+
+final class FailableConvenienceInit: SharedConstructed {
+  let x: Int64
+  init(x: Int64) {
+    self.x = x
+    super.init()
+  }
+  convenience init?(maybe: Bool) { // expected-error {{initializer 'init(maybe:)' cannot be failable because it is declared in a class that subclasses a C++ foreign reference type}}
+    if !maybe { return nil }
+    self.init(x: 1)
+  }
+  convenience init(orThrow: Bool) throws { // expected-error {{initializer 'init(orThrow:)' cannot be throwing because it is declared in a class that subclasses a C++ foreign reference type}}
+    if !orThrow { throw InitError.bad }
+    self.init(x: 2)
+  }
+}

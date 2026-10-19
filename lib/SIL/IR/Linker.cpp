@@ -211,8 +211,9 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return Changed;
 }
 
-bool SILLinkerVisitor::processConformance(ProtocolConformanceRef conformanceRef) {
-  visitProtocolConformance(conformanceRef, false);
+bool SILLinkerVisitor::processConformance(ProtocolConformanceRef conformanceRef,
+                                          bool referencedFromInitExistential) {
+  visitProtocolConformance(conformanceRef, referencedFromInitExistential);
   process();
   return Changed;
 }
@@ -335,7 +336,7 @@ void SILLinkerVisitor::visitProtocolConformance(
     // If the module is at or past the Lowered stage, then we can't do any
     // further deserialization, since pre-IRGen SIL lowering changes the types
     // of definitions to make them incompatible with canonical serialized SIL.
-    if (Mod.getStage() == SILStage::Lowered)
+    if (Mod.haveFunctionTypesBeenRewritten())
       return;
   
     WT = Mod.getSILLoader()->lookupWitnessTable(WT);
@@ -494,7 +495,7 @@ void SILLinkerVisitor::visitAllocRefDynamicInst(AllocRefDynamicInst *ARI) {
     return;
 
   // Grab the class decl from the alloc ref inst.
-  ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
+  ClassDecl *D = ARI->getType().getClassDecl();
   if (!D)
     return;
 
@@ -506,7 +507,7 @@ void SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
     return;
 
   // Grab the class decl from the alloc ref inst.
-  ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
+  ClassDecl *D = ARI->getType().getClassDecl();
   if (!D)
     return;
 
@@ -518,7 +519,7 @@ void SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
     return;
 
   CanType instTy = MI->getType().castTo<MetatypeType>().getInstanceType();
-  ClassDecl *C = instTy.getClassOrBoundGenericClass();
+  ClassDecl *C = instTy.getClassDecl();
   if (!C)
     return;
 

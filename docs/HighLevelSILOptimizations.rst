@@ -246,6 +246,11 @@ array.mutate_unknown
   mutating functionality. This may be more efficient than cleanly
   isolating the copy and mutation code.
 
+array.realloc_array_buffer
+
+  This operation re-allocates the array buffer, but does not release any
+  array elements. Therefore this operation is not a deinit-barrier.
+
 To complete the semantics understood by the optimizer, we define these relations:
 
 interferes-with

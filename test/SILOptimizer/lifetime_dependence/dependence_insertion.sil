@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt \
 // RUN:   -lifetime-dependence-insertion \
-// RUN:   -enable-address-dependencies \
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
@@ -263,4 +262,139 @@ bb0(%0 : $*Agg):
   destroy_value %2
   %36 = tuple ()
   return %36
+}
+
+@_addressableForDependencies
+struct AddressableHolder {
+  var inner: AddressableForDeps
+}
+
+sil @getAddressableDep : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @useInoutNE : $@convention(thin) (@inout NE) -> ()
+
+// rdar://189654192: an addressable-for-dependencies source that is accessed through an unsafeMutableAddress accessor
+// (UnsafeMutablePointer.pointee) depends on the accessor's 'self', not on the [unsafe] access scope.
+//
+// CHECK-LABEL: sil hidden [ossa] @testUnsafeAddressorAddressable : $@convention(thin) (UnsafeMutablePointer<AddressableForDeps>) -> () {
+// CHECK: bb0(%0 : $UnsafeMutablePointer<AddressableForDeps>):
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe]
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK:   end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testUnsafeAddressorAddressable'
+sil hidden [ossa] @testUnsafeAddressorAddressable : $@convention(thin) (UnsafeMutablePointer<AddressableForDeps>) -> () {
+bb0(%0 : $UnsafeMutablePointer<AddressableForDeps>):
+  %1 = alloc_box ${ var NE }, var, name "ref"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = struct_extract %0, #UnsafeMutablePointer._rawValue
+  %5 = pointer_to_address %4 to [strict] $*AddressableForDeps
+  %6 = mark_dependence [unresolved] %5 on %0
+  %7 = begin_access [modify] [unsafe] %6
+  %8 = function_ref @getAddressableDep : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %9 = apply %8(%7) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  end_access %7
+  store %9 to [init] %3
+  %12 = begin_access [modify] [unknown] %3
+  %13 = function_ref @useInoutNE : $@convention(thin) (@inout NE) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@inout NE) -> ()
+  end_access %12
+  end_borrow %2
+  destroy_value %1
+  %18 = tuple ()
+  return %18
+}
+
+// Same as above, but the source is a stored property projected from the unsafeMutableAddress access.
+//
+// CHECK-LABEL: sil hidden [ossa] @testUnsafeAddressorAddressableProjection : $@convention(thin) (UnsafeMutablePointer<AddressableHolder>) -> () {
+// CHECK: bb0(%0 : $UnsafeMutablePointer<AddressableHolder>):
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe]
+// CHECK:   [[FIELD:%.*]] = struct_element_addr [[ACCESS]], #AddressableHolder.inner
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[FIELD]]) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK:   end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testUnsafeAddressorAddressableProjection'
+sil hidden [ossa] @testUnsafeAddressorAddressableProjection : $@convention(thin) (UnsafeMutablePointer<AddressableHolder>) -> () {
+bb0(%0 : $UnsafeMutablePointer<AddressableHolder>):
+  %1 = alloc_box ${ var NE }, var, name "ref"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = struct_extract %0, #UnsafeMutablePointer._rawValue
+  %5 = pointer_to_address %4 to [strict] $*AddressableHolder
+  %6 = mark_dependence [unresolved] %5 on %0
+  %7 = begin_access [modify] [unsafe] %6
+  %8 = struct_element_addr %7, #AddressableHolder.inner
+  %9 = function_ref @getAddressableDep : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %10 = apply %9(%8) : $@convention(thin) (@inout AddressableForDeps) -> @lifetime(borrow address_for_deps 0) @owned NE
+  end_access %7
+  store %10 to [init] %3
+  %13 = begin_access [modify] [unknown] %3
+  %14 = function_ref @useInoutNE : $@convention(thin) (@inout NE) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@inout NE) -> ()
+  end_access %13
+  end_borrow %2
+  destroy_value %1
+  %19 = tuple ()
+  return %19
+}
+
+sil @getObject : $@convention(thin) () -> @owned AnyObject
+sil @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+
+// rdar://189111544 (Non-escapable result of a protocol extension method can't outlive its declaration when the
+// receiver is a temporary)
+//
+// The store consumes the temporary owned value, so the dependence must be on the stack location, not the stored value.
+//
+// CHECK-LABEL: sil [ossa] @testConsumedTemporary : $@convention(thin) () -> () {
+// CHECK:   [[OBJ:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:   [[TEMP:%.*]] = alloc_stack $AnyObject
+// CHECK:   store [[OBJ]] to [init] [[TEMP]]
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[TEMP]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on [[TEMP]]
+// CHECK-LABEL: } // end sil function 'testConsumedTemporary'
+sil [ossa] @testConsumedTemporary : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  %1 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %2 = alloc_stack $AnyObject
+  store %1 to [init] %2
+  %4 = function_ref @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  destroy_addr %2
+  dealloc_stack %2
+  %8 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %9 = apply %8(%5) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %5
+  %11 = tuple ()
+  return %11
+}
+
+// The temporary holds a copy, so the dependence is on the copied variable.
+//
+// CHECK-LABEL: sil [ossa] @testCopiedTemporary : $@convention(thin) () -> () {
+// CHECK:   [[VAR:%.*]] = move_value [var_decl]
+// CHECK:   [[TEMP:%.*]] = alloc_stack $AnyObject
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[TEMP]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on [[VAR]]
+// CHECK-LABEL: } // end sil function 'testCopiedTemporary'
+sil [ossa] @testCopiedTemporary : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  %1 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %2 = move_value [var_decl] %1
+  %3 = alloc_stack $AnyObject
+  %4 = copy_value %2
+  store %4 to [init] %3
+  %6 = function_ref @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  destroy_addr %3
+  dealloc_stack %3
+  %10 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %11 = apply %10(%7) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %7
+  destroy_value %2
+  %14 = tuple ()
+  return %14
 }

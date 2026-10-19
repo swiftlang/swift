@@ -60,9 +60,6 @@ public:
 
 private:
   friend class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
-
-  explicit SILLoop(SILBasicBlock *BB)
-    : llvm::LoopBase<SILBasicBlock, SILLoop>(BB) {}
 };
 
 /// Information about loops in a function.
@@ -71,7 +68,6 @@ class SILLoopInfo {
   using SILLoopInfoBase = llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 
   SILLoopInfoBase LI;
-  DominanceInfo *Dominance;
 
   void operator=(const SILLoopInfo &) = delete;
   SILLoopInfo(const SILLoopInfo &) = delete;
@@ -128,7 +124,7 @@ public:
   /// Replace the specified loop in the top-level loops list with the indicated
   /// loop.
   void changeTopLevelLoop(SILLoop *OldLoop, SILLoop *NewLoop) {
-    LI.changeTopLevelLoop(OldLoop, NewLoop);
+    LI.replaceLoop(OldLoop, NewLoop);
   }
 
   ///  This adds the specified loop to the collection of top-level loops.

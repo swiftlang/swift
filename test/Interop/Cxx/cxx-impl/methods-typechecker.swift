@@ -5,8 +5,7 @@
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature CxxImplementation \
 // RUN:   -disable-objc-interop \
-// RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}methods.h \
-// RUN:   -I %S%{fs-sep}Inputs
+// RUN:   -I %S/Inputs
 
 // REQUIRES: swift_feature_CxxImplementation
 
@@ -142,10 +141,9 @@ extension Rejections {
 }
 
 
-// Virtual
+// A virtual method matches like a non-virtual one.
 
 extension Polymorphic {
-  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ method 'virtualMethod' because it is the first non-inline virtual method of C++ class 'Polymorphic'}}
   @cxx @implementation
   func virtualMethod() -> Int32 { return 0 }
 }
@@ -170,8 +168,6 @@ extension Widget {
   @cxx @implementation
   func tag() -> Int32 { return id }
 
-  // The type's only out-of-line virtual method is its key function.
-  // expected-error@+2{{instance method 'describe()' cannot implement C++ method 'describe' because it is the first non-inline virtual method of C++ class 'Widget'}}
   @cxx @implementation
   func describe() -> Int32 { return id }
 

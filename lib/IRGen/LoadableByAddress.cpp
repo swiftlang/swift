@@ -132,6 +132,32 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
   return false;
 }
 
+/// The explosion size above which a debug_value's operand is killed.
+///
+/// A load within a reconstruction block (created by prependDeref) will create
+/// a fragment for each of the aggregate's elements in IRGen. LLVM's
+/// calculateDbgEntityHistory (run from the AsmPrinter) is quadratic and
+/// can considerably increase compile time.
+static constexpr unsigned MaxDebugReconstructionExplosionSize = 64;
+
+/// Prepend a deref to operand \p idx of \p dbg.
+/// If the load would be too expensive, the operand is killed.
+static void tryPrependDerefToDebugValue(DebugValueInst *dbg, unsigned idx,
+                                        irgen::IRGenModule &Mod) {
+  if (dbg->getDebugReconstructionBlock()) {
+    SILType addrTy = dbg->getOperand(idx)->getType();
+    auto canType = addrTy.getObjectType().getASTType();
+    if (canType->hasTypeParameter())
+      canType = getSubstGenericEnvironment(dbg->getFunction())
+                    ->mapTypeIntoEnvironment(canType)
+                    ->getCanonicalType();
+    if (Mod.getTypeInfoForLowered(canType).getSchema().size() >
+        MaxDebugReconstructionExplosionSize)
+      return dbg->killOperand(idx);
+  }
+  dbg->prependDeref(idx);
+}
+
 /// Check if a type is a large loadable tuple type that requires indirect
 /// passing according to the native calling convention.
 static bool isLargeLoadableTupleType(GenericEnvironment *GenericEnv, SILType t,
@@ -731,7 +757,9 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::EnumInst:
       case SILInstructionKind::MakeAddrBorrowInst:
       case SILInstructionKind::DereferenceAddrBorrowInst:
-      case SILInstructionKind::DereferenceBorrowAddrInst: {
+      case SILInstructionKind::DereferenceBorrowAddrInst:
+      case SILInstructionKind::UncheckedTrivialBitCastInst:
+      case SILInstructionKind::UncheckedBitwiseCastInst: {
         // TODO Any more instructions to add here?
         visitResultTyInst(cast<SingleValueInstruction>(currIns));
         break;
@@ -1906,7 +1934,8 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       // Update the debug_value to point to the variable in the alloca.
       scalarUse->set(address);
-      dbgInst->prependDeref(scalarUse->getOperandNumber());
+      tryPrependDerefToDebugValue(dbgInst, scalarUse->getOperandNumber(),
+                                  pass.Mod);
     }
   }
 }
@@ -2426,7 +2455,7 @@ static void rewriteFunction(StructLoweringState &pass,
     } else {
       assert(currOperand->getType().isAddress() &&
              "Expected an address type");
-      instr->prependDeref(operand->getOperandNumber());
+      tryPrependDerefToDebugValue(instr, operand->getOperandNumber(), pass.Mod);
     }
   }
 
@@ -2536,6 +2565,18 @@ static void rewriteFunction(StructLoweringState &pass,
           convInstr->hasOperand() ? convInstr->getOperand() : SILValue();
       newInstr = resultTyBuilder.createEnum(
           Loc, operand, convInstr->getElement(), newSILType.getObjectType());
+      break;
+    }
+    case SILInstructionKind::UncheckedTrivialBitCastInst: {
+      auto *convInstr = cast<UncheckedTrivialBitCastInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedTrivialBitCast(
+          Loc, convInstr->getOperand(), newSILType.getObjectType());
+      break;
+    }
+    case SILInstructionKind::UncheckedBitwiseCastInst: {
+      auto *convInstr = cast<UncheckedBitwiseCastInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedBitwiseCast(
+          Loc, convInstr->getOperand(), newSILType.getObjectType());
       break;
     }
     case SILInstructionKind::DereferenceBorrowAddrInst: {
@@ -2932,10 +2973,12 @@ void LoadableByAddress::recreateSingleApply(
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];
 
-      // For now, just replace the value with an immediate load if the old value
-      // was direct.
-      if (oldValue->getType() != newValue->getType() &&
-          !oldValue->getType().isAddress()) {
+      // For now, just replace the value with an immediate load if the
+      // old value was direct and the new value is indirect. Note the
+      // type may change while staying direct, e.g. a yielded closure
+      // type whose signature was rewritten from direct to indirect
+      // but the closure value stays direct.
+      if (!oldValue->getType().isAddress() && newValue->getType().isAddress()) {
         LoadOwnershipQualifier ownership;
         if (!F->hasOwnership()) {
           ownership = LoadOwnershipQualifier::Unqualified;
@@ -2969,13 +3012,14 @@ void LoadableByAddress::recreateSingleApply(
           callee->getType().castTo<SILFunctionType>(), *currIRMod,
           /*mustTransform*/ true);
       SILType newType = SILType::getPrimitiveObjectType(newFnType);
-      callee = applyBuilder.createConvertFunction(castedApply->getLoc(),
-                                                  callee, newType, false);
+      callee = applyBuilder.createConvertFunction(castedApply->getLoc(), callee,
+                                                  newType);
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
-        castedApply->isOnStack(), castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation,
+        castedApply->getExecutionSemantics(), castedApply->isOnStack(),
+        castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -3215,9 +3259,9 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   }
   case SILInstructionKind::ConvertFunctionInst: {
     auto instr = cast<ConvertFunctionInst>(convInstr);
-    newInstr = convBuilder.createConvertFunction(
-        instr->getLoc(), instr->getOperand(), newType,
-        instr->withoutActuallyEscaping());
+    newInstr =
+        convBuilder.createConvertFunction(instr->getLoc(), instr->getOperand(),
+                                          newType, instr->getConversionKind());
     break;
   }
   case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
@@ -3381,7 +3425,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
 void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
   // verification.
-  getModule()->setStage(SILStage::Lowered);
+  getModule()->commitStage(SILStage::Lowered);
 
   for (auto &F : *getModule())
     runOnFunction(&F);
@@ -4211,6 +4255,10 @@ public:
     return heuristic.isLargeLoadableType(ty);
   }
 
+  void tryPrependDerefToDebugValue(DebugValueInst *dbg, unsigned idx) {
+    ::tryPrependDerefToDebugValue(dbg, idx, *irgenModule);
+  }
+
   bool contains(SILValue v) {
     return valueToAddressMap.find(v) != valueToAddressMap.end();
   }
@@ -4861,7 +4909,7 @@ protected:
       }
       SILValue addr = assignment.getAddressForValue(operandVal);
       operand.set(addr);
-      dbg->prependDeref(operand.getOperandNumber());
+      assignment.tryPrependDerefToDebugValue(dbg, operand.getOperandNumber());
     }
   }
 

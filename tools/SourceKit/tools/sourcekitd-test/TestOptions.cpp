@@ -34,26 +34,14 @@ enum Opt {
 #undef OPTION
 };
 
-#define OPTTABLE_STR_TABLE_CODE
+// Create tables mapping all options defined in Options.td.
+#define OPTTABLE_CODE
 #include "Options.inc"
-#undef OPTTABLE_STR_TABLE_CODE
-
-#define OPTTABLE_PREFIXES_TABLE_CODE
-#include "Options.inc"
-#undef OPTTABLE_PREFIXES_TABLE_CODE
-
-// Create table mapping all options defined in Options.td.
-static const llvm::opt::OptTable::Info InfoTable[] = {
-#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
-#include "Options.inc"
-#undef OPTION
-};
 
 // Create OptTable class for parsing actual command line arguments
-class TestOptTable : public llvm::opt::GenericOptTable {
+class TestOptTable : public llvm::opt::OptTable {
 public:
-  TestOptTable()
-      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
+  TestOptTable() : OptTable(optionTables()) {}
 };
 
 } // end anonymous namespace

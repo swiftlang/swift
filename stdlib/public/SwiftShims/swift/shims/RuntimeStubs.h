@@ -36,7 +36,7 @@ swift_stdlib_readLine_stdin(unsigned char * _Nullable * _Nonnull LinePtr);
 #if defined(__wasm__)
 // Wasm can't access call frame for security purposes
 #define get_return_address() ((void*) 0)
-#elif __GNUC__
+#elif defined(__clang__) || defined(__GNUC__)
 #define get_return_address() __builtin_return_address(0)
 #elif _MSC_VER
 #include <intrin.h>

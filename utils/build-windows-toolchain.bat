@@ -24,7 +24,6 @@ echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
 echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo set HOST_ARCH_NAME=%HOST_ARCH_NAME%>> %TEMP%\call-build.cmd
-echo set SMOKE_TEST=%SMOKE_TEST%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -62,21 +61,26 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
-:: Select the test suites by subtracting skipped tests
+:: Build the -Test argument, if any, by subtracting skipped tests
 set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
-set "TestsToRun="
+set "TestArg="
 :: Strip stray double quotes from SKIP_TESTS so the substring match below still works.
 set "SkipTests=%SKIP_TESTS:"=%"
 set "Skip=,%SkipTests%,"
 for %%I in (%TestsList%) do (
   if "!Skip:,%%I,=!" == "!Skip!" (
-      set "TestsToRun=!TestsToRun! %%I"
+      set "TestArg=!TestArg!%%I,"
   )
 )
+set "TestArg=-Test !TestArg!"
 
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
 set "PackagingArg="
 if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Package -Stage %PackageRoot%"
+
+:: The SBoM is only published with the installer.
+set "SBoMArg="
+if not "%INCLUDE_PACKAGING%"=="" set "SBoMArg=-IncludeSBoM"
 
 :: Build the arguments related to Windows SDK builds
 set "WindowsSDKArgs=-Windows"
@@ -93,16 +97,6 @@ if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 
 call :CloneRepositories || (exit /b 1)
 
-if not "%SMOKE_TEST%"=="" if "%INCLUDE_PACKAGING%"=="" (
-  echo SMOKE_TEST needs INCLUDE_PACKAGING
-  exit /b 1
-)
-
-if not "%SMOKE_TEST%"=="" if not exist "%SourceRoot%\swift-docker" (
-  echo SMOKE_TEST needs a swift-docker checkout at %SourceRoot%\swift-docker
-  exit /b 1
-)
-
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
@@ -113,39 +107,10 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
   %PackagingArg% ^
-  -IncludeSBoM ^
+  %TestArg% ^
+  %SBoMArg% ^
   %DebugInfoArg% ^
   -Summary || (exit /b 1)
-
-:: Run every selected suite, even if an earlier suite fails.
-:: Use -Command because Windows PowerShell -File cannot pass a false switch value.
-:: Omit -Windows and packaging options to avoid rebuilding SDKs or installers.
-set "FailedTests="
-for %%I in (%TestsToRun%) do (
-  powershell.exe -ExecutionPolicy RemoteSigned -Command ^
-    "& '%~dp0build.ps1'" ^
-    %HostArchNameArg% ^
-    -SourceCache "'%SourceRoot%'" ^
-    -BinaryCache "'%BuildRoot%'" ^
-    -ArtifactCache "'%BuildRoot%\ArtifactCache'" ^
-    -BuildRoot "'%BuildRoot%'" ^
-    -ObjectStore "'%BuildRoot%\ObjectStore'" ^
-    -Toolchain:$false ^
-    -Test %%I ^
-    %DebugInfoArg% ^
-    -Summary || (set "FailedTests=!FailedTests! %%I")
-)
-if defined FailedTests (
-  echo Failed test suites:!FailedTests!
-  exit /b 1
-)
-
-if not "%SMOKE_TEST%"=="" (
-  powershell.exe -NonInteractive -ExecutionPolicy RemoteSigned -File %~dp0windows-smoke-tests\RunSmokeTest.ps1 ^
-    -Installer "%PackageRoot%\installer.exe" ^
-    -SourceCache "%SourceRoot%" ^
-    -EntryPoint "%~dp0windows-smoke-tests\SmokeTest.ps1" || (exit /b 1)
-)
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
 :: CI can upload the archive to the Swift debug-symbols server.

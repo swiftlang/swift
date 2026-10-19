@@ -5,7 +5,7 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}foreign-reference.h \
 // RUN:   -I %S%{fs-sep}Inputs
 
@@ -22,6 +22,37 @@ func takesNode(_ n: Node) -> Int32 { return n.value }
 
 @cxx @implementation
 func takesNullableNode(_ n: Node?) -> Int32 { return n?.value ?? -1 }
+
+// A C++ reference to a foreign reference type imports like the reference
+// type itself. The parameter carries the object, not the reference, so the
+// implementation need not be `@unsafe`.
+@cxx @implementation
+func takesNodeByRef(_ n: Node) -> Int32 { return n.value }
+
+// A const one is borrowed for the call, so it must be `borrowing`.
+// expected-error@+2{{global function 'consumesConstNodeRef' cannot implement C++ function 'consumesConstNodeRef' because parameter 'n' must be 'borrowing' to match a C++ 'const' reference}}{{32-41=borrowing}}
+@cxx @implementation
+func consumesConstNodeRef(_ n: consuming Node) -> Int32 { return n.value }
+
+// A C++ reference to a pointer to a foreign reference type is implemented by
+// an `inout` parameter of the reference type, a const one by a `borrowing`
+// parameter. The referent is the pointer, so the implementation must be
+// `@unsafe` as for any other reference parameter.
+@unsafe @cxx @implementation
+func reseatNode(_ p: inout Node, _ to: Node) { p = to }
+
+@unsafe @cxx @implementation
+func readNodePtr(_ p: borrowing Node) -> Int32 { return p.value }
+
+// expected-error@+2{{global function 'mismatchedNodePtrSpelling' of type '(UnsafeMutablePointer<Node>) -> ()' does not match type '(inout Node) -> Void' declared by the header}}
+@unsafe @cxx @implementation
+func mismatchedNodePtrSpelling(_ p: UnsafeMutablePointer<Node>) {}
+
+// expected-error@+2{{global function 'missingUnsafeNodePtr' must be marked '@unsafe' to implement C++ function 'missingUnsafeNodePtr'}}{{-1:1-1=@unsafe }}
+@cxx @implementation
+func missingUnsafeNodePtr(
+  _ p: borrowing Node // expected-note{{C++ callers may modify parameter 'p' through another reference during the call}}
+) -> Int32 { return p.value }
 
 @cxx @implementation
 func returnsRetainedNode(_ n: Node) -> Node { return n }
@@ -47,6 +78,10 @@ func returnsUnretainedNode(_ n: Node) -> Node { return n }
 // expected-error@+2{{global function 'returnsUnannotatedNode' cannot implement C++ function 'returnsUnannotatedNode' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
 @cxx @implementation
 func returnsUnannotatedNode(_ n: Node) -> Node { return n }
+
+// expected-error@+2{{global function 'returnsNodeByRef()' cannot implement C++ function 'returnsNodeByRef' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
+@cxx @implementation
+func returnsNodeByRef() -> Node { fatalError() }
 
 // expected-error@+2{{global function 'returnsLeaf' cannot implement C++ function 'returnsLeaf' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
 @cxx @implementation
@@ -119,7 +154,6 @@ extension Singleton {
 // A virtual method of a foreign reference type.
 
 extension Polymorphic {
-  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ method 'virtualMethod' because it is the first non-inline virtual method of C++ class 'Polymorphic'}}
   @cxx @implementation
   func virtualMethod() -> Int32 { return 0 }
 

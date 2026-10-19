@@ -115,6 +115,47 @@ extension Box {
 }
 
 
+// References
+
+// int readTracked(const Tracked &t);
+// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z11readTrackedRK7Tracked(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} i32 @"?readTracked@@YAHAEBUTracked@@@Z"(ptr %0)
+// CHECK-SYSV-NOT: {{call|invoke}} {{.*}}@_ZN7Tracked
+// CHECK-WIN-NOT: {{call|invoke}} {{.*}}@"??{{[01]}}Tracked@@
+// CHECK: getelementptr inbounds{{.*}} %TSo7TrackedV, ptr %0
+// CHECK-SYSV-NOT: {{call|invoke}} {{.*}}@_ZN7Tracked
+// CHECK-WIN-NOT: {{call|invoke}} {{.*}}@"??{{[01]}}Tracked@@
+// CHECK: ret i32
+@unsafe @cxx @implementation
+public func readTracked(_ t: borrowing Tracked) -> Int32 { return t.value }
+
+// int readMoveOnly(const MoveOnly &m);
+// CHECK-SYSV-LABEL: define{{.*}} i32 @_Z12readMoveOnlyRK8MoveOnly(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} i32 @"?readMoveOnly@@YAHAEBUMoveOnly@@@Z"(ptr %0)
+// CHECK-SYSV-NOT: {{call|invoke}} {{.*}}@_ZN8MoveOnly
+// CHECK-WIN-NOT: {{call|invoke}} {{.*}}@"??{{[01]}}MoveOnly@@
+// CHECK: getelementptr inbounds{{.*}} %TSo8MoveOnlyV, ptr %0
+// CHECK-SYSV-NOT: {{call|invoke}} {{.*}}@_ZN8MoveOnly
+// CHECK-WIN-NOT: {{call|invoke}} {{.*}}@"??{{[01]}}MoveOnly@@
+// CHECK: ret i32
+@unsafe @cxx @implementation
+public func readMoveOnly(_ m: borrowing MoveOnly) -> Int32 { return m.value }
+
+// void bumpTracked(Tracked &t);
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z11bumpTrackedR7Tracked(ptr %0)
+// CHECK-WIN-LABEL: define{{.*}} void @"?bumpTracked@@YAXAEAUTracked@@@Z"(ptr %0)
+@unsafe @cxx @implementation
+public func bumpTracked(_ t: inout Tracked) { t.value += 1 }
+
+// void assignTracked(Tracked &dst, const Tracked &src);
+// CHECK-SYSV-LABEL: define{{.*}} void @_Z13assignTrackedR7TrackedRKS_(ptr %0, ptr %1)
+// CHECK-WIN-LABEL: define{{.*}} void @"?assignTracked@@YAXAEAUTracked@@AEBU1@@Z"(ptr %0, ptr %1)
+@unsafe @cxx @implementation
+public func assignTracked(_ dst: inout Tracked, _ src: borrowing Tracked) {
+  dst = copy src
+}
+
+
 // Swift-side calls
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s{{.*}}19callNonTrivialFuncsyyF"
@@ -128,8 +169,12 @@ extension Box {
 // CHECK-SYSV:   invoke i32 @_ZN3Box3addE7Tracked
 // CHECK-SYSV:   invoke void @_ZNK3Box7produceEv
 // CHECK-SYSV:   invoke void @_ZN3Box4wrapEi
+// CHECK-SYSV:   invoke i32 @_Z11readTrackedRK7Tracked
+// CHECK-SYSV:   invoke i32 @_Z12readMoveOnlyRK8MoveOnly
+// CHECK-SYSV:   invoke void @_Z11bumpTrackedR7Tracked
+// CHECK-SYSV:   invoke void @_Z13assignTrackedR7TrackedRKS_
 public func callNonTrivialFuncs() {
-  let t = Tracked(1)
+  var t = Tracked(1)
   _ = takesTracked(t)
   _ = takesTwoTracked(t, t)
   _ = returnsTracked(2)
@@ -142,4 +187,11 @@ public func callNonTrivialFuncs() {
   _ = box.add(t)
   _ = box.produce()
   _ = Box.wrap(5)
+
+  let u = Tracked(6)
+  let m = MoveOnly(7)
+  _ = readTracked(t)
+  _ = readMoveOnly(m)
+  bumpTracked(&t)
+  assignTracked(&t, u)
 }

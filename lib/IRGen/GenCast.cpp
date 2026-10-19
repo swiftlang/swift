@@ -114,6 +114,10 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
     // The `DynamicCastTest()` runtime was added in Swift 6.5.
     // For older runtimes, we have to make do with the regular casting
     // endpoint, which requires a temporary buffer to put the result into.
+    //
+    // The copy that entails is safe because Sema rejects casting out of a
+    // non-'Copyable' existential at these deployment targets.  See
+    // checkNoncopyableExistentialCastingAvailability().
     auto targetSILType =
         IGF.IGM.getLoweredType(AbstractionPattern::getOpaque(), targetType);
     auto &targetTI = IGF.getTypeInfo(targetSILType);
@@ -263,12 +267,12 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   if (auto archetypeTy = dyn_cast<ArchetypeType>(toType)) {
     nonSpecificClass = true;
     if (auto superclassTy = archetypeTy->getSuperclass())
-      destClass = superclassTy->getClassOrBoundGenericClass();
+      destClass = superclassTy->getClassDecl();
   } else if (auto selfTy = dyn_cast<DynamicSelfType>(toType)) {
     nonSpecificClass = true;
-    destClass = selfTy->getSelfType()->getClassOrBoundGenericClass();
+    destClass = selfTy->getSelfType()->getClassDecl();
   } else {
-    destClass = toType.getClassOrBoundGenericClass();
+    destClass = toType.getClassDecl();
     assert(destClass != nullptr);
   }
 
@@ -608,7 +612,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
 static std::optional<unsigned> getFastLookupIndex(IRGenModule &IGM,
                                                   CanType srcInstanceType,
                                                   ProtocolDecl *proto) {
-  ClassDecl *cDecl = srcInstanceType.getClassOrBoundGenericClass();
+  ClassDecl *cDecl = srcInstanceType.getClassDecl();
   if (!cDecl)
     return std::nullopt;
 
@@ -1149,13 +1153,11 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(!targetLoweredType.is<AnyMetatypeType>() &&
          "scalar cast of class reference to metatype is unimplemented");
 
-  // A cast to a COM existential is not a representation-preserving conformance
-  // check. `QueryInterface` can return a distinct interface pointer, and the
-  // COM existential representation does not carry witness tables. Use the
-  // general dynamic-cast entry point so that the runtime can perform the
-  // identity query and return exactly the single-word COM existential
-  // representation.
-  if (targetFormalType.isCOMExistentialType()) {
+  // COM casts can change both the pointer and its reference-counting identity.
+  // QueryInterface obtains a destination interface, while ISwiftObject recovers
+  // a native object from a source interface. Use the runtime for both cases.
+  if (sourceFormalType.isCOMExistentialType() ||
+      targetFormalType.isCOMExistentialType()) {
     auto &sourceTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(sourceLoweredType));
     auto source =
         sourceTI.allocateStack(IGF, sourceLoweredType, "com.cast.source");
@@ -1165,9 +1167,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     auto target =
         targetTI.allocateStack(IGF, targetLoweredType, "com.cast.target");
 
-    auto storage = cast<llvm::PointerType>(targetTI.getStorageType());
-    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(storage),
-                            target.getAddress());
+    IGF.Builder.CreateStore(
+        llvm::Constant::getNullValue(targetTI.getStorageType()),
+        target.getAddress());
 
     emitCheckedCast(IGF, source.getAddress(), sourceFormalType,
                     target.getAddress(), targetFormalType,

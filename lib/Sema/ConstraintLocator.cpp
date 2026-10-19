@@ -52,6 +52,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalInjection:
+  case ConstraintLocator::OptionalPayload:
   case ConstraintLocator::Member:
   case ConstraintLocator::MemberRefBase:
   case ConstraintLocator::UnresolvedMember:
@@ -174,6 +175,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::ApplyFunction:
     out << "apply function";
+    break;
+
+  case ConstraintLocator::OptionalPayload:
+    out << "optional payload";
     break;
 
   case ConstraintLocator::OptionalInjection:

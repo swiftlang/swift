@@ -92,6 +92,9 @@ FEATURE(TaskDeadline,                                   (6, 5))
 FEATURE(CancellationHandlerWithReason,                  (6, 5))
 FEATURE(DistributedActorResignRemoteID,                 (6, 5))
 FEATURE(EmbeddedDistributedSwift,                       (6, 5))
+FEATURE(DistributedAccessorIsolation,                   (6, 5))
+FEATURE(DynamicCastTest,                                (6, 5))
+FEATURE(OnceClosureDestroyedError,                      (6, 5))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
@@ -101,8 +104,6 @@ FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
 FEATURE(CoroutineAccessors,                             FUTURE)
 FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
 FEATURE(CoroutineFunctions,                             FUTURE)
-// TODO: DynamicCastTest: Change to correct version number.
-FEATURE(DynamicCastTest,                                FUTURE)
 
 #undef FEATURE
 #undef FUTURE

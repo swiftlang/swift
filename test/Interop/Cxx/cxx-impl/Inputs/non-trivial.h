@@ -68,11 +68,21 @@ struct Box {
   static Tracked wrap(int v);
 };
 
-// Rejected: implementations spelled `borrowing` or `consuming`.
+// By reference.
+
+int readTracked(const Tracked &t);
+int readMoveOnly(const MoveOnly &m);
+void bumpTracked(Tracked &t);
+void assignTracked(Tracked &dst, const Tracked &src);
+
+// Rejected: by-value implementations spelled `borrowing` or `consuming`, and
+// `const` reference implementations not spelled `borrowing`.
 
 int takesTrackedBorrowing(Tracked t);
 int takesTrackedConsuming(Tracked t);
 int takesMoveOnlyBorrowing(MoveOnly m);
 int takesMoveOnlyConsuming(MoveOnly m);
+int consumesTrackedRef(const Tracked &t);
+int consumesMoveOnlyRef(const MoveOnly &m);
 
 #endif

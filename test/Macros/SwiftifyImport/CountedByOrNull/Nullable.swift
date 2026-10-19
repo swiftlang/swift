@@ -29,7 +29,7 @@ public func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMu
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
     let len = CInt(exactly: unsafe ptr?.count ?? 0)!
     return unsafe myFunc(ptr?.baseAddress, len)
@@ -38,7 +38,7 @@ public func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
 @__swiftmacro_4test7myFunc215_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
@@ -53,7 +53,7 @@ public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
 @__swiftmacro_4test7myFunc315_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(ptr: copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
 public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let len2 = CInt(exactly: ptr2?.count ?? 0)!
@@ -75,7 +75,7 @@ public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<C
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc4(_ ptr: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {

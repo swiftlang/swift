@@ -61,3 +61,17 @@ func returns_any_retained() -> CFTypeRef? {
 
 // CHECK-LABEL: sil{{.*}} @$s16c_implementation20returns_any_retainedyXlSgyFTo : $@convention(c) () -> @owned Optional<AnyObject> {
 
+
+@c @implementation
+func returns_not_retained_unmanaged() -> Unmanaged<CFString>? {
+  return nil
+}
+
+// CHECK-LABEL: sil{{.*}} @$s16c_implementation30returns_not_retained_unmanageds9UnmanagedVySo11CFStringRefaGSgyFTo : $@convention(c) () -> Optional<Unmanaged<CFString>> {
+
+@c @implementation
+func returns_retained_unmanaged() -> Unmanaged<CFString>? {
+  return Unmanaged.passRetained(getString() as CFString)
+}
+
+// CHECK-LABEL: sil{{.*}} @$s16c_implementation26returns_retained_unmanageds9UnmanagedVySo11CFStringRefaGSgyFTo : $@convention(c) () -> Optional<Unmanaged<CFString>> {

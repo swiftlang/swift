@@ -139,6 +139,11 @@ struct QueuedDiagnostics {
 
   /// The known source files
   var sourceFiles: [ExportedSourceFile] = []
+
+  /// Diagnostics raised without a source location.
+  ///
+  /// 'grouped' does not hold them since they have no matching source.
+  var unlocated: [SimpleDiagnostic] = []
 }
 
 /// Create a grouped diagnostics structure in which we can add osou
@@ -165,7 +170,9 @@ public func destroyQueuedDiagnostics(
 }
 
 /// Diagnostic message used for thrown errors.
-fileprivate struct SimpleDiagnostic: DiagnosticMessage {
+struct SimpleDiagnostic: DiagnosticMessage {
+  let diagnosticID: MessageID
+
   let message: String
 
   let severity: DiagnosticSeverity
@@ -175,8 +182,18 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
   /// Full category chain (leaf-first).
   let categoryChain: [DiagnosticCategory]
 
-  var diagnosticID: MessageID {
-    .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
+  init(
+    id: String,
+    message: String,
+    severity: DiagnosticSeverity,
+    category: DiagnosticCategory?,
+    categoryChain: [DiagnosticCategory]
+  ) {
+    self.diagnosticID = MessageID(domain: "SwiftCompiler", id: id)
+    self.message = message
+    self.severity = severity
+    self.category = category
+    self.categoryChain = categoryChain
   }
 }
 
@@ -273,6 +290,7 @@ public func addQueuedDiagnostic(
   text: BridgedStringRef,
   severity: swift.DiagnosticKind,
   loc: SourceLoc,
+  diagnosticID: BridgedStringRef,
   categoryChainPtr: UnsafePointer<BridgedDiagnosticCategoryEntry>?,
   numCategoryChainEntries: Int,
   highlightRangesPtr: UnsafePointer<CharSourceRange>?,
@@ -287,22 +305,42 @@ public func addQueuedDiagnostic(
     to: PerFrontendDiagnosticState.self
   )
 
+  let categoryChain = convertCategoryChain(categoryChainPtr, count: numCategoryChainEntries)
+  let category: DiagnosticCategory? = categoryChain.first
+
+  // Register all groups for footnote generation.
+  for category in categoryChain {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
   guard let rawPosition = loc.raw else {
+    // A diagnostic raised without a source location has nothing to render it
+    // against, so it is added to `unlocated`.
+    queuedDiagnostics.pointee.unlocated.append(
+      SimpleDiagnostic(
+        id: String(bridged: diagnosticID),
+        message: String(bridged: text),
+        severity: severity.asSeverity,
+        category: category,
+        categoryChain: categoryChain
+      )
+    )
     return
   }
 
   // Find the source file that contains this location.
-  let sourceFile = queuedDiagnostics.pointee.sourceFiles.first { sf in
+  let sourceFileIndex = queuedDiagnostics.pointee.sourceFiles.firstIndex { sf in
     guard let baseAddress = sf.buffer.baseAddress else {
       return false
     }
 
     return rawPosition >= baseAddress && rawPosition <= baseAddress + sf.buffer.count
   }
-  guard let sourceFile = sourceFile else {
+  guard let sourceFileIndex = sourceFileIndex else {
     // FIXME: Hard to report an error here...
     return
   }
+  let sourceFile = queuedDiagnostics.pointee.sourceFiles[sourceFileIndex]
 
   let sourceFileBaseAddress = UnsafeRawPointer(sourceFile.buffer.baseAddress!)
   let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
@@ -376,15 +414,6 @@ public func addQueuedDiagnostic(
     }
   }
 
-  // Convert the category chain from bridged data.
-  let categoryChain = convertCategoryChain(categoryChainPtr, count: numCategoryChainEntries)
-  let category: DiagnosticCategory? = categoryChain.first
-
-  // Register all groups for footnote generation.
-  for category in categoryChain {
-    diagnosticState.pointee.referencedCategories.insert(category)
-  }
-
   // Map the Fix-Its
   let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
     fixIts.compactMap { fixIt in
@@ -414,6 +443,7 @@ public func addQueuedDiagnostic(
     node: node,
     position: position,
     message: SimpleDiagnostic(
+      id: String(bridged: diagnosticID),
       message: String(bridged: text),
       severity: severity.asSeverity,
       category: category,
@@ -454,6 +484,8 @@ public func renderSingleDiagnostic(
 
   let renderedStr = formatter.formattedMessage(
     SimpleDiagnostic(
+      // This path only renders; nothing reads the identifier.
+      id: "SimpleDiagnostic",
       message: String(bridged: text),
       severity: severity.asSeverity,
       category: category,

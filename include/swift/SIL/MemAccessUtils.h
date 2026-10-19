@@ -833,18 +833,6 @@ namespace llvm {
 /// AccessStorage values are distinct. Inequality does, however, guarantee that
 /// two *uniquely* identified AccessStorage values are distinct.
 template <> struct DenseMapInfo<swift::AccessStorage> {
-  static swift::AccessStorage getEmptyKey() {
-    return swift::AccessStorage(swift::SILValue::getFromOpaqueValue(
-                               llvm::DenseMapInfo<void *>::getEmptyKey()),
-                           swift::AccessStorage::Unidentified);
-  }
-
-  static swift::AccessStorage getTombstoneKey() {
-    return swift::AccessStorage(swift::SILValue::getFromOpaqueValue(
-                               llvm::DenseMapInfo<void *>::getTombstoneKey()),
-                           swift::AccessStorage::Unidentified);
-  }
-
   static unsigned getHashValue(swift::AccessStorage storage) {
     switch (storage.getKind()) {
     case swift::AccessStorage::Unidentified:
@@ -1285,18 +1273,6 @@ namespace llvm {
 
 /// Allow AccessPath to be used in DenseMap.
 template <> struct DenseMapInfo<swift::AccessPath> {
-  static inline swift::AccessPath getEmptyKey() {
-    return swift::AccessPath(
-        DenseMapInfo<swift::AccessStorage>::getEmptyKey(),
-        swift::AccessPath::PathNode(
-          DenseMapInfo<swift::IndexTrieNode *>::getEmptyKey()), 0);
-  }
-  static inline swift::AccessPath getTombstoneKey() {
-    return swift::AccessPath(
-        DenseMapInfo<swift::AccessStorage>::getTombstoneKey(),
-        swift::AccessPath::PathNode(
-          DenseMapInfo<swift::IndexTrieNode *>::getTombstoneKey()), 0);
-  }
   static inline unsigned getHashValue(const swift::AccessPath &val) {
     return llvm::hash_combine(
         DenseMapInfo<swift::AccessStorage>::getHashValue(val.getStorage()),
@@ -1308,16 +1284,6 @@ template <> struct DenseMapInfo<swift::AccessPath> {
   }
 };
 template <> struct DenseMapInfo<swift::AccessPathWithBase> {
-  static inline swift::AccessPathWithBase getEmptyKey() {
-    return swift::AccessPathWithBase(
-        DenseMapInfo<swift::AccessPath>::getEmptyKey(),
-        DenseMapInfo<swift::SILValue>::getEmptyKey());
-  }
-  static inline swift::AccessPathWithBase getTombstoneKey() {
-    return swift::AccessPathWithBase(
-        DenseMapInfo<swift::AccessPath>::getTombstoneKey(),
-        DenseMapInfo<swift::SILValue>::getTombstoneKey());
-  }
   static inline unsigned getHashValue(const swift::AccessPathWithBase &val) {
     return llvm::hash_combine(
         DenseMapInfo<swift::AccessPath>::getHashValue(val.accessPath),

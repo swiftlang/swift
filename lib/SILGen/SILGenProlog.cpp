@@ -881,9 +881,9 @@ private:
         }
       }
     }
-    // If we're relying on ManualOwnership for explicit-copies enforcement,
-    // we don't need @noImplicitCopy / MoveOnlyWrapper.
-    if (SGF.B.hasManualOwnershipAttr())
+
+    // Do we actually need the wrapper type?
+    if (!SGF.usingWrapperTypeImplicitCopyEnforcement())
       isNoImplicitCopy = false;
 
     // If we have a no implicit copy argument and the argument is trivial,
@@ -1314,7 +1314,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   bool isNoImplicitCopy;
 
   if (ty.isTrivial(SGF.F) || ty.isMoveOnly() ||
-      SGF.B.hasManualOwnershipAttr()) {
+      !SGF.usingWrapperTypeImplicitCopyEnforcement()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
     isNoImplicitCopy = true;

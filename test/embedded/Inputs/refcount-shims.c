@@ -19,12 +19,22 @@
 // Extern`.
 
 void *swift_retain_n(void *object, unsigned n);
+void swift_release_n(void *object, unsigned n);
 void *swift_bridgeObjectRetain(void *object);
 void swift_unownedRetainStrongAndRelease(void *object);
 void *swift_weakTakeStrong(void *ref);
+long swift_retainCount(void *object);
 
 void *test_retain_n(void *object, unsigned n) {
   return swift_retain_n(object, n);
+}
+
+void test_release_n(void *object, unsigned n) {
+  swift_release_n(object, n);
+}
+
+long test_retainCount(void *object) {
+  return swift_retainCount(object);
 }
 
 void *test_bridgeObjectRetain(void *object) {

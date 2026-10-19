@@ -972,6 +972,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OptionalPayload>() ||
         last.is<LocatorPathElt::OpenedGeneric>() ||
         last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||
@@ -1858,12 +1859,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
-  assert(!baseType->isPlaceholder() &&
-         "Base type must not be a type placeholder");
+  assert(!baseType->is<HoleType>() && "Base type must not be a type hole");
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
-  assert(!unwrappedType->isPlaceholder() &&
-         "Unwrapped type must not be a type placeholder");
+  assert(!unwrappedType->is<HoleType>() &&
+         "Unwrapped type must not be a type hole");
 
   if (!baseType->getOptionalObjectType())
     return false;
@@ -4398,7 +4398,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
     Type Ty, TypoCorrectionResults &corrections, DeclNameRef memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
-  if (!Ty->getEnumOrBoundGenericEnum())
+  if (!Ty->getEnumDecl())
     return DeclName();
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
@@ -4415,10 +4415,10 @@ ValueDecl *MissingMemberFailure::
 findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
   IterableDeclContext *idc = nullptr;
 
-  if (auto ED = instanceTy->getEnumOrBoundGenericEnum()) {
+  if (auto ED = instanceTy->getEnumDecl()) {
     idc = ED;
   }
-  else if (auto SD = instanceTy->getStructOrBoundGenericStruct()) {
+  else if (auto SD = instanceTy->getStructDecl()) {
     // Did ClangImporter add OptionSet to this struct?
     for (auto protoAttr :
             SD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -4626,7 +4626,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     return true;
   } else {
     // Check for a few common cases that can cause missing members.
-    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    auto *ED = baseType->getEnumDecl();
     if (ED && getName().isSimpleName("rawValue")) {
       auto loc = ED->getNameLoc();
       if (loc.isValid()) {
@@ -7643,8 +7643,22 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
 
 bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     diagnoseAsError() {
-  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
-                 getToType());
+  auto getSemantics = [](Type type) -> std::optional<ExecutionSemantics> {
+    if (auto *fnType = type->getAs<FunctionType>())
+      return fnType->getExecutionSemantics();
+    return std::nullopt;
+  };
+
+  // The source has the execution semantics, unless the constraint required
+  // the two types to be equal.
+  auto semantics = getSemantics(getFromType());
+  if (!semantics)
+    semantics = getSemantics(getToType());
+
+  emitDiagnostic(diag::called_attr_function_type_mismatch,
+                 CalledAttr::getSemanticsName(
+                     semantics.value_or(ExecutionSemantics::AtMostOnce)),
+                 getFromType(), getToType());
   return true;
 }
 
@@ -7825,7 +7839,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   // Unresolved key path argument requires a tailored diagnostic
   // that doesn't mention a fallback type - `KeyPath<_, _>`.
   if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
-    auto keyPathTy = argType->castTo<BoundGenericType>();
+    auto keyPathTy = argType->castTo<NominalType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
     if (rootTy->isBareErrorType()) {
       emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
@@ -8218,7 +8232,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   if (!argType->isKnownKeyPathType())
     return false;
 
-  auto kpType = argType->castTo<BoundGenericType>();
+  auto kpType = argType->castTo<NominalType>();
   auto kpRootType = kpType->getGenericArgs()[0];
   auto kpValueType = kpType->getGenericArgs()[1];
 

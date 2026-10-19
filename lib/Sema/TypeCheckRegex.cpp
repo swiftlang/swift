@@ -154,11 +154,11 @@ static Type computeRegexLiteralType(const RegexLiteralExpr *regex,
   }
   assert(!matchElements.empty() && "Should have decoded at least an atom");
   if (matchElements.size() == 1)
-    return BoundGenericStructType::get(regexDecl, Type(),
-                                       matchElements.front().getType());
+    return StructType::get(regexDecl, Type(),
+                           {matchElements.front().getType()}, ctx);
   // Form a tuple.
   auto matchType = TupleType::get(matchElements, ctx);
-  return BoundGenericStructType::get(regexDecl, Type(), {matchType});
+  return StructType::get(regexDecl, Type(), {matchType}, ctx);
 }
 
 RegexLiteralPatternInfo

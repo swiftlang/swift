@@ -684,6 +684,8 @@ static StringRef getDumpString(ExplicitSafety safety) {
 }
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
+  case ExecutionSemantics::AtMostOnce:
+    return "atMostOnce";
   case ExecutionSemantics::Once:
     return "once";
   }
@@ -5152,8 +5154,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Frozen, frozen)
   TRIVIAL_ATTR_PRINTER(GKInspectable, gk_inspectable)
   TRIVIAL_ATTR_PRINTER(GlobalActor, global_actor)
-  TRIVIAL_ATTR_PRINTER(HasHiddenStoredProperties,
-                       has_hidden_stored_properties)
   TRIVIAL_ATTR_PRINTER(HasInitialValue, has_initial_value)
   TRIVIAL_ATTR_PRINTER(HasMissingDesignatedInitializers,
                        has_missing_designated_initializers)
@@ -6340,25 +6340,12 @@ namespace {
 
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
-      auto originator = T->getOriginator();
-      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
-        printRec(typeVar, Label::always("type_variable"));
-      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
-                            Label::optional("originating_var"), DeclColor);
-      } else if (isa<ErrorExpr *>(originator)) {
-        printFlag("error_expr");
-      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
-        printRec(errTy, Label::always("error_type"));
-      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
-        printRec(DMT, Label::always("dependent_member_type"));
-      } else if (isa<TypeRepr *>(originator)) {
-        printFlag("type_repr");
-      } else if (isa<Pattern *>(originator)) {
-        printFlag("pattern");
-      } else {
-        assert(false && "unknown originator");
-      }
+      printFoot();
+    }
+
+    void visitHoleType(HoleType *T, Label label) {
+      printCommon("hole_type", label);
+      printRec(T->getOriginator(), Label::always("originator"));
       printFoot();
     }
 
@@ -6531,31 +6518,18 @@ namespace {
                                                            \
       if (T->getParent())                                  \
         printRec(T->getParent(), Label::always("parent")); \
+      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
+        printRec(arg, label);                              \
+      }, Label::optional("generic_args"));                 \
                                                            \
       printFoot();                                         \
     }
 
-#define VISIT_BINDABLE_NOMINAL_TYPE(TypeClass, Name)       \
-    VISIT_NOMINAL_TYPE(TypeClass, Name)                    \
-    void visitBoundGeneric##TypeClass(                     \
-        BoundGeneric##TypeClass *T, Label label) {         \
-      printCommon("bound_generic_" #Name, label);          \
-      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
-      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
-      if (T->getParent())                                  \
-        printRec(T->getParent(), Label::always("parent")); \
-      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
-        printRec(arg, label);                              \
-      }, Label::optional("generic_args"));                 \
-      printFoot();                                         \
-    }
-
-    VISIT_BINDABLE_NOMINAL_TYPE(EnumType, enum_type)
-    VISIT_BINDABLE_NOMINAL_TYPE(StructType, struct_type)
-    VISIT_BINDABLE_NOMINAL_TYPE(ClassType, class_type)
+    VISIT_NOMINAL_TYPE(EnumType, enum_type)
+    VISIT_NOMINAL_TYPE(StructType, struct_type)
+    VISIT_NOMINAL_TYPE(ClassType, class_type)
     VISIT_NOMINAL_TYPE(ProtocolType, protocol_type)
 
-#undef VISIT_BINDABLE_NOMINAL_TYPE
 #undef VISIT_NOMINAL_TYPE
 
     void visitBuiltinTupleType(BuiltinTupleType *T, Label label) {
@@ -6795,7 +6769,8 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
-        printFlag(T->isCalledOnce(), "called_once");
+        if (auto semantics = T->getExecutionSemantics())
+          printField(*semantics, Label::always("called"));
         printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
@@ -6970,6 +6945,9 @@ namespace {
           break;
         case InvertibleProtocolKind::Escapable:
           printFlag("inverse_escapable");
+          break;
+        case InvertibleProtocolKind::Deinitable:
+          printFlag("inverse_deinitable");
           break;
         }
       }

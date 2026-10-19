@@ -79,6 +79,6 @@ public class CC<T : PP> {
   }
 }
 
-// CHECK-DAG: sil [serialized] [canonical] [ossa] @$s14serialize_attr14specializeThis_1uyx_q_tr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] [ossa] @$s14serialize_attr14specializeThis_1uyx_q_tr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
 
-// CHECK-DAG: sil [serialized] [noinline] [canonical] [ossa] @$s14serialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in_guaranteed U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-DAG: sil [serialized] [noinline] [canonical] [stage=canonical] [ossa] @$s14serialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in_guaranteed U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {

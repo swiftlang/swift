@@ -929,8 +929,7 @@ public:
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(F);
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF),
-                std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       Ctx.initBlockIDs(RPOT);
       interleave(RPOT,
@@ -1822,6 +1821,8 @@ public:
   void visitBeginApplyInst(BeginApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isUnresolved())
+      *this << "[unresolved] ";
     visitApplyInstBase(AI);
   }
 
@@ -1874,8 +1875,15 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->isCalledOnce()) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      switch (*semantics) {
+      case ExecutionSemantics::AtMostOnce:
+        *this << "[called_at_most_once] ";
+        break;
+      case ExecutionSemantics::Once:
+        *this << "[called_once] ";
+        break;
+      }
     }
     visitApplyInstBase(CI);
   }
@@ -2377,6 +2385,8 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())
       *this << "[without_actually_escaping] ";
+    if (CI->withoutActuallyDiscarding())
+      *this << "[without_actually_discarding] ";
     *this << CI->getType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
@@ -2965,6 +2975,9 @@ public:
     case DiagnoseKind::UnpermittedCopy:
       *this << "[unpermitted_copy] ";
       break;
+    case DiagnoseKind::LetReinit:
+      *this << "[let_reinit] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
@@ -3091,6 +3104,7 @@ public:
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
+          << (BAI->isUnresolved() ? "[unresolved] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitMoveOnlyWrapperToCopyableAddrInst(
@@ -4012,8 +4026,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // SIB) after importing canonical SIL from another module. If the imported
   // functions are reserialized (e.g. shared linkage), then we must preserve
   // this attribute.
-  if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
+  if (WasDeserializedCanonical && getModule().getStageFloor() == SILStage::Raw)
     OS << "[canonical] ";
+
+  // A function that is ahead of the module's stage floor carries its own stage.
+  // A function at the floor prints nothing: the module `sil_stage` line already
+  // captures this.
+  if (getFunctionStage() > getModule().getStageFloor())
+    OS << "[stage=" << getSILStageName(getFunctionStage()) << "] ";
 
   // If this function is not an external declaration /and/ is in ownership ssa
   // form, print [ossa].
@@ -4478,18 +4498,7 @@ static void printExternallyVisibleDecls(SILPrintContext &Ctx,
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_stage ";
-  switch (Stage) {
-  case SILStage::Raw:
-    OS << "raw";
-    break;
-  case SILStage::Canonical:
-    OS << "canonical";
-    break;
-  case SILStage::Lowered:
-    OS << "lowered";
-    break;
-  }
+  OS << "sil_stage " << getSILStageName(StageFloor);
 
   OS << "\n\nimport " << BUILTIN_NAME
      << "\nimport " << STDLIB_NAME
@@ -5157,7 +5166,7 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF), std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
       for (unsigned Index : indices(RPOT))

@@ -946,8 +946,16 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 ///
 /// - Returns: the Id stored in this ExecutorJob or Task, for purposes of debug printing
 @available(StdlibDeploymentTarget 5.9, *)
+@usableFromInline
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
+
+/// Returns the 64-bit TaskID of the currently-executing task, or 0 if there
+/// is no current task.
+@available(StdlibDeploymentTarget 6.5, *)
+@usableFromInline
+@_silgen_name("swift_task_getCurrentTaskId")
+internal func _getCurrentTaskId() -> UInt64
 
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_isSameExclusiveExecutionContext")
@@ -956,14 +964,18 @@ internal func _task_serialExecutor_isSameExclusiveExecutionContext<E>(current cu
   currentExecutor.isSameExclusiveExecutionContext(other: executor)
 }
 
+#if !$Embedded
 @available(SwiftStdlib 6.0, *)
+#endif
 @_silgen_name("_task_serialExecutor_checkIsolated")
 internal func _task_serialExecutor_checkIsolated<E>(executor: E)
     where E: SerialExecutor {
   executor.checkIsolated()
 }
 
+#if !$Embedded
 @available(SwiftStdlib 6.2, *)
+#endif
 @_silgen_name("_task_serialExecutor_isIsolatingCurrentContext")
 internal func _task_serialExecutor_isIsolatingCurrentContext<E>(executor: E) -> Int8
   where E: SerialExecutor {
@@ -976,7 +988,9 @@ internal func _task_serialExecutor_isIsolatingCurrentContext<E>(executor: E) -> 
 
 /// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
+#if !$Embedded
 @available(SwiftStdlib 5.9, *)
+#endif
 @_silgen_name("_task_serialExecutor_getExecutorRef")
 internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
     where E: SerialExecutor {
@@ -985,8 +999,9 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
-@_unavailableInEmbedded
+#if !$Embedded
 @available(SwiftStdlib 6.0, *)
+#endif
 @_silgen_name("_task_taskExecutor_getTaskExecutorRef")
 internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Builtin.Executor
     where E: TaskExecutor {

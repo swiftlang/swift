@@ -1885,6 +1885,9 @@ public:
   void emitExprInto(Expr *E, Initialization *I,
                     std::optional<SILLocation> L = std::nullopt);
 
+  /// Borrow the given expression into a borrow binding's Initialization.
+  void emitBorrowInto(Expr *E, Initialization *I, SILLocation loc);
+
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
 
@@ -2325,8 +2328,9 @@ public:
                        SILValue selfValue,
                        SILDeclRef methodConstant,
                        SubstitutionMap subMap);
-  
-  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
+
+  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                               CanType resultType = CanType());
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
@@ -2879,6 +2883,10 @@ public:
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
+  /// Emits a call to `__isRemoteActor(self)` and returns the unwrapped i1.
+  SILValue emitDistributedActorIsRemote(SILLocation Loc, SILValue selfValue,
+                                        Type selfTy);
+
   void emitDistributedIfRemoteBranch(SILLocation Loc, SILValue selfValue,
                                      Type selfTy, SILBasicBlock *isRemoteBB,
                                      SILBasicBlock *isLocalBB);
@@ -3425,6 +3433,10 @@ public:
   /// marker for lifetime resolution so that it can reason about the formal
   /// scopes of variables.
   void enterLetBindingFormalScopeCleanup(VarDecl *vd);
+
+  /// Are we using the SILMoveOnlyWrappedType to check bindings that are
+  /// @noImplicitCopy?
+  bool usingWrapperTypeImplicitCopyEnforcement();
 };
 
 

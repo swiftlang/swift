@@ -1336,7 +1336,16 @@ public:
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
   /// Whether this declaration predates the introduction of concurrency.
+  ///
+  /// An inferred `@preconcurrency` is only seen if the actor isolation has
+  /// already been computed; use \c preconcurrencyIncludingInferred() when the
+  /// answer must not depend on that.
   bool preconcurrency() const;
+
+  /// Like \c preconcurrency(), but computes the actor isolation first, so an
+  /// inferred `@preconcurrency` is always seen. This can be cyclic if called
+  /// while computing the isolation or interface type of this declaration.
+  bool preconcurrencyIncludingInferred() const;
 
   /// Query whether this declaration was explicitly declared to be safe or
   /// unsafe.
@@ -5307,7 +5316,7 @@ class StructDecl final : public NominalTypeDecl {
   //
   // What we need is to serialize enough information to be
   // able to instantiate C++ class template on deserialization. It turns out
-  // that all that information is conveniently covered by the BoundGenericType,
+  // that all that information is conveniently covered by the NominalType,
   // which we store in this field. The field is set during the typechecking at
   // the time when we instantiate the C++ class template.
   //
@@ -5521,6 +5530,10 @@ public:
   /// otherwise.
   bool walkSuperclasses(
       llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const;
+
+  /// Whether an inverse of the given invertible protocol in this class's
+  /// inheritance clause suppresses the implicit conformance.
+  bool canSuppressInvertible(InvertibleProtocolKind ip) const;
 
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
@@ -7943,10 +7956,10 @@ private:
     setIndices(Indices);
   }
 
-  /// Returns the given type as a `BoundGenericType` if it is a
+  /// Returns the given type as a `NominalType` if it is a
   /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
   /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
-  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
+  static NominalType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -8021,7 +8034,7 @@ public:
   /// If `useDC` is provided (where the decl is being used), validates that
   /// access control is being used consistently and that `decl` is appropriately
   /// accessible, returning `nullptr` if inaccessible.
-  BoundGenericType *getDynamicMemberLookupKeyPathType() const;
+  NominalType *getDynamicMemberLookupKeyPathType() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(

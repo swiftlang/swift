@@ -859,6 +859,11 @@ public:
   /// being consistent across versions of the framework.
   bool isResilient() const;
 
+  /// Whether the conforming type and the protocol were originally defined in
+  /// the same module, honoring @_originallyDefinedIn: a type moved into the
+  /// protocol's module is still considered cross-module.
+  bool isOriginallyInSameModuleAsProtocol() const;
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   TypeWitnessAndDecl
@@ -1236,7 +1241,7 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
-    auto bgc = getType()->getClassOrBoundGenericClass();
+    auto bgc = getType()->getClassDecl();
 
     // In some cases, we may not have a BGC handy, in which case we should
     // delegate to the inherited conformance for the decl context.

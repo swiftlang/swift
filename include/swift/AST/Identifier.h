@@ -298,12 +298,6 @@ namespace llvm {
 
   // Identifiers hash just like pointers.
   template<> struct DenseMapInfo<swift::Identifier> {
-    static swift::Identifier getEmptyKey() {
-      return swift::Identifier::getEmptyKey();
-    }
-    static swift::Identifier getTombstoneKey() {
-      return swift::Identifier::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::Identifier Val) {
       return DenseMapInfo<const void*>::getHashValue(Val.get());
     }
@@ -478,12 +472,6 @@ raw_ostream &operator<<(raw_ostream &OS, swift::DeclBaseName D);
 
 // DeclBaseNames hash just like pointers.
 template<> struct DenseMapInfo<swift::DeclBaseName> {
-  static swift::DeclBaseName getEmptyKey() {
-    return swift::Identifier::getEmptyKey();
-  }
-  static swift::DeclBaseName getTombstoneKey() {
-    return swift::Identifier::getTombstoneKey();
-  }
   static unsigned getHashValue(swift::DeclBaseName Val) {
     return DenseMapInfo<const void *>::getHashValue(Val.getAsOpaquePointer());
   }
@@ -1089,12 +1077,6 @@ namespace llvm {
 
   // DeclNames hash just like pointers.
   template<> struct DenseMapInfo<swift::DeclName> {
-    static swift::DeclName getEmptyKey() {
-      return swift::Identifier::getEmptyKey();
-    }
-    static swift::DeclName getTombstoneKey() {
-      return swift::Identifier::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::DeclName Val) {
       return DenseMapInfo<void*>::getHashValue(Val.getOpaqueValue());
     }
@@ -1118,12 +1100,6 @@ namespace llvm {
 
   // DeclNameRefs hash just like DeclNames.
   template<> struct DenseMapInfo<swift::DeclNameRef> {
-    static swift::DeclNameRef getEmptyKey() {
-      return swift::DeclNameRef(DenseMapInfo<swift::DeclName>::getEmptyKey());
-    }
-    static swift::DeclNameRef getTombstoneKey() {
-      return swift::DeclNameRef(DenseMapInfo<swift::DeclName>::getTombstoneKey());
-    }
     static unsigned getHashValue(swift::DeclNameRef Val) {
       return DenseMapInfo<swift::DeclName>::getHashValue(Val.getFullName());
     }
@@ -1149,13 +1125,6 @@ namespace llvm {
 
   // ObjCSelectors hash just like pointers.
   template<> struct DenseMapInfo<swift::ObjCSelector> {
-    static swift::ObjCSelector getEmptyKey() {
-      return swift::ObjCSelector(DenseMapInfo<swift::DeclName>::getEmptyKey());
-    }
-    static swift::ObjCSelector getTombstoneKey() {
-      return swift::ObjCSelector(
-               DenseMapInfo<swift::DeclName>::getTombstoneKey());
-    }
     static unsigned getHashValue(swift::ObjCSelector Val) {
       return DenseMapInfo<void*>::getHashValue(Val.getOpaqueValue());
     }

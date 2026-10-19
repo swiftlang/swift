@@ -17,12 +17,15 @@
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SARIFDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -43,6 +46,12 @@ public:
 private:
   CompilerInstance &instance;
   const CompilerInvocation &invocation;
+
+  // With compilation caching, diagnostics are emitted through a SourceManager
+  // whose buffers are named after applying the cache replay prefix map. The
+  // input file names used to dispatch diagnostics to the per-file consumers
+  // need to be mapped the same way.
+  llvm::PrefixMapper ReplayPrefixMapper;
 
   // potentially created diagnostic consumers.
   PrintingDiagnosticConsumer PDC;
@@ -101,12 +110,15 @@ private:
 
 /// Creates a diagnostic consumer that handles dispatching diagnostics to
 /// multiple output files, based on the supplementary output paths specified by
-/// \p inputsAndOutputs.
+/// \p inputsAndOutputs. The input file names are mapped with
+/// \p replayPrefixMapper to match the buffer names in the SourceManager that
+/// diagnostics are emitted with.
 ///
 /// If no output files are needed, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createDispatchingDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
+    llvm::PrefixMapper &replayPrefixMapper,
     llvm::function_ref<std::unique_ptr<DiagnosticConsumer>(const InputFile &)>
         maybeCreateConsumerForDiagnosticsFrom) {
 
@@ -123,7 +135,9 @@ createDispatchingDiagnosticConsumerIfNeeded(
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
-          subconsumers.emplace_back(input.getFileName(), std::move(consumer));
+          subconsumers.emplace_back(
+              replayPrefixMapper.mapToString(input.getFileName()),
+              std::move(consumer));
         return false;
       });
   // For batch mode, the compiler must sometimes swallow diagnostics pertaining
@@ -140,7 +154,8 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subconsumers.emplace_back(input.getFileName(), nullptr);
+          subconsumers.emplace_back(
+              replayPrefixMapper.mapToString(input.getFileName()), nullptr);
           return false;
         });
   }
@@ -148,28 +163,44 @@ createDispatchingDiagnosticConsumerIfNeeded(
   return FileSpecificDiagnosticConsumer::consolidateSubconsumers(subconsumers);
 }
 
-/// Creates a diagnostic consumer that handles serializing diagnostics, based on
-/// the supplementary output paths specified by \p inputsAndOutputs.
+/// Creates a diagnostic consumer that serializes diagnostics in \p format,
+/// based on the supplementary output paths specified by \p inputsAndOutputs.
 ///
 /// The returned consumer will handle producing multiple serialized diagnostics
 /// files if necessary, by using sub-consumers for each file and dispatching to
 /// the right one.
 ///
 /// If no serialized diagnostics are being produced, returns null.
-static std::unique_ptr<DiagnosticConsumer>
-createSerializedDiagnosticConsumerIfNeeded(
+static std::unique_ptr<DiagnosticConsumer> createDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    bool emitMacroExpansionFiles) {
+    llvm::PrefixMapper &replayPrefixMapper,
+    DiagnosticOptions::SerializedFormat format, bool emitMacroExpansionFiles) {
   return createDispatchingDiagnosticConsumerIfNeeded(
-      inputsAndOutputs,
-      [emitMacroExpansionFiles](
+      inputsAndOutputs, replayPrefixMapper,
+      [format, emitMacroExpansionFiles](
           const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
-        auto serializedDiagnosticsPath =
-            input.getLLVMBitcodeDiagnosticsPath();
-        if (serializedDiagnosticsPath.empty())
+        StringRef path;
+        std::unique_ptr<DiagnosticConsumer> (*createConsumer)(StringRef, bool);
+
+        switch (format) {
+        case DiagnosticOptions::SerializedFormat::LLVMBitcode:
+          path = input.getLLVMBitcodeDiagnosticsPath();
+          createConsumer = serialized_diagnostics::createConsumer;
+          break;
+        case DiagnosticOptions::SerializedFormat::SARIF:
+#if SWIFT_BUILD_SARIF
+          path = input.getSARIFDiagnosticsPath();
+          createConsumer = sarif_diagnostics::createConsumer;
+          break;
+#else
+          ABORT("'-serialize-diagnostics=sarif' is rejected while parsing "
+                "arguments in a build without SARIF support");
+#endif
+        }
+
+        if (path.empty())
           return nullptr;
-        return serialized_diagnostics::createConsumer(serializedDiagnosticsPath,
-                                                      emitMacroExpansionFiles);
+        return createConsumer(path, emitMacroExpansionFiles);
       });
 }
 
@@ -179,9 +210,10 @@ createSerializedDiagnosticConsumerIfNeeded(
 /// If no json fixit diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createJSONFixItDiagnosticConsumerIfNeeded(
-    const CompilerInvocation &invocation) {
+    const CompilerInvocation &invocation,
+    llvm::PrefixMapper &replayPrefixMapper) {
   return createDispatchingDiagnosticConsumerIfNeeded(
-      invocation.getFrontendOptions().InputsAndOutputs,
+      invocation.getFrontendOptions().InputsAndOutputs, replayPrefixMapper,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
         auto fixItsOutputPath = input.getFixItsOutputPath();
         if (fixItsOutputPath.empty())
@@ -199,19 +231,30 @@ DiagnosticHelper::Implementation::Implementation(
 }
 
 void DiagnosticHelper::Implementation::initDiagnosticConsumers() {
+  // The invocation is only fully parsed at this point.
+  SmallVector<llvm::MappedPrefix, 4> Prefixes;
+  llvm::MappedPrefix::transformPairs(
+      invocation.getFrontendOptions().CacheReplayPrefixMap, Prefixes);
+  ReplayPrefixMapper.addRange(Prefixes);
+  ReplayPrefixMapper.sort();
+
   // Because the serialized diagnostics consumer is initialized here,
   // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
   // arguments are generated by the driver, not directly by a user. The driver
   // is responsible for emitting diagnostics for its own errors.
   // See https://github.com/apple/swift/issues/45288 for details.
-  SerializedConsumerDispatcher = createSerializedDiagnosticConsumerIfNeeded(
-      invocation.getFrontendOptions().InputsAndOutputs,
-      invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
+  // Diagnostics are serialized in one format per invocation, so only the
+  // consumer for the requested format is created.
+  const auto &diagOpts = invocation.getDiagnosticOptions();
+  SerializedConsumerDispatcher = createDiagnosticConsumerIfNeeded(
+      invocation.getFrontendOptions().InputsAndOutputs, ReplayPrefixMapper,
+      diagOpts.SerializedDiagnosticsFormat, diagOpts.EmitMacroExpansionFiles);
   if (SerializedConsumerDispatcher)
     instance.addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 
-  FixItsConsumer = createJSONFixItDiagnosticConsumerIfNeeded(invocation);
+  FixItsConsumer =
+      createJSONFixItDiagnosticConsumerIfNeeded(invocation, ReplayPrefixMapper);
   if (FixItsConsumer)
     instance.addDiagnosticConsumer(FixItsConsumer.get());
 

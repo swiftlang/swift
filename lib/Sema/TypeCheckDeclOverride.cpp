@@ -1238,6 +1238,10 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
   checkOverrideAccessControl(baseDecl, decl, ctx);
 
+  if (!isa<AccessorDecl>(decl))
+    diagnoseImplicitForceUnwrapOfIUOParams(decl, baseDecl,
+                                           /*isWitness=*/false);
+
   bool mayHaveMismatchedOptionals =
       (attempt == OverrideCheckingAttempt::MismatchedOptional ||
        attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
@@ -1505,6 +1509,10 @@ bool swift::checkOverrides(ValueDecl *decl) {
   if (decl->getAttrs().hasAttribute<NonOverrideAttr>())
     return false;
 
+  // Neither does a @cxx implementation; see OverriddenDeclsRequest.
+  if (decl->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return false;
+
   // If we already computed overridden declarations and either succeeded
   // or invalidated the attribute, there's nothing more to do.
   if (decl->overriddenDeclsComputed()) {
@@ -1619,7 +1627,6 @@ namespace  {
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
-    UNINTERESTING_ATTR(HasHiddenStoredProperties)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
@@ -2551,6 +2558,13 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     return abiOverriddenDecls;
   }
+
+  // A @cxx implementation is the body of a C++ method, whose C++ declaration
+  // says what it overrides; the Swift function overrides nothing. Its
+  // `override` keyword is checked against the C++ declaration when it is
+  // matched to the imported method.
+  if (decl->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return {};
 
   auto &ctx = decl->getASTContext();
   auto overridden = computeOverriddenDecls(decl, false);

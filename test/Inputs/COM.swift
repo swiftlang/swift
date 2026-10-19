@@ -26,6 +26,13 @@ public protocol ISwiftObject {
   var metadata: UnsafeRawPointer { get }
 }
 
+#if !MISSING_ISWIFTOBJECT_DEFAULTS
+extension ISwiftObject {
+  public var object: UnsafeMutableRawPointer { fatalError() }
+  public var metadata: UnsafeRawPointer { fatalError() }
+}
+#endif
+
 public protocol COMInterface {
   var IID: IID { get }
 }

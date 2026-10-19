@@ -183,16 +183,28 @@ public:
   }
 
   SWIFT_INLINE_THUNK void operator=(OpaqueStorage &&other) noexcept {
-    auto temp = storage;
+    if (this == &other)
+      return;
+    if (storage)
+      opaqueFree(static_cast<char *_Nonnull>(storage));
     storage = other.storage;
-    other.storage = temp;
+    other.storage = nullptr;
   }
   void operator=(const OpaqueStorage &) noexcept = delete;
 
+  /// A moved-from container has no allocation and holds no Swift value.
+  SWIFT_INLINE_THUNK bool isAllocated() const noexcept {
+    return storage != nullptr;
+  }
+
   SWIFT_INLINE_THUNK char *_Nonnull getOpaquePointer() noexcept {
+    if (!storage)
+      abort();
     return static_cast<char *_Nonnull>(storage);
   }
   SWIFT_INLINE_THUNK const char *_Nonnull getOpaquePointer() const noexcept {
+    if (!storage)
+      abort();
     return static_cast<char *_Nonnull>(storage);
   }
 

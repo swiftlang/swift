@@ -1,0 +1,94 @@
+{
+  "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+        {
+          "location" : {
+            "uri" : "file://SOURCE_DIR/test/diagnostics/SARIF/Inputs/sarif-diagnostics-bridging-header.h"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        }
+      ],
+      "columnKind" : "utf16CodeUnits",
+      "results" : [
+        {
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 3,
+                  "endLine" : 1,
+                  "startColumn" : 2,
+                  "startLine" : 1
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "\"here is some warning about something\""
+          },
+          "ruleId" : "warning_from_clang",
+          "ruleIndex" : 0
+        },
+        {
+          "level" : "error",
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 3,
+                  "endLine" : 2,
+                  "startColumn" : 2,
+                  "startLine" : 2
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "\"but this one is an error\""
+          },
+          "ruleId" : "error_from_clang",
+          "ruleIndex" : 1
+        },
+        {
+          "level" : "error",
+          "message" : {
+            "text" : "failed to import bridging header 'SOURCE_DIR/test/diagnostics/SARIF/Inputs/sarif-diagnostics-bridging-header.h'"
+          },
+          "ruleId" : "bridging_header_error",
+          "ruleIndex" : 2
+        }
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "rules" : [
+            {
+              "id" : "warning_from_clang"
+            },
+            {
+              "id" : "error_from_clang"
+            },
+            {
+              "id" : "bridging_header_error"
+            }
+          ],
+          "version" : "SWIFT_VERSION"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}

@@ -111,6 +111,11 @@ function(add_swift_compiler_modules_library name)
     endif()
   endforeach()
 
+  # FIXME: forward the C++ targets' other MSVC definitions here too, not just this one.
+  if(MSVC AND NOT LLVM_ENABLE_EH)
+    list(APPEND swift_compile_options "-Xcc" "-D_HAS_EXCEPTIONS=0")
+  endif()
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
       list(APPEND swift_compile_options
@@ -149,6 +154,12 @@ function(add_swift_compiler_modules_library name)
   if("${BRIDGING_MODE}" STREQUAL "PURE")
     list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
+
+  # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+  # need it.
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_CONDITIONS})
+    list(APPEND swift_compile_options "-D${condition}")
+  endforeach()
 
   if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
@@ -370,7 +381,7 @@ else()
         message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
       endif()
 
-      set(min_supported_swift_version 5.9)
+      set(min_supported_swift_version 6.2)
       if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
         message(FATAL_ERROR
             "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "

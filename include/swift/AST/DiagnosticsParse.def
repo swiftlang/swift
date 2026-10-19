@@ -448,9 +448,9 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
-      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+      "deinitializers may only be declared within a class, actor, or non-'Copyable' type", ())
 ERROR(destructor_decl_on_noncopyable_enum,none,
-      "deinitializers are not yet supported on noncopyable enums", ())
+      "deinitializers are not yet supported on non-'Copyable' enums", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -752,6 +752,9 @@ ERROR(expected_sil_stage_name, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
 ERROR(multiple_sil_stage_decls, none,
       "sil_stage declared multiple times", ())
+ERROR(sil_function_stage_below_module_stage, none,
+      "function stage '%0' is below the module stage '%1'", (StringRef,
+      StringRef))
 
 // SIL VTable
 ERROR(expected_sil_vtable_colon,none,
@@ -1869,7 +1872,9 @@ ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
 ERROR(attr_called_expected_rparen,none,
       "expected ')' after execution semantics", ())
 ERROR(attr_called_expected_semantics,none,
-      "expected 'once' as the `@called` execution semantics", ())
+      "expected 'exactlyOnce' or 'atMostOnce' as the '@called' execution "
+      "semantics",
+      ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -2241,6 +2246,15 @@ ERROR(sil_failed_to_parse_sil_optional,none,
       "Expected SIL optional value of the form '[' NAME ']'", ())
 
 //------------------------------------------------------------------------------
+// MARK: Scope restrictions
+//------------------------------------------------------------------------------
+
+ERROR(expected_scope_specifier, PointsToFirstBadToken,
+      "expected identifier or 'self' in '_scoped' attribute", ())
+ERROR(immortal_scope_cannot_be_access, none,
+      "cannot depend on the access scope of 'immortal'", ())
+
+//------------------------------------------------------------------------------
 // MARK: nonisolated(nonsending)
 //------------------------------------------------------------------------------
 
@@ -2259,9 +2273,6 @@ ERROR(nonisolated_nonsending_repeated,none,
 ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
       "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
-ERROR(experimental_file_default_disabled,PointsToFirstBadToken,
-      "file-level defaults are an experimental feature that is currently "
-      "disabled", ())
 ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
       "attribute cannot be attached to a file-level default", ())
 

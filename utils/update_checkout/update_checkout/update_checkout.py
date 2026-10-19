@@ -468,10 +468,13 @@ def update_single_repository(pool_args: UpdateArguments):
 
         # It's important that we checkout, fetch, and rebase, in order.
         # .git/FETCH_HEAD updates the not-for-merge attributes based on
-        # which branch was checked out during the fetch.
+        # which branch was checked out during the fetch. Without history, the
+        # tags are not needed, and fetching each of them at depth 1 takes
+        # minutes in the larger repositories.
+        fetch_tags = [] if pool_args.skip_history else ["--tags"]
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
+            ["fetch", "--recurse-submodules=yes"] + fetch_tags + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -915,7 +918,7 @@ def obtain_all_additional_swift_sources(
                         break
 
         else:
-            repo_exists = repo_path.joinpath(".git").is_dir()
+            repo_exists = repo_path.joinpath(".git").exists()
 
         if repo_exists:
             skipped_repositories.append(

@@ -3,7 +3,7 @@ include(macCatalystUtils)
 # Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_add_dependencies TARGET)
   foreach(DEPENDENCY ${ARGN})
-    string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
+    string(REGEX REPLACE "[<>:\"/\\|?*]" _ sanitized ${DEPENDENCY})
     set(depfile "${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift")
     add_custom_command(OUTPUT ${depfile}
       COMMAND ${CMAKE_COMMAND} -E touch ${depfile}
@@ -101,6 +101,11 @@ function(_add_host_swift_compile_options name)
     target_compile_options(${name} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -DPURE_BRIDGING_MODE>")
   endif()
+
+  # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+  # need it.
+  target_compile_definitions(${name} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:${SWIFT_LLVM_VERSION_MAJOR_CONDITIONS}>")
 
   # The compat56 library is not available in current toolchains. The stage-0
   # compiler will build fine since the builder compiler is not aware of the 56

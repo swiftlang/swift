@@ -18,6 +18,7 @@
 #include "PrintClangFunction.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
 #include "swift/AST/TypeRepr.h"
@@ -59,11 +60,14 @@ struct CxxDeclEmissionScope {
   /// lexical scope.
   llvm::StringMap<llvm::SmallVector<EmittedFunctionOverload, 2>>
       emittedFunctionOverloads;
+  /// Inherited names that newly printable members must not hide.
+  llvm::StringSet<> inheritedFunctionNamesToPreserve;
 };
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
-class DeclAndTypePrinter {
+class DeclAndTypePrinter final
+    : public cxx_translation::NominalTypeLayoutQueries {
 public:
   using DelayedMemberSet = llvm::SmallSetVector<const ValueDecl *, 32>;
 
@@ -127,9 +131,14 @@ public:
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
-  bool shouldInclude(const ValueDecl *VD);
+  /// Imported inherited members may be exposed by their supplied header even
+  /// when this header's exposure options would exclude them.
+  bool shouldInclude(const ValueDecl *VD,
+                     bool isImportedInheritedMember = false);
 
-  bool isZeroSized(const NominalTypeDecl *decl);
+  bool isZeroSized(const NominalTypeDecl *decl) override;
+
+  bool isOpaqueLayout(const NominalTypeDecl *decl) override;
 
   /// Returns true if \p vd is visible given the current access level and thus
   /// can be included in the generated header.

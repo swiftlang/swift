@@ -59,7 +59,7 @@ sil_vtable C2 {}
 // CHECK: %TSi = type <{ [[WORD:i.*]] }>
 
 // -- %a: S.x
-// CHECK: [[KP_A:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_A:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1SV"
 // CHECK-SAME: @"symbolic Si
@@ -69,7 +69,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %b: S.y
-// CHECK: [[KP_B:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_B:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1SV
 // CHECK-SAME: @"symbolic SS
@@ -80,7 +80,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0100_0008> }>
 
 // -- %c: S.z
-// CHECK: [[KP_C:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_C:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1SV
 // CHECK-SAME: @"symbolic{{.*}}8keypaths1CC
@@ -91,7 +91,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0180_0018> }>
 
 // -- %d: C.x
-// CHECK: [[KP_D:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_D:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -102,7 +102,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %d1: C1.x
-// CHECK: [[KP_D1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_D1:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -113,7 +113,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %e: C.y
-// CHECK: [[KP_E:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_E:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -124,7 +124,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0300_0018> }>
 
 // -- %f: C.z
-// CHECK: [[KP_F:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_F:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -135,7 +135,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0028> }>
 
 // -- %g: S.z.x
-// CHECK: [[KP_G:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_G:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -150,7 +150,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %h: C.z.x
-// CHECK: [[KP_H:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_H:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -163,7 +163,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %k: computed
-// CHECK: [[KP_K:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_K:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -175,7 +175,7 @@ sil_vtable C2 {}
 // CHECK-SAME: ptr {{.*}}@k_get{{.*}}
 
 // -- %l: computed
-// CHECK: [[KP_L:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_L:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -188,7 +188,7 @@ sil_vtable C2 {}
 // CHECK-SAME: ptr @l_set{{.*}}
 
 // -- %m: computed
-// CHECK: [[KP_M:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_M:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -203,10 +203,10 @@ sil_vtable C2 {}
 // -- %m2: reabstracted
 // Note: the contents here aren't interesting. The test triggered infinite
 // looping in the compiler at one point.
-// CHECK: [[KP_M:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_M:@keypath.*]] = private constant <{ {{.*}} }> <{
 
 // -- %t0: T.a.0
-// CHECK: [[KP_T0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_T0:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -219,7 +219,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %t1: T.b.g
-// CHECK: [[KP_T1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_T1:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: ptr @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -234,7 +234,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: <i32 0x0180_0010> }>
 
 // -- %i: Gen<A>.x
-// CHECK: [[KP_I:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_I:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
 // CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"symbolic{{[^"]*}}8keypaths3GenV{{[^"]*}}"
@@ -247,7 +247,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 32 }>
 
 // -- %j: Gen<A>.y
-// CHECK: [[KP_J:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_J:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
 // CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"symbolic{{[^"]*}}8keypaths3GenV{{[^"]*}}"
@@ -260,7 +260,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 36 }>
 
 // -- %tg0: TG<T,U,V>.a.0
-// CHECK: [[KP_TG0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_TG0:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment r1_l"
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -275,7 +275,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %tg1: TG<T,U,V>.a.2
-// CHECK: [[KP_TG1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_TG1:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment r1_l"
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -292,7 +292,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 64 }>
 
 // -- %tg2: TGA<T,U>.1
-// CHECK: [[KP_TG2:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_TG2:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment r0_l"
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -303,7 +303,7 @@ sil_vtable C2 {}
 // CHECK-64-SAME: i32 48 }>
 
 // -- %gcx: GC<T>.x
-// CHECK: [[KP_GCX:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK: [[KP_GCX:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{
 // CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"symbolic{{[^"]*}}8keypaths2GCC{{[^"]*}}"
 // CHECK-SAME: @"symbolic x"
@@ -410,26 +410,26 @@ entry:
   // CHECK: [[ARGS2:%.*]] = alloca i{{.*}}
   // CHECK: [[ARGS3:%.*]] = alloca i{{.*}}
 
-  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS1]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[ARGS1]])
   // CHECK: store ptr %T, ptr [[ARGS1]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS1]])
-  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS1]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr [[ARGS1]])
   %i = keypath $KeyPath<Gen<T,T>, T>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <T>
   strong_retain %i : $KeyPath<Gen<T,T>, T>
 
-  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS2]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[ARGS2]])
   // CHECK: store ptr %U, ptr [[ARGS2]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_J]], ptr [[ARGS2]])
-  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS2]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr [[ARGS2]])
   %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
   strong_retain %j : $KeyPath<Gen<U,U>, U>
 
-  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS3]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[ARGS3]])
   // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8keypaths3FooVMa"([[WORD]] 0, ptr %T)
   // CHECK: [[FOO_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: store ptr [[FOO_T]], ptr [[ARGS3]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_I]], ptr [[ARGS3]])
-  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS3]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr [[ARGS3]])
   %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
   strong_retain %i2 : $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>
 
@@ -443,24 +443,24 @@ entry:
   // CHECK: [[ARGS2:%.*]] = alloca i{{.*}}
   // CHECK: [[ARGS3:%.*]] = alloca i{{.*}}
 
-  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS1]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[ARGS1]])
   // CHECK: store ptr %T, ptr [[ARGS1]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG0]], ptr [[ARGS1]])
-  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS1]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr [[ARGS1]])
   %tg0 = keypath $KeyPath<TG<T,U,V>, T>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #0 : $A) <T,U,V>
   strong_retain %tg0 : $KeyPath<TG<T,U,V>, T>
 
-  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS2]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[ARGS2]])
   // CHECK: store ptr %T, ptr [[ARGS2]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG1]], ptr [[ARGS2]])
-  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS2]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr [[ARGS2]])
   %tg1 = keypath $KeyPath<TG<T,U,V>, V>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #2 : $C) <T,U,V>
   strong_retain %tg1 : $KeyPath<TG<T,U,V>, V>
 
-  // CHECK: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[ARGS3]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[ARGS3]])
   // CHECK: store ptr %T, ptr [[ARGS3]]
   // CHECK: call ptr @swift_getKeyPath(ptr [[KP_TG2]], ptr [[ARGS3]])
-  // CHECK: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[ARGS3]])
+  // CHECK: call void @llvm.lifetime.end.p0(ptr [[ARGS3]])
   %tg2 = keypath $KeyPath<TGA<T,U>, U>, <A,B> (root $TGA<A,B>; tuple_element #1 : $B) <T,U>
   strong_retain %tg2 : $KeyPath<TGA<T,U>, U>
 

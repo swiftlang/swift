@@ -194,6 +194,20 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return types
   }
 
+  /// The conformances of all non-generic witness tables in this module which
+  /// IRGen emits eagerly, i.e. the ones of `@export(interface)` conformances.
+  var conformancesWithEagerlyEmittedWitnessTables: [Conformance] {
+    var conformances: [Conformance] = []
+    withUnsafeMutablePointer(to: &conformances) { conformancesPtr in
+      bridgedPassContext.visitConformancesWithEagerlyEmittedWitnessTables(conformancesPtr) {
+        (conformancesPtr, bridgedConformance) in
+        conformancesPtr.assumingMemoryBound(to: [Conformance].self).pointee.append(
+          Conformance(bridged: bridgedConformance))
+      }
+    }
+    return conformances
+  }
+
   func createEmptyFunction(
     name: String,
     parameters: [ParameterInfo],

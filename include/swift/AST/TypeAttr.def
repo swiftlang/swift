@@ -71,6 +71,7 @@ SIMPLE_TYPE_ATTR(nonisolated, Nonisolated)
 SIMPLE_TYPE_ATTR(_addressable, Addressable)
 SIMPLE_TYPE_ATTR(concurrent, Concurrent)
 TYPE_ATTR(called, Called)
+TYPE_ATTR(_scoped, Scoped)
 SIMPLE_TYPE_ATTR(yield_once, YieldOnce)
 SIMPLE_TYPE_ATTR(yield_once_2, YieldOnce2)
 

@@ -13,6 +13,11 @@
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck %s < %t/deps.json
 
+// Ensure dummy synthetic modules are not serialized into the cache
+// RUN: %llvm-strings %t/cache.moddepcache | %FileCheck %s -check-prefix CHECK-NO-DUMMY
+// CHECK-NO-DUMMY-NOT: -OverlayDependencies
+// CHECK-NO-DUMMY-NOT: -CrossImportOverlays
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 

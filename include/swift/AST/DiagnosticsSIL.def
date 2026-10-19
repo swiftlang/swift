@@ -229,7 +229,7 @@ ERROR(ivar_not_initialized_by_init_accessor,none,
       (StringRef))
 
 ERROR(noncopyable_dynamic_lifetime_unsupported,none,
-      "conditional initialization or destruction of noncopyable types is not "
+      "conditional initialization or destruction of non-'Copyable' types is not "
       "supported; this variable must be consistently in an initialized or "
       "uninitialized state through every code path", ())
 
@@ -285,6 +285,9 @@ ERROR(immutable_property_already_initialized,none,
       (StringRef))
 NOTE(initial_value_provided_in_let_decl,none,
      "initial value already provided in 'let' declaration", ())
+ERROR(definite_init_bug_unknown_storage,none,
+      "initialization of this value cannot be verified. This is a compiler bug. "
+      "Please file a bug with a small example of the bug", ())
 ERROR(mutation_of_property_of_immutable_value,none,
       "cannot mutate %select{property %0|subscript}1 of immutable value '%2'",
       (DeclBaseName, bool, StringRef))
@@ -397,6 +400,10 @@ GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,non
       "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
 GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
+GROUPED_ERROR(embedded_infinite_class_specialization,EmbeddedRestrictions,none,
+      "cannot specialize %0 in embedded Swift because its methods create infinitely many specializations of the class", (Type))
+GROUPED_ERROR(embedded_infinite_conformance_specialization,EmbeddedRestrictions,none,
+      "cannot specialize the conformance of %0 to '%1' in embedded Swift because its witness methods create infinitely many specializations of the conformance", (Type, StringRef))
 GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
@@ -708,6 +715,8 @@ NOTE(autodiff_cannot_differentiate_writes_to_global_variables,none,
      "cannot differentiate writes to global variables", ())
 NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
      "cannot differentiate writes to mutable captures", ())
+NOTE(autodiff_cannot_differentiate_invalid_pointer_cast,none,
+     "cannot differentiate non-projection raw pointer operations", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
@@ -900,7 +909,7 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type",
+      "non-'Copyable' '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type",
       (StringRef))
 ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
@@ -916,7 +925,7 @@ ERROR(sil_movechecking_value_consumed_in_a_loop, none,
 ERROR(sil_movechecking_use_after_partial_consume, none,
       "cannot use '%0' after partial consume", (StringRef))
 ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
-      "cannot consume noncopyable stored property '%0' %select{of a class|that is global}1",
+      "cannot consume non-'Copyable' stored property '%0' %select{of a class|that is global}1",
       (StringRef, bool))
 ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
       "cannot partially consume '%0' when it has a deinitializer",
@@ -977,6 +986,19 @@ NOTE(sil_movechecking_nonconsuming_use_here, none,
      "used here", ())
 NOTE(sil_movechecking_consumed_in_loop_here, none,
      "consumed in loop here", ())
+NOTE(sil_movechecking_exit_without_reinit, none,
+     "%select{if this call throws, the function exits|the function exits here by throwing an error|"
+     "the function returns here}0 "
+     "without reinitializing '%1'", (unsigned, StringRef))
+NOTE(sil_movechecking_consumed_by_argument_here, none,
+     "consumed here; %0 takes ownership of this argument", (DeclName))
+NOTE(sil_movechecking_consumed_by_method_here, none,
+     "consumed here by call to consuming method %0", (DeclName))
+NOTE(sil_movechecking_consider_borrowing_parameter, none,
+     "consider making this parameter 'borrowing' if %0 does not need "
+     "ownership of it", (DeclName))
+NOTE(sil_movechecking_noncopyable_declared_here, none,
+     "'%0' declared here with noncopyable type %1", (StringRef, Type))
 NOTE(sil_movechecking_deinit_here, none,
      "deinitializer declared here", ())
 
@@ -984,9 +1006,9 @@ NOTE(sil_movechecking_deinit_here, none,
 ERROR(sil_movechecking_not_understand_consumable_and_assignable, none,
       "usage of no-implicit-copy value that the compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_not_understand_moveonly, none,
-      "usage of a noncopyable type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
+      "usage of a non-'Copyable' type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_missed_copy, none,
-      "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+      "copy of non-'Copyable' typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_exclusivity_violation, none,
       "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
@@ -995,6 +1017,19 @@ ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
 ERROR(sil_movekillscopyable_move_applied_to_nonlocal_memory, none,
       "'consume' cannot be applied to %select{globals|escaping captures}0",
       (unsigned))
+
+// Implicit destroy checker
+ERROR(sil_implicit_destroy_not_consumed, none,
+      "'%0' is not %select{consumed|called}1 on all paths",
+      (StringRef, unsigned))
+ERROR(sil_implicit_destroy_unnamed_not_consumed, none,
+      "%select{value of type %0|'@called(exactlyOnce)' function}1 is not "
+      "%select{consumed|called}1 on all paths",
+      (Type, unsigned))
+NOTE(sil_implicit_destroy_path_exit, none,
+     "path exits here without %select{a consume|a call}0", (unsigned))
+ERROR(sil_implicit_destroy_discard_unsupported, none,
+      "'discard' is not yet supported for nondeinitable type %0", (Type))
 
 
 // Implicit inout-to-UnsafeRawPointer conversions
@@ -1342,7 +1377,7 @@ ERROR(executor_factory_must_conform, none,
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
-      "deinit of non-copyable type %0 not visible in the current module", (Type))
+      "deinit of non-'Copyable' type %0 not visible in the current module", (Type))
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
@@ -1373,6 +1408,10 @@ NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRe
 
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
+
+ERROR(noncopyable_cast_pattern_binding_unimplemented, none,
+      "binding the payload of a non-'Copyable' value with a cast pattern is not "
+      "implemented; use 'case is' to test the type without binding", ())
 
 
 /// Borrow and mutate accessors

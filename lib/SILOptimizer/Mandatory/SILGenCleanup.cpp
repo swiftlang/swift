@@ -14,6 +14,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILBasicBlock.h"
 #define DEBUG_TYPE "silgen-cleanup"
 
 #include "swift/SIL/BasicBlockUtils.h"
@@ -258,6 +259,23 @@ static void removeEndFormalScopeMarkers(SILFunction &f) {
   }
 }
 
+static void clearUnresolvedMarkers(SILFunction &f) {
+  // TODO: Skip this when lifetime resolution is enabled, since that pass
+  // will potentially reestablish unresolved accesses as needed to respect
+  // value lifetimes.
+  for (SILBasicBlock &block : f) {
+    for (auto i = block.begin(), e = block.end(); i != e; ++i) {
+      if (auto bap = dyn_cast<BeginApplyInst>(&*i)) {
+        bap->setUnresolved(false);
+      }
+      if (auto bac = dyn_cast<BeginAccessInst>(&*i)) {
+        bac->setUnresolved(false);
+      }
+    }
+  }
+
+}
+
 void SILGenCleanup::run() {
   SILFunction *function = getFunction();
   if (!function->isDefinition())
@@ -268,6 +286,7 @@ void SILGenCleanup::run() {
   LLVM_DEBUG(llvm::dbgs()
              << "\nRunning SILGenCleanup on " << function->getName() << "\n");
 
+  clearUnresolvedMarkers(*function);
   removeEndFormalScopeMarkers(*function);
   removeUnreachableBlocks(*function);
   bool changed = fixupBorrowAccessors(function);

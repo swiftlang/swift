@@ -24,6 +24,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/NestedNameSpecifier.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/StringRef.h"
 
 using namespace swift;
@@ -115,23 +116,15 @@ void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
   }
   auto &clangCtx = typeDecl->getASTContext();
   clang::PrintingPolicy pp(clangCtx.getLangOpts());
-  const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
+  const auto NS = clang::NestedNameSpecifier::getRequiredQualification(
       clangCtx, clangCtx.getTranslationUnitDecl(),
       typeDecl->getLexicalDeclContext());
   if (NS)
-    NS->print(os, pp);
+    NS.print(os, pp);
   assert(cast<clang::NamedDecl>(typeDecl)->getDeclName().isIdentifier());
   os << cast<clang::NamedDecl>(typeDecl)->getName();
-  if (auto *ctd = dyn_cast<clang::ClassTemplateSpecializationDecl>(typeDecl)) {
-    if (ctd->getTemplateArgs().size()) {
-      os << '<';
-      llvm::interleaveComma(ctd->getTemplateArgs().asArray(), os,
-                            [&](const clang::TemplateArgument &arg) {
-                              arg.print(pp, os, /*IncludeType=*/true);
-                            });
-      os << '>';
-    }
-  }
+  if (auto *ctd = dyn_cast<clang::ClassTemplateSpecializationDecl>(typeDecl))
+    clang::printTemplateArgumentList(os, ctd->getTemplateArgs().asArray(), pp);
 }
 
 bool ClangSyntaxPrinter::printNestedTypeNamespaceQualifiers(const ValueDecl *D,
@@ -496,7 +489,7 @@ void ClangSyntaxPrinter::printSymbolUSRAttribute(const ValueDecl *D) const {
 void ClangSyntaxPrinter::printKnownCType(
     Type t, PrimitiveTypeMapping &typeMapping) const {
   auto info =
-      typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+      typeMapping.getKnownCTypeInfo(t->getNominalDecl());
   assert(info.has_value() && "not a known type");
   os << info->name;
   if (info->canBeNullable)

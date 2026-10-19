@@ -35,8 +35,6 @@
 namespace swift {
 namespace constraints {
 
-class FunctionArgpplyInfo;
-
 /// Base class for all of the possible diagnostics,
 /// provides most basic information such as location of
 /// the problem, parent expression and some utility methods.
@@ -913,8 +911,10 @@ public:
                                   ConstraintLocator *locator)
       : ContextualFailure(solution, actualType, requiredType, locator),
         Mismatches(mismatches) {
-    assert(actualType->is<BoundGenericType>());
-    assert(requiredType->is<BoundGenericType>());
+    assert(actualType->is<NominalType>() &&
+           actualType->castTo<NominalType>()->hasGenericArgs());
+    assert(requiredType->is<NominalType>() &&
+           requiredType->castTo<NominalType>()->hasGenericArgs());
   }
 
   bool diagnoseAsError() override;
@@ -932,13 +932,13 @@ private:
   getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
-  BoundGenericType *getActual() const {
-    return getFromType()->castTo<BoundGenericType>();
+  NominalType *getActual() const {
+    return getFromType()->castTo<NominalType>();
   }
 
   /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const {
-    return getToType()->castTo<BoundGenericType>();
+  NominalType *getRequired() const {
+    return getToType()->castTo<NominalType>();
   }
 };
 
@@ -1011,11 +1011,11 @@ public:
 };
 
 /// Diagnose failures related to conversion between two types with different
-/// execution semantics i.e. '@called(once)' function and regular one:
+/// execution semantics i.e. '@called(atMostOnce)' function and regular one:
 ///
 /// ```swift
 /// func test(_: () -> Void) {}
-/// let fn: @called(once) () -> Void = {}
+/// let fn: @called(atMostOnce) () -> Void = {}
 /// test(fn) // error due to widening
 /// ```
 class ConversionBetweenFunctionsWithDifferentExecutionSemantics final

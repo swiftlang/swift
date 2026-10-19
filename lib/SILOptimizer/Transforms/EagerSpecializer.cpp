@@ -488,9 +488,9 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
     // If we add non-Int value generic parameters in the future, the destructuring
     // and equality checking logic below will also need to change.
     GenericWord = Builder.createStructExtract(Loc, genericInt,
-      valueTy->getStructOrBoundGenericStruct()->getStoredProperties().front());
+      valueTy->getStructDecl()->getStoredProperties().front());
     SpecializedWord = Builder.createStructExtract(Loc, specializedInt,
-      valueTy->getStructOrBoundGenericStruct()->getStoredProperties().front());
+      valueTy->getStructDecl()->getStoredProperties().front());
   } else {
     auto WordTy = SILType::getBuiltinWordType(Ctx);
     auto GenericMT = Builder.createMetatype(

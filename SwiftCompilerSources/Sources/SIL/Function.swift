@@ -26,6 +26,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
+  /// True if `sourceLoc` is within the function's declaration or closure expression.
+  public func contains(_ sourceLoc: SourceLoc) -> Bool {
+    bridged.isInSourceRange(sourceLoc.bridged)
+  }
+
+  /// True if `sourceLoc` is within the function's body.
+  public func bodyContains(_ sourceLoc: SourceLoc) -> Bool {
+    bridged.isInBodySourceRange(sourceLoc.bridged)
+  }
+
+  /// The location of the end of the function's body.
+  public var bodyEndLoc: SourceLoc? { SourceLoc(bridged: bridged.getBodyEndLoc()) }
+
   public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
 
   public var sourceFile: SourceFile? { declRef.sourceFile }
@@ -69,6 +82,15 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// standard library - and for specializations of such functions.
   public func isInCurrentModule(_ context: some Context) -> Bool {
     parentModule == context.currentModuleContext
+  }
+
+  /// This function's SIL stage. Prefer this over `Context.stageFloor` for a
+  /// per-function query.
+  public var silStage: SILStage {
+    guard let stage = SILStage(rawValue: bridged.getStage()) else {
+      fatalError("unhandled SILStage")
+    }
+    return stage
   }
 
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
@@ -358,7 +380,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   public var isDeinitBarrier: Bool {
-    effects.sideEffects?.global.isDeinitBarrier ?? true
+    if hasSemanticsAttribute("realloc_array_buffer") {
+      return false
+    }
+    return effects.sideEffects?.global.isDeinitBarrier ?? true
   }
 
   public enum PerformanceConstraints {

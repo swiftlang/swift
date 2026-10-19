@@ -60,11 +60,11 @@ int main() {
 
   Holder holder{7};
   Triple spread = holder.spread(3);
-  printf("spread=%ld %ld %ld\n", spread.a, spread.b, spread.c);
+  printf("spread=%lld %lld %lld\n", spread.a, spread.b, spread.c);
   // CHECK: spread=7 3 10
 
   Triple triple = Holder::makeTriple(20);
-  printf("makeTriple=%ld %ld %ld\n", triple.a, triple.b, triple.c);
+  printf("makeTriple=%lld %lld %lld\n", triple.a, triple.b, triple.c);
   // CHECK: makeTriple=20 21 22
 
   NonTrivialReceiver receiver;

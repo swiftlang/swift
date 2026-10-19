@@ -1,7 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name function_conversion -primary-file %s
-
-
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name function_conversion -primary-file %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name function_conversion -primary-file %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name function_conversion -primary-file %s
 
@@ -471,23 +468,34 @@ func convTupleToOptionalIndirect<T>(_ f: @escaping (T) -> (T, T)) -> (T) -> (T, 
 
 // ==== Make sure we support AnyHashable erasure
 
-// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion15convAnyHashable1tyx_tSHRzlF
-// CHECK:         function_ref @$s19function_conversion15convAnyHashable1tyx_tSHRzlFSbs0dE0V_AEtcfU_
-// CHECK:         function_ref @$ss11AnyHashableVABSbIegnnd_xxSbIegnnd_SHRzlTR
-
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss11AnyHashableVABSbIegnnd_xxSbIegnnd_SHRzlTR : $@convention(thin) <T where T : Hashable> (@in_guaranteed T, @in_guaranteed T, @guaranteed @callee_guaranteed (@in_guaranteed AnyHashable, @in_guaranteed AnyHashable) -> Bool) -> Bool
-// CHECK:         alloc_stack $AnyHashable
-// CHECK:         function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF
-// CHECK:         apply {{.*}}<T>
-// CHECK:         alloc_stack $AnyHashable
-// CHECK:         function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF
-// CHECK:         apply {{.*}}<T>
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion15convAnyHashable2fnyxyc_tSHRzlF : $@convention(thin) <T where T : Hashable> (@guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> () {
+// CHECK:         function_ref @$sxIegr_s11AnyHashableVIegr_SHRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed @callee_guaranteed () -> @out τ_0_0) -> @out AnyHashable
 // CHECK:         return
 
-func convAnyHashable<T : Hashable>(t: T) {
-  let fn: (T, T) -> Bool = {
-    (x: AnyHashable, y: AnyHashable) in x == y
-  }
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sxIegr_s11AnyHashableVIegr_SHRzlTR : $@convention(thin) <T where T : Hashable> (@guaranteed @callee_guaranteed () -> @out T) -> @out AnyHashable
+// CHECK:         function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK:         return
+
+func convAnyHashable<T : Hashable>(fn: @escaping () -> T) {
+  let fn: () -> AnyHashable = fn
+}
+
+func convAnyHashableLoadable(fn: @escaping () -> Int) {
+  let fn: () -> AnyHashable = fn
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s19function_conversion23convAnyHashableOptional2fnyxSgyc_tSHRzlF : $@convention(thin) <T where T : Hashable> (@guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out Optional<τ_0_0> for <T>) -> () {
+// CHECK:         function_ref @$sxSgIegr_s11AnyHashableVIegr_SHRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@guaranteed @callee_guaranteed () -> @out Optional<τ_0_0>) -> @out AnyHashable
+// CHECK:         return
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sxSgIegr_s11AnyHashableVIegr_SHRzlTR : $@convention(thin) <T where T : Hashable> (@guaranteed @callee_guaranteed () -> @out Optional<T>) -> @out AnyHashable {
+// CHECK:         [[BOX:%.*]] = alloc_stack $Optional<T>
+// CHECK:         [[FN:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK:         apply [[FN]]<Optional<T>>(%0, [[BOX]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK:         return
+
+func convAnyHashableOptional<T: Hashable>(fn: @escaping () -> T?) {
+  let fn2: () -> AnyHashable = fn
 }
 
 // ==== Convert exploded tuples to Any or Optional<Any>

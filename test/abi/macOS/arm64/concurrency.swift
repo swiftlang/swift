@@ -417,8 +417,9 @@ Added: _swift_task_isCancelledWithFlags
 Added: _$sSct5_taskBovg
 Added: _$sSct5_taskBovpMV
 
-// Swift.UnsafeCurrentTask.init(_AsyncTask) -> Swift.UnsafeCurrentTask
-Added: _$sSctyScts10_AsyncTaskVcfC
+// Swift.UnsafeCurrentTask.init(Builtin.NativeObject) -> Swift.UnsafeCurrentTask
+Added: _$sSctySctBocfC
+
 // Swift.withUnsafeCurrentTaskNonsending<A>(body: nonisolated(nonsending) (Swift.UnsafeCurrentTask?) async throws -> A) async throws -> A
 Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlF
 Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlFTu
@@ -538,6 +539,7 @@ Added: _swift_task_cancellationScopeIsCancelled
 Added: _swift_task_cancelWithFlags
 Added: _swift_task_findNearestDeadlineForClock
 Added: _swift_task_getIsCancelledWithReason
+Added: _swift_task_getIsCancelledWithReasonWithFlags
 Added: __swift_task_hasActiveDeadline
 Added: _swift_task_popCancellationScope
 Added: _swift_task_popDeadline
@@ -547,3 +549,32 @@ Added: _swift_taskGroup_cancelAllWithFlags
 
 // Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
 Added: _swift_task_addCancellationHandlerWithReason
+
+// ExecutorJob._context getter, used by the
+// @export(implementation) unsafeCurrentTask accessor (SE-0469)
+Added: _$ss11ExecutorJobV8_contextBjvg
+
+// property descriptor for Swift.UnownedJob.unsafeCurrentTask : Swift.UnsafeCurrentTask?
+Added: _$sScJ17unsafeCurrentTaskSctSgvpMV
+
+// Task.id / UnsafeCurrentTask.id / Task.currentID
+Added: _swift_task_getCurrentTaskId
+Added: _$sScT2ids6TaskIDVvpMV
+Added: _$sSct2ids6TaskIDVvpMV
+Added: _$sScTss5NeverORszABRs_rlE9currentIDs04TaskC0VSgvpZMV
+
+// TaskID struct (Sendable, Hashable)
+Added: _$ss6TaskIDVMa
+Added: _$ss6TaskIDVMn
+Added: _$ss6TaskIDVN
+Added: _$ss6TaskIDVSHsMc
+Added: _$ss6TaskIDVSQsMc
+Added: _$ss6TaskIDV2eeoiySbAB_ABtFZ
+Added: _$ss6TaskIDV4hash4intoys6HasherVz_tF
+Added: _$ss6TaskIDV8rawValues6UInt64VvpMV
+Added: _$ss6TaskIDV9hashValueSivg
+Added: _$ss6TaskIDV9hashValueSivpMV
+Added: _$ss6TaskIDV9_rawValues6UInt64Vvg
+Added: _$ss6TaskIDV9_rawValues6UInt64VvM
+Added: _$ss6TaskIDV9_rawValues6UInt64VvpMV
+Added: _$ss6TaskIDV9_rawValues6UInt64Vvs

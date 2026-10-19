@@ -32,3 +32,49 @@ func testExplicitClosure() {
     var callback: (() throws -> Void)?
     callback = { () throws(E) in }
 }
+
+// A non-throwing closure literal converted to a typed-throws type whose error
+// type depends on an outer generic parameter is emitted at its own type and
+// then converted.
+struct Tree<Key> {
+  enum KeyError: Error { case missing }
+
+  func takesNonEscaping(_ fn: () throws(KeyError) -> Void) {}
+  func takesEscaping(_ fn: @escaping () throws(KeyError) -> Void) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testNoGenericCaptureyyF :
+  // CHECK:         [[FN:%.*]] = function_ref @$s{{.*}}testNoGenericCaptureyyFyyXEfU_ : $@convention(thin) () -> ()
+  // CHECK:         [[THICK:%.*]] = thin_to_thick_function [[FN]]
+  // CHECK:         convert_function [[THICK]] to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error Tree<τ_0_0>.KeyError for <Key>
+  func testNoGenericCapture() {
+    takesNonEscaping {}
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testGenericCaptureyyF :
+  // CHECK:         [[FN:%.*]] = function_ref @$s{{.*}}testGenericCaptureyyFyyXEfU_ : $@convention(thin) <τ_0_0> () -> ()
+  // CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Key>()
+  // CHECK:         [[NOESC:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]]
+  // CHECK:         convert_function [[NOESC]] to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error Tree<τ_0_0>.KeyError for <Key>
+  func testGenericCapture() {
+    takesNonEscaping { _ = Key.self }
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testEscapingyyF :
+  // CHECK:         [[FN:%.*]] = function_ref @$s{{.*}}testEscapingyyFyycfU_ : $@convention(thin) () -> ()
+  // CHECK:         [[THICK:%.*]] = thin_to_thick_function [[FN]]
+  // CHECK:         convert_function [[THICK]] to $@callee_guaranteed @substituted <τ_0_0> () -> @error Tree<τ_0_0>.KeyError for <Key>
+  func testEscaping() {
+    takesEscaping {}
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testGenericErroryyxms0F0RzlF :
+// CHECK:         [[FN:%.*]] = function_ref @$s{{.*}}testGenericErroryyxms0F0RzlFyyXEfU_ : $@convention(thin) () -> ()
+// CHECK:         [[THICK:%.*]] = thin_to_thick_function [[FN]]
+// CHECK:         [[THUNK:%.*]] = function_ref @$sIg_xIegzr_s5ErrorRzlTR
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<Err>([[THICK]])
+// CHECK:         convert_function [[PA]] to $@callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <Err>
+func testGenericError<Err: Error>(_: Err.Type) {
+  func take(_ fn: () throws(Err) -> Void) {}
+  take {}
+}

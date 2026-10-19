@@ -1,0 +1,23 @@
+// RUN: %target-swift-frontend %s -emit-sil -verify
+
+// The module stage floor is a lower bound over every function in the module, so
+// a function below it cannot exist. Reject the attribute rather than silently
+// clamp it, which would hand the author a stage they did not ask for.
+
+sil_stage canonical
+
+import Builtin
+
+sil [stage=raw] @below_the_floor : $@convention(thin) () -> () {
+// expected-error@-1 {{function stage 'raw' is below the module stage 'canonical'}}
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [stage=nonsense] @not_a_stage : $@convention(thin) () -> () {
+// expected-error@-1 {{expected 'raw' or 'canonical' after 'sil_stage'}}
+bb0:
+  %r = tuple ()
+  return %r : $()
+}

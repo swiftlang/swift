@@ -651,7 +651,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     assert(txt.starts_with("false") || txt.starts_with("true"));
     return txt.starts_with("true");
   };
-  SDKNodeKind Kind;
+  std::optional<SDKNodeKind> Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
   NodeVector Conformances;
@@ -787,7 +787,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
   if (Result)
     return Result;
-  Result = Info.createSDKNode(Kind);
+  Result = Info.createSDKNode(Kind.value());
   for (auto C : Children) {
     Result->addChild(C);
   }
@@ -1571,9 +1571,14 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
-    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr);
+    // An enum marked `@nonexhaustive` cannot be switched over exhaustively
+    // from another module, even when it's defined in a module that isn't
+    // built with library evolution. Adding a case to such an enum is
+    // therefore not a source-breaking change.
+    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr) &&
+                       !ED->getAttrs().hasAttribute<NonexhaustiveAttr>();
     if (auto RT = ED->getRawType()) {
-      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+      if (auto *D = RT->getNominalDecl()) {
         EnumRawTypeName = D->getName().str();
       }
     }
@@ -1646,8 +1651,9 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   // Handle the case where Type has sub-types.
-  if (auto BGT = T->getAs<BoundGenericType>()) {
-    for (auto Arg : BGT->getGenericArgs()) {
+  if (auto NT = T->getAs<NominalType>()) {
+    // FIXME: parent type?
+    for (auto Arg : NT->getGenericArgs()) {
       Root->addChild(constructTypeNode(Arg));
     }
   } else if (auto Tup = T->getAs<TupleType>()) {

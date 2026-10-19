@@ -134,18 +134,45 @@ public func printStaticBuildConfiguration(
   return result ?? BridgedStringRef()
 }
 
+/// The static build configuration for an ASTContext, along with
+/// representations of it that are computed on first use.
+public struct StaticBuildConfigurationStorage {
+  public let configuration: StaticBuildConfiguration
+
+  /// The JSON representation of `configuration`.
+  private var cachedJSON: String? = nil
+
+  init(configuration: StaticBuildConfiguration) {
+    self.configuration = configuration
+  }
+
+  /// The JSON representation of `configuration`. Computed on first use.
+  public mutating func json() throws -> String {
+    if let cachedJSON {
+      return cachedJSON
+    }
+    let json = try String(decoding: JSON.encode(configuration), as: UTF8.self)
+    cachedJSON = json
+    return json
+  }
+}
+
 @_cdecl("swift_Basic_createStaticBuildConfiguration")
 public func createStaticBuildConfiguration(
   cLangOpts: BridgedLangOptions
 ) -> UnsafeMutableRawPointer {
-  let storage = UnsafeMutablePointer<StaticBuildConfiguration>.allocate(capacity: 1)
-  storage.initialize(to: StaticBuildConfiguration(langOptions: cLangOpts))
+  let storage = UnsafeMutablePointer<StaticBuildConfigurationStorage>.allocate(capacity: 1)
+  storage.initialize(
+    to: StaticBuildConfigurationStorage(
+      configuration: StaticBuildConfiguration(langOptions: cLangOpts)
+    )
+  )
   return UnsafeMutableRawPointer(storage)
 }
 
-/// Free the given static build configuration.
+/// Free the given static build configuration. Does nothing if it is null.
 @_cdecl("swift_Basic_freeStaticBuildConfiguration")
-public func freeStaticBuildConfiguration(pointer: UnsafeMutableRawPointer) {
-  pointer.assumingMemoryBound(to: StaticBuildConfiguration.self)
+public func freeStaticBuildConfiguration(pointer: UnsafeMutableRawPointer?) {
+  pointer?.assumingMemoryBound(to: StaticBuildConfigurationStorage.self)
     .deinitialize(count: 1).deallocate()
 }

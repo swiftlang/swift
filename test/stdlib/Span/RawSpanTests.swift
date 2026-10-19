@@ -14,12 +14,12 @@
 
 // REQUIRES: executable_test
 
-// Blocked by rdar://181604244 (opaque values borrow accessors)
+// Blocked by https://github.com/swiftlang/swift/issues/91660 (rdar://181604244)
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
-var suite = TestSuite("Span Tests")
+var suite = TestSuite("RawSpan Tests")
 defer { runAllTests() }
 
 suite.test("Initialize with Span<Int>")
@@ -494,6 +494,40 @@ suite.test("RawSpan init(elements:)")
   let array = ContiguousArray(0..<capacity)
   let bytes = array.span.bytes
   expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+}
+
+suite.test("init(bytesOf:) from value")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let inline: [5 of UInt8] = [0, 1, 2, 3, 4]
+
+  let bytes = RawSpan(bytesOf: inline)
+  expectEqual(bytes.byteCount, MemoryLayout<InlineArray<5, UInt8>>.size)
+  expectEqual(bytes.byteCount, inline.count)
+  for o in bytes.byteOffsets {
+    expectEqual(bytes[o], inline[o])
+  }
+}
+
+suite.test("init(bytesOf:) from value: round trip")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  let value = UInt64.random(in: .max/2 ... .max)
+
+  let bytes = RawSpan(bytesOf: value)
+  expectEqual(bytes.byteCount, MemoryLayout<UInt64>.size)
+  expectEqual(
+    bytes.load(fromByteOffset: 0, as: Int64.self), Int64(bitPattern: value)
+  )
+}
+
+suite.test("init(bytesOf:) from value: compare with indirect approach")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  let value = Duration.seconds(3) + .nanoseconds(14)
+
+  let direct = RawSpan(bytesOf: value)
+  let viaSpan = Span(ofOne: value).bytes
+  expectTrue(direct.isIdentical(to: viaSpan))
 }
 
 suite.test("Typed Span")

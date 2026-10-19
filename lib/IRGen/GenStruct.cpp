@@ -82,7 +82,7 @@ static StructTypeInfoKind getStructTypeInfoKind(const TypeInfo &type) {
 /// If this type has a CXXDestructorDecl, find it and return it. Otherwise,
 /// return nullptr.
 static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
-  auto *structDecl = type.getStructOrBoundGenericStruct();
+  auto *structDecl = type.getStructDecl();
   if (!structDecl || !structDecl->getClangDecl())
     return nullptr;
   const clang::CXXRecordDecl *cxxRecordDecl =
@@ -350,6 +350,25 @@ namespace {
       super::fillWithZerosIfSensitive(IGF, address, T);
     }
 
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
+      // The code below checks the AST to call a deinit method
+      // which we don't support from hidden representations yet
+      assertNotDeserialized("StructTypeInfoBase::assignWithTake");
+
+      // Assignment overwrites an existing value, which must be destroyed
+      // first. If the struct has a deinit, elementwise take-assignment would
+      // skip it, so run a full destroy (which invokes the deinit) and then
+      // take-initialize the destination.
+      if (tryEmitDestroyUsingDeinit(IGF, dest, T)) {
+        super::fillWithZerosIfSensitive(IGF, dest, T);
+        asImpl().initializeWithTake(IGF, dest, src, T, isOutlined,
+                                    /*zeroizeIfSensitive=*/T.isSensitive());
+        return;
+      }
+      super::assignWithTake(IGF, dest, src, T, isOutlined);
+    }
+
     void verify(IRGenTypeVerifierFunction &IGF,
                 llvm::Value *metadata,
                 SILType structType) const override {
@@ -500,6 +519,12 @@ namespace {
       }
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -577,11 +602,11 @@ namespace {
 
     void emitCopyWithCopyFunction(IRGenFunction &IGF, SILType T, Address src,
                                   Address dst) const {
+      auto &clangCtx = clangDecl->getASTContext();
       auto *copyFunction =
           clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
               IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
-              /*isVolatile*/ false,
-              clang::QualType(clangDecl->getTypeForDecl(), 0));
+              /*isVolatile*/ false, clangCtx.getCanonicalTagType(clangDecl));
       auto *dstValue = dst.getAddress();
       auto *srcValue = src.getAddress();
       IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,
@@ -605,6 +630,12 @@ namespace {
                              IsABIAccessible),
           clangDecl(clangDecl) {
       (void)clangDecl;
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -850,6 +881,12 @@ namespace {
       (void)ClangDecl;
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1063,6 +1100,12 @@ namespace {
         : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo, fields,
                              IGM, representation) {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &IGM) const override {
@@ -1174,6 +1217,12 @@ namespace {
                            alwaysFixedSize, isABIAccessible)
     {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1254,12 +1303,12 @@ namespace {
     SILType TheStruct;
   public:
     StructNonFixedOffsets(SILType type) : TheStruct(type) {
-      assert(TheStruct.getStructOrBoundGenericStruct());
+      assert(TheStruct.getStructDecl());
     }
 
     llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
       auto &layout =
-          IGF.IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct());
+          IGF.IGM.getMetadataLayout(TheStruct.getStructDecl());
       auto offset = layout.getFieldOffset(
           IGF, layout.getDecl()->getStoredProperties()[index]);
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
@@ -1271,7 +1320,7 @@ namespace {
     MemberAccessStrategy getFieldAccessStrategy(IRGenModule &IGM,
                                                 unsigned nonFixedIndex) {
       auto start =
-        IGM.getMetadataLayout(TheStruct.getStructOrBoundGenericStruct())
+        IGM.getMetadataLayout(TheStruct.getStructDecl())
           .getFieldOffsetVectorOffset();
 
       // FIXME: Handle resilience
@@ -1303,6 +1352,12 @@ namespace {
                            structAccessible) {
     }
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
     createSerializableHiddenTypeInfoRepresentation(
         IRGenModule &) const override {
@@ -1332,10 +1387,18 @@ namespace {
 
         // If we're an array, use the ArrayLayoutEntry.
         if (rawLayout->getArrayLikeTypeAndCount()) {
+          // Don't return yet as a deinit below could replace the
+          // array's destroy.
           auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
-          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
-                                                           loweredLikeType,
-                                                           countType);
+          likeTypeLayout = IGM.typeLayoutCache.getOrCreateArrayEntry(
+              likeTypeLayout, loweredLikeType, countType);
+        }
+
+        // If there's a deinit, use it to destroy instead of the like
+        // type's destroy
+        if (T.getStructDecl()->hasValueTypeDestructor()) {
+          return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+              {likeTypeLayout}, T, getBestKnownAlignment().getValue(), *this);
         }
 
         // Otherwise, this is just going to use the same layout entry as the
@@ -1563,14 +1626,14 @@ public:
 
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
-    if (SwiftType.getStructOrBoundGenericStruct()->isCxxNonTrivial()) {
+    if (SwiftType.getStructDecl()->isCxxNonTrivial()) {
       return AddressOnlyCXXClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment,
           (SwiftDecl && !SwiftDecl->canBeCopyable())
             ? IsNotCopyable : IsCopyable,
           ClangDecl);
     }
-    if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
+    if (SwiftType.getStructDecl()->isNonTrivialPtrAuth()) {
       return AddressOnlyPointerAuthRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment,
           (SwiftDecl && !SwiftDecl->canBeCopyable())
@@ -1715,7 +1778,7 @@ private:
       if (fieldTy->isAnyClassReferenceType() &&
           fieldTy->getReferenceCounting() != ReferenceCounting::None)
         hasReferenceField = true;
-      else if (auto structDecl = fieldTy->getStructOrBoundGenericStruct();
+      else if (auto structDecl = fieldTy->getStructDecl();
                structDecl && structDecl->hasClangNode() &&
                getStructTypeInfoKind(fieldTI) ==
                    StructTypeInfoKind::LoadableClangRecordTypeInfo)
@@ -1931,6 +1994,12 @@ namespace {
                             IsABIAccessible_t abiAccessible)
       : ResilientTypeInfo(T, copyable, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
     }
 
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation>

@@ -19,6 +19,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <optional>
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -197,6 +198,15 @@ private:
   void printTypeImplTypeSpecifier(Type type, const ModuleDecl *moduleContext);
 
   bool hasKnownOptionalNullableCxxMapping(Type type);
+
+  /// Collects the parameters, 'self' included, whose value Swift takes
+  /// ownership of from the caller.
+  ///
+  /// This follows the lowered convention, as a parameter can be consumed
+  /// without being spelled 'consuming'; a setter's 'newValue' is.
+  void collectConsumedParameters(
+      const LoweredFunctionSignature &signature,
+      llvm::SmallPtrSetImpl<const ParamDecl *> &consumed);
 
   raw_ostream &os;
   raw_ostream &cPrologueOS;

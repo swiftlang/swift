@@ -301,7 +301,7 @@ public:
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
             getKind() == ProjectionKind::Class));
-    auto *nominalDecl = BaseType.getNominalOrBoundGenericNominal();
+    auto *nominalDecl = BaseType.getNominalDecl();
     assert(nominalDecl && "This should only be called with a nominal type");
     return getIndexedField(nominalDecl, getIndex());
   }
@@ -309,8 +309,8 @@ public:
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
     assert(isValid());
     assert(getKind() == ProjectionKind::Enum);
-    assert(BaseType.getEnumOrBoundGenericEnum() && "Expected enum type");
-    auto Iter = BaseType.getEnumOrBoundGenericEnum()->getAllElements().begin();
+    assert(BaseType.getEnumDecl() && "Expected enum type");
+    auto Iter = BaseType.getEnumDecl()->getAllElements().begin();
     std::advance(Iter, getIndex());
     return *Iter;
   }
@@ -1031,14 +1031,6 @@ namespace llvm {
 using swift::ProjectionPath;
 /// Allow ProjectionPath to be used in DenseMap.
 template <> struct DenseMapInfo<ProjectionPath> {
-  static inline ProjectionPath getEmptyKey() {
-    return ProjectionPath(DenseMapInfo<swift::SILType>::getEmptyKey(),
-                          DenseMapInfo<swift::SILType>::getEmptyKey());
-  }
-  static inline ProjectionPath getTombstoneKey() {
-    return ProjectionPath(DenseMapInfo<swift::SILType>::getTombstoneKey(),
-                          DenseMapInfo<swift::SILType>::getTombstoneKey());
-  }
   static inline unsigned getHashValue(const ProjectionPath &Val) {
     return hash_value(Val);
   }

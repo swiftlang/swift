@@ -141,12 +141,12 @@ ImportCache::getImportSet(ASTContext &ctx,
       hasHeaderImportModule = true;
   }
 
-  void *InsertPos = nullptr;
+  llvm::FoldingSetInsertToken InsertToken;
 
   llvm::FoldingSetNodeID ID;
   ImportSet::Profile(ID, topLevelImports);
 
-  if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos)) {
+  if (ImportSet *result = ImportSets.lookup(ID, InsertToken)) {
     if (ctx.Stats)
       ++ctx.Stats->getFrontendCounters().ImportSetFoldHit;
     return *result;
@@ -195,7 +195,7 @@ ImportCache::getImportSet(ASTContext &ctx,
   // Find the insert position again, in case the above traversal invalidated
   // the folding set via re-entrant calls to getImportSet() from
   // getImportedModulesForLookup().
-  if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
+  if (ImportSet *result = ImportSets.lookup(ID, InsertToken))
     return *result;
   
   size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(
@@ -207,7 +207,7 @@ ImportCache::getImportSet(ASTContext &ctx,
                                      topLevelImports,
                                      transitiveImports,
                                      transitiveSwiftOnlyImports);
-  ImportSets.InsertNode(result, InsertPos);
+  ImportSets.insert(result, InsertToken);
 
   return *result;
 }

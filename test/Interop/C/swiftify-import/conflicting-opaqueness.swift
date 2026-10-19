@@ -37,7 +37,7 @@ struct container_t {
 // }}
 // expected-expansion@+7:75{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func fooWrapped(_ x: UnsafeMutablePointer<container_t>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func fooWrapped(_ x: UnsafeMutablePointer<container_t>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe fooWrapped(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -53,7 +53,7 @@ void foobar_release(foobar_ref x);
 
 // expected-expansion@+10:57{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<CInt>, _ _foobar_param2: foobar_ref!) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<CInt>, _ _foobar_param2: foobar_ref!) {|}}
 //   expected-remark@3{{macro content: |    let _foobar_param1 = CInt(exactly: _foobar_param0.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe foobar(_foobar_param0.baseAddress, _foobar_param1, _foobar_param2)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -71,7 +71,7 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 
 // expected-expansion@+10:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func bar(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe bar(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -82,7 +82,7 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 void bar(struct qux *x, int * __counted_by(len) p, int len);
 // expected-expansion@+10:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func barReturn(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<qux>! {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func barReturn(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<qux>! {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe barReturn(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -101,7 +101,7 @@ struct qux * barReturn(int * __counted_by(len) p, int len);
 struct qux;
 // expected-expansion@+10:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func baz(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func baz(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe baz(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -112,7 +112,7 @@ struct qux;
 void baz(struct qux *x, int * __counted_by(len) p, int len);
 // expected-expansion@+10:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bazReturn(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<qux>! {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func bazReturn(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<qux>! {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe bazReturn(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}

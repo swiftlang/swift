@@ -162,6 +162,27 @@ func vector_bitcast_test_ii(_ src: Builtin.Int16) -> Builtin.Vec16xInt8 {
   return Builtin.sext_Vec16xInt1_Vec16xInt8(v16x1)   // CHECK: sext
 }
 
+func fmaddRelaxed_test(
+  _ a: Builtin.FPIEEE32,
+  _ b: Builtin.FPIEEE32,
+  _ c: Builtin.FPIEEE32
+) -> Builtin.FPIEEE32 {
+  // CHECK: fmul reassoc nsz contract float
+  // CHECK: fadd reassoc nsz contract float
+  Builtin.fadd_relaxed_FPIEEE32(a, Builtin.fmul_relaxed_FPIEEE32(b, c))
+}
+
+func fmaddRelaxedVector_test(
+  _ a: Builtin.Vec4xFPIEEE32,
+  _ b: Builtin.Vec4xFPIEEE32,
+  _ c: Builtin.Vec4xFPIEEE32
+) -> Builtin.Vec4xFPIEEE32 {
+  // CHECK: fmul reassoc nsz contract <4 x float>
+  // CHECK: fadd reassoc nsz contract <4 x float>
+  let p = Builtin.fmul_relaxed_Vec4xFPIEEE32(b, c)
+  return Builtin.fadd_relaxed_Vec4xFPIEEE32(a, p)
+}
+
 func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
   // CHECK: insertelement <4 x float> zeroinitializer
   // CHECK: shufflevector <4 x float>

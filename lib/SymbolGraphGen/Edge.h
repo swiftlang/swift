@@ -156,24 +156,6 @@ using Symbol = swift::symbolgraphgen::Symbol;
 using Edge = swift::symbolgraphgen::Edge;
 using ExtensionDecl = swift::ExtensionDecl;
 template <> struct DenseMapInfo<Edge> {
-  static inline Edge getEmptyKey() {
-    return {
-      DenseMapInfo<SymbolGraph *>::getEmptyKey(),
-      { "Empty" },
-      DenseMapInfo<Symbol>::getEmptyKey(),
-      DenseMapInfo<Symbol>::getEmptyKey(),
-      DenseMapInfo<const ExtensionDecl *>::getEmptyKey(),
-    };
-  }
-  static inline Edge getTombstoneKey() {
-    return {
-      nullptr,
-      { "Tombstone" },
-      DenseMapInfo<Symbol>::getTombstoneKey(),
-      DenseMapInfo<Symbol>::getTombstoneKey(),
-      DenseMapInfo<const ExtensionDecl *>::getTombstoneKey(),
-    };
-  }
   static unsigned getHashValue(const Edge E) {
     unsigned H = 0;
     H ^= DenseMapInfo<StringRef>::getHashValue(E.Kind.Name);

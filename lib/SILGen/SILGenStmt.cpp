@@ -708,9 +708,13 @@ SILGenFunction::prepareIndirectResultInit(
 }
 
 static Expr *lookThroughProjections(Expr *expr) {
-  auto *lookupExpr = dyn_cast<LookupExpr>(expr);
+  auto *semanticExpr = expr->getSemanticsProvidingExpr();
+  if (auto *inoutExpr = dyn_cast<InOutExpr>(semanticExpr)) {
+    return lookThroughProjections(inoutExpr->getSubExpr());
+  }
+  auto *lookupExpr = dyn_cast<LookupExpr>(semanticExpr);
   if (!lookupExpr) {
-    return expr;
+    return semanticExpr;
   }
   return lookThroughProjections(lookupExpr->getBase());
 }
@@ -1800,7 +1804,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
 
             return ManagedValue::forForwardedRValue(*this, exn);
           }).forward(*this);
-    } else if (destASTType->getClassOrBoundGenericClass()) {
+    } else if (destASTType->getClassDecl()) {
       // Class upcast: the in-flight error is a reference to a subclass of
       // the destination. SIL's `upcast` instruction additionally verifies
       // the subclass relationship in asserts builds; release builds rely

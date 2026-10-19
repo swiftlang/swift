@@ -19,6 +19,7 @@ import AngryPhonebook
 import AnyHashableWithAClass
 import Array2D
 import ArrayAppend
+import ArrayCastTest
 import ArrayInClass
 import ArrayLiteral
 import ArrayOfGenericPOD
@@ -30,6 +31,7 @@ import ArraySetElement
 import ArraySliceTests
 import ArraySubscript
 import ArrayTests
+import AssumeIsolated
 import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
@@ -68,6 +70,7 @@ import CxxStringConversion
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
+import DistributedThunkHop
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -213,12 +216,14 @@ import StringReplaceSubrange
 import StringSplitting
 import StringSwitch
 import StringTests
+import StringValidating
 import StringWalk
 import SubstringTest
 import Suffix
 import SuperChars
 import TaskGroups
 import TaskIsCancelledCancellationScopes
+import TaskIDBenchmark
 import TaskLocalGet
 import TaskRegistryStress
 import ToddCoxeter
@@ -237,6 +242,7 @@ register(AngryPhonebook.benchmarks)
 register(AnyHashableWithAClass.benchmarks)
 register(Array2D.benchmarks)
 register(ArrayAppend.benchmarks)
+register(ArrayCastTest.benchmarks)
 register(ArrayInClass.benchmarks)
 register(ArrayLiteral.benchmarks)
 register(ArrayOfGenericPOD.benchmarks)
@@ -248,6 +254,7 @@ register(ArraySetElement.benchmarks)
 register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
 register(ArrayTests.benchmarks)
+register(AssumeIsolated.benchmarks)
 register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
@@ -286,6 +293,7 @@ register(CxxStringConversion.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
+register(DistributedThunkHop.benchmarks)
 register(DictOfArraysToArrayOfDicts.benchmarks)
 register(DictTest.benchmarks)
 register(DictTest2.benchmarks)
@@ -436,12 +444,14 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 
 register(StringSwitch.benchmarks)
 register(StringTests.benchmarks)
+register(StringValidating.benchmarks)
 register(StringWalk.benchmarks)
 register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskIsCancelledCancellationScopes.benchmarks)
+register(TaskIDBenchmark.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)

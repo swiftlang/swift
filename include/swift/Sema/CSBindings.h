@@ -151,15 +151,8 @@ struct PotentialBinding {
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
-    return {PlaceholderType::get(typeVar->getASTContext(), typeVar),
-            AllowedBindingKind::Exact,
+    return {HoleType::get(typeVar), AllowedBindingKind::Exact,
             /*source=*/locator, /*originator=*/nullptr};
-  }
-
-  static PotentialBinding forPlaceholder(Type placeholderTy) {
-    return {placeholderTy, AllowedBindingKind::Exact,
-            PointerUnion<Constraint *, ConstraintLocator *>(),
-            /*originator=*/nullptr};
   }
 
   void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
@@ -353,6 +346,12 @@ struct PotentialBindings {
 
   void infer(Constraint *constraint);
 
+  /// Determine if the given typeVar, or any of the type variables in its
+  /// equivalence class, have a locator indicating they are from a single
+  /// expression closure and thus will convert to Void and need a fallback
+  /// binding kind
+  static bool isToVoidTypeVar(TypeVariableType *typeVar, ConstraintSystem *CS);
+
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
   ///
@@ -380,45 +379,13 @@ template <>
 struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   using Binding = swift::constraints::inference::PotentialBinding;
 
-  static Binding getEmptyKey() {
-    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
-  }
-
-  static Binding getTombstoneKey() {
-    return placeholderKey(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(const Binding &Val) {
     return DenseMapInfo<swift::Type>::getHashValue(
         Val.BindingType->getCanonicalType());
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
-#if LLVM_VERSION_MAJOR <= 21
-    // If either side is empty or tombstone, let's use pointer equality.
-    {
-      auto lhsTy = LHS.BindingType.getPointer();
-      auto rhsTy = RHS.BindingType.getPointer();
-
-      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
-      auto tombstoneTy =
-          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
-
-      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-
-      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-    }
-#endif
-
     return LHS == RHS;
-  }
-
-private:
-  static Binding placeholderKey(swift::Type type) {
-    return Binding::forPlaceholder(type);
   }
 };
 
@@ -561,9 +528,9 @@ public:
   bool canBeNil() const;
 
   /// If this type variable doesn't have any viable bindings, or
-  /// if there is only one binding and it's a placeholder type, consider
+  /// if there is only one binding and it's a hole type, consider
   /// this type variable to be a hole in a constraint system
-  /// regardless of where the placeholder type originated.
+  /// regardless of where the hole type originated.
   bool isHole() const {
     if (isDirectHole())
       return true;
@@ -572,14 +539,14 @@ public:
       return false;
 
     const auto &binding = Bindings.front();
-    return binding.BindingType->is<PlaceholderType>();
+    return binding.BindingType->is<HoleType>();
   }
 
   /// Determines whether the only possible binding for this type variable
-  /// would be a placeholder type. This is different from `isHole` method
-  /// because type variable could also acquire a placeholder type transitively
+  /// would be a hole type. This is different from `isHole` method
+  /// because type variable could also acquire a hole type transitively
   /// if one of the type variables in its subtype/equivalence chain has been
-  /// bound to a placeholder type.
+  /// bound to a hole type.
   bool isDirectHole() const;
 
   /// Determine whether attempting this type variable should be

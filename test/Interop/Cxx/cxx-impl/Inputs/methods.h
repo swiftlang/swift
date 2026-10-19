@@ -28,16 +28,16 @@ struct Pair {
 // A struct too large to be returned in registers is returned indirectly
 
 struct Triple {
-  long a;
-  long b;
-  long c;
+  long long a;
+  long long b;
+  long long c;
 };
 
 struct Holder {
   int value;
 
   Triple spread(int k) const;
-  static Triple makeTriple(long a);
+  static Triple makeTriple(int a);
 };
 
 // A non-trivial receiver is passed by pointer, unlike a non-trivial parameter
@@ -69,7 +69,6 @@ struct Rejections {
 };
 
 struct Polymorphic {
-  // expected-note@+1{{to implement 'virtualMethod' in Swift, declare another non-inline virtual method before it and define that method in C++}}
   virtual int virtualMethod() const;
   int nonVirtualMethod() const;
 };
@@ -96,7 +95,6 @@ __attribute__((swift_attr("release:releaseWidget"))) Widget {
   int id;
 
   int tag() const;
-  // expected-note@+1{{to implement 'describe' in Swift, declare another non-inline virtual method before it and define that method in C++}}
   virtual int describe() const;
   static int count();
 };

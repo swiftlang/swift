@@ -89,6 +89,24 @@ static CanType unwrapExistential(CanType e) {
   return e;
 }
 
+static bool sourceCanInhabitExistential(CanType source, CanType target) {
+  assert(target.isExistentialType() && "target should be an existential type");
+
+  // Non-concrete types cannot be judged here.
+  if (source.isAnyExistentialType() || source->hasArchetype() ||
+      source->hasTypeParameter() || source->hasOpaqueArchetype())
+    return true;
+
+  // Copyable/Escapable targets require Copyable/Escapable source
+  if (source->isNoncopyable() && !target->isNoncopyable())
+    return false;
+  if (!source->isEscapable() && target->isEscapable())
+    return false;
+
+  // Otherwise, we cannot judge.
+  return true;
+}
+
 /// Try to classify a conversion from non-existential type
 /// into an existential type by performing a static check
 /// of protocol conformances if it is possible.
@@ -100,6 +118,10 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
 
   if (source == target)
     return DynamicCastFeasibility::WillSucceed;
+
+  // Reject putting a concrete ~C/~E into a regular (C&E) existential
+  if (!sourceCanInhabitExistential(source, target))
+    return DynamicCastFeasibility::WillFail;
 
   auto *TargetProtocol = cast_or_null<ProtocolDecl>(target.getAnyNominal());
   if (!TargetProtocol)
@@ -144,7 +166,7 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
 
   // If it is a class and it can be proven that this class and its
   // superclasses cannot have unknown subclasses, then it is safe to proceed.
-  if (auto *CD = source.getClassOrBoundGenericClass()) {
+  if (auto *CD = source.getClassDecl()) {
     if (canClassOrSuperclassesHaveUnknownSubclasses(CD, isWholeModuleOpts))
       return DynamicCastFeasibility::MaySucceed;
     // Derived types may conform to the protocol.
@@ -214,11 +236,11 @@ classifyDynamicCastFromProtocol(ModuleDecl *M, CanType source, CanType target,
   // Casts from class existential into a non-class can never succeed.
   if (source->isClassExistentialType() &&
       !target.isAnyExistentialType() &&
-      !target.getClassOrBoundGenericClass() &&
+      !target.getClassDecl() &&
       !isa<ArchetypeType>(target) &&
       !mayBridgeToObjectiveC(M, target)) {
-    assert((target.getEnumOrBoundGenericEnum() ||
-            target.getStructOrBoundGenericStruct() ||
+    assert((target.getEnumDecl() ||
+            target.getStructDecl() ||
             isa<TupleType>(target) ||
             isa<SILFunctionType>(target) ||
             isa<FunctionType>(target) ||
@@ -352,11 +374,13 @@ bool swift::doesCastPreserveOwnershipForTypes(SILModule &module,
   if (!canIRGenUseScalarCheckedCastInstructions(module, sourceType, targetType))
     return false;
 
-  // QueryInterface returns an independently retained interface pointer. Even
-  // class-bound COM interfaces cannot forward guaranteed ownership through a
-  // cast, since retaining the result and releasing the source are observable.
+  // COM casts can recover a different interface or native object with its own
+  // reference count. Even class-bound interfaces cannot forward guaranteed
+  // ownership through the cast.
+  auto sourceObjectType = sourceType->lookThroughAllOptionalTypes();
   auto targetObjectType = targetType->lookThroughAllOptionalTypes();
-  if (targetObjectType->isCOMExistentialType())
+  if (sourceObjectType->isCOMExistentialType() ||
+      targetObjectType->isCOMExistentialType())
     return false;
 
   // (B2) unwrapping
@@ -458,7 +482,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
 }
 
 CanType swift::getNSBridgedClassOfCFClass(CanType type) {
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
             classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()) {
@@ -633,7 +657,7 @@ swift::classifyDynamicCast(SILFunction *function,
     // can never succeed.
     if (source->isClassExistentialType() &&
         !target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass())
+        !target.getClassDecl())
       return DynamicCastFeasibility::WillFail;
 
     // TODO: prove that some conversions to existential metatype will
@@ -650,19 +674,19 @@ swift::classifyDynamicCast(SILFunction *function,
 
     // If both metatypes are class metatypes, check if classes can be
     // cast.
-    if (source.getClassOrBoundGenericClass() &&
-        target.getClassOrBoundGenericClass())
+    if (source.getClassDecl() &&
+        target.getClassDecl())
       return classifyClassHierarchyCast(source, target);
 
     // Different structs cannot be cast to each other.
-    if (source.getStructOrBoundGenericStruct() &&
-        target.getStructOrBoundGenericStruct() &&
+    if (source.getStructDecl() &&
+        target.getStructDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
     // Different enums cannot be cast to each other.
-    if (source.getEnumOrBoundGenericEnum() &&
-        target.getEnumOrBoundGenericEnum() &&
+    if (source.getEnumDecl() &&
+        target.getEnumDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
@@ -737,8 +761,8 @@ swift::classifyDynamicCast(SILFunction *function,
   }
 
   // Class casts.
-  auto sourceClass = source.getClassOrBoundGenericClass();
-  auto targetClass = target.getClassOrBoundGenericClass();
+  auto sourceClass = source.getClassDecl();
+  auto targetClass = target.getClassDecl();
   if (sourceClass) {
     if (targetClass) {
       // Imported Objective-C generics don't check the generic parameters, which
@@ -796,11 +820,11 @@ swift::classifyDynamicCast(SILFunction *function,
     // be bridged to a SwiftValueBox. You would need an AnyObject source for
     // that.
     if (!target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass() &&
+        !target.getClassDecl() &&
         !isa<ArchetypeType>(target) &&
         mustBridgeToSwiftValueBox(M, target)) {
-      assert((target.getEnumOrBoundGenericEnum() ||
-              target.getStructOrBoundGenericStruct() ||
+      assert((target.getEnumDecl() ||
+              target.getStructDecl() ||
               isa<TupleType>(target) ||
               isa<SILFunctionType>(target) ||
               isa<FunctionType>(target) ||
@@ -836,11 +860,11 @@ swift::classifyDynamicCast(SILFunction *function,
   // We know that a cast from Int -> class foobar will fail.
   if (targetClass &&
       !source.isAnyExistentialType() &&
-      !source.getClassOrBoundGenericClass() &&
+      !source.getClassDecl() &&
       !isa<ArchetypeType>(source) &&
       mustBridgeToSwiftValueBox(M, source)) {
-      assert((source.getEnumOrBoundGenericEnum() ||
-              source.getStructOrBoundGenericStruct() ||
+      assert((source.getEnumDecl() ||
+              source.getStructDecl() ||
               isa<TupleType>(source) ||
               isa<SILFunctionType>(source) ||
               isa<FunctionType>(source) ||
@@ -879,8 +903,8 @@ swift::classifyDynamicCast(SILFunction *function,
   }
 
   // Check for a viable collection cast.
-  if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
-    if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
+  if (auto sourceStruct = dyn_cast<StructType>(source)) {
+    if (auto targetStruct = dyn_cast<StructType>(target)) {
       // Both types have to be the same kind of collection.
       if (sourceStruct->getDecl() == targetStruct->getDecl()) {
         auto sourceArgs = sourceStruct.getGenericArgs();
@@ -1333,8 +1357,8 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
   if (src->getType() != dest->getType())
   if (src->getType().isAnyExistentialType() !=
       dest->getType().isAnyExistentialType() ||
-      !(src->getType().getClassOrBoundGenericClass() &&
-       dest->getType().getClassOrBoundGenericClass())) {
+      !(src->getType().getClassDecl() &&
+       dest->getType().getClassDecl())) {
 
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.

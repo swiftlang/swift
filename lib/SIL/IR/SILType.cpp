@@ -29,6 +29,141 @@
 using namespace swift;
 using namespace swift::Lowering;
 
+static StringRef getReferenceCountingName(ReferenceCounting referenceCounting) {
+  switch (referenceCounting) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+static StringRef
+getExistentialRepresentationName(ExistentialRepresentation representation) {
+  switch (representation) {
+  case ExistentialRepresentation::None:
+    return "none";
+  case ExistentialRepresentation::Opaque:
+    return "opaque";
+  case ExistentialRepresentation::Class:
+    return "class";
+  case ExistentialRepresentation::Metatype:
+    return "metatype";
+  case ExistentialRepresentation::Boxed:
+    return "boxed";
+  case ExistentialRepresentation::COM:
+    return "com";
+  }
+  llvm_unreachable("unhandled existential representation");
+}
+
+void SILType::printForAbstractTypeLayoutInfo(raw_ostream &OS, SILModule &M,
+                                          TypeExpansionContext expansion) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS << "  " << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  auto printOptionalType = [&](StringRef name, Type type) {
+    OS << "  " << name << ": ";
+    if (type)
+      type.print(OS);
+    else
+      OS << "none";
+    OS << "\n";
+  };
+
+  auto printOptionalSILType = [&](StringRef name, SILType type) {
+    OS << "  " << name << ": ";
+    if (type)
+      type.print(OS);
+    else
+      OS << "none";
+    OS << "\n";
+  };
+
+  OS << "SILType:\n";
+  OS << "  type: ";
+  print(OS);
+  OS << "\n";
+  OS << "  category: " << (isObject() ? "object" : "address") << "\n";
+
+  auto type = getASTType();
+  bool referenceSemantics = hasReferenceSemantics();
+  printFlag("isVoid", isVoid());
+  printFlag("isTuple", isTuple());
+  printFlag("isFunction", isFunction());
+  printFlag("isMetatype", isMetatype());
+  printFlag("isAggregate", isAggregate());
+  printFlag("isOrHasEnum", isOrHasEnum());
+  StringRef nominalKind = "none";
+  if (getClassDecl())
+    nominalKind = "class";
+  else if (getStructDecl())
+    nominalKind = "struct";
+  else if (getEnumDecl())
+    nominalKind = "enum";
+  else if (getNominalDecl())
+    nominalKind = "other";
+  OS << "  nominalKind: " << nominalKind << "\n";
+  printOptionalSILType("optionalObjectType", getOptionalObjectType());
+  printFlag("isForeignReferenceType", isForeignReferenceType());
+  printFlag("isSensitive", isSensitive());
+  printFlag("isMoveOnly", isMoveOnly());
+  printFlag("isValueTypeWithDeinit", isValueTypeWithDeinit());
+  printFlag("hasTypeParameter", hasTypeParameter());
+  printFlag("hasArchetype", type->hasArchetype());
+  printFlag("hasPrimaryArchetype", type->hasPrimaryArchetype());
+  printFlag("hasLocalArchetype", hasLocalArchetype());
+  printFlag("hasOpaqueArchetype", type->hasOpaqueArchetype());
+  printFlag("hasOpenedExistential", hasOpenedExistential());
+  printFlag("hasElementArchetype", hasElementArchetype());
+  printFlag("hasParameterPack", hasParameterPack());
+  printFlag("hasPack", hasPack());
+  printFlag("hasPackArchetype", hasPackArchetype());
+  printFlag("hasAnyPack", hasAnyPack());
+  printFlag("hasParameterizedExistential", hasParameterizedExistential());
+  printFlag("hasDynamicSelf", type->hasDynamicSelfType());
+  printFlag("hasUnboundGeneric", type->hasUnboundGenericType());
+  printFlag("hasError", type->hasError());
+  printFlag("hasBareError", type->hasBareError());
+  printFlag("hasReferenceSemantics", referenceSemantics);
+  printFlag("isAnyClassReferenceType", isAnyClassReferenceType());
+  printFlag("hasRetainablePointerRepresentation",
+            hasRetainablePointerRepresentation());
+  printFlag("isConstraintType", type.isConstraintType());
+  printFlag("isExistentialType", isExistentialType());
+  printFlag("isAnyExistentialType", isAnyExistentialType());
+  printFlag("isClassExistentialType", isClassExistentialType());
+  OS << "  existentialRepresentation: "
+     << getExistentialRepresentationName(
+            getPreferredExistentialRepresentation())
+     << "\n";
+  printFlag("isBridgeableObjectType", isBridgeableObjectType());
+  printFlag("isClassOrClassMetatype", isClassOrClassMetatype(type));
+  printFlag("isAddressableForDependencies",
+            isAddressableForDeps(M, expansion));
+  auto rawLayout = getRawLayout();
+  printFlag("hasRawLayout", rawLayout != nullptr);
+  printOptionalType("rawLayoutLikeType", getRawLayoutSubstitutedLikeType());
+  printOptionalType("rawLayoutCountType", getRawLayoutSubstitutedCountType());
+  if (referenceSemantics)
+    OS << "  referenceCounting: "
+       << getReferenceCountingName(type->getReferenceCounting()) << "\n";
+}
+
 /// Find a local archetype represented by this type.
 /// It is assumed by this method that the type contains
 /// at most one opened archetype.
@@ -196,7 +331,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     return true;
   }
 
-  if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
+  if (StructDecl *structDecl = getStructDecl()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
     SILModule &module = F.getModule();
@@ -366,7 +501,7 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
 }
 
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
-  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
   return getIndexedField(decl, fieldIndex);
 }
@@ -392,10 +527,10 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
 
   // If this type is not a class type, then we propagate "move only"-ness to the
   // field. Example:
-  if (!getClassOrBoundGenericClass() && isMoveOnlyWrapped())
+  if (!getClassDecl() && isMoveOnlyWrapped())
     loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
-  if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
+  if (isAddress() || getClassDecl() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
     return SILType::getPrimitiveObjectType(loweredTy);
@@ -417,20 +552,20 @@ SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const 
 }
 
 StringRef SILType::getFieldName(intptr_t fieldIndex) const {
-  NominalTypeDecl *decl = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *decl = getNominalDecl();
   VarDecl *field = getIndexedField(decl, fieldIndex);
   return field->getName().str();
 }
 
 unsigned SILType::getNumNominalFields() const {
-  auto *nominal = getNominalOrBoundGenericNominal();
+  auto *nominal = getNominalDecl();
   assert(nominal && "expected nominal type");
   return getNumFieldsInNominal(nominal);
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                                     TypeExpansionContext context) const {
-  assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
+  assert(elt->getDeclContext() == getEnumDecl());
   assert(elt->hasAssociatedValues());
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
@@ -468,7 +603,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
 }
 
 EnumElementDecl *SILType::getEnumElement(int caseIndex) const {
-  EnumDecl *enumDecl = getEnumOrBoundGenericEnum();
+  EnumDecl *enumDecl = getEnumDecl();
   for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
     if ((int)elemWithIndex.index() == caseIndex)
       return elemWithIndex.value();
@@ -513,7 +648,7 @@ bool SILType::isHeapObjectReferenceType() const {
 }
 
 bool SILType::aggregateHasUnreferenceableStorage() const {
-  if (auto s = getStructOrBoundGenericStruct()) {
+  if (auto s = getStructDecl()) {
     return s->hasUnreferenceableStorage();
   }
   // Tuples with pack expansions don't *actually* have unreferenceable
@@ -935,10 +1070,22 @@ bool SILType::isDifferentiable(SILModule &M) const {
       .has_value();
 }
 
-bool SILType::isCalledOnce() const {
+bool SILType::hasCalledAtMostOnceSemantics() const {
   if (auto F = dyn_cast<SILFunctionType>(getASTType()))
-    return F->isCalledOnce();
+    return F->hasCalledAtMostOnceSemantics();
   return false;
+}
+
+bool SILType::isImplicitlyDestroyable(const SILFunction &fn) const {
+  auto type = removingMoveOnlyWrapper();
+
+  // A box that isn't promoted to the stack is captured by an escaping closure.
+  // The move-only checker doesn't let anything consume its contents, so
+  // destroying the box destroys them.
+  if (type.is<SILBoxType>())
+    return type.getSILBoxFieldType(&fn).isImplicitlyDestroyable(fn);
+
+  return type.getASTType()->isDeinitable();
 }
 
 Type
@@ -1000,7 +1147,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
 }
 
 bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
-  EnumDecl *decl = getEnumOrBoundGenericEnum();
+  EnumDecl *decl = getEnumDecl();
   assert(decl && "Called for a non enum type");
 
   // Since unavailable enum elements cannot be referenced in canonical SIL,
@@ -1043,7 +1190,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     }
   }
 
-  if (auto structDecl = getStructOrBoundGenericStruct()) {
+  if (auto structDecl = getStructDecl()) {
     // If the struct has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (structDecl->isResilient(M.getSwiftModule(), expansion)) {
@@ -1081,7 +1228,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
     return SILType();
   }
 
-  if (auto enumDecl = getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = getEnumDecl()) {
     // If the enum has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (enumDecl->isResilient(M.getSwiftModule(), expansion)) {
@@ -1167,7 +1314,7 @@ bool SILType::isMoveOnly(bool orWrapped) const {
   }
    */
   if (auto F = dyn_cast<SILFunctionType>(ty))
-    return F->isCalledOnce();
+    return F->hasCalledAtMostOnceSemantics();
 
   // Treat all other SIL-specific types as Copyable.
   if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
@@ -1184,7 +1331,7 @@ bool SILType::isMoveOnly(bool orWrapped) const {
 bool SILType::isValueTypeWithDeinit() const {
   // Do not look inside an aggregate type that has a user-deinit, for which
   // memberwise-destruction is not equivalent to aggregate destruction.
-  if (auto *nominal = getNominalOrBoundGenericNominal()) {
+  if (auto *nominal = getNominalDecl()) {
     return nominal->hasValueTypeDestructor();
   }
   return false;
@@ -1220,7 +1367,7 @@ static bool nominalIsMarkedAsImmortal(NominalTypeDecl *nominal) {
 }
 
 bool SILType::isMarkedAsImmortal() const {
-  NominalTypeDecl *nominal = getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominal = getNominalDecl();
   if (!nominal)
     return false;
 
@@ -1252,7 +1399,7 @@ bool SILType::isAddressableForDeps(SILModule &M,
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
-  auto *nominal = getNominalOrBoundGenericNominal();
+  auto *nominal = getNominalDecl();
   if (!nominal)
     return -1;
 
@@ -1277,7 +1424,7 @@ intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
 }
 
 intptr_t SILType::getCaseIdxOfEnumType(StringRef caseName) const {
-  auto *enumDecl = getEnumOrBoundGenericEnum();
+  auto *enumDecl = getEnumDecl();
   if (!enumDecl)
     return -1;
 
@@ -1358,7 +1505,7 @@ Type SILType::getRawLayoutSubstitutedLikeType() const {
   if (rawLayout->getSizeAndAlignment())
     return Type();
 
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   auto likeType = rawLayout->getResolvedLikeType(structDecl);
   auto astT = getASTType();
   auto subs = astT->getContextSubstitutionMap();
@@ -1374,7 +1521,7 @@ Type SILType::getRawLayoutSubstitutedCountType() const {
   if (rawLayout->getSizeAndAlignment() || rawLayout->getScalarLikeType())
     return Type();
 
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   auto countType = rawLayout->getResolvedCountType(structDecl);
   auto astT = getASTType();
   auto subs = astT->getContextSubstitutionMap();

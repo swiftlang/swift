@@ -526,7 +526,7 @@ public:
     auto i = separatelyImportedOverlays.find(declaring);
     if (i == separatelyImportedOverlays.end()) return;
 
-    auto &value = std::get<1>(*i);
+    auto &value = i->second;
     overlays.append(value.begin(), value.end());
   }
 

@@ -305,6 +305,42 @@ extension Task: Equatable {
   }
 }
 
+// ==== -----------------------------------------------------------------------
+// MARK: Task ID
+
+/// An opaque, process-unique identifier for a Swift ``Task``.
+///
+/// A `TaskID` is assigned at task creation, never changes for the lifetime
+/// of the task, and is never reused once a task has completed. IDs are
+/// scoped to the current process and are not suitable for cross-process
+/// correlation.
+///
+/// - SeeAlso: ``Task/currentID``
+/// - SeeAlso: ``Task/id``
+/// - SeeAlso: ``UnsafeCurrentTask/id``
+@available(StdlibDeploymentTarget 6.5, *)
+@frozen
+public struct TaskID: Sendable, Hashable {
+  @usableFromInline
+  internal var _rawValue: UInt64
+
+  @export(implementation)
+  internal init(_rawValue: UInt64) {
+    self._rawValue = _rawValue
+  }
+
+  /// The raw 64-bit value of this TaskID.
+  @export(implementation)
+  public var rawValue: UInt64 { _rawValue }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task {
+  /// A type alias for ``TaskID``, providing the spelling
+  /// `Task.ID` at the use site.
+  public typealias ID = TaskID
+}
+
 // ==== Task Priority ----------------------------------------------------------
 
 /// The priority of a task.
@@ -452,6 +488,25 @@ extension Task where Success == Never, Failure == Never {
       }
       return nil
     }
+  }
+
+  /// The stable ID of the currently-executing task.
+  ///
+  /// If you access this static property outside the execution context of a
+  /// task, it will return `nil`.
+  ///
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// - SeeAlso: ``Task/id``
+  /// - SeeAlso: ``UnsafeCurrentTask/id``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public static var currentID: Task.ID? {
+    let id = _getCurrentTaskId()
+    return id == 0 ? nil : TaskID(_rawValue: id)
   }
 
 }
@@ -658,6 +713,26 @@ extension Task {
       nil
     }
   }
+
+  /// A stable ID for this task.
+  ///
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// The same ID is visible in tools such as `swift-inspect` and
+  /// Instruments, which makes it a convenient correlation key for tracing
+  /// and logging.
+  ///
+  /// - SeeAlso: ``Task/currentID``
+  /// - SeeAlso: ``UnsafeCurrentTask/id``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public var id: ID {
+    unsafe .init(
+      _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
+  }
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -850,10 +925,18 @@ public struct UnsafeCurrentTask {
   }
 
   // May only be created by the standard library.
-  @usableFromInline // Since 6.4
   @available(SwiftStdlib 5.1, *)
   internal init(_ asyncTask: _AsyncTask) {
     unsafe self._rawTask = asyncTask
+  }
+
+  /// ABI-compat shim for the 6.4 `init(_ task: Builtin.NativeObject)`
+  /// Inlined client code that must run on 6.4 runtimes (`_$sSctySctBocfC`)
+  /// creates an `UnsafeCurrentTask` through this initializer
+  @usableFromInline
+  @available(SwiftStdlib 6.4, *)
+  internal init(_ task: Builtin.NativeObject) {
+    unsafe self.init(_AsyncTask(task))
   }
 
   /// A Boolean value that indicates whether the current task was canceled.
@@ -864,6 +947,10 @@ public struct UnsafeCurrentTask {
   /// This property returns the actual cancellation state of the task, regardless of whether
   /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
+  ///
+  /// Unlike the static ``Task/isCancelled-type.property`` property, this property doesn't reflect
+  /// a cancellation that only applies to a part of the task, such as an expired deadline of
+  /// ``withDeadline(in:tolerance:clock:operation:)``.
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
@@ -901,14 +988,19 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
-    if #available(SwiftStdlib 6.4, *) {
-      unsafe _isCancelled(ignoreTaskCancellationShield: true)
+    // This getter is part of the stdlib, so `swift_task_isCancelledWithFlags` is
+    // available whenever the stdlib is deployed with it, even on an older OS.
+    // `swift_task_isCancelled` would take shields and scopes into account.
+    if #available(StdlibDeploymentTarget 6.4, *) {
+      let taskOnly: UInt64 = 0x1
+      return unsafe _taskIsCancelledWithFlags(_rawTask, flags: taskOnly)
     } else {
-      unsafe _taskIsCancelled(_rawTask)
+      return unsafe _taskIsCancelled(_rawTask)
     }
   }
 
-  /// Check if the task is cancelled, optionally ignoring active cancellation shields.
+  /// Check if the task is cancelled, optionally only checking the task itself and
+  /// ignoring cancellation shields and cancellation scopes.
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
@@ -969,6 +1061,10 @@ public struct UnsafeCurrentTask {
   /// Mirrors ``UnsafeCurrentTask/isCancelled``: once this returns non-nil it
   /// will consistently return the same value for the remaining life of the
   /// task. Not affected by cancellation shields.
+  ///
+  /// Unlike the static ``Task/cancellationReason`` property, this property doesn't reflect a
+  /// cancellation that only applies to a part of the task, such as an expired deadline of
+  /// ``withDeadline(in:tolerance:clock:operation:)``.
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public var cancellationReason: CancellationError.Reason? {
@@ -1015,6 +1111,24 @@ public struct UnsafeCurrentTask {
     } else {
       nil
     }
+  }
+
+  /// A stable ID for the current task.
+  ///
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// Returns the same value as ``Task/id`` read on the owning task.
+  ///
+  /// - SeeAlso: ``Task/id``
+  /// - SeeAlso: ``Task/currentID``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
+  public var id: Task.ID {
+    unsafe TaskID(
+      _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
   }
 }
 
@@ -1065,10 +1179,6 @@ internal struct _AsyncTask {
 @_silgen_name("swift_task_getCurrent")
 @usableFromInline
 internal func _getCurrentAsyncTask() -> _AsyncTask?
-
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_getJobFlags")
-func getJobFlags(_ task: Builtin.NativeObject) -> JobFlags
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobal")
@@ -1188,12 +1298,19 @@ internal func _taskCancelWithFlags(_ task: _AsyncTask, _ flags: UInt)
 @usableFromInline
 internal func _taskGetIsCancelledWithReason(_ task: _AsyncTask) -> UInt
 
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_getIsCancelledWithReasonWithFlags")
+@usableFromInline
+internal func _taskGetIsCancelledWithReasonWithFlags(
+  _ task: _AsyncTask, flags: UInt64
+) -> UInt
+
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 internal func _taskIsCancelled(_ task: _AsyncTask) -> Bool
 
-@available(SwiftStdlib 6.4, *)
+@available(StdlibDeploymentTarget 6.4, *)
 @_silgen_name("swift_task_isCancelledWithFlags")
 @usableFromInline
 internal func _taskIsCancelledWithFlags(_ task: _AsyncTask, flags: UInt64) -> Bool

@@ -347,39 +347,46 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   fixupSILForLifetimeExtension(optionalSome, optionalNone);
 }
 
+static SILInstruction *getSingleNonDebugNonRefCountUser(SILValue v) {
+  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
+  for (auto *use : getNonDebugUses(v)) {
+    auto *user = use->getUser();
+    if (onlyAffectsRefCount(user))
+      continue;
+    if (isa<EndBorrowInst>(user))
+      continue;
+    if (singleNonDebugNonRefCountUser) {
+      return nullptr;
+    }
+    singleNonDebugNonRefCountUser = user;
+  }
+  return singleNonDebugNonRefCountUser;
+}
+
+/// Look through closure conversions and reabstractions of \p inst
+/// (convert_function, convert_escape_to_noescape, partial_apply, and
+/// begin_borrow) to find the instruction that ultimately uses the closure.
+///
+/// \p memoized optionally caches results across queries.
 static SILInstruction *lookThroughRebastractionUsers(
     SILInstruction *inst,
-    llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized) {
+    llvm::DenseMap<SILInstruction *, SILInstruction *> *memoized) {
   if (inst == nullptr)
     return nullptr;
 
   // Try a cached lookup.
-  auto res = memoized.find(inst);
-  if (res != memoized.end())
-    return res->second;
+  if (memoized) {
+    auto res = memoized->find(inst);
+    if (res != memoized->end())
+      return res->second;
+  }
 
   // Cache recursive results.
   auto memoizeResult = [&](SILInstruction *from, SILInstruction *toResult) {
-    memoized[from] = toResult;
+    if (memoized)
+      (*memoized)[from] = toResult;
     return toResult;
   };
-  
-  auto getSingleNonDebugNonRefCountUser =
-    [](SILValue v) -> SILInstruction* {
-      SILInstruction *singleNonDebugNonRefCountUser = nullptr;
-      for (auto *use : getNonDebugUses(v)) {
-        auto *user = use->getUser();
-        if (onlyAffectsRefCount(user))
-          continue;
-        if (isa<EndBorrowInst>(user))
-          continue;
-        if (singleNonDebugNonRefCountUser) {
-          return nullptr;
-        }
-        singleNonDebugNonRefCountUser = user;
-      }
-      return singleNonDebugNonRefCountUser;
-    };
 
   // If we have a convert_function, just look at its user.
   if (auto *cvt = dyn_cast<ConvertFunctionInst>(inst))
@@ -407,6 +414,82 @@ static SILInstruction *lookThroughRebastractionUsers(
   return inst;
 }
 
+/// If the closure converted by \p cvt has a single user that allows promotion
+/// to a partial_apply [on_stack], return that user: a full apply (other than
+/// begin_apply), a StartAsyncLetWithLocalBuffer builtin, or a begin_borrow.
+static SILInstruction *getStackPromotableClosureUser(
+    ConvertEscapeToNoEscapeInst *cvt,
+    llvm::DenseMap<SILInstruction *, SILInstruction *> *memoized) {
+  auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
+  if (!singleUser)
+    return nullptr;
+
+  if (FullApplySite::isa(singleUser)) {
+    // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
+    if (isa<BeginApplyInst>(singleUser))
+      return nullptr;
+    return singleUser;
+  }
+  if (isBuiltinInst(singleUser, BuiltinValueKind::StartAsyncLetWithLocalBuffer))
+    return singleUser;
+  if (isa<BeginBorrowInst>(singleUser))
+    return singleUser;
+  return nullptr;
+}
+
+/// If the operand of \p cvt is a partial_apply, possibly through a
+/// convert_function, and the converted closure has no other non-debug,
+/// non-ref-count users, return the partial_apply.
+static PartialApplyInst *
+getStackPromotablePartialApply(ConvertEscapeToNoEscapeInst *cvt) {
+  SILValue closure = cvt->getOperand();
+  auto *pai = dyn_cast<PartialApplyInst>(closure);
+  if (auto *convert = dyn_cast<ConvertFunctionInst>(closure)) {
+    pai = dyn_cast<PartialApplyInst>(convert->getOperand());
+    if (pai && !pai->hasOneUse())
+      return nullptr;
+  }
+  if (!pai)
+    return nullptr;
+
+  // The convert_escape_to_noescape must be the only non ref count user of the
+  // closure.
+  for (auto *use : getNonDebugUses(closure)) {
+    auto *user = use->getUser();
+    if (!onlyAffectsRefCount(user) && user != cvt)
+      return nullptr;
+  }
+  return pai;
+}
+
+ConvertEscapeToNoEscapeInst *
+swift::getNonEscapingClosureConversion(PartialApplyInst *pai) {
+  if (pai->isOnStack())
+    return nullptr;
+
+  auto *user = getSingleNonDebugNonRefCountUser(pai);
+  if (auto *convert = dyn_cast_or_null<ConvertFunctionInst>(user))
+    user = getSingleNonDebugNonRefCountUser(convert);
+
+  auto *cvt = dyn_cast_or_null<ConvertEscapeToNoEscapeInst>(user);
+  if (!cvt)
+    return nullptr;
+
+  // Only a [not_guaranteed] conversion is promoted unless the closure is
+  // @called(atMostOnce). See fixupClosureLifetimes.
+  if (cvt->isLifetimeGuaranteed() &&
+      !cvt->getType().hasCalledAtMostOnceSemantics())
+    return nullptr;
+
+  if (getStackPromotablePartialApply(cvt) != pai)
+    return nullptr;
+
+  if (!getStackPromotableClosureUser(cvt, /*memoized*/ nullptr))
+    return nullptr;
+
+  return cvt;
+}
+
 /// Insert a mark_dependence for any non-trivial argument of a partial_apply.
 static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
                                                          SILBuilder &b) {
@@ -420,9 +503,10 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
       if (m->hasGuaranteedInitialKind())
         continue;
 
-    // A `@called(once)` closure's on-stack context takes ownership of its
+    // A `@called(atMostOnce)` closure's on-stack context takes ownership of its
     // Copyable captures directly.
-    if (pai->isCalledOnce() && !arg.get()->getType().isAddress())
+    if (pai->hasCalledAtMostOnceSemantics() &&
+        !arg.get()->getType().isAddress())
       continue;
 
     curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
@@ -475,16 +559,6 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
   fas.insertAfterApplication(insertFn);
-}
-
-static SILValue skipConvert(SILValue v) {
-  auto *cvt = dyn_cast<ConvertFunctionInst>(v);
-  if (!cvt)
-    return v;
-  auto *pa = dyn_cast<PartialApplyInst>(cvt->getOperand());
-  if (!pa || !pa->hasOneUse())
-    return v;
-  return pa;
 }
 
 static SILAnalysis::InvalidationKind
@@ -541,8 +615,8 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
       continue;
     }
 
-    // `@called(once)` is always consumed by a call.
-    if (v->getType().isCalledOnce() &&
+    // `@called(atMostOnce)` is always consumed by a call.
+    if (v->getType().hasCalledAtMostOnceSemantics() &&
         (isa<ApplyInst>(consumer) || isa<TryApplyInst>(consumer))) {
       lifetimeEnds.push_back(consumer);
       continue;
@@ -593,19 +667,9 @@ static SILValue tryRewriteToPartialApplyStack(
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
     ReachableBlocks const &reachableBlocks, const bool &modifiedCFG) {
 
-  auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
+  auto *origPA = getStackPromotablePartialApply(cvt);
   if (!origPA)
     return SILValue();
-
-  // TODO: Make it possible to stack-promote `@called(once)` closure with
-  //       consuming captures.
-  if (origPA->isCalledOnce()) {
-    ApplySite origSite(origPA);
-    for (auto &arg : origPA->getArgumentOperands()) {
-      if (origSite.getArgumentConvention(arg).isOwnedConventionInCaller())
-        return SILValue();
-    }
-  }
 
   auto *convertOrPartialApply = cast<SingleValueInstruction>(origPA);
   if (cvt->getOperand() != origPA)
@@ -618,20 +682,15 @@ static SILValue tryRewriteToPartialApplyStack(
     deleter.forceDelete(i);
   };
 
-  // Look for a single non ref count user of the partial_apply.
+  // getStackPromotablePartialApply checked that the closure has a single non
+  // ref count user.
   SmallVector<SILInstruction *, 8> refCountInsts;
-  SILInstruction *singleNonDebugNonRefCountUser = nullptr;
   for (auto *use : getNonDebugUses(convertOrPartialApply)) {
     auto *user = use->getUser();
-    if (onlyAffectsRefCount(user)) {
+    if (onlyAffectsRefCount(user))
       refCountInsts.push_back(user);
-      continue;
-    }
-    if (singleNonDebugNonRefCountUser)
-      return SILValue();
-    singleNonDebugNonRefCountUser = user;
   }
-  
+
   SILBuilderWithScope b(cvt);
 
   // Remove the original destroy of the partial_apply, if any, since the
@@ -658,11 +717,16 @@ static SILValue tryRewriteToPartialApplyStack(
         }
       }
 
-      // A `@called(once)` closure's on-stack context takes ownership of
+      // A `@called(atMostOnce)` closure's on-stack context takes ownership of
       // its Copyable captured arguments unlike regular closures that always
-      // borrow. This is done because a `@called(once)` closure has a destructor.
-      if (origPA->isCalledOnce() && !foundNoImplicitCopy &&
-          !argValue->getType().isMoveOnly()) {
+      // borrow. This is done because a `@called(atMostOnce)` closure has a
+      // destructor. A move-only consuming capture has to be transferred
+      // into the closure, not borrowed as well.
+      bool isConsumedInCaller = ApplySite(origPA)
+                                    .getArgumentConvention(arg)
+                                    .isOwnedConventionInCaller();
+      if (origPA->hasCalledAtMostOnceSemantics() && !foundNoImplicitCopy &&
+          (!argValue->getType().isMoveOnly() || isConsumedInCaller)) {
         args.push_back(argValue);
         continue;
       }
@@ -682,7 +746,7 @@ static SILValue tryRewriteToPartialApplyStack(
   auto newPA = b.createPartialApply(
       origPA->getLoc(), origPA->getCallee(), origPA->getSubstitutionMap(), args,
       origPA->getCalleeConvention(), origPA->getResultIsolation(),
-      origPA->isCalledOnce(), PartialApplyInst::OnStackKind::OnStack);
+      origPA->getExecutionSemantics(), PartialApplyInst::OnStackKind::OnStack);
 
   // Insert mark_dependence for any non-trivial address operands to the
   // partial_apply.
@@ -699,9 +763,9 @@ static SILValue tryRewriteToPartialApplyStack(
     auto origTy = convert->getType().castTo<SILFunctionType>();
     auto origWithNoEscape = SILType::getPrimitiveObjectType(
         origTy->getWithExtInfo(origTy->getExtInfo().withNoEscape()));
-    closureOp = b.createConvertFunction(convert->getLoc(), closure,
-                                        origWithNoEscape, false);
-    
+    closureOp =
+        b.createConvertFunction(convert->getLoc(), closure, origWithNoEscape);
+
     /* DEBUG
     llvm::errs() << "--- with\n";
     closureOp->dumpInContext();
@@ -948,6 +1012,15 @@ static SILValue tryRewriteToPartialApplyStack(
   closureOp->dump();
   llvm::errs() << "--- at\n";
   */
+  // The on-stack context of an at-most-once closure takes ownership of the
+  // noncopyable address-only arguments that the closure consumes, so there
+  // is nothing for the caller to destroy after the closure's lifetime ends.
+  llvm::SmallPtrSet<SILValue, 4> addressArgsOwnedByClosure;
+  for (auto &arg : newPA->getArgumentOperands()) {
+    if (ApplySite(newPA).hasContextOwnedAddressArgument(arg))
+      addressArgsOwnedByClosure.insert(arg.get());
+  }
+
   for (auto destroy : lifetimeEnds) {
     /* DEBUG
     destroy->dump();
@@ -973,11 +1046,16 @@ static SILValue tryRewriteToPartialApplyStack(
           builder.createEndBorrow(newPA->getLoc(), argBorrow);
         }
 
-        // Unlike regular on-stack closures `@called(once)` don't borrow their
-        // non-trivially destroyable Copyable captures because they always have
-        // a destructor and so no separate cleanup for such values in necessary.
-        if (newPA->isCalledOnce() && !argBorrow &&
+        // Unlike regular on-stack closures `@called(atMostOnce)` don't borrow
+        // their non-trivially destroyable Copyable captures because they always
+        // have a destructor and so no separate cleanup for such values in
+        // necessary.
+        if (newPA->hasCalledAtMostOnceSemantics() && !argBorrow &&
             !argValue->getType().isAddress())
+          return SILValue();
+
+        // The closure's context owns the argument.
+        if (addressArgsOwnedByClosure.contains(argValue))
           return SILValue();
 
         // Don't need to destroy if we borrowed in place .
@@ -987,8 +1065,8 @@ static SILValue tryRewriteToPartialApplyStack(
                                        newPA->getLoc());
     };
 
-    // `try_apply` is a terminator: a `@called(once)` closure consumed as the
-    // callee of a throwing call ends its lifetime at the call itself, but
+    // `try_apply` is a terminator: a `@called(atMostOnce)` closure consumed as
+    // the callee of a throwing call ends its lifetime at the call itself, but
     // there is no "next instruction in the same block" to insert after. The
     // consuming callee operand is spent before either successor runs, so the
     // cleanup has to be duplicated at the start of both.
@@ -1049,22 +1127,14 @@ static bool tryExtendLifetimeToLastUse(
     const bool &modifiedCFG) {
   // If there is a single user, this is simple: extend the
   // lifetime of the operand until the use ends.
-  auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
+  //
+  // Handle apply instructions, startAsyncLet, and begin_borrow.
+  auto *singleUser = getStackPromotableClosureUser(cvt, &memoized);
   if (!singleUser)
     return false;
 
-  // Handle apply instructions and startAsyncLet.
-  BuiltinInst *startAsyncLet = nullptr;
-  if (FullApplySite::isa(singleUser)) {
-    // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
-    if (isa<BeginApplyInst>(singleUser))
-      return false;
-  } else if ((startAsyncLet = isBuiltinInst(singleUser,
-                            BuiltinValueKind::StartAsyncLetWithLocalBuffer))) {
-    // continue
-  } else if (!isa<BeginBorrowInst>(singleUser)) {
-    return false;
-  }
+  BuiltinInst *startAsyncLet =
+      isBuiltinInst(singleUser, BuiltinValueKind::StartAsyncLetWithLocalBuffer);
 
   if (SILValue closureOp = tryRewriteToPartialApplyStack(
           cvt, singleUser, dominanceAnalysis, deleter, memoized,
@@ -1098,7 +1168,7 @@ static bool tryExtendLifetimeToLastUse(
   // Prevent a copy of the closure below because they have owned convention
   // and are forwarded through the escape -> no-escape conversion into the
   // callee that consumed the value.
-  if (cvt->getType().isCalledOnce())
+  if (cvt->getType().hasCalledAtMostOnceSemantics())
     return false;
 
   // Insert a copy at the convert_escape_to_noescape [not_guaranteed] and
@@ -1528,12 +1598,13 @@ static bool fixupClosureLifetimes(SILFunction &fn,
       if (!cvt)
         continue;
 
-      // @called(once) has owned convention so it's always lifetime guaranteed
-      // due to owned convention, but that only means no extra `destroy_value`.
-      // Stack promotion should still be attempted were call that takes it is
-      // a lifetime ending use.
-      bool isCalledOnce = cvt->getType().isCalledOnce();
-      if (cvt->isLifetimeGuaranteed() && !isCalledOnce)
+      // @called(atMostOnce) has owned convention so it's always lifetime
+      // guaranteed due to owned convention, but that only means no extra
+      // `destroy_value`. Stack promotion should still be attempted were call
+      // that takes it is a lifetime ending use.
+      bool hasCalledAtMostOnceSemantics =
+          cvt->getType().hasCalledAtMostOnceSemantics();
+      if (cvt->isLifetimeGuaranteed() && !hasCalledAtMostOnceSemantics)
         continue;
 
       // First try to peephole a known pattern.
@@ -1553,9 +1624,9 @@ static bool fixupClosureLifetimes(SILFunction &fn,
         continue;
       }
 
-      // A `@called(once)` conversion's ownership is already fully accounted
-      // for even when on-stack promotion above didn't apply.
-      if (isCalledOnce) {
+      // A `@called(atMostOnce)` conversion's ownership is already fully
+      // accounted for even when on-stack promotion above didn't apply.
+      if (hasCalledAtMostOnceSemantics) {
         assert(cvt->isLifetimeGuaranteed());
         continue;
       }

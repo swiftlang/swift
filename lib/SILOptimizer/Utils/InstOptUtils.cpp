@@ -726,13 +726,11 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
                        "not ABI "
                        "compatible");
       // Insert convert_function.
-      return {builder->createConvertFunction(loc, value, destTy,
-                                             /*WithoutActuallyEscaping=*/false),
-              false};
+      return {builder->createConvertFunction(loc, value, destTy), false};
     }
   }
-  NominalTypeDecl *srcNominal = srcTy.getNominalOrBoundGenericNominal();
-  NominalTypeDecl *destNominal = destTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *srcNominal = srcTy.getNominalDecl();
+  NominalTypeDecl *destNominal = destTy.getNominalDecl();
   if (srcNominal && srcNominal == destNominal &&
       !layoutIsTypeDependent(srcNominal) &&
       srcTy.isObject() && destTy.isObject()) {
@@ -999,7 +997,12 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
 /// deleted together with the closure.
 static bool isDeadOnStackClosureUser(SILInstruction *user) {
   return isa<DeallocStackInst>(user) || isa<DebugValueInst>(user) ||
-         isa<DestroyValueInst>(user);
+         isa<DestroyValueInst>(user) ||
+         // `strong_release` is `destroy_value`'s non-OSSA equivalent: a
+         // dead on-stack closure can be found (and deleted) after ownership
+         // has been lowered from its function, e.g. when closure
+         // specialization folds `apply(partial_apply())` into a direct call.
+         isa<StrongReleaseInst>(user);
 }
 
 static bool
@@ -1153,13 +1156,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     // lifetime is managed outside of the closure and there's nothing to do
     // here.
 
-    // A `@called(once)` on-stack closure can also own (consume) its captures,
-    // and is responsible for releasing them via its destructor. Release such
-    // captures here to make up for that.
-    if (pa->isCalledOnce()) {
+    // A `@called(atMostOnce)` on-stack closure can also own (consume) its
+    // captures, and is responsible for releasing them via its destructor.
+    // Release such captures here to make up for that.
+    if (pa->hasCalledAtMostOnceSemantics()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
-        if (!argOp.isConsuming())
+        if (!argOp.isConsuming() &&
+            !ApplySite(pa).hasContextOwnedAddressArgument(argOp))
           continue;
 
         SILBuilderWithScope builder(pa, builderCtxt);
@@ -1915,6 +1919,36 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+/// Turns \p debugValue into a variable of empty tuple type.
+/// Used when the type of the variable can no longer be described, when it uses
+/// an archetype that will be removed.
+/// \p debugValue is erased as a new instruction is created.
+static void replaceWithVoidVariable(DebugValueInst *debugValue) {
+  SILBuilder builder(debugValue, debugValue->getDebugScope());
+  builder.createVoidVariableDebugValue(
+      debugValue->getLoc(), *debugValue->getVarInfo(),
+      debugValue->usesMoveableValueDebugInfo(), debugValue->hasTrace());
+  debugValue->eraseFromParent();
+}
+
+/// Kills every debug use of \p value. A variable whose type cannot be written
+/// becomes an empty tuple placeholder instead.
+static void killDebugUses(SILValue value) {
+  while (Operand *use = getAnyDebugUse(value)) {
+    auto *debugValue = cast<DebugValueInst>(use->getUser());
+    if (debugValue->getVarType().hasLocalArchetype())
+      replaceWithVoidVariable(debugValue);
+    else
+      debugValue->killOperand(use->getOperandNumber());
+  }
+}
+
+/// Kills every debug use of any result of \p inst.
+static void killDebugUses(SILInstruction *inst) {
+  for (SILValue result : inst->getResults())
+    killDebugUses(result);
+}
+
 /// Canonicalizes the operand list of \p debugValue, minimizing the amount of
 /// live operands. Merges duplicates, and kills dead or undef operands.
 static void canonicalizeDebugValue(DebugValueInst *debugValue) {
@@ -2053,7 +2087,7 @@ static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
   std::optional<bool> ResultsInError;
   SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
   if (!folded)
-    return;
+    return killDebugUses(builtin);
 
   auto *tupleFolded = cast<SingleValueInstruction>(folded);
 
@@ -2234,15 +2268,19 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
 // TODO: whenever a debug_value is inserted at a new location, check that no
 // other debug_value instructions exist between the old and new location for
 // the same variable.
-//
-// TODO: Kill all debug uses when the salvage fails.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
 
+  // Stores to an allocation are salvaged: debug values are cloned at each
+  // store. The debug values on the allocation itself are deleted rather than
+  // killed, as the clones describe the variable now.
+  if (isa<AllocStackInst>(I) || isa<AllocPackInst>(I))
+    return deleteAllDebugUses(I, /*salvage=*/false);
+
   // Instructions with type dependent operands cannot be salvaged.
   if (I->getNumTypeDependentOperands() != 0)
-    return;
+    return killDebugUses(I);
 
   switch (I->getKind()) {
   case SILInstructionKind::StoreInst: {
@@ -2302,7 +2340,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // Only salvage side-effects free SIL builtins.
     BuiltinInfo info = builtin->getBuiltinInfo();
     if (info.ID == BuiltinValueKind::None || !info.isReadNone())
-      return;
+      return killDebugUses(I);
 
     if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
          info.ID == BuiltinValueKind::UToUCheckedTrunc ||
@@ -2319,9 +2357,10 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // or, and, xor, cmp_*, ...
     return salvageMultiOperandInst(builtin);
   }
+
   default:
-    // TODO: Kill all debug uses when the salvage fails.
-    return;
+    // Any instruction that cannot be salvaged has its debug uses killed.
+    return killDebugUses(I);
   }
 }
 
@@ -2424,7 +2463,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
     SILBuilderWithScope builder(insertionPoint, ctx);
     return builder.createTuple(insertionPoint->getLoc(), ty, elements);
   }
-  if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *decl = ty.getStructDecl()) {
     TypeExpansionContext tec = *function;
     auto &module = function->getModule();
     if (decl->isResilient(tec.getContext()->getParentModule(),
@@ -2447,7 +2486,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
 }
 
 static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
-  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = ty.getStructDecl()) {
     return swift::findUnreferenceableStorage(structDecl, ty, func);
   }
   if (auto tupleTy = ty.getAs<TupleType>()) {

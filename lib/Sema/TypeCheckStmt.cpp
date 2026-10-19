@@ -1596,8 +1596,10 @@ public:
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
 
-      // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->hasValueTypeDestructor()) {
+        // has to have a deinit or else it's pointless, unless the type is
+        // ~Deinitable, where `discard self` is how a value's lifetime ends.
+      } else if (!nominalDecl->hasValueTypeDestructor() &&
+                 nominalType->isDeinitable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -2613,7 +2615,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     if (!implicitlyGenerated) {
       auto selfTy = fromCtor->getDeclContext()->getSelfInterfaceType();
-      if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
+      if (auto classTy = selfTy->getClassDecl()) {
         assert(classTy->getSuperclass());
         auto &Diags = fromCtor->getASTContext().Diags;
         Diags.diagnose(apply->getArgs()->getLoc(), diag::chain_convenience_init,
@@ -3840,11 +3842,25 @@ public:
     buildMakeIteratorVar();
     buildOpaqueSequenceExpr();
 
-    SmallVector<ASTNode, 3> stmts;
-    if (auto *sequenceBinding = buildSequenceBinding())
-      stmts.push_back(sequenceBinding);
+    // `buildMakeIterator` refers to the sequence binding, build it first.
+    auto *sequenceBinding = buildSequenceBinding();
+
+    SmallVector<ASTNode, 2> stmts;
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
+
+    // The iterator depends on the sequence binding, so it has to be destroyed
+    // before the binding's borrow ends. SILGen ends the local borrow accesses
+    // of a brace before it runs the brace's cleanups, so the iterator can't
+    // share a brace with the binding: nest it in an inner brace, which destroys
+    // the iterator when it is popped.
+    if (sequenceBinding) {
+      auto *loopBrace = BraceStmt::createImplicit(
+          ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+      stmts.clear();
+      stmts.push_back(sequenceBinding);
+      stmts.push_back(loopBrace);
+    }
 
     auto *braceStmt = BraceStmt::createImplicit(ctx, stmt->getStartLoc(), stmts,
                                                 stmt->getEndLoc());
@@ -4009,48 +4025,21 @@ private:
     stmt->setOpaqueSequenceExpr(opaqueSeqExpr);
   }
 
-  /// Whether the sequence expression reads a parameter directly.
-  bool sequenceReadsNoImplicitCopyBinding() const {
-    auto *expr = stmt->getSequence()->getSemanticsProvidingExpr();
-    // A mutable binding is loaded before it is used as an rvalue.
-    if (auto *load = dyn_cast<LoadExpr>(expr))
-      expr = load->getSubExpr()->getSemanticsProvidingExpr();
-
-    auto *declRef = dyn_cast<DeclRefExpr>(expr);
-    if (!declRef)
-      return false;
-
-    auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl());
-    return paramDecl;
-  }
-
-  /// Bind the sequence to an implicit local whose scope encloses the loop.
-  ///
-  /// Returns `nullptr` if no binding is needed.
+  /// Borrow the sequence in an implicit local whose scope encloses the loop.
   PatternBindingDecl *buildSequenceBinding() {
     // Only a borrowing iterator holds onto the sequence for the duration of
     // the loop.
     if (!isBorrowing)
       return nullptr;
 
-    // A sequence read directly from a parameter needs no binding of its own:
-    // the parameter's scope already covers the loop.
-    if (sequenceReadsNoImplicitCopyBinding())
-      return nullptr;
-
     std::string name;
-    {
-      if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
-        name = "$" + np->getBoundName().str().str();
-      name += "$sequence";
-    }
+    if (auto *np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+      name = "$" + np->getBoundName().str().str();
+    name += "$sequence";
 
-    auto introducer = stmt->getSequence()->getType()->isNoncopyable()
-                          ? VarDecl::Introducer::Borrowing
-                          : VarDecl::Introducer::Let;
-    sequenceVar = new (ctx) VarDecl(/*isStatic=*/false, introducer,
-                                    stmt->getSequence()->getStartLoc(),
-                                    ctx.getIdentifier(name), dc);
+    sequenceVar = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Borrowing,
+        stmt->getSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
     sequenceVar->setImplicit();
 
     Pattern *pattern = NamedPattern::createImplicit(ctx, sequenceVar);
@@ -4076,12 +4065,13 @@ private:
       witness = seqConformanceRef.getWitnessByName(makeIterator->getName());
     }
 
-    // Call `makeIterator()` on the sequence binding when there is one, so that
-    // the iterator depends on that binding's scope rather than on a temporary.
+    // Call `makeBorrowingIterator()` on the sequence binding when there is
+    // one, so that the iterator depends on the binding's scope.
     Expr *base;
     if (sequenceVar) {
-      base = new (ctx) DeclRefExpr(sequenceVar, DeclNameLoc(stmt->getForLoc()),
-                                   /*Implicit=*/true);
+      base = new (ctx) DeclRefExpr(
+          sequenceVar, DeclNameLoc(stmt->getSequence()->getStartLoc()),
+          /*implicit=*/true);
     } else {
       base = stmt->getOpaqueSequenceExpr();
     }
