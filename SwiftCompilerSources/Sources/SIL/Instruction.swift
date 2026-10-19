@@ -1904,6 +1904,9 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
   public var token: Value { getResult(index: resultCount - (isCalleeAllocated ? 2 : 1)) }
 
+  /// The callee-allocated coroutine frame, which must be deallocated after the coroutine ends.
+  public var calleeAllocation: Value? { isCalleeAllocated ? getResult(index: resultCount - 1) : nil }
+
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - (isCalleeAllocated ? 2 : 1))
   }
