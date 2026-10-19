@@ -649,6 +649,16 @@ RValue Lowering::emitConditionalCheckedCast(
   return RValue(SGF, loc, optTargetType->getCanonicalType(), result);
 }
 
+/// Formally, `case is T` has the same meaning as `case _ as T`;
+/// they both verify the type without binding any payload in the result.
+bool Lowering::patternNeedsNoPayload(const Pattern *pattern) {
+  // True for `case is T`
+  if (!pattern)
+    return true;
+  // True for `case _ as T` (and variations thereof)
+  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
+}
+
 /// True if a cast from \p sourceType to \p targetType can be answered by a
 /// non-consuming type test rather than going through the full dynamic
 /// cast machinery used by `as?`
