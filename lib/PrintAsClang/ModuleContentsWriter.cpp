@@ -446,7 +446,11 @@ public:
   /// The standard library is special-cased: we assume that any types from it
   /// will be handled explicitly rather than needing an explicit @import.
   bool addImport(const Decl *D) {
-    ModuleDecl *otherModule = D->getModuleContext();
+    // C++ namespace members can have the synthetic imported-header module as
+    // their declaration context. Find the module that actually owns the decl.
+    ModuleDecl *otherModule = outputLangMode == OutputLanguageMode::Cxx
+                                  ? D->getModuleContextForNameLookup()
+                                  : D->getModuleContext();
 
     if (otherModule == &M)
       return false;
@@ -630,8 +634,10 @@ public:
               cd->isForeignReferenceType())
             emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
-        if (TAD->hasClangNode())
+        if (TAD->hasClangNode()) {
+          addImport(TAD);
           emitReferencedClangTypeMetadata(TAD);
+        }
       }
       return;
     }
