@@ -3719,6 +3719,17 @@ protected:
     emi->setOperand(opAddr);
   }
 
+  void
+  visitInitCOMExistentialValueInst(InitCOMExistentialValueInst *projection) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    auto *lowered = builder.createInitCOMExistentialAddr(
+        projection->getLoc(), projection->getType(),
+        projection->getFormalConcreteType(), opAddr,
+        projection->getConformances());
+    projection->replaceAllUsesWith(lowered);
+    pass.deleter.forceDelete(projection);
+  }
+
   void visitCOMMethodInst(COMMethodInst *method) {
     SILValue opAddr = addrMat.materializeAddress(use->get());
     method->setOperand(opAddr);
@@ -5127,6 +5138,10 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
 
   allocator.finalizeOpaqueStorage();
 
+  // Debug-value salvage during cleanup must preserve address-only operands as
+  // addresses, including when replacing deleted storage with undef.
+  function->setHasLoweredAddresses(true);
+
   allocator.sinkProjections();
 
   deleteRewrittenInstructions(pass);
@@ -5137,11 +5152,6 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   // createStackAllocation or StackNesting.
   pm->invalidateAnalysis(
       function, SILAnalysis::InvalidationKind::BranchesAndInstructions);
-
-  // Mark the function lowered now, so its conventions and verification see
-  // address form immediately (the module stage only reaches Canonical after all
-  // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
-  function->setHasLoweredAddresses(true);
 }
 
 //===----------------------------------------------------------------------===//

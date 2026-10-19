@@ -2844,6 +2844,10 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
     printForwardingOwnershipKind(OI, OI->getOperand());
   }
+  void visitInitCOMExistentialRefInst(InitCOMExistentialRefInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
+  }
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
@@ -2868,6 +2872,18 @@ public:
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
     printConformances(AEI->getConformances());
   }
+  void visitInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *AEI) {
+    *this << getIDAndForcedPrintedType(AEI->getOperand()) << " : $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
+  }
+
+  void visitInitCOMExistentialValueInst(InitCOMExistentialValueInst *AEI) {
+    *this << getIDAndForcedPrintedType(AEI->getOperand()) << " : $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
+    printConformances(AEI->getConformances());
+  }
+
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
     *this << getIDAndForcedPrintedType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();

@@ -131,6 +131,8 @@ public:
     visitProtocolConformance(WMI->getConformance(), false);
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
+  void visitInitCOMExistentialAddrInst(InitCOMExistentialAddrInst *IERI);
+  void visitInitCOMExistentialValueInst(InitCOMExistentialValueInst *IERI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *IEMI);

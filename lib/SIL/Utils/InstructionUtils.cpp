@@ -731,6 +731,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
            RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
+  case SILInstructionKind::InitCOMExistentialAddrInst:
+  case SILInstructionKind::InitCOMExistentialValueInst:
+    impactType = cast<SingleValueInstruction>(inst)->getType();
+    return RuntimeEffect::RefCounting | RuntimeEffect::Existential;
+
+  case SILInstructionKind::InitCOMExistentialRefInst:
+    return RuntimeEffect::NoEffect;
+
   case SILInstructionKind::InitExistentialRefInst:
     impactType = cast<InitExistentialRefInst>(inst)->getType();
     // Make sure to get a diagnostic error in embedded swift for class existentials
