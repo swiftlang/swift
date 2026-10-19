@@ -63,9 +63,12 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
 
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  auto *Type = Sugared->isEqual(RealType) ? DeclType.getPointer()
-                                          : RealType.getPointer();
-  return getFromTypeInfo(Type, Info, IGM);
+  if (!Sugared->isEqual(RealType))
+    return getFromTypeInfo(RealType, Info, IGM);
+
+  if (DeclType->hasTypeParameter())
+    DeclType = Decl->getTypeInContext();
+  return getFromTypeInfo(DeclType, Info, IGM);
 }
 
 DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty, Size size,
