@@ -1601,7 +1601,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
 CheckedCastKind
 TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,
-                                  DeclContext *dc) {
+                                  DeclContext *dc,
+                                  bool isTypeTest) {
   // If the from/to types are equivalent or convertible, this is a coercion.
   if (fromType->isEqual(toType) ||
       isConvertibleTo(fromType, toType, dc)) {
@@ -1634,7 +1635,15 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       fromType->isNoncopyable() && fromType->isExistentialType() &&
       !toType->isExistentialType() && !toType->is<ArchetypeType>();
 
-  if (!isSupportedNoncopyableExistentialCast &&
+  // `is` only borrows the source, so we can handle noncopyables here
+  // But continue to reject Metatypes for now...
+  bool isNoncopyableTypeTest =
+      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
+      (isTypeTest || contextKind == CheckedCastContextKind::IsExpr ||
+       contextKind == CheckedCastContextKind::IsPattern) &&
+      !fromType->is<AnyMetatypeType>() && !toType->is<AnyMetatypeType>();
+
+  if (!isSupportedNoncopyableExistentialCast && !isNoncopyableTypeTest &&
       (fromType->getMetatypeInstanceType()->isNoncopyable()
        || toType->getMetatypeInstanceType()->isNoncopyable()))
     return CheckedCastKind::Unresolved;
@@ -1644,6 +1653,16 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     if (!fromType->isEscapable()) {
       // ... except some ~Escapable values that can't be boxed at all.
       return CheckedCastKind::Unresolved;
+    }
+    // ... and ~Copyable values that cannot be copied into a box
+    if (fromType->isNoncopyable()) {
+      if (fromType->isExistentialType()) {
+        // `~Copyable` existential might hold a `Copyable` payload
+        return CheckedCastKind::ValueCast;
+      } else {
+        // Otherwise, a value cannot be boxed without copying
+        return CheckedCastKind::Unresolved;
+      }
     }
     return CheckedCastKind::BridgingCoercion;
   }
