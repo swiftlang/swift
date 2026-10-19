@@ -1083,6 +1083,21 @@ static InlineCost getEnforcementCost(SILAccessEnforcement enforcement) {
 /// instruction. This is of course very much so not true.
 InlineCost swift::instructionInlineCost(SILInstruction &I) {
   switch (I.getKind()) {
+  case SILInstructionKind::DestroyValueInst: {
+    auto *dvi = cast<DestroyValueInst>(&I);
+    // Neither a destroy in a dead-end block nor the destroy of a non-escaping
+    // closure (which is not reference counted) generates code.
+    if (dvi->isDeadEnd() ||
+        isa<ConvertEscapeToNoEscapeInst>(dvi->getOperand()))
+      return InlineCost::Free;
+    return InlineCost::Expensive;
+  }
+  case SILInstructionKind::LoadBorrowInst:
+    // A `load_borrow` with a value hint is replaced by the hinted value when
+    // lowering ownership.
+    if (cast<LoadBorrowInst>(&I)->hasValueHint())
+      return InlineCost::Free;
+    return InlineCost::Expensive;
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::DebugValueInst:
@@ -1313,7 +1328,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
   case SILInstructionKind::UnmanagedReleaseValueInst:
-  case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::DynamicMethodBranchInst:
@@ -1329,7 +1343,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::LoadInst:
-  case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:
