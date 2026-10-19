@@ -122,6 +122,28 @@ func captureImmutableOwned<T>(_ t: T) {
 }
 func captureImmutableOwned_callee(_ cl: () -> ()) {}
 
+// CaptureKind::Immutable, canGuarantee=false, isPack=false, noncopyable and address-only
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyF : {{.*}} {
+// CHECK:         [[BOX:%[^,]+]] = alloc_box ${ let MOAny }
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
+// CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
+// CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_
+// CHECK:         [[COPY:%[^,]+]] = load [copy] [[ADDR]]
+// CHECK:         [[CONTEXT:%[^,]+]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[COPY]])
+// CHECK:         [[NOESCAPE_CONTEXT:%[^,]+]] = convert_escape_to_noescape [not_guaranteed] [[CONTEXT]]
+// CHECK:         apply {{%[^,]+}}([[NOESCAPE_CONTEXT]])
+// CHECK:         destroy_value [[NOESCAPE_CONTEXT]]
+// CHECK:         destroy_value [[CONTEXT]]
+// CHECK-NOT:     destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyF'
+struct MOAny : ~Copyable { var a: Any }
+func captureImmutableOwnedNoncopyable() {
+  let mo = MOAny(a: 1)
+  captureImmutableOwned_callee {
+    _ = mo.a
+  }
+}
+
 // CaptureKind::StorageAddress, isMoveOnlyWrapped=false, isPack=false
 // CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlF : {{.*}} {
 // CHECK:       bb0([[ADDR:%[^,]+]] :
