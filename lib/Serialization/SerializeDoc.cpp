@@ -25,6 +25,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/Serialization.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
@@ -751,11 +752,13 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
 }
 
 static void emitFileListRecord(llvm::BitstreamWriter &Out,
-                               ModuleOrSourceFile MSF, StringWriter &FWriter) {
+                               ModuleOrSourceFile MSF, StringWriter &FWriter,
+                               const SerializationOptions &options) {
   assert(MSF);
 
   struct SourceFileListWriter {
     StringWriter &FWriter;
+    const SerializationOptions &options;
 
     llvm::SmallString<0> Buffer;
     llvm::StringSet<> seenFilenames;
@@ -767,20 +770,31 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       SmallString<128> absolutePath = info.getFilePath();
       llvm::sys::fs::make_absolute(absolutePath);
 
+      std::string remappedPath = std::string(absolutePath);
+      if (options.PrefixMapSourceInfo) {
+        const auto &PathRemapper = options.SourceInfoPrefixMap;
+        const auto &PathObfuscator = options.PathObfuscator;
+        remappedPath =
+            PathObfuscator.obfuscate(PathRemapper.remapPath(absolutePath));
+      }
+
       // Don't emit duplicated files.
-      if (!seenFilenames.insert(absolutePath).second)
+      if (!seenFilenames.insert(remappedPath).second)
         return;
 
-      auto fileID = FWriter.getTextOffset(absolutePath);
+      auto fileID = FWriter.getTextOffset(remappedPath);
 
       auto fingerprintStrIncludingTypeMembers =
         info.getInterfaceHashIncludingTypeMembers().getRawValue();
       auto fingerprintStrExcludingTypeMembers =
         info.getInterfaceHashExcludingTypeMembers().getRawValue();
 
-      auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                           info.getLastModified().time_since_epoch())
-                           .count();
+      auto timestamp =
+          options.PrefixMapSourceInfo
+              ? 0
+              : std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    info.getLastModified().time_since_epoch())
+                    .count();
 
       llvm::raw_svector_ostream out(Buffer);
       endian::Writer writer(out, llvm::endianness::little);
@@ -801,10 +815,11 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       writer.write<uint64_t>(info.getFileSize());
     }
 
-    SourceFileListWriter(StringWriter &FWriter) : FWriter(FWriter) {
+    SourceFileListWriter(StringWriter &FWriter, const SerializationOptions &options)
+        : FWriter(FWriter), options(options) {
       Buffer.reserve(1024);
     }
-  } writer(FWriter);
+  } writer(FWriter, options);
 
   if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
     writer.emitSourceFileInfo(BasicSourceFileInfo(SF));
@@ -879,7 +894,8 @@ public:
 };
 }
 void serialization::writeSourceInfoToStream(raw_ostream &os,
-                                            ModuleOrSourceFile DC) {
+                                            ModuleOrSourceFile DC,
+                                            const SerializationOptions &options) {
   assert(DC);
   SourceInfoSerializer S{SWIFTSOURCEINFO_SIGNATURE, DC};
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -892,7 +908,7 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       DeclUSRsTableWriter USRWriter;
       StringWriter FPWriter;
       DocRangeWriter DocWriter(FPWriter);
-      emitFileListRecord(S.Out, DC, FPWriter);
+      emitFileListRecord(S.Out, DC, FPWriter, options);
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
       // Emit USR table mapping from a USR to USR Id.
       // The basic locs record uses USR Id instead of actual USR, so that we
