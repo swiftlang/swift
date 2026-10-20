@@ -5327,7 +5327,7 @@ public:
 
 class SerializeAttrGenericSignatureRequest
     : public SimpleRequest<SerializeAttrGenericSignatureRequest,
-                           GenericSignature(const AbstractFunctionDecl *,
+                           GenericSignature(const Decl *,
                                             AbstractSpecializeAttr *),
                            RequestFlags::SeparatelyCached> {
 public:
@@ -5336,8 +5336,7 @@ public:
 private:
   friend SimpleRequest;
 
-  GenericSignature evaluate(Evaluator &evaluator,
-                            const AbstractFunctionDecl *decl,
+  GenericSignature evaluate(Evaluator &evaluator, const Decl *decl,
                             AbstractSpecializeAttr *attr) const;
 
 public:

@@ -52,6 +52,18 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // visited.
     specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
 
+    // IRGen also emits the metadata of exported type specializations eagerly,
+    // even if nothing in this module uses them. A class's metadata contains
+    // its vtable, whose entries must be specialized. Usually an instruction
+    // using the class triggers that (see `optimize`), but an exported class
+    // specialization may have no such use, so specialize its vtable here.
+    for type in moduleContext.typesWithEmittedMetadata where type.isClass {
+      Optimizer.specializeVTable(forClassType: type, errorLocation: .artificialUnreachableLocation,
+                                 history: &specializationHistory, moduleContext) {
+        worklist.pushIfNotVisited($0)
+      }
+    }
+
     // Likewise, IRGen emits the witness tables of `@export(interface)`
     // conformances eagerly. Their base-protocol and associated conformance
     // entries point directly to the witness tables of the nested

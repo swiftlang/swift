@@ -3438,8 +3438,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<AbstractSpecializeAttr>(DA);
-      auto *afd = cast<AbstractFunctionDecl>(D);
-      auto *targetFunDecl = attr->getTargetFunctionDecl(afd);
+      auto *VD = cast<ValueDecl>(D);
+      auto *targetFunDecl = attr->getTargetFunctionDecl(VD);
 
       SmallVector<IdentifierID, 4> pieces;
 
@@ -3460,7 +3460,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isPublic(),
           (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
-          S.addGenericSignatureRef(attr->getSpecializedSignature(afd)),
+          S.addGenericSignatureRef(attr->getSpecializedSignature(VD)),
           S.addDeclRef(targetFunDecl), numSPIGroups, numAvailabilityAttrs,
           pieces);
       for (auto availAttr : attr->getAvailableAttrs()) {

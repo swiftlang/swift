@@ -1490,6 +1490,12 @@ public:
         SGM.emitNonCopyableTypeDeinitTable(nom);
         SGM.recordNonCopyableTypeWithEmittedMetadata(nom);
       }
+      // Record its exported specializations, whose metadata this module owns
+      // in Embedded Swift.
+      SmallVector<CanType, 2> exported;
+      SpecializedAttr::getExportedTypeSpecializations(nom, exported);
+      for (auto type : exported)
+        SGM.M.addExportedTypeSpecialization(type);
     }
 
     // Build a default witness table if this is a protocol that needs one.

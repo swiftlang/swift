@@ -181,7 +181,7 @@ func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
 func testSpecializePublic<X, Y, Z>(x: X, y: Y, z: Z) {}
 
 @specialized(exported: true, where X == Int)
-func testSpecializeExported<X>(x: X) {}
+public func testSpecializeExported<X>(x: X) {}
 
 @_spi(SPIName) public func spiFn() {}
 
