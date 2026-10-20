@@ -53,7 +53,7 @@ public func concurrentFree() async -> Int {
 public class MainActorClass {
   // CHECK-LABEL: // MainActorClass.mainActorMethod()
   // CHECK: sil @$s4test14MainActorClassC04mainC6MethodSiyYaF
-  // CHECK:   [[MA:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+  // CHECK:   [[MA:%[0-9]+]] = {{apply .* -> @owned MainActor|load .* : \$\*MainActor}}
   // CHECK:   await_async_continuation {{%[0-9]+}} : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]]
   // CHECK: [[RESUME]]:
   // CHECK-NEXT: hop_to_executor [[MA]] : $MainActor

@@ -10,11 +10,11 @@ import E
 // CHECK: "directDependencies": [
 // CHECK-NEXT: {
 // CHECK-DAG:          "swift": "E"
-// CHECK-DAG:          "swift": "Swift"
-// CHECK-DAG:          "swift": "SwiftOnoneSupport"
-// CHECK-DAG:          "swift": "_Concurrency"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "Swift"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "_Concurrency"
 // CHECK-DAG:          "clang": "_SwiftConcurrencyShims"
-// CHECK-DAG:          "swift": "_StringProcessing"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "_StringProcessing"
 // The source of dependency on clang:F is the bridging header, ensure it is captured here
 // CHECK-DAG:          "clang": "F"
 

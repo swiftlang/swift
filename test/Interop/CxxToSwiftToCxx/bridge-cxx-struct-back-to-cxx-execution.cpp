@@ -17,6 +17,7 @@
 // REQUIRES: swift_feature_Reparenting
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_stdlib_library_evolution
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 //--- header.h

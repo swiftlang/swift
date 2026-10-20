@@ -12,14 +12,14 @@
 
 // CHECK: 00-output_for_index
 // CHECK: DEPEND START
-// CHECK: Unit | system | Swift | [[MODULE:.*[/\\]Swift[.]swiftmodule([/\\].+[.]swiftinterface)?]] | [[SWIFT:.+[.]swiftinterface-[A-Z0-9]*]]
+// CHECK: Unit | system | Swift | [[MODULE:.*[/\\]Swift[.]swiftmodule([/\\].+[.]swift(interface|module))?]] | [[SWIFT:.+[.]swift(interface|module)-[A-Z0-9]*]]
 // CHECK: Record | user | {{.*}}{{/|\\}}unit-one-file-multi-file-invocation.swift |
 // CHECK: DEPEND END (2)
 
 // CHECK: [[SWIFT]]
 // CHECK: DEPEND START
-// CHECK: Record | system | Swift.Math.Floating | [[MODULE]] | {{.+}}.swiftinterface_Math_Floating-{{.*}}
-// CHECK: Record | system | Swift.String | [[MODULE]] | {{.+}}.swiftinterface_String-{{.*}}
+// CHECK: Record | system | Swift.Math.Floating | [[MODULE]] | {{.+}}.swift{{interface|module}}_Math_Floating-{{.*}}
+// CHECK: Record | system | Swift.String | [[MODULE]] | {{.+}}.swift{{interface|module}}_String-{{.*}}
 // CHECK: DEPEND END
 
 func test1() {

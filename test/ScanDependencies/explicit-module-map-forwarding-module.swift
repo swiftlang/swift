@@ -42,6 +42,11 @@
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"_RegexParser\"," >> %/t/inputs/map.json
+// RUN: echo "\"modulePath\": \"%/regex_parser_module\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"Distributed\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%/distributed_module\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-irgen -enable-library-evolution | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
+// REQUIRES: swift_stdlib_library_evolution
 
 struct Empty: Error {}
 

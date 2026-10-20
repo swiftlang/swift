@@ -71,9 +71,8 @@ func testMainActorContext() {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiSgIegy_AAIegy_TRScMTU : $@convention(thin) (Optional<Int>, @guaranteed @callee_guaranteed (Optional<Int>) -> ()) -> ()
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .* : \$\*MainActor}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -102,18 +101,16 @@ func testComplexGlobal<U>(_ fn: @escaping @MainActor (U?) -> Void) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sxSgIegn_AAIegn_lTRScMTU : $@convention(thin) <U> (@in_guaranteed Optional<U>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<U>) -> ()) -> ()
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .* : \$\*MainActor}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSiIegy_SiIegy_TRScMTU : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> ()) -> ()
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .* : \$\*MainActor}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -152,18 +149,16 @@ func testMembers<X>(v: X, s: S<X>, fn: @escaping @MainActor (X) -> Int) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sxSiIegnd_xSiIegnd_lTRScMTU : $@convention(thin) <X> (@in_guaranteed X, @guaranteed @callee_guaranteed (@in_guaranteed X) -> Int) -> Int
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .* : \$\*MainActor}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sxIgr_xIgr_lTRScMTU : $@convention(thin) <X> (@guaranteed @noescape @callee_guaranteed () -> @out X) -> @out X
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .* : \$\*MainActor}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF

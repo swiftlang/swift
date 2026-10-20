@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-verify-all -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -enable-sil-opaque-values -parse-as-library -emit-sil -Onone %s | %FileCheck %s --check-prefixes=CHECK,%if swift_stdlib_library_evolution %{CHECK-EVO%} %else %{CHECK-NOEVO%}
 
 // REQUIRES: concurrency
 
@@ -22,10 +22,11 @@ public func makeStream() -> AsyncStream<String> {
 // CHECK:         switch_enum {{.*}}, case #Optional.some!enumelt: [[OUTER_BODY:bb[0-9]+]], case #Optional.none!enumelt: [[OUTER_EXIT:bb[0-9]+]]
 //
 // Outer-loop body allocates the per-outer-iteration AsyncStream iterator
-// storage. The `[lexical] [var_decl]` alloc is the `$x$generator`.
+// storage. The `[lexical] [var_decl]` alloc is the `$x$generator`. The
+// AsyncStream temporaries are only address-only if the stdlib is resilient.
 // CHECK:       [[OUTER_BODY]]({{.*}}):
-// CHECK:         [[STREAM:%[^,]+]] = alloc_stack $AsyncStream<String>
-// CHECK:         [[ITER:%[^,]+]] = alloc_stack $AsyncStream<String>.Iterator
+// CHECK-EVO:     [[STREAM:%[^,]+]] = alloc_stack $AsyncStream<String>
+// CHECK-EVO:     [[ITER:%[^,]+]] = alloc_stack $AsyncStream<String>.Iterator
 // CHECK:         [[GEN:%[^,]+]] = alloc_stack [lexical] [var_decl] $AsyncStream<String>.Iterator
 // CHECK:         br [[INNER_HEADER:bb[0-9]+]]
 //
@@ -37,8 +38,8 @@ public func makeStream() -> AsyncStream<String> {
 // CHECK:       [[OUTER_BACK]]:
 // CHECK:         destroy_addr [[GEN]]
 // CHECK:         dealloc_stack [[GEN]]
-// CHECK:         dealloc_stack [[ITER]]
-// CHECK:         dealloc_stack [[STREAM]]
+// CHECK-EVO:     dealloc_stack [[ITER]]
+// CHECK-EVO:     dealloc_stack [[STREAM]]
 // CHECK-NEXT:    br [[OUTER_HEADER]]
 //
 // Outer-loop exit: only the outer iterator is deallocated.

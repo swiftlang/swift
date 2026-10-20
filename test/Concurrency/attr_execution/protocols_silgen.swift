@@ -70,7 +70,7 @@ struct AllCaller : P {
   // CHECK: bb0([[SELF:%.*]] : $*AllCaller):
   // CHECK:   [[LOAD:%.*]] = load [trivial] [[SELF]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s21attr_execution_silgen9AllCallerV13mainActorTestyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, AllCaller) -> ()
-  // CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+  // CHECK:   [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
   // CHECK:   [[EXIS_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]]
   // CHECK:   [[OPT_MAIN_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[EXIS_MAIN_ACTOR]]
   // CHECK:   [[OPT_MAIN_ACTOR_B:%.*]] = begin_borrow [[OPT_MAIN_ACTOR]]
