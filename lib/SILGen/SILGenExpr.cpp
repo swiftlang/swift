@@ -2188,6 +2188,17 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   CanAnyFunctionType destType =
       cast<FunctionType>(e->getType()->getCanonicalType());
 
+  // withoutActuallyDiscarding(_:do:) drops the exactly-once guarantee with a
+  // single marked conversion.
+  if (e->isWithoutActuallyDiscarding()) {
+    ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
+    SILType resultType = SGF.getLoweredType(destType);
+    SILValue result = SGF.B.createConvertFunction(
+        e, original.forward(SGF), resultType,
+        ConvertFunctionInst::Kind::WithoutActuallyDiscarding);
+    return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
+  }
+
   if (destType->getRepresentation() ==
       FunctionTypeRepresentation::CFunctionPointer) {
     ManagedValue result;
