@@ -2622,9 +2622,13 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   switch (attr->getExposureKind()) {
   case ExposureKind::Wasm: {
-    // Only top-level func decls are currently supported.
-    if (!isa<FuncDecl>(D) || D->getDeclContext()->isTypeContext())
-      diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
+    const bool isGlobalFunc =
+        isa<FuncDecl>(D) && !D->getDeclContext()->isTypeContext();
+    auto *VD = dyn_cast<VarDecl>(D);
+    const bool isGlobalVar = VD && VD->hasStorage() &&
+                             (VD->isGlobalStorage() || VD->isTopLevelGlobal());
+    if (!isGlobalFunc && !isGlobalVar)
+      diagnose(attr->getLocation(), diag::expose_wasm_unsupported_decl);
     break;
   }
   case ExposureKind::NotCxx:
