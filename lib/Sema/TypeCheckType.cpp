@@ -186,7 +186,6 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
-  case TypeResolverContext::ValueGenericArgument:
   case TypeResolverContext::RawLayoutAttr:
     break;
   }
@@ -1383,16 +1382,14 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
     return paramDecl->isValue();
   });
 
-  // If the type declares at least one parameter pack, allow pack expansions
-  // anywhere in the argument list. We'll use the PackMatcher to ensure that
-  // everything lines up. Otherwise, don't allow pack expansions to appear
-  // at all.
+  // If the type declares at least one parameter pack and no value parameters,
+  // allow pack expansions anywhere in the argument list. We'll use the
+  // PackMatcher to ensure that everything lines up. Otherwise, don't allow pack
+  // expansions to appear at all.
   auto argOptions = options.withoutContext().withContext(
-      hasParameterPack
-      ? TypeResolverContext::VariadicGenericArgument
-      : TypeResolverContext::ScalarGenericArgument);
-  if (hasValueParam)
-    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
+      hasParameterPack && !hasValueParam
+          ? TypeResolverContext::VariadicGenericArgument
+          : TypeResolverContext::ScalarGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -1613,8 +1610,8 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
   // Builtins have special handling.
   if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
     // We don't have any variadic builtins yet, but we do have value arguments.
-    auto argOptions = options.withoutContext()
-      .withContext(TypeResolverContext::ValueGenericArgument);
+    auto argOptions = options.withoutContext().withContext(
+        TypeResolverContext::ScalarGenericArgument);
     auto genericResolution = resolution.withOptions(argOptions);
 
     // Resolve the types of the generic arguments.
@@ -4476,7 +4473,7 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
       auto *unqualIdentRepr = cast<UnqualifiedIdentTypeRepr>(repr);
 
       auto argOptions = options.withoutContext().withContext(
-          TypeResolverContext::ValueGenericArgument);
+          TypeResolverContext::ScalarGenericArgument);
 
       for (auto argRepr : unqualIdentRepr->getGenericArgs()) {
         auto argTy = resolveType(argRepr, argOptions);
@@ -6106,7 +6103,7 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
                                      TypeResolutionOptions options) {
   ASTContext &ctx = getASTContext();
   auto argOptions = options.withoutContext().withContext(
-      TypeResolverContext::ValueGenericArgument);
+      TypeResolverContext::ScalarGenericArgument);
 
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
@@ -6223,7 +6220,6 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
     TypeResolutionOptions options) {
   if (!options.is(TypeResolverContext::ScalarGenericArgument) &&
       !options.is(TypeResolverContext::VariadicGenericArgument) &&
-      !options.is(TypeResolverContext::ValueGenericArgument) &&
       !options.is(TypeResolverContext::SameTypeRequirement) &&
       !options.is(TypeResolverContext::RawLayoutAttr) &&
       !options.contains(TypeResolutionFlags::SILMode)) {
@@ -6404,7 +6400,6 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
-  case TypeResolverContext::ValueGenericArgument:
   case TypeResolverContext::RawLayoutAttr:
     doDiag = true;
     break;

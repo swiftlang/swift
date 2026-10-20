@@ -2053,6 +2053,31 @@
         "funcSelfKind": "NonMutating"
       },
       {
+        "kind": "Function",
+        "name": "typedThrows",
+        "printedName": "typedThrows(_:)",
+        "children": [
+          {
+            "kind": "TypeNominal",
+            "name": "Void",
+            "printedName": "()"
+          },
+          {
+            "kind": "TypeNominal",
+            "name": "GenericTypeParam",
+            "printedName": "E"
+          }
+        ],
+        "declKind": "Func",
+        "usr": "s:4cake11typedThrowsyyxxYKs5ErrorRzlF",
+        "mangledName": "$s4cake11typedThrowsyyxxYKs5ErrorRzlF",
+        "moduleName": "cake",
+        "genericSig": "<E where E : Swift.Error>",
+        "throwing": true,
+        "thrownType": "τ_0_0",
+        "funcSelfKind": "NonMutating"
+      },
+      {
         "kind": "TypeDecl",
         "name": "Int",
         "printedName": "Int",
@@ -2491,6 +2516,6 @@
         ]
       }
     ],
-    "json_format_version": 9
+    "json_format_version": 10
   }
 }
