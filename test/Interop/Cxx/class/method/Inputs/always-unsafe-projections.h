@@ -39,7 +39,7 @@ struct TemplateAndSafeOwner {
   // Returns whatever the caller passes in, not a projection of 'this'.
   template <typename T> T identity(T t) const { return t; }
 
-  // With ImportUnsafeCxxMethodsAsAlwaysUnsafe, 'safe' suppresses the rename.
+  // 'safe' exempts a method from the heuristic.
   __attribute__((swift_attr("safe"))) int *vouchedProjection() const;
 
   // ...except for begin and end, whose '__<name>Unsafe' stubs witness the

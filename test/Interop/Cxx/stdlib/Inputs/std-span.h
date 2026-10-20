@@ -383,7 +383,11 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
       [[clang::lifetimebound]] {
     return ConstSpanOfInt(v.data(), v.size());
   }
-  SpanOfInt getMutable() [[clang::lifetimebound]] {
+  // Vouch for safety explicitly: whether std::span is considered a
+  // self-contained type (and hence whether this is an unsafe projection)
+  // depends on the C++ standard library implementation.
+  __attribute__((swift_attr("safe"))) SpanOfInt getMutable()
+      [[clang::lifetimebound]] {
     return SpanOfInt(v.data(), v.size());
   }
 };
@@ -392,7 +396,7 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
 // CHECK-NEXT:   convenience init()
 // CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
-// CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt
+// CHECK-NEXT:   borrowing func getMutable() -> SpanOfInt
 // CHECK-NEXT: }
 
 struct NonCopyable {

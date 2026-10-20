@@ -1,6 +1,5 @@
-// RUN: %target-swift-emit-silgen %s -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %S/Inputs -cxx-interoperability-mode=default | %FileCheck %s
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
 // A C++ default argument is lowered to a generator function whose name is
 // derived from the Clang declaration, so importing the same method twice -- once

@@ -33,21 +33,21 @@ struct HasNonIteratorBeginMethod {
 import Test
 
 public func test(x: M) {
-  // CHECK: note: C++ method 'test1' that returns a pointer of type 'UnsafeMutablePointer' is unavailable
-  // CHECK: note: C++ method 'test1' may return an interior pointer
-  // CHECK: note: annotate method 'test1' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: note: reference to unsafe instance method 'test1()'
+  // CHECK: note: this returns a pointer or reference into a type that owns its storage
   x.test1()
-  // CHECK: note: C++ method 'test2' that returns a reference of type 'UnsafeMutablePointer' is unavailable
-  // CHECK: note: C++ method 'test2' may return an interior pointer
-  // CHECK: note: annotate method 'test2' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: note: reference to unsafe instance method 'test2()'
+  // CHECK: note: this returns a pointer or reference into a type that owns its storage
   x.test2()
-  // CHECK: note: C++ method 'test3' that returns a value of type 'Ptr' is unavailable
-  // CHECK: note: C++ method 'test3' may return an interior pointer
-  // CHECK: note: annotate method 'test3' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
-  // CHECK: note: annotate type 'Ptr' with SWIFT_SELF_CONTAINED in C++ to make methods that return it available in Swift
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: note: reference to unsafe instance method 'test3()'
+  // CHECK: note: this returns a view into a type that owns its storage
   x.test3()
-  // CHECK: note: C++ method 'begin' that returns an iterator is unavailable
-  // CHECK: note: C++ methods that return iterators are potentially unsafe; try using Swift collection APIs instead
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: note: reference to unsafe instance method 'begin()'
+  // CHECK: note: 'begin' and 'end' are assumed to return iterators, which do not keep the underlying storage alive
   x.begin()
 
   // CHECK-NOT: error: value of type 'M' has no member 'stringLiteral'

@@ -1,5 +1,5 @@
-// C++ methods that return iterators are imported with an unsafe name mangling,
-// i.e., '__{{METHOD_NAME}}Unsafe'.
+// C++ methods that return iterators are imported as '@unsafe(always)', and their
+// old '__{{METHOD_NAME}}Unsafe' spelling as a deprecated migration stub.
 //
 // In this test, we ensure that the iterator-detection logic does not depend on
 // whether the iterator type happens to be instantiated at the time we determine
@@ -72,49 +72,49 @@ struct DDD : DD {};
 import CxxModule
 
 let aa = AA()
-aa.getIter() // expected-error {{has no member 'getIter'}}
-aa.__getIterUnsafe()
+aa.getIter() // expected-error {{must be marked with 'unsafe'}}
+aa.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 aa.getValue()
 aa.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let bb = BB()
-bb.getIter() // expected-error {{has no member 'getIter'}}
-bb.__getIterUnsafe()
+bb.getIter() // expected-error {{must be marked with 'unsafe'}}
+bb.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 bb.getValue()
 bb.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let cc = CC()
-cc.getIter() // expected-error {{has no member 'getIter'}}
-cc.__getIterUnsafe()
+cc.getIter() // expected-error {{must be marked with 'unsafe'}}
+cc.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 cc.getValue()
 cc.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let dd = DD()
-dd.getIter() // expected-error {{has no member 'getIter'}}
-dd.__getIterUnsafe()
+dd.getIter() // expected-error {{must be marked with 'unsafe'}}
+dd.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 dd.getValue()
 dd.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let aaa = AAA()
-aaa.getIter() // expected-error {{has no member 'getIter'}}
-aaa.__getIterUnsafe()
+aaa.getIter() // expected-error {{must be marked with 'unsafe'}}
+aaa.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 aaa.getValue()
 aaa.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let bbb = BBB()
-bbb.getIter() // expected-error {{has no member 'getIter'}}
-bbb.__getIterUnsafe()
+bbb.getIter() // expected-error {{must be marked with 'unsafe'}}
+bbb.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 bbb.getValue()
 bbb.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let ccc = CCC()
-ccc.getIter() // expected-error {{has no member 'getIter'}}
-ccc.__getIterUnsafe()
+ccc.getIter() // expected-error {{must be marked with 'unsafe'}}
+ccc.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 ccc.getValue()
 ccc.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
 
 let ddd = DDD()
-ddd.getIter() // expected-error {{has no member 'getIter'}}
-ddd.__getIterUnsafe()
+ddd.getIter() // expected-error {{must be marked with 'unsafe'}}
+ddd.__getIterUnsafe() // expected-warning {{'__getIterUnsafe()' is deprecated: renamed to 'getIter()'}}
 ddd.getValue()
 ddd.__getValueUnsafe() // expected-error {{has no member '__getValueUnsafe'}}
