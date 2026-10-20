@@ -599,6 +599,14 @@ public:
       ConformanceExecutionContext *context,
       unsigned numParamsExemptFromInvertibleChecks = 0);
 
+  /// Whether `req`, a requirement in `shape`'s requirement signature, is a
+  /// protocol requirement repeated from its generalization signature. Older
+  /// compilers emit these. They're satisfied by the generalization arguments,
+  /// and the existential container doesn't store their witness tables.
+  bool _isRepeatedGeneralizationRequirement(
+      const ExtendedExistentialTypeShape *shape,
+      const GenericRequirementDescriptor &req);
+
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
   /// "initializing" memory that might have been initialized to the correct

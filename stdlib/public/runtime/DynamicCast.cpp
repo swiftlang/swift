@@ -2324,6 +2324,7 @@ static DynamicCastResult tryCastToExtendedExistential(
 
   auto destExistentialType = cast<ExtendedExistentialTypeMetadata>(destType);
   auto *destExistentialShape = destExistentialType->Shape;
+  const unsigned shapeParamCount = destExistentialShape->getNumGenSigParams();
   const unsigned shapeArgumentCount =
       destExistentialShape->getGenSigArgumentLayoutSizeInWords();
   const Metadata *selfType = srcType;
@@ -2358,14 +2359,24 @@ static DynamicCastResult tryCastToExtendedExistential(
       return DynamicCastResult::Failure;
   }
 
-  llvm::SmallVector<const void *, 4> allGenericArgsVec;
+  llvm::SmallVector<const void *, 8> allGenericArgsVec;
   llvm::SmallVector<const void *, 4> witnessTables;
   {
-    // Line up the arguments to the requirement signature.
+    auto requirementSig = destExistentialShape->getRequirementSignature();
+
+    // Line up the arguments to the requirement signature: the generalization
+    // parameters' metadata, `Self`, then the generalization witness tables.
+    // `_checkGenericRequirements` appends the requirement signature's witness
+    // tables after those. Reserve upfront so `substitutions`'s pointer into
+    // `allGenericArgsVec` stays valid as witness tables are appended.
+    allGenericArgsVec.reserve(shapeArgumentCount + 1 +
+                              requirementSig.getRequirements().size());
     auto genArgs = destExistentialType->getGeneralizationArguments();
-    allGenericArgsVec.append(genArgs, genArgs + shapeArgumentCount);
-    // Tack on the `Self` argument.
+    allGenericArgsVec.append(genArgs, genArgs + shapeParamCount);
     allGenericArgsVec.push_back((const void *)selfType);
+    allGenericArgsVec.append(genArgs + shapeParamCount,
+                             genArgs + shapeArgumentCount);
+    const unsigned witnessTablesOffset = allGenericArgsVec.size();
 
     SubstGenericParametersFromMetadata substitutions(destExistentialShape,
                                                      allGenericArgsVec.data());
@@ -2373,19 +2384,18 @@ static DynamicCastResult tryCastToExtendedExistential(
     // arguments from the source value. The leading generalization parameters
     // never record inverses, so don't check them for Copyable and Escapable.
     ConformanceExecutionContext context;
-    auto requirementSig = destExistentialShape->getRequirementSignature();
     auto error = swift::_checkGenericRequirements(
         requirementSig.getParams(),
         requirementSig.getRequirements(),
-        witnessTables,
+        allGenericArgsVec,
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index).Ptr;
         },
         [&substitutions](unsigned fullOrdinal, unsigned keyOrdinal) {
           return substitutions.getMetadataKeyArgOrdinal(keyOrdinal).Ptr;
         },
-        [](const Metadata *type, unsigned index) -> const WitnessTable * {
-          swift_unreachable("Resolution of witness tables is not supported");
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
         },
         &context, /*numParamsExemptFromInvertibleChecks=*/
         destExistentialShape->getNumGenSigParams());
@@ -2398,6 +2408,19 @@ static DynamicCastResult tryCastToExtendedExistential(
 
     if (!swift_isInConformanceExecutionContext(selfType, &context))
       return DynamicCastResult::Failure;
+
+    // Collect the witness tables for the existential container, skipping any
+    // repeated from the generalization signature.
+    unsigned witnessTableIndex = witnessTablesOffset;
+    for (auto &req : requirementSig.getRequirements()) {
+      if (req.getKind() != GenericRequirementKind::Protocol ||
+          !req.getProtocol().needsWitnessTable())
+        continue;
+      auto *witnessTable = allGenericArgsVec[witnessTableIndex++];
+      if (!_isRepeatedGeneralizationRequirement(destExistentialShape, req))
+        witnessTables.push_back(witnessTable);
+    }
+    assert(witnessTableIndex == allGenericArgsVec.size());
   }
 
   // The source is compatible with the target existential. Everything below
@@ -2441,9 +2464,11 @@ static DynamicCastResult tryCastToExtendedExistential(
   const unsigned numWitnessTables = witnessTables.size();
   assert(numWitnessTables ==
          llvm::count_if(destExistentialShape->getRequirementSignature().getRequirements(),
-                        [](const auto &req) -> bool {
+                        [&](const auto &req) -> bool {
                           return req.getKind() ==
-                                 GenericRequirementKind::Protocol;
+                                     GenericRequirementKind::Protocol &&
+                                 !_isRepeatedGeneralizationRequirement(
+                                     destExistentialShape, req);
                         }));
   for (unsigned i = 0; i < numWitnessTables; ++i) {
     destWitnesses[i] = reinterpret_cast<const WitnessTable *>(witnessTables[i]);
