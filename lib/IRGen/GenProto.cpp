@@ -2845,6 +2845,12 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
         return;
     }
 
+    // Likewise for an exported conformance specialization.
+    if (SpecializedAttr::isExportedConformanceSpecialization(
+            wt->getConformance()) &&
+        wt->getDeclContext()->getParentModule() != getSwiftModule())
+      return;
+
     // A conformance can have both an unspecialized witness table and a
     // specialized one, e.g. when a default implementation in a protocol
     // extension had to be specialized for the conforming type. Both mangle to

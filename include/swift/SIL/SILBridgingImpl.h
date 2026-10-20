@@ -1193,6 +1193,10 @@ bool BridgedFunction::isSpecialization() const {
   return getFunction()->isSpecialization();
 }
 
+bool BridgedFunction::isExportedSpecialization() const {
+  return getFunction()->isExportedSpecialization();
+}
+
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
   return decl.getAs<swift::NominalTypeDecl>()->isResilient(getFunction()->getModule().getSwiftModule(),
                                                            getFunction()->getResilienceExpansion());

@@ -18,6 +18,7 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -648,6 +649,21 @@ static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   return false;
 }
 
+/// Whether the type's module owns \p ty's metadata, in Embedded Swift.
+static bool isEmbeddedExportedTypeSpecialization(CanType ty) {
+  return ty->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+         SpecializedAttr::isExportedTypeSpecialization(ty);
+}
+
+/// Whether the type's module owns \p conformance's witness table, in Embedded
+/// Swift.
+static bool isEmbeddedExportedConformanceSpecialization(
+    const ProtocolConformance *conformance) {
+  return conformance->getDeclContext()->getASTContext().LangOpts.hasFeature(
+             Feature::Embedded) &&
+         SpecializedAttr::isExportedConformanceSpecialization(conformance);
+}
+
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
@@ -676,6 +692,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable: {
     auto type = getType();
+
+    // Unique: defined by the type's module, external elsewhere.
+    if (isEmbeddedExportedTypeSpecialization(type))
+      return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
     // In embedded existenitals mode we generate lazy public metadata on demand
     // which makes it non unique.
@@ -723,6 +743,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
+      // Unique: defined by the type's module, external elsewhere.
+      if (isEmbeddedExportedTypeSpecialization(getType()))
+        return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+
       // In embedded existentials mode we generate lazy public metadata on
       // demand which makes the full metadata non-unique.
       if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
@@ -908,6 +932,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
                          forDefinition);
 
   case Kind::ProtocolWitnessTable:
+    // Unique: defined by the type's module, external elsewhere.
+    if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
+      return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+    LLVM_FALLTHROUGH;
   case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptorRecord:
     return getLinkageForProtocolConformance(getRootProtocolConformance(),
@@ -1866,6 +1894,10 @@ bool LinkEntity::hasNonUniqueDefinition() const {
       getKind() == Kind::ValueWitnessTable) {
     // For a nominal type, check its declaration.
     CanType type = getType();
+    // Not linkonce_odr: a single strong definition in the type's module, not
+    // one per separately linked library.
+    if (isEmbeddedExportedTypeSpecialization(type))
+      return false;
     if (auto nominal = type->getAnyNominal()) {
       return SILDeclRef::declHasNonUniqueDefinition(nominal);
     }
@@ -1878,6 +1910,10 @@ bool LinkEntity::hasNonUniqueDefinition() const {
   // definitions (so they get linkonce_odr linkage) unless the underlying
   // conformance was explicitly marked @export(interface).
   if (getKind() == Kind::ProtocolWitnessTable) {
+    // Not linkonce_odr: a single strong definition in the type's module, not
+    // one per separately linked library.
+    if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
+      return false;
     if (auto context = getDeclContextForEmission()) {
       if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
               Feature::Embedded)) {

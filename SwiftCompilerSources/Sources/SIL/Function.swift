@@ -105,6 +105,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isSpecialization: Bool { bridged.isSpecialization() }
 
+  /// True for a specialization that a `@specialized(exported: true)` attribute
+  /// declares. Its declaring module owns the only definition.
+  public var isExportedSpecialization: Bool { bridged.isExportedSpecialization() }
+
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }

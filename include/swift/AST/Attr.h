@@ -2038,8 +2038,8 @@ public:
   ValueDecl *getTargetFunctionDecl(const ValueDecl *forDecl) const;
 
   /// \p forDecl is the value decl that the attribute belongs to.
-  GenericSignature
-  getSpecializedSignature(const AbstractFunctionDecl *forDecl) const;
+  /// '@_specialize' is on functions; '@specialized' on functions and types.
+  GenericSignature getSpecializedSignature(const Decl *forDecl) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialize ||
@@ -2158,6 +2158,30 @@ public:
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
+
+  /// Adds to \p result the specialized signatures that the '@specialized'
+  /// attributes on \p member's type give it, if any, each with whether it's
+  /// exported. E.g. with '@specialized(exported: true, where T == Int) struct
+  /// Box<T>', the signature of 'Box.get()' with 'T == Int', exported.
+  static void
+  getTypeLevelSpecializations(
+      const AbstractFunctionDecl *member,
+      SmallVectorImpl<std::pair<GenericSignature, bool>> &result);
+
+  /// Adds to \p result the types that the exported '@specialized' attributes
+  /// on \p nominal specialize it for, one per attribute, e.g. 'Box<Int>'.
+  static void getExportedTypeSpecializations(const NominalTypeDecl *nominal,
+                                             SmallVectorImpl<CanType> &result);
+
+  /// Whether \p type is a specialization that an exported '@specialized'
+  /// attribute on its type declares, so the type's module owns its metadata,
+  /// e.g. 'Box<Int>'.
+  static bool isExportedTypeSpecialization(CanType type);
+
+  /// Whether the type's module owns \p conformance's witness table, e.g. for
+  /// 'Box<Int>: P' when the module declares 'extension Box: P'.
+  static bool
+  isExportedConformanceSpecialization(const ProtocolConformance *conformance);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialized;
