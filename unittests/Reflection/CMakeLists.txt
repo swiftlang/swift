@@ -3,13 +3,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
     add_swift_unittest(SwiftReflectionTests
       TypeRef.cpp)
-    target_include_directories(SwiftReflectionTests BEFORE PRIVATE
-      ${SWIFT_SOURCE_DIR}/stdlib/include)
-    target_compile_definitions(SwiftReflectionTests PRIVATE
-      SWIFT_INLINE_NAMESPACE=__runtime
-      GTEST_NO_LLVM_SUPPORT)
+    # Link the host library rather than the stdlib's. It's built with the same
+    # flags as this test, including sanitizers. The stdlib's copy is never
+    # sanitized, which produces false container-overflow reports under ASan.
     target_link_libraries(SwiftReflectionTests
       PRIVATE
-      swiftRemoteInspection${SWIFT_PRIMARY_VARIANT_SUFFIX})
+      swiftRemoteInspection)
   endif()
 endif()
