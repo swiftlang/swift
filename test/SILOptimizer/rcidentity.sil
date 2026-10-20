@@ -171,3 +171,16 @@ bb4(%6 : $Builtin.NativeObject):
 bb5:
   return undef : $()
 }
+
+// CHECK-LABEL: @test_end_init_let_ref_rcid@
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 0
+sil @test_end_init_let_ref_rcid : $@convention(thin) (C) -> () {
+bb0(%0 : $C):
+  %1 = end_init_let_ref %0 : $C
+  %2 = unchecked_ref_cast %1 : $C to $E
+  %3 = end_init_let_ref %2 : $E
+  return undef : $()
+}
