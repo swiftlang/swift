@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt %s -sil-combine -dead-access-scope-elimination -sil-combine | %FileCheck %s
 
 // Test that a dead global_addr, function_ref, or thin_to_thick_function of a
 // function_ref is salvaged into a debug reconstruction block.
@@ -76,6 +76,28 @@ bb0:
   %0 = function_ref @callee : $@convention(thin) () -> ()
   %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
   debug_value %1 : $@callee_guaranteed () -> (), let, name "f"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A dead begin_access is salvaged to the address it accesses.
+
+// CHECK-LABEL: sil @test_salvage_begin_access
+// CHECK-NOT:     begin_access
+// CHECK:         debug_value (), let, name "p", transform {
+// CHECK:           bb0:
+// CHECK:             %0 = global_addr @plain_global : $*Int64
+// CHECK:             %1 = address_to_pointer %0 to $Builtin.RawPointer
+// CHECK:             return %1
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'test_salvage_begin_access'
+sil @test_salvage_begin_access : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @plain_global : $*Int64
+  %1 = begin_access [read] [dynamic] %0 : $*Int64
+  %2 = address_to_pointer %1 : $*Int64 to $Builtin.RawPointer
+  debug_value %2 : $Builtin.RawPointer, let, name "p"
+  end_access %1 : $*Int64
   %r = tuple ()
   return %r : $()
 }
