@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s %if objc_interop %{ --check-prefixes=CHECK,CHECK-OBJC %} %else %{ --check-prefixes=CHECK,CHECK-NOOBJC %}
 
 // We want to check two things here:
 // - Correctness
@@ -734,7 +734,10 @@ func test28_3() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test29SbyF
 // CHECK: bb0
-// CHECK: checked_cast
+// WITH Objective-C interop the source might contain a metatype
+// represented as an ObjC object, so the runtime cast is not eliminated.
+// CHECK-OBJC: checked_cast
+// CHECK-NOOBJC-NOT: checked_cast
 // CHECK: return
 @inline(never)
 func test29() -> Bool {
@@ -752,7 +755,10 @@ func test30() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test32SbyF
 // CHECK: bb0
-// CHECK: checked_cast
+// WITH Objective-C interop the source might contain a metatype
+// represented as an ObjC object, so the runtime cast is not eliminated.
+// CHECK-OBJC: checked_cast
+// CHECK-NOOBJC-NOT: checked_cast
 // CHECK: return
 @inline(never)
 func test32() -> Bool {
@@ -763,7 +769,10 @@ func test32() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding6test33SbyF
 // CHECK: bb0
-// CHECK: checked_cast
+// WITH Objective-C interop the source might contain a metatype
+// represented as an ObjC object, so the runtime cast is not eliminated.
+// CHECK-OBJC: checked_cast
+// CHECK-NOOBJC-NOT: checked_cast
 // CHECK: return
 @inline(never)
 func test33() -> Bool {
@@ -963,21 +972,27 @@ public func test39d() -> Bool {
   return cast39((1, 2, 3))
 }
 
+// The `is` here now folds to a constant: SILGen emits a test_only cast, which
+// SimplifyCheckedCast can replace with a branch once the outcome is known, and
+// the branch then folds away.
+
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test40a{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// FIXME: Would love to fold this to just "true"
-// CHECK-NOT: return:
-// CHECK: unconditional_checked_cast_addr
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NOT: checked_cast
 @inline(never)
 public func test40a() -> Bool {
   return cast40((1, A()))
 }
 
+// The `is` here now folds to a constant: SILGen emits a test_only cast, which
+// SimplifyCheckedCast can replace with a branch once the outcome is known, and
+// the branch then folds away.
+
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test40b{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// FIXME: Would love to fold this to just "true"
-// CHECK-NOT: return:
-// CHECK: unconditional_checked_cast_addr
+// CHECK: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NOT: checked_cast
 @inline(never)
 public func test40b() -> Bool {
   return cast40((1, AA()))
@@ -997,7 +1012,7 @@ public func test40c() -> Bool {
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test40d{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
 // CHECK-NOT: return
-// CHECK: checked_cast_addr_br take_always (Int, Any) in
+// CHECK: checked_cast_addr_br test_only (Int, Any) in
 @inline(never)
 public func test40d(_ a: Any) -> Bool {
   return cast40((1, a))

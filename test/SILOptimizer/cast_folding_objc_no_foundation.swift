@@ -11,8 +11,7 @@ struct PlainStruct {}
 // CHECK-LABEL: sil hidden [noinline] @$s31cast_folding_objc_no_foundation23testAnyObjectToArrayIntySbyXlF : $@convention(thin) (@guaranteed AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
-// CHECK: [[TARGET:%.*]] = alloc_stack $Array<Int>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Array<Int> in [[TARGET]] : $*Array<Int>, bb1, bb2
+// CHECK: checked_cast_addr_br test_only AnyObject in [[SOURCE]] : $*AnyObject to Array<Int>, bb2, bb1
 @inline(never)
 func testAnyObjectToArrayInt(_ a: AnyObject) -> Bool {
   return a is [Int]
@@ -21,8 +20,7 @@ func testAnyObjectToArrayInt(_ a: AnyObject) -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s31cast_folding_objc_no_foundation26testAnyObjectToArrayStringySbyXlF : $@convention(thin) (@guaranteed AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
-// CHECK: [[TARGET:%.*]] = alloc_stack $Array<String>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Array<String> in [[TARGET]] : $*Array<String>, bb1, bb2
+// CHECK: checked_cast_addr_br test_only AnyObject in [[SOURCE]] : $*AnyObject to Array<String>, bb2, bb1
 @inline(never)
 func testAnyObjectToArrayString(_ a: AnyObject) -> Bool {
   return a is [String]
@@ -31,8 +29,7 @@ func testAnyObjectToArrayString(_ a: AnyObject) -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s31cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridgedySbyXlF : $@convention(thin) (@guaranteed AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
-// CHECK: [[TARGET:%.*]] = alloc_stack $Array<PlainStruct>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Array<PlainStruct> in [[TARGET]] : $*Array<PlainStruct>, bb1, bb2
+// CHECK: checked_cast_addr_br test_only AnyObject in [[SOURCE]] : $*AnyObject to Array<PlainStruct>, bb2, bb1
 @inline(never)
 func testAnyObjectToArrayNotBridged(_ a: AnyObject) -> Bool {
   return a is [PlainStruct]
@@ -41,8 +38,7 @@ func testAnyObjectToArrayNotBridged(_ a: AnyObject) -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s31cast_folding_objc_no_foundation25testAnyObjectToDictionaryySbyXlF : $@convention(thin) (@guaranteed AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
-// CHECK: [[TARGET:%.*]] = alloc_stack $Dictionary<Int, String>
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Dictionary<Int, String> in [[TARGET]] : $*Dictionary<Int, String>, bb1, bb2
+// CHECK: checked_cast_addr_br test_only AnyObject in [[SOURCE]] : $*AnyObject to Dictionary<Int, String>, bb2, bb1
 @inline(never)
 func testAnyObjectToDictionary(_ a: AnyObject) -> Bool {
   return a is [Int: String]
@@ -51,8 +47,7 @@ func testAnyObjectToDictionary(_ a: AnyObject) -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s31cast_folding_objc_no_foundation21testAnyObjectToStringySbyXlF : $@convention(thin) (@guaranteed AnyObject) -> Bool {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
-// CHECK: [[TARGET:%.*]] = alloc_stack $String
-// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to String in [[TARGET]] : $*String, bb1, bb2
+// CHECK: checked_cast_addr_br test_only AnyObject in [[SOURCE]] : $*AnyObject to String, bb2, bb1
 @inline(never)
 func testAnyObjectToString(_ a: AnyObject) -> Bool {
   return a is String
