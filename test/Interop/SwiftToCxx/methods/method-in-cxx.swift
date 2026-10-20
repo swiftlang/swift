@@ -166,8 +166,7 @@ public final class ClassUsingGenericTypes {
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK LargeStruct staticFinalClassMethod(swift::Int x) noexcept SWIFT_SYMBOL("s:7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ");
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
-// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept = default;
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct doubled() const noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK void dump() const noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct scaled(swift::Int x, swift::Int y) const noexcept SWIFT_SYMBOL("s:7Methods11LargeStructV6scaledyACSi_SitF");
