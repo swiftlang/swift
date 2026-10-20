@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all %s -onone-simplification -simplify-instruction=tuple_pack_extract | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+struct A {}
+struct B {}
+
+sil @use : $@convention(thin) <T> (@guaranteed T) -> ()
+
+// CHECK-LABEL: sil [opaque] @simplify_scalar_index_zero
+// CHECK-NOT:     tuple_pack_extract
+// CHECK:         [[ELEM:%[^,]+]] = tuple_extract %0, 0
+// CHECK:         apply {{.*}}<A>([[ELEM]])
+// CHECK:       } // end sil function 'simplify_scalar_index_zero'
+sil @simplify_scalar_index_zero : $@convention(thin) ((A, B)) -> () {
+bb0(%tuple : $(A, B)):
+  %idx = scalar_pack_index 0 of $Pack{A, B}
+  %elem = tuple_pack_extract %idx of %tuple : $(A, B) as $A
+  %use = function_ref @use : $@convention(thin) <T> (@guaranteed T) -> ()
+  apply %use<A>(%elem) : $@convention(thin) <T> (@guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [opaque] @simplify_scalar_index_one
+// CHECK-NOT:     tuple_pack_extract
+// CHECK:         [[ELEM:%[^,]+]] = tuple_extract %0, 1
+// CHECK:         apply {{.*}}<B>([[ELEM]])
+// CHECK:       } // end sil function 'simplify_scalar_index_one'
+sil @simplify_scalar_index_one : $@convention(thin) ((A, B)) -> () {
+bb0(%tuple : $(A, B)):
+  %idx = scalar_pack_index 1 of $Pack{A, B}
+  %elem = tuple_pack_extract %idx of %tuple : $(A, B) as $B
+  %use = function_ref @use : $@convention(thin) <T> (@guaranteed T) -> ()
+  apply %use<B>(%elem) : $@convention(thin) <T> (@guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// A dynamic_pack_index does not get simplified, since the indexed
+// component is not statically known.
+// CHECK-LABEL: sil [opaque] @dont_simplify_dynamic_pack_index
+// CHECK:         tuple_pack_extract
+// CHECK:       } // end sil function 'dont_simplify_dynamic_pack_index'
+sil @dont_simplify_dynamic_pack_index : $@convention(thin) ((A, B), Builtin.Word) -> () {
+bb0(%tuple : $(A, B), %i : $Builtin.Word):
+  %idx = dynamic_pack_index %i of $Pack{A, B}
+  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, id 1
+  %elem = tuple_pack_extract %idx of %tuple : $(A, B) as $@pack_element(1) Z
+  %use = function_ref @use : $@convention(thin) <T> (@guaranteed T) -> ()
+  apply %use<@pack_element(1) Z>(%elem) : $@convention(thin) <T> (@guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// A scalar_pack_index over a tuple containing a pack expansion does not
+// get simplified, since tuple_extract cannot index past the
+// expansion at compile time.
+// CHECK-LABEL: sil [opaque] @dont_simplify_pack_expansion_tuple
+// CHECK:         tuple_pack_extract
+// CHECK:       } // end sil function 'dont_simplify_pack_expansion_tuple'
+sil @dont_simplify_pack_expansion_tuple : $@convention(thin) <each T> ((A, repeat each T, B)) -> () {
+bb0(%tuple : $(A, repeat each T, B)):
+  %idx = scalar_pack_index 0 of $Pack{A, repeat each T, B}
+  %elem = tuple_pack_extract %idx of %tuple : $(A, repeat each T, B) as $A
+  %use = function_ref @use : $@convention(thin) <T> (@guaranteed T) -> ()
+  apply %use<A>(%elem) : $@convention(thin) <T> (@guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
