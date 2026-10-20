@@ -34,23 +34,11 @@
 
 // CHECK:      class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField final {
 // CHECK-NEXT: public:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithIntField() noexcept {
-// CHECK:        }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField(const StructWithIntField &other) noexcept {
-// CHECK:        }
-// CHECK:        SWIFT_INLINE_THUNK StructWithIntField &operator =(const StructWithIntField &other) noexcept {
-// CHECK-NEXT:     auto metadata = _impl::$s7Structs18StructWithIntFieldVMa(0);
-// CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
-// CHECK-NEXT:   #ifdef __arm64e__
-// CHECK-NEXT:     auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
-// CHECK-NEXT:   #else
-// CHECK-NEXT:     auto *vwTable = *vwTableAddr;
-// CHECK-NEXT:   #endif
-// CHECK-NEXT:     vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT:   return *this;
-// CHECK-NEXT:  }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithIntField() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField(const StructWithIntField &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField &operator =(const StructWithIntField &other) noexcept = default;
 // CHECK-NEXT: private:
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept {}
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithIntField() noexcept = default;
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK StructWithIntField _make() noexcept { return StructWithIntField(); }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage; }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { return _storage; }
@@ -80,14 +68,7 @@
 // CHECK-NEXT:   return result;
 // CHECK-NEXT:  }
 // CHECK-NEXT: static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
-// CHECK-NEXT:   auto metadata = _impl::$s7Structs18StructWithIntFieldVMa(0);
-// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
-// CHECK-NEXT: #ifdef __arm64e__
-// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
-// CHECK-NEXT: #else
-// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
-// CHECK-NEXT: #endif
-// CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
+// CHECK-NEXT:   memcpy(destStorage, srcStorage, 8);
 // CHECK-NEXT: }
 // CHECK-NEXT: };
 // CHECK-EMPTY:

@@ -11,10 +11,14 @@
 // REQUIRES: executable_test
 
 #include <assert.h>
+#include <type_traits>
 #include "structs.h"
 
 int main() {
   using namespace Structs;
+
+  static_assert(!std::is_trivially_copyable<StructWithRefcountedMember>::value, "");
+  static_assert(!std::is_trivially_destructible<StructWithRefcountedMember>::value, "");
 
   // Ensure that the value destructor is called.
   {
