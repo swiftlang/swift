@@ -2329,25 +2329,34 @@ private:
     if (setupTargetPointers)
       return;
 
-    auto getPointer = [&](const std::string &name) -> StoredPointer {
+    auto getPointerInProcessAddressSpace =
+        [&](const std::string &name) -> StoredPointer {
       auto Symbol = getReader().getSymbolAddress(name);
       if (!Symbol)
         return 0;
       auto Pointer = getReader().readPointer(Symbol, sizeof(StoredPointer));
       if (!Pointer)
         return 0;
-      return Pointer->getResolvedAddress().getRawAddress();
+      RemoteAddress Address = Pointer->getResolvedAddress();
+      if (Address.getAddressSpace() != RemoteAddress::DefaultAddressSpace) {
+        auto ProcessAddress = getReader().resolveRemoteAddress(Address);
+        if (!ProcessAddress)
+          return 0;
+        Address = *ProcessAddress;
+      }
+      return stripSignedPointer(Address).getRawAddress();
     };
-    target_asyncTaskMetadata =
-        getPointer("_swift_concurrency_debug_asyncTaskMetadata");
-    target_non_future_adapter =
-        getPointer("_swift_concurrency_debug_non_future_adapter");
-    target_future_adapter =
-        getPointer("_swift_concurrency_debug_future_adapter");
-    target_task_wait_throwing_resume_adapter = getPointer(
+    // These are compared against pointers in the address space of the process.
+    target_asyncTaskMetadata = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_asyncTaskMetadata");
+    target_non_future_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_non_future_adapter");
+    target_future_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_future_adapter");
+    target_task_wait_throwing_resume_adapter = getPointerInProcessAddressSpace(
         "_swift_concurrency_debug_task_wait_throwing_resume_adapter");
-    target_task_future_wait_resume_adapter =
-        getPointer("_swift_concurrency_debug_task_future_wait_resume_adapter");
+    target_task_future_wait_resume_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_task_future_wait_resume_adapter");
     auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
         "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {
