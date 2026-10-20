@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -parse-as-library %s
 // RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-EXTENSION
 // RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-EXTENSION
 
@@ -50,8 +50,7 @@ public func availableOnMacOSExtensionOnlyFunc() {}
 // CHECK-LABEL:             sil{{.*}}@$s4Test31availableOniOSExtensionOnlyFuncyyF
 // CHECK-NO-EXTENSION:        [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
 // CHECK-NO-EXTENSION-NEXT:   [[APPLY:%.*]] = apply [[FNREF]]()
-// FIXME: [availability] This should not diagnose when building with -application-extension
-// CHECK-EXTENSION:           _diagnoseUnavailableCodeReached
+// CHECK-EXTENSION-NOT:       _diagnoseUnavailableCodeReached
 // CHECK:                   } // end sil function '$s4Test31availableOniOSExtensionOnlyFuncyyF'
 @available(macOS, unavailable)
 @available(iOS, unavailable)
@@ -78,3 +77,46 @@ public struct UnavailableOniOS {
 // CHECK:           } // end sil function '$s4Test37unavailableOnMacCatalystExtensionFuncyyF'
 @available(macCatalystApplicationExtension, unavailable)
 public func unavailableOnMacCatalystExtensionFunc() {}
+
+public struct S {}
+
+// CHECK-LABEL:     sil{{.*}}@$s4Test30availableOnMacCatalystOnlyFuncyyF
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
+// CHECK:           } // end sil function '$s4Test30availableOnMacCatalystOnlyFuncyyF'
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(macCatalyst, introduced: 13.1)
+public func availableOnMacCatalystOnlyFunc() {}
+
+// CHECK-LABEL:     sil private [global_init_once_fn]{{.*}}@$s4Test32availableOnMacCatalystOnlyGlobal_WZ
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
+// CHECK:           } // end sil function '$s4Test32availableOnMacCatalystOnlyGlobal_WZ'
+// CHECK-LABEL:     sil [global_init]{{.*}}@$s4Test32availableOnMacCatalystOnlyGlobalAA1SVvau
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
+// CHECK:           } // end sil function '$s4Test32availableOnMacCatalystOnlyGlobalAA1SVvau'
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(macCatalyst, introduced: 13.1)
+public let availableOnMacCatalystOnlyGlobal = S()
+
+// CHECK-LABEL:     sil private [global_init_once_fn]{{.*}}@$s4Test30unavailableOnMacOSAndiOSGlobal_WZ
+// CHECK:             [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
+// CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:           } // end sil function '$s4Test30unavailableOnMacOSAndiOSGlobal_WZ'
+// CHECK-LABEL:     sil [global_init]{{.*}}@$s4Test30unavailableOnMacOSAndiOSGlobalAA1SVvau
+// CHECK:             [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
+// CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:           } // end sil function '$s4Test30unavailableOnMacOSAndiOSGlobalAA1SVvau'
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+public let unavailableOnMacOSAndiOSGlobal = S()
+
+public struct HasStaticProperties {
+  // CHECK-LABEL:     sil private [global_init_once_fn]{{.*}}@$s4Test19HasStaticPropertiesV026availableOnMacCatalystOnlyC3Let_WZ
+  // CHECK-NOT:         _diagnoseUnavailableCodeReached
+  // CHECK:           } // end sil function '$s4Test19HasStaticPropertiesV026availableOnMacCatalystOnlyC3Let_WZ'
+  @available(macOS, unavailable)
+  @available(iOS, unavailable)
+  @available(macCatalyst, introduced: 13.1)
+  public static let availableOnMacCatalystOnlyStaticLet = S()
+}

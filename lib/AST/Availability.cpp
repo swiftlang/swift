@@ -576,11 +576,18 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains. The attributes
   // of a pattern binding are attached to its variables, so look them up on the
-  // same decl that the restrictions were computed from.
+  // same decl that the restrictions were computed from. When building a
+  // zippered binary, attributes that are only active for the target variant
+  // are also relevant.
   auto *attrDecl = decl->getAbstractSyntaxDeclForAttributes();
+  bool hasTargetVariant = ctx.LangOpts.TargetVariant.has_value();
   for (auto attr :
-       attrDecl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+       attrDecl->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
     auto domain = attr.getDomain();
+    if (!domain.isActive(ctx) &&
+        !(hasTargetVariant && domain.isActive(ctx, /*forTargetVariant=*/true)))
+      continue;
+
     if (llvm::is_contained(unavailableDomains, domain))
       continue;
 
