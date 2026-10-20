@@ -105,8 +105,8 @@ static_assert(IsTriviallyDestructible<DWARFModuleUnit>::value,
 
 ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
     SourceLoc importLoc, ImportPath::Module path) {
-  // There's no importing from debug info if no importer is installed.
-  if (!DWARFImporter)
+  // There's no importing from debug info if no importer is active.
+  if (!DWARFImporter || !DWARFImporterLoadsModules)
     return nullptr;
 
   // FIXME: Implement submodule support!
@@ -205,4 +205,8 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
 
 void ClangImporter::setDWARFImporterDelegate(DWARFImporterDelegate *delegate) {
   Impl.setDWARFImporterDelegate(delegate);
+}
+
+void ClangImporter::setDWARFImporterLoadsModules(bool loadsModules) {
+  Impl.DWARFImporterLoadsModules = loadsModules;
 }

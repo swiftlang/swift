@@ -1077,6 +1077,9 @@ private:
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 
+  /// Synthesize any module Clang cannot load from debug info.
+  bool DWARFImporterLoadsModules = true;
+
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 

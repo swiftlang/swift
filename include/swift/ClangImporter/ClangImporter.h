@@ -311,6 +311,11 @@ public:
   /// info. Used by LLDB.
   void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate);
 
+  /// Control whether a module that Clang cannot load is synthesized from
+  /// debug info. Type lookups through the DWARFImporter delegate are
+  /// unaffected.
+  void setDWARFImporterLoadsModules(bool loadsModules);
+
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
 
