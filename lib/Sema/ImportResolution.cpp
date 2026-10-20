@@ -944,6 +944,12 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       topLevelModule.get()->isResilient())
     return;
 
+  // Implicit imports of system modules, like _Concurrency, can't be changed.
+  // Module interfaces spell them out.
+  if ((!getImportDecl() || SF.Kind == SourceFileKind::Interface) &&
+      !getUnderlyingModule() && topLevelModule.get()->isSystemModule())
+    return;
+
   auto inFlight = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                                      diag::module_not_compiled_with_library_evolution,
                                      targetName, importerName);
