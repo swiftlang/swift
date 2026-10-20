@@ -5,9 +5,12 @@
 // the C declaration it implements is hidden or the Swift declaration is
 // effectively less than public.
 
+// Some targets (e.g., WebAssembly) default to -fvisibility=hidden, so pass
+// -fvisibility=default explicitly to test unannotated C declarations.
+
 // RUN: %target-swift-frontend -emit-ir %t/main.swift -I %t \
 // RUN:   -module-name main -parse-as-library \
-// RUN:   -validate-tbd-against-ir=all \
+// RUN:   -validate-tbd-against-ir=all -Xcc -fvisibility=default \
 // RUN:   | %FileCheck %s --check-prefixes=CHECK,DEFAULT
 
 // -enable-testing exports internal implementations, unless the C declaration
@@ -15,6 +18,7 @@
 // RUN: %target-swift-frontend -emit-ir %t/main.swift -I %t \
 // RUN:   -module-name main -parse-as-library \
 // RUN:   -validate-tbd-against-ir=all -enable-testing \
+// RUN:   -Xcc -fvisibility=default \
 // RUN:   | %FileCheck %s --check-prefixes=CHECK,TESTING
 
 // -fvisibility=hidden makes unannotated C declarations hidden.
