@@ -68,6 +68,8 @@ ERROR(no_longer_open,APIDigesterBreakage,"%0 is no longer open for subclassing",
 
 ERROR(func_type_escaping_changed,APIDigesterBreakage,"%0 has %select{removed|added}2 '@escaping' in %1", (StringRef, StringRef, bool))
 
+ERROR(func_thrown_type_change,APIDigesterBreakage,"%0 has thrown error type change from %1 to %2", (StringRef, StringRef, StringRef))
+
 ERROR(func_self_access_change,APIDigesterBreakage,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
 
 ERROR(param_ownership_change,APIDigesterBreakage,"%0 has %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
