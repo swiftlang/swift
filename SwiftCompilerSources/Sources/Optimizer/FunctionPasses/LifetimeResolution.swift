@@ -17,6 +17,7 @@ private func log(_ message: @autoclosure () -> String) {
   llvmDebug("lifetime-resolution", message())
 }
 
+// TODO: determine whether this needs OSSACompleteLifetime to run first.
 let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   (function: Function, context: FunctionPassContext) in
 
@@ -27,8 +28,9 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   var resolver = Resolver(function, context)
   var indexCache = FieldIndexTrieCache(for: function)
 
-  // Process results in reverse post-order to ensure dependent uses are already resolved.
-  for block in function.blocks.reversed() {
+  // Visit blocks in post-order, each bottom-up, so a value's uses in the blocks it dominates are
+  // resolved before the value itself.
+  for block in function.postOrderBlocks(context) {
     for inst in block.instructions.reversed() {
       // Ignore `mark_uninitialized` this pass is driven by the storage itself.
       if inst is MarkUninitializedInst { continue }
@@ -1432,6 +1434,9 @@ private struct PartitionedUses: CustomStringConvertible {
 
     liverange.insert(contentsOf: consumes.users)
     liverange.insert(contentsOf: uses.users)
+    // FIXME: this should add `indirectUses`. We also need a cache of information about the dependent values's uses, to
+    //  effectively extend the range of instructions to be considered deinit barriers so it includes all
+    //  dependent value's lifetimeLimits too.
 
     collectDeinitBarriers(into: &indirectUses, liverange: liverange,
       lifetimeLimits: lifetimeLimits, def: root, context)

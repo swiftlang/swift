@@ -86,17 +86,11 @@ private struct BlocksThatEndInUnreachable : ~Copyable {
   init(in function: Function, _ context: FunctionPassContext) {
     blocks = BasicBlockSet(context)
     // A block is added once all of its successors are, so blocks in a loop that never ends aren't added.
-    var changed = true
-    while changed {
-      changed = false
-      // FIXME: [deinitable] .reversed() doesn't guarantee successors will be visited prior to predecessors
-      for block in function.blocks.reversed() where !blocks.contains(block) {
-        let successors = block.successors
-        if block.terminator is UnreachableInst ||
-           (!successors.isEmpty && successors.allSatisfy { blocks.contains($0) }) {
-          blocks.insert(block)
-          changed = true
-        }
+    for block in function.postOrderBlocks(context) {
+      let successors = block.successors
+      if block.terminator is UnreachableInst ||
+         (!successors.isEmpty && successors.allSatisfy { blocks.contains($0) }) {
+        blocks.insert(block)
       }
     }
   }

@@ -1,0 +1,59 @@
+// RUN: %target-sil-opt %s -lifetime-resolution -sil-disable-input-verify | %FileCheck %s --implicit-check-not diagnose
+
+// Roots must be resolved in post-order, so that a value loaded from storage is resolved
+// before the storage itself, independent of block layout.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+struct NC: ~Copyable { var k: K }
+
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @useNC : $@convention(thin) (@guaranteed NC) -> ()
+sil @consumeNC : $@convention(thin) (@owned NC) -> ()
+
+// Resolving %v first copies it for the interior consume, leaving the load with only
+// borrowing uses, so it becomes a load_borrow rather than a diagnosed load [copy].
+
+// CHECK-LABEL: sil [ossa] @storage_laid_out_after_load :
+// CHECK:       bb1:
+// CHECK:         [[LB:%.*]] = load_borrow [[ROOT:%.*]] : $*NC
+// CHECK-NEXT:    [[COPY:%.*]] = copy_value [[LB]]
+// CHECK-NEXT:    diagnose [unpermitted_copy] [[COPY]]
+// CHECK-NEXT:    apply {{%.*}}([[COPY]]) : $@convention(thin) (@owned NC) -> ()
+// CHECK-NEXT:    apply {{%.*}}([[LB]]) : $@convention(thin) (@guaranteed NC) -> ()
+// CHECK-NEXT:    end_borrow [[LB]]
+// CHECK-NEXT:    [[TAKE:%.*]] = load [take] [[ROOT]] : $*NC
+// CHECK:       bb2:
+// CHECK:         [[ROOT]] = mark_uninitialized [var]
+// CHECK:       } // end sil function 'storage_laid_out_after_load'
+sil [ossa] @storage_laid_out_after_load : $@convention(thin) () -> () {
+bb0:
+  br bb2
+
+bb1:
+  %useFn = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %consumeFn = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %v = load [copy] %root : $*NC
+  apply %consumeFn(%v) : $@convention(thin) (@owned NC) -> ()
+  apply %useFn(%v) : $@convention(thin) (@guaranteed NC) -> ()
+  destroy_value %v
+  %w = load [copy] %root : $*NC
+  apply %useFn(%w) : $@convention(thin) (@guaranteed NC) -> ()
+  destroy_value %w
+  destroy_addr %root : $*NC
+  dealloc_stack %0 : $*NC
+  %t = tuple ()
+  return %t
+
+bb2:
+  %0 = alloc_stack [lexical] [var_decl] $NC, var, name "a", type $NC
+  %root = mark_uninitialized [var] %0
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %val = apply %getFn() : $@convention(thin) () -> @owned NC
+  assign %val to %root
+  br bb1
+}
