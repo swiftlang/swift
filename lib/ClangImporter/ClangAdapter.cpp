@@ -168,7 +168,8 @@ bool importer::anySubobjectTypeSatisfies(
 
 std::optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
-                                   bool allowForwardDeclaration) {
+                                   bool allowForwardDeclaration,
+                                   const ClangImporter::Implementation *owner) {
   const clang::Decl *actual = nullptr;
 
   // Put an Objective-C class into the module that contains the @interface
@@ -182,7 +183,17 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
   if (!actual)
     actual = getFirstNonLocalDecl(D);
 
+  if (owner)
+    if (auto *module = owner->getSupplementalModule(actual))
+      return const_cast<clang::Module *>(module);
+
   return actual->getImportedOwningModule();
+}
+
+std::optional<clang::Module *>
+ClangImporter::Implementation::getClangSubmoduleForDecl(
+    const clang::Decl *D, bool allowForwardDeclaration) const {
+  return importer::getClangSubmoduleForDecl(D, allowForwardDeclaration, this);
 }
 
 /// Retrieve the instance type of the given Clang declaration context.

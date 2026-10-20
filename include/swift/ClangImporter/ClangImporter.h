@@ -24,6 +24,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
@@ -640,6 +641,18 @@ public:
   /// clients.
   clang::TargetInfo &getTargetInfo() const;
   clang::CodeGenOptions &getCodeGenOpts() const;
+
+  /// Check a serialized SDK reference against the deployment-target
+  /// declaration. An empty producer target denotes a module without Clang
+  /// context metadata.
+  llvm::Error validateSDKReference(const clang::Decl *decl,
+                                   llvm::StringRef producerClangTarget = {});
+  llvm::Error pushSDKReferenceContext(llvm::StringRef producerClangTarget);
+  void popSDKReferenceContext();
+  std::string getSDKReferenceTarget(const clang::Decl *decl) const;
+  std::vector<std::string> getSDKReferenceTargets() const;
+  std::vector<std::string>
+  getSDKReferenceArguments(llvm::StringRef context) const;
 
   std::string computeClangContextHash() const;
 

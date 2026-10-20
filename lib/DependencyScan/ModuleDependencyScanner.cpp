@@ -883,6 +883,16 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   mainDependencies.setLibraryLevel(ScanASTContext.LangOpts.LibraryLevel);
 
   llvm::StringSet<> alreadyAddedModules;
+  const auto &codeGenDependencies =
+      ScanCompilerInvocation.getFrontendOptions().ClangCodeGenDependencies;
+  if (!codeGenDependencies.empty()) {
+    for (const auto &name : codeGenDependencies)
+      mainDependencies.addModuleImport(name, /*isExported=*/false,
+                                       AccessLevel::Public,
+                                       &alreadyAddedModules);
+    return mainDependencies;
+  }
+
   // Compute Implicit dependencies of the main module
   {
     const auto &importInfo = mainModule->getImplicitImportInfo();
@@ -1162,6 +1172,14 @@ std::vector<ModuleDependencyID>
 ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) {
   PrettyStackTraceStringAction trace("Performing dependency scan of: ",
                                      rootModuleID.ModuleName);
+  if (!ScanCompilerInvocation.getFrontendOptions()
+           .ClangCodeGenDependencies.empty()) {
+    ModuleDependencyIDSetVector discoveredModules;
+    discoveredModules.insert(rootModuleID);
+    resolveClangModuleDependencies({rootModuleID}, discoveredModules);
+    return discoveredModules.takeVector();
+  }
+
   // If scanning for an individual Clang module, simply resolve its imports
   if (rootModuleID.Kind == ModuleDependencyKind::Clang) {
     ModuleDependencyIDSetVector discoveredClangModules;
@@ -2492,6 +2510,13 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   // Pass the -sdk flag to make the system header VFS overlay finable
   // for the -direct-clang-cc1-module-build emit-pcm command on Windows.
   StringRef SDKPath = ScanASTContext.SearchPathOpts.getSDKPath();
+  if (!ScanASTContext.ClangImporterOpts.TargetContext.empty() &&
+      llvm::Triple(invocation.getTargetOpts().Triple).isOSDarwin() &&
+      !invocation.getHeaderSearchOpts().Sysroot.empty()) {
+    // Darwin does not need a Swift SDK overlay. Shared PCM wrapper jobs must
+    // use the native sysroot even when a replay has no Swift -sdk option.
+    SDKPath = invocation.getHeaderSearchOpts().Sysroot;
+  }
   if (!SDKPath.empty()) {
     swiftArgs.push_back("-sdk");
     swiftArgs.push_back(SDKPath.str());
@@ -2500,14 +2525,23 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   // Pass the -target flag so the Swift frontend uses the correct target
   // triple for the -direct-clang-cc1-module-build action.
   swiftArgs.push_back("-target");
-  swiftArgs.push_back(ScanASTContext.LangOpts.Target.str());
-
-  // If the scanner was invoked with -clang-target, forward it so the
-  // frontend can distinguish the Clang target from the Swift target
-  // (e.g. zippered Mac Catalyst builds).
-  if (ScanASTContext.LangOpts.ClangTarget.has_value()) {
+  if (!ScanASTContext.ClangImporterOpts.TargetContext.empty()) {
+    // Different Swift consumers can share this exact PCM. Its wrapper command
+    // must depend on the Clang invocation, not on the consumer's deployment
+    // target, so the driver can share the scanner-generated build job.
+    const auto &target = invocation.getTargetOpts().Triple;
+    swiftArgs.push_back(target);
     swiftArgs.push_back("-clang-target");
-    swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
+    swiftArgs.push_back(target);
+  } else {
+    swiftArgs.push_back(ScanASTContext.LangOpts.Target.str());
+
+    // Preserve distinct Swift and Clang targets for ordinary scans, including
+    // zippered Mac Catalyst builds.
+    if (ScanASTContext.LangOpts.ClangTarget.has_value()) {
+      swiftArgs.push_back("-clang-target");
+      swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
+    }
   }
 
   // Add args reported by the scanner.

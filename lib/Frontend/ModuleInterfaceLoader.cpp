@@ -1652,6 +1652,35 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   // invoking ASTContext.
   GenericArgs.push_back("-compile-module-from-interface");
   genericSubInvocation.setTargetTriple(LangOpts.Target);
+  genericSubInvocation.getClangImporterOptions().TargetContext =
+      clangImporterOpts.TargetContext;
+  if (requestedAction == FrontendOptions::ActionType::Typecheck &&
+      !clangImporterOpts.TargetContext.empty()) {
+    // Verification rebuilds the source module's own textual interface in a
+    // sub-instance, so it must retain the same deployment and producer views.
+    auto &subImporterOpts = genericSubInvocation.getClangImporterOptions();
+    subImporterOpts.CodeGenModuleFiles = clangImporterOpts.CodeGenModuleFiles;
+    subImporterOpts.ProducerModuleFiles = clangImporterOpts.ProducerModuleFiles;
+    subImporterOpts.ProducerContextArguments =
+        clangImporterOpts.ProducerContextArguments;
+    subImporterOpts.SDKContext = clangImporterOpts.SDKContext;
+    if (!subImporterOpts.SDKContext.empty()) {
+      GenericArgs.push_back("-experimental-clang-sdk-context");
+      GenericArgs.push_back(ArgSaver.save(subImporterOpts.SDKContext));
+    }
+    for (const auto &input : subImporterOpts.CodeGenModuleFiles) {
+      GenericArgs.push_back("-experimental-clang-codegen-module-file");
+      GenericArgs.push_back(ArgSaver.save(input));
+    }
+    for (const auto &input : subImporterOpts.ProducerModuleFiles) {
+      GenericArgs.push_back("-experimental-clang-producer-module-file");
+      GenericArgs.push_back(ArgSaver.save(input));
+    }
+    for (const auto &input : subImporterOpts.ProducerContextArguments) {
+      GenericArgs.push_back("-experimental-clang-producer-context-argument");
+      GenericArgs.push_back(ArgSaver.save(input));
+    }
+  }
 
   auto triple = ArgSaver.save(genericSubInvocation.getTargetTriple());
   if (!triple.empty()) {
@@ -1714,6 +1743,22 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       SearchPathOpts.getImportSearchPaths());
   genericSubInvocation.setFrameworkSearchPaths(
       SearchPathOpts.getFrameworkSearchPaths());
+  if (!clangImporterOpts.TargetContext.empty()) {
+    // A deployment-context scan must rediscover header dependencies rather than
+    // loading only the SDK PCMs. Keep the search paths needed by that scan.
+    for (const auto &path : SearchPathOpts.getImportSearchPaths()) {
+      GenericArgs.push_back(path.IsSystem ? "-Isystem" : "-I");
+      GenericArgs.push_back(ArgSaver.save(path.Path));
+    }
+    for (const auto &path : SearchPathOpts.getFrameworkSearchPaths()) {
+      GenericArgs.push_back(path.IsSystem ? "-Fsystem" : "-F");
+      GenericArgs.push_back(ArgSaver.save(path.Path));
+    }
+    if (!SearchPathOpts.RuntimeResourcePath.empty()) {
+      GenericArgs.push_back("-resource-dir");
+      GenericArgs.push_back(ArgSaver.save(SearchPathOpts.RuntimeResourcePath));
+    }
+  }
   if (!SearchPathOpts.getSDKPath().empty()) {
     // Add -sdk arguments to the module building commands.
     // Module building commands need this because dependencies sometimes use
@@ -1966,7 +2011,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     // by their context hash for different variants, so would still cause a
     // difference in the Swift compile commands, when different.
     inheritedParentContextClangArgs =
-        clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
+        clangImporterOpts.TargetContext.empty()
+            ? clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency()
+            : clangImporterOpts.ExtraArgs;
     genericSubInvocation.getFrontendOptions()
         .DependencyScanningSubInvocation = true;
   } else if (LoaderOpts.strictImplicitModuleContext ||
@@ -2214,6 +2261,16 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   // Insert arguments collected from the interface file.
   BuildArgs.insert(BuildArgs.end(), interfaceInfo.Arguments.begin(),
                    interfaceInfo.Arguments.end());
+
+  if (!subInvocation.getClangImporterOptions().TargetContext.empty()) {
+    // Interface arguments override the importing source's target. Export the
+    // parsed target so the driver does not have to reinterpret that argument
+    // ordering when it plans this interface's Clang dependencies.
+    auto target = subInvocation.getLangOptions().Target.str();
+    subInvocation.getClangImporterOptions().TargetContext = target;
+    BuildArgs.push_back("-experimental-clang-target-context");
+    BuildArgs.push_back(ArgSaver.save(target));
+  }
 
   // restore `StrictImplicitModuleContext`
   subInvocation.getFrontendOptions().StrictImplicitModuleContext =
@@ -3009,6 +3066,15 @@ static std::string getContextHash(const CompilerInvocation &CI,
       // serialized SIL (e.g. TSan instrumentation) and the Clang dependencies.
       CI.getSILOptions().Sanitizers.toRaw());
 
+  if (!CI.getClangImporterOptions().TargetContext.empty()) {
+    // The SDK declaration view and the deployment definition view both affect
+    // serialized Swift declarations and inlinable bodies.
+    H = llvm::hash_combine(H, CI.getClangImporterOptions().TargetContext,
+                           CI.getClangImporterOptions().SDKContext,
+                           CI.getLangOptions().ClangTarget
+                               ? CI.getLangOptions().ClangTarget->str()
+                               : "");
+  }
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }
 

@@ -7650,7 +7650,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   // Find the other accessor, if it exists.
   auto propertyName = importedName.getBaseIdentifier(Impl.SwiftContext);
   auto lookupTable =
-      Impl.findLookupTable(*getClangSubmoduleForDecl(accessor));
+      Impl.findLookupTable(*Impl.getClangSubmoduleForDecl(accessor));
   assert(lookupTable && "No lookup table?");
   bool foundAccessor = false;
   for (auto entry : lookupTable->lookup(SerializedSwiftName(propertyName),
@@ -11216,7 +11216,7 @@ void ClangImporter::Implementation::loadStorageMembers(Decl *D,
   // in some cases, such as when processing DWARF imported AST nodes from LLDB,
   // it has not. Do it here just to be safe.
   if (auto namedDecl = dyn_cast_or_null<clang::NamedDecl>(D->getClangDecl())) {
-    if (!namedDecl->hasOwningModule()) {
+    if (!namedDecl->hasOwningModule() && !isSupplementalDecl(namedDecl)) {
       auto mutableNamedDecl = const_cast<clang::NamedDecl *>(namedDecl);
       addBridgeHeaderTopLevelDecls(mutableNamedDecl);
       addEntryToLookupTable(*BridgingHeaderLookupTable,

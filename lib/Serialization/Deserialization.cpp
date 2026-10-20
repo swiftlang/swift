@@ -14,12 +14,13 @@
 #include "DeserializationErrors.h"
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
@@ -44,10 +45,10 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Attr.h"
-#include "clang/Basic/SourceManager.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/AttributeCommonInfo.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/UnifiedSymbolResolution/USRGeneration.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -55,6 +56,8 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <cstdlib>
 
 #define DEBUG_TYPE "Serialization"
 
@@ -2260,9 +2263,21 @@ void ModuleFile::consumeHiddenTypeXRefPathPieces(
   }
 }
 
-Expected<Decl *>
-ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
+Expected<Decl *> ModuleFile::resolveCrossReference(ModuleID MID,
+                                                   uint32_t pathLen,
+                                                   StringRef clangTarget) {
   using namespace decls_block;
+
+  auto *importer =
+      static_cast<ClangImporter *>(getContext().getClangModuleLoader());
+  if (importer) {
+    if (auto error = importer->pushSDKReferenceContext(clangTarget))
+      return std::move(error);
+  }
+  SWIFT_DEFER {
+    if (importer)
+      importer->popSDKReferenceContext();
+  };
 
   ModuleDecl *baseModule = getModule(MID);
   if (!baseModule) {
@@ -3031,6 +3046,13 @@ giveUpFastPath:
   }
 
   assert(values.front() != nullptr);
+  if (importer) {
+    if (auto *clangDecl = values.front()->getClangDecl()) {
+      if (auto error = importer->validateSDKReference(clangDecl, clangTarget))
+        getContext().Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                                    llvm::toString(std::move(error)));
+    }
+  }
   return values.front();
 }
 
@@ -7541,7 +7563,12 @@ DeclDeserializer::getDeclCheckedImpl(
     assert(DAttrs == nullptr);
     ModuleID baseModuleID;
     uint32_t pathLen;
-    decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
+    IdentifierID clangTargetID;
+    decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen,
+                                        clangTargetID);
+    StringRef clangTarget = clangTargetID
+                                ? MF.getIdentifier(clangTargetID).str()
+                                : MF.getClangModuleTarget();
 
     auto fallback = MF.HiddenTypeFallbackMap.find(thisDeclID);
     bool canUseHiddenTypeFallback =
@@ -7553,7 +7580,8 @@ DeclDeserializer::getDeclCheckedImpl(
       auto pathCursor = MF.DeclTypeCursor;
       MF.consumeHiddenTypeXRefPathPieces(pathCursor, pathLen, originalPath);
 
-      auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
+      auto resolved =
+          MF.resolveCrossReference(baseModuleID, pathLen, clangTarget);
       if (resolved) {
         declOrOffset = resolved.get();
         break;
@@ -7576,12 +7604,15 @@ DeclDeserializer::getDeclCheckedImpl(
       }
       hidden.get()->OriginalXRefPath =
           MF.getContext().AllocateCopy(originalPath);
+      hidden.get()->OriginalClangTarget =
+          MF.getContext().getIdentifier(clangTarget);
       declOrOffset = hidden.get();
       llvm::consumeError(resolved.takeError());
       break;
     }
 
-    auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
+    auto resolved =
+        MF.resolveCrossReference(baseModuleID, pathLen, clangTarget);
     if (!resolved)
       return resolved;
     declOrOffset = resolved.get();
@@ -9200,11 +9231,24 @@ public:
     // Null reference.
     if (refKind == 0) return nullptr;
 
+    StringRef clangTarget = MF.getClangModuleTarget();
+    if (refKind == 3) {
+      clangTarget = readSwiftIdentifier().str();
+      refKind = readUInt64();
+    }
+    auto &importer = static_cast<ClangImporter &>(ClangLoader);
+    if (auto error = importer.pushSDKReferenceContext(clangTarget)) {
+      MF.getContext().Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                                     llvm::toString(std::move(error)));
+      return nullptr;
+    }
+    SWIFT_DEFER { importer.popSDKReferenceContext(); };
+
     // Swift declaration.
     if (refKind == 1) {
       swift::Decl *swiftDecl = MF.getDecl(DeclID(readUInt64()));
-      return const_cast<clang::Decl*>(
-        ClangLoader.resolveStableSerializationPath(swiftDecl));
+      return validateClangReference(
+          ClangLoader.resolveStableSerializationPath(swiftDecl), clangTarget);
     }
 
     // External path.
@@ -9221,12 +9265,35 @@ public:
                             : Identifier();
         path.add(*kind, name);
       }
-      return const_cast<clang::Decl*>(
-        ClangLoader.resolveStableSerializationPath(std::move(path)));
+      return validateClangReference(
+          ClangLoader.resolveStableSerializationPath(std::move(path)),
+          clangTarget);
     }
 
     // Unknown kind?
     return nullptr;
+  }
+
+  clang::Decl *validateClangReference(const clang::Decl *decl,
+                                      StringRef clangTarget) {
+    // Clang's generated type reader requires non-null declarations. Stop on
+    // an unsupported context before it attempts to construct a type from one.
+    if (!decl &&
+        !MF.getContext().ClangImporterOpts.CodeGenModuleFiles.empty()) {
+      auto &diags = MF.getContext().Diags;
+      diags.diagnose(
+          SourceLoc(), diag::error_from_clang,
+          "cannot resolve a serialized Clang reference in its target context");
+      diags.flushConsumers();
+      std::exit(1);
+    }
+    if (decl) {
+      auto &importer = static_cast<ClangImporter &>(ClangLoader);
+      if (auto error = importer.validateSDKReference(decl, clangTarget))
+        MF.getContext().Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                                       llvm::toString(std::move(error)));
+    }
+    return const_cast<clang::Decl *>(decl);
   }
 
   const clang::Attr *readAttr() {

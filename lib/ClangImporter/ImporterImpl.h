@@ -564,6 +564,18 @@ private:
   /// modules.
   std::unique_ptr<clang::CompilerInstance> Instance;
 
+  struct CodeGenContext;
+  std::unique_ptr<CodeGenContext> SeparateCodeGenContext;
+  llvm::StringMap<std::string> SDKModuleFiles;
+  CodeGenContext *findSDKReferenceContext(StringRef target) const;
+  llvm::Expected<CodeGenContext *> getActiveSDKReferenceContext() const;
+  CodeGenContext *getSupplementalContext(const clang::Decl *decl) const;
+  llvm::DenseMap<const clang::Decl *, CodeGenContext *>
+      SupplementalDeclContexts;
+  llvm::Error initializeCodeGenContext(const IRGenOptions *IRGenOpts);
+  llvm::DenseMap<const clang::Decl *, const clang::Module *>
+      SupplementalDeclModules;
+
   /// Clang compiler action, which is used to actually run the
   /// parser.
   std::unique_ptr<clang::FrontendAction> Action;
@@ -584,6 +596,19 @@ private:
   llvm::StringMap<llvm::TinyPtrVector<SourceFile *>> ClangSwiftAttrSourceFiles;
 
 public:
+  const clang::Module *getSupplementalModule(const clang::Decl *decl) const;
+  bool isSupplementalDecl(const clang::Decl *decl) const {
+    return getSupplementalModule(decl) != nullptr;
+  }
+  llvm::Expected<bool> lookupSupplementalDecls(const clang::Module *module,
+                                               DeclName name);
+  llvm::Expected<bool>
+  lookupSupplementalClangDecls(const clang::DeclContext *context,
+                               StringRef name);
+  llvm::Expected<bool>
+  lookupSupplementalRecordMembers(const clang::RecordDecl *record,
+                                  DeclName name);
+
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
@@ -1149,6 +1174,9 @@ public:
   /// Clang decl.
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
+  std::optional<clang::Module *>
+  getClangSubmoduleForDecl(const clang::Decl *decl,
+                           bool allowForwardDeclaration = false) const;
 
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.

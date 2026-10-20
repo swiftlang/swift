@@ -2251,6 +2251,11 @@ def driver_no_explicit_module_build:
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Opt out of the default explicit-module-build behavior for swiftc">;
 
+def driver_experimental_clang_codegen_target_context:
+  Flag<["-"], "experimental-clang-codegen-target-context">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Build separate Clang modules for deployment-target code generation">;
+
 def incremental_dependency_scan:
   Flag<["-"], "incremental-dependency-scan">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,

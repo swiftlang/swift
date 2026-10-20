@@ -558,7 +558,8 @@ private:
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
   llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
-                                               uint32_t pathLen);
+                                               uint32_t pathLen,
+                                               StringRef clangTarget);
 
   struct AccessorRecord {
     SmallVector<serialization::DeclID, 8> IDs;
@@ -932,6 +933,8 @@ public:
   StringRef getTargetTriple() const {
     return Core->TargetTriple;
   }
+
+  StringRef getClangModuleTarget() const { return Core->ClangModuleTarget; }
 
   /// AST-verify imported decls.
   ///

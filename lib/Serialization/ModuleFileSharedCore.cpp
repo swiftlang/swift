@@ -245,6 +245,15 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       extendedInfo.setLibraryLevel(LibraryLevel(rawLevel));
       break;
     }
+    case options_block::CLANG_MODULE_TARGET:
+      extendedInfo.setClangModuleTarget(blobData);
+      break;
+    case options_block::CLANG_MODULE_REFERENCE_TARGET:
+      extendedInfo.addClangModuleReferenceTarget(blobData);
+      break;
+    case options_block::CLANG_CONTEXT_ARGUMENT:
+      extendedInfo.addClangContextArgument(blobData);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1598,6 +1607,13 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       }
       Name = info.name;
       TargetTriple = info.targetTriple;
+      ClangModuleTarget = extInfo.getClangModuleTarget();
+      auto referenceTargets = extInfo.getClangModuleReferenceTargets();
+      ClangModuleReferenceTargets.assign(referenceTargets.begin(),
+                                         referenceTargets.end());
+      auto contextArguments = extInfo.getClangContextArguments();
+      ClangContextArguments.assign(contextArguments.begin(),
+                                   contextArguments.end());
       SDKName = info.sdkName;
       CompatibilityVersion = info.compatibilityVersion;
       UserModuleVersion = info.userModuleVersion;

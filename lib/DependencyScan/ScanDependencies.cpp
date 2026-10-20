@@ -376,6 +376,34 @@ private:
     if (moduleID.Kind == ModuleDependencyKind::Clang)
       return;
 
+    if (!instance.getInvocation()
+             .getClangImporterOptions()
+             .TargetContext.empty()) {
+      // The deployment scan can use overlays and search paths unused by the
+      // SDK scan. Preserve them, and include the complete original interface
+      // invocation in the scanner-owned artifact identity. At this point that
+      // invocation has neither resolved PCM paths nor its own output path.
+      auto contextInvocation = instance.getInvocation();
+      if (auto *importer = static_cast<ClangImporter *>(
+              instance.getASTContext().getClangModuleLoader()))
+        contextInvocation.getClangImporterOptions().SDKContext =
+            importer->getSDKReferenceTarget(nullptr);
+      const auto originalCommand = resolvingDepInfo.getCommandline();
+      for (size_t i = 0; i + 1 < originalCommand.size(); ++i) {
+        if (originalCommand[i] == "-experimental-clang-target-context")
+          contextInvocation.getClangImporterOptions().TargetContext =
+              originalCommand[i + 1];
+      }
+      SwiftInterfaceModuleOutputPathResolution::ArgListTy contextArgs(
+          originalCommand.begin(), originalCommand.end());
+      auto *details = resolvingDepInfo.getAsSwiftInterfaceModule();
+      SwiftInterfaceModuleOutputPathResolution::setOutputPath(
+          outputPath, moduleID.ModuleName, details->swiftInterfaceFile,
+          instance.getASTContext().SearchPathOpts.getSDKPath(),
+          contextInvocation, contextArgs);
+      return;
+    }
+
     // Prune the command line.
     std::vector<std::string> resolvedCommandLine;
     size_t skip = 0;
@@ -779,6 +807,21 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
   }
 
   std::string mainModuleName = allModules.front().ModuleName;
+  std::string clangTargetContext;
+  std::vector<std::string> clangContextArguments;
+  if (!instance.getInvocation()
+           .getClangImporterOptions()
+           .TargetContext.empty() ||
+      !instance.getInvocation()
+           .getFrontendOptions()
+           .ClangCodeGenDependencies.empty()) {
+    if (auto *importer = static_cast<ClangImporter *>(
+            instance.getASTContext().getClangModuleLoader())) {
+      clangTargetContext = importer->getSDKReferenceTarget(nullptr);
+      clangContextArguments =
+          importer->getSDKReferenceArguments(clangTargetContext);
+    }
+  }
   swiftscan_dependency_set_t *dependencySet = new swiftscan_dependency_set_t;
   dependencySet->count = allModules.size();
   dependencySet->modules =
@@ -857,7 +900,9 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             createMacroDependencySet(swiftTextualDeps->macroDependencies),
             create_clone(swiftTextualDeps->userModuleVersion.c_str()),
             /*chained_bridging_header_path=*/create_clone(""),
-            /*chained_bridging_header_content=*/create_clone("")};
+            /*chained_bridging_header_content=*/create_clone(""),
+            /*clang_target_context=*/create_clone(""),
+            /*clang_context_arguments=*/create_empty_set()};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
@@ -895,8 +940,9 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             createMacroDependencySet(swiftSourceDeps->macroDependencies),
             /*userModuleVersion*/ create_clone(""),
             create_clone(swiftSourceDeps->chainedBridgingHeaderPath.c_str()),
-            create_clone(
-                swiftSourceDeps->chainedBridgingHeaderContent.c_str())};
+            create_clone(swiftSourceDeps->chainedBridgingHeaderContent.c_str()),
+            create_clone(clangTargetContext.c_str()),
+            create_set(clangContextArguments)};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
         details->swift_binary_details = {
@@ -912,7 +958,9 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             swiftBinaryDeps->isStatic,
             createMacroDependencySet(swiftBinaryDeps->macroDependencies),
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str()),
-            create_clone(swiftBinaryDeps->userModuleVersion.c_str())};
+            create_clone(swiftBinaryDeps->userModuleVersion.c_str()),
+            create_set(swiftBinaryDeps->clangTargetContexts),
+            create_set(swiftBinaryDeps->clangContextArguments)};
       } else {
         // Clang module details
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_CLANG;

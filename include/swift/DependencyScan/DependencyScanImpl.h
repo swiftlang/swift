@@ -155,6 +155,11 @@ typedef struct {
   /// Chained bridging header content.
   swiftscan_string_ref_t chained_bridging_header_content;
 
+  /// Native invocation identity and raw arguments for experimental context
+  /// scans.
+  swiftscan_string_ref_t clang_target_context;
+  swiftscan_string_set_t *clang_context_arguments;
+
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.
@@ -195,6 +200,8 @@ typedef struct {
 
   /// User module version
   swiftscan_string_ref_t user_module_version;
+  swiftscan_string_set_t *clang_target_contexts;
+  swiftscan_string_set_t *clang_context_arguments;
 } swiftscan_swift_binary_details_t;
 
 /// Clang modules are built from a module map file.

@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 4
+#define SWIFTSCAN_VERSION_MINOR 5
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -252,6 +252,16 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_context_hash(
     swiftscan_module_details_t details);
 
+/// Native Clang invocation identity exported by experimental context scans.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_clang_target_context(
+    swiftscan_module_details_t details);
+
+/// Clang frontend arguments, starting with -cc1, for that invocation identity.
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_textual_detail_get_clang_context_arguments(
+    swiftscan_module_details_t details);
+
 SWIFTSCAN_PUBLIC bool swiftscan_swift_textual_detail_get_is_framework(
     swiftscan_module_details_t details);
 
@@ -319,6 +329,17 @@ swiftscan_swift_binary_detail_get_module_cache_key(
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_user_module_version(
+    swiftscan_module_details_t details);
+
+/// Clang target contexts needed to resolve this binary's serialized references.
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_clang_target_contexts(
+    swiftscan_module_details_t details);
+
+/// Raw Clang arguments, each prefixed with its producer context and "=".
+/// Empty when the producing compiler did not preserve that configuration.
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_clang_context_arguments(
     swiftscan_module_details_t details);
 
 //=== Swift Placeholder Module Details query APIs - DEPRECATED -----------===//

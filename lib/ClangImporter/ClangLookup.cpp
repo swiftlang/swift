@@ -23,6 +23,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
@@ -120,15 +121,16 @@ public:
 };
 } // anonymous namespace
 
-static SmallVector<const clang::NamedDecl *, 4>
-directRecordMemberLookup(ClangImporter &Importer,
-                         const clang::RecordDecl *whereDecl, DeclName name,
-                         UnifiedStatsReporter *stats) {
+static SmallVector<const clang::NamedDecl *, 4> directRecordMemberLookup(
+    ClangImporter &Importer, const clang::RecordDecl *whereDecl, DeclName name,
+    UnifiedStatsReporter *stats, bool isSupplementalRecord) {
   SmallVector<const clang::NamedDecl *, 4> result;
 
-  // Class template instances aren't in the lookup table.
+  // Class template instances and records supplemented from the SDK AST don't
+  // have their members in the serialized lookup table.
   // Import all member names to figure out which one(s) we're looking for.
-  if (isa<clang::ClassTemplateSpecializationDecl>(whereDecl)) {
+  if (isa<clang::ClassTemplateSpecializationDecl>(whereDecl) ||
+      isSupplementalRecord) {
     // TODO: we could make this faster if we can cache class templates in the
     //       lookup table as well.
 
@@ -137,7 +139,7 @@ directRecordMemberLookup(ClangImporter &Importer,
       if (!namedDecl)
         continue;
 
-      if (stats)
+      if (stats && !isSupplementalRecord)
         ++stats->getFrontendCounters()
               .ClangRecordMemberLookupTemplateMembersScanned;
 
@@ -154,8 +156,7 @@ directRecordMemberLookup(ClangImporter &Importer,
     return result;
   }
 
-  auto *clangModule =
-      importer::getClangOwningModule(whereDecl, whereDecl->getASTContext());
+  auto *clangModule = Importer.getClangOwningModule(whereDecl);
 
   auto *lookupTable = Importer.findLookupTable(clangModule);
 
@@ -281,8 +282,9 @@ void importer::forEachCXXNamespaceMember(
 
   // If this is non-null, we will only import members from that module
   const clang::Module *owningModule = nullptr;
-  if (!includeOtherModules && namespaceDecl->getOwningModule())
-    owningModule = namespaceDecl->getOwningModule()->getTopLevelModule();
+  if (!includeOtherModules)
+    if (auto *module = clangModuleLoader->getClangOwningModule(namespaceDecl))
+      owningModule = module->getTopLevelModule();
 
   auto importSpecializations = [&](const clang::ClassTemplateDecl *tmpl) {
     if (!includeSpecializations)
@@ -306,16 +308,19 @@ void importer::forEachCXXNamespaceMember(
   llvm::stable_sort(Redecls, [&](auto *LHS, auto *RHS) {
     // Sort according to module name, if any (a namespace redeclaration will not
     // have an owning Clang module if it is declared in a bridging header).
-    if (!LHS->getOwningModule() || !RHS->getOwningModule())
-      return (bool)LHS->getOwningModule() < (bool)RHS->getOwningModule();
-    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
+    auto *lhsModule = clangModuleLoader->getClangOwningModule(LHS);
+    auto *rhsModule = clangModuleLoader->getClangOwningModule(RHS);
+    if (!lhsModule || !rhsModule)
+      return (bool)lhsModule < (bool)rhsModule;
+    return lhsModule->Name < rhsModule->Name;
   });
 
   for (auto *redecl : Redecls) {
     // Skip namespace declarations that come from other top-level modules
     // if there's such a requirement (i.e., if owningModule is non-null)
-    if (owningModule && redecl->getOwningModule() &&
-        owningModule != redecl->getOwningModule()->getTopLevelModule())
+    auto *redeclModule = clangModuleLoader->getClangOwningModule(redecl);
+    if (owningModule && redeclModule &&
+        owningModule != redeclModule->getTopLevelModule())
       continue;
 
     for (auto *member : redecl->decls()) {
@@ -357,8 +362,17 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
       cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
-  auto directResults =
-      directRecordMemberLookup(Importer, clangRecordDecl, name, ctx.Stats);
+  if (auto supplemented =
+          Importer.Impl.lookupSupplementalRecordMembers(clangRecordDecl, name);
+      !supplemented) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                       llvm::toString(supplemented.takeError()));
+    return {};
+  }
+
+  auto directResults = directRecordMemberLookup(
+      Importer, clangRecordDecl, name, ctx.Stats,
+      Importer.Impl.isSupplementalDecl(clangRecordDecl));
 
   // It's possible that there are entries in the lookup table that end up
   // getting mangled as unsafe, but were not added to the look up table as
@@ -374,8 +388,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (id.starts_with("__") && id.ends_with("Unsafe") && id != "__Unsafe") {
       auto unUnsafeId = id.drop_front(2).drop_back(6);
       DeclName unUnsafeName(ctx.getIdentifier(unUnsafeId));
-      auto moreResults = directRecordMemberLookup(Importer, clangRecordDecl,
-                                                  unUnsafeName, ctx.Stats);
+      auto moreResults = directRecordMemberLookup(
+          Importer, clangRecordDecl, unUnsafeName, ctx.Stats,
+          Importer.Impl.isSupplementalDecl(clangRecordDecl));
       directResults.append(moreResults.begin(), moreResults.end());
     }
   }

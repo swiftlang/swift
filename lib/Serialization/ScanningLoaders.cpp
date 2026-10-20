@@ -120,6 +120,11 @@ bool SwiftModuleScanner::handlePossibleTargetMismatch(
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
                                                       StringRef moduleName,
                                                       StringRef interfacePath) {
+  // Candidate binaries may contain constants folded in the SDK context. Until
+  // their context provenance is validated, rebuild the textual interface in
+  // this experimental mode. The resulting module still uses the normal cache.
+  if (!ctx.ClangImporterOpts.TargetContext.empty())
+    return {};
   return ctx.getModuleInterfaceChecker()
       ->getCompiledModuleCandidatesForInterface(moduleName.str(),
                                                 interfacePath);
@@ -381,6 +386,17 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
           ResilienceStrategy::Resilient,
       loadedModuleFile->strictMemorySafety(),
       /*module-cache-key*/ "", userModuleVer);
+
+  if (!Ctx.ClangImporterOpts.TargetContext.empty()) {
+    SmallVector<StringRef, 4> targets;
+    if (!loadedModuleFile->getClangModuleTarget().empty())
+      targets.push_back(loadedModuleFile->getClangModuleTarget());
+    for (auto target : loadedModuleFile->getClangModuleReferenceTargets())
+      if (!llvm::is_contained(targets, target))
+        targets.push_back(target);
+    dependencies.setClangContextDependencies(
+        targets, loadedModuleFile->getClangContextArguments());
+  }
 
   for (auto &macro : loadedModuleFile->getExternalMacros()) {
     auto deps =

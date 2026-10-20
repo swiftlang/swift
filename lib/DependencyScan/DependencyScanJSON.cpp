@@ -488,6 +488,14 @@ void writeJSON(llvm::raw_ostream &out,
       writeJSONSingleField(out, "contextHash", swiftTextualDeps->context_hash,
                            5,
                            /*trailingComma=*/true);
+      if (swiftTextualDeps->clang_target_context.length != 0) {
+        writeJSONSingleField(out, "clangTargetContext",
+                             swiftTextualDeps->clang_target_context, 5,
+                             /*trailingComma=*/true);
+        writeJSONSingleField(out, "clangContextArguments",
+                             swiftTextualDeps->clang_context_arguments, 5,
+                             /*trailingComma=*/true);
+      }
       bool hasBridgingHeader =
           (swiftTextualDeps->bridging_header_path.data &&
            get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0') ||
@@ -588,6 +596,14 @@ void writeJSON(llvm::raw_ostream &out,
                            swiftBinaryDeps->user_module_version,
                            /*indentLevel=*/5,
                            /*trailingComma=*/true);
+      if (swiftBinaryDeps->clang_target_contexts->count)
+        writeJSONSingleField(out, "clangTargetContexts",
+                             swiftBinaryDeps->clang_target_contexts, 5,
+                             /*trailingComma=*/true);
+      if (swiftBinaryDeps->clang_context_arguments->count)
+        writeJSONSingleField(out, "clangContextArguments",
+                             swiftBinaryDeps->clang_context_arguments, 5,
+                             /*trailingComma=*/true);
       // Module doc file
       if (swiftBinaryDeps->module_doc_path.data &&
           get_C_string(swiftBinaryDeps->module_doc_path)[0] != '\0')

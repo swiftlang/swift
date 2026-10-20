@@ -13,6 +13,7 @@
 // This file implements support for loading Clang modules into Swift.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/ClangImporter/ClangImporter.h"
 #include "CFTypeInfo.h"
 #include "ClangDerivedConformances.h"
 #include "ClangDiagnosticConsumer.h"
@@ -36,28 +37,35 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SILOptions.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/ParseVersion.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/ASTImporter.h"
+#include "clang/AST/ASTImporterSharedState.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -87,6 +95,7 @@
 #include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "clang/Options/Options.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/DelayedDiagnostic.h"
@@ -101,6 +110,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -110,6 +120,8 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Option/ArgList.h"
+#include "llvm/Option/OptTable.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Error.h"
@@ -1420,6 +1432,40 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
   // When creating from driver commands, clang expects this to be like an actual
   // command line. So we need to pass in "clang" for argv[0]
   invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
+  if (!ctx.ClangImporterOpts.ClangContextArguments.empty()) {
+    auto &savedArguments = ctx.ClangImporterOpts.ClangContextArguments;
+    bool isCC1 = savedArguments.front() == "-cc1";
+    for (size_t index = 0; index < savedArguments.size(); ++index) {
+      StringRef argument = savedArguments[index];
+      if (argument == "-target" || argument == "--target" ||
+          argument == "-triple" ||
+          argument == "-darwin-target-variant-triple") {
+        ++index;
+        continue;
+      }
+      if (argument.starts_with("-target=") || argument.starts_with("--target="))
+        continue;
+      invocationArgStrs.push_back(argument.str());
+    }
+    llvm::Triple target = ctx.LangOpts.ClangTarget && !ignoreClangTarget
+                              ? *ctx.LangOpts.ClangTarget
+                              : ctx.LangOpts.Target;
+    if (auto canonical = getCanonicalTriple(target))
+      target = *canonical;
+    llvm::append_values(invocationArgStrs, isCC1 ? "-triple" : "-target",
+                        target.str());
+    auto variant = ctx.LangOpts.ClangTargetVariant && !ignoreClangTarget
+                       ? ctx.LangOpts.ClangTargetVariant
+                       : ctx.LangOpts.TargetVariant;
+    if (variant) {
+      if (auto canonical = getCanonicalTriple(*variant))
+        variant = *canonical;
+      llvm::append_values(invocationArgStrs, "-darwin-target-variant-triple",
+                          variant->str());
+    }
+    invocationArgStrs.push_back(Implementation::moduleImportBufferName.str());
+    return invocationArgStrs;
+  }
   switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:
@@ -1435,6 +1481,11 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
       /*needSystemVFSOverlay=*/!clangFileMapping.redirectedFiles.empty() &&
           !ctx.CASOpts.HasImmutableFileSystem,
       ignoreClangTarget);
+  // Producer contexts must distinguish header search paths and VFS overlays.
+  if (!ctx.ClangImporterOpts.TargetContext.empty() ||
+      !ctx.ClangImporterOpts.CodeGenModuleFiles.empty())
+    llvm::append_values(invocationArgStrs, "-Xclang",
+                        "-fmodules-strict-context-hash");
   if (ctx.LangOpts.Target.isWindowsMSVCEnvironment()) {
     auto iterator = llvm::find_if(clangFileMapping.redirectedFiles,
                                   [](const auto &mapping) {
@@ -1471,7 +1522,51 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 
   // If using direct cc1 module build, use extra args to setup ClangImporter.
   // This is code path is not applicable for invocation for codegen.
-  if (!forCodeGen && ctx.ClangImporterOpts.DirectClangCC1ModuleBuild) {
+  const auto &savedArguments = ctx.ClangImporterOpts.ClangContextArguments;
+  if (!savedArguments.empty() && savedArguments.front() == "-cc1") {
+    auto arguments = getClangDriverArguments(ctx, forCodeGen);
+    SmallVector<const char *> clangArgs;
+    for (const auto &argument : ArrayRef<std::string>(arguments).drop_front(2))
+      clangArgs.push_back(argument.c_str());
+    CI = std::make_unique<clang::CompilerInvocation>();
+    if (!clang::CompilerInvocation::CreateFromArgs(*CI, clangArgs, *clangDiags))
+      return nullptr;
+    // getCC1CommandLine writes the numeric level before the size mode. Parsing
+    // a later -Os or -Oz resets the level to 2, losing Swift's (3, size)
+    // policy. These are generated snapshots, so restore their one explicit
+    // numeric level while retaining the independently parsed OptimizeSize.
+    unsigned missingIndex, missingCount;
+    auto parsed = clang::getDriverOptTable().ParseArgs(
+        clangArgs, missingIndex, missingCount,
+        llvm::opt::Visibility(clang::options::CC1Option));
+    std::optional<unsigned> optimizationLevel;
+    for (const auto *argument :
+         parsed.filtered(clang::options::OPT_O, clang::options::OPT_O0)) {
+      unsigned level = 0;
+      if (argument->getOption().matches(clang::options::OPT_O)) {
+        StringRef value = argument->getValue();
+        if (value == "s" || value == "z")
+          continue;
+        if (value.getAsInteger(10, level) || level > 3)
+          continue;
+      }
+      if (optimizationLevel) {
+        ctx.Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                           "Clang context snapshot has multiple numeric "
+                           "optimization levels");
+        return nullptr;
+      }
+      optimizationLevel = level;
+    }
+    if (!optimizationLevel) {
+      ctx.Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                         "Clang context snapshot has no numeric "
+                         "optimization level");
+      return nullptr;
+    }
+    CI->getCodeGenOpts().OptimizationLevel = *optimizationLevel;
+    CI->getCodeGenOpts().Argv0 = ctx.ClangImporterOpts.clangPath.c_str();
+  } else if (!forCodeGen && ctx.ClangImporterOpts.DirectClangCC1ModuleBuild) {
     llvm::SmallVector<const char *> clangArgs;
     clangArgs.reserve(ctx.ClangImporterOpts.ExtraArgs.size());
     llvm::for_each(
@@ -1594,6 +1689,1278 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
+namespace {
+
+static bool sameClangTarget(StringRef spelling, const llvm::Triple &target) {
+  llvm::Triple other(llvm::Triple::normalize(spelling));
+  return other.getArch() == target.getArch() &&
+         other.getSubArch() == target.getSubArch() &&
+         other.getVendor() == target.getVendor() &&
+         other.getOS() == target.getOS() &&
+         other.getEnvironment() == target.getEnvironment() &&
+         other.getObjectFormat() == target.getObjectFormat() &&
+         other.getOSVersion() == target.getOSVersion();
+}
+
+static std::string getClangContextTarget(clang::CompilerInstance &instance) {
+  const auto &target = instance.getTarget();
+  return target.getTriple().str() + "|" +
+         target.getTargetOpts().DarwinTargetVariantTriple + "|" +
+         instance.getInvocation().computeContextHash(instance.getDiagnostics());
+}
+
+static bool sameClangContextTarget(StringRef spelling,
+                                   clang::CompilerInstance &instance) {
+  auto primaryAndRest = spelling.split('|');
+  auto variantAndHash = primaryAndRest.second.split('|');
+  if (variantAndHash.second.empty() || variantAndHash.second.contains('|'))
+    return false;
+  const auto &target = instance.getTarget();
+  if (!sameClangTarget(primaryAndRest.first, target.getTriple()) ||
+      variantAndHash.second != instance.getInvocation().computeContextHash(
+                                   instance.getDiagnostics()))
+    return false;
+  const auto &variant = target.getTargetOpts().DarwinTargetVariantTriple;
+  if (variantAndHash.first.empty() || variant.empty())
+    return variantAndHash.first.empty() && variant.empty();
+  return sameClangTarget(variantAndHash.first, llvm::Triple(variant));
+}
+
+static clang::Module *getSupplementalSourceModule(const clang::Decl *decl) {
+  // Parameters and other local declarations inherit their containing API's
+  // module. The ordinary Swift ownership helper expects a non-local decl.
+  while (decl) {
+    if (auto *module = decl->getOwningModule())
+      return module;
+    auto *parent = decl->getDeclContext();
+    if (!parent || parent->isTranslationUnit())
+      return nullptr;
+    decl = clang::Decl::castFromDeclContext(parent);
+  }
+  return nullptr;
+}
+
+static clang::DeclContext *
+findCorrespondingClangContext(const clang::DeclContext *source,
+                              clang::ASTContext &target) {
+  source = source->getRedeclContext();
+  if (source->isTranslationUnit())
+    return target.getTranslationUnitDecl();
+  auto *named =
+      dyn_cast<clang::NamedDecl>(clang::Decl::castFromDeclContext(source));
+  if (!named || !named->getIdentifier())
+    return nullptr;
+  auto *parent = findCorrespondingClangContext(source->getParent(), target);
+  if (!parent)
+    return nullptr;
+  clang::DeclContext *result = nullptr;
+  for (auto *candidate : parent->lookup(&target.Idents.get(named->getName()))) {
+    if (candidate->getKind() != named->getKind())
+      continue;
+    auto *context = dyn_cast<clang::DeclContext>(candidate);
+    if (!context)
+      continue;
+    context = context->getPrimaryContext();
+    if (result && result != context)
+      return nullptr;
+    result = context;
+  }
+  return result;
+}
+
+/// Merge SDK declarations into an AST built for the deployment target. A
+/// specialization must be instantiated from the deployment-target template
+/// before ASTImporter sees it, or ASTImporter can copy the SDK definition.
+class CodeGenASTImporter final : public clang::ASTImporter {
+  clang::Sema &FromSema;
+  clang::Sema &ToSema;
+  std::shared_ptr<clang::ASTImporterSharedState> State;
+  std::string FailureReason;
+  llvm::DenseSet<
+      std::pair<const clang::RecordDecl *, const clang::RecordDecl *>>
+      CheckingRecords;
+  llvm::SmallPtrSet<const clang::NamedDecl *, 16> PreparingDeclarations;
+  std::function<llvm::Error(const clang::Decl *)> Validate;
+  std::function<void(clang::Decl *, clang::Decl *)> Register;
+  std::function<const clang::Module *(const clang::Decl *)> ModuleForDecl;
+
+  llvm::Error reject(StringRef reason) {
+    if (FailureReason.empty())
+      FailureReason = reason.str();
+    return llvm::make_error<clang::ASTImportError>(
+        clang::ASTImportError::UnsupportedConstruct);
+  }
+
+  llvm::Expected<clang::TemplateArgument>
+  importTemplateArgument(const clang::TemplateArgument &argument) {
+    switch (argument.getKind()) {
+    case clang::TemplateArgument::Type: {
+      auto type = Import(argument.getAsType());
+      if (!type)
+        return type.takeError();
+      return clang::TemplateArgument(*type);
+    }
+    case clang::TemplateArgument::Integral: {
+      auto type = Import(argument.getIntegralType());
+      if (!type)
+        return type.takeError();
+      return clang::TemplateArgument(getToContext(), argument.getAsIntegral(),
+                                     *type);
+    }
+    case clang::TemplateArgument::Pack: {
+      SmallVector<clang::TemplateArgument, 4> elements;
+      for (const auto &element : argument.pack_elements()) {
+        auto imported = importTemplateArgument(element);
+        if (!imported)
+          return imported.takeError();
+        elements.push_back(*imported);
+      }
+      return clang::TemplateArgument::CreatePackCopy(getToContext(), elements);
+    }
+    default:
+      return reject("unsupported template argument in deployment-target code "
+                    "generation");
+    }
+  }
+
+  llvm::Error checkEnum(clang::EnumDecl *from, clang::EnumDecl *to) {
+    if (auto *definition = from->getDefinition())
+      from = definition;
+    if (auto *definition = to->getDefinition())
+      to = definition;
+    if (from->isCompleteDefinition() != to->isCompleteDefinition() ||
+        from->isScoped() != to->isScoped() || from->isFixed() != to->isFixed())
+      return reject("enum ABI differs between SDK and deployment targets");
+    if (auto error = checkABIType(from->getIntegerType(), to->getIntegerType()))
+      return error;
+    if (!from->isCompleteDefinition())
+      return llvm::Error::success();
+    auto other = to->enumerator_begin();
+    for (auto *element : from->enumerators()) {
+      if (other == to->enumerator_end() ||
+          element->getName() != (*other)->getName() ||
+          element->getInitVal() != (*other)->getInitVal())
+        return reject("enum values differ between SDK and deployment targets");
+      ++other;
+    }
+    if (other != to->enumerator_end())
+      return reject("enum values differ between SDK and deployment targets");
+    return llvm::Error::success();
+  }
+
+  llvm::Error checkABIType(clang::QualType from, clang::QualType to) {
+    if (from.isNull() || to.isNull()) {
+      if (from.isNull() && to.isNull())
+        return llvm::Error::success();
+      return reject(
+          "type completeness differs between SDK and deployment targets");
+    }
+    if (!IsStructurallyEquivalent(from, to))
+      return reject("type differs between SDK and deployment targets");
+    if (from->isDependentType())
+      return llvm::Error::success();
+    if (auto *record = from->getAs<clang::RecordType>())
+      return checkRecord(record->getDecl(),
+                         to->getAs<clang::RecordType>()->getDecl());
+    if (auto *enumeration = from->getAs<clang::EnumType>())
+      return checkEnum(enumeration->getDecl(),
+                       to->getAs<clang::EnumType>()->getDecl());
+    if (from->isPointerType() || from->isReferenceType())
+      return checkABIType(from->getPointeeType(), to->getPointeeType());
+    if (auto *array = getFromContext().getAsArrayType(from))
+      return checkABIType(array->getElementType(),
+                          getToContext().getAsArrayType(to)->getElementType());
+    if (auto *function = from->getAs<clang::FunctionProtoType>()) {
+      auto *other = to->getAs<clang::FunctionProtoType>();
+      if (auto error =
+              checkABIType(function->getReturnType(), other->getReturnType()))
+        return error;
+      for (unsigned i = 0; i != function->getNumParams(); ++i)
+        if (auto error =
+                checkABIType(function->getParamType(i), other->getParamType(i)))
+          return error;
+    }
+    return llvm::Error::success();
+  }
+
+  llvm::Error checkFunction(clang::FunctionDecl *from,
+                            clang::FunctionDecl *to) {
+    if (from->isInvalidDecl() || to->isInvalidDecl())
+      return reject("invalid function in deployment-target code generation");
+    if (auto error = checkABIType(from->getType(), to->getType()))
+      return error;
+    if (from->isDeleted() != to->isDeleted() ||
+        from->isDefaulted() != to->isDefaulted() ||
+        from->isTrivialForCall() != to->isTrivialForCall())
+      return reject("function definition differs between SDK and deployment "
+                    "targets");
+    if (from->getNumParams() != to->getNumParams())
+      return reject("function parameters differ between SDK and deployment "
+                    "targets");
+    for (unsigned i = 0; i != from->getNumParams(); ++i) {
+      auto *fromParameter = from->getParamDecl(i);
+      auto *toParameter = to->getParamDecl(i);
+      if (auto *mapped = GetAlreadyImportedOrNull(fromParameter))
+        if (mapped != toParameter)
+          return reject("conflicting deployment-target function parameter");
+      MapImported(fromParameter, toParameter);
+    }
+    if (from->isDependentContext() || to->isDependentContext())
+      return llvm::Error::success();
+
+    auto *fromType = from->getType()->getAs<clang::FunctionProtoType>();
+    auto *toType = to->getType()->getAs<clang::FunctionProtoType>();
+    if (!fromType || !toType)
+      return llvm::Error::success();
+    fromType = FromSema.ResolveExceptionSpec(from->getLocation(), fromType);
+    toType = ToSema.ResolveExceptionSpec(to->getLocation(), toType);
+    if (!fromType || !toType || fromType->canThrow() != toType->canThrow() ||
+        fromType->getCallConv() != toType->getCallConv())
+      return reject("function ABI differs between SDK and deployment targets");
+    return llvm::Error::success();
+  }
+
+  llvm::Error checkRecord(clang::RecordDecl *from, clang::RecordDecl *to) {
+    if (auto *definition = from->getDefinition())
+      from = definition;
+    if (auto *definition = to->getDefinition())
+      to = definition;
+    if (from->isDependentContext() || to->isDependentContext())
+      return llvm::Error::success();
+    if (from->isCompleteDefinition() != to->isCompleteDefinition())
+      return reject(
+          "record completeness differs between SDK and deployment targets");
+    if (!from->isCompleteDefinition())
+      return llvm::Error::success();
+    auto pair = std::make_pair(from, to);
+    if (!CheckingRecords.insert(pair).second)
+      return llvm::Error::success();
+    auto finished = llvm::scope_exit([&] { CheckingRecords.erase(pair); });
+    if (from->isInvalidDecl() || to->isInvalidDecl())
+      return reject("invalid record in deployment-target code generation");
+    if (!IsStructurallyEquivalent(getFromContext().getCanonicalTagType(from),
+                                  getToContext().getCanonicalTagType(to)))
+      return reject("record definition differs between SDK and deployment "
+                    "targets");
+    const auto &fromLayout = getFromContext().getASTRecordLayout(from);
+    const auto &toLayout = getToContext().getASTRecordLayout(to);
+    if (fromLayout.getSize() != toLayout.getSize() ||
+        fromLayout.getAlignment() != toLayout.getAlignment() ||
+        fromLayout.getFieldCount() != toLayout.getFieldCount())
+      return reject("record layout differs between SDK and deployment targets");
+    if (from->getArgPassingRestrictions() != to->getArgPassingRestrictions())
+      return reject(
+          "record argument ABI differs between SDK and deployment targets");
+    for (unsigned i = 0; i != fromLayout.getFieldCount(); ++i)
+      if (fromLayout.getFieldOffset(i) != toLayout.getFieldOffset(i))
+        return reject("record field layout differs between SDK and deployment "
+                      "targets");
+    auto targetField = to->field_begin();
+    for (auto *field : from->fields()) {
+      if (auto error =
+              checkABIType(field->getType(), (*targetField)->getType()))
+        return error;
+      ++targetField;
+    }
+    if (auto *fromCXX = dyn_cast<clang::CXXRecordDecl>(from)) {
+      auto *toCXX = dyn_cast<clang::CXXRecordDecl>(to);
+      if (!toCXX ||
+          fromCXX->hasTrivialCopyConstructor() !=
+              toCXX->hasTrivialCopyConstructor() ||
+          fromCXX->hasTrivialMoveConstructor() !=
+              toCXX->hasTrivialMoveConstructor() ||
+          fromCXX->hasTrivialDestructor() != toCXX->hasTrivialDestructor() ||
+          fromCXX->hasTrivialCopyConstructorForCall() !=
+              toCXX->hasTrivialCopyConstructorForCall() ||
+          fromCXX->hasTrivialMoveConstructorForCall() !=
+              toCXX->hasTrivialMoveConstructorForCall() ||
+          fromCXX->hasTrivialDestructorForCall() !=
+              toCXX->hasTrivialDestructorForCall() ||
+          fromCXX->isPolymorphic() != toCXX->isPolymorphic() ||
+          fromCXX->hasAttr<clang::FinalAttr>() !=
+              toCXX->hasAttr<clang::FinalAttr>() ||
+          fromLayout.getNonVirtualSize() != toLayout.getNonVirtualSize() ||
+          fromLayout.getNonVirtualAlignment() !=
+              toLayout.getNonVirtualAlignment())
+        return reject("C++ record ABI differs between SDK and deployment "
+                      "targets");
+
+      if (fromCXX->getNumBases() != toCXX->getNumBases())
+        return reject("C++ base classes differ between SDK and deployment "
+                      "targets");
+      auto targetBase = toCXX->bases_begin();
+      for (const auto &base : fromCXX->bases()) {
+        if (base.isVirtual() != targetBase->isVirtual() ||
+            base.getAccessSpecifier() != targetBase->getAccessSpecifier())
+          return reject("C++ base classes differ between SDK and deployment "
+                        "targets");
+        if (auto error = checkABIType(base.getType(), targetBase->getType()))
+          return error;
+        auto *fromBase = base.getType()->getAsCXXRecordDecl();
+        auto *toBase = targetBase->getType()->getAsCXXRecordDecl();
+        auto fromOffset = base.isVirtual()
+                              ? fromLayout.getVBaseClassOffset(fromBase)
+                              : fromLayout.getBaseClassOffset(fromBase);
+        auto toOffset = targetBase->isVirtual()
+                            ? toLayout.getVBaseClassOffset(toBase)
+                            : toLayout.getBaseClassOffset(toBase);
+        if (fromOffset != toOffset)
+          return reject("C++ base layout differs between SDK and deployment "
+                        "targets");
+        ++targetBase;
+      }
+
+      // Record size and alignment do not describe the virtual dispatch ABI.
+      // Require the same ordered virtual declarations in each base and record.
+      SmallVector<clang::CXXMethodDecl *, 8> fromVirtualMethods,
+          toVirtualMethods;
+      for (auto *method : fromCXX->methods())
+        if (method->isVirtual())
+          fromVirtualMethods.push_back(method);
+      for (auto *method : toCXX->methods())
+        if (method->isVirtual())
+          toVirtualMethods.push_back(method);
+      if (fromVirtualMethods.size() != toVirtualMethods.size())
+        return reject("C++ virtual methods differ between SDK and deployment "
+                      "targets");
+      for (unsigned i = 0; i != fromVirtualMethods.size(); ++i) {
+        auto *fromMethod = fromVirtualMethods[i];
+        auto *toMethod = toVirtualMethods[i];
+        if (fromMethod->getDeclName().getNameKind() !=
+                toMethod->getDeclName().getNameKind() ||
+            fromMethod->getNameAsString() != toMethod->getNameAsString() ||
+            fromMethod->getMethodQualifiers() !=
+                toMethod->getMethodQualifiers() ||
+            fromMethod->getRefQualifier() != toMethod->getRefQualifier() ||
+            fromMethod->isPureVirtual() != toMethod->isPureVirtual() ||
+            fromMethod->hasAttr<clang::FinalAttr>() !=
+                toMethod->hasAttr<clang::FinalAttr>() ||
+            fromMethod->size_overridden_methods() !=
+                toMethod->size_overridden_methods())
+          return reject("C++ virtual methods differ between SDK and deployment "
+                        "targets");
+        if (auto error = checkFunction(fromMethod, toMethod))
+          return error;
+      }
+    }
+    return llvm::Error::success();
+  }
+
+protected:
+  llvm::Expected<clang::Decl *> ImportImpl(clang::Decl *from) override {
+    if (Validate) {
+      // Existing deployment declarations must not receive SDK attributes,
+      // initializers, or bodies through ASTImporter's merge path.
+      if (auto *named = dyn_cast<clang::NamedDecl>(from))
+        if (auto *existing = findExistingDeclaration(named))
+          if (!State->isNewDecl(existing))
+            return reject(
+                "supplemental SDK declaration depends on an existing "
+                "deployment declaration that requires explicit mapping");
+    }
+    if (Validate)
+      if (auto error = Validate(from)) {
+        FailureReason = llvm::toString(std::move(error));
+        return reject(FailureReason);
+      }
+    if (auto *record = dyn_cast<clang::ClassTemplateSpecializationDecl>(from)) {
+      if (!isa<clang::ClassTemplatePartialSpecializationDecl>(record) &&
+          !record->isExplicitSpecialization()) {
+        auto importedTemplate = Import(record->getSpecializedTemplate());
+        if (!importedTemplate)
+          return importedTemplate.takeError();
+        auto *pattern = cast<clang::ClassTemplateDecl>(*importedTemplate);
+        if (State->isNewDecl(pattern) ||
+            State->isNewDecl(pattern->getTemplatedDecl()))
+          return reject("no deployment-target class template definition");
+        auto location = pattern->getLocation();
+        clang::TemplateArgumentListInfo arguments(location, location);
+        for (const auto &argument : record->getTemplateArgs().asArray()) {
+          auto imported = importTemplateArgument(argument);
+          if (!imported)
+            return imported.takeError();
+          arguments.addArgument(ToSema.getTrivialTemplateArgumentLoc(
+              *imported, clang::QualType(), location));
+        }
+        auto type = ToSema.CheckTemplateIdType(
+            clang::ElaboratedTypeKeyword::None, clang::TemplateName(pattern),
+            location, arguments, nullptr, false);
+        if (type.isNull())
+          return reject("cannot form deployment-target class specialization");
+        auto *specialization =
+            dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                type->getAsCXXRecordDecl());
+        if (!specialization)
+          return reject("unexpected deployment-target class specialization");
+        if (record->isCompleteDefinition() &&
+            !specialization->isCompleteDefinition() &&
+            ToSema.InstantiateClassTemplateSpecialization(
+                location, specialization, clang::TSK_ImplicitInstantiation,
+                /*Complain=*/true, /*PrimaryStrictPackMatch=*/false))
+          return reject("cannot instantiate deployment-target class");
+        if (auto error = checkRecord(record, specialization))
+          return std::move(error);
+        return MapImported(from, specialization);
+      }
+    }
+
+    auto *function = dyn_cast<clang::FunctionDecl>(from);
+    if (function && function->getPrimaryTemplate() &&
+        function->getTemplateSpecializationKind() !=
+            clang::TSK_ExplicitSpecialization) {
+      auto importedTemplate = Import(function->getPrimaryTemplate());
+      if (!importedTemplate)
+        return importedTemplate.takeError();
+      auto *pattern = cast<clang::FunctionTemplateDecl>(*importedTemplate);
+      if (State->isNewDecl(pattern) ||
+          State->isNewDecl(pattern->getTemplatedDecl()))
+        return reject("no deployment-target function template definition");
+
+      SmallVector<clang::TemplateArgument, 4> arguments;
+      for (const auto &argument :
+           function->getTemplateSpecializationArgs()->asArray()) {
+        auto imported = importTemplateArgument(argument);
+        if (!imported)
+          return imported.takeError();
+        arguments.push_back(*imported);
+      }
+      auto *list =
+          clang::TemplateArgumentList::CreateCopy(getToContext(), arguments);
+      auto *specialization = ToSema.InstantiateFunctionDeclaration(
+          pattern, list, pattern->getLocation());
+      if (!specialization || specialization->isInvalidDecl())
+        return reject("cannot instantiate deployment-target function template");
+      if (function->hasBody()) {
+        ToSema.InstantiateFunctionDefinition(specialization->getLocation(),
+                                             specialization, true, true, true);
+        if (!specialization->hasBody() || specialization->isInvalidDecl())
+          return reject("cannot instantiate deployment-target function body");
+      }
+      if (auto error = checkFunction(function, specialization))
+        return std::move(error);
+      return MapImported(from, specialization);
+    }
+
+    if (function && function->getInstantiatedFromMemberFunction() &&
+        function->getTemplateSpecializationKind() !=
+            clang::TSK_ExplicitSpecialization) {
+      auto *record = dyn_cast<clang::CXXRecordDecl>(function->getDeclContext());
+      if (!record)
+        return reject("unsupported deployment-target member specialization");
+      auto importedRecord = Import(record);
+      if (!importedRecord)
+        return importedRecord.takeError();
+      auto importedPattern =
+          Import(function->getInstantiatedFromMemberFunction());
+      if (!importedPattern)
+        return importedPattern.takeError();
+      auto *pattern = cast<clang::FunctionDecl>(*importedPattern);
+      for (auto *method :
+           cast<clang::CXXRecordDecl>(*importedRecord)->methods()) {
+        auto *methodPattern = method->getInstantiatedFromMemberFunction();
+        if (!methodPattern ||
+            methodPattern->getCanonicalDecl() != pattern->getCanonicalDecl())
+          continue;
+        if (function->hasBody() && !method->hasBody())
+          ToSema.InstantiateFunctionDefinition(method->getLocation(), method,
+                                               true, true, true);
+        if (function->hasBody() && !method->hasBody())
+          return reject("cannot instantiate deployment-target member body");
+        if (auto error = checkFunction(function, method))
+          return std::move(error);
+        return MapImported(from, method);
+      }
+      return reject("no deployment-target member specialization");
+    }
+
+    auto imported = clang::ASTImporter::ImportImpl(from);
+    if (!imported)
+      return imported.takeError();
+    if (State->isNewDecl(*imported) &&
+        (isa<clang::ClassTemplateSpecializationDecl>(from) ||
+         isa<clang::VarTemplateSpecializationDecl>(from)))
+      return reject("no deployment-target definition for a class or variable "
+                    "template specialization");
+    if (function) {
+      auto *to = cast<clang::FunctionDecl>(*imported);
+      if (function->isFromASTFile() && function->hasBody() &&
+          State->isNewDecl(to))
+        return reject("no deployment-target definition for an SDK function");
+      if (auto error = checkFunction(function, to))
+        return std::move(error);
+    } else if (auto *record = dyn_cast<clang::RecordDecl>(from)) {
+      if (auto error = checkRecord(record, cast<clang::RecordDecl>(*imported)))
+        return std::move(error);
+    }
+    return imported;
+  }
+
+public:
+  clang::NamedDecl *findExistingDeclaration(clang::NamedDecl *source) {
+    if (!source->getIdentifier())
+      return nullptr;
+    auto *target =
+        findCorrespondingClangContext(source->getDeclContext(), getToContext());
+    if (!target)
+      return nullptr;
+    for (auto *candidate :
+         target->lookup(&getToContext().Idents.get(source->getName()))) {
+      if (candidate->getKind() != source->getKind())
+        continue;
+      auto *sourceModule = ModuleForDecl ? ModuleForDecl(source)
+                                         : getSupplementalSourceModule(source);
+      auto *targetModule = ModuleForDecl
+                               ? ModuleForDecl(candidate)
+                               : getSupplementalSourceModule(candidate);
+      if ((sourceModule == nullptr) != (targetModule == nullptr) ||
+          (sourceModule && sourceModule->getFullModuleName() !=
+                               targetModule->getFullModuleName()))
+        continue;
+      if (auto *function = dyn_cast<clang::FunctionDecl>(source)) {
+        auto *other = cast<clang::FunctionDecl>(candidate);
+        if (auto *method = dyn_cast<clang::CXXMethodDecl>(function)) {
+          auto *otherMethod = cast<clang::CXXMethodDecl>(other);
+          if (method->isStatic() != otherMethod->isStatic() ||
+              method->getMethodQualifiers() !=
+                  otherMethod->getMethodQualifiers() ||
+              method->getRefQualifier() != otherMethod->getRefQualifier() ||
+              method->isImplicitObjectMemberFunction() !=
+                  otherMethod->isImplicitObjectMemberFunction())
+            continue;
+        }
+        if (function->getNumParams() != other->getNumParams())
+          continue;
+        bool matches = true;
+        for (unsigned i = 0; i != function->getNumParams(); ++i)
+          if (!IsStructurallyEquivalent(function->getParamDecl(i)->getType(),
+                                        other->getParamDecl(i)->getType())) {
+            matches = false;
+            break;
+          }
+        if (!matches)
+          continue;
+      }
+      return candidate;
+    }
+    return nullptr;
+  }
+
+  llvm::Error validateReference(clang::NamedDecl *source,
+                                clang::NamedDecl *target) {
+    clearFailureReason();
+    auto validate = [&]() -> llvm::Error {
+      if (auto *record = dyn_cast<clang::RecordDecl>(source)) {
+        if (auto *definition = record->getDefinition())
+          record = definition;
+        auto *other = cast<clang::RecordDecl>(target);
+        if (auto *definition = other->getDefinition())
+          other = definition;
+        return checkRecord(record, other);
+      }
+      if (auto *function = dyn_cast<clang::FunctionDecl>(source))
+        return checkFunction(function, cast<clang::FunctionDecl>(target));
+      if (auto *enumeration = dyn_cast<clang::EnumDecl>(source))
+        return checkEnum(enumeration, cast<clang::EnumDecl>(target));
+      if (auto *element = dyn_cast<clang::EnumConstantDecl>(source)) {
+        if (element->getInitVal() !=
+            cast<clang::EnumConstantDecl>(target)->getInitVal())
+          return reject(
+              "enum value differs between SDK and deployment targets");
+      }
+      if (auto *type = dyn_cast<clang::TypedefNameDecl>(source))
+        return checkABIType(
+            type->getUnderlyingType(),
+            cast<clang::TypedefNameDecl>(target)->getUnderlyingType());
+      if (auto *value = dyn_cast<clang::VarDecl>(source)) {
+        auto *other = cast<clang::VarDecl>(target);
+        if (auto error = checkABIType(value->getType(), other->getType()))
+          return error;
+        if (getFromContext().getDeclAlign(value) !=
+            getToContext().getDeclAlign(other))
+          return reject(
+              "variable alignment differs between SDK and deployment targets");
+        if (value->isConstexpr() != other->isConstexpr())
+          return reject(
+              "variable definition differs between SDK and deployment targets");
+        if (value->isConstexpr()) {
+          auto *fromValue = value->evaluateValue();
+          auto *toValue = other->evaluateValue();
+          if (!fromValue || !toValue || !fromValue->isInt() ||
+              !toValue->isInt())
+            return reject("unsupported SDK constexpr variable reference");
+          if (fromValue->getInt() != toValue->getInt())
+            return reject(
+                "constexpr value differs between SDK and deployment targets");
+        }
+      }
+      return llvm::Error::success();
+    };
+    if (auto error = validate())
+      return describeError(std::move(error));
+    return llvm::Error::success();
+  }
+
+  llvm::Error prepareType(clang::QualType type) {
+    if (type.isNull())
+      return llvm::Error::success();
+    if (auto *alias = dyn_cast<clang::TypedefType>(type.getTypePtr()))
+      return prepareDeclaration(alias->getDecl());
+    if (type->isBuiltinType())
+      return llvm::Error::success();
+    if (auto *record = type->getAs<clang::RecordType>())
+      return prepareDeclaration(record->getDecl());
+    if (auto *enumeration = type->getAs<clang::EnumType>())
+      return prepareDeclaration(enumeration->getDecl());
+    if (type->isPointerType() || type->isReferenceType())
+      return prepareType(type->getPointeeType());
+    if (auto *array = getFromContext().getAsArrayType(type))
+      return prepareType(array->getElementType());
+    if (auto *function = type->getAs<clang::FunctionProtoType>()) {
+      if (auto error = prepareType(function->getReturnType()))
+        return error;
+      for (auto parameter : function->param_types())
+        if (auto error = prepareType(parameter))
+          return error;
+      return llvm::Error::success();
+    }
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "unsupported type in a supplemental SDK declaration");
+  }
+
+  llvm::Error prepareDeclaration(clang::NamedDecl *source) {
+    if (GetAlreadyImportedOrNull(source) ||
+        !PreparingDeclarations.insert(source).second)
+      return llvm::Error::success();
+    auto finished =
+        llvm::scope_exit([&] { PreparingDeclarations.erase(source); });
+    if (auto *target = findExistingDeclaration(source)) {
+      if (auto error = validateReference(source, target))
+        return error;
+      // Register before Import, whose already-mapped path leaves deployment
+      // attributes, initializers, and executable definitions unchanged.
+      for (auto *redecl : source->redecls()) {
+        auto *mapped = redecl == source->getCanonicalDecl()
+                           ? target->getCanonicalDecl()
+                           : target;
+        if (!GetAlreadyImportedOrNull(redecl))
+          MapImported(redecl, mapped);
+      }
+      return llvm::Error::success();
+    }
+
+    for (auto *parent = source->getDeclContext();
+         parent && !parent->isTranslationUnit(); parent = parent->getParent()) {
+      auto *nameSpace = dyn_cast<clang::NamespaceDecl>(
+          clang::Decl::castFromDeclContext(parent));
+      if (!nameSpace)
+        continue;
+      auto *target = findCorrespondingClangContext(parent, getToContext());
+      if (!target)
+        return llvm::createStringError(
+            llvm::inconvertibleErrorCode(),
+            "cannot supplement an SDK declaration in a missing namespace");
+      auto *targetDecl = clang::Decl::castFromDeclContext(target);
+      for (auto *redecl : nameSpace->redecls())
+        if (!GetAlreadyImportedOrNull(redecl))
+          MapImported(redecl, targetDecl);
+    }
+    if (auto *record = dyn_cast<clang::RecordDecl>(source)) {
+      if (auto *definition = record->getDefinition())
+        record = definition;
+      if (!record->isCompleteDefinition())
+        return llvm::Error::success();
+      for (auto *field : record->fields())
+        if (auto error = prepareType(field->getType()))
+          return error;
+      if (auto *cxxRecord = dyn_cast<clang::CXXRecordDecl>(record))
+        for (const auto &base : cxxRecord->bases())
+          if (auto error = prepareType(base.getType()))
+            return error;
+    } else if (auto *alias = dyn_cast<clang::TypedefNameDecl>(source)) {
+      return prepareType(alias->getUnderlyingType());
+    } else if (auto *function = dyn_cast<clang::FunctionDecl>(source)) {
+      return prepareType(function->getType());
+    }
+    return llvm::Error::success();
+  }
+
+  void Imported(clang::Decl *from, clang::Decl *to) override {
+    if (Register && State->isNewDecl(to))
+      Register(from, to);
+  }
+
+  CodeGenASTImporter(clang::CompilerInstance &from, clang::CompilerInstance &to,
+                     std::shared_ptr<clang::ASTImporterSharedState> state)
+      : clang::ASTImporter(to.getASTContext(), to.getFileManager(),
+                           from.getASTContext(), from.getFileManager(),
+                           /*MinimalImport=*/false, state),
+        FromSema(from.getSema()), ToSema(to.getSema()),
+        State(std::move(state)) {
+    setODRHandling(ODRHandlingType::Conservative);
+  }
+
+  void clearFailureReason() { FailureReason.clear(); }
+
+  void setSupplementalCallbacks(
+      std::function<llvm::Error(const clang::Decl *)> validate,
+      std::function<void(clang::Decl *, clang::Decl *)> registerDecl,
+      std::function<const clang::Module *(const clang::Decl *)> moduleForDecl) {
+    Validate = std::move(validate);
+    Register = std::move(registerDecl);
+    ModuleForDecl = std::move(moduleForDecl);
+  }
+
+  llvm::Error describeError(llvm::Error error) const {
+    std::string message = "cannot map Clang AST for deployment-target code "
+                          "generation: ";
+    if (FailureReason.empty()) {
+      message += llvm::toString(std::move(error));
+    } else {
+      message += FailureReason;
+      llvm::consumeError(std::move(error));
+    }
+    return llvm::createStringError(llvm::inconvertibleErrorCode(), message);
+  }
+};
+
+} // namespace
+
+struct ClangImporter::Implementation::CodeGenContext {
+  LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
+  SILOptions SILOpts;
+  SearchPathOptions SearchPathOpts;
+  ClangImporterOptions ImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
+  std::unique_ptr<ASTContext> SwiftContext;
+  ClangImporter *Importer = nullptr;
+  std::unique_ptr<CodeGenASTImporter> Mapper;
+  llvm::StringMap<clang::Module *> PrimaryModules;
+  llvm::StringMap<clang::Module *> AuxiliaryModules;
+  std::shared_ptr<clang::ASTImporterSharedState> ImportState;
+  std::vector<std::unique_ptr<CodeGenContext>> ProducerContexts;
+  SmallVector<std::string, 4> ActiveReferenceTargets;
+
+  explicit CodeGenContext(ASTContext &context)
+      : LangOpts(context.LangOpts), TypeCheckerOpts(context.TypeCheckerOpts),
+        SILOpts(context.SILOpts), SearchPathOpts(context.SearchPathOpts),
+        ImporterOpts(context.ClangImporterOpts),
+        SymbolGraphOpts(context.SymbolGraphOpts), CASOpts(context.CASOpts),
+        SerializationOpts(context.SerializationOpts) {}
+};
+
+llvm::Error ClangImporter::Implementation::initializeCodeGenContext(
+    const IRGenOptions *IRGenOpts) {
+  const auto &options = SwiftContext.ClangImporterOpts;
+  if (SwiftContext.CASOpts.EnableCaching ||
+      SwiftContext.CASOpts.ImportModuleFromCAS ||
+      SwiftContext.CASOpts.HasImmutableFileSystem ||
+      options.DirectClangCC1ModuleBuild)
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "supplemental SDK Clang contexts do not "
+                                   "support caching or direct cc1 invocations");
+  if (!options.BridgingHeader.empty() || !options.BridgingHeaderPCH.empty())
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "supplemental SDK Clang contexts do not support bridging headers");
+  if (SwiftContext.LangOpts.ClangTargetVariant)
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "supplemental SDK Clang contexts do not "
+                                   "support Clang target variant overrides");
+
+  llvm::StringMap<std::vector<std::string>> contextArguments;
+  for (const auto &argument : options.ProducerContextArguments) {
+    auto contextAndArgument = StringRef(argument).split('=');
+    if (contextAndArgument.first.empty() || contextAndArgument.second.empty())
+      return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                     "invalid producer Clang context argument");
+    contextArguments[contextAndArgument.first].push_back(
+        contextAndArgument.second.str());
+  }
+  auto loadModules =
+      [](Implementation &implementation,
+         llvm::StringMap<clang::Module *> &modules) -> llvm::Error {
+    auto &instance = *implementation.Instance;
+    for (const auto &entry :
+         instance.getHeaderSearchOpts().PrebuiltModuleFiles) {
+      auto location = implementation.getNextIncludeLoc();
+      SmallVector<StringRef, 4> components;
+      StringRef(entry.first).split(components, '.');
+      SmallVector<clang::IdentifierLoc, 4> path;
+      for (StringRef component : components)
+        path.emplace_back(
+            location, instance.getPreprocessor().getIdentifierInfo(component));
+      auto module = instance.loadModule(location, path, clang::Module::Hidden,
+                                        /*IsInclusionDirective=*/false);
+      if (!module)
+        return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                       "cannot load explicit Clang module '" +
+                                           entry.first + "'");
+      modules[entry.first] = module;
+    }
+    return llvm::Error::success();
+  };
+  auto configureAuxiliary =
+      [&](CodeGenContext &context, StringRef descriptor,
+          const llvm::StringMap<std::string> &files) -> llvm::Error {
+    auto targets = descriptor.split('|');
+    auto variantAndHash = targets.second.split('|');
+    if (targets.first.empty() || variantAndHash.second.empty() ||
+        variantAndHash.second.contains('|'))
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "invalid producer Clang context descriptor");
+    auto savedArguments = contextArguments.find(descriptor);
+    if (savedArguments == contextArguments.end() ||
+        savedArguments->second.empty())
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "missing saved arguments for producer Clang context '" + descriptor +
+              "'");
+    if (savedArguments->second.front() != "-cc1")
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "producer Clang context requires a resolved cc1 invocation");
+    context.LangOpts.ClangTarget = llvm::Triple(targets.first);
+    context.LangOpts.TargetVariant.reset();
+    context.LangOpts.ClangTargetVariant.reset();
+    context.LangOpts.VariantSDKVersion.reset();
+    if (!variantAndHash.first.empty()) {
+      context.LangOpts.TargetVariant = llvm::Triple(variantAndHash.first);
+      context.LangOpts.ClangTargetVariant = llvm::Triple(variantAndHash.first);
+    }
+    std::vector<std::string> arguments;
+    bool skipNext = false;
+    for (const auto &argument : savedArguments->second) {
+      if (skipNext) {
+        skipNext = false;
+        continue;
+      }
+      if (argument == "-fmodule-file") {
+        skipNext = true;
+        continue;
+      }
+      if (StringRef(argument).starts_with("-fmodule-file="))
+        continue;
+      arguments.push_back(argument);
+    }
+    for (const auto &file : files)
+      arguments.push_back("-fmodule-file=" + file.first().str() + "=" +
+                          file.second);
+    llvm::append_values(arguments, "-fno-implicit-modules",
+                        "-fno-implicit-module-maps");
+    context.ImporterOpts.ClangContextArguments = std::move(arguments);
+    return llvm::Error::success();
+  };
+  auto createAuxiliary = [&](CodeGenContext &context,
+                             StringRef descriptor) -> llvm::Error {
+    context.ImporterOpts.CodeGenModuleFiles.clear();
+    context.ImporterOpts.ProducerModuleFiles.clear();
+    context.ImporterOpts.ProducerContextArguments.clear();
+    context.ImporterOpts.SDKContext.clear();
+    context.ImporterOpts.TargetContext.clear();
+    context.SwiftContext.reset(ASTContext::get(
+        context.LangOpts, context.TypeCheckerOpts, context.SILOpts,
+        context.SearchPathOpts, context.ImporterOpts, context.SymbolGraphOpts,
+        context.CASOpts, context.SerializationOpts, SwiftContext.SourceMgr,
+        SwiftContext.Diags, SwiftContext.OutputBackend));
+    registerClangImporterRequestFunctions(context.SwiftContext->evaluator);
+    auto importer = ClangImporter::create(
+        *context.SwiftContext, IRGenOpts, {}, {}, nullptr,
+        /*ignoreFileMapping=*/false, /*needCodeGenTargetOpts=*/false);
+    if (!importer)
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "cannot create auxiliary SDK Clang context");
+    if (!sameClangContextTarget(descriptor, *importer->Impl.Instance))
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "producer Clang configuration does not match its context '" +
+              descriptor + "'");
+    context.Importer = importer.get();
+    context.SwiftContext->addModuleLoader(std::move(importer),
+                                          /*isClang=*/true);
+    return loadModules(context.Importer->Impl, context.AuxiliaryModules);
+  };
+
+  auto context = std::make_unique<CodeGenContext>(SwiftContext);
+  if (auto error =
+          configureAuxiliary(*context, options.SDKContext, SDKModuleFiles))
+    return error;
+  if (auto error = loadModules(*this, context->PrimaryModules))
+    return error;
+  if (auto error = createAuxiliary(*context, options.SDKContext))
+    return error;
+  context->ImportState = std::make_shared<clang::ASTImporterSharedState>(
+      *Instance->getASTContext().getTranslationUnitDecl());
+  SeparateCodeGenContext = std::move(context);
+
+  auto installMapper = [&](CodeGenContext &context) {
+    context.Mapper = std::make_unique<CodeGenASTImporter>(
+        *context.Importer->Impl.Instance, *Instance,
+        SeparateCodeGenContext->ImportState);
+    auto primaryModuleForDecl =
+        [this](const clang::Decl *decl) -> clang::Module * {
+      auto *sourceModule = getSupplementalSourceModule(decl);
+      if (!sourceModule)
+        return nullptr;
+      SmallVector<StringRef, 4> components;
+      std::string fullName = sourceModule->getFullModuleName();
+      StringRef(fullName).split(components, '.');
+      auto *module =
+          SeparateCodeGenContext->PrimaryModules.lookup(components[0]);
+      for (StringRef component : ArrayRef<StringRef>(components).drop_front()) {
+        if (!module)
+          return nullptr;
+        module = module->findSubmodule(component);
+      }
+      return module;
+    };
+    context.Mapper->setSupplementalCallbacks(
+        [primaryModuleForDecl](const clang::Decl *decl) -> llvm::Error {
+          if (auto *function = dyn_cast<clang::FunctionDecl>(decl)) {
+            if (function->hasBody() && !function->isImplicit())
+              return llvm::createStringError(
+                  llvm::inconvertibleErrorCode(),
+                  "cannot supplement an SDK function body at the deployment "
+                  "target");
+            for (auto *parameter : function->parameters())
+              if (parameter->hasDefaultArg())
+                return llvm::createStringError(
+                    llvm::inconvertibleErrorCode(),
+                    "cannot supplement an SDK default argument at the "
+                    "deployment target");
+          }
+          if (auto *field = dyn_cast<clang::FieldDecl>(decl))
+            if (field->hasInClassInitializer())
+              return llvm::createStringError(
+                  llvm::inconvertibleErrorCode(),
+                  "cannot supplement an SDK member initializer at the "
+                  "deployment target");
+          if (getSupplementalSourceModule(decl)) {
+            auto *module = primaryModuleForDecl(decl);
+            if (!module || module->NameVisibility != clang::Module::AllVisible)
+              return llvm::createStringError(
+                  llvm::inconvertibleErrorCode(),
+                  "cannot supplement a declaration from a hidden or absent "
+                  "deployment-target Clang module");
+          }
+          return llvm::Error::success();
+        },
+        [this, primaryModuleForDecl, origin = &context](clang::Decl *from,
+                                                        clang::Decl *to) {
+          if (auto *module = primaryModuleForDecl(from)) {
+            SupplementalDeclModules.try_emplace(to, module);
+            SupplementalDeclContexts.try_emplace(to, origin);
+          }
+        },
+        [this](const clang::Decl *decl) -> const clang::Module * {
+          if (&decl->getASTContext() == &getClangASTContext())
+            if (auto *module = getSupplementalModule(decl))
+              return module;
+          return getSupplementalSourceModule(decl);
+        });
+  };
+  installMapper(*SeparateCodeGenContext);
+
+  llvm::StringMap<llvm::StringMap<std::string>> inputs;
+  for (const auto &input : options.ProducerModuleFiles) {
+    auto targetAndFile = StringRef(input).split('=');
+    auto nameAndPath = targetAndFile.second.split('=');
+    auto targets = targetAndFile.first.split('|');
+    auto variantAndHash = targets.second.split('|');
+    if (targets.first.empty() || nameAndPath.first.empty() ||
+        nameAndPath.second.empty() || variantAndHash.second.empty() ||
+        variantAndHash.second.contains('|'))
+      return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                     "invalid producer Clang module input");
+    auto &files = inputs[targetAndFile.first];
+    auto found = files.find(nameAndPath.first);
+    if (found != files.end() && found->second != nameAndPath.second)
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "conflicting producer Clang modules for the same target and module");
+    files[nameAndPath.first] = nameAndPath.second.str();
+  }
+  for (auto &input : inputs) {
+    auto *existing = findSDKReferenceContext(input.first());
+    const clang::CompilerInstance *existingInstance = nullptr;
+    if (sameClangContextTarget(input.first(), *Instance))
+      existingInstance = Instance.get();
+    else if (existing)
+      existingInstance = &existing->Importer->getClangInstance();
+    if (existingInstance) {
+      const auto &files =
+          existingInstance->getHeaderSearchOpts().PrebuiltModuleFiles;
+      for (const auto &file : input.second) {
+        auto found = files.find(file.first().str());
+        if (found == files.end() || found->second != file.second)
+          return llvm::createStringError(
+              llvm::inconvertibleErrorCode(),
+              "conflicting producer Clang module context");
+      }
+      continue;
+    }
+    auto producer = std::make_unique<CodeGenContext>(SwiftContext);
+    if (auto error = configureAuxiliary(*producer, input.first(), input.second))
+      return error;
+    if (auto error = createAuxiliary(*producer, input.first()))
+      return error;
+    installMapper(*producer);
+    SeparateCodeGenContext->ProducerContexts.push_back(std::move(producer));
+  }
+  return llvm::Error::success();
+}
+
+ClangImporter::Implementation::CodeGenContext *
+ClangImporter::Implementation::findSDKReferenceContext(StringRef target) const {
+  auto *context = SeparateCodeGenContext.get();
+  if (!context)
+    return nullptr;
+  if (target.empty() ||
+      sameClangContextTarget(target, *context->Importer->Impl.Instance))
+    return context;
+  for (const auto &producer : context->ProducerContexts)
+    if (sameClangContextTarget(target, *producer->Importer->Impl.Instance))
+      return producer.get();
+  return nullptr;
+}
+
+llvm::Expected<ClangImporter::Implementation::CodeGenContext *>
+ClangImporter::Implementation::getActiveSDKReferenceContext() const {
+  auto *context = SeparateCodeGenContext.get();
+  if (!context || context->ActiveReferenceTargets.empty())
+    return context;
+  StringRef target = context->ActiveReferenceTargets.back();
+  if (!target.empty() && sameClangContextTarget(target, *Instance))
+    return nullptr;
+  if (auto *active = findSDKReferenceContext(target))
+    return active;
+  return llvm::createStringError(
+      llvm::inconvertibleErrorCode(),
+      "serialized Clang reference requires an unavailable target context '" +
+          target + "'");
+}
+
+ClangImporter::Implementation::CodeGenContext *
+ClangImporter::Implementation::getSupplementalContext(
+    const clang::Decl *decl) const {
+  while (decl) {
+    if (auto *context = SupplementalDeclContexts.lookup(decl))
+      return context;
+    if (auto *context =
+            SupplementalDeclContexts.lookup(decl->getCanonicalDecl()))
+      return context;
+    auto *parent = decl->getDeclContext();
+    if (!parent || parent->isTranslationUnit())
+      return nullptr;
+    decl = clang::Decl::castFromDeclContext(parent);
+  }
+  return nullptr;
+}
+
+const clang::Module *ClangImporter::Implementation::getSupplementalModule(
+    const clang::Decl *decl) const {
+  while (decl) {
+    if (auto *module = SupplementalDeclModules.lookup(decl))
+      return module;
+    if (auto *module = SupplementalDeclModules.lookup(decl->getCanonicalDecl()))
+      return module;
+    auto *context = decl->getDeclContext();
+    if (!context || context->isTranslationUnit())
+      return nullptr;
+    decl = clang::Decl::castFromDeclContext(context);
+  }
+  return nullptr;
+}
+
+llvm::Expected<bool> ClangImporter::Implementation::lookupSupplementalDecls(
+    const clang::Module *module, DeclName name) {
+  auto active = getActiveSDKReferenceContext();
+  if (!active)
+    return active.takeError();
+  auto *context = *active;
+  if (!context || !module || name.isSpecial())
+    return false;
+  auto *auxiliary =
+      context->AuxiliaryModules.lookup(module->getTopLevelModuleName());
+  if (!auxiliary)
+    return false;
+  auto *sourceTable = context->Importer->Impl.findLookupTable(auxiliary);
+  auto *targetTable = findLookupTable(module);
+  if (!sourceTable || !targetTable)
+    return false;
+  auto *sourceTU =
+      context->Importer->getClangASTContext().getTranslationUnitDecl();
+  bool added = false;
+  for (auto entry : sourceTable->lookup(name.getBaseName(), sourceTU)) {
+    auto *decl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!decl ||
+        (!isa<clang::TypeDecl>(decl) && !isa<clang::FunctionDecl>(decl)))
+      continue;
+    if (auto *existing = context->Mapper->findExistingDeclaration(decl)) {
+      if (isSupplementalDecl(existing))
+        if (auto error = context->Mapper->validateReference(decl, existing))
+          return std::move(error);
+      continue;
+    }
+    if (context->Mapper->GetAlreadyImportedOrNull(decl))
+      continue;
+    context->Mapper->clearFailureReason();
+    if (auto error = context->Mapper->prepareDeclaration(decl))
+      return std::move(error);
+    auto imported = context->Mapper->Import(decl);
+    if (!imported)
+      return context->Mapper->describeError(imported.takeError());
+    auto *mapped = cast<clang::NamedDecl>(*imported);
+    if (!isSupplementalDecl(mapped))
+      continue;
+    addEntryToLookupTable(*targetTable, mapped, getNameImporter());
+    added = true;
+  }
+  return added;
+}
+
+llvm::Expected<bool>
+ClangImporter::Implementation::lookupSupplementalRecordMembers(
+    const clang::RecordDecl *target, DeclName name) {
+  auto active = getActiveSDKReferenceContext();
+  if (!active)
+    return active.takeError();
+  auto *context = *active;
+  // Outside deserialization, a supplemented record retains its producer's
+  // members even when the default SDK context has a different definition.
+  if (SeparateCodeGenContext &&
+      SeparateCodeGenContext->ActiveReferenceTargets.empty())
+    if (auto *origin = getSupplementalContext(target))
+      context = origin;
+  if (!context || name.isSpecial() || target->isDependentContext() ||
+      isa<clang::ClassTemplateSpecializationDecl>(target))
+    return false;
+  auto &sourceAST = context->Importer->getClangASTContext();
+  auto *source = dyn_cast_or_null<clang::RecordDecl>(
+      findCorrespondingClangContext(target, sourceAST));
+  if (!source)
+    return false;
+  auto *sourceTable = context->Importer->Impl.findLookupTable(source);
+  auto *targetTable = findLookupTable(target);
+  if (!sourceTable || !targetTable)
+    return false;
+
+  bool added = false;
+  for (auto entry : sourceTable->lookup(name.getBaseName(), source)) {
+    auto *decl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!decl || decl->getDeclContext()->getPrimaryContext() !=
+                     source->getPrimaryContext())
+      continue;
+    if (auto *existing = context->Mapper->findExistingDeclaration(decl)) {
+      if (isSupplementalDecl(existing)) {
+        if (auto error = context->Mapper->prepareDeclaration(source))
+          return std::move(error);
+        if (auto error = context->Mapper->validateReference(decl, existing))
+          return std::move(error);
+      }
+      continue;
+    }
+    auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
+    if (!method ||
+        isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+            clang::CXXConversionDecl>(method) ||
+        method->isVirtual() || method->isOverloadedOperator() ||
+        (!method->isStatic() && !method->isImplicitObjectMemberFunction()) ||
+        method->getTemplatedKind() != clang::FunctionDecl::TK_NonTemplate)
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "cannot supplement this kind of SDK record member");
+
+    for (auto *candidate :
+         target->lookup(&getClangASTContext().Idents.get(method->getName()))) {
+      auto *other = dyn_cast<clang::CXXMethodDecl>(candidate);
+      if (!other || method->getNumParams() != other->getNumParams())
+        continue;
+      bool sameParameters = true;
+      for (unsigned index = 0; index != method->getNumParams(); ++index)
+        if (!context->Mapper->IsStructurallyEquivalent(
+                method->getParamDecl(index)->getType(),
+                other->getParamDecl(index)->getType())) {
+          sameParameters = false;
+          break;
+        }
+      if (sameParameters && (method->isStatic() != other->isStatic() ||
+                             (method->getRefQualifier() == clang::RQ_None) !=
+                                 (other->getRefQualifier() == clang::RQ_None)))
+        return llvm::createStringError(
+            llvm::inconvertibleErrorCode(),
+            "SDK method conflicts with a deployment-target member");
+    }
+
+    // Validate and map the existing owner without importing its definition.
+    // Only the new member receives supplemental provenance.
+    if (auto error = context->Mapper->prepareDeclaration(source))
+      return std::move(error);
+    if (auto error = context->Mapper->prepareDeclaration(method))
+      return std::move(error);
+    auto imported = context->Mapper->Import(method);
+    if (!imported)
+      return context->Mapper->describeError(imported.takeError());
+    auto *mapped = cast<clang::CXXMethodDecl>(*imported);
+    if (!isSupplementalDecl(mapped))
+      continue;
+    addEntryToLookupTable(*targetTable, mapped, getNameImporter());
+    added = true;
+  }
+  return added;
+}
+
+llvm::Expected<bool>
+ClangImporter::Implementation::lookupSupplementalClangDecls(
+    const clang::DeclContext *target, StringRef name) {
+  auto active = getActiveSDKReferenceContext();
+  if (!active)
+    return active.takeError();
+  auto *context = *active;
+  if (SeparateCodeGenContext &&
+      SeparateCodeGenContext->ActiveReferenceTargets.empty())
+    if (auto *origin =
+            getSupplementalContext(clang::Decl::castFromDeclContext(target)))
+      context = origin;
+  if (!context || name.empty())
+    return false;
+  auto &sourceAST = context->Importer->getClangASTContext();
+  auto *source = findCorrespondingClangContext(target, sourceAST);
+  if (!source)
+    return false;
+  bool added = false;
+  for (auto *decl : source->lookup(&sourceAST.Idents.get(name))) {
+    if (!isa<clang::TypeDecl>(decl) && !isa<clang::FunctionDecl>(decl))
+      continue;
+    if (auto *existing = context->Mapper->findExistingDeclaration(decl)) {
+      if (isSupplementalDecl(existing))
+        if (auto error = context->Mapper->validateReference(decl, existing))
+          return std::move(error);
+      continue;
+    }
+    if (context->Mapper->GetAlreadyImportedOrNull(decl))
+      continue;
+    context->Mapper->clearFailureReason();
+    if (auto error = context->Mapper->prepareDeclaration(decl))
+      return std::move(error);
+    auto imported = context->Mapper->Import(decl);
+    if (!imported)
+      return context->Mapper->describeError(imported.takeError());
+    auto *mapped = cast<clang::NamedDecl>(*imported);
+    if (auto *module = getSupplementalModule(mapped)) {
+      if (auto *table = findLookupTable(module))
+        addEntryToLookupTable(*table, mapped, getNameImporter());
+      added = true;
+    }
+  }
+  return added;
+}
+
 std::unique_ptr<ClangImporter> ClangImporter::create(
     ASTContext &ctx, const IRGenOptions *IRGenOpts, StringRef swiftPCHHash,
     std::string casidForPCH, DependencyTracker *tracker, bool ignoreFileMapping,
@@ -1630,9 +2997,36 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
 
   // Create a new Clang compiler invocation.
   {
-    importer->Impl.Invocation = importer->createClangInvocation(ctx, vfs);
+    bool useDeploymentModules = !importerOpts.CodeGenModuleFiles.empty();
+    importer->Impl.Invocation = importer->createClangInvocation(
+        ctx, vfs, /*forCodeGen=*/useDeploymentModules);
     if (!importer->Impl.Invocation)
       return nullptr;
+
+    if (useDeploymentModules) {
+      auto &invocation = *importer->Impl.Invocation;
+      if (!invocation.getFrontendOpts().ModuleFiles.empty()) {
+        ctx.Diags.diagnose(
+            SourceLoc(), diag::error_from_clang,
+            "supplemental SDK Clang modules require named explicit PCM inputs");
+        return nullptr;
+      }
+      auto &files = invocation.getHeaderSearchOpts().PrebuiltModuleFiles;
+      for (const auto &file : files)
+        importer->Impl.SDKModuleFiles[file.first] = file.second;
+      files.clear();
+      for (const auto &input : importerOpts.CodeGenModuleFiles) {
+        auto entry = StringRef(input).split('=');
+        if (entry.first.empty() || entry.second.empty() ||
+            !files.emplace(entry.first.str(), entry.second.str()).second) {
+          ctx.Diags.diagnose(
+              SourceLoc(), diag::error_from_clang,
+              "expected a unique module-name=pcm-path for each deployment "
+              "Clang module");
+          return nullptr;
+        }
+      }
+    }
 
     importer->Impl.ClangArgs = importer->Impl.Invocation->getCC1CommandLine();
     ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
@@ -1668,10 +3062,13 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   {
     // The Clang modules produced by ClangImporter are always embedded in an
     // ObjectFilePCHContainer and contain -gmodules debug info.
-    importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
-    if (importerOpts.DebuggerSupport)
-      importer->Impl.Invocation->getCodeGenOpts().setDebugInfo(
-          llvm::codegenoptions::FullDebugInfo);
+    if (importerOpts.ClangContextArguments.empty() ||
+        importerOpts.ClangContextArguments.front() != "-cc1") {
+      importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
+      if (importerOpts.DebuggerSupport)
+        importer->Impl.Invocation->getCodeGenOpts().setDebugInfo(
+            llvm::codegenoptions::FullDebugInfo);
+    }
 
     auto PCHContainerOperations =
       std::make_shared<clang::PCHContainerOperations>();
@@ -1717,7 +3114,8 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   // The AST-affecting policy is applied to the "real" underlying invocation
   // regardless (see configureOptionsForCodeGen).
   std::unique_ptr<clang::CompilerInvocation> swiftTargetClangInvocation;
-  if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts) {
+  if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts &&
+      importerOpts.CodeGenModuleFiles.empty()) {
     swiftTargetClangInvocation = importer->createClangInvocation(
         ctx, instance.getVirtualFileSystemPtr(), /*forCodeGen=*/true);
     if (!swiftTargetClangInvocation)
@@ -1895,6 +3293,14 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   importedHeaderModule->setIsNonSwiftModule(true);
 
   importer->Impl.IsReadingBridgingPCH = false;
+
+  if (!importerOpts.CodeGenModuleFiles.empty()) {
+    if (auto error = importer->Impl.initializeCodeGenContext(IRGenOpts)) {
+      ctx.Diags.diagnose(SourceLoc(), diag::error_from_clang,
+                         llvm::toString(std::move(error)));
+      return nullptr;
+    }
+  }
 
   return importer;
 }
@@ -3566,7 +4972,9 @@ static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
   // getTopLevelDecls, for example), we should compare the underlying Clang modules to determine
   // module membership.
   if (auto ClangNode = VD->getClangNode()) {
-    if (auto *ClangModule = ClangNode.getOwningClangModule()) {
+    auto *Importer = static_cast<ClangImporter *>(
+        VD->getASTContext().getClangModuleLoader());
+    if (auto *ClangModule = Importer->getClangOwningModule(ClangNode)) {
       return ModuleFilter->getClangModule() == ClangModule;
     }
   }
@@ -3614,8 +5022,8 @@ importer::getClangOwningModule(ClangNode Node,
 
 static const clang::Module *
 getClangTopLevelOwningModule(ClangNode Node,
-                             const clang::ASTContext &ClangCtx) {
-  const clang::Module *OwningModule = getClangOwningModule(Node, ClangCtx);
+                             const ClangModuleLoader &Importer) {
+  const clang::Module *OwningModule = Importer.getClangOwningModule(Node);
   if (!OwningModule)
     return nullptr;
   return OwningModule->getTopLevelModule();
@@ -3646,11 +5054,9 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
     return true;
 
   const clang::Decl *D = ClangNode.castAsDecl();
-  auto &ClangASTContext = ModuleFilter->getClangASTContext();
   // We don't handle Clang submodules; pop everything up to the top-level
   // module.
-  auto OwningClangModule = getClangTopLevelOwningModule(ClangNode,
-                                                        ClangASTContext);
+  auto OwningClangModule = getClangTopLevelOwningModule(ClangNode, *Importer);
   if (OwningClangModule == ModuleFilter->getClangModule())
     return true;
 
@@ -3698,8 +5104,8 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
         continue;
     }
 
-    auto OwningClangModule = getClangTopLevelOwningModule(Redeclaration,
-                                                          ClangASTContext);
+    auto OwningClangModule =
+        getClangTopLevelOwningModule(Redeclaration, *Importer);
     if (OwningClangModule == ModuleFilter->getClangModule())
       return true;
   }
@@ -4300,6 +5706,17 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 
   // Find the corresponding lookup table.
   if (auto lookupTable = owner.findLookupTable(clangModule)) {
+    // Supplement individual declarations before looking up the name. An
+    // existing declaration does not imply that every SDK overload is present.
+    if (clangModule) {
+      auto supplemented = owner.lookupSupplementalDecls(clangModule, name);
+      if (!supplemented) {
+        owner.SwiftContext.Diags.diagnose(
+            SourceLoc(), diag::error_from_clang,
+            llvm::toString(supplemented.takeError()));
+        return;
+      }
+    }
     // Search it.
     owner.lookupValue(*lookupTable, name, *consumer);
   }
@@ -4307,6 +5724,12 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
 
 bool ClangImporter::Implementation::isVisibleClangEntry(
     const clang::NamedDecl *clangDecl) const {
+  // ASTImporter creates local declarations without Clang module ownership.
+  // Preserve their source module's visibility before asking Clang, which
+  // would otherwise consider an unowned declaration unconditionally visible.
+  if (auto *module = getSupplementalModule(clangDecl))
+    return module->NameVisibility == clang::Module::AllVisible;
+
   // For a declaration, check whether the declaration is hidden.
   clang::Sema &clangSema = getClangSema();
   if (clangSema.isVisible(clangDecl)) return true;
@@ -4557,10 +5980,10 @@ void ClangModuleUnit::lookupObjCMethods(
                                                /*CheckTheOther=*/false);
 
   // Import the methods.
-  auto &clangCtx = clangSema.getASTContext();
   for (auto objcMethod : objcMethods) {
     // Verify that this method came from this module.
-    auto owningClangModule = getClangTopLevelOwningModule(objcMethod, clangCtx);
+    auto owningClangModule = getClangTopLevelOwningModule(
+        objcMethod, *owner.SwiftContext.getClangModuleLoader());
     if (owningClangModule != clangModule) continue;
 
     if (shouldSuppressDeclImport(objcMethod))
@@ -4667,6 +6090,9 @@ const clang::CompilerInstance &ClangImporter::getClangInstance() const {
 }
 
 const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
+  if (auto *decl = Node.getAsDecl())
+    if (auto *module = Impl.getSupplementalModule(decl))
+      return module;
   return importer::getClangOwningModule(Node, Impl.getClangASTContext());
 }
 
@@ -4680,6 +6106,155 @@ clang::Sema &ClangImporter::getClangSema() const {
 
 clang::CodeGenOptions &ClangImporter::getCodeGenOpts() const {
   return Impl.getCodeGenOptions();
+}
+
+llvm::Error
+ClangImporter::pushSDKReferenceContext(StringRef producerClangTarget) {
+  if (auto *context = Impl.SeparateCodeGenContext.get())
+    context->ActiveReferenceTargets.push_back(producerClangTarget.str());
+  return llvm::Error::success();
+}
+
+void ClangImporter::popSDKReferenceContext() {
+  if (auto *context = Impl.SeparateCodeGenContext.get()) {
+    assert(!context->ActiveReferenceTargets.empty());
+    context->ActiveReferenceTargets.pop_back();
+  }
+}
+
+std::string
+ClangImporter::getSDKReferenceTarget(const clang::Decl *decl) const {
+  if (!decl)
+    return getClangContextTarget(*Impl.Instance);
+  if (!Impl.SeparateCodeGenContext)
+    return {};
+  if (auto *context = Impl.getSupplementalContext(decl))
+    return getClangContextTarget(*context->Importer->Impl.Instance);
+  return getClangContextTarget(*Impl.Instance);
+}
+
+std::vector<std::string> ClangImporter::getSDKReferenceTargets() const {
+  auto *context = Impl.SeparateCodeGenContext.get();
+  if (!context)
+    return {};
+  std::vector<std::string> targets{
+      getSDKReferenceTarget(nullptr),
+      getClangContextTarget(*context->Importer->Impl.Instance)};
+  for (const auto &producer : context->ProducerContexts)
+    targets.push_back(
+        getClangContextTarget(*producer->Importer->Impl.Instance));
+  llvm::sort(targets);
+  targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+  return targets;
+}
+
+std::vector<std::string>
+ClangImporter::getSDKReferenceArguments(StringRef context) const {
+  auto *selected = const_cast<ClangImporter *>(this);
+  if (!sameClangContextTarget(context, *selected->Impl.Instance)) {
+    auto *auxiliary = Impl.findSDKReferenceContext(context);
+    if (!auxiliary)
+      return {};
+    selected = auxiliary->Importer;
+  }
+  auto &swiftContext = selected->Impl.SwiftContext;
+  // Serialize the resolved invocation, including Swift's AST-affecting
+  // CodeGen policy, rather than reconstructing it from driver arguments.
+  // The snapshot decoder restores the numeric optimization level separately
+  // from -Os/-Oz because native argument parsing folds them into one option.
+  clang::CompilerInvocation invocation(*selected->Impl.Invocation);
+  invocation.getFrontendOpts().Inputs.clear();
+  auto result = invocation.getCC1CommandLine();
+  bool hasWorkingDirectory = llvm::any_of(result, [](StringRef argument) {
+    return argument == "-working-directory" ||
+           argument.starts_with("-working-directory=");
+  });
+  if (!hasWorkingDirectory) {
+    const auto &instance = selected->getClangInstance();
+    std::string directory = instance.getFileSystemOpts().WorkingDir;
+    if (directory.empty()) {
+      auto current =
+          instance.getVirtualFileSystem().getCurrentWorkingDirectory();
+      if (!current) {
+        swiftContext.Diags.diagnose(
+            SourceLoc(), diag::error_from_clang,
+            "cannot record the working directory of a Clang context");
+        return {};
+      }
+      directory = *current;
+    }
+    llvm::append_values(result, "-working-directory", directory);
+  }
+  return result;
+}
+
+llvm::Error ClangImporter::validateSDKReference(const clang::Decl *decl,
+                                                StringRef producerClangTarget) {
+  if (!Impl.SeparateCodeGenContext || !decl)
+    return llvm::Error::success();
+  auto selectContext =
+      [&]() -> llvm::Expected<Implementation::CodeGenContext *> {
+    if (producerClangTarget.empty())
+      return Impl.getActiveSDKReferenceContext();
+    if (sameClangContextTarget(producerClangTarget, *Impl.Instance))
+      return nullptr;
+    if (auto *context = Impl.findSDKReferenceContext(producerClangTarget))
+      return context;
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "serialized Clang reference requires an unavailable target context '" +
+            producerClangTarget + "'");
+  };
+  auto selected = selectContext();
+  if (!selected)
+    return selected.takeError();
+  auto *context = *selected;
+  auto *origin = Impl.getSupplementalContext(decl);
+  if (!context) {
+    if (origin)
+      return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                     "serialized Clang reference is absent "
+                                     "from its deployment-target context");
+    return llvm::Error::success();
+  }
+  if (origin == context)
+    return llvm::Error::success();
+  if (auto *tag = dyn_cast<clang::TagDecl>(decl)) {
+    if (!tag->getIdentifier()) {
+      if (auto *alias = tag->getTypedefNameForAnonDecl())
+        return validateSDKReference(alias, producerClangTarget);
+      if (!isa<clang::RecordDecl>(tag->getDeclContext()))
+        return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                       "cannot validate an unnamed SDK type "
+                                       "without a typedef or record owner");
+    }
+  }
+  if (auto *record = dyn_cast<clang::RecordDecl>(decl->getDeclContext()))
+    if (auto error = validateSDKReference(record, producerClangTarget))
+      return error;
+  if (auto *enumeration = dyn_cast<clang::EnumDecl>(decl->getDeclContext()))
+    if (auto error = validateSDKReference(enumeration, producerClangTarget))
+      return error;
+  auto *named = dyn_cast<clang::NamedDecl>(decl);
+  if (!named || !named->getIdentifier())
+    return llvm::Error::success();
+  auto &sourceAST = context->Importer->getClangASTContext();
+  auto *sourceContext =
+      findCorrespondingClangContext(named->getDeclContext(), sourceAST);
+  if (sourceContext) {
+    for (auto *candidate :
+         sourceContext->lookup(&sourceAST.Idents.get(named->getName()))) {
+      auto *matched = context->Mapper->findExistingDeclaration(candidate);
+      if (!matched || matched->getCanonicalDecl() != named->getCanonicalDecl())
+        continue;
+      return context->Mapper->validateReference(
+          candidate, const_cast<clang::NamedDecl *>(named));
+    }
+  }
+  return llvm::createStringError(
+      llvm::inconvertibleErrorCode(),
+      "serialized Clang declaration '" + named->getName() +
+          "' has no matching declaration in its producer target context");
 }
 
 std::string ClangImporter::computeClangContextHash() const {
@@ -5291,7 +6866,10 @@ void ClangImporter::Implementation::configureOptionsForCodeGen(
 
   CodeGenTargetInfo.reset(targetInfo);
 
-  if (!IRGenOpts)
+  const auto &savedArguments =
+      SwiftContext.ClangImporterOpts.ClangContextArguments;
+  if (!IRGenOpts ||
+      (!savedArguments.empty() && savedArguments.front() == "-cc1"))
     return;
 
   // The underlying ClangImporter invocation is what the bridging-header PCH and
@@ -5335,6 +6913,9 @@ SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
 
 SwiftLookupTable *
 ClangImporter::Implementation::findLookupTable(const clang::Decl *decl) {
+  if (auto *module = getSupplementalModule(decl))
+    return findLookupTable(module);
+
   // Contents of a C++ namespace are added to the __ObjC module.
   bool isWithinNamespace = false;
   auto declContext = decl->getDeclContext();

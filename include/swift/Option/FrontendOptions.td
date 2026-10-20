@@ -314,6 +314,41 @@ def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
 
+def experimental_clang_producer_module_file
+  : Separate<["-"], "experimental-clang-producer-module-file">,
+    MetaVarName<"<context>=<name>=<path>">,
+    HelpText<"Specify a Clang module for validating a serialized Swift producer context">;
+
+def experimental_clang_producer_context_argument
+  : Separate<["-"], "experimental-clang-producer-context-argument">,
+    MetaVarName<"<context>=<argument>">,
+    HelpText<"Specify a saved Clang argument for a serialized producer context">;
+
+def experimental_clang_sdk_context
+  : Separate<["-"], "experimental-clang-sdk-context">,
+    MetaVarName<"<context>">,
+    HelpText<"Specify the native Clang invocation of the shared SDK module graph">;
+
+def experimental_clang_target_context
+  : Separate<["-"], "experimental-clang-target-context">,
+    MetaVarName<"<triple>">,
+    HelpText<"Use the effective Swift target to identify a Clang declaration context">;
+
+def experimental_clang_context_argument
+  : Separate<["-"], "experimental-clang-context-argument">,
+    MetaVarName<"<argument>">,
+    HelpText<"Specify a saved Clang frontend argument for a named dependency scan">;
+
+def experimental_clang_codegen_module_file
+  : Separate<["-"], "experimental-clang-codegen-module-file">,
+    MetaVarName<"<name>=<path>">,
+    HelpText<"Specify a Clang module for deployment-target code generation">;
+
+def experimental_clang_codegen_dependency
+  : Separate<["-"], "experimental-clang-codegen-dependency">,
+    MetaVarName<"<name>">,
+    HelpText<"Scan a Clang module's dependencies for deployment-target code generation">;
+
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
 

@@ -135,6 +135,9 @@ class ExtendedValidationInfo {
   StringRef ExportAsName;
   StringRef PublicModuleName;
   StringRef OSLogStringSectionName;
+  StringRef ClangModuleTarget;
+  SmallVector<StringRef, 4> ClangModuleReferenceTargets;
+  SmallVector<StringRef, 16> ClangContextArguments;
   CXXStdlibKind CXXStdlib;
   version::Version SwiftInterfaceCompilerVersion;
   struct {
@@ -172,6 +175,21 @@ public:
   }
   void addExtraClangImporterOption(StringRef option) {
     ExtraClangImporterOpts.push_back(option);
+  }
+
+  StringRef getClangModuleTarget() const { return ClangModuleTarget; }
+  void setClangModuleTarget(StringRef target) { ClangModuleTarget = target; }
+  ArrayRef<StringRef> getClangModuleReferenceTargets() const {
+    return ClangModuleReferenceTargets;
+  }
+  void addClangModuleReferenceTarget(StringRef target) {
+    ClangModuleReferenceTargets.push_back(target);
+  }
+  ArrayRef<StringRef> getClangContextArguments() const {
+    return ClangContextArguments;
+  }
+  void addClangContextArgument(StringRef argument) {
+    ClangContextArguments.push_back(argument);
   }
 
   ArrayRef<std::pair<PluginSearchOption::Kind, StringRef>>
