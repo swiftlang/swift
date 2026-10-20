@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded
-
 import Swift
 
 // ==== -----------------------------------------------------------------------
@@ -19,6 +17,7 @@ import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+#if !$Embedded
 /// Executes an operation with the expectation it completes within a specified deadline.
 ///
 /// Use this function to limit the execution time of an asynchronous operation to a specific instant.
@@ -131,6 +130,57 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   where Return: ~Copyable,
         Failure: Error,
         C: Clock & Identifiable {
+  return try await _withDeadline(
+    expiration,
+    tolerance: tolerance,
+    clock: clock,
+    operation: operation
+  )
+}
+#else
+/// Executes an operation with the expectation it completes within a specified deadline.
+///
+/// This is the Embedded Swift variant of ``withDeadline(_:tolerance:clock:operation:)``.
+/// It behaves the same way, except that you always pass the `clock`: Embedded Swift has no
+/// `ContinuousClock` to default to.
+///
+/// - Parameters:
+///   - expiration: The instant by which the operation must complete.
+///   - tolerance: The tolerance used for the sleep. Defaults to `nil`.
+///   - clock: The clock to use for measuring time.
+///   - operation: The asynchronous operation to complete before the deadline.
+///
+/// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
+/// - Throws: The error thrown by the operation.
+@available(StdlibDeploymentTarget 6.5, *)
+public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
+  _ expiration: C.Instant,
+  tolerance: C.Instant.Duration? = nil,
+  clock: C,
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error,
+        C: Clock & Identifiable {
+  return try await _withDeadline(
+    expiration,
+    tolerance: tolerance,
+    clock: clock,
+    operation: operation
+  )
+}
+#endif
+
+@available(StdlibDeploymentTarget 6.5, *)
+internal nonisolated(nonsending) func _withDeadline<Return, Failure, C>(
+  _ expiration: C.Instant,
+  tolerance: C.Instant.Duration?,
+  clock: C,
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error,
+        C: Clock & Identifiable {
 #if $BuiltinTaskDeadline
   // Fast path: if an outer deadline exists for the same clock
   if let outer = _findNearestDeadline(clock: clock), outer <= expiration {
@@ -195,6 +245,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 // ==== -----------------------------------------------------------------------
 // MARK: withDeadline(in:)
 
+#if !$Embedded
 /// Executes an operation with the expectation it completes within the given
 /// relative timeout, measured against `clock.now` at the point of call.
 ///
@@ -237,6 +288,42 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
     operation: operation
   )
 }
+#else
+/// Executes an operation with the expectation it completes within the given
+/// relative timeout, measured against `clock.now` at the point of call.
+///
+/// This is the Embedded Swift variant of ``withDeadline(in:tolerance:clock:operation:)``.
+/// It behaves the same way, except that you always pass the `clock`: Embedded Swift has no
+/// `ContinuousClock` to default to.
+///
+/// - Parameters:
+///   - timeout: The duration, relative to `clock.now`, by which the
+///     operation must complete.
+///   - tolerance: The tolerance used for the sleep. Defaults to `nil`.
+///   - clock: The clock to use for measuring time.
+///   - operation: The asynchronous operation to complete before the deadline.
+///
+/// - Returns: The result of the operation.
+/// - Throws: The error thrown by the operation.
+@available(StdlibDeploymentTarget 6.5, *)
+@export(implementation)
+public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
+  in timeout: C.Instant.Duration,
+  tolerance: C.Instant.Duration? = nil,
+  clock: C,
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error,
+        C: Clock & Identifiable {
+  return try await withDeadline(
+    clock.now.advanced(by: timeout),
+    tolerance: tolerance,
+    clock: clock,
+    operation: operation
+  )
+}
+#endif
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 // ==== -----------------------------------------------------------------------
@@ -270,6 +357,7 @@ extension Task where Success == Never, Failure == Never {
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension Task where Success == Never, Failure == Never {
+  #if !$Embedded
   /// Find the nearest active deadline installed on the current task for the
   /// specified clock.
   ///
@@ -299,11 +387,30 @@ extension Task where Success == Never, Failure == Never {
     // No need to short-circut here with hasDeadline as the `find...` already does so.
     _findNearestDeadline(clock: clock)
   }
+  #else
+  /// Find the nearest active deadline installed on the current task for the
+  /// specified clock.
+  ///
+  /// This is the Embedded Swift variant of ``activeDeadline(for:)``. It behaves the same
+  /// way, except that you always pass the `clock`: Embedded Swift has no `ContinuousClock`
+  /// to default to.
+  ///
+  /// - Parameter clock: The clock whose deadlines to search for.
+  ///
+  /// - Returns: The nearest `C.Instant` deadline installed for `clock` on
+  ///   the current task (or any of its parents, walking outward), or
+  ///   `nil` if no `withDeadline` scope for `clock` is active.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public static func activeDeadline<C: Clock & Identifiable>(for clock: C) -> C.Instant? {
+    _findNearestDeadline(clock: clock)
+  }
+  #endif
 }
 
 // ==== -----------------------------------------------------------------------
 // MARK: Internals
 
+#if !$Embedded
 /// Swift-side helper called by the runtime for each deadline record whose
 /// `ClockType` metadata pointer-equals the caller's `I`.
 ///
@@ -321,7 +428,9 @@ internal func _task_isEqualIdentifiableID<I: Identifiable>(
     .assumingMemoryBound(to: I.self).pointee
   return stored.id == queryClock.id
 }
+#endif
 
+#if !$Embedded
 /// Find the innermost active deadline installed on the current task for
 /// the given clock, or nil if none.
 @_spi(Concurrency)
@@ -346,11 +455,48 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
 internal func _swift_task_findNearestDeadlineForClock<C: Clock & Identifiable>(
   queryClock: C
 ) -> UnsafeMutableRawPointer?
+#else
+/// Find the innermost active deadline installed on the current task for
+/// the given clock, or nil if none.
+@_spi(Concurrency)
+@available(StdlibDeploymentTarget 6.5, *)
+public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant? {
+  // Embedded Swift has no metadata or witness tables, so the runtime can't call
+  // `C.id` itself. It checks that a record's clock has type `C`, and then asks
+  // this closure, which the compiler specializes for `C`, to compare identities.
+  var matches: (UnsafeMutableRawPointer) -> Bool = { stored in
+    unsafe stored.assumingMemoryBound(to: C.self).pointee.id == clock.id
+  }
+  let matched = unsafe withUnsafeMutablePointer(to: &matches) { context in
+    unsafe _swift_task_findNearestDeadlineForClock(
+      clockType: unsafeBitCast(C.self, to: UnsafeRawPointer.self),
+      matches: { stored, context in
+        unsafe context.assumingMemoryBound(
+          to: ((UnsafeMutableRawPointer) -> Bool).self
+        ).pointee(stored)
+      },
+      context: context)
+  }
+  guard let matched = unsafe matched else {
+    return nil
+  }
 
+  // The runtime returns a borrowed +0 pointer into the record's instant slot.
+  // The load below copies it, which produces an owned +1.
+  return unsafe UnsafeRawPointer(matched)
+    .assumingMemoryBound(to: C.Instant.self).pointee
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_findNearestDeadlineForClock")
+internal func _swift_task_findNearestDeadlineForClock(
+  clockType: UnsafeRawPointer,
+  matches: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Bool,
+  context: UnsafeMutableRawPointer
+) -> UnsafeMutableRawPointer?
+#endif
 
 @usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("_swift_task_hasActiveDeadline")
 internal func _swift_task_hasActiveDeadline() -> Bool
-
-#endif // !$Embedded

@@ -628,9 +628,6 @@ swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
-// Task deadlines are unavailable in Embedded Swift
-#if !SWIFT_CONCURRENCY_EMBEDDED
-
 /// Push a deadline status record onto the current task.
 ///
 /// The caller must guarantee that both `clock` and `instant` remain
@@ -661,6 +658,7 @@ void swift_task_popDeadline(TaskDeadlineStatusRecord *record);
 /// past the record pop, it must be copied by the caller.
 ///
 /// Runtime availability: Swift 6.5
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue *
 swift_task_findNearestDeadlineForClock(
@@ -668,8 +666,18 @@ swift_task_findNearestDeadlineForClock(
     const Metadata *clockType,
     const WitnessTable *identifiableWT,
     const WitnessTable *clockWT);
-
-#endif // !SWIFT_CONCURRENCY_EMBEDDED
+#else
+/// Embedded Swift has no witness tables to call `Identifiable.id` through.
+/// The runtime instead calls `matches` for each deadline record whose clock
+/// type is `clockType`, and passes it the record's clock and `context`. The
+/// caller compares that clock to the one it is looking for.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue *
+swift_task_findNearestDeadlineForClock(
+    const Metadata *clockType,
+    bool (*matches)(OpaqueValue *recordClock, void *context),
+    void *context);
+#endif
 
 /// Push a cancellation scope record onto the current task.
 ///

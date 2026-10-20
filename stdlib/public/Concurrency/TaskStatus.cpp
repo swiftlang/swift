@@ -684,7 +684,6 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 /******************************** DEADLINES *******************************/
 /**************************************************************************/
 
-// Task deadlines are unavailable in Embedded Swift
 #if !SWIFT_CONCURRENCY_EMBEDDED
 
 /// Bridged Swift-side helper. Called by the runtime for each candidate
@@ -709,6 +708,7 @@ bool _task_isEqualIdentifiableID(
     OpaqueValue *queryClock,
     const Metadata *clockType,
     const WitnessTable *identifiableWT);
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 SWIFT_CC(swift)
 static void
@@ -870,6 +870,7 @@ static OpaqueValue *findNearestDeadline(
   return nullptr;
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_CC(swift)
 static OpaqueValue *
 swift_task_findNearestDeadlineForClockImpl(
@@ -902,8 +903,29 @@ swift_task_findNearestDeadlineForClockImpl(
         /*identifiableWT=*/identifiableWT);
   });
 }
+#else
+SWIFT_CC(swift)
+static OpaqueValue *
+swift_task_findNearestDeadlineForClockImpl(
+    const Metadata *clockType,
+    bool (*matches)(OpaqueValue *recordClock, void *context),
+    void *context) {
+  auto task = swift_task_getCurrent();
+  if (!task)
+    return nullptr;
 
-#endif // !SWIFT_CONCURRENCY_EMBEDDED
+  // Embedded Swift has no metadata to call `Identifiable.id` through, so the
+  // caller supplies the identity comparison for its clock type. Return borrowed
+  // (+0) like the non-Embedded version.
+  return findNearestDeadline(task, [&](TaskDeadlineStatusRecord *record) {
+    // Clock types must be pointer-equal before `matches` may read the clock.
+    if (record->getClockType() != clockType)
+      return false;
+
+    return matches(record->getClockPtr(), context);
+  });
+}
+#endif
 
 /// Check for `Task.hasActiveDeadline`. The task status flags tell us if the
 /// task definitely has no deadline installed.
@@ -916,9 +938,6 @@ bool _swift_task_hasActiveDeadline() {
   auto status = task->_private()._status().load(std::memory_order_relaxed);
   if (!status.hasDeadline())
     return false;
-#if SWIFT_CONCURRENCY_EMBEDDED
-  return true;
-#else
   // A cancellation shield prevents finding the deadlines outside of it. A
   // child task might have inherited the flag from a deadline of its parent that
   // doesn't apply to it. Otherwise the flag is enough.
@@ -926,7 +945,6 @@ bool _swift_task_hasActiveDeadline() {
     return true;
   return findNearestDeadline(
              task, [](TaskDeadlineStatusRecord *) { return true; }) != nullptr;
-#endif
 }
 
 void AsyncTask::inheritDeadlineFrom(AsyncTask *parent) {

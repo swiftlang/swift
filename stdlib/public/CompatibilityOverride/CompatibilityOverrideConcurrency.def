@@ -443,9 +443,6 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
                      swift::, (TaskExecutorPreferenceStatusRecord *record),
                      (record))
 
-// Task deadlines are unavailable in Embedded Swift
-#if !SWIFT_CONCURRENCY_EMBEDDED
-
 OVERRIDE_TASK_STATUS(task_pushDeadline,
                      void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -462,6 +459,7 @@ OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      swift::, (TaskDeadlineStatusRecord *record),
                      (record))
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
                      OpaqueValue *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -471,8 +469,16 @@ OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
                       const WitnessTable *identifiableWT,
                       const WitnessTable *clockWT),
                      (queryClock, clockType, identifiableWT, clockWT))
-
-#endif // !SWIFT_CONCURRENCY_EMBEDDED
+#else
+OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
+                     OpaqueValue *,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::,
+                     (const Metadata *clockType,
+                      bool (*matches)(OpaqueValue *recordClock, void *context),
+                      void *context),
+                     (clockType, matches, context))
+#endif
 
 OVERRIDE_TASK_STATUS(task_pushCancellationScope, TaskCancellationScopeRecord *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

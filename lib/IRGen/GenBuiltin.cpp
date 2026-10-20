@@ -1732,8 +1732,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Under `borrowing` opaque-generic operands, SIL passes the values
     // by address ($*C, $*I), which IRGen sees as raw `i8*` pointers.
     // Metadata comes from the generic substitutions.
-    auto *clockPtr = args.claimNext();
-    auto *instantPtr = args.claimNext();
+    //
+    // Once the caller is specialized, which is always the case in Embedded
+    // Swift, the operands are loadable values instead. The record keeps
+    // pointers to them until the matching pop, so spill them into stack slots
+    // that live as long as the function.
+    auto claimOperandAddress = [&](SILType operandTy, StringRef name) {
+      if (operandTy.isAddress())
+        return args.claimNext();
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(operandTy));
+      Address slot = IGF.createAlloca(ti.getStorageType(),
+                                      ti.getFixedAlignment(), name);
+      ti.initialize(IGF, args, slot, /*isOutlined=*/false);
+      return IGF.Builder.CreateBitCast(slot.getAddress(), IGF.IGM.Int8PtrTy);
+    };
+    auto *clockPtr = claimOperandAddress(argTypes[0], "task.deadline.clock");
+    auto *instantPtr =
+        claimOperandAddress(argTypes[1], "task.deadline.instant");
     auto clockTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     auto instantTy = substitutions.getReplacementTypes()[1]->getCanonicalType();
     auto *clockType = IGF.emitTypeMetadataRef(clockTy);
