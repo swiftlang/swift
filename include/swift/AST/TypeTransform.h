@@ -261,7 +261,7 @@ case TypeKind::Id:
 
       if (anyChanged)
         return NominalType::get(nominalTy->getDecl(), substParentTy,
-                                substArgs, ctx);
+                                substArgs, ctx, nominalTy->getScopeArgs());
 
       return t;
     }

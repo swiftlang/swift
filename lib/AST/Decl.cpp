@@ -4816,6 +4816,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 }
 
 CanType ValueDecl::getOverloadSignatureType() const {
+  // FIXME: Erase scopes.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     bool isMethod = afd->hasImplicitSelfDecl();
     return mapSignatureFunctionType(getASTContext(), getInterfaceType(),

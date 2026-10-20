@@ -351,13 +351,13 @@ extension ASTGenVisitor {
       return nil
     }
 
-    var specifiers: [BridgedScopeSpecifier] = []
+    var restrictions: [BridgedScopeRestrictionRepr] = []
     for arg in args {
-      guard let specifier = self.generateScopeSpecifier(arg) else {
+      guard let restriction = self.generateScopeRestriction(arg) else {
         self.diagnose(.invalidArgumentInAttribute(node, arg))
         return nil
       }
-      specifiers.append(specifier)
+      restrictions.append(restriction)
     }
 
     return .createParsed(
@@ -365,11 +365,11 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       parensRange: self.generateAttrParensRange(attribute: node),
-      specifiers: specifiers.lazy.bridgedArray(in: self)
+      restrictions: restrictions.lazy.bridgedArray(in: self)
     )
   }
 
-  func generateScopeSpecifier(_ arg: LabeledExprSyntax) -> BridgedScopeSpecifier? {
+  func generateScopeRestriction(_ arg: LabeledExprSyntax) -> BridgedScopeRestrictionRepr? {
     var label: Identifier = nil
     var labelLoc = SourceLoc()
     if let labelToken = arg.label {
@@ -399,7 +399,7 @@ extension ASTGenVisitor {
     }
 
     let loc = self.generateSourceLoc(declRefExpr)
-    let scope: BridgedScopeDescriptor
+    let scope: BridgedScopeRepr
     switch declRefExpr.baseName.tokenKind {
     case .keyword(.`self`):
       scope = .forSelf(loc: loc, isAccess: isAccess)

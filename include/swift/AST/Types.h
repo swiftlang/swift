@@ -30,6 +30,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -539,9 +540,12 @@ protected:
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 32,
+  SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 16+16,
+    /// The number of scope arguments.
+    ScopeArgCount : 16,
+
     /// The number of generic arguments.
-    GenericArgCount : 32;
+    GenericArgCount : 16;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
@@ -3030,10 +3034,18 @@ class NominalType : public AnyGenericType, public llvm::FoldingSetNode {
       const_cast<const NominalType*>(this)->getTrailingObjectsPointer());
   }
 
+  /// Retrieve the scope argument storage from the subtype
+  const ScopeRef *getScopeArgsPointer() const;
+  ScopeRef *getScopeArgsPointer() {
+    return const_cast<ScopeRef *>(
+      const_cast<const NominalType *>(this)->getScopeArgsPointer());
+  }
+
 protected:
   NominalType(TypeKind K, NominalTypeDecl *TheDecl, Type parent,
               ArrayRef<Type> genericArgs, const ASTContext *C,
-              RecursiveTypeProperties properties);
+              RecursiveTypeProperties properties,
+              ArrayRef<ScopeRef> scopeArgs = {});
 
 public:
   /// Returns the declaration that declares this type.
@@ -3051,11 +3063,24 @@ public:
 
   SmallVector<Type, 2> getExpandedGenericArgs();
 
+  /// Returns the arguments for the declaration's scope parameters.
+  ArrayRef<ScopeRef> getScopeArgs() const {
+    if (!hasScopeArgs())
+      return {};
+    return {getScopeArgsPointer(),
+            static_cast<size_t>(Bits.NominalType.ScopeArgCount)};
+  }
+
+  bool hasScopeArgs() const {
+    return Bits.NominalType.ScopeArgCount != 0;
+  }
+
   static NominalType *get(NominalTypeDecl *D, Type parent, const ASTContext &C) {
     return get(D, parent, {}, C);
   }
   static NominalType *get(NominalTypeDecl *D, Type parent,
-                          ArrayRef<Type> genericArgs, const ASTContext &C);
+                          ArrayRef<Type> genericArgs, const ASTContext &C,
+                          ArrayRef<ScopeRef> scopeArgs = {});
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3064,10 +3089,11 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getParent(), getGenericArgs());
+    Profile(ID, getDecl(), getParent(), getGenericArgs(), getScopeArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *theDecl,
-                      Type parent, ArrayRef<Type> genericArgs);
+                      Type parent, ArrayRef<Type> genericArgs,
+                      ArrayRef<ScopeRef> scopeArgs);
 };
 BEGIN_CAN_TYPE_WRAPPER(NominalType, AnyGenericType)
   CanTypeArrayRef getGenericArgs() const {
@@ -3076,10 +3102,15 @@ BEGIN_CAN_TYPE_WRAPPER(NominalType, AnyGenericType)
 END_CAN_TYPE_WRAPPER(NominalType, AnyGenericType)
 
 /// EnumType - This represents the type declared by an EnumDecl.
-class EnumType final : public NominalType,
-                       private llvm::TrailingObjects<EnumType, Type> {
+class EnumType final
+    : public NominalType,
+      private llvm::TrailingObjects<EnumType, Type, ScopeRef> {
   friend TrailingObjects;
   friend class NominalType; // to access the trailing objects
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return getGenericArgs().size();
+  }
 
 public:
   /// getDecl() - Returns the decl which declares this type.
@@ -3102,7 +3133,7 @@ public:
 
 private:
   EnumType(EnumDecl *D, Type parent, ArrayRef<Type> args,
-           const ASTContext *ctx,
+           ArrayRef<ScopeRef> scopeArgs, const ASTContext *ctx,
            RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(EnumType, NominalType)
@@ -3111,10 +3142,15 @@ BEGIN_CAN_TYPE_WRAPPER(EnumType, NominalType)
 END_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType final : public NominalType,
-                         private llvm::TrailingObjects<StructType, Type> {
+class StructType final
+    : public NominalType,
+      private llvm::TrailingObjects<StructType, Type, ScopeRef> {
   friend TrailingObjects;
   friend class NominalType; // to access the trailing objects
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return getGenericArgs().size();
+  }
 
 public:
   /// getDecl() - Returns the decl which declares this type.
@@ -3137,7 +3173,7 @@ public:
   
 private:
   StructType(StructDecl *D, Type parent, ArrayRef<Type> args,
-             const ASTContext *ctx,
+             ArrayRef<ScopeRef> scopeArgs, const ASTContext *ctx,
              RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(StructType, NominalType)
@@ -3147,7 +3183,7 @@ END_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
 class ClassType final : public NominalType,
-                        private llvm::TrailingObjects<StructType, Type> {
+                        private llvm::TrailingObjects<ClassType, Type> {
   friend TrailingObjects;
   friend class NominalType; // to access the trailing objects
 
@@ -8790,9 +8826,9 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
 inline const Type *NominalType::getTrailingObjectsPointer() const {
   switch (getKind()) {
   case TypeKind::Struct:
-    return cast<StructType>(this)->getTrailingObjects();
+    return cast<StructType>(this)->getTrailingObjects<Type>();
   case TypeKind::Enum:
-    return cast<EnumType>(this)->getTrailingObjects();
+    return cast<EnumType>(this)->getTrailingObjects<Type>();
   case TypeKind::Class:
     return cast<ClassType>(this)->getTrailingObjects();
   case TypeKind::Protocol:
@@ -8800,6 +8836,17 @@ inline const Type *NominalType::getTrailingObjectsPointer() const {
     return nullptr;
   default:
     llvm_unreachable("Unhandled NominalType!");
+  }
+}
+
+inline const ScopeRef *NominalType::getScopeArgsPointer() const {
+  switch (getKind()) {
+  case TypeKind::Struct:
+    return cast<StructType>(this)->getTrailingObjects<ScopeRef>();
+  case TypeKind::Enum:
+    return cast<EnumType>(this)->getTrailingObjects<ScopeRef>();
+  default:
+    ABORT("only structs and enums have scope arguments");
   }
 }
 

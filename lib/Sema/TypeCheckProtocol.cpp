@@ -981,6 +981,7 @@ RequirementMatch swift::matchWitness(
       }
 
       // Check that lifetime dependencies match
+      // TODO: Also check scopes eventually.
       if (auto result = matchLifetimes(
               LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
               LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {

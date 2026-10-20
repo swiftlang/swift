@@ -6816,6 +6816,25 @@ public:
     printTypeDeclName(Ty, NameContext);
   }
 
+  // FIXME: This prints elided scopes as `^depth.index` in module interfaces and
+  // diagnostics, which can't be parsed.
+  void printScopeArgs(NominalType *Ty) {
+    if (!Ty->hasScopeArgs())
+      return;
+    Printer.printAttrName("@_scoped");
+    Printer << "(";
+    interleave(
+        Ty->getScopeArgs(),
+        [&](ScopeRef scope) {
+          llvm::SmallString<16> buffer;
+          llvm::raw_svector_ostream os(buffer);
+          scope.print(os);
+          Printer << buffer;
+        },
+        [&] { Printer << ", "; });
+    Printer << ") ";
+  }
+
   void visit(Type T, NonRecursivePrintOptions nrOptions = std::nullopt) {
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
@@ -7136,6 +7155,7 @@ public:
       }
     }
 
+    printScopeArgs(T);
     printQualifiedType(T);
 
     if (T->hasGenericArgs()) {
