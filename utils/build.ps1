@@ -4784,6 +4784,11 @@ roots:
             OPENSSL_USE_STATIC_LIBS = "YES";
           };
         }
+        if ($Platform.OS -eq [OS]::Android) {
+          # Use the shared C++ runtime so that libraries like _FoundationICU
+          # don't carry their own copy.
+          $PlatformDefines.CMAKE_ANDROID_STL_TYPE = "c++_shared"
+        }
         $FoundationDefines = $SDKInstallDefines + $FoundationDefines + $PlatformDefines
 
         Build-CMakeProject `
