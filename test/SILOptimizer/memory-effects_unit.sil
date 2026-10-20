@@ -2191,3 +2191,69 @@ bb0(%0 : $*Int32, %1 : $*Int32):
   return %r : $()
 }
 
+
+sil_global hidden @globalX1 : $X
+sil_global hidden @globalX2 : $X
+
+// A `load_borrow` only reads from its own address - like a `load`. That the memory must not be
+// modified until the `end_borrow` is modelled by the effects of the `end_borrow`.
+// CHECK-LABEL: @test_load_borrow_other_global
+// CHECK:      PAIR #19.
+// CHECK-NEXT:     %7 = load_borrow %6 : $*X
+// CHECK-NEXT:     %2 = begin_access [modify] [dynamic] %1 : $*X
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #21.
+// CHECK-NEXT:     %7 = load_borrow %6 : $*X
+// CHECK-NEXT:     %6 = begin_access [read] [dynamic] %5 : $*X
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #22.
+// CHECK-NEXT:     %7 = load_borrow %6 : $*X
+// CHECK-NEXT:     %10 = begin_access [modify] [dynamic] %1 : $*X
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_load_borrow_other_global : $@convention(thin) (@owned X) -> @owned X {
+bb0(%0 : @owned $X):
+  specify_test "memory_effects"
+  %1 = global_addr @globalX1 : $*X
+  %2 = begin_access [modify] [dynamic] %1 : $*X
+  store %0 to [assign] %2 : $*X
+  end_access %2 : $*X
+  %5 = global_addr @globalX2 : $*X
+  %6 = begin_access [read] [dynamic] %5 : $*X
+  %7 = load_borrow %6 : $*X
+  end_borrow %7 : $X
+  end_access %6 : $*X
+  %10 = begin_access [modify] [dynamic] %1 : $*X
+  %11 = load [take] %10 : $*X
+  end_access %10 : $*X
+  return %11 : $X
+}
+
+// An `end_borrow` of a reborrowed `load_borrow` has the same effects as an `end_borrow` of
+// the `load_borrow` itself.
+// CHECK-LABEL: @test_end_borrow_of_reborrowed_load_borrow
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %8 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*X
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %8 : $X
+// CHECK-NEXT:     %1 = alloc_stack $X
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow_of_reborrowed_load_borrow : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  specify_test "memory_effects"
+  %1 = alloc_stack $X
+  %2 = load_borrow %0 : $*X
+  br bb1(%2 : $X)
+
+bb1(%4 : @reborrow $X):
+  %5 = borrowed %4 : $X from ()
+  br bb2(%5 : $X)
+
+bb2(%7 : @reborrow $X):
+  %8 = borrowed %7 : $X from ()
+  end_borrow %8 : $X
+  dealloc_stack %1 : $*X
+  %11 = tuple ()
+  return %11 : $()
+}
