@@ -1,6 +1,7 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: concurrency
 // RUN: %target-swift-frontend -emit-ir %s  -target %target-swift-5.1-abi-triple -validate-tbd-against-ir=all -module-name test | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s  -target %target-swift-5.1-abi-triple -validate-tbd-against-ir=all -module-name test -enable-library-evolution -o /dev/null
 
 // CHECK: @barTu = global %swift.async_func_pointer
 @_silgen_name("bar")
@@ -10,4 +11,15 @@ public func foo() async {}
 
 open class C {
   private func f() async { }
+}
+
+// A @_silgen_name computed property is a definition, not a forward declaration.
+public final class D<T> {
+  @usableFromInline
+  @_silgen_name("$s4test1DC6resultxSgvp")
+  internal var _legacy_result: T? {
+    @usableFromInline
+    @_silgen_name("$s4test1DC6resultxSgvg")
+    get async throws { nil }
+  }
 }

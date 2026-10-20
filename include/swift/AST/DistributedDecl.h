@@ -224,6 +224,11 @@ bool isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
 /// without hopping off the caller
 bool distributedThunkShouldBeNonisolatedNonsending(FuncDecl *func);
 
+/// Given a synthesized distributed thunk, return the declaration it was
+/// synthesized for: the `distributed func`, or the getter of a
+/// `distributed var`. Returns null if the original cannot be found.
+AbstractFunctionDecl *getDistributedThunkOriginalDecl(FuncDecl *thunk);
+
 /// Retrieve the declaration of DistributedActorSystem.make().
 ///
 /// \param thunk the function from which we'll be invoking things on the
