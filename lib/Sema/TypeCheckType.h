@@ -107,7 +107,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether we are checking generic arguments of a non-variadic bound generic
   /// type. This includes parameterized protocol types. We don't allow pack
-  /// expansions here.
+  /// expansions here. Integer types and value parameters are allowed, and we
+  /// use the ValueMatchVisitor to ensure that they line up with value
+  /// parameters.
   ScalarGenericArgument,
 
   /// Whether we are checking generic arguments of a variadic generic type.
@@ -116,11 +118,6 @@ enum class TypeResolverContext : uint8_t {
   /// arguments, and pack expansion parameters line up with pack expansion
   /// arguments.
   VariadicGenericArgument,
-
-  /// Whether we are checking generic arguments of a bound generic type with
-  /// value parameters. We use the ValueMatchVisitor to ensure that all value
-  /// parameters line up with integer types or other value parameters.
-  ValueGenericArgument,
 
   /// Whether we are checking a tuple element type.
   TupleElement,
@@ -320,7 +317,6 @@ public:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
     case Context::Inverted:
-    case Context::ValueGenericArgument:
     case Context::PatternBindingDecl:
     case Context::RawLayoutAttr:
       return false;
@@ -367,7 +363,6 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return true;
     }
@@ -411,7 +406,6 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return false;
     }
@@ -422,7 +416,6 @@ public:
     switch (context) {
     case Context::ScalarGenericArgument:
     case Context::VariadicGenericArgument:
-    case Context::ValueGenericArgument:
       return true;
 
     case Context::None:
@@ -502,7 +495,6 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::Inverted:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return false;
     }
