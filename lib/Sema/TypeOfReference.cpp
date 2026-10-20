@@ -2703,6 +2703,17 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   return {true, getApplicationLevel(cs, baseTy, UDE)};
 }
 
+/// The isolation of the function types that the special type checking
+/// semantics build: nonisolated, or nonisolated(nonsending) when that is the
+/// default.
+static FunctionTypeIsolation
+getDefaultFunctionTypeIsolation(ConstraintSystem &CS) {
+  if (CS.getASTContext().LangOpts.hasFeature(
+          Feature::NonisolatedNonsendingByDefault))
+    return FunctionTypeIsolation::forNonisolatedNonsending();
+  return FunctionTypeIsolation::forNonIsolated();
+}
+
 /// If we're resolving an overload set with a decl that has special type
 /// checking semantics, compute the type of the reference.  For now, follow
 /// the lead of \c getTypeOfMemberReference and return a pair of
@@ -2759,11 +2770,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         0, preparedOverload);
     FunctionType::Param arg(escapeClosure);
 
-    auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
-    if (CS.getASTContext().LangOpts.hasFeature(
-            Feature::NonisolatedNonsendingByDefault)) {
-      bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
-    }
+    auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
     auto bodyClosure = FunctionType::get(arg, /* yields */ {}, result,
                                          FunctionType::ExtInfoBuilder()
@@ -2777,16 +2784,60 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
-    auto withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolated();
-    if (CS.getASTContext().LangOpts.hasFeature(
-            Feature::NonisolatedNonsendingByDefault)) {
-      withoutEscapingIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
-    }
+    auto withoutEscapingIsolation = getDefaultFunctionTypeIsolation(CS);
 
     return FunctionType::get(args, /* yields */ {}, result,
                              FunctionType::ExtInfoBuilder()
                                  .withNoEscape(false)
                                  .withIsolation(withoutEscapingIsolation)
+                                 .withAsync(true)
+                                 .withThrows(true, thrownError)
+                                 .build());
+  }
+  case DeclTypeCheckingSemantics::WithoutActuallyDiscarding: {
+    // Proceed with a "WithoutActuallyDiscarding" operation. The body closure
+    // receives the exactly-once argument converted to an at-most-once
+    // function. The body parameter is escaping if the argument is.
+    auto exactlyOnceClosure = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape, preparedOverload);
+    auto atMostOnceClosure = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape, preparedOverload);
+    CS.addConstraint(ConstraintKind::DiscardableFunctionOf, atMostOnceClosure,
+                     exactlyOnceClosure, CS.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
+    auto result = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape, preparedOverload);
+    auto thrownError = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType), 0,
+        preparedOverload);
+    auto consuming =
+        ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::Consuming);
+    FunctionType::Param arg(atMostOnceClosure, Identifier(), consuming);
+
+    auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
+
+    auto bodyClosure = FunctionType::get(arg, /* yields */ {}, result,
+                                         FunctionType::ExtInfoBuilder()
+                                             .withNoEscape(true)
+                                             .withIsolation(bodyParamIsolation)
+                                             .withAsync(true)
+                                             .withThrows(true, thrownError)
+                                             .build());
+    FunctionType::Param args[] = {
+        FunctionType::Param(exactlyOnceClosure, Identifier(), consuming),
+        FunctionType::Param(bodyClosure,
+                            CS.getASTContext().getIdentifier("do")),
+    };
+
+    auto withoutDiscardingIsolation = getDefaultFunctionTypeIsolation(CS);
+
+    return FunctionType::get(args, /* yields */ {}, result,
+                             FunctionType::ExtInfoBuilder()
+                                 .withNoEscape(false)
+                                 .withIsolation(withoutDiscardingIsolation)
                                  .withAsync(true)
                                  .withThrows(true, thrownError)
                                  .build());
@@ -2811,11 +2862,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         0, preparedOverload);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
 
-    auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
-    if (CS.getASTContext().LangOpts.hasFeature(
-            Feature::NonisolatedNonsendingByDefault)) {
-      bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
-    }
+    auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
     auto bodyClosure = FunctionType::get(bodyArgs, /* yields */ {}, result,
                                          FunctionType::ExtInfoBuilder()
@@ -2829,11 +2876,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
-    auto openExistentialIsolation = FunctionTypeIsolation::forNonIsolated();
-    if (CS.getASTContext().LangOpts.hasFeature(
-            Feature::NonisolatedNonsendingByDefault)) {
-      openExistentialIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
-    }
+    auto openExistentialIsolation = getDefaultFunctionTypeIsolation(CS);
 
     return FunctionType::get(args, /* yields */ {}, result,
                              FunctionType::ExtInfoBuilder()
