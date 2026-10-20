@@ -867,16 +867,17 @@ do {
     guard let _: P = c2 != nil ? c2! : c1 else { return }
     // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
 
-    // We only diagnose this situation when the outermost conversion in the
-    // initializer is an optional injection. But it may happen that the
-    // conversion is pushed down into the arms of a ternary, for example.
-    guard let _: P = c3.first != nil ? c3.first! : c1 else { return }  // FIXME: Should also be an error
+    guard let _: P = c3.first != nil ? c3.first! : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
 
-    guard let _: P = b ? c1 : d else { return }  // FIXME: Should also be an error
+    guard let _: P = b ? c1 : d else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
 
-    guard let _: P = c2 != nil ? c2! : d else { return }  // FIXME: Should also be an error
+    guard let _: P = c2 != nil ? c2! : d else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
 
-    guard let _: P = c3.first != nil ? c3.first! : d else { return }  // FIXME: Should also be an error
+    guard let _: P = c3.first != nil ? c3.first! : d else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
   }
 }
 
