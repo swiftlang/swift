@@ -514,7 +514,7 @@ enum class FixKind : uint8_t {
   IgnoreClassRequirementForDynamicMemberLookup,
 
   /// Ignore an attempt to convert between function types with different
-  /// execution semantics i.e. go from `@called(atMostOnce)` to a regular
+  /// execution semantics, such as going from at-most-once to a regular
   /// function type.
   ExecutionSemanticsMismatch,
 };

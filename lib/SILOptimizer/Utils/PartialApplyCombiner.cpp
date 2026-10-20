@@ -70,7 +70,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     getConsumedPartialApplyArgs(pai, argsToHandle,
                                 /*includeTrivialAddrArgs*/ true);
   } else if (pai->hasCalledAtMostOnceSemantics()) {
-    // A `@called(atMostOnce)` on-stack closure can own (consume)
+    // An at-most-once on-stack closure can own (consume)
     // captures, so they have to be copied when possible.
     for (Operand &argOp : pai->getArgumentOperands()) {
       if (argOp.isConsuming())
@@ -194,7 +194,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
     if (paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
             .isConsumedInCaller()) {
       // A move-only `arg` has no copy to make, this can only happen for
-      // a `@called(atMostOnce)` on-stack closure's consuming capture. Transfer
+      // an at-most-once on-stack closure's consuming capture. Transfer
       // it directly instead, and sever `pai`'s own operand so its later
       // teardown doesn't try to release the same value again. `pai` is
       // left with no real uses and gets cleaned up as a dead closure.

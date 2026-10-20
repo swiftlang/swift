@@ -4050,7 +4050,7 @@ public:
   }
 
   /// Returns true if values of this function type must be called exactly
-  /// once, which is true only for `@called(exactlyOnce)` function types.
+  /// once, which is true only for exactly-once function types.
   bool isCalledOnce() const {
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
@@ -4204,7 +4204,7 @@ public:
   }
 
   /// A dependent type that determines whether the function is
-  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// at-most-once. This is only used within the constraint system, and
   /// will contain type variables if present.
   Type getExecutionSemanticsDependentType() const {
     if (!hasExecutionSemanticsDependentType())
@@ -5580,7 +5580,7 @@ public:
     return getExtInfo().hasCalledAtMostOnceSemantics();
   }
   /// Returns true if values of this function type must be called exactly
-  /// once, which is true only for `@called(exactlyOnce)` function types.
+  /// once, which is true only for exactly-once function types.
   bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();

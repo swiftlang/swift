@@ -7883,7 +7883,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate the
-    // '@called(atMostOnce)' bit to the closure without invalidating prior
+    // at-most-once bit to the closure without invalidating prior
     // analysis.
     fromEI = fromFunc->getExtInfo();
     if (toEI.hasCalledAtMostOnceSemantics() &&
@@ -7893,7 +7893,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
-        // Propagating '@called(atMostOnce)' might have satisfied the entire
+        // Propagating at-most-once might have satisfied the entire
         // conversion. If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;

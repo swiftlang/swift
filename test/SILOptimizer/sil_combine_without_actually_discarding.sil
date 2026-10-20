@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature CalledAttribute -enable-sil-verify-all -sil-combine %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature OnceFunctions -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
-// REQUIRES: swift_feature_CalledAttribute
+// REQUIRES: swift_feature_OnceFunctions
 
 sil_stage canonical
 
@@ -11,13 +11,13 @@ import Swift
 // guarantee. Both conversions have to stay.
 //
 // CHECK-LABEL: sil [ossa] @test_fold_through_discard :
-// CHECK:         [[DISCARDED:%.*]] = convert_function %0 : $@called(exactlyOnce) @callee_owned () -> () to [without_actually_discarding] $@called(atMostOnce) @callee_owned () -> ()
-// CHECK-NEXT:    [[SENDABLE:%.*]] = convert_function [[DISCARDED]] : $@called(atMostOnce) @callee_owned () -> () to $@Sendable @called(atMostOnce) @callee_owned () -> ()
+// CHECK:         [[DISCARDED:%.*]] = convert_function %0 : $@once @callee_owned () -> () to [without_actually_discarding] $@callable(once) @callee_owned () -> ()
+// CHECK-NEXT:    [[SENDABLE:%.*]] = convert_function [[DISCARDED]] : $@callable(once) @callee_owned () -> () to $@Sendable @callable(once) @callee_owned () -> ()
 // CHECK-NEXT:    return [[SENDABLE]]
 // CHECK:       } // end sil function 'test_fold_through_discard'
-sil [ossa] @test_fold_through_discard : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @Sendable @called(atMostOnce) @callee_owned () -> () {
-bb0(%0 : @owned $@called(exactlyOnce) @callee_owned () -> ()):
-  %1 = convert_function %0 : $@called(exactlyOnce) @callee_owned () -> () to [without_actually_discarding] $@called(atMostOnce) @callee_owned () -> ()
-  %2 = convert_function %1 : $@called(atMostOnce) @callee_owned () -> () to $@Sendable @called(atMostOnce) @callee_owned () -> ()
-  return %2 : $@Sendable @called(atMostOnce) @callee_owned () -> ()
+sil [ossa] @test_fold_through_discard : $@convention(thin) (@owned @once @callee_owned () -> ()) -> @owned @Sendable @callable(once) @callee_owned () -> () {
+bb0(%0 : @owned $@once @callee_owned () -> ()):
+  %1 = convert_function %0 : $@once @callee_owned () -> () to [without_actually_discarding] $@callable(once) @callee_owned () -> ()
+  %2 = convert_function %1 : $@callable(once) @callee_owned () -> () to $@Sendable @callable(once) @callee_owned () -> ()
+  return %2 : $@Sendable @callable(once) @callee_owned () -> ()
 }

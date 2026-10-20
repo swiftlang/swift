@@ -65,6 +65,7 @@ extension ASTGenVisitor {
         .Local,
         .NoMetadata,
         .Nonisolated,
+        .Once,
         .PackGuaranteed,
         .PackInout,
         .PackOut,
@@ -95,8 +96,8 @@ extension ASTGenVisitor {
       case .Isolated:
         return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .Called:
-        return (self.generateCalledTypeAttr(attribute: node)?.asTypeAttribute)
+      case .Callable:
+        return (self.generateCallableTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       case .Scoped:
@@ -301,21 +302,8 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCalledTypeAttr(attribute node: AttributeSyntax) -> BridgedCalledTypeAttr? {
-    let semanticsLoc = self.generateSourceLoc(node.arguments)
-    let semantics: BridgedCalledTypeAttrSemantics? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "exactlyOnce": return .exactlyOnce
-        case "atMostOnce": return .atMostOnce
-        default:
-          // TODO: Diagnose.
-          return nil
-        }
-      }
-    )
-    guard let semantics else {
+  func generateCallableTypeAttr(attribute node: AttributeSyntax) -> BridgedCallableTypeAttr? {
+    guard self.generateCallableAttrArgument(attribute: node) else {
       return nil
     }
 
@@ -323,11 +311,11 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      semantics: semantics,
-      semanticsLoc: semanticsLoc
+      parensRange: self.generateAttrParensRange(attribute: node)
     )
   }
+
+
 
   /// E.g.
   ///   ```

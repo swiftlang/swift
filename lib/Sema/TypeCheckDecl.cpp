@@ -2405,9 +2405,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
-  // Every kind of @called implies `consumed`.
+  // A function type with execution semantics implies `consuming`.
   if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-    if (attributedTy->has(TypeAttrKind::Called))
+    if (attributedTy->has(TypeAttrKind::Once) ||
+        attributedTy->has(TypeAttrKind::Callable))
       return ParamSpecifier::Consuming;
   }
 
@@ -2510,8 +2511,8 @@ static Type validateParameterType(ParamDecl *decl) {
       case ParamSpecifier::LegacyShared:
         ctx.Diags.diagnose(
             decl->getTypeRepr()->getLoc(),
-            diag::called_attr_cannot_be_used_with_borrowing,
-            CalledAttr::getSemanticsName(*F->getExecutionSemantics()));
+            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
+            getExecutionSemanticsAttrSpelling(*F->getExecutionSemantics()));
         return ErrorType::get(ctx);
 
       case ParamSpecifier::InOut:
@@ -2520,7 +2521,7 @@ static Type validateParameterType(ParamDecl *decl) {
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(atMostOnce) is consuming by default and we don't
+      // at-most-once is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;

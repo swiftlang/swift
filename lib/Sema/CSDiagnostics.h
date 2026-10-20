@@ -1011,11 +1011,11 @@ public:
 };
 
 /// Diagnose failures related to conversion between two types with different
-/// execution semantics i.e. '@called(atMostOnce)' function and regular one:
+/// execution semantics, such as an at-most-once function and a regular one:
 ///
 /// ```swift
 /// func test(_: () -> Void) {}
-/// let fn: @called(atMostOnce) () -> Void = {}
+/// let fn: @callable(once) () -> Void = {}
 /// test(fn) // error due to widening
 /// ```
 class ConversionBetweenFunctionsWithDifferentExecutionSemantics final

@@ -482,7 +482,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
     return false;
 
   // A nonescaping closure borrows its captures (note that
-  // `@called(atMostOnce)`, is allowed to also consume its captures), but now
+  // at-most-once, is allowed to also consume its captures), but now
   // that we've lowered those borrows away, we need to make those dependence
   // relationships explicit so that the optimizer continues respecting them.
   ApplySite applySite(inst);
@@ -502,7 +502,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
         break;
       }
 
-      // In `@called(atMostOnce)` case, consumed captures don't need the
+      // In at-most-once case, consumed captures don't need the
       // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
       // value.
       if (inst->hasCalledAtMostOnceSemantics()) {
@@ -813,7 +813,7 @@ static bool stripOwnership(SILFunction &func) {
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
-      // A `@called(atMostOnce)` closure's context can be consumed directly by a
+      // An at-most-once closure's context can be consumed directly by a
       // `try_apply`, which is a terminator, so the `dealloc_stack` has to
       // go at the start of every successor block instead.
       if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {

@@ -2582,7 +2582,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
     // Empty values don't matter, unless they still require a nontrivial
     // destroy (e.g. a zero-sized `~Copyable` type with a user-defined
-    // deinit captured by a `@called(atMostOnce)` closure).
+    // deinit captured by an at-most-once closure).
     auto schema = ti.getSchema();
     if (schema.empty() && !param.isFormalIndirect() &&
         ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
@@ -2827,7 +2827,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();
 
-      // @called(atMostOnce) closures always get a context even if they are
+      // at-most-once closures always get a context even if they are
       // stack promoted because they can have consuming captures.
       if (outType->hasCalledAtMostOnceSemantics()) {
         assert(!outType->isTrivialNoEscape());

@@ -414,7 +414,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::DiscardableFunctionOf:
-    Out << " @called(atMostOnce) type of ";
+    Out << " @callable(once) type of ";
     break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;

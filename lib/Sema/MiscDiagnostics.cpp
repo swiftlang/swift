@@ -2334,7 +2334,7 @@ public:
       return false;
     }
 
-    // Escaping `@called(atMostOnce)` closures are allowed to implicitly capture
+    // Escaping at-most-once closures are allowed to implicitly capture
     // `self` because the call (which is a consuming operation) would break
     // the cycle.
     if (hasCalledAtMostOnceSemantics(CE)) {
@@ -2966,7 +2966,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 }
 
 /// Diagnose cases where a `sending` capture is associated with a
-/// non-`@called(atMostOnce)` closure.
+/// non-at-most-once closure.
 static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
                                                       const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -2985,7 +2985,7 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
           if (!V->isSendingCapture())
             continue;
 
-          if (!Ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+          if (!Ctx.LangOpts.hasFeature(Feature::OnceFunctions)) {
             Ctx.Diags.diagnose(
                 V->getLoc(),
                 diag::sending_capture_requires_experimental_feature);
@@ -2993,8 +2993,8 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
           }
 
           if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
-            Ctx.Diags.diagnose(V->getLoc(),
-                               diag::sending_capture_decl_requires_called_closure);
+            Ctx.Diags.diagnose(
+                V->getLoc(), diag::sending_capture_decl_requires_once_closure);
             V->setInvalid();
             continue;
           }

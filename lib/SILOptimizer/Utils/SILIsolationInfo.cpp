@@ -1016,7 +1016,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
             isClosureCapturedNonisolatedUnsafe);
       }
 
-      // All of the non-Sendable captures of non-escaping @called(atMostOnce)
+      // All of the non-Sendable captures of non-escaping at-most-once
       // closures that aren't explicitly `sending` are disconnected.
       if (auto *closure = declRef.getClosureExpr();
           closure && closure->hasCalledAtMostOnceSemantics()) {

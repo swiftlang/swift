@@ -2205,7 +2205,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         continue;
       }
 
-      // A `@called(atMostOnce)` closure's context is consumed directly by the
+      // An at-most-once closure's context is consumed directly by the
       // `apply`/`try_apply` its passed to.
       if (hasCalledAtMostOnceSemantics() &&
           isa<ApplyInst, TryApplyInst>(use->getUser())) {
@@ -2252,12 +2252,12 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 
   for (auto *inst : boundary.lastUsers) {
     Operand *consumingOperand = nullptr;
-    // Non-`@called(atMostOnce)` values end their lifetime only at
+    // Non-at-most-once values end their lifetime only at
     // `destroy_value`.
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       consumingOperand = &dvi->getOperandRef();
     } else if (hasCalledAtMostOnceSemantics()) {
-      // `@called(atMostOnce)` is consumed by an apply, look up the operand
+      // at-most-once is consumed by an apply, look up the operand
       // where it appears.
       for (auto &operand : inst->getAllOperands()) {
         if (operand.isConsuming() && lookThroughOwnershipAndForwardingInsts(

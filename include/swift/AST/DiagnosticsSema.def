@@ -1480,7 +1480,7 @@ ERROR(cannot_jump_in_single_value_stmt,none,
 WARNING(effect_marker_on_single_value_stmt,none,
       "'%0' has no effect on '%1' expression", (StringRef, StmtKind))
 ERROR(without_actually_discarding_requires_exactly_once,none,
-      "'withoutActuallyDiscarding' requires a '@called(exactlyOnce)' function, "
+      "'withoutActuallyDiscarding' requires a '@once' function, "
       "but argument has type %0", (Type))
 ERROR(out_of_place_then_stmt,none,
       "'then' may only appear as the last statement in an 'if', 'switch', or "
@@ -2697,19 +2697,22 @@ WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
 
-// @called
-ERROR(called_attr_cannot_be_used_with_borrowing,none,
-      "'@called(%0)' cannot be used together with 'borrowing'", (StringRef))
-ERROR(called_attr_function_type_mismatch,none,
-      "invalid conversion from '@called(%0)' function of type %1 "
+// @once and @callable(once)
+ERROR(execution_semantics_attr_cannot_be_used_with_borrowing,none,
+      "'%0' cannot be used together with 'borrowing'", (StringRef))
+ERROR(execution_semantics_function_type_mismatch,none,
+      "invalid conversion from '%0' function of type %1 "
       "to function type %2", (StringRef, Type, Type))
+ERROR(execution_semantics_function_type_mismatch_to,none,
+      "invalid conversion from function of type %0 "
+      "to '%1' function of type %2", (Type, StringRef, Type))
 ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
-      "'CalledAttribute' is enabled",
+      "'OnceFunctions' is enabled",
       ())
-ERROR(sending_capture_decl_requires_called_closure,none,
-      "'sending' capture may only be declared in a '@called(atMostOnce)' or "
-      "'@called(exactlyOnce)' closure",
+ERROR(sending_capture_decl_requires_once_closure,none,
+      "'sending' capture may only be declared in a '@once' or "
+      "'@callable(once)' closure",
       ())
 
 // Alignment attribute
@@ -7117,9 +7120,9 @@ ERROR(unsupported_convention,none,
 ERROR(invalid_isolated_and_convention_attributes,none,
       "'@convention(%0)' attribute is not allowed on '@isolated' types",
       (StringRef))
-ERROR(invalid_called_and_attr_attributes,none,
-      "%0 attribute is not allowed on '@called' types",
-      (TypeAttribute *))
+ERROR(invalid_execution_semantics_and_attr_attributes,none,
+      "%0 attribute is not allowed on '%1' types",
+      (TypeAttribute *, StringRef))
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(non_inferrable_opaque_generic_parameter,none,

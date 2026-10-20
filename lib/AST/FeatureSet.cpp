@@ -777,9 +777,9 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
 
-static bool usesFeatureCalledAttribute(Decl *D) {
+static bool usesFeatureOnceFunctions(Decl *D) {
   auto &ctx = D->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+  if (!ctx.LangOpts.hasFeature(Feature::OnceFunctions))
     return false;
 
   std::function<bool(Type)> hasCalled = [](Type T) {
@@ -803,7 +803,7 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
       bool usesCalled = false;
       P->forEachVariable([&usesCalled](auto *V) {
-        usesCalled |= usesFeatureCalledAttribute(V);
+        usesCalled |= usesFeatureOnceFunctions(V);
       });
 
       if (usesCalled)

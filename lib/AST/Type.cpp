@@ -1659,8 +1659,8 @@ Type TypeBase::replaceTypeVariablesAndHolesWithErrors() {
     }
     std::pair<Type, std::optional<ExecutionSemantics>>
     transformExecutionSemanticsDependentType(Type ty) {
-      // Fold away the @called(atMostOnce) dependence if present, the function
-      // type will just become non-@called(atMostOnce).
+      // Fold away the at-most-once dependence if present, the function
+      // type will just become non-at-most-once.
       return std::make_pair(Type(), std::nullopt);
     }
   };
