@@ -1930,6 +1930,20 @@ DropAsyncAttribute *DropAsyncAttribute::create(ConstraintSystem &cs,
       DropAsyncAttribute(cs, fromType, toType, locator);
 }
 
+bool DropNonTransferableAttribute::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  NonTransferableFunctionConversionFailure failure(solution, getFromType(),
+                                                   getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+DropNonTransferableAttribute *DropNonTransferableAttribute::create(
+    ConstraintSystem &cs, FunctionType *fromType, FunctionType *toType,
+    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DropNonTransferableAttribute(cs, fromType, toType, locator);
+}
+
 bool IgnoreContextualType::diagnose(const Solution &solution,
                                     bool asNote) const {
   ContextualFailure failure(solution, getFromType(), getToType(), getLocator());

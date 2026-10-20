@@ -10012,6 +10012,10 @@ ERROR(conformance_repression_only_on_struct_class_enum,none,
 // MARK: `~Transferable`
 //===----------------------------------------------------------------------===//
 
+ERROR(non_transferable_functiontype_mismatch,none,
+      "invalid conversion from non-'Transferable' function of type %0 to "
+      "'Transferable' function type %1", (Type, Type))
+
 ERROR(invalid_non_transferable_and_attr_combination,none,
       "%0 attribute is not allowed on '@nontransferable' types",
       (TypeAttribute *))

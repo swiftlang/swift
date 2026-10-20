@@ -1048,8 +1048,9 @@ static bool diagnoseSingleNonSendableType(
                          inDerivedConformance);
     }
 
-    if (type->is<FunctionType>()) {
-      ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
+    if (auto *funcType = type->getAs<FunctionType>()) {
+      if (funcType->isTransferable())
+        ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
     } else if (nominal &&
                nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
       nominal->diagnose(diag::sendable_conformance_is_suppressed, nominal);

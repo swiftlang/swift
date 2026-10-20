@@ -1034,6 +1034,23 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose failures related to conversion between non-'Transferable' function
+/// type and a Transferable one.
+class NonTransferableFunctionConversionFailure final : public ContextualFailure {
+public:
+  NonTransferableFunctionConversionFailure(const Solution &solution, Type fromType,
+                                 Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {
+#ifndef NDEBUG
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->isNonTransferable() != fnType2->isNonTransferable());
+#endif
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to conversion between two types with different
 /// execution semantics, such as an at-most-once function and a regular one:
 ///

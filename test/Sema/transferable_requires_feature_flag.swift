@@ -36,3 +36,6 @@ func qualified<T: Swift.Transferable>(_: T) {}
 // expected-disabled-error@-1 {{'Transferable' requires '-enable-experimental-feature NontransferableTypes'}}
 func positiveExistential(_: any Transferable) {}
 // expected-disabled-error@-1 {{'Transferable' requires '-enable-experimental-feature NontransferableTypes'}}
+
+func nontransferableFunction(_: @nontransferable () -> Void) {}
+// expected-disabled-error@-1 {{'@nontransferable' attribute is only valid when experimental feature NontransferableTypes is enabled}}
