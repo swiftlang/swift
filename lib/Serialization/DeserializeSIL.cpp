@@ -1516,9 +1516,14 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
                                 unsigned &NextIdx) {
   assert(ListOfValues.size() >= NextIdx+3 &&
          "Expect 3 numbers for SILDeclRef");
-  SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
-                  (SILDeclRef::Kind)ListOfValues[NextIdx+1],
-                  /*isForeign=*/ListOfValues[NextIdx+2] > 0);
+  auto *decl = cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx]));
+  auto kind = (SILDeclRef::Kind)ListOfValues[NextIdx+1];
+  // Distributed thunks are serialized as the decl they were synthesized for.
+  if (kind == SILDeclRef::Kind::DistributedThunk)
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
+      if (auto *thunk = afd->getDistributedThunk())
+        decl = thunk;
+  SILDeclRef DRef(decl, kind, /*isForeign=*/ListOfValues[NextIdx+2] > 0);
   NextIdx += 3;
   return DRef;
 }
