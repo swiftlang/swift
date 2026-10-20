@@ -428,11 +428,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
     // If the derived class already has its own directly-synthesized
     // property with the looked-up name, don't clone a same-named
-    // synthesized property from the base on top of it. This is the case
-    // e.g. when SWIFT_REFCOUNTED_PTR is applied to both a base and a
-    // derived smart pointer: each gets its own `asReference` and
-    // surfacing the base's clone too would leave the derived with two
-    // copies.
+    // synthesized property from the base on top of it, which would leave
+    // the derived class with two copies.
     bool derivedHasOwnSynthesizedVar = false;
     for (auto m : inheritingDecl->getCurrentMembersWithoutLoading()) {
       auto ownVD = dyn_cast<VarDecl>(m);
@@ -552,6 +549,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     } else if (name.getBaseName().isSubscript()) {
       for (auto *sub : Importer.Impl.lookupAndImportSubscripts(inheritingDecl))
         result.push_back(sub);
+    } else if (name.isSimpleName("asReference")) {
+      if (auto *asReference =
+              Importer.Impl.lookupAndImportAsReference(inheritingDecl))
+        result.push_back(asReference);
     }
   }
 

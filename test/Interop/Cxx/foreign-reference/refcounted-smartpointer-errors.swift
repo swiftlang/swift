@@ -8,5 +8,6 @@ func triggerWarnings(_ a: errors.MissingToRawPtr,               // @expected-err
                      _ e: errors.PrivateConversionFunction,     // @expected-error {{'PrivateConversionFunction' is not a member type of enum '__ObjC.errors'}}
                      _ f: errors.NoSuitableCtor,                // @expected-error {{'NoSuitableCtor' is not a member type of enum '__ObjC.errors'}}
                      _ g: errors.AmbiguousCtors,                // @expected-error {{'AmbiguousCtors' is not a member type of enum '__ObjC.errors'}}
-                     _ h: errors.MismatchingPointerTypes) {     // @expected-error {{'MismatchingPointerTypes' is not a member type of enum '__ObjC.errors'}}
+                     _ h: errors.MismatchingPointerTypes,       // @expected-error {{'MismatchingPointerTypes' is not a member type of enum '__ObjC.errors'}}
+                     _ i: errors.NotAFunction) {                // @expected-error {{'NotAFunction' is not a member type of enum '__ObjC.errors'}}
 }

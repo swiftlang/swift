@@ -1756,12 +1756,12 @@ static ImportedType adjustTypeForConcreteImport(
   case ImportHint::IntrusivelyRefCountedSmartPtr:
     if (bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
       auto decl = importedType->castTo<StructType>()->getDecl();
-      auto lookupResult = decl->lookupDirect(
-          DeclName(impl.SwiftContext.getIdentifier("asReference")));
-      ASSERT(lookupResult.size() == 1);
-      auto asReference = cast<VarDecl>(lookupResult.front());
-      importedType = asReference->getInterfaceType();
-      optKind = OTK_None;
+      // If the annotation is invalid, VisitRecordDecl() diagnoses it and does
+      // not import the smart pointer, so leave it unbridged here.
+      if (auto *asReference = impl.lookupAndImportAsReference(decl)) {
+        importedType = asReference->getInterfaceType();
+        optKind = OTK_None;
+      }
     }
     break;
   }

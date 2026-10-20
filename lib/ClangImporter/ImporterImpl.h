@@ -810,6 +810,89 @@ public:
   /// __convertToBool() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
 
+  /// Info about a Clang record decl possibly annotated with REFCOUNTED_PTR.
+  ///
+  /// Records three pieces of information: the name of the toRawPtr operation,
+  /// the toRawPtr method decl, and the toSmartPtr constructor decl; as well as
+  /// any errors associated with those decls.
+  class RefCountedPtrInfo {
+  public:
+    /// The kinds of errors associated with toRawPtr and toSmartPtr
+    enum class Error : uint8_t {
+      NoError = 0,
+      Missing,
+      LookupFailure,
+      LookupAmbiguity,
+      NotAFunction,
+      WrongSignature,
+    };
+
+  private:
+    StringRef toRawPtrName;
+    llvm::PointerIntPair<ValueDecl *, 3, Error> toRawPtrAndError;
+    llvm::PointerIntPair<ConstructorDecl *, 3, Error> toSmartPtrAndError;
+
+  public:
+    /// A record that is not annotated with SWIFT_REFCOUNTED_PTR
+    static RefCountedPtrInfo notAnnotated() {
+      return {"", nullptr, Error::NoError, nullptr, Error::Missing};
+    }
+
+    /// An annotation that does not name a ToRawPointer function
+    static RefCountedPtrInfo missingRawPtr() {
+      return {"", nullptr, Error::Missing, nullptr, Error::NoError};
+    }
+
+    /// \p toRawPtr is what looking up the ToRawPointer function \p
+    /// toRawPtrName found, if anything. If it is not a function, the
+    /// ToRawPointer error is NotAFunction rather than \p toRawPtrError.
+    RefCountedPtrInfo(StringRef toRawPtrName, ValueDecl *toRawPtr,
+                      Error toRawPtrError, ConstructorDecl *toSmartPtr,
+                      Error toSmartPtrError)
+        : toRawPtrName(toRawPtrName), toRawPtrAndError(toRawPtr, toRawPtrError),
+          toSmartPtrAndError(toSmartPtr, toSmartPtrError) {
+      if (toRawPtr && !isa<FuncDecl>(toRawPtr))
+        toRawPtrAndError.setInt(Error::NotAFunction);
+    }
+
+    bool isAnnotated() const {
+      return toSmartPtrAndError.getInt() != Error::Missing;
+    }
+
+    /// Whether the record is not a valid SWIFT_REFCOUNTED_PTR, including when
+    /// it is not annotated at all.
+    bool hasError() const {
+      return toRawPtrAndError.getInt() != Error::NoError ||
+             toSmartPtrAndError.getInt() != Error::NoError;
+    }
+
+    StringRef getToRawPtrName() const { return toRawPtrName; }
+
+    /// The ToRawPointer function, or null if hasError().
+    FuncDecl *getToRawPtr() const {
+      return hasError() ? nullptr
+                        : cast<FuncDecl>(toRawPtrAndError.getPointer());
+    }
+
+    /// The constructor that converts a foreign reference to the smart pointer,
+    /// used by SILGen for implicit bridging, or null if hasError().
+    ConstructorDecl *getToSmartPtr() const {
+      return hasError() ? nullptr : toSmartPtrAndError.getPointer();
+    }
+
+    /// Emits a note on \p decl for each error in its annotation. Returns true
+    /// if it emitted any.
+    bool diagnose(Implementation &Impl, const clang::TagDecl *decl) const;
+  };
+
+  /// Validate the SWIFT_REFCOUNTED_PTR annotation of \a Record, if any.
+  RefCountedPtrInfo validateRefCountedPtr(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .asReference property of a
+  /// valid SWIFT_REFCOUNTED_PTR smart pointer, or of a C++ struct that
+  /// publicly inherits from one without being annotated itself.
+  VarDecl *lookupAndImportAsReference(NominalTypeDecl *Record);
+
 private:
   /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
   llvm::DenseMap<NominalTypeDecl *,
@@ -819,6 +902,8 @@ private:
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
       importedSubscriptsCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
+  llvm::DenseMap<NominalTypeDecl *, RefCountedPtrInfo> refCountedPtrInfoCache;
+  llvm::DenseMap<NominalTypeDecl *, VarDecl *> importedAsReferenceCache;
 
 public:
   /// Cache of synthesized derived-to-base pointer upcast functions,

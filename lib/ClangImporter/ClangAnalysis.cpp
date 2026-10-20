@@ -1,13 +1,18 @@
 #include "ClangDerivedConformances.h"
 #include "CxxUnsafetyReason.h"
 #include "ImporterImpl.h"
+#include "SwiftDeclSynthesizer.h"
+#include "swift/AST/ArgumentList.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/CXXInheritance.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Expr.h"
@@ -1488,4 +1493,290 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
           recordDecl, Impl.SwiftContext, isa<ClassDecl>(nominal)))
     diagnoseUnsafetyReason(Impl, HeaderLoc(recordDecl->getLocation(), useLoc),
                            *unsafe);
+}
+
+//===----------------------------------------------------------------------===//
+// SWIFT_REFCOUNTED_PTR
+//===----------------------------------------------------------------------===//
+
+CustomAttr *importer::getRefCountedPtrAttr(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    auto *typeRepr = attr->getTypeRepr();
+    if (typeRepr && typeRepr->isSimpleUnqualifiedIdentifier("_refCountedPtr"))
+      return attr;
+  }
+
+  return nullptr;
+}
+
+/// Whether \p decl is annotated with SWIFT_REFCOUNTED_PTR
+static bool hasRefCountedPtrSwiftAttr(const clang::CXXRecordDecl *decl) {
+  return llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
+                      [](const clang::SwiftAttrAttr *attr) {
+                        return attr->getAttribute().starts_with(
+                            "@_refCountedPtr");
+                      });
+}
+
+ClangImporter::Implementation::RefCountedPtrInfo
+ClangImporter::Implementation::validateRefCountedPtr(NominalTypeDecl *Record) {
+  using Error = RefCountedPtrInfo::Error;
+
+  auto *customAttr = getRefCountedPtrAttr(Record);
+  if (!customAttr)
+    return RefCountedPtrInfo::notAnnotated();
+
+  auto [it, inserted] = refCountedPtrInfoCache.try_emplace(
+      Record, RefCountedPtrInfo::notAnnotated());
+  if (!inserted)
+    return it->second;
+
+  StringRef toRawPtrName;
+  for (auto arg : *customAttr->getArgs()) {
+    if (arg.getLabel().str() == "ToRawPointer") {
+      if (const auto *literal = dyn_cast<StringLiteralExpr>(arg.getExpr()))
+        toRawPtrName = literal->getValue();
+    }
+  }
+
+  if (toRawPtrName.empty()) {
+    it->second = RefCountedPtrInfo::missingRawPtr();
+    return it->second;
+  }
+
+  // What we will build RefCountedPtrInfo result out of
+  ValueDecl *toRawPtrFunc = nullptr;
+  Error toRawPtrError = Error::NoError;
+  ConstructorDecl *toSmartPtrCtor = nullptr;
+  Error toSmartPtrError = Error::NoError;
+
+  // What toRawPtrFunc returns a pointer to (if it has the right signature)
+  Type pointeeType;
+
+  auto toRawPtrResults = getValueDeclsForName(Record, toRawPtrName);
+  if (toRawPtrResults.empty()) {
+    toRawPtrError = Error::LookupFailure;
+  } else if (toRawPtrResults.size() > 1) {
+    toRawPtrError = Error::LookupAmbiguity;
+  } else {
+    // If this is not a function, RefCountedPtrInfo records NotAFunction.
+    toRawPtrFunc = toRawPtrResults.front();
+    if (auto *func = dyn_cast<FuncDecl>(toRawPtrFunc)) {
+      auto returnType =
+          func->getResultInterfaceType()->lookThroughSingleOptionalType();
+      if (func->getParameters()->size() != 0 || !returnType->getClassDecl())
+        toRawPtrError = Error::WrongSignature;
+      else
+        pointeeType = returnType;
+    }
+  }
+
+  auto *clangRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(Record->getClangDecl());
+  if (!clangRecord) {
+    toSmartPtrError = Error::LookupFailure;
+  } else {
+    // We accept a constructor whose parameter imports as the foreign
+    // reference type. In C++ that means a raw pointer (T*, possibly
+    // const-qualified) or an lvalue reference (T&, possibly
+    // const-qualified). We rank candidates so that more-specific
+    // forms win when several are available:
+    //   T*  >  const T*  >  T&  >  const T&
+    // Duplicates of the best rank are ambiguous. Rvalue-reference and
+    // deleted ctors aren't bridgeable. The selected constructor is
+    // relied on during SILGen to introduce implicit bridging.
+    std::optional<int> selectedRank;
+    for (auto *clangCtor : clangRecord->ctors()) {
+      if (clangCtor->isDeleted() || clangCtor->getNumParams() != 1)
+        continue;
+
+      clang::QualType paramTy = clangCtor->getParamDecl(0)->getType();
+      int rank;
+      if (paramTy->isLValueReferenceType()) {
+        rank = paramTy->getPointeeType().isConstQualified() ? 3 : 2;
+      } else if (paramTy->isPointerType()) {
+        rank = paramTy->getPointeeType().isConstQualified() ? 1 : 0;
+      } else {
+        // Not a pointer or lvalue reference (e.g., rvalue ref).
+        continue;
+      }
+
+      auto *ctor = dyn_cast_or_null<ConstructorDecl>(
+          importDecl(clangCtor, CurrentVersion));
+      if (!ctor || ctor->getParameters()->size() != 1)
+        continue;
+      Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
+      if (!ctorParamType->isForeignReferenceType())
+        continue;
+
+      if (!selectedRank || rank < *selectedRank) {
+        toSmartPtrCtor = ctor;
+        selectedRank = rank;
+        toSmartPtrError = Error::NoError;
+      } else if (rank == *selectedRank) {
+        toSmartPtrError = Error::LookupAmbiguity;
+      }
+    }
+
+    if (!toSmartPtrCtor) {
+      toSmartPtrError = Error::LookupFailure;
+    } else if (toSmartPtrError == Error::NoError && pointeeType) {
+      // The constructor must take what toRawPtrFunc returns.
+      Type ctorParamType =
+          toSmartPtrCtor->getParameters()->get(0)->getInterfaceType();
+      if (!ctorParamType->lookThroughSingleOptionalType()->isEqual(pointeeType))
+        toSmartPtrError = Error::WrongSignature;
+    }
+  }
+
+  // The iterator from the try_emplace() above may have been invalidated by now,
+  // so look up Record again
+  return refCountedPtrInfoCache
+      .insert_or_assign(Record, RefCountedPtrInfo(toRawPtrName, toRawPtrFunc,
+                                                  toRawPtrError, toSmartPtrCtor,
+                                                  toSmartPtrError))
+      .first->second;
+}
+
+bool ClangImporter::Implementation::RefCountedPtrInfo::diagnose(
+    Implementation &Impl, const clang::TagDecl *decl) const {
+  // Emit a note about decl, which is the last argument of every note
+  bool diagnosed = false;
+  auto note = [&](auto diagID, auto... args) {
+    Impl.addImportDiagnostic(decl, Diagnostic(diagID, args..., decl),
+                             decl->getLocation());
+    diagnosed = true;
+  };
+
+  switch (toRawPtrAndError.getInt()) {
+  case Error::NoError:
+    break;
+  case Error::Missing:
+    note(diag::refcounted_ptr_missing_torawpointer);
+    break;
+  case Error::LookupFailure:
+    note(diag::refcounted_ptr_torawpointer_lookup_failure,
+         Impl.SwiftContext.AllocateCopy(toRawPtrName.str()));
+    break;
+  case Error::LookupAmbiguity:
+    note(diag::refcounted_ptr_torawpointer_lookup_ambiguity,
+         Impl.SwiftContext.AllocateCopy(toRawPtrName.str()));
+    break;
+  case Error::NotAFunction:
+    note(diag::refcounted_ptr_torawpointer_not_function,
+         toRawPtrAndError.getPointer());
+    break;
+  case Error::WrongSignature:
+    note(diag::refcounted_ptr_torawpointer_wrong_signature,
+         toRawPtrAndError.getPointer());
+    break;
+  }
+
+  switch (toSmartPtrAndError.getInt()) {
+  case Error::NoError:
+  case Error::Missing: // Not annotated, which is not an error
+    break;
+  case Error::LookupFailure:
+    note(diag::refcounted_ptr_ctor_lookup_failure);
+    break;
+  case Error::LookupAmbiguity:
+    note(diag::refcounted_ptr_ctor_lookup_ambiguity);
+    break;
+  case Error::WrongSignature:
+    note(diag::refcounted_ptr_ctor_wrong_parameter_type);
+    break;
+  case Error::NotAFunction:
+    llvm_unreachable("a constructor is always a function");
+  }
+
+  return diagnosed;
+}
+
+VarDecl *ClangImporter::Implementation::lookupAndImportAsReference(
+    NominalTypeDecl *Record) {
+  bool isAnnotated = getRefCountedPtrAttr(Record);
+  auto *clangRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(Record->getClangDecl());
+
+  // Only a C++ record can inherit .asReference from an annotated base
+  if (!isAnnotated && !clangRecord)
+    return nullptr;
+
+  if (!isAnnotated && isa<ClassDecl>(Record))
+    // TODO: diagnose a type that has (or inherits) both foreign reference type
+    // and SWIFT_REFCOUNTED_PTR annotations
+    return nullptr;
+
+  if (auto [it, inserted] =
+          importedAsReferenceCache.try_emplace(Record, nullptr);
+      !inserted)
+    return it->second;
+
+  // Note: from here onward, if we return early or re-enter this function for
+  // Record before returning, callers will pick up the nullptr cached earlier
+
+  FuncDecl *toRawPtrFunc = nullptr;
+  if (isAnnotated) {
+    toRawPtrFunc = validateRefCountedPtr(Record).getToRawPtr();
+    if (!toRawPtrFunc)
+      return nullptr;
+  } else {
+    // An unannotated C++ struct with an annotated public base gets an
+    // .asReference that calls the base's ToRawPointer function, but is not
+    // implicitly bridged, since it is not annotated itself
+    auto isAnnotatedBase = [](const clang::CXXBaseSpecifier *base,
+                              clang::CXXBasePath &) -> bool {
+      auto *baseRecord = base->getType()->getAsCXXRecordDecl();
+      baseRecord = baseRecord ? baseRecord->getDefinition() : nullptr;
+      return baseRecord && hasRefCountedPtrSwiftAttr(baseRecord);
+    };
+    clang::CXXBasePaths paths;
+    if (!clangRecord->lookupInBases(isAnnotatedBase, paths))
+      return nullptr;
+
+    // The annotated base must be unique, unambiguous, and reached only
+    // through public bases
+    auto &clangCtx = clangRecord->getASTContext();
+    clang::CanQualType baseType =
+        clangCtx.getCanonicalType(paths.front().back().Base->getType());
+    for (const auto &path : paths) {
+      if (clangCtx.getCanonicalType(path.back().Base->getType()) != baseType ||
+          path.Access != clang::AS_public)
+        return nullptr;
+    }
+    if (paths.isAmbiguous(baseType))
+      return nullptr;
+
+    // The annotated base must be imported to validate its annotation, which
+    // also names the ToRawPointer function; errors are diagnosed on the base
+    auto *baseRecord = dyn_cast_or_null<NominalTypeDecl>(importDecl(
+        baseType->getAsCXXRecordDecl()->getDefinition(), CurrentVersion));
+    if (!baseRecord)
+      return nullptr;
+    auto baseInfo = validateRefCountedPtr(baseRecord);
+    if (baseInfo.hasError())
+      return nullptr;
+
+    auto toRawPtrResults =
+        getValueDeclsForName(Record, baseInfo.getToRawPtrName());
+    if (toRawPtrResults.size() != 1)
+      return nullptr;
+    toRawPtrFunc = dyn_cast<FuncDecl>(toRawPtrResults.front());
+    if (!toRawPtrFunc)
+      return nullptr;
+  }
+
+  SwiftDeclSynthesizer synth{*this};
+  auto *asReference = synth.createSmartPtrBridgingProperty(toRawPtrFunc);
+  markMemberSynthesizedPerType(asReference);
+  Record->addMember(asReference);
+
+  // The iterator from the try_emplace() above may have been invalidated
+  importedAsReferenceCache[Record] = asReference;
+  return asReference;
+}
+
+ConstructorDecl *
+ClangImporter::getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) {
+  return Impl.validateRefCountedPtr(smartPtr).getToSmartPtr();
 }
