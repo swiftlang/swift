@@ -95,3 +95,63 @@ public struct UnavailableOnVisionOS {
     return S()
   }
 }
+
+// CHECK-LABEL: sil private [global_init_once_fn]{{.*}}@$s4Test37iOSUnavailableVisionOSAvailableGlobal_WZ
+// CHECK-NOT:     _diagnoseUnavailableCodeReached
+// CHECK:       } // end sil function '$s4Test37iOSUnavailableVisionOSAvailableGlobal_WZ'
+// CHECK-LABEL: sil [global_init]{{.*}}@$s4Test37iOSUnavailableVisionOSAvailableGlobalAA1SVvau
+// CHECK-NOT:     _diagnoseUnavailableCodeReached
+// CHECK:       } // end sil function '$s4Test37iOSUnavailableVisionOSAvailableGlobalAA1SVvau'
+@available(iOS, unavailable)
+@available(visionOS, introduced: 1.0)
+public let iOSUnavailableVisionOSAvailableGlobal = S()
+
+// CHECK-LABEL: sil private [global_init_once_fn]{{.*}}@$s4Test31iOSAndVisionOSUnavailableGlobal_WZ
+// CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:       } // end sil function '$s4Test31iOSAndVisionOSUnavailableGlobal_WZ'
+@available(iOS, unavailable)
+@available(visionOS, unavailable)
+public let iOSAndVisionOSUnavailableGlobal = S()
+
+public struct HasStaticProperties {
+  // CHECK-LABEL: sil private [global_init_once_fn]{{.*}}@$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3Let_WZ
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
+  // CHECK:       } // end sil function '$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3Let_WZ'
+  // CHECK-LABEL: sil [global_init]{{.*}}@$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3LetAA1SVvau
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
+  // CHECK:       } // end sil function '$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3LetAA1SVvau'
+  @available(iOS, unavailable)
+  @available(visionOS, introduced: 1.0)
+  public static let iOSUnavailableVisionOSAvailableStaticLet = S()
+
+  // CHECK-LABEL: sil private [global_init_once_fn]{{.*}}@$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3Var_WZ
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
+  // CHECK:       } // end sil function '$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3Var_WZ'
+  // CHECK-LABEL: sil [global_init]{{.*}}@$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3VarAA1SVvau
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
+  // CHECK:       } // end sil function '$s4Test19HasStaticPropertiesV031iOSUnavailableVisionOSAvailableC3VarAA1SVvau'
+  @available(iOS, unavailable)
+  @available(visionOS, introduced: 1.0)
+  public static var iOSUnavailableVisionOSAvailableStaticVar = S()
+
+  // CHECK-LABEL: sil private [global_init_once_fn]{{.*}}@$s4Test19HasStaticPropertiesV025iOSAndVisionOSUnavailableC3Let_WZ
+  // CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+  // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+  // CHECK:       } // end sil function '$s4Test19HasStaticPropertiesV025iOSAndVisionOSUnavailableC3Let_WZ'
+  @available(iOS, unavailable)
+  @available(visionOS, unavailable)
+  public static let iOSAndVisionOSUnavailableStaticLet = S()
+}
+
+@available(iOS, unavailable)
+@available(visionOS, introduced: 1.0)
+public struct IOSUnavailableVisionOSAvailable {
+  // CHECK-LABEL: sil private [global_init_once_fn]{{.*}}@$s4Test31IOSUnavailableVisionOSAvailableV9staticLet_WZ
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
+  // CHECK:       } // end sil function '$s4Test31IOSUnavailableVisionOSAvailableV9staticLet_WZ'
+  // CHECK-LABEL: sil [global_init]{{.*}}@$s4Test31IOSUnavailableVisionOSAvailableV9staticLetAA1SVvau
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
+  // CHECK:       } // end sil function '$s4Test31IOSUnavailableVisionOSAvailableV9staticLetAA1SVvau'
+  public static let staticLet = S()
+}

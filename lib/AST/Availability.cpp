@@ -574,9 +574,12 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   // Check whether there are any available attributes that would make the
-  // decl available in descendants of the unavailable domains.
+  // decl available in descendants of the unavailable domains. The attributes
+  // of a pattern binding are attached to its variables, so look them up on the
+  // same decl that the restrictions were computed from.
+  auto *attrDecl = decl->getAbstractSyntaxDeclForAttributes();
   for (auto attr :
-       decl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+       attrDecl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     auto domain = attr.getDomain();
     if (llvm::is_contained(unavailableDomains, domain))
       continue;
