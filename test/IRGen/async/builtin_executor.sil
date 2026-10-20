@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s --check-prefix=%if swift_stdlib_library_evolution %{CHECK-EVO%} %else %{CHECK-NOEVO%}
 
 // REQUIRES: concurrency
 // rdar://106849189 move-only types should be supported in freestanding mode
@@ -55,12 +55,13 @@ bb0(%0 : $MyDefaultActor):
 // CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_build_custom_actor(ptr %0)
 sil @test_build_custom_actor : $(@guaranteed MyCustomActor) -> Builtin.Executor {
 bb0(%0 : $MyCustomActor):
-  // CHECK:      [[T0:%.*]] = ptrtoint ptr %0 to [[INT]]
-  // CHECK-NEXT: [[T1:%.*]] = call ptr @"$s4test13MyCustomActorCACScfAAWl"()
-  // CHECK-NEXT: [[T2:%.*]] = ptrtoint ptr [[T1]] to [[INT]]
-  // CHECK:      [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[T0]], 0
-  // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] [[T2]], 1
-  // CHECK-NEXT: ret { [[INT]], [[INT]] } [[TWO]]
+  // CHECK:          [[T0:%.*]] = ptrtoint ptr %0 to [[INT]]
+  // CHECK-EVO-NEXT: [[T1:%.*]] = call ptr @"$s4test13MyCustomActorCACScfAAWl"()
+  // CHECK-EVO-NEXT: [[T2:%.*]] = ptrtoint ptr [[T1]] to [[INT]]
+  // CHECK:          [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[T0]], 0
+  // CHECK-EVO-NEXT:   [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] [[T2]], 1
+  // CHECK-NOEVO-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] ptrtoint (ptr @"$s4test13MyCustomActorCScfAAWP" to [[INT]]), 1
+  // CHECK-NEXT:     ret { [[INT]], [[INT]] } [[TWO]]
   %1 = builtin "buildOrdinarySerialExecutorRef"<MyCustomActor>(%0 : $MyCustomActor) : $Builtin.Executor
   return %1 : $Builtin.Executor
 }

@@ -6,9 +6,8 @@
 
 // CHECK-LABEL: sil private [ossa] @async_Main : $@convention(thin) @async () -> () {
 // CHECK: bb0:
-// CHECK: [[META:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[FUNC:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK: [[ACTOR_RAW:%.*]] = apply [[FUNC]]([[META]])
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[ACTOR_RAW:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // CHECK: [[ACTOR_RAW_E:%.*]] = init_existential_ref [[ACTOR_RAW]]
 // CHECK: [[ACTOR_RAW_E_O:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ACTOR_RAW_E]]
 // CHECK: [[ACTOR:%.*]] = begin_borrow [[ACTOR_RAW_E_O]]

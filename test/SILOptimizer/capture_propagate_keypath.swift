@@ -10,6 +10,9 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test
+// FIXME: A non-resilient stdlib inlines the read to KeyPath._projectReadOnly(from:),
+// which is not folded like swift_getAtKeyPath.
+// REQUIRES: swift_stdlib_library_evolution
 
 struct Str {
   var i: Int = 27

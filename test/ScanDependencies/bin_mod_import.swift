@@ -19,7 +19,7 @@ import EWrapper
 // CHECK-NEXT: "directDependencies": [
 // CHECK-NEXT:   {
 // CHECK-DAG:     "swift": "E"
-// CHECK-DAG:     "swift": "Swift"
-// CHECK-DAG:     "swift": "SwiftOnoneSupport"
+// CHECK-DAG:     "swift{{(PrebuiltExternal)?}}": "Swift"
+// CHECK-DAG:     "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],

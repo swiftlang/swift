@@ -88,7 +88,7 @@ actor MyActor {
   // CHECK:           hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:           builtin "initializeDefaultActor"
   // CHECK:           [[FUNC:%[0-9]+]] = function_ref @$s4test16unspecifiedAsyncyyYaF : $@convention(thin) @async () -> ()
-  // CHECK:           %24 = apply [[FUNC]]() : $@convention(thin) @async () -> ()
+  // CHECK:           {{%[0-9]+}} = apply [[FUNC]]() : $@convention(thin) @async () -> ()
   // CHECK-NEXT:      hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:       } // end sil function '$s4test7MyActorC4withACSi_tYacfc'
   @MainActor
