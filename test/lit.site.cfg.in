@@ -42,6 +42,10 @@ config.swift_test_results_dir = \
 config.host_triple = "@SWIFT_HOST_TRIPLE@"
 config.host_sdkroot = "@SWIFT_HOST_SDKROOT@"
 
+config.swift_test_sdk = r'''@SWIFT_TEST_SDK@'''
+config.swift_test_sdk_runtime_dir = r'''@SWIFT_TEST_SDK_RUNTIME_DIR@'''
+config.swift_test_support_dir = r'''@SWIFT_TEST_SUPPORT_DIR@'''
+
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
 config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
@@ -111,6 +115,9 @@ if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('swift7')
 else:
     config.available_features.add('no_asserts')
+
+if "@SWIFT_TEST_STDLIB_LIBRARY_EVOLUTION@" == "TRUE":
+    config.available_features.add('swift_stdlib_library_evolution')
 
 if "@SWIFT_STDLIB_ASSERTIONS@" == "TRUE":
     config.available_features.add('swift_stdlib_asserts')
