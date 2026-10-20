@@ -13,8 +13,7 @@ def exponential_retry(
     """
     Retries with exponential backoff if the method returns a value > 0.
 
-    A ``None`` return (as produced by the per-repository clone/update
-    workers, which report failures by raising) counts as success.
+    A ``None`` return counts as success.
 
     Args:
         max_retries (int): Maximum number of retry attempts. 0 is for no

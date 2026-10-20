@@ -733,8 +733,6 @@ def update_all_repositories(
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
-    # Per-repository backoff retry: one flaky repo must not force a whole-run
-    # retry of every repo; main's whole-run retry stays as the last resort.
     retried_update = exponential_retry(max_retries=args.max_retries)(
         update_single_repository
     )
@@ -905,8 +903,6 @@ def obtain_all_additional_swift_sources(
 ):
     skipped_repositories = []
     pool_args = []
-    # Per-repository backoff retry: one flaky repo must not force a whole-run
-    # retry of every repo; main's whole-run retry stays as the last resort.
     retried_obtain = exponential_retry(max_retries=args.max_retries)(
         obtain_additional_swift_sources
     )
