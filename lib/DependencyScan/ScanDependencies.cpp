@@ -207,6 +207,20 @@ private:
       commandline.push_back(arg);
     }
 
+    // Pass the in-process plugin server path if any library plugin above is
+    // loaded in-process.
+    auto &inProcPluginServerPath =
+        instance.getInvocation().getSearchPathOptions().InProcessPluginServerPath;
+    bool needInProcPluginServer = llvm::any_of(
+        depInfo.getMacroDependencies(), [](const auto &macro) {
+          return !macro.second.LibraryPath.empty() &&
+                 macro.second.ExecutablePath.empty();
+        });
+    if (needInProcPluginServer && !inProcPluginServerPath.empty()) {
+      commandline.push_back("-resolved-in-process-plugin-server-path");
+      commandline.push_back(mapPath(inProcPluginServerPath));
+    }
+
     // Update CAS dependencies.
     if (auto err = collectCASDependencies(depInfo))
       return err;
