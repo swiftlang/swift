@@ -6,6 +6,7 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(COM) %t/%target-library-name(Widget) | %FileCheck %s
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // Note: we pass the libraries as command line arguments so that test runs using
 // remote-run will copy them across to the runner.
