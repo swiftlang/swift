@@ -487,6 +487,10 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
     .assumingMemoryBound(to: C.Instant.self).pointee
 }
 
+// Embedded Swift serializes function bodies, so `_findNearestDeadline` ends up in
+// client modules. This declaration has to be `@usableFromInline` for those clients
+// to link to the runtime function with the right linkage.
+@usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_task_findNearestDeadlineForClock")
 internal func _swift_task_findNearestDeadlineForClock(
