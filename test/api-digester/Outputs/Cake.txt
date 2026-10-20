@@ -30,16 +30,25 @@ cake: Func SwiftObjcClass.foo(a:b:c:) has ObjC name change from OldObjCFool:OldO
 cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
+cake: Accessor typedThrowsGetter.Get() has thrown error type change from cake.TypedThrowsError to cake.OtherTypedThrowsError
 cake: AssociatedType AssociatedTypePro.T3 has default type change from cake.C1 to cake.C6
 cake: Constructor S1.init(_:) has parameter 0 type change from Swift.Int to Swift.Double
+cake: Constructor TypedThrowsOpenClassInits.init() has thrown error type change from any Swift.Error to cake.TypedThrowsError
+cake: Constructor TypedThrowsOpenClassInits.init(x:) has thrown error type change from any Swift.Error to cake.TypedThrowsError
 cake: Func C1.foo2(_:) has parameter 0 type change from Swift.Int to () -> ()
 cake: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake: Func C7.foo(_:_:) has removed default argument from parameter 1
+cake: Func TypedThrowsOpenClass.untypedToTypedThrowsOpen() has thrown error type change from any Swift.Error to cake.TypedThrowsError
+cake: Func TypedThrowsProto.untypedToTypedThrowsReq() has thrown error type change from any Swift.Error to cake.TypedThrowsError
+cake: Func genericTypedToUntypedThrows(_:) has thrown error type change from τ_0_0 to any Swift.Error
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake: Func typedThrowsErrorChanged() has thrown error type change from cake.TypedThrowsError to cake.OtherTypedThrowsError
+cake: Func typedToUntypedThrows() has thrown error type change from cake.TypedThrowsError to any Swift.Error
 cake: TypeAlias TChangesFromIntToString.T has underlying type change from Swift.Int to Swift.String
 
 /* Decl Attribute changes */
+cake: Accessor nonThrowingToThrowingGetter.Get() is now throwing
 cake: Enum IceKind is now without @frozen
 cake: Func C1.foo1() is now not static
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
