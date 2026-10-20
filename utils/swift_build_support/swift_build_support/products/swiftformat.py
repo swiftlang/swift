@@ -64,7 +64,7 @@ class SwiftFormat(product.Product):
             '--configuration', self.configuration(),
             '--build-path', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
-        ]
+        ] + self.swiftpm_caching_helper_args()
 
         install_destdir = self.host_install_destdir(host_target)
         toolchain_path = self.native_toolchain_path(host_target)

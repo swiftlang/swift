@@ -82,6 +82,7 @@ class FoundationTests(product.Product):
         ]
         if self.args.verbose_build:
             cmd.append('--verbose')
+        cmd += self.swiftpm_caching_flags()
         shell.call(cmd, env={
             'SWIFTCI_USE_LOCAL_DEPS': '1',
             'DISPATCH_INCLUDE_PATH': include_path

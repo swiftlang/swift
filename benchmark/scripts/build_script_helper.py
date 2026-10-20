@@ -26,7 +26,7 @@ def perform_build(args, swiftbuild_path, config, binary_name, opt_flag):
         "-align-module-to-page-size",
         "-Xswiftc",
         opt_flag
-    ]
+    ] + args.extra_swiftpm_flags
 
     if config == "debug":
         swiftbuild_args += [
@@ -55,6 +55,9 @@ def main():
     parser.add_argument("--package-path", type=str, required=True)
     parser.add_argument("--build-path", type=str, required=True)
     parser.add_argument("--toolchain", type=str, required=True)
+    parser.add_argument("--extra-swiftpm-flag", dest="extra_swiftpm_flags",
+                        action="append", default=[],
+                        help="additional flag to pass to SwiftPM")
 
     args = parser.parse_args()
 
