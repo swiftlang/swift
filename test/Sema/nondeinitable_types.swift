@@ -242,3 +242,40 @@ func closureGenericCaptures<T: ~Copyable & ~Deinitable>(_ t: consuming T) {
   let _ = { [t] in _ = t }
   // expected-error@-1 {{capture list entry 't' of 'Deinitable'-conforming closure has non-'Deinitable' type 'T'}}
 }
+
+// MARK: - Unapplied references
+
+// Partial/unapplied references to members of `~Copyable & ~Deinitable` type
+// should produce `@called(exactlyOnce)` types.
+
+struct NDBox<T>: ~Copyable, ~Deinitable {
+  init(_: T) {}
+  consuming func finish() { discard self }
+}
+
+func unappliedConsumingMethods(
+  _ nd1: consuming ND, _ nd2: consuming ND, _ nd3: consuming ND
+) {
+  let _: @called(exactlyOnce) () -> Void = nd1.finish // Ok
+  let _: @called(atMostOnce) () -> Void = nd2.finish
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+
+  let finishRef = nd3.finish // Ok
+  let _: @called(atMostOnce) () -> Void = finishRef
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+
+  let _: (consuming ND) -> @called(exactlyOnce) () -> Void = ND.finish // Ok
+  let _: (consuming ND) -> @called(atMostOnce) () -> Void = ND.finish
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+}
+
+// The base's generic arguments may be unresolved when the member is referenced.
+func unappliedConsumingMethodsOnUnresolvedBase() {
+  let _: @called(exactlyOnce) () -> Void = NDBox(42).finish // Ok
+  let _: @called(atMostOnce) () -> Void = NDBox(42).finish
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+
+  let finishRef = NDBox(42).finish
+  let _: @called(atMostOnce) () -> Void = finishRef
+  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+}

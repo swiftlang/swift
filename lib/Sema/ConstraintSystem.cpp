@@ -1781,10 +1781,10 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     if (ty->hasTypeVariable())
       return std::make_pair(ty, std::nullopt);
 
-    // Otherwise we've flattened the dependence, evaluate @called(atMostOnce).
-    if (ty->isNoncopyable())
-      return std::make_pair(Type(), ExecutionSemantics::AtMostOnce);
-    return std::make_pair(Type(), std::nullopt);
+    // Otherwise we've flattened the dependence, evaluate the execution
+    // semantics.
+    return std::make_pair(Type(),
+                          getUnappliedConsumingMethodExecutionSemantics(ty));
   }
 };
 
@@ -5331,6 +5331,18 @@ bool constraints::isSendableCapture(Type type) {
     }
     return false;
   });
+}
+
+std::optional<ExecutionSemantics>
+constraints::getUnappliedConsumingMethodExecutionSemantics(Type baseType) {
+  ASSERT(!baseType->hasTypeVariable());
+
+  InvertibleProtocolSet inverses;
+  if (baseType->isNoncopyable())
+    inverses.insert(InvertibleProtocolKind::Copyable);
+  if (!baseType->isDeinitable())
+    inverses.insert(InvertibleProtocolKind::Deinitable);
+  return getExecutionSemanticsSuppressing(inverses);
 }
 
 ASTNode constraints::findAsyncNode(ClosureExpr *closure) {

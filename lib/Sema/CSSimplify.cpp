@@ -2961,15 +2961,9 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   // The execution semantics are given by the invertible protocols that the
   // dependent type suppresses if present, otherwise by the function itself.
   auto getInverses = [](FunctionType *func, Type dep) {
-    if (!dep)
-      return getSuppressedInvertibleProtocols(func->getExecutionSemantics());
-
-    InvertibleProtocolSet inverses;
-    if (dep->isNoncopyable())
-      inverses.insert(InvertibleProtocolKind::Copyable);
-    if (!dep->isDeinitable())
-      inverses.insert(InvertibleProtocolKind::Deinitable);
-    return inverses;
+    return getSuppressedInvertibleProtocols(
+        dep ? getUnappliedConsumingMethodExecutionSemantics(dep)
+            : func->getExecutionSemantics());
   };
   auto inverses1 = getInverses(func1, dep1);
   auto inverses2 = getInverses(func2, dep2);
