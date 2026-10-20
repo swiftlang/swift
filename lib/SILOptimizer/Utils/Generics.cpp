@@ -3188,7 +3188,15 @@ static bool usePrespecialized(
 
         if (lowered.isBuiltinBridgeObject() && layout->isBridgeObject()) {
           newSubs.push_back(genericParam->getASTContext().TheBridgeObjectType);
-        } else if (lowered.hasRetainablePointerRepresentation()) {
+        } else if (layout->isClass() &&
+                   entry.value()->satisfiesClassConstraint() &&
+                   lowered.hasRetainablePointerRepresentation()) {
+          // Only apply a _Class pre-specialization if the type is really a
+          // class type. A struct wrapping a single reference or an Optional
+          // reference has the same layout, but is not a class type. The
+          // pre-specialized code may depend on the type being a class, e.g. the
+          // array implementation uses `_ContiguousArrayStorage<AnyObject>`
+          // only for class element types.
           if (layout->isNativeClass()) {
             newSubs.push_back(
                 genericParam->getASTContext().TheNativeObjectType);
