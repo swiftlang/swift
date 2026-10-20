@@ -398,6 +398,10 @@ enum class FixKind : uint8_t {
   /// `async` attribute from the source function.
   DropAsyncAttribute,
 
+  /// Fix conversion from non-'Transferable' to Transferable function by
+  /// removing explicit `@nontransferable` attribute from the source function.
+  DropNonTransferableAttribute,
+
   /// Allow invalid pointer conversions for autoclosure result types as if the
   /// pointer type is a function parameter rather than an autoclosure result.
   AllowAutoClosurePointerConversion,
@@ -1204,6 +1208,31 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::DropAsyncAttribute;
+  }
+};
+
+/// This is a contextual mismatch between Transferable and non-Transferable
+/// function types, repair it by dropping `@nontransferable` attribute.
+class DropNonTransferableAttribute final : public ContextualMismatch {
+  DropNonTransferableAttribute(ConstraintSystem &cs, FunctionType *fromType,
+                               FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::DropNonTransferableAttribute, fromType,
+                           toType, locator) {
+    ASSERT(fromType->isNonTransferable() != toType->isNonTransferable());
+  }
+
+public:
+  std::string getName() const override { return "drop '@nontransferable' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static DropNonTransferableAttribute *create(ConstraintSystem &cs,
+                                              FunctionType *fromType,
+                                              FunctionType *toType,
+                                              ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::DropNonTransferableAttribute;
   }
 };
 
