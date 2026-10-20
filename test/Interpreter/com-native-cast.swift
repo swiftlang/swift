@@ -14,6 +14,7 @@
 // RUN: %target-not-crash %target-run %t/test-opt fail %t/%target-library-name(COM) 2>&1 | %FileCheck %s --check-prefix=FAILURE
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import COMIdentity
 
