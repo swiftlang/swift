@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -solver-enable-promote-supertypes | %FileCheck %s
 
 // REQUIRES: objc_interop
 
