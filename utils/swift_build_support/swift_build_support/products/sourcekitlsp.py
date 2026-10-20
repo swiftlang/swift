@@ -128,7 +128,7 @@ class SourceKitLSP(product.Product):
             '--toolchain', toolchain_path,
             '--ninja-bin', self.toolchain.ninja,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
-        ]
+        ] + self.swiftpm_caching_helper_args()
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
 
