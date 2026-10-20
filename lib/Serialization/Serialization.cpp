@@ -6339,7 +6339,7 @@ public:
         isolation, fnTy->hasSendingResult(),
         getRawStableFunctionTypeExecutionSemantics(
             fnTy->getExecutionSemantics()),
-        fnTy->isCoroutine());
+        fnTy->isCoroutine(), fnTy->isNonTransferable());
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6365,7 +6365,8 @@ public:
         isolation, fnTy->hasSendingResult(),
         getRawStableFunctionTypeExecutionSemantics(
             fnTy->getExecutionSemantics()),
-        fnTy->isCoroutine(), S.addGenericSignatureRef(genericSig));
+        fnTy->isCoroutine(), fnTy->isNonTransferable(),
+        S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
