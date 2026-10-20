@@ -37,6 +37,7 @@ void defaultFilePrivate(void);
 __attribute__((visibility("hidden"))) void hiddenPublic(void);
 __attribute__((visibility("hidden"))) void hiddenInternal(void);
 __attribute__((visibility("default"))) void explicitDefaultInternal(void);
+__attribute__((visibility("hidden"))) void cdeclHiddenPublic(void);
 
 //--- main.swift
 @_implementationOnly import Vis
@@ -65,3 +66,8 @@ __attribute__((visibility("default"))) void explicitDefaultInternal(void);
 // TESTING-DAG: define{{( protected)?}} void @explicitDefaultInternal()
 // FVIS-HIDDEN-DAG: define hidden void @explicitDefaultInternal()
 @c @implementation func explicitDefaultInternal() {}
+
+// `@_cdecl` goes through a native-to-foreign thunk, which must be hidden and
+// not serialized.
+// CHECK-DAG: define hidden void @cdeclHiddenPublic()
+@_cdecl("cdeclHiddenPublic") @implementation public func cdeclHiddenPublic() {}
