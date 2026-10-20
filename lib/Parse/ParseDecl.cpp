@@ -5020,11 +5020,11 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
 }
 
 /// \verbatim
-///   scope-descriptor:
+///   scope:
 ///     'immortal'
 ///     '&'? (identifier | 'self')
 /// \endverbatim
-static std::optional<ScopeDescriptor> parseScopeDescriptor(Parser &P) {
+static std::optional<ScopeRepr> parseScope(Parser &P) {
   SourceLoc ampersandLoc;
   bool isAccess = P.consumeIf(tok::amp_prefix, ampersandLoc);
 
@@ -5033,29 +5033,29 @@ static std::optional<ScopeDescriptor> parseScopeDescriptor(Parser &P) {
       P.diagnose(ampersandLoc, diag::immortal_scope_cannot_be_access)
           .fixItRemove(ampersandLoc);
     }
-    return ScopeDescriptor::forImmortal(P.consumeToken());
+    return ScopeRepr::forImmortal(P.consumeToken());
   }
 
   if (P.Tok.is(tok::kw_self))
-    return ScopeDescriptor::forSelf(P.consumeToken(tok::kw_self), isAccess);
+    return ScopeRepr::forSelf(P.consumeToken(tok::kw_self), isAccess);
 
   if (P.Tok.is(tok::identifier)) {
     Identifier name;
     auto loc = P.consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
     if (isAccess)
-      return ScopeDescriptor::forAccessedValue({name, loc});
-    return ScopeDescriptor::forScopeName({ScopeName(name), loc});
+      return ScopeRepr::forAccessedValue({name, loc});
+    return ScopeRepr::forScopeName({ScopeName(name), loc});
   }
 
-  P.diagnose(P.Tok, diag::expected_scope_specifier);
+  P.diagnose(P.Tok, diag::expected_scope);
   return std::nullopt;
 }
 
 /// \verbatim
-///   scope-specifier:
-///     (identifier ':')? scope-descriptor
+///   scope-restriction:
+///     (identifier ':')? scope
 /// \endverbatim
-static std::optional<ScopeSpecifier> parseScopeSpecifier(Parser &P) {
+static std::optional<ScopeRestrictionRepr> parseScopeRestriction(Parser &P) {
   std::optional<Located<ScopeName>> label;
   if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon)) {
     Identifier name;
@@ -5071,15 +5071,15 @@ static std::optional<ScopeSpecifier> parseScopeSpecifier(Parser &P) {
     P.consumeToken(tok::colon);
   }
 
-  auto scope = parseScopeDescriptor(P);
+  auto scope = parseScope(P);
   if (!scope)
     return std::nullopt;
-  return ScopeSpecifier(label, *scope);
+  return ScopeRestrictionRepr(label, *scope);
 }
 
 /// \verbatim
 ///   scoped-attribute-arguments:
-///     '(' scope-specifier (',' scope-specifier)* ')'
+///     '(' scope-restriction (',' scope-restriction)* ')'
 /// \endverbatim
 ///
 /// Only returns an error for missing parentheses, returns success and leaves
@@ -5095,32 +5095,32 @@ static ParserStatus parseScopedTypeAttr(Parser &P, SourceLoc atLoc,
   }
 
   if (P.Tok.is(tok::r_paren)) {
-    P.diagnose(P.Tok, diag::expected_scope_specifier);
+    P.diagnose(P.Tok, diag::expected_scope);
     P.consumeToken(tok::r_paren);
     return makeParserSuccess();
   }
 
-  SmallVector<ScopeSpecifier, 2> specifiers;
-  bool invalidSpecifier = false;
+  SmallVector<ScopeRestrictionRepr, 2> restrictions;
+  bool invalidRestriction = false;
   SourceLoc rParenLoc;
   auto status = P.parseList(
       tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
       {diag::attr_expected_rparen, {"_scoped", /*DeclModifier=*/false}},
       [&]() -> ParserStatus {
-        auto specifier = parseScopeSpecifier(P);
-        if (!specifier) {
-          invalidSpecifier = true;
+        auto restriction = parseScopeRestriction(P);
+        if (!restriction) {
+          invalidRestriction = true;
           return makeParserError();
         }
-        specifiers.push_back(*specifier);
+        restrictions.push_back(*restriction);
         return makeParserSuccess();
       });
   if (status.isError())
     return status;
 
-  if (!invalidSpecifier) {
+  if (!invalidRestriction) {
     result = ScopedTypeAttr::create(P.Context, atLoc, attrLoc,
-                                    {lParenLoc, rParenLoc}, specifiers);
+                                    {lParenLoc, rParenLoc}, restrictions);
   }
   return status;
 }

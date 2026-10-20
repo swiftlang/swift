@@ -4482,7 +4482,7 @@ protected:
 
     SWIFT_INLINE_BITFIELD_FULL(ScopedTypeAttr, TypeAttribute, 32,
       : NumPadBits,
-      NumSpecifiers : 32
+      NumRestrictions : 32
     );
   } Bits;
   // clang-format on
@@ -4688,19 +4688,19 @@ public:
 
 class ScopedTypeAttr final
     : public SimpleTypeAttrWithArgs<TypeAttrKind::Scoped>,
-      private llvm::TrailingObjects<ScopedTypeAttr, ScopeSpecifier> {
+      private llvm::TrailingObjects<ScopedTypeAttr, ScopeRestrictionRepr> {
   friend TrailingObjects;
 
   ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
-                 ArrayRef<ScopeSpecifier> specifiers);
+                 ArrayRef<ScopeRestrictionRepr> restrictions);
 
 public:
   static ScopedTypeAttr *create(const ASTContext &ctx, SourceLoc atLoc,
                                 SourceLoc kwLoc, SourceRange parens,
-                                ArrayRef<ScopeSpecifier> specifiers);
+                                ArrayRef<ScopeRestrictionRepr> restrictions);
 
-  ArrayRef<ScopeSpecifier> getSpecifiers() const {
-    return getTrailingObjects(Bits.ScopedTypeAttr.NumSpecifiers);
+  ArrayRef<ScopeRestrictionRepr> getRestrictions() const {
+    return getTrailingObjects(Bits.ScopedTypeAttr.NumRestrictions);
   }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;

@@ -2249,7 +2249,7 @@ ERROR(sil_failed_to_parse_sil_optional,none,
 // MARK: Scope restrictions
 //------------------------------------------------------------------------------
 
-ERROR(expected_scope_specifier, PointsToFirstBadToken,
+ERROR(expected_scope, PointsToFirstBadToken,
       "expected identifier or 'self' in '_scoped' attribute", ())
 ERROR(immortal_scope_cannot_be_access, none,
       "cannot depend on the access scope of 'immortal'", ())
