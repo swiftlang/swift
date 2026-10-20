@@ -50,9 +50,17 @@ func exposeToCxxCxx() {}
 @_expose(wasm, "with_name") func wasmName() {}
 @_expose(wasm, "") func wasmEmptyNameOk() {}
 
-@_expose(wasm) struct WasmErrorOnStruct { // expected-error {{'@_expose' with 'wasm' can only be applied to global functions}}
-  @_expose(wasm) func errorOnMethod() {} // expected-error {{'@_expose' with 'wasm' can only be applied to global functions}}
+@_expose(wasm) struct WasmErrorOnStruct { // expected-error {{'@_expose' with 'wasm' can only be applied to global functions and to global or static stored variables}}
+  @_expose(wasm) func errorOnMethod() {} // expected-error {{'@_expose' with 'wasm' can only be applied to global functions and to global or static stored variables}}
+  @_expose(wasm) var errorOnInstanceProperty = 0 // expected-error {{'@_expose' with 'wasm' can only be applied to global functions and to global or static stored variables}}
+  @_expose(wasm) static var errorOnStaticComputedProperty: Int { 0 } // expected-error {{'@_expose' with 'wasm' can only be applied to global functions and to global or static stored variables}}
+  @_expose(wasm) static var wasmStaticStoredProperty = 0
+  @_expose(wasm, "with_name") static let wasmStaticStoredLet = 0
 }
+
+@_expose(wasm) var wasmGlobalVar = 0
+@_expose(wasm, "with_name") let wasmGlobalLet = 0
+@_expose(wasm) var errorOnGlobalComputedVar: Int { 0 } // expected-error {{'@_expose' with 'wasm' can only be applied to global functions and to global or static stored variables}}
 
 func wasmNested() {
   @_expose(wasm) // expected-error {{attribute '_expose' can only be used in a non-local scope}}
