@@ -64,7 +64,8 @@ bb0(%0 : @owned $KlassUser):
   %1 = begin_borrow %0
   %2 = ref_element_addr %1, #KlassUser.field
   %3 = load_borrow %2
-  %4 = apply %useKlass(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %3
   end_borrow %1
   debug_value %3, let, name "field"
