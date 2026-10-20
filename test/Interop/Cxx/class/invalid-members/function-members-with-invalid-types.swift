@@ -182,6 +182,29 @@ struct UsesGoodStruct {
 // CHECK-NEXT:   func takes(_: GoodStruct)
 // CHECK-NEXT: }
 
+// Member function templates are imported lazily, so none of these should
+// prevent HasTemplateMembers from being imported sans error.
+struct HasTemplateMembers {
+  template <class T>
+  int goodTemplate(T t) const { return 0; }
+
+  // expected-swift-note@+2 {{explicitly marked unavailable here}}
+  template <class T>
+  Bro<Ken> badTemplate(T t) const;
+
+  // expected-swift-note@+2 {{explicitly marked unavailable here}}
+  template <class T>
+  static Bro<Ken> badStaticTemplate(T t);
+};
+// CHECK:      struct HasTemplateMembers {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   func goodTemplate<T>(_ t: T) -> CInt
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   func badTemplate<T>(_ t: T) -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   static func badStaticTemplate<T>(_ t: T) -> Never
+// CHECK-NEXT: }
+
 //--- ok.cpp
 // expected-no-diagnostics
 #include <function.h>
@@ -196,6 +219,9 @@ void ok(void) {
   auto f = usgs.field;
   f = usgs.returns();
   usgs.takes(f);
+
+  HasTemplateMembers htm;
+  htm.goodTemplate(42);
 }
 
 //--- err.cpp
@@ -264,6 +290,10 @@ func ok() {
   var f = usgs.field
   f = usgs.returns()
   usgs.takes(f)
+
+  // Looking up one member function template must not import the others.
+  let htm = HasTemplateMembers()
+  let _: CInt = htm.goodTemplate(42 as CInt)
 }
 
 //--- err.swift
@@ -314,4 +344,10 @@ func err() {
   ugs.badArg(uinc)           // expected-swift-error {{has no member}}
 
   let _ = ugs.getBad()  // expected-swift-error {{is unavailable}}
+
+  // Bro<Ken> has already been instantiated above, so these only diagnose the
+  // unavailable return type.
+  let htm = HasTemplateMembers()
+  _ = htm.badTemplate(42 as CInt)                      // expected-swift-error {{is unavailable}}
+  _ = HasTemplateMembers.badStaticTemplate(42 as CInt) // expected-swift-error {{is unavailable}}
 }
