@@ -5176,11 +5176,20 @@ public:
     auto inheritedIDs = rawIDs.slice(0, numInheritedTypes);
     auto dependencyIDs = rawIDs.slice(numInheritedTypes);
 
-    for (TypeID dependencyID : dependencyIDs) {
-      auto dependency = MF.getTypeChecked(dependencyID);
-      if (!dependency) {
-        return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
+    // A dependency can lead back to this class (`class A: Base<B>` and
+    // `class B: Base<A>`). If we're re-entered while checking this class's
+    // dependencies, skip the checks to avoid infinite recursion. The class is
+    // then created before all of its dependencies are known to be readable;
+    // if one is missing, the class stays cached but incomplete, and later
+    // lookups can find it.
+    if (MF.ClassesResolvingDependencies.insert(thisDeclID).second) {
+      SWIFT_DEFER { MF.ClassesResolvingDependencies.erase(thisDeclID); };
+      for (TypeID dependencyID : dependencyIDs) {
+        auto dependency = MF.getTypeChecked(dependencyID);
+        if (!dependency) {
+          return llvm::make_error<TypeError>(
+              name, takeErrorInfo(dependency.takeError()));
+        }
       }
     }
 
@@ -5200,7 +5209,13 @@ public:
         genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
-    theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
+    // The dependency checks above may have been skipped to break a cycle, so
+    // the signature isn't guaranteed to be readable. Report an error instead
+    // of aborting.
+    GenericSignature genericSig;
+    SET_OR_RETURN_ERROR(genericSig,
+                        MF.getGenericSignatureChecked(genericSigID));
+    theClass->setGenericSignature(genericSig);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       theClass->setAccess(*accessLevel);
