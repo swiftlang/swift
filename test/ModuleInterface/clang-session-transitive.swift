@@ -13,8 +13,8 @@ import TestModule
  // CHECK:      "directDependencies": [
  // CHECK-NEXT:        {
  // CHECK-DAG:          "swift": "TestModule"
- // CHECK-DAG:          "swift": "Swift"
- // CHECK-DAG:          "swift": "SwiftOnoneSupport"
+ // CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "Swift"
+ // CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 
 // Additional occurence in source-imported dependencies field
  // CHECK:      "swift": "TestModule"
@@ -28,10 +28,10 @@ import TestModule
  // CHECK-NEXT:      ],
  // CHECK-NEXT:      "directDependencies": [
  // CHECK-NEXT:        {
- // CHECK-NEXT:          "swift": "Swift"
+ // CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "Swift"
  // CHECK-NEXT:        },
  // CHECK-NEXT:        {
- // CHECK-NEXT:          "swift": "SwiftOnoneSupport"
+ // CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
  // CHECK-NEXT:        }
  // CHECK-NEXT:      ],
  // CHECK-NEXT:      "linkLibraries": [

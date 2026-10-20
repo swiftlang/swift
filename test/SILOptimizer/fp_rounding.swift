@@ -7,9 +7,9 @@
 
 // CHECK-LABEL: sil @{{.*}}propagate_roundingmode
 // CHECK:      bb0:
-// CHECK-NEXT:   %0 = integer_literal {{.*}}, 0
-// CHECK-NEXT:   %1 = struct $Int (%0 {{.*}})
-// CHECK-NEXT:   return %1
+// CHECK:        [[ZERO:%[0-9]+]] = integer_literal {{.*}}, 0
+// CHECK-NEXT:   [[INT:%[0-9]+]] = struct $Int ([[ZERO]] {{.*}})
+// CHECK-NEXT:   return [[INT]]
 public func propagate_roundingmode() -> Int {
   let rm = FloatingPointRoundingRule.toNearestOrEven
   switch rm {

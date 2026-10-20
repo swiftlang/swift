@@ -131,7 +131,7 @@ class MainActorKlass {
   // CHECK-NEXT: // Isolation: global_actor. type: MainActor
   // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation14MainActorKlassC24callNonIsolatedWithParamyyYaF : $@convention(method) @async (@guaranteed MainActorKlass) -> () {
   // CHECK: bb0(
-  // CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+  // CHECK:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
   // CHECK:   [[B_ACTOR:%.*]] = begin_borrow [[ACTOR]]
   // CHECK:   hop_to_executor [[B_ACTOR]]
   // CHECK:   [[VAR_DECL:%.*]] = move_value [lexical] [var_decl]

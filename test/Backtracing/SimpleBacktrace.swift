@@ -6,6 +6,8 @@
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// A non-resilient Runtime module requires clients to enable C++ interop.
+// REQUIRES: swift_stdlib_library_evolution
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

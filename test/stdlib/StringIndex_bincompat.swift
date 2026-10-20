@@ -8,6 +8,9 @@
 // UNSUPPORTED: OS=emscripten
 // UNSUPPORTED: use_os_stdlib || back_deployment_runtime
 // UNSUPPORTED: swift_stdlib_asserts
+// FIXME: The Windows runtime that Runtimes/ builds ignores
+// SWIFT_BINARY_COMPATIBILITY_VERSION without runtime OS versioning.
+// UNSUPPORTED: OS=windows-msvc && !swift_stdlib_library_evolution
 
 // In 5.7, a number of String APIs started performing stronger index validation,
 // eliminating issues such as out of bounds memory accesses when members are

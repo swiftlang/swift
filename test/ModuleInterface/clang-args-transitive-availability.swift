@@ -13,8 +13,8 @@ import ImportsMacroSpecificClangModule
 
 // CHECK:      "directDependencies": [
 // CHECK-DAG:          "swift": "ImportsMacroSpecificClangModule"
-// CHECK-DAG:          "swift": "Swift"
-// CHECK-DAG:          "swift": "SwiftOnoneSupport"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "Swift"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 
 // Additional occurence in source-imported dependencies field
 //CHECK:      "swift": "ImportsMacroSpecificClangModule"
@@ -31,7 +31,7 @@ import ImportsMacroSpecificClangModule
 //CHECK-NEXT:          "swift": "SubImportsMacroSpecificClangModule"
 //CHECK-NEXT:        },
 //CHECK-NEXT:        {
-//CHECK-NEXT:          "swift": "SwiftOnoneSupport"
+//CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 
 //CHECK:      "swift": "SubImportsMacroSpecificClangModule"
 //CHECK-NEXT:    },
@@ -43,7 +43,7 @@ import ImportsMacroSpecificClangModule
 //CHECK-NEXT:      "directDependencies": [
 //CHECK-NEXT:        {
 //CHECK-DAG:          "clang": "OnlyWithMacro"
-//CHECK-DAG:          "swift": "SwiftOnoneSupport"
+//CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 //CHECK-NEXT:        }
 
 // CHECK:      "clang": "OnlyWithMacro"
