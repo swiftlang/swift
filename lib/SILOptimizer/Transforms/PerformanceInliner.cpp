@@ -783,6 +783,18 @@ bool SILPerformanceInliner::isProfitableToInline(
     return false;
   }
 
+  // A function which must not be specialized in Osize mode must not be inlined
+  // in a generic context, either. Otherwise the generic specializer would
+  // specialize the inlined code (and its callees) in an Osize client.
+  // This also applies to inlining into a generic caller which is compiled with
+  // -O, because the caller's body may be serialized and used by an Osize client.
+  if (IsGeneric &&
+      Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER) &&
+      (OptMode == OptimizationMode::ForSize ||
+       AI.getSubstitutionMap().getRecursiveProperties().hasArchetype())) {
+    return false;
+  }
+
   // Bail out if this is a generic call of a `@_specialize(exported:)` function
   // and we are in the early inliner. We want to give the generic specializer
   // the opportunity to see specialized call sites.
