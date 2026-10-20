@@ -116,7 +116,9 @@ enum class TypeResolverContext : uint8_t {
   /// We allow pack expansions in all argument positions, and then use the
   /// PackMatcher to ensure that scalar parameters line up with scalar
   /// arguments, and pack expansion parameters line up with pack expansion
-  /// arguments.
+  /// arguments. As with ScalarGenericArgument, integer types and value
+  /// parameters are allowed, and we use the ValueMatchVisitor to ensure that
+  /// they line up with value parameters.
   VariadicGenericArgument,
 
   /// Whether we are checking a tuple element type.

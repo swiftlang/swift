@@ -1378,18 +1378,14 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
   auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
     return paramDecl->isParameterPack();
   });
-  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
-    return paramDecl->isValue();
-  });
 
-  // If the type declares at least one parameter pack and no value parameters,
-  // allow pack expansions anywhere in the argument list. We'll use the
-  // PackMatcher to ensure that everything lines up. Otherwise, don't allow pack
-  // expansions to appear at all.
+  // If the type declares at least one parameter pack, allow pack expansions
+  // anywhere in the argument list. We'll use the PackMatcher to ensure that
+  // everything lines up. Otherwise, don't allow pack expansions to appear
+  // at all.
   auto argOptions = options.withoutContext().withContext(
-      hasParameterPack && !hasValueParam
-          ? TypeResolverContext::VariadicGenericArgument
-          : TypeResolverContext::ScalarGenericArgument);
+      hasParameterPack ? TypeResolverContext::VariadicGenericArgument
+                       : TypeResolverContext::ScalarGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
