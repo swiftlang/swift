@@ -192,7 +192,6 @@ import SwiftShims
 fileprivate func _allocate<T: AnyObject>(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
-  growthFactor: Float? = nil, // Exponential growth factor for large allocs
   tailAllocator: (_ numTailBytes: Int) -> T // Do the actual tail allocation
 ) -> (T, realNumTailBytes: Int) {
 #if !$Embedded
@@ -201,29 +200,13 @@ fileprivate func _allocate<T: AnyObject>(
 
   let numBytes = numHeaderBytes + numTailBytes
 
-  let linearBucketThreshold = 128
-  if _fastPath(numBytes < linearBucketThreshold) {
-    // Allocate up to the nearest bucket of 16
-    let realNumBytes = _roundUp(numBytes, toAlignment: 16)
-    let realNumTailBytes = realNumBytes - numHeaderBytes
-    _internalInvariant(realNumTailBytes >= numTailBytes)
-    let object = tailAllocator(realNumTailBytes)
-    return (object, realNumTailBytes)
-  }
-
-  let growTailBytes: Int
-  if let growth = growthFactor {
-    growTailBytes = Swift.max(numTailBytes, Int(Float(numTailBytes) * growth))
-  } else {
-    growTailBytes = numTailBytes
-  }
-
 #if !$Embedded
-  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
+  let total = _mallocGoodSize(for: numBytes)
 #else
-  let total = _roundUp(numHeaderBytes + growTailBytes, toAlignment: 16)
+  let total = _roundUp(numBytes, toAlignment: 16)
 #endif
   let totalTailBytes = total - numHeaderBytes
+  _internalInvariant(totalTailBytes >= numTailBytes)
 
   return (tailAllocator(totalTailBytes), totalTailBytes)
 }
