@@ -1042,6 +1042,7 @@ enum Project {
 
   XCTest
   Testing
+  TestSupport
   ClangBuiltins
   ClangRuntime
   SwiftInspect
@@ -2971,31 +2972,20 @@ function Build-CDispatch([Hashtable] $Platform,
 
 function Get-CompilersDefines([Hashtable] $Platform,
                               [string]    $Variant,
-                              [switch]    $Test,
                               [string]    $SwiftSDK = (Get-PinnedToolchainSDK -OS $Platform.OS),
                               [string]    $DispatchPackage = $null) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
   $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
-  $TestDefines = if ($Test) {
-    @{
-      SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
-      SWIFT_BUILD_DYNAMIC_STDLIB = "YES";
-      SWIFT_BUILD_REMOTE_MIRROR = "YES";
-      SWIFT_NATIVE_SWIFT_TOOLS_PATH = "";
-    }
-  } else {
-    @{
-      SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
-      SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
-      # Pin OFF: a prior Test-Compilers reconfigure can have left this `YES`
-      # in CMakeCache.txt.  With SWIFT_BUILD_DYNAMIC_STDLIB=NO the libexec
-      # subdir's swift-backtrace target references absent stdlib targets.
-      SWIFT_BUILD_LIBEXEC = "NO";
-      SWIFT_BUILD_REMOTE_MIRROR = "NO";
-      SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
-    }
+  # Pin these OFF: an earlier build.ps1 enabled them to test the compilers, and
+  # they persist in CMakeCache.txt.
+  $StdlibDefines = @{
+    SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
+    SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
+    SWIFT_BUILD_LIBEXEC = "NO";
+    SWIFT_BUILD_REMOTE_MIRROR = "NO";
+    SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
   }
 
   # If DebugInfo is enabled limit the number of parallel links to avoid OOM.
@@ -3014,7 +3004,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
     @{}
   }
 
-  return $TestDefines + $DebugDefines + $DispatchDefines + @{
+  return $StdlibDefines + $DebugDefines + $DispatchDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -3434,6 +3424,27 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
+# Builds StdlibUnittest and its dependencies against the platform SDK.
+function Build-TestSupport([Hashtable] $Platform) {
+  Sync-Runtimes
+
+  Build-CMakeProject `
+    -Src $SourceCache\swift\Runtimes\Testing `
+    -Bin (Get-ProjectBinaryCache $Platform TestSupport) `
+    -InstallTo "$(Get-ProjectBinaryCache $Platform TestSupport)\usr" `
+    -Platform $Platform `
+    -CCompiler $Compilers.Stage1.GNUC `
+    -CXXCompiler $Compilers.Stage1.GNUCXX `
+    -SwiftCompiler $Compilers.Stage1.Swift `
+    -SwiftSDK $null `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
+      CMAKE_CXX_FLAGS = @("-I$(Get-ProjectBinaryCache $Platform DynamicRuntime)\include");
+      Swift_SDKROOT = (Get-SwiftSDK -OS $Platform.OS);
+    }
+}
+
 function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
@@ -3442,19 +3453,23 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
     $env:Path = "$SwiftRuntime;$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
     $env:PYTHONUTF8 = "1"
-    $TestingDefines = Get-CompilersDefines $Platform $Variant -Test -SwiftSDK $SwiftSDK
-    # Stage2 tests must use the freshly-built native tools, not Stage1.
-    $TestingDefines["SWIFT_NATIVE_SWIFT_TOOLS_PATH"] = $Stage2BinDir
-    # check-swift depends on swift-backtrace-${SDK}; build the libexec helpers
-    # with the rest of the test targets.
-    $TestingDefines["SWIFT_BUILD_LIBEXEC"] = "YES"
-    # Keep %host-build-swift on the same platform SDK that Stage2 uses.
-    $TestingDefines["SWIFT_HOST_SDKROOT"] = $SwiftSDK
+    # Configure the tree as Build-Compilers did, so that nothing rebuilds.
+    $TestingDefines = Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage (Get-ProjectCMakeModules $Platform DynamicCDispatch)
+    $TestingDefines += @{
+      # Keep %host-build-swift on the same platform SDK that Stage2 uses.
+      SWIFT_HOST_SDKROOT = $SwiftSDK;
+      SWIFT_TEST_SDK = $SwiftSDK;
+      SWIFT_TEST_SDK_RUNTIME_DIR = $SwiftRuntime;
+      # The platform SDK's runtime supports reflection.
+      SWIFT_ENABLE_REFLECTION = "YES";
+    }
     $Targets = @()
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
+      Build-TestSupport $Platform
+      $TestingDefines["SWIFT_TEST_SUPPORT_DIR"] = "$(Get-ProjectBinaryCache $Platform TestSupport)\usr"
       # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
       # need it, so it is built before check-swift starts.
       $Targets += @("SwiftCompilerPlugin")
@@ -3481,9 +3496,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
       }
 
-      # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
-      # already lives in $CompilerCache\bin and is what repl_swift.exe is linked
-      # against, so only swiftrt.obj needs to be staged from the SDK here.
+      # Runtime dependencies of repl_swift.exe.
       New-Item -ItemType Directory -Force "$CompilerCache\$SwiftRTSubdir" | Out-Null
       Write-Host "Copying '$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$CompilerCache\$SwiftRTSubdir'"
       Copy-Item `
@@ -3508,17 +3521,14 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Write-Warning "Test-Compilers invoked without specifying test target(s)."
     }
 
-    # Build and bind the runtime-loading tools before swift-test-stdlib can
-    # repopulate bin\ with freshly-built runtime DLLs.  This path intentionally
-    # uses the bundle SxS helper rather than the per-DLL install-layout helper
-    # because the test build keeps producing flat runtime DLLs in bin\.  Reuse
-    # the same configure arguments for the final build so ninja does not relink
-    # away the manifests.
+    # Build and bind the runtime-loading tools first.  Reuse the same configure
+    # arguments for the final build so ninja does not relink away the manifests.
     $BuildCMakeArgs = @{
       Src           = [IO.Path]::Combine($SourceCache, "llvm-project", "llvm")
       Bin           = (Get-ProjectBinaryCache $Platform Stage2Compilers)
       InstallTo     = "$($Platform.ToolchainInstallRoot)\usr"
       Platform      = $Platform
+      Assembler     = $Assemblers.Stage1
       CCompiler     = $Compilers.Stage1.C
       CXXCompiler   = $Compilers.Stage1.CXX
       SwiftCompiler = $Compilers.Stage1.Swift
@@ -3537,7 +3547,6 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     # Prefer the platform SDK runtime.  The pre-staged bundle fallback keeps
     # running without -Toolchain usable when the install image is absent.
-    $Stage2LibexecSwiftDir = [IO.Path]::Combine($BuildCMakeArgs.Bin, "libexec", "swift")
     $RuntimeSourceCandidates = @(
       $SwiftRuntime,
       (Join-Path $Stage2BinDir "swiftToolchainRuntime")
@@ -3557,11 +3566,6 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     Invoke-IsolatingEnvVars {
       # Test-time tools execute on the build host.
-      # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
-      # the test reconfigure here makes lldb compile expressions against the in-
-      # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
-      # uses the shipped runtime instead.
-      # See https://github.com/swiftlang/swift/issues/91537 for details.
       Invoke-VsDevShell $BuildPlatform
       Set-WindowsSxSToolchainRuntime `
         -BinaryDir              $Stage2BinDir `
@@ -3579,25 +3583,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
                                    "swiftc-legacy-driver.exe",
-                                   "lldb.exe"
+                                   "lldb.exe",
+                                   "repl_swift.exe"
                                  )
-      # SxS only probes the EXE's own directory for the named assembly.
-      if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
-        Set-WindowsSxSToolchainRuntime `
-          -BinaryDir              $Stage2LibexecSwiftDir `
-          -RuntimeSourceDir       $RuntimeSource `
-          -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
-          -Tools                  @("swift-backtrace.exe")
-      } else {
-        Write-Warning "SxS bind: '$Stage2LibexecSwiftDir\swift-backtrace.exe' not present; skipping backtracer bind (Build-TestBacktrace did not run or failed)"
-      }
     }
 
-    # TODO(roman-bcny): Workaround for https://github.com/swiftlang/swift/issues/87970
-    # Stdlib DLLs must be fully linked before swift-frontend compilations
-    # that load them, otherwise the linker races with memory-mapped DLLs
-    # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
     if ($Targets) {
       Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
     }
@@ -4415,6 +4405,20 @@ $SDKSupplementalRuntimes = @(
   "Runtime"
 )
 
+# Copies the standard library sources that Runtimes builds from.
+# TODO: remove this once the migration is completed.
+function Sync-Runtimes {
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $BuildPlatform
+
+    Push-Location "${SourceCache}\swift\Runtimes"
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
+    Pop-Location
+  }
+}
+
 function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $SDKIdentifier         = $Context.SDKIdentifier
   $Variant               = $Context.Variant
@@ -4440,16 +4444,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
   $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
-  # TODO: remove this once the migration is completed.
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $BuildPlatform
-
-    Push-Location "${SourceCache}\swift\Runtimes"
-    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
-    $CMakeBin = (Get-CMake).Path
-    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
-    Pop-Location
-  }
+  Sync-Runtimes
 
   Invoke-IsolatingEnvVars {
     # TODO(compnerd) build statically for static builds
