@@ -71,3 +71,28 @@ func test_optional_chaining(v: Int?, defaultV: Int) {
   // CHECK: declref_expr type="(consuming Int?, @autoclosure () throws -> Int?) throws -> Int?" {{.*}} decl="Swift.(file).??
   _ = (v ?? defaultV)?.test() // Ok (no warnings)
 }
+
+func test_conditional_binding_infer_return_type() {
+  let storage: [String: Any] = [:]
+
+  func value<V>(for key: String) -> V? {
+    return storage[key] as? V
+  }
+
+  // CHECK: declref_expr type="(consuming [Any]?, @autoclosure () throws -> [Any]?) throws -> [Any]?" {{.*}} decl="Swift.(file).??
+  if let values = value(for: "missing") ?? [] {
+    _ = values
+  }
+
+  // CHECK: declref_expr type="(consuming [Any]?, @autoclosure () throws -> [Any]?) throws -> [Any]?" {{.*}} decl="Swift.(file).??
+  if let values: [Any] = value(for: "missing") ?? [] {
+    _ = values
+  }
+
+  // CHECK: declref_expr type="(consuming [Any]?, @autoclosure () throws -> [Any]?) throws -> [Any]?" {{.*}} decl="Swift.(file).??
+  let _: [Any]? = value(for: "missing") ?? []
+
+  // CHECK: declref_expr type="(consuming [Any]?, @autoclosure () throws -> [Any]?) throws -> [Any]?" {{.*}} decl="Swift.(file).??
+  guard let values = value(for: "missing") ?? [] else { return }
+  _ = values
+}

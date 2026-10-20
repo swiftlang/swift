@@ -1377,23 +1377,64 @@ static DisjunctionInfo computeDisjunctionInfo(
     // first argument matches exactly, the ranking is going to be skewed
     // towards selecting an overload choice that returns a non-optional type.
     // This is not always correct i.e. when operator is involved in optional
-    // chaining. To avoid producing an incorrect favoring, let's skip the this
-    // disjunction when constraints associated with result type indicate
-    // that it should be optional.
+    // chaining or when the contextual result type is optional (such as inside
+    // `if let` or `guard let`). To avoid producing an incorrect favoring,
+    // let's skip this disjunction when constraints associated with result type
+    // indicate that it should be optional.
     //
     // Simply adding it as a binding won't work because if the second argument
     // is non-optional the overload that returns `T?` would still have a lower
     // score.
-    if (!bindingSet.hasViableBindings() &&
-        !bindingSet.isDirectHole() &&
-        isNilCoalescingOperator(disjunction)) {
+    if (isNilCoalescingOperator(disjunction)) {
+      auto isOptionalType = [&](Type type) -> bool {
+        type = cs.simplifyType(type)->getRValueType();
+        if (type->getOptionalObjectType())
+          return true;
+        if (auto *tv = type->getAs<TypeVariableType>()) {
+          if (tv == typeVar)
+            return false;
+          auto &cg = cs.getConstraintGraph();
+          if (llvm::any_of(cg[tv].getConstraints(), [&](Constraint *c) {
+                return c->getKind() == ConstraintKind::OptionalObject &&
+                       c->getFirstType()->isEqual(tv);
+              }))
+            return true;
+          auto tvBindings = cs.getBindingsFor(tv);
+          return llvm::any_of(tvBindings.Bindings, [&](const auto &b) {
+            return (bool)b.BindingType->getRValueType()->getOptionalObjectType();
+          });
+        }
+        return false;
+      };
+
+      if (llvm::any_of(bindingSet.Bindings, [&](const auto &binding) {
+            return isOptionalType(binding.BindingType);
+          })) {
+        return DisjunctionInfo();
+      }
+
       auto &cg = cs.getConstraintGraph();
       if (llvm::any_of(cg[typeVar].getConstraints(),
-                       [&typeVar](Constraint *constraint) {
-                         if (constraint->getKind() !=
-                             ConstraintKind::OptionalObject)
+                       [&](Constraint *constraint) {
+                         if (!constraint->getFirstType()->isEqual(typeVar))
                            return false;
-                         return constraint->getFirstType()->isEqual(typeVar);
+
+                         if (constraint->getKind() ==
+                             ConstraintKind::OptionalObject)
+                           return true;
+
+                         switch (constraint->getKind()) {
+                         case ConstraintKind::Conversion:
+                         case ConstraintKind::Subtype:
+                         case ConstraintKind::ArgumentConversion:
+                         case ConstraintKind::OperatorArgumentConversion:
+                         case ConstraintKind::Bind:
+                         case ConstraintKind::Equal:
+                         case ConstraintKind::OneWayEqual:
+                           return isOptionalType(constraint->getSecondType());
+                         default:
+                           return false;
+                         }
                        })) {
         return DisjunctionInfo();
       }
@@ -1419,6 +1460,10 @@ static DisjunctionInfo computeDisjunctionInfo(
       }
     }
   } else {
+    if (isNilCoalescingOperator(disjunction) &&
+        resultType->getRValueType()->getOptionalObjectType())
+      return DisjunctionInfo();
+
     resultTypes.push_back(resultType);
   }
 
