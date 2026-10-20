@@ -192,6 +192,11 @@ struct HasTemplateMembers {
   template <class T>
   Bro<Ken> badTemplate(T t) const;
 
+  // expected-swift-note@+3 {{explicitly marked unavailable here}}
+  template <class T>
+  __attribute__((swift_name("renamedBadTemplate(_:)")))
+  Bro<Ken> badTemplateWithSwiftName(T t) const;
+
   // expected-swift-note@+2 {{explicitly marked unavailable here}}
   template <class T>
   static Bro<Ken> badStaticTemplate(T t);
@@ -201,6 +206,8 @@ struct HasTemplateMembers {
 // CHECK-NEXT:   func goodTemplate<T>(_ t: T) -> CInt
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func badTemplate<T>(_ t: T) -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   func renamedBadTemplate<T>(_ t: T) -> Never
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   static func badStaticTemplate<T>(_ t: T) -> Never
 // CHECK-NEXT: }
@@ -349,5 +356,6 @@ func err() {
   // unavailable return type.
   let htm = HasTemplateMembers()
   _ = htm.badTemplate(42 as CInt)                      // expected-swift-error {{is unavailable}}
+  _ = htm.renamedBadTemplate(42 as CInt)               // expected-swift-error {{is unavailable}}
   _ = HasTemplateMembers.badStaticTemplate(42 as CInt) // expected-swift-error {{is unavailable}}
 }

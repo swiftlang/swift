@@ -958,16 +958,8 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
   }
 
   // Classify a member function template like the underlying function
-  if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(decl)) {
+  if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(decl))
     decl = ftd->getTemplatedDecl();
-
-    // The swift_name attribute is on the templated decl, so the
-    // SwiftLookupTable records the template under its C++ name.
-    //
-    // Import it eagerly, otherwise lazy lookup would miss it.
-    if (decl->hasAttr<clang::SwiftNameAttr>())
-      return true;
-  }
 
   if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
     switch (fn->getDeclName().getNameKind()) {

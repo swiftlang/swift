@@ -643,6 +643,10 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   if (version == ImportNameVersion::raw())
     return std::nullopt;
 
+  // Attributes on a function template are attached to the templated decl.
+  if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(decl))
+    decl = ftd->getTemplatedDecl();
+
   /// Decode the given Clang attribute to try to determine whether it is
   /// a Swift name attribute.
   auto decodeAttr =
@@ -1626,7 +1630,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
 
   // C++ interop was not available in Swift 2
-  if (!swift3OrLaterName && isa<clang::CXXMethodDecl>(D)) {
+  if (!swift3OrLaterName &&
+      isa_and_nonnull<clang::CXXMethodDecl>(D->getAsFunction())) {
     return ImportedName();
   }
   // If this function uses C++23 deducing this, bail.
@@ -1811,7 +1816,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         skipCustomName = true;
         result.info.hasInvalidCustomName = true;
       }
-    } else if (auto *func = dyn_cast<clang::FunctionDecl>(D)) {
+    } else if (auto *func = D->getAsFunction()) {
+      // Look through function templates to the templated decl.
       if (auto *cxxMethod = dyn_cast<clang::CXXMethodDecl>(func)) {
         // `swift_name` attribute is not supported in virtual methods overrides
         if (cxxMethod->isVirtual() && cxxMethod->size_overridden_methods() > 0)
@@ -1819,7 +1825,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       }
 
       // `swift_name` attribute is not supported in virtual methods overrides
-      if (auto method = dyn_cast<clang::CXXMethodDecl>(D);
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(func);
           method && overridesVirtualMethods(method))
         skipCustomName = true;
 

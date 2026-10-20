@@ -1935,7 +1935,13 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                          named, importedName.getEffectiveContext());
         }
 
-        if (auto swiftNameAttr = named->getAttr<clang::SwiftNameAttr>()) {
+        const clang::Decl *attrDecl = named;
+
+        // Attributes on a function template are attached to the templated decl.
+        if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(named))
+          attrDecl = ftd->getTemplatedDecl();
+
+        if (auto *swiftNameAttr = attrDecl->getAttr<clang::SwiftNameAttr>()) {
           auto parsedDeclName = parseDeclName(swiftNameAttr->getName());
           auto swiftDeclName =
               parsedDeclName.formDeclName(nameImporter.getContext());
