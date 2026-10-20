@@ -342,23 +342,23 @@ func test_isa_1(p: P) {
   // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $any P
   // CHECK-NEXT: copy_addr %0 to [init] [[PTMPBUF]] : $*any P
   switch p {
-    // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+    // `case is X` binds nothing, so no buffer is allocated for a payload that
+    // is never extracted.
+  // CHECK-NOT: alloc_stack $X
+  // CHECK:   checked_cast_addr_br test_only any P in [[P:%.*]] : $*any P to X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case is X:
   // CHECK: [[IS_X]]:
-  // CHECK-NEXT: load [trivial] [[TMPBUF]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[FUNC:%.*]] = function_ref @$s6switch1ayyF
   // CHECK-NEXT: apply [[FUNC]]()
-  // CHECK-NEXT: dealloc_stack [[TMPBUF]]
   // CHECK-NEXT: destroy_addr [[PTMPBUF]]
   // CHECK-NEXT: dealloc_stack [[PTMPBUF]]
     a()
     // CHECK:   br [[CONT:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[P]] : $*any P to Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
 // CHECK: [[IS_Y]]:
   case is Y:
@@ -367,7 +367,7 @@ func test_isa_1(p: P) {
     b()
 
   // CHECK: [[IS_NOT_Y]]:
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Z in {{%.*}} : $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[P]] : $*any P to Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
 
   // CHECK: [[IS_Z]]:
   case is Z:
@@ -389,7 +389,7 @@ func test_isa_1(p: P) {
 // CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_21pyAA1P_p_tF
 func test_isa_2(p: P) {
   switch (p, foo()) {
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[P:%.*]] : $*any P to X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_X]]:
   // CHECK:   function_ref @$s6switch3fooSiyF
@@ -401,7 +401,7 @@ func test_isa_2(p: P) {
     a()
 
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[P]] : $*any P to Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_Y]]:
   // CHECK:   function_ref @$s6switch3fooSiyF
@@ -415,7 +415,7 @@ func test_isa_2(p: P) {
   // CHECK: [[NOT_CASE2]]:
   // CHECK: [[IS_NOT_Y]]:
 
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in {{%.*}} : $*X, [[CASE3:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[P:%.*]] : $*any P to X, [[CASE3:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   case (is X, _):
   // CHECK: [[CASE3]]:
@@ -425,7 +425,7 @@ func test_isa_2(p: P) {
 
   // -- case (is Y, foo()):
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_addr_br copy_on_success any P in [[P]] : $*any P to Y in {{%.*}} : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br test_only any P in [[P]] : $*any P to Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
   // CHECK: [[IS_Y]]:
   // CHECK:   function_ref @$s6switch3barSiyF
   // CHECK:   cond_br {{%.*}}, [[CASE4:bb[0-9]+]], [[NOT_CASE4:bb[0-9]+]]
@@ -1053,9 +1053,9 @@ func rdar14826416<T, U>(t: T, u: U) {
   }
 }
 // CHECK-LABEL: sil hidden [ossa] @$s6switch12rdar14826416{{[_0-9a-zA-Z]*}}F
-// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to Int in {{%.*}} : $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
+// CHECK:   checked_cast_addr_br test_only T in {{%.*}} : $*T to Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
 // CHECK: [[ISNT_INT]]:
-// CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to U in {{%.*}} : $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
+// CHECK:   checked_cast_addr_br test_only T in {{%.*}} : $*T to U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
 
 // <rdar://problem/14835992>
 class Rdar14835992 {}

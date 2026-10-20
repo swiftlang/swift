@@ -1990,26 +1990,43 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
   CanType sourceType = firstPattern->getType()->getCanonicalType();
   CanType targetType = getTargetType(rows[0]);
 
-  // For now, limit this path to noncopyable existentials
-  if (!canUseNoncopyableTypeTest(sourceType, targetType,
-                                 firstPattern->getCastKind()))
+  if (!canUseTypeTestForIsa(SGF, sourceType, targetType,
+                            firstPattern->getCastKind()))
     return false;
 
   // The test reads the subject through a pointer.
-  // * Without OpaqueValues, return here if it's not an address
+  // * Without OpaqueValues, return here if it is copyable and
+  //   not an address (the ordinary lowering handles those)
   // * With OpaqueValues, fall through to borrow it into a temporary
   ManagedValue subject = src.getFinalManagedValue();
-  if (!subject.getType().isAddress() && SGF.useLoweredAddresses())
+  if (!subject.getType().isAddress() && SGF.useLoweredAddresses() &&
+      !sourceType->isNoncopyable())
     return false;
 
-  // We can't yet support binding the payload, so diagnose here.
+  // We can't yet support binding the payload. For a copyable subject the
+  // ordinary lowering handles that perfectly well, so hand those back
+  // untouched; a noncopyable one has no such fallback and is diagnosed below.
   bool wantsPayload = false;
   for (auto &row : rows) {
-    auto *is = cast<IsPattern>(row.Pattern);
-    if (!patternNeedsNoPayload(is->getSubPattern())) {
-      SGF.SGM.diagnose(is->getLoc(),
-                       diag::noncopyable_cast_pattern_binding_unimplemented);
+    if (!patternNeedsNoPayload(cast<IsPattern>(row.Pattern)->getSubPattern()))
       wantsPayload = true;
+  }
+  bool subjectIsNoncopyable =
+      sourceType->isNoncopyable() && sourceType->isExistentialType();
+  if (wantsPayload && !subjectIsNoncopyable)
+    return false;
+
+  // For a noncopyable subject there is no ordinary lowering to fall back to:
+  // it hands the pattern machinery a cast value whose consumption kind
+  // bindBorrow() asserts on, so falling through is a compiler crash rather than
+  // an error. Binding needs a borrowed projection out of the container, which is
+  // not implemented yet, so diagnose.
+  if (wantsPayload) {
+    for (auto &row : rows) {
+      auto *is = cast<IsPattern>(row.Pattern);
+      if (!patternNeedsNoPayload(is->getSubPattern()))
+        SGF.SGM.diagnose(is->getLoc(),
+                         diag::noncopyable_cast_pattern_binding_unimplemented);
     }
   }
 
@@ -2046,8 +2063,8 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
 
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
-  emitNoncopyableTypeTest(SGF, loc, subject, sourceType, targetType, trueBB,
-                          falseBB, rows[0].Count, ProfileCounter());
+  emitTypeTestForIsa(SGF, loc, subject, sourceType, targetType, trueBB,
+                     falseBB, rows[0].Count, ProfileCounter());
 
   // Chain failure to the next case
   SGF.B.setInsertionPoint(falseBB);

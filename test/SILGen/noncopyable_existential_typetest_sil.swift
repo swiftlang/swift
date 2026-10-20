@@ -90,16 +90,54 @@ func asOptional(_ box: consuming any P & ~Copyable) -> Int {
   return -1
 }
 
-// MARK: - A copyable existential is untouched
+// MARK: - A copyable existential gets the same treatment
 
-// canUseNoncopyableTypeTest() deliberately does not apply to copyable sources,
-// so their codegen and optimizer behavior are unchanged.
+// canUseTypeTestForIsa() asks only whether the cast uses the address strategy,
+// not whether the source is copyable: `is` never needs the payload either way.
+// So an opaque *copyable* existential also lowers to a test.
 //
 // CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil15copyableSubject{{[_0-9a-zA-Z]*}}F
-// CHECK-NOT:       test_only
+// CHECK:           checked_cast_addr_br test_only any CopyableP in {{%.*}} to CopyableS
+// CHECK-NOT:       copy_addr
 // CHECK:         } // end sil function
 protocol CopyableP {}
 struct CopyableS: CopyableP {}
 func copyableSubject(_ box: any CopyableP) -> Bool {
   box is CopyableS
+}
+
+// MARK: - The test carries the target's cast options
+
+// CheckedCastInstOptions are a property of the target type, not of how the cast
+// is emitted, and they decide whether the cast *succeeds*: a `Sendable`-
+// constrained existential must not be satisfied by an isolated conformance. So
+// the test form has to carry them exactly as the value-producing form does --
+// dropping them would make `is` and `as?` disagree.
+//
+// Only reachable now that the test applies to copyable sources: a non-`Copyable`
+// source cannot have an existential target, so its options are always default.
+
+protocol SendableRefining: Sendable {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil22genericIsSendableBoundySbxlF
+// CHECK:           checked_cast_addr_br [prohibit_isolated_conformances] test_only T in {{%.*}} to any SendableRefining
+// CHECK:         } // end sil function
+func genericIsSendableBound<T>(_ x: T) -> Bool {
+  x is any SendableRefining
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil0B15IsSendableBoundySbAA9CopyableP_pF
+// CHECK:           checked_cast_addr_br [prohibit_isolated_conformances] test_only any CopyableP in {{%.*}} to any SendableRefining
+// CHECK:         } // end sil function
+func existentialIsSendableBound(_ x: any CopyableP) -> Bool {
+  x is any SendableRefining
+}
+
+// A target with no Sendable constraint keeps the default options, so no marker.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil23genericIsUnconstrainedPySbxlF
+// CHECK:           checked_cast_addr_br test_only T in {{%.*}} to any CopyableP
+// CHECK:         } // end sil function
+func genericIsUnconstrainedP<T>(_ x: T) -> Bool {
+  x is any CopyableP
 }

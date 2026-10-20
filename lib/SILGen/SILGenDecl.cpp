@@ -1503,23 +1503,30 @@ static Expr *findConsumableStorageReference(Expr *e) {
   return nullptr;
 }
 
-// Try to use the original storage directly when casting a
-// noncopyable existential source.
+// Try to use the original storage directly rather than a copy of it.
 bool IsPatternInitialization::tryInitializeFromStorageReference(
     SILGenFunction &SGF, Expr *initializer, SILLocation loc) {
-  if (!isNoncopyableExistentialSubject())
-    return false;
-
   if (!subInitialization.get()) {
     // `if case is T = box` or `if case _ as T = box` bind nothing
     // so they just need to borrow the source within a borrow scope
     // that is closed in the continuation block.
+    if (!canUseTypeTestForIsa(SGF, pattern->getType()->getCanonicalType(),
+                              pattern->getCastType()->getCanonicalType(),
+                              pattern->getCastKind()))
+      return false;
+
     FormalEvaluationScope borrowScope(SGF);
     ManagedValue borrowed = emitTypeTestOperand(SGF, initializer);
     if (!borrowed || !borrowed.getType().isAddress())
       return false;
     return tryEmitNoncopyablePatternMatch(SGF, loc, borrowed);
   }
+
+  // Binding the payload consumes the subject out of its own storage so that a
+  // *failed* cast can leave it intact. That is specific to a noncopyable
+  // existential; a copyable one has no reason to avoid the ordinary copy.
+  if (!isNoncopyableExistentialSubject())
+    return false;
 
   // Is the subject stored where we can use it directly?  If not, return
   // false and caller will copy it.
@@ -1558,9 +1565,9 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
     SILBasicBlock *failBB =
         SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
 
-    emitNoncopyableTypeTest(SGF, loc, value, sourceType, targetType, contBB,
-                            failBB, initInfo.numTrueTaken,
-                            initInfo.numFalseTaken);
+    emitTypeTestForIsa(SGF, loc, value, sourceType, targetType, contBB,
+                       failBB, initInfo.numTrueTaken,
+                       initInfo.numFalseTaken);
 
     SGF.B.setInsertionPoint(contBB);
     return true;

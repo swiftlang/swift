@@ -8,7 +8,8 @@
 // because casting out of a non-`Copyable` existential is diagnosed at this
 // deployment target -- which is exactly what makes the fallback's copy safe.
 
-// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature NoncopyableCasting | %FileCheck %s --check-prefix=IR
+// The IR check tests back-deployment on ABI-stable platforms
+// RUN: %if VENDOR=apple %{ %target-swift-frontend -emit-ir %s -enable-experimental-feature NoncopyableCasting | %FileCheck %s --check-prefix=IR %}
 // RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableCasting) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -enable-experimental-feature NoncopyableCasting) | %FileCheck %s
 
@@ -81,3 +82,21 @@ hammer()
 
 // CHECK-NEXT: afterScope: live=0
 print("afterScope: live=\(Tracked.live)")
+
+// MARK: - repeated tests of a generic target in one function
+
+func twice<S, T>(_ x: S, _: T.Type) -> String {
+  var r = ""
+  r += x is T ? "1" : "-"
+  r += x is T ? "2" : "-"
+  switch x {
+  case is T: r += "3"
+  default: r += "-"
+  }
+  return r
+}
+
+// CHECK-NEXT: twice: 123 --- 123
+print("twice:", twice(Boxed(a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8), Boxed.self),
+      twice(Small(t: 1), Boxed.self),
+      twice(q, Boxed.self))
