@@ -254,9 +254,15 @@ private:
                           sugaredFirstType);
 
         auto sugaredFirstNominal = sugaredFirstType->castTo<NominalType>();
-        if (auto firstParent = firstNominal.getParent()) {
+        auto firstParent = firstNominal.getParent();
+        auto secondParent = secondNominal->getParent();
+        if (bool(firstParent) != bool(secondParent))
+          return mismatch(firstNominal.getPointer(), secondNominal,
+                          sugaredFirstType);
+
+        if (firstParent) {
           if (!this->visit(firstParent,
-                           secondNominal->getParent(),
+                           secondParent,
                            sugaredFirstNominal->getParent()))
             return false;
         }
