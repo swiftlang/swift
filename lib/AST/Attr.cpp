@@ -250,20 +250,22 @@ void LifetimeTypeAttr::printImpl(ASTPrinter &printer,
 
 ScopedTypeAttr::ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
                                SourceRange parens,
-                               ArrayRef<ScopeSpecifier> specifiers)
+                               ArrayRef<ScopeRestrictionRepr> restrictions)
     : SimpleTypeAttr(atLoc, kwLoc, parens) {
-  Bits.ScopedTypeAttr.NumSpecifiers = specifiers.size();
-  ASSERT(Bits.ScopedTypeAttr.NumSpecifiers == specifiers.size());
-  llvm::uninitialized_copy(specifiers, getTrailingObjects());
+  Bits.ScopedTypeAttr.NumRestrictions = restrictions.size();
+  ASSERT(Bits.ScopedTypeAttr.NumRestrictions == restrictions.size());
+  llvm::uninitialized_copy(restrictions, getTrailingObjects());
 }
 
-ScopedTypeAttr *ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc,
-                                       SourceLoc kwLoc, SourceRange parens,
-                                       ArrayRef<ScopeSpecifier> specifiers) {
-  ASSERT(!specifiers.empty());
-  void *mem = ctx.Allocate(totalSizeToAlloc<ScopeSpecifier>(specifiers.size()),
-                           alignof(ScopedTypeAttr));
-  return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, specifiers);
+ScopedTypeAttr *
+ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc, SourceLoc kwLoc,
+                       SourceRange parens,
+                       ArrayRef<ScopeRestrictionRepr> restrictions) {
+  ASSERT(!restrictions.empty());
+  void *mem =
+      ctx.Allocate(totalSizeToAlloc<ScopeRestrictionRepr>(restrictions.size()),
+                   alignof(ScopedTypeAttr));
+  return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, restrictions);
 }
 
 void ScopedTypeAttr::printImpl(ASTPrinter &printer,
@@ -272,20 +274,20 @@ void ScopedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printAttrName("@_scoped");
   printer << "(";
   interleave(
-      getSpecifiers(),
-      [&](const ScopeSpecifier &specifier) {
-        if (auto label = specifier.getLabel()) {
+      getRestrictions(),
+      [&](const ScopeRestrictionRepr &restriction) {
+        if (auto label = restriction.getLabel()) {
           printer.printName(label->Item.getIdentifier(),
                             PrintNameContext::Attribute);
           printer << ": ";
         }
 
-        auto scope = specifier.getScope();
+        auto scope = restriction.getScope();
         if (scope.isAccess())
           printer << "&";
 
         switch (scope.getSubject()) {
-        case ScopeDescriptor::Subject::Name: {
+        case ScopeRepr::Subject::Name: {
           auto name = scope.isAccess() ? scope.getAccessedValue()
                                        : scope.getScopeName().getIdentifier();
           if (name.is("immortal"))
@@ -294,10 +296,10 @@ void ScopedTypeAttr::printImpl(ASTPrinter &printer,
             printer.printName(name, PrintNameContext::Attribute);
           break;
         }
-        case ScopeDescriptor::Subject::Self:
+        case ScopeRepr::Subject::Self:
           printer << "self";
           break;
-        case ScopeDescriptor::Subject::Immortal:
+        case ScopeRepr::Subject::Immortal:
           printer << "immortal";
           break;
         }

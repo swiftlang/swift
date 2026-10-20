@@ -16,7 +16,7 @@ struct Box<T> { var value: T }
 
 //--- valid.swift
 
-// MARK: - Scope specifier forms
+// MARK: - Scope forms
 
 func named(a: Int, b: @_scoped(a) S) {}
 // expected-off-error@-1:24{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
@@ -169,8 +169,8 @@ func selfLabel(a: Int, p: @_scoped(self: a) Pair) {}
 func missingLParen(b: @_scoped S) {}
 // expected-error@-1:32{{expected '(' in '_scoped' attribute}}
 
-func emptySpecifierList(b: @_scoped() S) {}
-// expected-error@-1:37{{expected identifier or 'self' in '_scoped' attribute}}
+func emptyRestrictionList(b: @_scoped() S) {}
+// expected-error@-1:39{{expected identifier or 'self' in '_scoped' attribute}}
 
 func ampersandWithoutName(b: @_scoped(&) S) {}
 // expected-error@-1:39{{expected identifier or 'self' in '_scoped' attribute}}
@@ -182,19 +182,19 @@ func immortalAccess(b: @_scoped(&immortal) S) {}
 func detachedAmpersand(a: inout Int, b: @_scoped(& a) S) {}
 // expected-error@-1:50{{expected identifier or 'self' in '_scoped' attribute}}
 
-func integerSpecifier(b: @_scoped(0) S) {}
-// expected-error@-1:35{{expected identifier or 'self' in '_scoped' attribute}}
+func integerScope(b: @_scoped(0) S) {}
+// expected-error@-1:31{{expected identifier or 'self' in '_scoped' attribute}}
 
-func dollarSpecifier(b: @_scoped($0) S) {}
-// expected-error@-1:34{{expected identifier or 'self' in '_scoped' attribute}}
+func dollarScope(b: @_scoped($0) S) {}
+// expected-error@-1:30{{expected identifier or 'self' in '_scoped' attribute}}
 
 func capitalSelf(b: @_scoped(Self) S) {}
 // expected-error@-1:30{{expected identifier or 'self' in '_scoped' attribute}}
 
 // FIXME: probably deserves better recovery...
-func memberSpecifier(a: Int, b: @_scoped(a.b) S) {}
-// expected-error@-1:43{{expected ',' separator}}{{43-43=,}}
-// expected-error@-2:43{{expected identifier or 'self' in '_scoped' attribute}}
+func memberScope(a: Int, b: @_scoped(a.b) S) {}
+// expected-error@-1:39{{expected ',' separator}}{{39-39=,}}
+// expected-error@-2:39{{expected identifier or 'self' in '_scoped' attribute}}
 
 // Indistinguishable from a missing ',', which is how it is recovered.
 func missingRParen(b: @_scoped(immortal S) {}
@@ -204,8 +204,8 @@ func missingRParen(b: @_scoped(immortal S) {}
 func missingComma(a: Int, b: Int, p: @_scoped(left: a right: b) Pair) {}
 // expected-error@-1:55{{expected ',' separator}}{{54-54=,}}
 
-func labelWithoutSpecifier(b: @_scoped(left:) Pair) {}
-// expected-error@-1:45{{expected identifier or 'self' in '_scoped' attribute}}
+func labelWithoutScope(b: @_scoped(left:) Pair) {}
+// expected-error@-1:41{{expected identifier or 'self' in '_scoped' attribute}}
 
 func leadingComma(a: Int, b: @_scoped(,a) S) {}
 // expected-error@-1:39{{unexpected ',' separator}}{{39-40=}}
