@@ -491,6 +491,10 @@ public:
   /// Path to in-process plugin server shared library.
   std::string InProcessPluginServerPath;
 
+  /// Path to in-process plugin server shared library resolved by the
+  /// dependency scanner. Overrides 'InProcessPluginServerPath'.
+  std::string ResolvedInProcessPluginServerPath;
+
   /// Don't automatically add any import paths.
   bool SkipAllImplicitImportPaths = false;
 

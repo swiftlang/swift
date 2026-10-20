@@ -2613,6 +2613,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
     Opts.InProcessPluginServerPath = A->getValue();
+  if (const Arg *A =
+          Args.getLastArg(OPT_resolved_in_process_plugin_server_path))
+    Opts.ResolvedInProcessPluginServerPath = A->getValue();
 
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'

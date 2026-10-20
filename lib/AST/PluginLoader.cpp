@@ -24,6 +24,26 @@
 
 using namespace swift;
 
+PluginLoader::PluginLoader(
+    ASTContext &Ctx, DependencyTracker *DepTracker,
+    std::optional<std::vector<std::pair<std::string, std::string>>> Remap,
+    bool disableSandbox)
+    : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {
+  if (Remap && !Remap->empty()) {
+    SmallVector<llvm::MappedPrefix, 4> prefixes;
+    llvm::MappedPrefix::transformPairs(*Remap, prefixes);
+    PathRemapper.emplace();
+    PathRemapper->addRange(prefixes);
+    PathRemapper->sort();
+  }
+}
+
+std::string PluginLoader::remapPath(StringRef path) {
+  if (!PathRemapper)
+    return path.str();
+  return PathRemapper->mapToString(path);
+}
+
 void PluginLoader::setRegistry(PluginRegistry *newValue) {
   assert(Registry == nullptr && "Too late to set a new plugin registry");
   Registry = newValue;
@@ -101,20 +121,6 @@ PluginLoader::getPluginMap() {
     map[moduleNameIdentifier] = {copy(libPath), copy(execPath),
                                  copy(prefixMappedLibPath),
                                  copy(prefixMappedExecPath)};
-  };
-
-  std::optional<llvm::PrefixMapper> mapper;
-  if (!PathRemap.empty()) {
-    SmallVector<llvm::MappedPrefix, 4> prefixes;
-    llvm::MappedPrefix::transformPairs(PathRemap, prefixes);
-    mapper.emplace();
-    mapper->addRange(prefixes);
-    mapper->sort();
-  }
-  auto remapPath = [&mapper](StringRef path) {
-    if (!mapper)
-      return path.str();
-    return mapper->mapToString(path);
   };
 
   auto fs = getPluginLoadingFS(Ctx);
@@ -247,7 +253,13 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
 }
 
 llvm::Expected<CompilerPlugin *> PluginLoader::getInProcessPlugins() {
-  auto inProcPluginServerPath = Ctx.SearchPathOpts.InProcessPluginServerPath;
+  // The resolved server path from the dependency scanner can be prefix mapped,
+  // the same as the resolved plugin paths.
+  auto &resolvedServerPath =
+      Ctx.SearchPathOpts.ResolvedInProcessPluginServerPath;
+  auto inProcPluginServerPath =
+      resolvedServerPath.empty() ? Ctx.SearchPathOpts.InProcessPluginServerPath
+                                 : remapPath(resolvedServerPath);
   if (inProcPluginServerPath.empty()) {
     return llvm::createStringError(
         llvm::inconvertibleErrorCode(),
