@@ -4404,6 +4404,15 @@ ValueDecl *getOverloadChoiceDecl(Constraint *choice);
 /// This function requires the type to be fully resolved.
 bool isSendableCapture(Type type);
 
+/// Determine the execution semantics of an unapplied reference to a consuming
+/// method on the given base type. Such a reference owns its base, so it can't
+/// be copied if the base is non-Copyable, and has to be called if the base is
+/// also non-Deinitable.
+///
+/// This function requires the type to be fully resolved.
+std::optional<ExecutionSemantics>
+getUnappliedConsumingMethodExecutionSemantics(Type baseType);
+
 /// Find any references to external type variables used in the body of a
 /// conjunction element (e.g closures, taps, if/switch expressions).
 ///
