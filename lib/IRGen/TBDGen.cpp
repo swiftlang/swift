@@ -436,10 +436,10 @@ bool TBDGenVisitor::willVisitDecl(Decl *D) {
                             AFD->getAttrs().hasAttribute<ExternAttr>()))
       return false;
 
-  // Likewise for a @_silgen_name("...") or @_extern(c) variable without an
-  // initial value.
+  // Likewise for a @_silgen_name("...") or @_extern(c) global variable without
+  // an initial value. Computed properties never have one, so they don't count.
   if (auto VD = dyn_cast<VarDecl>(D))
-    if (!VD->hasInitialValue() &&
+    if (VD->isGlobalStorage() && !VD->hasInitialValue() &&
         (VD->getAttrs().hasAttribute<SILGenNameAttr>() ||
          ExternAttr::find(VD->getAttrs(), ExternKind::C)))
       return false;
