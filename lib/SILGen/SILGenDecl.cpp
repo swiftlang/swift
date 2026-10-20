@@ -1424,13 +1424,6 @@ public:
   bool tryInitializeFromStorageReference(SILGenFunction &SGF, Expr *initializer,
                                          SILLocation loc) override;
 
-  /// True if this is a cast pattern whose subject is a noncopyable
-  /// existential, which is the case the direct-branch lowering handles.
-  bool isNoncopyableExistentialSubject() const {
-    Type subjectType = pattern->getType();
-    return subjectType->isNoncopyable() && subjectType->isExistentialType();
-  }
-
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1523,9 +1516,13 @@ bool IsPatternInitialization::tryInitializeFromStorageReference(
   }
 
   // Binding the payload consumes the subject out of its own storage so that a
-  // *failed* cast can leave it intact. That is specific to a noncopyable
-  // existential; a copyable one has no reason to avoid the ordinary copy.
-  if (!isNoncopyableExistentialSubject())
+  // *failed* cast can leave it intact. That is specific to a non-`Copyable`
+  // subject; a copyable one has no reason to avoid the ordinary copy.
+  if (!pattern->getType()->isNoncopyable())
+    return false;
+
+  // Borrowing the source requires a plain address-based value cast
+  if (pattern->getCastKind() != CheckedCastKind::ValueCast)
     return false;
 
   // Is the subject stored where we can use it directly?  If not, return
@@ -1576,7 +1573,7 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
   auto &targetTL = SGF.getTypeLowering(targetType);
 
   // Destination buffer for the extracted payload. Note the target may be
-  // loadable (only the existential source has to be address-only);
+  // loadable (only the source has to be address-only)
   // checked_cast_addr_br writes through an address either way.
   SILValue destAddr = SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
 
@@ -1595,7 +1592,6 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
   if (!targetTL.isLoadableOrOpaque(SGF.F)) {
     payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
   } else {
-    // A copyable payload in a non-Copyable existential can be trivial
     payload = SGF.emitManagedRValueWithCleanup(
         SGF.B.createTrivialLoadOr(loc, destAddr, LoadOwnershipQualifier::Take),
         targetTL);
@@ -1612,11 +1608,11 @@ void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
                                                       bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
-  // For a noncopyable existential, first try emitting the direct-branch form
+  // For a non-`Copyable` subject, first try emitting the direct-branch form
   // without producing the intermediate optional.  That encodes the success
   // status in the CFG which makes it possible to selectively consume only on
   // success.
-  if (isNoncopyableExistentialSubject() &&
+  if (pattern->getType()->isNoncopyable() &&
       tryEmitNoncopyablePatternMatch(SGF, loc, value)) {
     return;
   }
