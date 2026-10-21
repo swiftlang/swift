@@ -17,8 +17,17 @@ class DispatchConflicts: NSObject {
   @objcDirect @IBSegueAction func segueAction(_ coder: NSCoder) -> Any? { return nil }
   // expected-error@-1 {{'@objcDirect' cannot be applied to an '@IBAction' or '@IBSegueAction' method; the action is invoked by selector}}
 
-  // Control: none of the above applies, so this is accepted.
+  @objcDirect @IBOutlet var outlet: NSObject?
+  // expected-error@-1 {{'@objcDirect' cannot be applied to an '@IBOutlet', '@IBInspectable' or '@GKInspectable' property; the value is set by key through key-value coding}}
+
+  @objcDirect @IBInspectable var inspectable: Int = 0
+  // expected-error@-1 {{'@objcDirect' cannot be applied to an '@IBOutlet', '@IBInspectable' or '@GKInspectable' property; the value is set by key through key-value coding}}
+
+  @objcDirect @GKInspectable var gkInspectable: Int = 0
+  // expected-error@-1 {{'@objcDirect' cannot be applied to an '@IBOutlet', '@IBInspectable' or '@GKInspectable' property; the value is set by key through key-value coding}}
+
   @objcDirect final func plainDirect() {}
+  @objcDirect var plainDirectProperty: NSObject?
 }
 
 @objc protocol Greeter {

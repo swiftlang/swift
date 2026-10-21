@@ -33,7 +33,7 @@ class ObjCDirectClass: NSObject {
 
   @objcDirect
   private final func privateMethod() { return }
-  // expected-error@-2 {{a 'private' or 'fileprivate' instance method cannot be '@objcDirect'}}
+  // expected-error@-2 {{an '@objcDirect' instance method must be visible to the whole module}}
 }
 
 final class FinalClass: NSObject {
@@ -119,21 +119,21 @@ protocol DirectProtocol {
 class GenericClass<T>: NSObject {
   @objcDirect
   public final func inGeneric() { return }
-  // expected-error@-2 {{'@objcDirect' cannot be applied to members of a generic class}}
+  // expected-error@-2 {{'@objcDirect' cannot be applied to members of 'GenericClass', which is not exposed to Objective-C}}
 }
 
 @objcDirect
 public func globalFunction() {}
-// expected-error@-2 {{'@objcDirect' can only be applied to members of a class}}
+// expected-error@-2 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
 
 struct SomeStruct {
   @objcDirect func structMethod() {}
-  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
 }
 
 enum SomeEnum {
   @objcDirect static func enumMethod() {}
-  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
 }
 
 // MARK: - Properties and subscripts
@@ -185,10 +185,10 @@ class DynamicClass: NSObject {
 
 class AccessLevelClass: NSObject {
   @objcDirect private var hidden: Int = 0
-  // expected-error@-1 {{a 'private' or 'fileprivate' property cannot be '@objcDirect'}}
+  // expected-error@-1 {{an '@objcDirect' property must be visible to the whole module}}
 
   @objcDirect fileprivate subscript(i: Int) -> Int { i }
-  // expected-error@-1 {{a 'private' or 'fileprivate' subscript cannot be '@objcDirect'}}
+  // expected-error@-1 {{an '@objcDirect' subscript must be visible to the whole module}}
 }
 
 class Base: NSObject {
@@ -226,19 +226,19 @@ class Derived: Base {
 
 class GenericStorageClass<T>: NSObject {
   @objcDirect var inGeneric: Int = 0
-  // expected-error@-1 {{'@objcDirect' cannot be applied to members of a generic class}}
+  // expected-error@-1 {{'@objcDirect' cannot be applied to members of 'GenericStorageClass', which is not exposed to Objective-C}}
 }
 
 struct StorageStruct {
   @objcDirect var structProperty: Int = 0
-  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
 
   @objcDirect subscript(i: Int) -> Int { i }
-  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
 }
 
 @objcDirect var globalProperty: Int = 0
-// expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+// expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
 
 @objc protocol HasCount {
   var count: Int { get } // expected-note {{requirement 'count' declared here}}
@@ -250,4 +250,83 @@ class DirectCount: NSObject, HasCount {
   // expected-error@-1 {{cannot satisfy a requirement of '@objc' protocol 'HasCount'}}
 
   var size: Int = 0
+}
+
+// MARK: - Class names
+
+class Outer: NSObject {
+  @objc(OuterNested) class Nested: NSObject {
+    @objcDirect func f() {}
+    // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
+  }
+}
+
+extension Outer.Nested {
+  @objcDirect func g() {}
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
+}
+
+func makeLocal() {
+  class Local: NSObject {
+    @objcDirect func f() {}
+    // expected-error@-1 {{'@objcDirect' can only be applied to members of a class declared at file scope}}
+  }
+}
+
+// A private class caps its members' scope.
+private class PrivateHelper: NSObject {
+  @objcDirect func run() {}
+  // expected-error@-1 {{an '@objcDirect' instance method must be visible to the whole module}}
+}
+
+fileprivate class FilePrivateHelper: NSObject {
+  @objcDirect func run() {}
+  // expected-error@-1 {{an '@objcDirect' instance method must be visible to the whole module}}
+}
+
+class TopLevel: NSObject {
+  @objcDirect func f() {}
+}
+
+// MARK: - Enclosing classes
+
+class PureSwift {
+  @objcDirect func f() {}
+  // expected-error@-1 {{'@objcDirect' cannot be applied to members of 'PureSwift', which is not exposed to Objective-C}}
+}
+
+class Generic<T>: NSObject {}
+class GenericAncestry: Generic<Int> {
+  @objcDirect func f() {}
+  // expected-error@-1 {{'@objcDirect' cannot be applied to members of 'GenericAncestry', which is not exposed to Objective-C}}
+}
+
+open class OpenClass: NSObject {
+  @objcDirect open func f() {}
+  // expected-error@-1 {{'@objcDirect' declarations are implicitly 'final'; use 'public' instead of 'open'}} {{15-19=public}}
+  @objcDirect open var p: Int { 0 }
+  // expected-error@-1 {{'@objcDirect' declarations are implicitly 'final'; use 'public' instead of 'open'}} {{15-19=public}}
+  @objcDirect public func publicIsFine() {}
+}
+
+// MARK: - Selectors
+
+class ProtocolSelectors: NSObject {
+  @objc(hash) @objcDirect final func myHash() -> Int { 0 }
+  // expected-error@-1 {{instance method 'myHash()' cannot be '@objcDirect': its Objective-C selector 'hash' is a requirement of protocol 'NSObjectProtocol', and a method that implements a protocol requirement cannot be direct}}
+
+  @objc(description) @objcDirect var desc: String { "" }
+  // expected-error@-1 {{property 'desc' cannot be '@objcDirect': its Objective-C selector 'description' is a requirement of protocol 'NSObjectProtocol', and a method that implements a protocol requirement cannot be direct}}
+
+  @objc(isEqual:) @objcDirect final func same(_ other: Any?) -> Bool { false }
+  // expected-error@-1 {{instance method 'same' cannot be '@objcDirect': its Objective-C selector 'isEqual:' is a requirement of protocol 'NSObjectProtocol', and a method that implements a protocol requirement cannot be direct}}
+
+  @objc(hashValueForDisplay) @objcDirect final func displayHash() -> Int { 0 }
+}
+
+class Subscripts: NSObject {
+  @objcDirect subscript(a: Int, b: Int) -> Int { 0 }
+  // expected-error@-1 {{an '@objcDirect' subscript must take exactly one index}}
+
+  @objcDirect subscript(a: Int) -> Int { 0 }
 }

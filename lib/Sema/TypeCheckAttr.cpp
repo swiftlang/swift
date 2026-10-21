@@ -1533,7 +1533,8 @@ static void diagnoseObjCAttrWithoutFoundation(DeclAttribute *attr, Decl *decl,
                                               ObjCReason reason,
                                               DiagnosticBehavior behavior) {
   assert(attr->getKind() == DeclAttrKind::ObjC ||
-         attr->getKind() == DeclAttrKind::ObjCMembers);
+         attr->getKind() == DeclAttrKind::ObjCMembers ||
+         attr->getKind() == DeclAttrKind::ObjCDirect);
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
@@ -1986,21 +1987,40 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
-  // The direct symbol's class-name segment is the printed @interface name, so
-  // the declaration has to belong to a class that is actually printed. A global
-  // function, or a member of a struct or enum, has no such name.
+  // There is no ObjCAttr for visitObjCAttr to check, so require here what an
+  // explicit '@objc' does: Objective-C interop and, unless that requirement is
+  // turned off, an import of Foundation.
+  diagnoseObjCAttrWithoutFoundation(
+      attr, VD, ObjCReason(ObjCReason::ExplicitlyObjC, attr),
+      DiagnosticBehavior::Unspecified);
+  if (attr->isInvalid())
+    return;
+
+  // The direct symbol names the class by its printed @interface name, so the
+  // class has to be declared at file scope. A class declared in ObjC always
+  // is, even when Swift imports it as a nested type.
+  // TODO: We could allow members of nested classes too, but that needs more
+  // type checking than it's worth.
   auto *classDecl = VD->getDeclContext()->getSelfClassDecl();
-  if (!classDecl) {
+  if (!classDecl || (!classDecl->hasClangNode() &&
+                     !classDecl->getDeclContext()->isModuleScopeContext())) {
     diagnoseAndRemoveAttr(attr, diag::objc_direct_not_in_class);
     return;
   }
 
-  // A generic class is never printed to the generated header, so a direct
-  // symbol on one could not be referenced from Objective-C even though the
-  // standard @objc check permits the member. Reject it rather than emit a
-  // symbol nothing can call.
-  if (classDecl->isGenericContext()) {
-    diagnoseAndRemoveAttr(attr, diag::objc_direct_in_generic_class);
+  // Only a class exposed to Objective-C is printed in the generated header, so
+  // only its members have a name a caller could link against. That rules out a
+  // generic class, one with generic ancestry, and a Swift class that does not
+  // derive from an Objective-C one.
+  if (classDecl->isGenericContext() || !classDecl->isObjC()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_class_not_objc, classDecl);
+    return;
+  }
+
+  // The header declares only what the whole module can see.
+  auto scope = VD->getFormalAccessScope();
+  if (scope.isPrivate() || scope.isFileScope()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_access_level, VD);
     return;
   }
 
@@ -2015,6 +2035,15 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
   if (D->getAttrs().hasAttribute<IBActionAttr>() ||
       D->getAttrs().hasAttribute<IBSegueActionAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::objc_direct_ibaction);
+    return;
+  }
+
+  // An outlet or inspectable is set by key from a nib, storyboard or
+  // editor, through key-value coding, which the compiler never sees.
+  if (D->getAttrs().hasAttribute<IBOutletAttr>() ||
+      D->getAttrs().hasAttribute<IBInspectableAttr>() ||
+      D->getAttrs().hasAttribute<GKInspectableAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_direct_iboutlet);
     return;
   }
 
@@ -2040,17 +2069,62 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
-  // Access level must be at least internal.
-  if (VD->getFormalAccess() < AccessLevel::Internal) {
-    diagnoseAndRemoveAttr(attr, diag::objc_direct_access_level, VD);
-    return;
-  }
-
   // No async support.
   if (auto *fn = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (fn->hasAsync()) {
       diagnoseAndRemoveAttr(attr, diag::objc_direct_with_async);
       return;
+    }
+  }
+
+  // Objective-C spells only a single-index subscript. With more indices the
+  // subscript is silently not exported at all, as for plain @objc, but the
+  // attribute was written explicitly, so say so.
+  if (auto *subscript = dyn_cast<SubscriptDecl>(VD)) {
+    if (subscript->getIndices()->size() != 1) {
+      diagnoseAndRemoveAttr(attr, diag::objc_direct_subscript_arity);
+      return;
+    }
+  }
+
+  // Clang rejects a direct method whose selector implements a requirement of a
+  // protocol the class or a superclass adopts, e.g. NSObject's 'hash', so the
+  // generated header wouldn't compile. The usual selector-conflict checks only
+  // look at class members.
+  auto collectSelectors =
+      [](ValueDecl *decl,
+         SmallVectorImpl<std::pair<ObjCSelector, bool>> &selectors) {
+        if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+          selectors.push_back(
+              {fn->getObjCSelector(), fn->isObjCInstanceMethod()});
+        } else if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
+          bool isInstance = storage->isInstanceMember();
+          selectors.push_back({storage->getObjCGetterSelector(), isInstance});
+          if (storage->isSettable(nullptr))
+            selectors.push_back(
+                {storage->getObjCSetterSelector(), isInstance});
+        }
+      };
+  SmallVector<std::pair<ObjCSelector, bool>, 2> directSelectors;
+  collectSelectors(VD, directSelectors);
+  for (auto *proto : classDecl->getAllProtocols()) {
+    if (!proto->isObjC())
+      continue;
+    for (auto *req : proto->getProtocolRequirements()) {
+      // A requirement with the member's own name is one it witnesses;
+      // conformance checking says why a witness cannot be direct.
+      if (req->getName() == VD->getName())
+        continue;
+      SmallVector<std::pair<ObjCSelector, bool>, 2> reqSelectors;
+      collectSelectors(req, reqSelectors);
+      for (auto &direct : directSelectors) {
+        if (llvm::is_contained(reqSelectors, direct)) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::objc_direct_protocol_requirement_selector,
+                                VD, direct.first, proto);
+          return;
+        }
+      }
     }
   }
 
@@ -6404,7 +6478,8 @@ static bool shouldBlockImplicitDynamic(Decl *D) {
       D->getAttrs().hasAttribute<TransparentAttr>() ||
       D->getAttrs().hasAttribute<InlinableAttr>() ||
       D->getAttrs().hasAttribute<CDeclAttr>() ||
-      D->getAttrs().hasAttribute<ExternAttr>())
+      D->getAttrs().hasAttribute<ExternAttr>() ||
+      D->getAttrs().hasAttribute<ObjCDirectAttr>())
     return true;
   return false;
 }
