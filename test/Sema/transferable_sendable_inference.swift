@@ -116,8 +116,12 @@ func checkExplicit() {
 func useSendable(_ f: @Sendable () -> Void) {}
 
 func checkCaptures(nt: NT, c: NTClass) {
-  useSendable { _ = nt } // expected-error {{capture of 'nt' with non-Sendable type 'NT' in a '@Sendable' closure}}
-  useSendable { _ = c } // expected-error {{capture of 'c' with non-Sendable type 'NTClass' in a '@Sendable' closure}}
+  useSendable { _ = nt }
+  // expected-error@-1 {{capture of 'nt' with non-Sendable type 'NT' in a '@Sendable' closure}}
+  // expected-error@-2 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  useSendable { _ = c }
+  // expected-error@-1 {{capture of 'c' with non-Sendable type 'NTClass' in a '@Sendable' closure}}
+  // expected-error@-2 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'c'}}
 }
 
 // A metatype can be Sendable without values of its type being Transferable,

@@ -7,8 +7,14 @@ struct NonTransferable: ~Transferable {
   func use() {}
 }
 
+class NonTransferableClass: ~Transferable {
+  func use() {}
+}
+
 func takesTransferable(_: () -> Void) {}
+func takesEscapingTransferable(_: @escaping () -> Void) {}
 func takesNontransferable(_: @nontransferable () -> Void) {}
+func takesEscapingNontransferable(_: @escaping @nontransferable () -> Void) {}
 
 func requiresTransferable<T>(_: T.Type) {}
 // expected-note@-1 {{required by global function 'requiresTransferable' where 'T' = '@nontransferable () -> Void'}}
@@ -91,4 +97,153 @@ func testSendableImpliesTransferable(
   let _: @MainActor @nontransferable () -> Void = { @MainActor in nt.use() } // Ok
   let _: @MainActor @nontransferable () -> Void = { nt.use() } // Ok
   let _: @MainActor @nontransferable () -> Void = { @Sendable @MainActor in } // Ok
+  let _: @MainActor @nontransferable () -> Void = { @Sendable @MainActor in nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+}
+
+func testCaptures(nt: NonTransferable, ntc: NonTransferableClass, value: Int) {
+  takesTransferable { nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesTransferable { [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+  takesTransferable { [x = nt] in x.use() }
+  // expected-error@-1 {{capture list entry 'x' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+
+  takesEscapingTransferable { ntc.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'ntc'}}
+  takesEscapingTransferable { [ntc] in ntc.use() }
+  // expected-error@-1 {{capture list entry 'ntc' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferableClass'}}
+
+  // The closure owns a capture list entry even if it's never used.
+  takesTransferable { [nt] in () }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+  // expected-warning@-2 {{capture 'nt' was never used}}
+
+  // A closure is @nontransferable only if its contextual type is.
+  let _: () -> Void = { nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  let _: () -> Void = { [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+  _ = { nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  _ = { [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+
+  takesNontransferable { nt.use() } // Ok
+  takesNontransferable { [nt] in nt.use() } // Ok
+  takesEscapingNontransferable { ntc.use() } // Ok
+  takesEscapingNontransferable { [ntc] in ntc.use() } // Ok
+  let _: @nontransferable () -> Void = { nt.use() } // Ok
+  let _: @nontransferable () -> Void = { [nt] in nt.use() } // Ok
+
+  takesTransferable { _ = value } // Ok
+  takesTransferable { [value] in _ = value } // Ok
+  takesNontransferable { _ = value } // Ok
+  takesNontransferable { [value] in _ = value } // Ok
+}
+
+func testAutoclosureCaptures(nt: NonTransferable) {
+  func takesAutoclosure(_: @autoclosure () -> Void) {}
+  func takesNontransferableAutoclosure(_: @autoclosure @nontransferable () -> Void) {}
+
+  takesAutoclosure(nt.use())
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesNontransferableAutoclosure(nt.use()) // Ok
+}
+
+func testInoutCaptures(nt: inout NonTransferable) {
+  takesTransferable { nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesTransferable { [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+  takesNontransferable { nt.use() } // Ok
+  takesNontransferable { [nt] in nt.use() } // Ok
+}
+
+func testFunctionCaptures(fn: @escaping () -> Void,
+                          ntFn: @escaping @nontransferable () -> Void) {
+  takesTransferable { ntFn() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'ntFn'}}
+  takesTransferable { [ntFn] in ntFn() }
+  // expected-error@-1 {{capture list entry 'ntFn' of 'Transferable'-conforming closure has non-'Transferable' type '@nontransferable () -> Void'}}
+  takesNontransferable { ntFn() } // Ok
+  takesNontransferable { [ntFn] in ntFn() } // Ok
+
+  takesTransferable { fn() } // Ok
+  takesTransferable { [fn] in fn() } // Ok
+}
+
+func testGenericCaptures<T: ~Transferable, U>(t: T, u: U) {
+  takesTransferable { _ = t }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 't'}}
+  takesTransferable { [t] in _ = t }
+  // expected-error@-1 {{capture list entry 't' of 'Transferable'-conforming closure has non-'Transferable' type 'T'}}
+  takesNontransferable { _ = t } // Ok
+  takesNontransferable { [t] in _ = t } // Ok
+
+  takesTransferable { _ = u } // Ok
+  takesTransferable { [u] in _ = u } // Ok
+}
+
+extension NonTransferable {
+  func testSelfCaptures() {
+    takesTransferable { self.use() }
+    // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'self'}}
+    takesTransferable { use() }
+    // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'self'}}
+    takesTransferable { [self] in use() }
+    // expected-error@-1 {{capture list entry 'self' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+    takesNontransferable { use() } // Ok
+    takesNontransferable { [self] in use() } // Ok
+  }
+}
+
+extension NonTransferableClass {
+  func testSelfCaptures() {
+    takesEscapingTransferable { self.use() }
+    // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'self'}}
+    takesEscapingTransferable { [self] in use() }
+    // expected-error@-1 {{capture list entry 'self' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferableClass'}}
+    takesEscapingNontransferable { self.use() } // Ok
+    takesEscapingNontransferable { [self] in use() } // Ok
+  }
+}
+
+func testNestedCaptures(nt: NonTransferable) {
+  takesTransferable { takesNontransferable { nt.use() } }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesTransferable { takesNontransferable { [nt] in nt.use() } }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesNontransferable { takesNontransferable { nt.use() } } // Ok
+  takesNontransferable { takesNontransferable { [nt] in nt.use() } } // Ok
+
+  takesNontransferable { takesTransferable { nt.use() } }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesNontransferable { takesTransferable { [nt] in nt.use() } }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+}
+
+func testNestedCaptureListEntries(nt: NonTransferable) {
+  takesNontransferable { [x = nt] in takesEscapingTransferable { x.use() } }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'x'}}
+  takesNontransferable { [x = nt] in
+    takesEscapingNontransferable { takesTransferable { x.use() } }
+    // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'x'}}
+  }
+  takesNontransferable { [x = nt] in takesNontransferable { x.use() } } // Ok
+
+  // Only the entry itself is diagnosed in the closure that owns it.
+  takesTransferable { [x = nt] in takesNontransferable { x.use() } }
+  // expected-error@-1 {{capture list entry 'x' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+}
+
+func testAsyncLetAndTaskCaptures(nt: NonTransferable, ntc: NonTransferableClass) async {
+  Task { ntc.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'ntc'}}
+  Task { [ntc] in ntc.use() }
+  // expected-error@-1 {{capture list entry 'ntc' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferableClass'}}
+
+  async let x: Void = nt.use()
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  _ = await x
 }
