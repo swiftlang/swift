@@ -57,7 +57,7 @@ class AllNonIsolatedUnsafe : SuperKlass {
   // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil private [thunk] [ossa] @$s21attr_execution_silgen20AllNonIsolatedUnsafeC13mainActorTestyyYaFAA10SuperKlassCADyyYaFTV : $@convention(method) @async (@guaranteed AllNonIsolatedUnsafe) -> () {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AllNonIsolatedUnsafe):
-  // CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+  // CHECK:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
   // CHECK:   [[ACTOR_E:%.*]] = init_existential_ref [[ACTOR]]
   // CHECK:   [[ACTOR_E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ACTOR_E]]
   // CHECK:   [[ACTOR_E_OPT_B:%.*]] = begin_borrow [[ACTOR_E_OPT]]

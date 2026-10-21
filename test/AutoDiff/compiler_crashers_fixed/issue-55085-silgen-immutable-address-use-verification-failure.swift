@@ -1,10 +1,12 @@
-// RUN: %target-swift-frontend -enable-resilience -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-resilience -emit-sil -verify %s \
+// RUN:   %if !swift_stdlib_library_evolution %{ -verify-additional-prefix noevo- %}
 
 // https://github.com/apple/swift/issues/55085
 // SILGen verification error regarding `ImmutableAddressUseVerifier`
 // and AutoDiff-generated code.
 
 import _Differentiation
+// expected-noevo-warning@-1 {{module '_Differentiation' was not compiled with library evolution support; using it means binary compatibility for 'main' can't be guaranteed}}
 
 public struct Resilient: Differentiable {
   var x: Float

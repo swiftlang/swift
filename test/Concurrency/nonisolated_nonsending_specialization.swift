@@ -115,9 +115,8 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
   // CHECK:   apply [[ASYNC_TEST]]([[BODY]]) : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
   // CHECK:   hop_to_executor [[ISOLATION]]
   // CHECK:   [[ISOLATED_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization12isolatedTestyyF : $@convention(thin) () -> ()
-  // CHECK:   [[MAIN_ACTOR_TYPE:%.*]] = metatype $@thick MainActor.Type
-  // CHECK:   [[MAIN_ACTOR_EXEC_REF:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-  // CHECK:   [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_EXEC_REF]]([[MAIN_ACTOR_TYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+  // CHECK:   function_ref @$sScM6sharedScMv{{gZ|au}} :
+  // CHECK:   [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load .*}}
   // CHECK:   hop_to_executor [[MAIN_ACTOR]]
   // CHECK:   apply [[ISOLATED_TEST]]() : $@convention(thin) () -> ()
   // CHECK: } // end sil function '$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU4_'
@@ -158,12 +157,12 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
   // CHECK: sil private @$s37nonisolated_nonsending_specialization22testMainActorIsolation4bodyyyyYaXE_tYaFyyYaXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
-  // CHECK:   [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_REF:%.*]]({{.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+  // CHECK:   [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load .*}}
   // CHECK:   [[ISOLATED_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization12isolatedTestyyyyYaXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
   // CHECK:   apply [[ISOLATED_TEST]]([[BODY]]) : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
   // CHECK:   hop_to_executor [[MAIN_ACTOR]]
   // CHECK:   [[SYNC_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization8syncTestyyyyYaXEF : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
-  // CHECK:   %11 = apply [[SYNC_TEST]]([[BODY]]) : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
+  // CHECK:   {{%[0-9]+}} = apply [[SYNC_TEST]]([[BODY]]) : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
   // CHECK: } // end sil function '$s37nonisolated_nonsending_specialization22testMainActorIsolation4bodyyyyYaXE_tYaFyyYaXEfU_'
   await withValue {
     await isolatedTest(body) // Ok

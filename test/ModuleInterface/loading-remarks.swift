@@ -51,7 +51,7 @@ import DirectMixedDependency
 
 // CHECK: remark: 'Swift' has a required transitive dependency on 'SwiftShims'
 // CHECK: remark: loaded module 'SwiftShims'; source: '{{.*}}module.modulemap', loaded: '{{.*}}SwiftShims-{{.*}}.pcm'
-// CHECK: remark: loaded module 'Swift'; source: '{{.*}}Swift.swiftmodule{{.*}}.swiftinterface', loaded: '{{.*}}Swift.swiftmodule{{.*}}.swiftmodule'
+// CHECK: remark: loaded module 'Swift'; source: '{{.*}}Swift.swiftmodule{{.*}}.swift{{interface|module}}', loaded: '{{.*}}Swift.swiftmodule{{.*}}.swiftmodule'
 // CHECK: remark: 'SwiftDependency' has a required transitive dependency on 'Swift'
 // CHECK: remark: loaded module 'SwiftDependency'; source: '{{.*}}SwiftDependency.swiftinterface', loaded: '{{.*}}SwiftDependency-{{.*}}.swiftmodule'
 // CHECK-DAG: remark: loaded module 'SwiftNonResilientDependency'; source: '{{.*}}SwiftNonResilientDependency.swiftmodule', loaded: '{{.*}}SwiftNonResilientDependency.swiftmodule'

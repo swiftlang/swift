@@ -10,6 +10,7 @@
 // REQUIRES: swift_feature_Reparenting
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_stdlib_library_evolution
 
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 

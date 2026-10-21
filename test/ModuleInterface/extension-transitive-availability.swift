@@ -14,8 +14,8 @@ func foo() {
 
 // CHECK:      "directDependencies": [
 // CHECK-DAG:          "swift": "ExtensionAvailable"
-// CHECK-DAG:          "swift": "Swift"
-// CHECK-DAG:          "swift": "SwiftOnoneSupport"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "Swift"
+// CHECK-DAG:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 
 // Additional occurence in source-imported dependencies field
 // CHECK:      "swift": "ExtensionAvailable"
@@ -29,10 +29,10 @@ func foo() {
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "directDependencies": [
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "swift": "Swift"
+// CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "Swift"
 // CHECK-NEXT:        },
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "swift": "SwiftOnoneSupport"
+// CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "linkLibraries": [

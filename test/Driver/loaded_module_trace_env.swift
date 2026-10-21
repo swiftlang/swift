@@ -16,12 +16,12 @@
 // CHECK-DAG: "name":"Swift"
 // CHECK-DAG: "path":"{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
 // CHECK-DAG: "isImportedDirectly":true
-// CHECK-DAG: "supportsLibraryEvolution":true
+// CHECK-DAG: "supportsLibraryEvolution":{{true|false}}
 // CHECK: }
 // CHECK: {
 // CHECK-DAG: "name":"SwiftOnoneSupport"
 // CHECK-DAG: "path":"{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
 // CHECK-DAG: "isImportedDirectly":true
-// CHECK-DAG: "supportsLibraryEvolution":true
+// CHECK-DAG: "supportsLibraryEvolution":{{true|false}}
 // CHECK: }
 // CHECK: ]

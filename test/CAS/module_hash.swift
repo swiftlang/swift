@@ -1,3 +1,5 @@
+// REQUIRES: swift_stdlib_library_evolution
+
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
 

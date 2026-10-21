@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Unsup -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/unsup.h
-// RUN: %FileCheck --implicit-check-not=NestedMO %s < %t/unsup.h
+// RUN: %FileCheck --implicit-check-not=NestedMO --check-prefixes=CHECK,%if swift_stdlib_library_evolution %{CHECK-STDLIB-EVO%} %else %{CHECK-STDLIB-NOEVO%} %s < %t/unsup.h
 // RUN: %check-interop-cxx-header-in-clang(%t/unsup.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %target-swift-frontend %s -module-name Unsup -enable-library-evolution -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/unsup-evo.h
@@ -29,7 +29,8 @@ public struct Box<T: ~Copyable>: ~Copyable {
     public init(t: consuming T) { self.t = t }
 }
 
-// A 'Mirror' field is resilient, which leaves the layout opaque.
+// A 'Mirror' field is resilient, which leaves the layout opaque, unless the
+// standard library is built without library evolution.
 public struct OpaqueMO: ~Copyable {
     public var o: Mirror
     public init(o: Mirror) { self.o = o }
@@ -83,8 +84,10 @@ public struct FrozenMO: ~Copyable {
 
 // CHECK-DAG: class Box { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' generic struct 'Box' can not yet be represented in C++");
 // CHECK-DAG: class EnumWithMOPayload { } SWIFT_UNAVAILABLE_MSG("Swift enum 'EnumWithMOPayload' cannot be represented in C++");
-// CHECK-DAG: class OpaqueMO { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'OpaqueMO' can not yet be represented in C++");
-// CHECK-DAG: // Unavailable in C++: Swift global function 'makeOpaqueMO(_:)'. Return type 'OpaqueMO' is not representable in C++.
+// CHECK-STDLIB-EVO-DAG: class OpaqueMO { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'OpaqueMO' can not yet be represented in C++");
+// CHECK-STDLIB-EVO-DAG: // Unavailable in C++: Swift global function 'makeOpaqueMO(_:)'. Return type 'OpaqueMO' is not representable in C++.
+// CHECK-STDLIB-NOEVO-DAG: class SWIFT_SYMBOL({{.*}}) OpaqueMO final {
+// CHECK-STDLIB-NOEVO-DAG: // Unavailable in C++: Swift global function 'makeOpaqueMO(_:)'. Parameter 'o' of type 'Mirror' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'optMO()'. Return type 'MO?' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takeOptMO(_:)'. Parameter 'x' of type 'MO?' is not representable in C++.
 // CHECK-DAG: // Unavailable in C++: Swift global function 'takePtr(_:)'. Parameter 'p' of type 'UnsafeMutablePointer<MO>' is not representable in C++.
