@@ -8465,18 +8465,37 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
 
     auto addRequirementDescriptors = [&](CanGenericSignature sig,
                                          GenericSignatureHeaderBuilder &header,
-                                         bool suppressInverses) {
-      auto info = suppressInverses
-        ? addGenericRequirements(IGM, b, sig, sig.getRequirements(), { })
-        : addGenericRequirements(IGM, b, sig);
+                                         ArrayRef<Requirement> reqs,
+                                         ArrayRef<InverseRequirement> inverses) {
+      auto info = addGenericRequirements(IGM, b, sig, reqs, inverses);
       header.add(info);
       header.finish(IGM, b);
     };
 
-    // GenericRequirementDescriptor GenericRequirements[*];
-    addRequirementDescriptors(reqSig, reqHeader, /*suppressInverses=*/false);
+    // The requirement signature extends the generalization signature, so it
+    // repeats the generalization signature's requirements. Those are satisfied
+    // by the generalization arguments. Leave them out, so their witness tables
+    // aren't counted as part of the existential container, and their inverse
+    // requirements aren't treated as applying to the existential itself.
+    SmallVector<Requirement, 2> reqSigReqs;
+    SmallVector<InverseRequirement, 2> reqSigInverses;
+    reqSig->getRequirementsWithInverses(reqSigReqs, reqSigInverses);
+    SmallVector<Requirement, 2> genSigReqs;
     if (genSig) {
-      addRequirementDescriptors(genSig, *genHeader, /*suppressInverses=*/true);
+      SmallVector<InverseRequirement, 2> genSigInverses;
+      genSig->getRequirementsWithInverses(genSigReqs, genSigInverses);
+      llvm::erase_if(reqSigReqs, [&](const Requirement &req) {
+        return llvm::is_contained(genSigReqs, req);
+      });
+      llvm::erase_if(reqSigInverses, [&](const InverseRequirement &inv) {
+        return inv.subject->getRootGenericParam()->getDepth() == 0;
+      });
+    }
+
+    // GenericRequirementDescriptor GenericRequirements[*];
+    addRequirementDescriptors(reqSig, reqHeader, reqSigReqs, reqSigInverses);
+    if (genSig) {
+      addRequirementDescriptors(genSig, *genHeader, genSigReqs, {});
     }
 
     // The 'Self' parameter in an existential is not variadic
