@@ -16,7 +16,7 @@ func barrier()
 // CHECK:         apply [[BORROW]]([[EI]])
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
 // CHECK:         apply [[BARRIER]]()
-// CHECK:         strong_release [[EI]]
+// CHECK:         strong_release [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'funky'
 @_silgen_name("funky")
 @_lexicalLifetimes
