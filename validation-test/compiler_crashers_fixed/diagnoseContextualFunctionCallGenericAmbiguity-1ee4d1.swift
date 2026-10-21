@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"315bd2bd","signature":"diagnoseContextualFunctionCallGenericAmbiguity(swift::constraints::ConstraintSystem&, llvm::ArrayRef<std::__1::pair<swift::constraints::Solution const*, swift::constraints::ConstraintFix const*>>, llvm::ArrayRef<std::__1::pair<swift::constraints::Solution const*, swift::constraints::ConstraintFix const*>>)","signatureAssert":"Assertion failed: (idx < size()), function operator[]","signatureNext":"ConstraintSystem::diagnoseAmbiguityWithFixes"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b
 }

@@ -1,5 +1,5 @@
 // {"kind":"complete","original":"9040bf6c","signature":"swift::Mangle::ASTMangler::mangleTypeAsUSR(swift::Type)","signatureNext":"printTypeUSR"}
-// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
+// RUN: %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 protocol a {
   associatedtype b
 }
