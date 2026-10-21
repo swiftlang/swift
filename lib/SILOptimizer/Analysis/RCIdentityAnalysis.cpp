@@ -54,6 +54,7 @@ static SILValue getRCIdentityPreservingCastOperand(SILValue V) {
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::ConvertFunctionInst:
+  case ValueKind::EndInitLetRefInst:
     return cast<SingleValueInstruction>(V)->getOperand(0);
   case ValueKind::UnconditionalCheckedCastInst: {
     auto *castInst = cast<UnconditionalCheckedCastInst>(V);
