@@ -102,10 +102,15 @@ public:
         dynamicSelfToRecord = DynamicSelf;
     }
 
-    return CaptureInfo(Context, Captures, dynamicSelfToRecord,
-                       OpaqueValue, HasGenericParamCaptures,
-                       NeedsImplicitIsolationCapture,
-                       CapturedEnvironments.getArrayRef(), CapturedTypes);
+    OptionSet<CaptureInfo::Flags> flags;
+    if (HasGenericParamCaptures)
+      flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+    if (NeedsImplicitIsolationCapture)
+      flags |= CaptureInfo::Flags::NeedsImplicitIsolationCapture;
+
+    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
+                       flags, CapturedEnvironments.getArrayRef(),
+                       CapturedTypes);
   }
 
   bool hasUsesOfCurrentIsolation() const {
@@ -1011,10 +1016,8 @@ static bool shouldLocalFuncCaptureIsolation(AbstractFunctionDecl *AFD,
 /// Given that a local function is isolated to the given var, should we
 /// force a capture of the var?
 static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
-                                              VarDecl *var,
+                                              ParamDecl *var,
                                               bool hasUsesOfCurrentIsolation) {
-  assert(isa<ParamDecl>(var));
-
   // Don't try to capture an isolated parameter of the function itself.
   if (var->getDeclContext() == AFD)
     return false;
@@ -1042,7 +1045,7 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     finder.checkType(type, AFD->getLoc());
   }
 
-  if (isNestedInClosureContext(AFD, isDeferBodyDecl)) {
+  if (isDeferInClosureContext(AFD)) {
     // A defer in a closure inherits the isolation of the closure. That
     // isolation is not known yet: it is determined from the captures of the
     // closure, which include the captures of the defer, and asking for the
@@ -1061,7 +1064,7 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     auto actorIsolation = getActorIsolation(AFD);
     if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
       if (auto *var = actorIsolation.getActorInstance()) {
-        if (shouldCaptureIsolationInLocalFunc(AFD, var,
+        if (shouldCaptureIsolationInLocalFunc(AFD, cast<ParamDecl>(var),
                                               finder.hasUsesOfCurrentIsolation()))
           finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
       }

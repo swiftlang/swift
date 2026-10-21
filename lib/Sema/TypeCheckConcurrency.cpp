@@ -3216,24 +3216,18 @@ namespace {
       }
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-#ifndef NDEBUG
-        // Unlike 'ActorIsolation::operator==', this considers
+        // The isolation of a defer in a closure must not have been determined
+        // before the isolation of the closure. Unlike 'operator==', consider
         // nonisolated(nonsending) equal to itself, since both isolations come
         // from the same context
-        auto isSameDeferIsolation = [](ActorIsolation lhs, ActorIsolation rhs) {
-          if (lhs.isNonisolatedNonsending() && rhs.isNonisolatedNonsending())
-            return true;
-          return lhs == rhs;
-        };
-        // The isolation of a defer in a closure must not have been determined
-        // before the isolation of the closure
-        assert((!isNestedInClosureContext(func, isDeferBodyDecl) ||
-                isSameDeferIsolation(
-                    getActorIsolation(func),
-                    getActorIsolationOfContext(func,
-                                               getClosureActorIsolation))) &&
-               "isolation of a defer in a closure was determined too early");
-#endif
+        if (isDeferInClosureContext(func)) {
+          auto isolation = getActorIsolation(func);
+          auto contextIsolation =
+              getActorIsolationOfContext(func, getClosureActorIsolation);
+          ASSERT((isolation.isNonisolatedNonsending() &&
+                  contextIsolation.isNonisolatedNonsending()) ||
+                 isolation == contextIsolation);
+        }
 
         if (func->getDeclContext()->isLocalContext()) {
           checkLocalCaptures(func);
@@ -6668,21 +6662,19 @@ static bool shouldSelfIsolationOverrideDefault(
   }
 }
 
-bool swift::isDeferBodyDecl(const Decl *D) {
+static bool isDeferBody(const Decl *D) {
   auto *FD = dyn_cast_or_null<FuncDecl>(D);
   return FD && FD->isDeferBody();
 }
 
-bool swift::isNestedInClosureContext(
-    const Decl *D, llvm::function_ref<bool(const Decl *)> predicate) {
-  if (!D || !predicate(D))
+bool swift::isDeferInClosureContext(const Decl *D) {
+  if (!isDeferBody(D))
     return false;
 
-  // Look through enclosing declarations that match as well, e.g. a defer
-  // nested in another defer has the context of the outer defer
+  // A defer nested in another defer has the context of the outer defer
   auto *DC = D->getDeclContext();
   while (auto *outer = DC->getAsDecl()) {
-    if (!predicate(outer))
+    if (!isDeferBody(outer))
       break;
     DC = outer->getDeclContext();
   }
@@ -6696,7 +6688,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // defer in a closure, that is the isolation stored on the closure, which
   // ActorIsolationChecker only sets after the closure body has been
   // type-checked. Evaluating this request earlier would read the unset
-  // isolation of the closure and cache it, see isNestedInClosureContext
+  // isolation of the closure and cache it, see isDeferInClosureContext
   if (value->isDeferBody())
     return {getActorIsolationOfContext(cast<FuncDecl>(value)),
             IsolationSource()};
@@ -8449,7 +8441,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // because it might depend on the isolation of a closure it is nested in,
   // and the isolation of closures isn't computed yet, but will be later
   // filled in by the ActorIsolationChecker.
-  if (isNestedInClosureContext(decl, isDeferBodyDecl))
+  if (isDeferInClosureContext(decl))
     return fnType;
 
   std::optional<FunctionTypeIsolation> funcIsolation;

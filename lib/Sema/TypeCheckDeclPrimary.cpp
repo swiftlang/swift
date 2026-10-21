@@ -2336,7 +2336,7 @@ public:
       // not determined yet
       if ((!VD->getDeclContext()->isTypeContext() ||
            isa<ProtocolDecl>(VD->getDeclContext())) &&
-          !isNestedInClosureContext(VD, isDeferBodyDecl))
+          !isDeferInClosureContext(VD))
         (void) getActorIsolation(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of

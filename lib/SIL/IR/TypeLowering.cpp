@@ -5370,9 +5370,11 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the result.
-  CaptureInfo info(Context, resultingCaptures,
-                   capturesDynamicSelf, capturesOpaqueValue,
-                   capturesGenericParams, genericEnv.getArrayRef(),
+  OptionSet<CaptureInfo::Flags> flags;
+  if (capturesGenericParams)
+    flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+  CaptureInfo info(Context, resultingCaptures, capturesDynamicSelf,
+                   capturesOpaqueValue, flags, genericEnv.getArrayRef(),
                    capturedTypes);
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");

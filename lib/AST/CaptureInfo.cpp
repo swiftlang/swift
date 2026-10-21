@@ -65,8 +65,7 @@ CaptureInfo::CaptureInfoStorage::getCapturedTypes() const {
 CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
-                         bool genericParamCaptures,
-                         bool needsImplicitIsolationCapture,
+                         OptionSet<Flags> flags,
                          ArrayRef<GenericEnvironment *> genericEnv,
                          ArrayRef<CapturedType> capturedTypes) {
   static_assert(IsTriviallyDestructible<CapturedValue>::value,
@@ -80,12 +79,6 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
     assert(env->getKind() == GenericEnvironment::Kind::Element);
   }
 #endif
-
-  OptionSet<Flags> flags;
-  if (genericParamCaptures)
-    flags |= Flags::HasGenericParamCaptures;
-  if (needsImplicitIsolationCapture)
-    flags |= Flags::NeedsImplicitIsolationCapture;
 
   if (captures.empty() && genericEnv.empty() && !dynamicSelf && !opaqueValue &&
       capturedTypes.empty()) {

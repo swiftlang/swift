@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CAPTURE_INFO_H
 #define SWIFT_AST_CAPTURE_INFO_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -208,11 +209,13 @@ class CaptureInfo {
     }
   };
 
+public:
   enum class Flags : unsigned {
     HasGenericParamCaptures = 1 << 0,
     NeedsImplicitIsolationCapture = 1 << 1
   };
 
+private:
   llvm::PointerIntPair<const CaptureInfoStorage *, 2, OptionSet<Flags>>
       StorageAndFlags;
 
@@ -222,21 +225,9 @@ public:
   CaptureInfo(ASTContext &ctx,
               ArrayRef<CapturedValue> captures,
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
-              bool genericParamCaptures,
+              OptionSet<Flags> flags,
               ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
-              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>())
-      : CaptureInfo(ctx, captures, dynamicSelf, opaqueValue,
-                    genericParamCaptures,
-                    /*needsImplicitIsolationCapture=*/false, genericEnv,
-                    capturedTypes) {}
-
-  CaptureInfo(ASTContext &ctx,
-              ArrayRef<CapturedValue> captures,
-              DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
-              bool genericParamCaptures,
-              bool needsImplicitIsolationCapture,
-              ArrayRef<GenericEnvironment *> genericEnv,
-              ArrayRef<CapturedType> capturedTypes);
+              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>());
 
   /// A CaptureInfo representing no captures at all.
   static CaptureInfo empty();
@@ -276,7 +267,7 @@ public:
   /// to. This is then added after closure isolation is computed during
   /// TypeConverter::getLoweredLocalCaptures.
   bool needsImplicitIsolationCapture() const {
-    assert(hasBeenComputed());
+    ASSERT(hasBeenComputed());
     return StorageAndFlags.getInt().contains(
         Flags::NeedsImplicitIsolationCapture);
   }
