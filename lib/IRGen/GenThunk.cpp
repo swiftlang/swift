@@ -517,7 +517,9 @@ void IRGenThunk::emit() {
           }
           IGF.emitAllExtractValues(expandedResult, structTy, resultArgValues);
         } else {
-          resultArgValues = convertForDirectError(IGF, result.claimNext(),
+          auto nativeResult =
+              schema.mapIntoNative(IGM, IGF, result, directResultType, false);
+          resultArgValues = convertForDirectError(IGF, nativeResult.claimNext(),
                                                   combined.combinedTy,
                                                   /*forExtraction*/ false);
         }
