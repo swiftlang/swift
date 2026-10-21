@@ -290,3 +290,61 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+sil @callee : $@convention(thin) (Int) -> Int
+
+// Deleting a dead closure kills its debug_values instead of deleting them.
+
+// CHECK-LABEL: sil @test_dead_heap_closure
+// CHECK:       bb0(
+// CHECK-NEXT:    debug_value undef : $@callee_guaranteed () -> Int, let, name "heap_fn"
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'test_dead_heap_closure'
+sil @test_dead_heap_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  debug_value %2 : $@callee_guaranteed () -> Int, let, name "heap_fn"
+  strong_release %2 : $@callee_guaranteed () -> Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_dead_stack_closure
+// CHECK:       bb0(
+// CHECK-NEXT:    debug_value undef : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'test_dead_stack_closure'
+sil @test_dead_stack_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (Int) -> Int
+  debug_value %2 : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+  dealloc_stack %2 : $@noescape @callee_guaranteed () -> Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// The destroy of the dead on-stack closure is on a forwarding mark_dependence.
+// The debug_values of both the closure and the mark_dependence are killed.
+
+// CHECK-LABEL: sil [ossa] @test_dead_stack_closure_with_mark_dependence
+// CHECK:       bb0([[MD_ARG:%[0-9]+]] : $Int, [[MD_BASE:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    debug_value undef : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+// CHECK-NEXT:    debug_value undef : $@noescape @callee_guaranteed () -> Int, let, name "dependent_fn"
+// CHECK-NEXT:    [[MD_RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[MD_RESULT]]
+// CHECK-NEXT:  } // end sil function 'test_dead_stack_closure_with_mark_dependence'
+sil [ossa] @test_dead_stack_closure_with_mark_dependence : $@convention(thin) (Int, @guaranteed Klass) -> () {
+bb0(%0 : $Int, %1 : @guaranteed $Klass):
+  %2 = function_ref @callee : $@convention(thin) (Int) -> Int
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (Int) -> Int
+  debug_value %3 : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+  %4 = mark_dependence [nonescaping] %3 : $@noescape @callee_guaranteed () -> Int on %1 : $Klass
+  debug_value %4 : $@noescape @callee_guaranteed () -> Int, let, name "dependent_fn"
+  destroy_value %4 : $@noescape @callee_guaranteed () -> Int
+  %5 = tuple ()
+  return %5 : $()
+}

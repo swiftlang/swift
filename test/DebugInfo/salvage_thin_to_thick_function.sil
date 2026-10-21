@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+sil [transparent] [ossa] @return_one : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  return %0 : $Builtin.Int32
+}
+
+
+// Test that MandatoryInlining salvages the debug_values of a dead thin_to_thick_function it deletes.
+// Salvaging of thin_to_thick_function/function_ref is not supported yet, so they are killed.
+
+
+// CHECK-LABEL: sil [ossa] @test_dead_thin_to_thick_function
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    debug_value undef : $@noescape () -> Builtin.Int32, let, name "fn"
+// CHECK-NEXT:    [[RES:%[0-9]+]] = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    return [[RES]] : $Builtin.Int32
+// CHECK-NEXT:  } // end sil function 'test_dead_thin_to_thick_function'
+sil [ossa] @test_dead_thin_to_thick_function : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Builtin.Int32 to $@noescape () -> Builtin.Int32
+  debug_value %1 : $@noescape () -> Builtin.Int32, let, name "fn"
+  %2 = apply %1() : $@noescape () -> Builtin.Int32
+  return %2 : $Builtin.Int32
+}
