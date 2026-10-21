@@ -676,6 +676,8 @@ actor AnActorWithClosures {
   var counter: Int = 0 // expected-note 2 {{mutation of this property is only permitted within the actor}}
   func exec() {
     acceptEscapingClosure { [unowned self] in
+      // expected-error@-1 {{actor-isolated closure cannot capture 'self' as 'unowned'}}
+      // expected-note@-2 {{capture 'self' as 'weak' instead}}
       self.counter += 1
 
       acceptEscapingClosure {

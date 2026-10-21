@@ -6333,6 +6333,12 @@ NOTE(marked_nonisolated_here,none,
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %kind0 can not be partially applied",
         (const ValueDecl *))
+ERROR(actor_isolated_closure_unowned_self_capture,none,
+      "actor-isolated closure cannot capture 'self' as %0",
+      (ReferenceOwnership))
+NOTE(actor_isolated_closure_unowned_self_capture_use_weak,none,
+      "capture 'self' as 'weak' instead",
+      ())
 ERROR(concurrent_access_local,none,
         "use of local %kind0 in concurrently-executing code",
         (const ValueDecl *))
