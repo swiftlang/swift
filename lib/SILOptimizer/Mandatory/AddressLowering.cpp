@@ -259,7 +259,8 @@ visitCallResults(FullApplySite apply,
 
 /// Return true if the given value is either a "fake" tuple that represents all
 /// of a call's results or an empty tuple of no results. This may return true
-/// for either an apply instruction or a block argument.
+/// for either an apply instruction or a block argument of a try_apply's normal
+/// destination.
 static bool isPseudoCallResult(SILValue value) {
   if (auto *apply = dyn_cast<ApplyInst>(value))
     return ApplySite(apply).getSubstCalleeConv().getNumDirectSILResults() > 1;
@@ -274,6 +275,10 @@ static bool isPseudoCallResult(SILValue value) {
 
   auto *tryApply = dyn_cast<TryApplyInst>(term);
   if (!tryApply)
+    return false;
+
+  // The argument of the error block is the error itself, not a result.
+  if (bbArg->getParent() != tryApply->getNormalBB())
     return false;
 
   return ApplySite(tryApply).getSubstCalleeConv().getNumDirectSILResults() > 1;
