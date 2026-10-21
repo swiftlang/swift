@@ -7266,7 +7266,7 @@ bool ConstraintSystem::repairFailures(
     // Repair a coercion ('as') with a runtime checked cast ('as!' or 'as?').
     if (auto *coerceToCheckCastFix =
             CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
-                                         getConstraintLocator(locator))) {
+                                         locator)) {
       conversionsOrFixes.push_back(coerceToCheckCastFix);
       return true;
     }
@@ -15030,7 +15030,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         loc->isForOptionalTry()) {
       if (restriction == ConversionRestrictionKind::Superclass) {
         if (auto *fix = CoerceToCheckedCast::attempt(
-                *this, fromType, toType, /*useConditionalCast*/ false, loc))
+                *this, fromType, toType, /*useConditionalCast*/ false, locator))
           return !recordFix(fix, impact);
       }
       
@@ -15038,6 +15038,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       // tuple mismatch.
       if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
         return true;
+
+      if (restriction == ConversionRestrictionKind::OptionalToOptional) {
+        auto *fix = GenericArgumentsMismatch::create(
+          *this, fromType, toType, {0}, loc);
+        return !recordFix(fix, impact);
+      }
 
       if (restriction == ConversionRestrictionKind::ValueToOptional) {
         // If this is an optional injection we can drop optional from

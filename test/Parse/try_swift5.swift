@@ -258,6 +258,7 @@ let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{cannot
 
 // We don't offer 'try!' here because it would not change the type of the expression in Swift 5+
 let _: Int? = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
 
 let _: Int?? = try? producer.produceDoubleOptionalInt() // good
 let _: Int??? = try? producer.produceDoubleOptionalInt() // good

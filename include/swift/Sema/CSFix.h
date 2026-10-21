@@ -2711,7 +2711,7 @@ public:
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
                                       Type toType, bool useConditionalCast,
-                                      ConstraintLocator *locator);
+                                      ConstraintLocatorBuilder locator);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::CoerceToCheckedCast;

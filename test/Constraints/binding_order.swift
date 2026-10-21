@@ -97,7 +97,15 @@ do {
     let _: [any Command] = [a, b]
     let _: [any Command] = Array([a, b])
     let _: [any Command] = [a, b].filter { _ in true }
+
+    let _: [any Command] = [a, b].compactMap { .some($0) }
+    // expected-error@-1 {{argument type 'Super' does not conform to expected type 'Command'}}
+    let _: [any Command] = [a, b].compactMap { Optional($0) }
+    // expected-error@-1 {{cannot convert value of type 'Optional<Super>' to closure result type '(any Command)?'}}
+
     let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
+    let _: [any Command] = [Optional(a), Optional(b)].compactMap { $0 }
+    let _: [any Command] = [.some(a), .some(b)].compactMap { $0 }
 
     let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
     // expected-error@-1 {{cannot convert value of type 'A?' to expected element type 'any Command'}}

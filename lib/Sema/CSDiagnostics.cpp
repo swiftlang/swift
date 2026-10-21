@@ -985,15 +985,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   }
 
   std::optional<Diag<Type, Type>> diagnostic;
-  if (path.empty()) {
-    if (isExpr<AssignExpr>(anchor)) {
-      diagnostic = getDiagnosticFor(CTP_AssignSource);
-    } else if (locator->isForCoercion()) {
-      diagnostic = getDiagnosticFor(CTP_CoerceOperand);
-    } else {
-      return false;
-    }
-  } else {
+  if (!path.empty()) {
     const auto &last = path.back();
     switch (last.getKind()) {
     case ConstraintLocator::TernaryBranch:
@@ -1112,8 +1104,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   }
 
   if (!diagnostic) {
-    // Handle all mismatches involving an `AssignExpr`
-    if (auto *assignExpr = getAsExpr<AssignExpr>(anchor)) {
+    // Handle all mismatches involving an `OptionalTryExpr`.
+    if (isExpr<OptionalTryExpr>(anchor)) {
+      diagnostic = diag::cannot_convert_initializer_value;
+    // Handle all mismatches involving an `AssignExpr`.
+    } else if (auto *assignExpr = getAsExpr<AssignExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_AssignSource);
       fromType = getType(assignExpr->getSrc());
       toType = getType(assignExpr->getDest());
