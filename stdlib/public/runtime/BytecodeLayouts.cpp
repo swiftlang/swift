@@ -42,6 +42,107 @@
 
 using namespace swift;
 
+// memcpy for the copies of dynamic size in the value witnesses, which are
+// mostly small (the bytes between ref-counted fields, or whole small values).
+// For those, this was measured to be faster than calling memcpy; copies over
+// 128 bytes tail call memcpy. src and dest must not overlap.
+//
+//   0..15     scalar loads/stores from both ends
+//   16..32    one 16-byte load/store from each end
+//   33..128   32 bytes from each end, plus 32 more from each end over 64 bytes
+//
+// Excluded on arm64_32, where size_t is 32 bits and the upper half of x2 is
+// undefined.
+#if defined(__aarch64__) && defined(__LP64__)
+#define SWIFT_LAYOUT_STRING_ARM64_MEMCPY 1
+
+__attribute__((naked, aligned(64))) static void
+layoutStringMemcpyArm64(void *dest, const void *src, size_t size) {
+  asm volatile(R"(
+    add     x4, x1, x2              // src end
+    add     x5, x0, x2              // dst end
+    cmp     x2, #128
+    b.hi    7f
+    cmp     x2, #32
+    b.hi    5f
+    cmp     x2, #16
+    b.lo    1f
+
+    // 16..32 bytes
+    ldr     q0, [x1]
+    ldr     q1, [x4, #-16]
+    str     q0, [x0]
+    str     q1, [x5, #-16]
+    ret
+
+1:  // 0..15 bytes
+    tbz     x2, #3, 2f
+    // 8..15 bytes
+    ldr     x6, [x1]
+    ldr     x7, [x4, #-8]
+    str     x6, [x0]
+    str     x7, [x5, #-8]
+    ret
+
+2:  // 0..7 bytes
+    tbz     x2, #2, 3f
+    // 4..7 bytes
+    ldr     w6, [x1]
+    ldr     w7, [x4, #-4]
+    str     w6, [x0]
+    str     w7, [x5, #-4]
+    ret
+
+3:  // 0..3 bytes
+    // 0..3 bytes: copy first, middle and last byte
+    cbz     x2, 4f
+    lsr     x8, x2, #1
+    ldrb    w6, [x1]
+    ldrb    w7, [x4, #-1]
+    ldrb    w9, [x1, x8]
+    strb    w6, [x0]
+    strb    w9, [x0, x8]
+    strb    w7, [x5, #-1]
+4:  // return
+    ret
+
+    .p2align 4
+5:  // 33..128 bytes
+    ldp     q0, q1, [x1]
+    ldp     q2, q3, [x4, #-32]
+    cmp     x2, #64
+    b.hi    6f
+    // 33..64 bytes
+    stp     q0, q1, [x0]
+    stp     q2, q3, [x5, #-32]
+    ret
+
+6:  // 65..128 bytes
+    ldp     q4, q5, [x1, #32]
+    ldp     q6, q7, [x4, #-64]
+    stp     q0, q1, [x0]
+    stp     q4, q5, [x0, #32]
+    stp     q6, q7, [x5, #-64]
+    stp     q2, q3, [x5, #-32]
+    ret
+
+7:  // > 128 bytes
+    b       _memcpy
+)");
+}
+#endif
+
+/// memcpy for copies whose size is only known at runtime.
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringMemcpy(void *dest, const void *src,
+                                      size_t size) {
+#ifdef SWIFT_LAYOUT_STRING_ARM64_MEMCPY
+  layoutStringMemcpyArm64(dest, src, size);
+#else
+  memcpy(dest, src, size);
+#endif
+}
+
 static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
 }
@@ -116,7 +217,7 @@ static constexpr bool platformSupportsTaggedPointers() {
     TAG = READER.readBytes<uint64_t>();                                        \
     OFFSET = (TAG & ~(0xFFULL << 56));                                         \
     if (OFFSET) {                                                              \
-      memcpy(DEST + ADDR_OFFSET, SRC + ADDR_OFFSET, OFFSET);                   \
+      layoutStringMemcpy(DEST + ADDR_OFFSET, SRC + ADDR_OFFSET, OFFSET);       \
     }                                                                          \
     ADDR_OFFSET += OFFSET;                                                     \
     TAG >>= 56;                                                                \
@@ -581,7 +682,7 @@ static void singlePayloadEnumSimple(const Metadata *metadata,
       }
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     reader.skip(refCountBytes);
     addrOffset += skip;
   });
@@ -603,7 +704,7 @@ static void singlePayloadEnumFN(const Metadata *metadata,
       size_t skip;
       reader.readBytes(refCountBytes, skip);
       reader.skip(refCountBytes);
-      memcpy(dest + addrOffset, src + addrOffset, skip);
+      layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
       addrOffset += skip;
     }
   });
@@ -623,7 +724,7 @@ static void singlePayloadEnumFNResolved(const Metadata *metadata,
 
     if (SWIFT_UNLIKELY(enumTag != 0)) {
       reader.skip(refCountBytes);
-      memcpy(dest + addrOffset, src + addrOffset, skip);
+      layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
       addrOffset += skip;
     }
   });
@@ -668,7 +769,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     }
 
     reader.skip(refCountBytes);
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -701,9 +802,10 @@ multiPayloadEnumFN(const Metadata *metadata, LayoutStringReader1 &reader,
     HandlerFn(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
   } else {
-    memcpy(dest + addrOffset, src + addrOffset, enumSize);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
     addrOffset += enumSize;
   }
 }
@@ -737,9 +839,10 @@ static void multiPayloadEnumFNResolved(const Metadata *metadata,
     HandlerFn(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
   } else {
-    memcpy(dest + addrOffset, src + addrOffset, enumSize);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
     addrOffset += enumSize;
   }
 }
@@ -774,9 +877,10 @@ multiPayloadEnumGeneric(const Metadata *metadata, LayoutStringReader1 &reader,
     HandlerFn(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
   } else {
-    memcpy(dest + addrOffset, src + addrOffset, enumSize);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
     addrOffset += enumSize;
   }
 }
@@ -1148,7 +1252,7 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
     if (offset) {
-      memcpy(dest + _addrOffset, src + _addrOffset, offset);
+      layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
     tag >>= 56;
@@ -1306,7 +1410,7 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
     if (offset) {
-      memcpy(dest + _addrOffset, src + _addrOffset, offset);
+      layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset += offset;
     tag >>= 56;
@@ -1323,7 +1427,7 @@ swift_cvw_initWithTakeImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
   if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     size_t size = metadata->vw_size();
-    memcpy(_dest, _src, size);
+    layoutStringMemcpy(_dest, _src, size);
     return _dest;
   }
 
@@ -1609,7 +1713,7 @@ static void handleSingleRefCountInitWithCopy(const Metadata *metadata,
   auto _addrOffset = addrOffset;
   auto offset = (tag & ~(0xFFULL << 56));
   if (SWIFT_UNLIKELY(offset)) {
-    memcpy(dest + _addrOffset, src + _addrOffset, offset);
+    layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
   }
   addrOffset = _addrOffset + offset;
   tag >>= 56;
@@ -1677,7 +1781,7 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 
@@ -1716,7 +1820,7 @@ static void singlePayloadEnumFNAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -1753,7 +1857,7 @@ static void singlePayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -1815,7 +1919,7 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -1859,7 +1963,8 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
@@ -1868,7 +1973,8 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (destTag < numPayloads) {
     size_t refCountOffset =
@@ -1877,7 +1983,7 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
   addrOffset += enumSize;
 }
 
@@ -1918,7 +2024,8 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
@@ -1927,7 +2034,8 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (destTag < numPayloads) {
     size_t refCountOffset =
@@ -1936,7 +2044,7 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
   addrOffset += enumSize;
 }
 
@@ -1979,7 +2087,7 @@ static void handleRefCountsAssignWithCopy(const Metadata *metadata,
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
     if (offset) {
-      memcpy(dest + _addrOffset, src + _addrOffset, offset);
+      layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
     tag >>= 56;
@@ -2046,7 +2154,8 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     }
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes) {
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     }
     return;
   } else if (srcTag < numPayloads) {
@@ -2056,7 +2165,8 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes) {
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     }
     return;
   } else if (destTag < numPayloads) {
@@ -2066,7 +2176,7 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
   addrOffset += enumSize;
 }
 
@@ -2667,7 +2777,7 @@ swift_cvw_initWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
                                              const Metadata *metadata) {
   if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     size_t size = metadata->vw_size();
-    memcpy(_dest, _src, size);
+    layoutStringMemcpy(_dest, _src, size);
     return _dest;
   }
 
