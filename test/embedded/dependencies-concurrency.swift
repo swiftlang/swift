@@ -12,6 +12,10 @@
 // RUN: %llvm-nm --defined-only --format=just-symbols %t/a.out | %FileCheck %s --check-prefix=DEBUG-SYMBOL
 // DEBUG-SYMBOL-DAG: _swift_concurrency_debug_asyncTaskSize
 // DEBUG-SYMBOL-DAG: _swift_concurrency_debug_asyncTaskNameOffset
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_non_future_adapter
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_future_adapter
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_task_wait_throwing_resume_adapter
+// DEBUG-SYMBOL-DAG: _swift_concurrency_debug_task_future_wait_resume_adapter
 
 //--- allowed-dependencies.txt
 ___assert_rtn
