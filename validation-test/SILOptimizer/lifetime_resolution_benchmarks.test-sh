@@ -31,8 +31,6 @@ EXCEPTIONAL_FILES = [
     # Compiler crash in LifetimeResolution
     pathlib.Path("benchmark/single-source/ToddCoxeter.swift"),
     pathlib.Path("benchmark/utils/DriverUtils.swift"),
-    # Compiler crash in DiagnoseInvalidEscapingCaptures
-    pathlib.Path("benchmark/single-source/Exclusivity.swift"),
     # SIL memory lifetime verification failure
     pathlib.Path("benchmark/single-source/Hash.swift"),
     # Spurious use-before-init / use-after-consume errors

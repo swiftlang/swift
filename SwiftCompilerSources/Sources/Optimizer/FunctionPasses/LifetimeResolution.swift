@@ -1335,6 +1335,10 @@ private struct PartitionedUses: CustomStringConvertible {
   }
 
   mutating func partitionUses(withDeinitBarriers addBarriers: Bool) {
+    if root.hasDirectPointerEscape {
+      hasUnboundedUse = true
+    }
+
     // TODO: should we use an InteriorUseWalker or some other robust walker?
     for use in root.uses {
       switch (use.ownership) {
@@ -1684,6 +1688,14 @@ private func replaceWithCopy(_ op: Operand, _ context: FunctionPassContext) {
   }
 
   op.set(to: copyValue, context)
+}
+
+extension Value {
+  /// Whether a use lets a pointer to this value escape, so that its liveness can't be derived from its uses.
+  /// An escape nested within a borrow scope is bounded by that scope instead.
+  var hasDirectPointerEscape: Bool {
+    uses.contains { $0.ownership == .pointerEscape || $0.ownership == .forwardingUnowned }
+  }
 }
 
 private extension MutableCollection {
