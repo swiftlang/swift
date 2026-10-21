@@ -728,8 +728,10 @@ readMultiPayloadEnum(LayoutStringReader1 &reader, const uint8_t *addr,
       static_assert(Kind == RefCountingKind::MultiPayloadEnumFNResolved);
       getEnumTag = reader.readBytes<GetEnumTagFn>();
     }
-    reader.readBytes(numPayloads, refCountBytes, enumSize);
+    // Call before reading the rest of the header, so that less is live
+    // across the call.
     enumTag = getEnumTag(addr);
+    reader.readBytes(numPayloads, refCountBytes, enumSize);
   }
 
   LayoutStringReader1 payloadOffsets = reader;
@@ -1312,8 +1314,141 @@ static void handleRefCountsDestroy(const Metadata *metadata,
   }
 }
 
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+// The general destroy walk, starting at `reader`.
+SWIFT_NOINLINE static void destroyRefCounts(const Metadata *metadata,
+                                            LayoutStringReader1 reader,
+                                            uintptr_t addrOffset,
+                                            uint8_t *addr) {
+  handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata, reader,
+                               addrOffset, addr);
+}
+
+// Continues a walk that destroyFast handed off at `reader`. If the walk was in
+// the payload of a multi-payload enum, it finishes the payload and resumes
+// after the enum.
+SWIFT_NOINLINE static void destroySlow(const Metadata *metadata,
+                                       LayoutStringReader1 reader,
+                                       uintptr_t addrOffset, uint8_t *addr,
+                                       LayoutStringReader1 resumeReader,
+                                       uintptr_t resumeAddrOffset) {
+  destroyRefCounts(metadata, reader, addrOffset, addr);
+  if (resumeReader.layoutStr)
+    destroyRefCounts(metadata, resumeReader, resumeAddrOffset, addr);
+}
+
+// Destroys a value with a walk that handles only the most common kinds, so that
+// it needs few registers and saves as few callee-saved registers as possible:
+// End, native strong references, native bridge objects and multi-payload enums
+// one level deep. It calls nothing with the standard calling convention except
+// an enum's getEnumTag; the ref counting slow paths are preserve_most. For
+// anything else, it hands off to destroySlow at the current tag.
+//
+// It is noinline so that hot/cold splitting leaves it alone: outlined cold code
+// is called with the standard calling convention, which would force saving
+// callee-saved registers on every call.
+SWIFT_NOINLINE static void destroyFast(const Metadata *metadata,
+                                       uint8_t *addr) {
+  LayoutStringReader1 reader{metadata->getLayoutString() +
+                             layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  LayoutStringReader1 resumeReader{nullptr};
+  uintptr_t resumeAddrOffset = 0;
+  uint64_t tag;
+
+  _Pragma("clang diagnostic push");
+  _Pragma("clang diagnostic ignored \"-Wgnu-label-as-value\"");
+  // clang-format off
+  static const void *const dispatchTable[] = {
+      &&End,  &&Slow,                 &&NativeStrong, &&Slow,
+      &&Slow, &&Slow,                 &&Slow,         &&Slow,
+      &&Bridge, &&Slow,               &&Slow,         &&Slow,
+      &&Slow, &&Slow,                 &&Slow,         &&Slow,
+      &&Slow, &&Slow,                 &&Slow,         &&Slow,
+      &&MultiPayloadEnumFN, &&MultiPayloadEnumFNResolved,
+      &&MultiPayloadEnumGeneric,
+  };
+  // clang-format on
+
+#define DESTROY_FAST_NEXT()                                                    \
+  do {                                                                         \
+    tag = reader.readBytes<uint64_t>();                                        \
+    addrOffset += tag & ~(0xFFULL << 56);                                      \
+    goto *dispatchTable[tag >> 56];                                            \
+  } while (false)
+
+#define DESTROY_FAST_MULTI_PAYLOAD_ENUM(KIND)                                  \
+  KIND:                                                                        \
+  {                                                                            \
+    if (resumeReader.layoutStr)                                                \
+      goto Slow;                                                               \
+    uintptr_t enumStart = addrOffset;                                          \
+    size_t enumSize;                                                           \
+    LayoutStringReader1 payloadReader;                                         \
+    if (readMultiPayloadEnum<RefCountingKind::KIND>(                           \
+            reader, addr + enumStart, enumSize, payloadReader)) {              \
+      resumeReader = reader;                                                   \
+      resumeAddrOffset = enumStart + enumSize;                                 \
+      reader = payloadReader;                                                  \
+    } else {                                                                   \
+      addrOffset = enumStart + enumSize;                                       \
+    }                                                                          \
+    DESTROY_FAST_NEXT();                                                       \
+  }
+
+  DESTROY_FAST_NEXT();
+
+End:
+  if (resumeReader.layoutStr) {
+    reader = resumeReader;
+    addrOffset = resumeAddrOffset;
+    resumeReader.layoutStr = nullptr;
+    DESTROY_FAST_NEXT();
+  }
+  return;
+
+NativeStrong:
+  {
+    auto *object = (HeapObject *)(*(uintptr_t *)(addr + addrOffset) &
+                                  ~_swift_abi_SwiftSpareBitsMask);
+    addrOffset += sizeof(HeapObject *);
+    layoutStringRelease(object);
+    DESTROY_FAST_NEXT();
+  }
+
+Bridge:
+  {
+    void *object = *(void **)(addr + addrOffset);
+    if (SWIFT_UNLIKELY(isTaggedOrNonNativeBridgeObject(object)))
+      goto Slow;
+    addrOffset += sizeof(void *);
+    layoutStringRelease((HeapObject *)(uintptr_t(object) &
+                                       ~heap_object_abi::SwiftSpareBitsMask));
+    DESTROY_FAST_NEXT();
+  }
+
+  DESTROY_FAST_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFN)
+  DESTROY_FAST_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFNResolved)
+  DESTROY_FAST_MULTI_PAYLOAD_ENUM(MultiPayloadEnumGeneric)
+
+Slow:
+  // Rewind to the current tag and let the general walk take it from there.
+  reader.layoutStr -= sizeof(uint64_t);
+  addrOffset -= tag & ~(0xFFULL << 56);
+  return destroySlow(metadata, reader, addrOffset, addr, resumeReader,
+                     resumeAddrOffset);
+  _Pragma("clang diagnostic pop");
+
+#undef DESTROY_FAST_MULTI_PAYLOAD_ENUM
+#undef DESTROY_FAST_NEXT
+}
+#endif
+
 static void swift_cvw_destroyImpl(swift::OpaqueValue *address,
                                   const Metadata *metadata) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  destroyFast(metadata, (uint8_t *)address);
+#else
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
@@ -1325,12 +1460,15 @@ static void swift_cvw_destroyImpl(swift::OpaqueValue *address,
 #else
   handleRefCountsDestroy(metadata, reader, addrOffset, addr);
 #endif
+#endif
 }
 
 void swift::swift_cvw_arrayDestroy(swift::OpaqueValue *address, size_t count,
                                    size_t stride, const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *addr = (uint8_t *)address;
+  // This doesn't use destroyFast: the loop below saves the callee-saved
+  // registers once per array instead of once per element.
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
