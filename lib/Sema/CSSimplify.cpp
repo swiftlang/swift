@@ -16638,8 +16638,6 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   if (!subscript)
     return;
 
-  ASSERT(getConstraintLocator(locator)->isSubscriptMemberRef());
-
   // If a keypath subscript is used without the expected `keyPath:` label,
   // continue with type-checking when attempting fixes so that it gets caught
   // by the argument label checking.
