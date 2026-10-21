@@ -3437,6 +3437,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Ya");
   if (fn->isSendable())
     appendOperator("Yb");
+  if (fn->isNonTransferable())
+    appendOperator("Yd");
   if (auto thrownError = fn->getEffectiveThrownErrorType()) {
     if ((*thrownError)->isEqual(Context.getErrorExistentialType())
         || !AllowTypedThrows) {

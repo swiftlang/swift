@@ -550,6 +550,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ConcurrentFunctionType:
+    case Node::Kind::NonTransferableFunctionType:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
@@ -888,7 +889,8 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
 
   unsigned argIndex = node->getNumChildren() - 2;
   unsigned startIndex = 0;
-  bool isSendable = false, isAsync = false, hasSendingResult = false;
+  bool isSendable = false, isNonTransferable = false, isAsync = false,
+       hasSendingResult = false;
   auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
   if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
     // handled earlier
@@ -941,6 +943,11 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
   }
 
   if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::NonTransferableFunctionType) {
+    ++startIndex;
+    isNonTransferable = true;
+  }
+  if (node->getChild(startIndex)->getKind() ==
       Node::Kind::ConcurrentFunctionType) {
     ++startIndex;
     isSendable = true;
@@ -972,6 +979,9 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
 
   if (isSendable)
     Printer << "@Sendable ";
+
+  if (isNonTransferable)
+    Printer << "@nontransferable ";
 
   printFunctionParameters(LabelList, node->getChild(argIndex), depth,
                           Options.ShowFunctionArgumentTypes);
@@ -3205,6 +3215,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
   case Node::Kind::ConcurrentFunctionType:
     Printer << "@Sendable ";
+    return nullptr;
+  case Node::Kind::NonTransferableFunctionType:
+    Printer << "@nontransferable ";
     return nullptr;
   case Node::Kind::DifferentiableFunctionType: {
     Printer << "@differentiable";
