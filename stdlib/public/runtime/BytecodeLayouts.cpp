@@ -1467,19 +1467,25 @@ void swift::swift_cvw_arrayDestroy(swift::OpaqueValue *address, size_t count,
                                    size_t stride, const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *addr = (uint8_t *)address;
+#if defined(__APPLE__) && defined(__arm64__)
   // This doesn't use destroyFast: the loop below saves the callee-saved
-  // registers once per array instead of once per element.
+  // registers once per array instead of once per element. It iterates over
+  // element addresses, which keeps fewer values live across the walk than an
+  // index, so that the loop state stays in registers.
+  const uint8_t *body = layoutStr + layoutStringHeaderSize;
+  for (uint8_t *end = addr + count * stride; addr != end; addr += stride) {
+    LayoutStringReader1 reader{body};
+    uintptr_t addrOffset = 0;
+    handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata,
+                                 reader, addrOffset, addr);
+  }
+#else
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-
-#if defined(__APPLE__) && defined(__arm64__)
-    handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata,
-                                 reader, addrOffset, addr);
-#else
     handleRefCountsDestroy(metadata, reader, addrOffset, addr);
-#endif
   }
+#endif
 }
 
 static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -1703,6 +1709,32 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
   }
 }
 
+#if defined(__APPLE__) && defined(__arm64__)
+// arrayInitWithCopy copies elements up to this size with a single memcpy before
+// handling their ref-counted fields. Larger elements copy the bytes between
+// the ref-counted fields along the way instead: for them, copying everything up
+// front was measured to be slower for large arrays, probably because the
+// stores of several cache lines then precede the first atomic ref count
+// operation. (For single values, copying everything up front is faster at
+// all sizes.)
+static constexpr size_t maxPrecopiedArrayElementSize = 128;
+
+// arrayInitWithCopy of elements larger than maxPrecopiedArrayElementSize.
+SWIFT_NOINLINE static void
+arrayInitWithCopyPiecewise(const Metadata *metadata, uint8_t *dest,
+                           uint8_t *src, size_t count, size_t stride) {
+  // Iterates over element addresses; see swift_cvw_arrayDestroy.
+  const uint8_t *body = metadata->getLayoutString() + layoutStringHeaderSize;
+  for (uint8_t *end = dest + count * stride; dest != end;
+       dest += stride, src += stride) {
+    LayoutStringReader1 reader{body};
+    uintptr_t addrOffset = 0;
+    handleRefCountsInliningEnums(initWithCopyTable, CONTINUE_WITH_COPY,
+                                 metadata, reader, addrOffset, dest, src);
+  }
+}
+#endif
+
 static swift::OpaqueValue *
 swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
@@ -1736,18 +1768,25 @@ void swift::swift_cvw_arrayInitWithCopy(swift::OpaqueValue *_dest,
   uint8_t *src = (uint8_t *)_src;
 #if defined(__APPLE__) && defined(__arm64__)
   size_t size = metadata->vw_size();
-#endif
+  if (SWIFT_UNLIKELY(size > maxPrecopiedArrayElementSize))
+    return arrayInitWithCopyPiecewise(metadata, dest, src, count, stride);
+  // Iterates over element addresses; see swift_cvw_arrayDestroy.
+  const uint8_t *body = layoutStr + layoutStringHeaderSize;
+  for (uint8_t *end = dest + count * stride; dest != end;
+       dest += stride, src += stride) {
+    LayoutStringReader1 reader{body};
+    uintptr_t addrOffset = 0;
+    layoutStringMemcpy(dest, src, size);
+    handleRefCountsPrecopied(initWithCopyTable, metadata, reader, addrOffset,
+                             dest, src);
+  }
+#else
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-#if defined(__APPLE__) && defined(__arm64__)
-    layoutStringMemcpy(dest + addrOffset, src + addrOffset, size);
-    handleRefCountsPrecopied(initWithCopyTable, metadata, reader, addrOffset,
-                             dest, src);
-#else
     handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
-#endif
   }
+#endif
 }
 
 static void unknownWeakInitWithTake(const Metadata *metadata,
