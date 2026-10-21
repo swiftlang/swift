@@ -237,6 +237,47 @@ func testNestedCaptureListEntries(nt: NonTransferable) {
   // expected-error@-1 {{capture list entry 'x' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
 }
 
+// A `defer` body runs in place with the isolation of its enclosing context, so
+// its captures never cross an isolation boundary.
+func testDeferCaptures(nt: NonTransferable) {
+  defer { nt.use() } // Ok
+  defer { takesNontransferable { nt.use() } } // Ok
+  defer { takesTransferable { nt.use() } }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  nt.use()
+}
+
+func asyncWork() async {}
+
+func testAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  defer { takesTransferable { nt.use() } }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  nt.use()
+}
+
+actor DeferIsolation {
+  func isolated(nt: NonTransferable) async {
+    defer { await asyncWork(); nt.use() } // Ok
+    nt.use()
+  }
+}
+
+@MainActor func testMainActorAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  nt.use()
+}
+
+nonisolated(nonsending) func testCallerIsolatedAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  nt.use()
+}
+
+@concurrent func testConcurrentAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  nt.use()
+}
+
 func testAsyncLetAndTaskCaptures(nt: NonTransferable, ntc: NonTransferableClass) async {
   Task { ntc.use() }
   // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'ntc'}}

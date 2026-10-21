@@ -2850,6 +2850,13 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         if (fd->hasSendingResult())
           infoBuilder = infoBuilder.withSendingResult();
         infoBuilder = infoBuilder.withCoroutine(fd->isCoroutine());
+
+        if (fd->isDeferBody()) {
+          // Allow `defer` blocks to capture ~Transferable values.
+          if (ctx.LangOpts.hasFeature(Feature::NontransferableTypes)) {
+            infoBuilder = infoBuilder.withNonTransferable();
+          }
+        }
       }
 
       // Lifetime dependencies only apply to the outer function type for
