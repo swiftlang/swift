@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse \
+// RUN:   -enable-experimental-feature ExtendedSpecializedAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -10,6 +11,7 @@
 // RUN:   | %sanitize-address > %t/astgen.ast
 
 // RUN: %target-swift-frontend-dump-parse \
+// RUN:   -enable-experimental-feature ExtendedSpecializedAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -25,11 +27,13 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
+// RUN:   -enable-experimental-feature ExtendedSpecializedAttribute \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ExtendedSpecializedAttribute
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_Lifetimes
@@ -175,6 +179,9 @@ func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
 
 @specialized(where X == Int, Y == Float, Z == Double)
 func testSpecializePublic<X, Y, Z>(x: X, y: Y, z: Z) {}
+
+@specialized(exported: true, where X == Int)
+func testSpecializeExported<X>(x: X) {}
 
 @_spi(SPIName) public func spiFn() {}
 

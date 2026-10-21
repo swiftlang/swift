@@ -96,6 +96,7 @@ extension Parser.LanguageFeatures {
     mapFeature(.LiteralExpressions, to: .literalExpressions)
     mapFeature(.OnceFunctions, to: .onceFunctions)
     mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
+    mapFeature(.ExtendedSpecializedAttribute, to: .extendedSpecializedAttribute)
   }
 }
 

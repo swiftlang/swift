@@ -1555,8 +1555,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     Printer << "@" << getAttrName() << "(";
 
-    // The non-underscored @specialize attribute currently does not support
-    // parameters so lets not print them.
+    // The non-underscored @specialized attribute only supports 'exported'.
+    if (attr->isPublic() && attr->isExported())
+      Printer << "exported: true, ";
     if (!attr->isPublic()) {
       auto exported = attr->isExported() ? "true" : "false";
       auto kind = attr->isPartialSpecialization() ? "partial" : "full";
