@@ -3138,7 +3138,10 @@ llvm::Constant *irgen::emitGlobalBlock(IRGenModule &IGM,
   auto blockFields = builder.beginStruct();
 
   auto header = blockFields.beginStruct(IGM.ObjCBlockStructTy);
-  header.add(getBlockIsa(IGM, "_NSConcreteGlobalBlock"));
+  // Sign the isa as for a stack block; clang signs its global blocks' isa too.
+  header.addSignedPointer(getBlockIsa(IGM, "_NSConcreteGlobalBlock"),
+                          IGM.getOptions().PointerAuth.ObjCIsaPointers,
+                          PointerAuthEntity());
   header.addInt32(flags);
   header.addInt32(0);
   header.addSignedPointer(
