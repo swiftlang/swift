@@ -2438,6 +2438,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back('h');
   }
 
+  if (fn->isNonTransferable()) {
+    OpArgs.push_back('D');
+  }
+
   // Asynchronous functions.
   if (fn->isAsync()) {
     OpArgs.push_back('H');
