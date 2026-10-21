@@ -7,7 +7,7 @@ func work() async {}
 actor A {
   func asyncDefer() {
     Task {
-      // CHECK-LABEL: (func_decl {{.*}} "$defer()" interface_type="() async -> ()" access=private captures=(<isolation> ) result="()" thrown_type="<null>"
+      // CHECK-LABEL: (func_decl {{.*}} "$defer()" interface_type="() async -> ()" access=private captures=(<isolation>) result="()" thrown_type="<null>"
       defer { await work() }
       _ = self
       await work()
@@ -38,9 +38,9 @@ actor A {
   func nestedAsyncDefer() {
     Task {
       _ = self
-      // CHECK-LABEL: (func_decl {{.*}} "$defer()" interface_type="() async -> ()" access=private captures=(<isolation> ) result="()" thrown_type="<null>"
+      // CHECK-LABEL: (func_decl {{.*}} "$defer()" interface_type="() async -> ()" access=private captures=(<isolation>) result="()" thrown_type="<null>"
       defer {
-        // CHECK: (func_decl {{.*}} "$defer()" interface_type="() async -> ()" access=private captures=(<isolation> ) result="()" thrown_type="<null>"
+        // CHECK: (func_decl {{.*}} "$defer()" interface_type="() async -> ()" access=private captures=(<isolation>) result="()" thrown_type="<null>"
         defer { await work() }
         await work()
       }

@@ -164,14 +164,23 @@ LLVM_ATTRIBUTE_USED void CaptureInfo::dump() const {
 void CaptureInfo::print(raw_ostream &OS) const {
   OS << "captures=(";
 
+  bool printedFlag = false;
+  auto printFlag = [&](StringRef flag) {
+    if (printedFlag)
+      OS << ' ';
+    OS << flag;
+    printedFlag = true;
+  };
   if (hasGenericParamCaptures())
-    OS << "<generic> ";
+    printFlag("<generic>");
   if (hasDynamicSelfCapture())
-    OS << "<dynamic_self> ";
+    printFlag("<dynamic_self>");
   if (hasOpaqueValueCapture())
-    OS << "<opaque_value> ";
+    printFlag("<opaque_value>");
   if (needsImplicitIsolationCapture())
-    OS << "<isolation> ";
+    printFlag("<isolation>");
+  if (printedFlag && !getCaptures().empty())
+    OS << ' ';
 
   interleave(getCaptures(),
              [&](const CapturedValue &capture) {
