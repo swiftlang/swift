@@ -2643,16 +2643,23 @@ NOTE(objc_direct_implies_final,none,
 ERROR(objc_direct_in_protocol,none,
       "'@objcDirect' cannot be applied to protocol requirements", ())
 ERROR(objc_direct_access_level,none,
-      "'private' or 'fileprivate' methods cannot be '@objcDirect'", ())
+      "a 'private' or 'fileprivate' %kindonly0 cannot be '@objcDirect'",
+      (const ValueDecl *))
 ERROR(objc_direct_with_async,none,
       "'@objcDirect' is not supported with 'async' methods", ())
 ERROR(objc_direct_override,none,
-      "'@objcDirect' methods cannot override superclass methods", ())
+      "an '@objcDirect' %kindonly0 cannot override a superclass declaration",
+      (const ValueDecl *))
 ERROR(objc_direct_on_deinit,none,
       "'@objcDirect' cannot be applied to 'deinit'", ())
+ERROR(objc_direct_on_accessor,none,
+      "'@objcDirect' cannot be applied to accessors; apply it to the "
+      "%kindonly0 to make both accessors direct",
+      (const ValueDecl *))
 ERROR(objc_direct_dynamic,none,
-      "'@objcDirect' cannot be applied to a 'dynamic' method; 'dynamic' "
-      "requires dispatch through the Objective-C runtime", ())
+      "'@objcDirect' cannot be applied to a 'dynamic' %kindonly0; 'dynamic' "
+      "requires dispatch through the Objective-C runtime",
+      (const ValueDecl *))
 ERROR(objc_direct_ibaction,none,
       "'@objcDirect' cannot be applied to an '@IBAction' or '@IBSegueAction' "
       "method; the action is invoked by selector", ())

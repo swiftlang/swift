@@ -9,7 +9,7 @@ import Foundation
 
 class DispatchConflicts: NSObject {
   @objcDirect dynamic func dynamicMethod() {}
-  // expected-error@-1 {{'@objcDirect' cannot be applied to a 'dynamic' method; 'dynamic' requires dispatch through the Objective-C runtime}}
+  // expected-error@-1 {{'@objcDirect' cannot be applied to a 'dynamic' instance method; 'dynamic' requires dispatch through the Objective-C runtime}}
 
   @objcDirect @IBAction func action(_ sender: Any) {}
   // expected-error@-1 {{'@objcDirect' cannot be applied to an '@IBAction' or '@IBSegueAction' method; the action is invoked by selector}}

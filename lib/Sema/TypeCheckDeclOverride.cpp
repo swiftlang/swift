@@ -2218,7 +2218,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     }
 
     base->diagnose(diag::overridden_here);
-    if (overridingFinal && base->getAttrs().hasAttribute<ObjCDirectAttr>())
+    if (overridingFinal && base->isObjCDirect())
       base->diagnose(diag::objc_direct_implies_final, base);
 
     return true;

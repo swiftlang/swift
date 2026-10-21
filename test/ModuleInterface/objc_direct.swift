@@ -17,9 +17,15 @@
 // CHECK: #if compiler(>=5.3) && $ObjCDirect
 // CHECK-NEXT: @objcDirect{{.*}}func lookup()
 // CHECK-NEXT: #endif
+// CHECK: #if compiler(>=5.3) && $ObjCDirect
+// CHECK-NEXT: @objcDirect{{.*}}var count:
+// CHECK: #if compiler(>=5.3) && $ObjCDirect
+// CHECK-NEXT: @objcDirect{{.*}}subscript(
 
 import Foundation
 
 @objc public class Cache: NSObject {
   @objcDirect public final func lookup() {}
+  @objcDirect public var count: Int = 0
+  @objcDirect public subscript(i: Int) -> Int { i }
 }

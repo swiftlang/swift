@@ -1,6 +1,5 @@
 // REQUIRES: objc_interop
 
-// '@objcDirect' is rejected unless the experimental feature is enabled.
 // RUN: %target-typecheck-verify-swift
 
 import Foundation

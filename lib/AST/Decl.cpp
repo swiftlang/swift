@@ -11519,12 +11519,21 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
+bool ValueDecl::isObjCDirect() const {
+  if (getAttrs().hasAttribute<ObjCDirectAttr>())
+    return true;
+
+  // An accessor is direct exactly when its storage is.
+  if (auto *accessor = dyn_cast<AccessorDecl>(this))
+    return accessor->getStorage()->getAttrs().hasAttribute<ObjCDirectAttr>();
+
+  return false;
+}
+
 bool ValueDecl::isObjCDirectDispatched() const {
-  // Written @objcDirect in Swift. The attribute is OnFunc | OnConstructor, so
-  // only an AbstractFunctionDecl can be carrying it.
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this))
-    if (AFD->isObjCDirect())
-      return true;
+  // Written @objcDirect in Swift, here or on an accessor's storage.
+  if (isObjCDirect())
+    return true;
 
   // Imported from a Clang declaration marked objc_direct. An accessor may
   // carry either the imported getter/setter method or, failing that, the

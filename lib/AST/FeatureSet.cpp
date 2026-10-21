@@ -820,6 +820,15 @@ UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 UNINTERESTING_FEATURE(BuiltinRelaxedFP)
 
 static bool usesFeatureObjCDirect(Decl *decl) {
+  // A stored property is printed through its PatternBindingDecl, which does
+  // not carry the attribute; the anchoring VarDecl does.
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        if (anchorVar->getAttrs().hasAttribute<ObjCDirectAttr>())
+          return true;
+    return false;
+  }
   return decl->getAttrs().hasAttribute<ObjCDirectAttr>();
 }
 

@@ -1016,13 +1016,10 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->isSemanticallyFinal())
     return false;
 
-  // So does '@objcDirect': the method has no method-list entry to swizzle, so
-  // inferring 'dynamic' would promise a dispatch it cannot perform. This runs
-  // after the explicit-'dynamic' test above, so writing both still reaches the
-  // diagnostic rather than being silently resolved here.
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
-    if (AFD->isObjCDirect())
-      return false;
+  // Must stay below the explicit-'dynamic' test, so 'dynamic @objcDirect'
+  // still reports the conflict instead of resolving silently here.
+  if (decl->isObjCDirect())
+    return false;
 
   // Types are never 'dynamic'.
   if (isa<TypeDecl>(decl))

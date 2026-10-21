@@ -1,9 +1,13 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ObjCDirect
 
+// Where '@objcDirect' is accepted and rejected.
+
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ObjCDirect
 
 import Foundation
+
+// MARK: - Methods and initializers
 
 class ObjCDirectClass: NSObject {
   @objcDirect
@@ -29,7 +33,7 @@ class ObjCDirectClass: NSObject {
 
   @objcDirect
   private final func privateMethod() { return }
-  // expected-error@-2 {{'private' or 'fileprivate' methods cannot be '@objcDirect'}}
+  // expected-error@-2 {{a 'private' or 'fileprivate' instance method cannot be '@objcDirect'}}
 }
 
 final class FinalClass: NSObject {
@@ -71,24 +75,9 @@ class InitClass: NSObject {
   // expected-error@-2 {{'@objcDirect' cannot be applied to 'required' initializers}}
 }
 
-// Properties, subscripts and accessors are not in it.
 class DeinitClass: NSObject {
   @objcDirect deinit {}
   // expected-error@-1 {{'@objcDirect' cannot be applied to 'deinit'}}
-}
-
-class PropertyClass: NSObject {
-  @objcDirect var x: Int = 0
-  // expected-error@-1 {{cannot be applied to this declaration}}
-
-  var y: Int {
-    @objcDirect get { return 0 }
-    // expected-error@-1 {{cannot be applied to this declaration}}
-    set {}
-  }
-
-  @objcDirect subscript(i: Int) -> Int { return i }
-  // expected-error@-1 {{cannot be applied to this declaration}}
 }
 
 extension ObjCDirectClass {
@@ -99,6 +88,7 @@ extension ObjCDirectClass {
 extension ObjCDirectClass {
   @objc
   public func overridable() { return }
+  // expected-note@-1 {{overridden declaration is here}}
 }
 
 class SubClass: ObjCDirectClass {
@@ -111,7 +101,7 @@ class SubClass: ObjCDirectClass {
 
   @objcDirect
   public override final func overridable() { return }
-  // expected-error@-2 {{'@objcDirect' methods cannot override superclass methods}}
+  // expected-error@-2 {{an '@objcDirect' instance method cannot override a superclass declaration}}
 
   // '@objcDirect' implies 'final'.
   public override func nonFinal() { return }
@@ -132,8 +122,6 @@ class GenericClass<T>: NSObject {
   // expected-error@-2 {{'@objcDirect' cannot be applied to members of a generic class}}
 }
 
-// Only class members: a global function, or a struct or enum member, has no
-// printed @interface name to mangle against.
 @objcDirect
 public func globalFunction() {}
 // expected-error@-2 {{'@objcDirect' can only be applied to members of a class}}
@@ -146,4 +134,120 @@ struct SomeStruct {
 enum SomeEnum {
   @objcDirect static func enumMethod() {}
   // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+}
+
+// MARK: - Properties and subscripts
+
+class StorageClass: NSObject {
+  @objcDirect var stored: Int = 0
+
+  @objcDirect var computed: Int { get { 0 } set {} }
+
+  @objcDirect var readOnly: Int { 0 }
+
+  @objcDirect let constant: Int = 0
+
+  @objc(renamedCount) @objcDirect var renamed: Int = 0
+
+  @objcDirect subscript(i: Int) -> Int { get { i } set {} }
+
+  @objcDirect subscript(key: NSString) -> NSString { NSString() }
+}
+
+class AccessorClass: NSObject {
+  var onGetter: Int {
+    @objcDirect get { 0 }
+    // expected-error@-1 {{'@objcDirect' cannot be applied to accessors; apply it to the property to make both accessors direct}}
+    set {}
+  }
+
+  var onSetter: Int {
+    get { 0 }
+    @objcDirect set {}
+    // expected-error@-1 {{'@objcDirect' cannot be applied to accessors; apply it to the property to make both accessors direct}}
+  }
+
+  subscript(i: Int) -> Int {
+    @objcDirect get { i }
+    // expected-error@-1 {{'@objcDirect' cannot be applied to accessors; apply it to the subscript to make both accessors direct}}
+    set {}
+  }
+}
+
+class DynamicClass: NSObject {
+  @objcDirect dynamic var explicitlyDynamic: Int = 0
+  // expected-error@-1 {{'@objcDirect' cannot be applied to a 'dynamic' property}}
+
+  // '@NSManaged' implies 'dynamic'.
+  @objcDirect @NSManaged var managed: NSString
+  // expected-error@-1 {{'@objcDirect' cannot be applied to a 'dynamic' property}}
+}
+
+class AccessLevelClass: NSObject {
+  @objcDirect private var hidden: Int = 0
+  // expected-error@-1 {{a 'private' or 'fileprivate' property cannot be '@objcDirect'}}
+
+  @objcDirect fileprivate subscript(i: Int) -> Int { i }
+  // expected-error@-1 {{a 'private' or 'fileprivate' subscript cannot be '@objcDirect'}}
+}
+
+class Base: NSObject {
+  @objc var overridable: Int = 0
+  // expected-note@-1 {{overridden declaration is here}}
+
+  @objcDirect var notOverridable: Int = 0
+  // expected-note@-1 {{overridden declaration is here}}
+  // expected-note@-2 {{property 'notOverridable' is implicitly 'final' because of '@objcDirect'}}
+
+  @objcDirect subscript(i: Int) -> Int { i }
+  // expected-note@-1 {{overridden declaration is here}}
+  // expected-note@-2 {{subscript 'subscript(_:)' is implicitly 'final' because of '@objcDirect'}}
+}
+
+class Derived: Base {
+  @objcDirect override var overridable: Int { get { 0 } set {} }
+  // expected-error@-1 {{an '@objcDirect' property cannot override a superclass declaration}}
+
+  // '@objcDirect' implies 'final'; reported once, against the storage.
+  override var notOverridable: Int { get { 0 } set {} }
+  // expected-error@-1 {{property overrides a 'final' property}}
+
+  override subscript(i: Int) -> Int { 0 }
+  // expected-error@-1 {{subscript overrides a 'final' subscript}}
+}
+
+@objc protocol StorageProtocol {
+  @objcDirect var requirement: Int { get }
+  // expected-error@-1 {{'@objcDirect' cannot be applied to protocol requirements}}
+
+  @objcDirect subscript(i: Int) -> Int { get }
+  // expected-error@-1 {{'@objcDirect' cannot be applied to protocol requirements}}
+}
+
+class GenericStorageClass<T>: NSObject {
+  @objcDirect var inGeneric: Int = 0
+  // expected-error@-1 {{'@objcDirect' cannot be applied to members of a generic class}}
+}
+
+struct StorageStruct {
+  @objcDirect var structProperty: Int = 0
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+
+  @objcDirect subscript(i: Int) -> Int { i }
+  // expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+}
+
+@objcDirect var globalProperty: Int = 0
+// expected-error@-1 {{'@objcDirect' can only be applied to members of a class}}
+
+@objc protocol HasCount {
+  var count: Int { get } // expected-note {{requirement 'count' declared here}}
+  var size: Int { get }
+}
+
+class DirectCount: NSObject, HasCount {
+  @objcDirect var count: Int = 0
+  // expected-error@-1 {{cannot satisfy a requirement of '@objc' protocol 'HasCount'}}
+
+  var size: Int = 0
 }

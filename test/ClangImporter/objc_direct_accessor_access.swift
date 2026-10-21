@@ -10,6 +10,9 @@
 // RUN: %target-swift-frontend -typecheck -import-objc-header %t/Box.h %t/use.swift
 // RUN: %target-swift-frontend -typecheck -import-objc-header %t/Box.h \
 // RUN:   -enable-experimental-feature ObjCDirect %t/use.swift
+// RUN: %target-swift-frontend -typecheck -import-objc-header %t/Box.h \
+// RUN:   -enable-experimental-feature ObjCDirect \
+// RUN:   -enable-experimental-feature ObjCImplementation %t/impl.swift
 
 //--- Box.h
 
@@ -46,3 +49,13 @@ func use(_ b: Box, _ g: Gauge) -> String? {
   return b["k"]
 }
 
+//--- impl.swift
+
+import Foundation
+
+@objc @implementation extension Box {
+  @objcDirect subscript(key: String) -> String? {
+    get { nil }
+    set { }
+  }
+}
