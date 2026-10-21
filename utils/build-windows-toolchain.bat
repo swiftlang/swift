@@ -106,6 +106,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BuildRoot %BuildRoot% ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
+  -Android ^
   %PackagingArg% ^
   %TestArg% ^
   %SBoMArg% ^
