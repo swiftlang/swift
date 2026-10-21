@@ -1382,8 +1382,8 @@ class SILExtInfoBuilder {
   //   |    0 .. 4    |      5      |     6    |     7      |   8
   //   |differentiability|unimplementable|erased isolation|nonisolated(nonsending)|
   //   |     9 .. 11     |      12       |      13        |    14                 |
-  //   | execution_semantics |
-  //   |       15 .. 16      |
+  //   | execution_semantics | nontransferable |
+  //   |       15 .. 16      |       17        |
   enum : unsigned {
     RepresentationMask = 0x1F << 0,
     PseudogenericMask = 1 << 5,
@@ -1397,7 +1397,8 @@ class SILExtInfoBuilder {
     NonisolatedNonsendingIsolationMask = 1 << 14,
     ExecutionSemanticsMaskOffset = 15,
     ExecutionSemanticsMask = 0x3 << ExecutionSemanticsMaskOffset,
-    NumMaskBits = 17
+    NonTransferableMask = 1 << 17,
+    NumMaskBits = 18
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -1415,13 +1416,15 @@ class SILExtInfoBuilder {
         lifetimeDependencies(lifetimeDependencies) {}
 
   static unsigned makeBits(Representation rep, bool isPseudogeneric,
-                           bool isNoEscape, bool isSendable, bool isAsync,
+                           bool isNoEscape, bool isSendable,
+                           bool isNonTransferable, bool isAsync,
                            bool isUnimplementable,
                            std::optional<ExecutionSemantics> executionSemantics,
                            SILFunctionTypeIsolation isolation,
                            DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) | (isSendable ? SendableMask : 0) |
+           (isNonTransferable ? NonTransferableMask : 0) |
            (isAsync ? AsyncMask : 0) |
            (isUnimplementable ? UnimplementableMask : 0) |
            (encodeExecutionSemantics(executionSemantics)
@@ -1439,28 +1442,32 @@ public:
   /// non-pseudogeneric, non-differentiable.
   SILExtInfoBuilder()
       : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
-                                   false, false, false, false, std::nullopt,
+                                   false, false, false, false, false,
+                                   std::nullopt,
                                    SILFunctionTypeIsolation::forUnknown(),
                                    DifferentiabilityKind::NonDifferentiable),
                           ClangTypeInfo(nullptr),
                           /*LifetimeDependenceInfo*/ {}) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
-                    bool isSendable, bool isAsync, bool isUnimplementable,
+                    bool isSendable, bool isNonTransferable, bool isAsync,
+                    bool isUnimplementable,
                     std::optional<ExecutionSemantics> executionSemantics,
                     SILFunctionTypeIsolation isolation,
                     DifferentiabilityKind diffKind, const clang::Type *type,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo)
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
-                                   isAsync, isUnimplementable,
-                                   executionSemantics, isolation, diffKind),
+                                   isNonTransferable, isAsync,
+                                   isUnimplementable, executionSemantics,
+                                   isolation, diffKind),
                           ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
       : SILExtInfoBuilder(
             makeBits(info.getSILRepresentation(), isPseudogeneric,
-                     info.isNoEscape(), info.isSendable(), info.isAsync(),
+                     info.isNoEscape(), info.isSendable(),
+                     info.isNonTransferable(), info.isAsync(),
                      /*unimplementable*/ false, info.getExecutionSemantics(),
                      SILFunctionTypeIsolation::fromAST(info.getIsolation()),
                      info.getDifferentiabilityKind()),
@@ -1488,6 +1495,10 @@ public:
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
 
   constexpr bool isSendable() const { return bits & SendableMask; }
+
+  constexpr bool isNonTransferable() const {
+    return bits & NonTransferableMask;
+  }
 
   constexpr bool isAsync() const { return bits & AsyncMask; }
 
@@ -1642,6 +1653,13 @@ public:
   }
 
   [[nodiscard]]
+  SILExtInfoBuilder withNonTransferable(bool isNonTransferable = true) const {
+    return SILExtInfoBuilder(isNonTransferable ? (bits | NonTransferableMask)
+                                               : (bits & ~NonTransferableMask),
+                             clangTypeInfo, lifetimeDependencies);
+  }
+
+  [[nodiscard]]
   SILExtInfoBuilder withAsync(bool isAsync = true) const {
     return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
                              clangTypeInfo, lifetimeDependencies);
@@ -1764,7 +1782,7 @@ public:
   /// A default ExtInfo but with a Thin convention.
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
-                             false, false, false, false, std::nullopt,
+                             false, false, false, false, false, std::nullopt,
                              SILFunctionTypeIsolation::forUnknown(),
                              DifferentiabilityKind::NonDifferentiable, nullptr,
                              {})
@@ -1791,6 +1809,12 @@ public:
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
 
   constexpr bool isSendable() const { return builder.isSendable(); }
+
+  /// Returns true if values of this function type cannot cross an isolation
+  /// boundary without also being consumed.
+  constexpr bool isNonTransferable() const {
+    return builder.isNonTransferable();
+  }
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
@@ -1865,6 +1889,10 @@ public:
   
   SILExtInfo withSendable(bool isSendable = true) const {
     return builder.withSendable(isSendable).build();
+  }
+
+  SILExtInfo withNonTransferable(bool isNonTransferable = true) const {
+    return builder.withNonTransferable(isNonTransferable).build();
   }
 
   SILExtInfo withAsync(bool isAsync = true) const {

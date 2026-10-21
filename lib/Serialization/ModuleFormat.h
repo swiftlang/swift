@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1050; // @nontransferable attribute support
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1050; // @nontransferable SIL function types
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1540,6 +1540,7 @@ namespace decls_block {
   TYPE_LAYOUT(SILFunctionTypeLayout,
     SIL_FUNCTION_TYPE,
     BCFixed<1>,                         // concurrent?
+    BCFixed<1>,                         // non-transferable?
     BCFixed<1>,                         // async?
     SILCoroutineKindField,              // coroutine kind
     ParameterConventionField,           // callee convention

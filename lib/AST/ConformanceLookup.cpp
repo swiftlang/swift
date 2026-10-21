@@ -337,8 +337,7 @@ static bool isTransferableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
     return !fnTy->isNonTransferable();
 
-  // TODO: SILFunctionType support for ~Transferable.
-  return true;
+  return !cast<const SILFunctionType *>(eitherFnTy)->isNonTransferable();
 }
 
 /// Whether the given function type conforms to Escapable.
