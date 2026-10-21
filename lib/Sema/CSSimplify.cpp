@@ -7373,6 +7373,7 @@ bool ConstraintSystem::isCGFloatDoubleConversionSupported(
     // conversions like Double -> CGFloat?? and vice versa.
     // T -> Optional<T>
     if (locator.endsWith<LocatorPathElt::OptionalInjection>() ||
+        locator.endsWith<LocatorPathElt::OptionalPayload>() ||
         locator.endsWith<LocatorPathElt::GenericArgument>()) {
       SmallVector<LocatorPathElt, 4> path;
       auto anchor = locator.getLocatorParts(path);
@@ -7383,6 +7384,7 @@ bool ConstraintSystem::isCGFloatDoubleConversionSupported(
                      path,
                      [](const LocatorPathElt &elt) {
                        return elt.is<LocatorPathElt::OptionalInjection>() ||
+                              elt.is<LocatorPathElt::OptionalPayload>() ||
                               elt.is<LocatorPathElt::GenericArgument>();
                      }),
                  path.end());
