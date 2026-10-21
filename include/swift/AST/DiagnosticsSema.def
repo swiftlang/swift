@@ -8223,6 +8223,10 @@ NOTE(change_caller_default_to_match_callee, none,
      (Identifier, StringRef))
 NOTE(silence_default_magic_identifier_mismatch, none,
      "add parentheses to silence this warning", ())
+GROUPED_WARNING(magic_file_path_prefix_mapped, PrefixMappedFilePath, none,
+                "'%0' evaluates to the prefix-mapped path '%1', not the "
+                "original path of the source file",
+                (StringRef, StringRef))
 
 
 //------------------------------------------------------------------------------

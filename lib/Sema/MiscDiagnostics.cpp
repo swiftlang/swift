@@ -42,6 +42,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -54,6 +55,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "Sema"
@@ -7121,6 +7123,74 @@ void swift::diagnoseImplicitForceUnwrapOfIUOParams(const ValueDecl *decl,
                                         /*isParam=*/false, isWitness, baseDecl);
 }
 
+/// Diagnose each '#filePath' (or '#file' meaning '#filePath') whose value is a
+/// path rewritten by the dependency scanner's prefix mapping. Code that uses
+/// the path to access the file system, such as to locate test resources, will
+/// not find the file at that path.
+static void diagnosePrefixMappedFilePath(const Expr *E, const DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  auto *sf = DC->getParentSourceFile();
+  if (ctx.CASOpts.ScannerMappedPrefixes.empty() || !sf ||
+      !ctx.Diags.isDiagnosticGroupEnabled(sf,
+                                          DiagGroupID::PrefixMappedFilePath))
+    return;
+
+  class PrefixMappedFilePathFinder : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+    bool isPrefixMapped(StringRef path) const {
+      return llvm::any_of(Ctx.CASOpts.ScannerMappedPrefixes,
+                          [&](StringRef prefix) {
+                            StringRef suffix = path;
+                            return suffix.consume_front(prefix) &&
+                                   (suffix.empty() ||
+                                    llvm::sys::path::is_separator(
+                                        suffix.front()));
+                          });
+    }
+
+  public:
+    PrefixMappedFilePathFinder(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // Skip implicit literals, such as caller-side default arguments, so that
+      // only the literals written in this source are diagnosed.
+      auto *magic = dyn_cast<MagicIdentifierLiteralExpr>(E);
+      if (!magic || magic->isImplicit() || magic->getStartLoc().isInvalid())
+        return Action::Continue(E);
+
+      switch (magic->getKind()) {
+      case MagicIdentifierLiteralExpr::FilePath:
+      case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+        break;
+      default:
+        return Action::Continue(E);
+      }
+
+      // Compute the path the same way SILGen does, using the outermost source
+      // file for a literal in a macro expansion.
+      auto &SM = Ctx.SourceMgr;
+      SourceLoc loc = magic->getStartLoc();
+      while (auto *generated =
+                 SM.getGeneratedSourceInfo(SM.findBufferContainingLoc(loc)))
+        loc = ASTNode::getFromOpaqueValue(generated->astNode).getStartLoc();
+
+      StringRef path = SM.getDisplayNameForLoc(loc);
+      if (isPrefixMapped(path))
+        Ctx.Diags.diagnose(magic->getStartLoc(),
+                           diag::magic_file_path_prefix_mapped,
+                           MagicIdentifierLiteralExpr::getKindString(
+                               magic->getKind()),
+                           path);
+
+      return Action::Continue(E);
+    }
+  };
+
+  PrefixMappedFilePathFinder walker(ctx);
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -7156,6 +7226,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
   diagnoseNondeinitableCaptureListEntries(E, DC);
   diagnoseImplicitForceUnwrap(E, DC);
+  diagnosePrefixMappedFilePath(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
