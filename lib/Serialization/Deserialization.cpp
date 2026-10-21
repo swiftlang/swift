@@ -4200,6 +4200,7 @@ public:
       if (!isStatic) {
         auto actualReadImpl = getActualReadImplKind(readImpl);
         if (actualReadImpl && *actualReadImpl == ReadImplKind::Stored) {
+          errorFlags |= DeclDeserializationError::Flag::AffectsMemoryLayout;
           errorFlags |= DeclDeserializationError::Flag::NeedsFieldOffsetVectorEntry;
         }
       }
@@ -4339,6 +4340,10 @@ public:
       if (!backingDecl) {
         // Pass through deserialization errors.
         if (backingDecl.errorIsA<FatalDeserializationError>())
+          return backingDecl.takeError();
+
+        if (MF.getContext().LangOpts.hasFeature(
+                Feature::SerializeAbstractTypeLayoutForHiddenTypes))
           return backingDecl.takeError();
 
         // FIXME: This is actually wrong. We can't just drop stored properties
@@ -5342,6 +5347,10 @@ public:
     DeclName name = argNames.empty() ? baseName : compoundName;
     PrettySupplementalDeclNameTrace trace(name);
 
+    DeclDeserializationError::Flags errorFlags;
+    if (hasPayload)
+      errorFlags |= DeclDeserializationError::Flag::AffectsMemoryLayout;
+
     for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
@@ -5354,7 +5363,7 @@ public:
         // For a resilient enum, we don't care and just drop the element
         // and continue.
         return llvm::make_error<TypeError>(
-          name, takeErrorInfo(dependency.takeError()));
+          name, takeErrorInfo(dependency.takeError()), errorFlags);
       }
     }
 
@@ -5378,7 +5387,7 @@ public:
       if (!paramList) {
         auto error = paramList.takeError();
         return llvm::make_error<TypeError>(
-            name, takeErrorInfo(std::move(error)));
+            name, takeErrorInfo(std::move(error)), errorFlags);
       }
       elem->setParameterList(*paramList);
     }
@@ -9387,6 +9396,21 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
   return suppliedMissingMember;
 }
 
+llvm::Error
+ModuleFile::fatalIfLayoutAffectingMemberError(llvm::Error error) const {
+  if (!getContext().LangOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes))
+    return error;
+
+  return llvm::handleErrors(
+      std::move(error),
+      [&](std::unique_ptr<DeclDeserializationError> error) -> llvm::Error {
+        if (error->affectsMemoryLayout())
+          fatal(llvm::Error(std::move(error)));
+        return llvm::Error(std::move(error));
+      });
+}
+
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
   diagnoseAndConsumeError(std::move(error));
@@ -9407,6 +9431,7 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
     return handleErrorAndSupplyMissingProtoMember(context, std::move(error),
                                                   containingProto);
   }
+  error = fatalIfLayoutAffectingMemberError(std::move(error));
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 

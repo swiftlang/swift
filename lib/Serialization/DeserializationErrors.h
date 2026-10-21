@@ -279,6 +279,9 @@ public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
     NeedsFieldOffsetVectorEntry = 1 << 1,
+    // Ignoring and recovering from this error may cause the client to derive
+    // an incorrect type layout.
+    AffectsMemoryLayout = 1 << 2,
   };
   using Flags = OptionSet<Flag>;
 
@@ -300,6 +303,9 @@ public:
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
+  }
+  bool affectsMemoryLayout() const {
+    return flags.contains(Flag::AffectsMemoryLayout);
   }
 
   bool isA(const void *const ClassID) const override {
