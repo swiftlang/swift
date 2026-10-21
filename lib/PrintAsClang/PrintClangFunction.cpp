@@ -358,6 +358,8 @@ public:
   visitClassType(ClassType *CT, std::optional<OptionalTypeKind> optionalKind,
                  bool isInOutParam) {
     auto *cd = CT->getDecl();
+    if (cd->isGenericContext() && !cd->hasClangNode())
+      return ClangRepresentation::unsupported;
     if (cd->hasClangNode()) {
       const auto *clangDecl = cd->getClangDecl();
       ClangSyntaxPrinter(cd->getASTContext(), os)

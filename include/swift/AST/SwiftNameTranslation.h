@@ -78,6 +78,7 @@ enum RepresentationError {
   UnrepresentableIsolatedInActor,
   UnrepresentableRequiresClientEmission,
   UnrepresentableGeneric,
+  UnrepresentableGenericSuperclass,
   UnrepresentableGenericRequirements,
   UnrepresentableThrows,
   UnrepresentableIndirectEnum,
