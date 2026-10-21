@@ -209,7 +209,8 @@ class CaptureInfo {
   };
 
   enum class Flags : unsigned {
-    HasGenericParamCaptures = 1 << 0
+    HasGenericParamCaptures = 1 << 0,
+    NeedsImplicitIsolationCapture = 1 << 1
   };
 
   llvm::PointerIntPair<const CaptureInfoStorage *, 2, OptionSet<Flags>>
@@ -223,7 +224,19 @@ public:
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
               bool genericParamCaptures,
               ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
-              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>());
+              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>())
+      : CaptureInfo(ctx, captures, dynamicSelf, opaqueValue,
+                    genericParamCaptures,
+                    /*needsImplicitIsolationCapture=*/false, genericEnv,
+                    capturedTypes) {}
+
+  CaptureInfo(ASTContext &ctx,
+              ArrayRef<CapturedValue> captures,
+              DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
+              bool genericParamCaptures,
+              bool needsImplicitIsolationCapture,
+              ArrayRef<GenericEnvironment *> genericEnv,
+              ArrayRef<CapturedType> capturedTypes);
 
   /// A CaptureInfo representing no captures at all.
   static CaptureInfo empty();
@@ -257,6 +270,15 @@ public:
   bool hasGenericParamCaptures() const {
     assert(hasBeenComputed());
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
+  }
+
+  /// \returns true if the function needs to capture the actor it is isolated
+  /// to. This is then added after closure isolation is computed during
+  /// TypeConverter::getLoweredLocalCaptures.
+  bool needsImplicitIsolationCapture() const {
+    assert(hasBeenComputed());
+    return StorageAndFlags.getInt().contains(
+        Flags::NeedsImplicitIsolationCapture);
   }
 
   /// \returns true if the function captures the dynamic Self type.

@@ -2329,11 +2329,14 @@ public:
       (void) VD->isDynamic();
 
       // Check for actor isolation of top-level and local declarations, and
-      // protocol requirements.g
+      // protocol requirements.
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
-      if (!VD->getDeclContext()->isTypeContext() ||
-          isa<ProtocolDecl>(VD->getDeclContext()))
+      // The isolation of a defer in a closure is that of the closure, which is
+      // not determined yet
+      if ((!VD->getDeclContext()->isTypeContext() ||
+           isa<ProtocolDecl>(VD->getDeclContext())) &&
+          !isNestedInClosureContext(VD, isDeferBodyDecl))
         (void) getActorIsolation(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of

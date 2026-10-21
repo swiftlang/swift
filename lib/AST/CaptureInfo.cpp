@@ -66,6 +66,7 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
                          bool genericParamCaptures,
+                         bool needsImplicitIsolationCapture,
                          ArrayRef<GenericEnvironment *> genericEnv,
                          ArrayRef<CapturedType> capturedTypes) {
   static_assert(IsTriviallyDestructible<CapturedValue>::value,
@@ -83,6 +84,8 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
   OptionSet<Flags> flags;
   if (genericParamCaptures)
     flags |= Flags::HasGenericParamCaptures;
+  if (needsImplicitIsolationCapture)
+    flags |= Flags::NeedsImplicitIsolationCapture;
 
   if (captures.empty() && genericEnv.empty() && !dynamicSelf && !opaqueValue &&
       capturedTypes.empty()) {
@@ -124,7 +127,8 @@ CaptureInfo CaptureInfo::empty() {
 bool CaptureInfo::isTrivial() const {
   assert(hasBeenComputed());
   return getCaptures().empty() && !hasGenericParamCaptures() &&
-         !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
+         !hasDynamicSelfCapture() && !hasOpaqueValueCapture() &&
+         !needsImplicitIsolationCapture();
 }
 
 VarDecl *CaptureInfo::getIsolatedParamCapture() const {
@@ -166,6 +170,8 @@ void CaptureInfo::print(raw_ostream &OS) const {
     OS << "<dynamic_self> ";
   if (hasOpaqueValueCapture())
     OS << "<opaque_value> ";
+  if (needsImplicitIsolationCapture())
+    OS << "<isolation> ";
 
   interleave(getCaptures(),
              [&](const CapturedValue &capture) {
