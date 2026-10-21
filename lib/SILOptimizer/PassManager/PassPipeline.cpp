@@ -250,6 +250,13 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // OSLogOptimization and MandatoryDeadObjectElimination.
   P.addOnoneSimplification();
 
+  // Create the specialized bodies exported by `@specialized(exported: true)`
+  // before MandatoryPerformanceOptimizations so that
+  // MandatoryPerformanceOptimizations applies to those specialized bodies.
+  if (P.getOptions().EmbeddedSwift) {
+    P.addEmbeddedExportedPrespecializations();
+  }
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();

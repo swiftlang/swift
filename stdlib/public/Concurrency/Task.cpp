@@ -1377,13 +1377,17 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   return _context->ResumeParent(_context->Parent);
 }
 
+[[gnu::used, gnu::retain]]
 const void *const swift::_swift_concurrency_debug_non_future_adapter =
     reinterpret_cast<void *>(non_future_adapter);
+[[gnu::used, gnu::retain]]
 const void *const swift::_swift_concurrency_debug_future_adapter =
     reinterpret_cast<void *>(future_adapter);
+[[gnu::used, gnu::retain]]
 const void
     *const swift::_swift_concurrency_debug_task_wait_throwing_resume_adapter =
         reinterpret_cast<void *>(task_wait_throwing_resume_adapter);
+[[gnu::used, gnu::retain]]
 const void
     *const swift::_swift_concurrency_debug_task_future_wait_resume_adapter =
         reinterpret_cast<void *>(task_future_wait_resume_adapter);
