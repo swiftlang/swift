@@ -1711,7 +1711,7 @@ Pattern *TypeChecker::coercePatternToType(
         SourceLoc loc = OP->getQuestionLoc();
         // Produce tailored diagnostic for if/let and other conditions.
         if (OP->isImplicit()) {
-          diagID = diag::condition_optional_element_pattern_not_valid_type;
+          diagID = diag::condition_binding_non_optional_type;
           loc = OP->getLoc();
         }
 
