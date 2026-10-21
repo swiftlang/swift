@@ -122,6 +122,17 @@ follows:
 |                 |         | process before starting to gather a crash log.   |
 |                 |         | (This does nothing on Windows.)                  |
 +-----------------+---------+--------------------------------------------------+
+| hook-fail-fast  | false   | Windows only.  Intercept calls to                |
+|                 |         | ``RaiseFailFastException()`` so that a backtrace |
+|                 |         | is generated before the process terminates.      |
+|                 |         | Some frameworks (e.g. WinUI) use this to         |
+|                 |         | terminate the process when an exception occurs   |
+|                 |         | in an event handler, which bypasses the normal   |
+|                 |         | crash handler.  This works by patching import    |
+|                 |         | address tables, and means running code in a      |
+|                 |         | process that has asked to terminate immediately, |
+|                 |         | so it is not enabled by default.                 |
++-----------------+---------+--------------------------------------------------+
 
 (*) On macOS 26 and later, this defaults to ``tty`` rather than ``yes``. On
     earlier versions, the default is ``no``.

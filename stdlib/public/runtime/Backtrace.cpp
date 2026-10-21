@@ -141,6 +141,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
 
   // closeFds
   false,
+
+  // hookFailFast
+  false,
 };
 
 }
@@ -747,6 +750,10 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     _swift_backtraceSettings.cache = parseBoolean(value);
   } else if (key.equals_insensitive("close-fds")) {
     _swift_backtraceSettings.closeFds = parseBoolean(value);
+#ifdef _WIN32
+  } else if (key.equals_insensitive("hook-fail-fast")) {
+    _swift_backtraceSettings.hookFailFast = parseBoolean(value);
+#endif
   } else if (key.equals_insensitive("output-to")) {
     if (value.equals_insensitive("auto"))
       _swift_backtraceSettings.outputTo = OutputTo::Auto;

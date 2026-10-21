@@ -18,13 +18,22 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <psapi.h>
 
 #include "swift/Runtime/Backtrace.h"
 #include "BacktracePrivate.h"
 
 using namespace swift::runtime::backtrace;
 
+#ifndef STATUS_FAIL_FAST_EXCEPTION
+#define STATUS_FAIL_FAST_EXCEPTION ((DWORD)0xC0000602L)
+#endif
+
 namespace {
+
+typedef VOID (WINAPI *RaiseFailFastException_t)(PEXCEPTION_RECORD,
+                                                PCONTEXT,
+                                                DWORD);
 
 SRWLOCK crashLock = SRWLOCK_INIT;
 
@@ -38,6 +47,12 @@ LONG NTAPI reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo);
 LONG callWithAltStack(EXCEPTION_POINTERS *arg,
                       LONG (*fn)(EXCEPTION_POINTERS *));
 LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo);
+VOID WINAPI hookRaiseFailFastException(PEXCEPTION_RECORD pExceptionRecord,
+                                       PCONTEXT pContextRecord,
+                                       DWORD dwFlags);
+void hookFailFastInLoadedModules();
+
+RaiseFailFastException_t pRealRaiseFailFastException = NULL;
 
 }
 
@@ -53,6 +68,12 @@ _swift_installCrashHandler()
   void *altStackBase = VirtualAlloc(NULL, altStackSize,
                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
   altStackTop = (char *)altStackBase + altStackSize;
+
+  if (_swift_backtraceSettings.hookFailFast) {
+    pRealRaiseFailFastException
+      = (RaiseFailFastException_t)GetProcAddress(GetModuleHandleW(L"kernelbase.dll"),
+                                                 "RaiseFailFastException");
+  }
 
   // Install the exception handler
   AddVectoredExceptionHandler(0, reinstallUnhandledExceptionFilter);
@@ -78,7 +99,30 @@ bool reinstalled = false;
 // Since we don't have a top-of-main() entry point for Swift, for now we
 // hack things by reinstalling our filter from the vectored exception
 // handler.  This is utterly horrible.
+//
+// If hook-fail-fast is enabled, we also redirect RaiseFailFastException()
+// from here, before any __except filter gets to see a potentially fatal
+// exception.  Some frameworks (e.g. WinUI) call RaiseFailFastException()
+// from their exception filters, which terminates the process without
+// running the unhandled exception filter.
 LONG reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo) {
+  if (pRealRaiseFailFastException) {
+    switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+    case EXCEPTION_ACCESS_VIOLATION:
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+    case EXCEPTION_BREAKPOINT:
+    case EXCEPTION_DATATYPE_MISALIGNMENT:
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+    case EXCEPTION_IN_PAGE_ERROR:
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+    case EXCEPTION_PRIV_INSTRUCTION:
+      hookFailFastInLoadedModules();
+      break;
+    default:
+      break;
+    }
+  }
+
   if (reinstalled)
     return EXCEPTION_CONTINUE_SEARCH;
 
@@ -197,6 +241,89 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   }
 
   return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// Redirect any import address table entries for RaiseFailFastException()
+// in the specified module to our hook.
+void hookFailFastInModule(HMODULE hModule) {
+  BYTE *base = (BYTE *)hModule;
+  IMAGE_DOS_HEADER *dosHeader = (IMAGE_DOS_HEADER *)base;
+  if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    return;
+
+  IMAGE_NT_HEADERS *ntHeaders = (IMAGE_NT_HEADERS *)(base + dosHeader->e_lfanew);
+  if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
+    return;
+
+  IMAGE_DATA_DIRECTORY *iatDirectory
+    = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT];
+  if (!iatDirectory->VirtualAddress || !iatDirectory->Size)
+    return;
+
+  void **iat = (void **)(base + iatDirectory->VirtualAddress);
+  size_t count = iatDirectory->Size / sizeof(void *);
+  for (size_t n = 0; n < count; ++n) {
+    if (iat[n] != (void *)pRealRaiseFailFastException)
+      continue;
+
+    DWORD dwOldProtect;
+    if (VirtualProtect(&iat[n], sizeof(void *), PAGE_READWRITE,
+                       &dwOldProtect)) {
+      InterlockedExchangePointer(&iat[n], (void *)hookRaiseFailFastException);
+      VirtualProtect(&iat[n], sizeof(void *), dwOldProtect, &dwOldProtect);
+    }
+  }
+}
+
+SRWLOCK hookLock = SRWLOCK_INIT;
+HMODULE loadedModules[1024];
+
+void hookFailFastInLoadedModules() {
+  // If another thread is already doing this, there's no need to wait
+  if (!TryAcquireSRWLockExclusive(&hookLock))
+    return;
+
+  DWORD cbNeeded;
+  if (K32EnumProcessModules(GetCurrentProcess(), loadedModules,
+                            sizeof(loadedModules), &cbNeeded)) {
+    if (cbNeeded > sizeof(loadedModules))
+      cbNeeded = sizeof(loadedModules);
+    DWORD count = cbNeeded / sizeof(HMODULE);
+    for (DWORD n = 0; n < count; ++n)
+      hookFailFastInModule(loadedModules[n]);
+  }
+
+  ReleaseSRWLockExclusive(&hookLock);
+}
+
+volatile LONG inFailFastHook = 0;
+
+VOID WINAPI hookRaiseFailFastException(PEXCEPTION_RECORD pExceptionRecord,
+                                       PCONTEXT pContextRecord,
+                                       DWORD dwFlags) {
+  if (InterlockedExchange(&inFailFastHook, 1) == 0) {
+    EXCEPTION_RECORD exceptionRecord;
+    CONTEXT context;
+    EXCEPTION_POINTERS exceptionPointers = { pExceptionRecord, pContextRecord };
+
+    if (!pContextRecord) {
+      RtlCaptureContext(&context);
+      exceptionPointers.ContextRecord = &context;
+    }
+    if (!pExceptionRecord) {
+      memset(&exceptionRecord, 0, sizeof(exceptionRecord));
+      exceptionRecord.ExceptionCode = STATUS_FAIL_FAST_EXCEPTION;
+      exceptionRecord.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
+      exceptionRecord.ExceptionAddress = __builtin_return_address(0);
+      exceptionPointers.ExceptionRecord = &exceptionRecord;
+    }
+
+    AcquireSRWLockExclusive(&crashLock);
+    callWithAltStack(&exceptionPointers, reallyHandleException);
+    ReleaseSRWLockExclusive(&crashLock);
+  }
+
+  pRealRaiseFailFastException(pExceptionRecord, pContextRecord, dwFlags);
 }
 
 void *pcFromContext(PCONTEXT Context) {
