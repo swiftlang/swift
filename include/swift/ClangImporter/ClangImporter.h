@@ -787,6 +787,17 @@ public:
       const clang::CXXRecordDecl *recordDecl) const override;
 
   bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const override;
+
+  /// For a safe-interop `@c @implementation` Swift function \p safeSwiftDecl,
+  /// synthesize and attach an `@_Unswiftify` peer macro invocation that will
+  /// expand to a C-callable bridge exposing \p introducedPeerName.
+  ///
+  /// The caller must have already established that the corresponding clang decl
+  /// carries bounds/lifetime info to invert (a `_SwiftifyImport` peer exists).
+  void
+  attachUnswiftifyForSafeImplementation(AbstractFunctionDecl *safeSwiftDecl,
+                                        DeclName introducedPeerName) override;
+
   bool isDeconstructedSwiftClosure(const clang::Type *type) const override;
 
   const clang::FunctionType *extractCXXFunctionType(

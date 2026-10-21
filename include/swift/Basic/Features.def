@@ -530,6 +530,18 @@ EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 // behavior is already standard in the stabilized version.
 EXPERIMENTAL_FEATURE(SafeInteropWrappersNullAsEmptySpan, true)
 
+// Enable @c @implementation on Swift functions that use safe types to
+// implement a C-declared function with __counted_by/__sized_by/noescape
+// annotations. The compiler synthesizes an @_Unswiftify peer macro invocation
+// to generate the unsafe C-callable bridge.
+//
+// Known limitation: this lowering is currently unsound, because C cannot
+// guarantee the exclusivity that `[Mutable]Span` requires of its storage, so a
+// caller may legally alias a buffer that the safe implementation assumes is
+// exclusively borrowed. Parameters should eventually map to `Span<Cell>`
+// variants instead. Source-breaking changes are expected.
+EXPERIMENTAL_FEATURE(SafeInteropImplementations, true)
+
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
