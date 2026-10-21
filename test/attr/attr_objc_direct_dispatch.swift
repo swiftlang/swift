@@ -82,3 +82,46 @@ func formSelectors(_ target: SelectorTarget) {
 
   _ = #selector(SelectorTarget.normalHandler)
 }
+
+// One note per accessor, both on the property.
+@objc class PropertySelectorTarget: NSObject {
+  // expected-note@+1 2 {{a direct property's accessor is not added to its class's Objective-C method list}}
+  @objcDirect var directValue: Int = 0
+}
+
+func formAccessorSelectors() {
+  _ = #selector(getter: PropertySelectorTarget.directValue)
+  // expected-error@-1 {{argument of '#selector' refers to property 'directValue' whose accessors are direct}}
+  _ = #selector(setter: PropertySelectorTarget.directValue)
+  // expected-error@-1 {{argument of '#selector' refers to property 'directValue' whose accessors are direct}}
+}
+
+// MARK: - #keyPath
+
+// Two key paths give two notes on the declaration's line.
+
+@objc class KeyPathTarget: NSObject {
+  // expected-note@+1 2 {{key-value coding cannot reach the property}}
+  @objcDirect var directProperty: Int = 0
+
+  @objc var normalProperty: Int = 0
+}
+
+func formKeyPaths() {
+  _ = #keyPath(KeyPathTarget.directProperty)
+  // expected-error@-1 {{argument of '#keyPath' refers to property 'directProperty' that is direct}}
+
+  _ = #keyPath(KeyPathTarget.normalProperty)
+}
+
+// The rejection follows the property through a multi-component path.
+@objc class Outer: NSObject {
+  @objc var inner: KeyPathTarget = KeyPathTarget()
+}
+
+func nestedKeyPath() {
+  _ = #keyPath(Outer.inner.directProperty)
+  // expected-error@-1 {{argument of '#keyPath' refers to property 'directProperty' that is direct}}
+
+  _ = #keyPath(Outer.inner.normalProperty)
+}

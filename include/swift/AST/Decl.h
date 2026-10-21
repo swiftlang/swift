@@ -3434,6 +3434,10 @@ public:
   /// selector must be diagnosed or skipped.
   bool isObjCDirectDispatched() const;
 
+  /// Whether a use that needs dynamic dispatch must be rejected because
+  /// this declaration is direct.
+  bool isDynamicUseDisallowed() const;
+
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 

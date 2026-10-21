@@ -6331,17 +6331,26 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
   class KVOObserveCallWalker : public BaseDiagnosticWalker {
     const ASTContext &C;
 
+    /// The number of calls enclosing the expression being visited. The
+    /// non-'@objc dynamic' warning is only given for calls outside any other
+    /// call, the reach it has always had; the direct-property error, which is
+    /// new and certain, applies to every call.
+    unsigned EnclosingCalls = 0;
+
   public:
     KVOObserveCallWalker(ASTContext &ctx) : C(ctx) {}
 
-    void maybeDiagnoseCallExpr(CallExpr *expr) {
+    void maybeDiagnoseCallExpr(CallExpr *expr, bool isNested) {
       auto fn = expr->getCalledValue(/*skipFunctionConversions=*/true);
       if (!fn)
         return;
-      SmallVector<KeyPathExpr *, 1> keyPathArgs;
+      // Each key path literal argument, and whether it was found only by
+      // looking through parentheses or an 'as' coercion, which the warning
+      // never did.
+      SmallVector<std::pair<KeyPathExpr *, bool>, 1> keyPathArgs;
       auto *args = expr->getArgs();
 
-      auto isKeyPathLiteral = [&](Expr *argExpr) -> KeyPathExpr * {
+      auto stripConversions = [&](Expr *argExpr) -> Expr * {
         if (auto *DTBE = getAsExpr<DerivedToBaseExpr>(argExpr))
           argExpr = DTBE->getSubExpr();
         // Sendable key path literals are represented as an existential
@@ -6349,24 +6358,88 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
         // opened in certain scenarios i.e. to pass it to non-Sendable version.
         if (auto *OEE = getAsExpr<OpenExistentialExpr>(argExpr))
           argExpr = OEE->getExistentialValue();
-        return getAsExpr<KeyPathExpr>(argExpr);
+        return argExpr;
+      };
+      auto addKeyPathLiteral = [&](Expr *argExpr) {
+        argExpr = stripConversions(argExpr);
+        bool lookedThrough = false;
+        while (true) {
+          if (auto *paren = dyn_cast<ParenExpr>(argExpr))
+            argExpr = stripConversions(paren->getSubExpr());
+          else if (auto *coerce = dyn_cast<CoerceExpr>(argExpr))
+            argExpr = stripConversions(coerce->getSubExpr());
+          else
+            break;
+          lookedThrough = true;
+        }
+        if (auto *keyPath = getAsExpr<KeyPathExpr>(argExpr))
+          keyPathArgs.push_back({keyPath, lookedThrough});
       };
 
+      // Other Foundation APIs that convert a key path to its key-value coding
+      // string, and trap without one, but need no KVO compliance: only the
+      // direct-property error below applies to them.
+      enum class KeyPathStringUse { None, KVO, KVC };
+      auto keyPathStringUse = [&]() {
+        if (fn->getModuleContext()->getName() != C.Id_Foundation)
+          return KeyPathStringUse::None;
+        auto name = fn->getName();
+        auto init = DeclBaseName::createConstructor();
+        if (name.isCompoundName("publisher", {"for", "options"}) ||
+            name.isCompoundName("willChangeValue", {"for"}) ||
+            name.isCompoundName("didChangeValue", {"for"}) ||
+            name.isCompoundName("willChangeValue",
+                                {"for", "withSetMutation", "using"}) ||
+            name.isCompoundName("didChangeValue",
+                                {"for", "withSetMutation", "using"}) ||
+            name.isCompoundName("willChange", {"", "valuesAt", "for"}) ||
+            name.isCompoundName("didChange", {"", "valuesAt", "for"}))
+          return KeyPathStringUse::KVO;
+        if (name.isCompoundName(init, {"keyPath", "ascending"}) ||
+            name.isCompoundName(init, {"keyPath", "ascending", "comparator"}) ||
+            name.isCompoundName(init, {"forKeyPath"}))
+          return KeyPathStringUse::KVC;
+        return KeyPathStringUse::None;
+      };
+
+      bool needsKVOCompliance = true;
+      auto stringUse = KeyPathStringUse::KVO;
       if (fn->getModuleContext()->getName() == C.Id_Foundation &&
           fn->getName().isCompoundName("observe",
                                        {"", "options", "changeHandler"})) {
-        if (auto keyPathArg = isKeyPathLiteral(args->getExpr(0))) {
-          keyPathArgs.push_back(keyPathArg);
-        }
+        addKeyPathLiteral(args->getExpr(0));
       } else if (fn->getAttrs()
                  .hasSemanticsAttr(semantics::KEYPATH_MUST_BE_VALID_FOR_KVO)) {
-        for (auto *argExpr : args->getArgExprs()) {
-          if (auto keyPathArg = isKeyPathLiteral(argExpr)) {
-            keyPathArgs.push_back(keyPathArg);
-          }
-        }
+        for (auto *argExpr : args->getArgExprs())
+          addKeyPathLiteral(argExpr);
+      } else if ((stringUse = keyPathStringUse()) != KeyPathStringUse::None) {
+        needsKVOCompliance = false;
+        for (auto *argExpr : args->getArgExprs())
+          addKeyPathLiteral(argExpr);
       }
-      for (auto *keyPathArg : keyPathArgs) {
+      for (auto [keyPathArg, lookedThrough] : keyPathArgs) {
+        // A key path through a direct property is given no key-value coding
+        // string, as for '#keyPath', so a KVO method traps on it every time.
+        auto components = keyPathArg->getComponents();
+        auto directComponent =
+            llvm::find_if(components, [&](const KeyPathExpr::Component &c) {
+              if (c.getKind() != KeyPathExpr::Component::Kind::Member)
+                return false;
+              auto *var = dyn_cast<VarDecl>(c.getDeclRef().getDecl());
+              return var && var->isDynamicUseDisallowed();
+            });
+        if (directComponent != components.end()) {
+          C.Diags
+              .diagnose(expr->getLoc(),
+                        diag::observe_keypath_property_objc_direct,
+                        directComponent->getDeclRef().getDecl()->getName(),
+                        fn->getName(), stringUse == KeyPathStringUse::KVC)
+              .highlight(directComponent->getLoc());
+          continue;
+        }
+        if (!needsKVOCompliance || isNested || lookedThrough)
+          continue;
+
         auto lastComponent = keyPathArg->getComponents().back();
         if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Member)
           continue;
@@ -6390,11 +6463,19 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
 
+      // Keep walking into the call: an 'observe' call can be an argument of
+      // another call, the base of a member access, or in a closure body.
       if (auto *CE = dyn_cast<CallExpr>(E)) {
-        maybeDiagnoseCallExpr(CE);
-        return Action::SkipNode(E);
+        maybeDiagnoseCallExpr(CE, /*isNested=*/EnclosingCalls > 0);
+        ++EnclosingCalls;
       }
 
+      return Action::Continue(E);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (isa<CallExpr>(E))
+        --EnclosingCalls;
       return Action::Continue(E);
     }
   };

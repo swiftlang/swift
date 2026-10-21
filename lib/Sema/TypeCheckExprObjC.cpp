@@ -339,6 +339,15 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
           diags.diagnose(var, diag::make_decl_objc, var)
               .fixItInsert(var->getAttributeInsertionLoc(false), "@objc ");
         }
+      } else if (var->isDynamicUseDisallowed()) {
+        // Key-value coding falls back to the instance variable when it
+        // finds no accessor, so this resolves today and quietly bypasses the
+        // property.
+        diags.diagnose(componentNameLoc, diag::expr_keypath_objc_direct,
+                       var->getName());
+        diags.diagnose(var, diag::note_objc_direct_no_key_path);
+        isInvalid = true;
+        break;
       } else {
         // FIXME: Warn about non-KVC-compliant getter/setter names?
       }

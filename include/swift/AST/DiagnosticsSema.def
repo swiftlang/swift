@@ -657,6 +657,12 @@ GROUPED_ERROR(expression_unused_keypath_result,NoUsage,NoUsage,
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (Identifier))
+ERROR(expr_keypath_objc_direct,none,
+      "argument of '#keyPath' refers to property %0 that is direct",
+      (Identifier))
+NOTE(note_objc_direct_no_key_path,none,
+     "a direct property's accessors are not added to its class's Objective-C "
+     "method list, so key-value coding cannot reach the property", ())
 ERROR(expr_keypath_type_of_property,none,
       "cannot refer to type member %0 within instance of type %1",
       (DeclNameRef, Type))
@@ -786,11 +792,13 @@ ERROR(expr_selector_not_objc,none,
       "Objective-C",
       (const ValueDecl *))
 ERROR(expr_selector_objc_direct,none,
-      "argument of '#selector' refers to %kind0 that is a direct method",
-      (const ValueDecl *))
+      "argument of '#selector' refers to %kind0 "
+      "%select{that is a direct method|whose accessors are direct}1",
+      (const ValueDecl *, bool))
 NOTE(note_objc_direct_no_selector,none,
-     "a direct method is not added to its class's Objective-C method list, so "
-     "it cannot be found by selector at runtime", ())
+     "a direct %select{method|property's accessor}0 is not added to its "
+     "class's Objective-C method list, so it cannot be found by selector at "
+     "runtime", (bool))
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %kindonly0 to Objective-C",
      (const ValueDecl *))
@@ -2669,7 +2677,7 @@ ERROR(objc_direct_iboutlet,none,
       "by key through key-value coding", ())
 ERROR(witness_objc_direct,none,
       "%kind0 cannot satisfy a requirement of '@objc' protocol %1 because it "
-      "is a direct method", (const ValueDecl *, Identifier))
+      "is %select{a direct method|direct}2", (const ValueDecl *, Identifier, bool))
 ERROR(objc_direct_required_init,none,
       "'@objcDirect' cannot be applied to 'required' initializers", ())
 ERROR(objc_direct_not_in_class,none,
@@ -8259,6 +8267,11 @@ WARNING(variable_never_read, none,
 WARNING(observe_keypath_property_not_objc_dynamic, none,
         "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
         "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
+ERROR(observe_keypath_property_objc_direct, none,
+      "passing reference to direct property %0 to "
+      "%select{KVO method|key-value coding API}2 %1 always traps at runtime, "
+      "because a key path through a direct property has no key-value coding "
+      "string", (DeclName, DeclName, bool))
 
 WARNING(default_magic_identifier_mismatch, none,
         "parameter %0 with default argument '%1' passed to parameter %2, whose "

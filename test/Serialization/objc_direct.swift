@@ -36,6 +36,14 @@ import Foundation
   @objcDirect public final func greet() {}
 }
 
+@objc public protocol Counter {
+  var count: Int { get }
+}
+
+@objc public class DirectCounter: NSObject {
+  @objcDirect public var count: Int = 0
+}
+
 //--- Client.swift
 
 import DirectLib
@@ -44,3 +52,8 @@ extension DirectGreeter: @retroactive Greeter {}
 // expected-direct-error@-1 {{cannot satisfy a requirement of '@objc' protocol 'Greeter' because it is a direct method}}
 // expected-direct-note@DirectLib.DirectGreeter.greet:2 {{'greet()' declared here}}
 // expected-direct-note@DirectLib.Greeter.greet:2 {{requirement 'greet()' declared here}}
+
+extension DirectCounter: @retroactive Counter {}
+// expected-direct-error@-1 {{cannot satisfy a requirement of '@objc' protocol 'Counter' because it is direct}}
+// expected-direct-note@DirectLib.DirectCounter.count:2 {{'count' declared here}}
+// expected-direct-note@DirectLib.Counter.count:2 {{requirement 'count' declared here}}

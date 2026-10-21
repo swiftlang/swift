@@ -350,6 +350,11 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       if (auto property = dyn_cast<VarDecl>(component.getDeclRef().getDecl())) {
         if (!property->isObjC())
           return false;
+        // A direct property has no KVC-visible accessor; with a key path
+        // string, KVC-based APIs would fall back to the instance variable and
+        // quietly bypass the property.
+        if (property->isDynamicUseDisallowed())
+          return false;
         if (!buf.empty()) {
           buf.push_back('.');
         }
@@ -5133,13 +5138,13 @@ namespace {
       }
 
       // A direct method is absent from the class's Objective-C method list, so
-      // a selector naming it cannot resolve at runtime. Gated on the feature
-      // for now, to give existing sources time to be corrected.
-      if (ctx.LangOpts.hasFeature(Feature::ObjCDirect) &&
-          method->isObjCDirectDispatched()) {
-        de.diagnose(E->getLoc(), diag::expr_selector_objc_direct, foundDecl)
+      // a selector naming it cannot resolve at runtime.
+      if (method->isDynamicUseDisallowed()) {
+        de.diagnose(E->getLoc(), diag::expr_selector_objc_direct, foundDecl,
+                    isa<AbstractStorageDecl>(foundDecl))
             .highlight(subExpr->getSourceRange());
-        de.diagnose(method, diag::note_objc_direct_no_selector);
+        de.diagnose(method, diag::note_objc_direct_no_selector,
+                    isa<AccessorDecl>(method));
         return E;
       }
 

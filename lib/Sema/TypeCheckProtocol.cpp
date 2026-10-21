@@ -6147,10 +6147,11 @@ void ConformanceChecker::resolveValueWitnesses() {
         // so every call made through the protocol would fail to resolve, at a
         // distance from the declaration that carries the attribute. Reject the
         // conformance instead.
-        if (witness->isObjCDirectDispatched()) {
+        if (witness->isDynamicUseDisallowed()) {
           SourceLoc diagLoc = getLocForDiagnosingWitness(Conformance, witness);
           C.Diags.diagnose(diagLoc, diag::witness_objc_direct, witness,
-                           Proto->getName());
+                           Proto->getName(),
+                           isa<AbstractStorageDecl>(witness));
           if (diagLoc != witness->getLoc())
             witness->diagnose(diag::decl_declared_here, witness);
           requirement->diagnose(diag::requirement_declared_here, requirement);
