@@ -233,6 +233,11 @@ static constexpr bool platformSupportsTaggedPointers() {
     goto *dispatchTable[TAG];                                                  \
   } while (false)
 
+// For copying witnesses whose caller already copied all of the value's bytes,
+// so only the ref-counted fields need handling.
+#define CONTINUE_PRECOPIED(METADATA, READER, ADDR_OFFSET, DEST, SRC)           \
+  CONTINUE_NO_COPY(METADATA, READER, ADDR_OFFSET, DEST)
+
 // Walks a layout string with computed-goto dispatch. With INLINE_ENUMS, the
 // active payload of a multi-payload enum is walked by the same loop instead of
 // a call to multiPayloadEnum*: the loop saves where the enum ends, continues
@@ -240,8 +245,10 @@ static constexpr bool platformSupportsTaggedPointers() {
 // End. Only one enum is walked inline at a time; enums inside its payload take
 // the call. Only for witnesses whose multi-payload handlers walk the active
 // payload with the same table (destroy, initWithCopy, initWithTake).
-#define handleRefCountsImpl(FN_TABLE, CONTINUE, INLINE_ENUMS, METADATA,        \
-                            READER, ADDR_OFFSET, ...)                          \
+// COPY_BYTES says whether the bytes of inline enums still need to be copied;
+// false with CONTINUE_PRECOPIED.
+#define handleRefCountsImpl(FN_TABLE, CONTINUE, INLINE_ENUMS, COPY_BYTES,      \
+                            METADATA, READER, ADDR_OFFSET, ...)                \
   do {                                                                         \
     LayoutStringReader1 _resumeReader{nullptr};                                \
     uintptr_t _resumeAddrOffset = 0;                                           \
@@ -284,7 +291,7 @@ static constexpr bool platformSupportsTaggedPointers() {
       [[clang::nomerge]] {                                                     \
       End:                                                                     \
         if (INLINE_ENUMS && _resumeReader.layoutStr) {                         \
-          if (_resumeAddrOffset != ADDR_OFFSET) {                              \
+          if (COPY_BYTES && _resumeAddrOffset != ADDR_OFFSET) {                \
             copyPayloadBytes(ADDR_OFFSET, _resumeAddrOffset - ADDR_OFFSET,     \
                              __VA_ARGS__);                                     \
           }                                                                    \
@@ -296,13 +303,14 @@ static constexpr bool platformSupportsTaggedPointers() {
         goto done;                                                             \
       }                                                                        \
       INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFN, CONTINUE, INLINE_ENUMS,    \
-                                METADATA, READER, ADDR_OFFSET, __VA_ARGS__)    \
+                                COPY_BYTES, METADATA, READER, ADDR_OFFSET,     \
+                                __VA_ARGS__)                                   \
       INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFNResolved, CONTINUE,          \
-                                INLINE_ENUMS, METADATA, READER, ADDR_OFFSET,   \
-                                __VA_ARGS__)                                   \
+                                INLINE_ENUMS, COPY_BYTES, METADATA, READER,    \
+                                ADDR_OFFSET, __VA_ARGS__)                      \
       INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumGeneric, CONTINUE,             \
-                                INLINE_ENUMS, METADATA, READER, ADDR_OFFSET,   \
-                                __VA_ARGS__)                                   \
+                                INLINE_ENUMS, COPY_BYTES, METADATA, READER,    \
+                                ADDR_OFFSET, __VA_ARGS__)                      \
       [[clang::nomerge]] {                                                     \
       Error:                                                                   \
                                                                                \
@@ -395,8 +403,8 @@ static constexpr bool platformSupportsTaggedPointers() {
 
 // The label for a multi-payload enum kind in handleRefCountsImpl. If the enum
 // can't be walked inline, it takes the call through the table.
-#define INLINE_MULTI_PAYLOAD_ENUM(KIND, CONTINUE, INLINE_ENUMS, METADATA,      \
-                                  READER, ADDR_OFFSET, ...)                    \
+#define INLINE_MULTI_PAYLOAD_ENUM(KIND, CONTINUE, INLINE_ENUMS, COPY_BYTES,    \
+                                  METADATA, READER, ADDR_OFFSET, ...)          \
   [[clang::nomerge]] {                                                         \
   KIND:                                                                        \
     if (INLINE_ENUMS && !_resumeReader.layoutStr) {                            \
@@ -410,7 +418,8 @@ static constexpr bool platformSupportsTaggedPointers() {
         _resumeAddrOffset = enumStart + enumSize;                              \
         READER = payloadReader;                                                \
       } else {                                                                 \
-        copyPayloadBytes(enumStart, enumSize, __VA_ARGS__);                    \
+        if (COPY_BYTES)                                                        \
+          copyPayloadBytes(enumStart, enumSize, __VA_ARGS__);                  \
         ADDR_OFFSET = enumStart + enumSize;                                    \
       }                                                                        \
       CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                    \
@@ -419,9 +428,11 @@ static constexpr bool platformSupportsTaggedPointers() {
   }
 
 #define handleRefCounts(FN_TABLE, CONTINUE, ...)                               \
-  handleRefCountsImpl(FN_TABLE, CONTINUE, false, __VA_ARGS__)
+  handleRefCountsImpl(FN_TABLE, CONTINUE, false, false, __VA_ARGS__)
 #define handleRefCountsInliningEnums(FN_TABLE, CONTINUE, ...)                  \
-  handleRefCountsImpl(FN_TABLE, CONTINUE, true, __VA_ARGS__)
+  handleRefCountsImpl(FN_TABLE, CONTINUE, true, true, __VA_ARGS__)
+#define handleRefCountsPrecopied(FN_TABLE, ...)                                \
+  handleRefCountsImpl(FN_TABLE, CONTINUE_PRECOPIED, true, false, __VA_ARGS__)
 #endif
 
 typedef void (*DestrFn)(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -1469,8 +1480,11 @@ swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
   uint8_t *src = (uint8_t *)_src;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCountsInliningEnums(initWithCopyTable, CONTINUE_WITH_COPY, metadata,
-                               reader, addrOffset, dest, src);
+  // Copy all bytes at once; the walk then only handles the ref-counted fields,
+  // whose handlers initialize their own bytes of dest again.
+  layoutStringMemcpy(dest, src, metadata->vw_size());
+  handleRefCountsPrecopied(initWithCopyTable, metadata, reader, addrOffset,
+                           dest, src);
 #else
   handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
 #endif
@@ -1487,12 +1501,16 @@ void swift::swift_cvw_arrayInitWithCopy(swift::OpaqueValue *_dest,
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *dest = (uint8_t *)_dest;
   uint8_t *src = (uint8_t *)_src;
+#if defined(__APPLE__) && defined(__arm64__)
+  size_t size = metadata->vw_size();
+#endif
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
 #if defined(__APPLE__) && defined(__arm64__)
-    handleRefCountsInliningEnums(initWithCopyTable, CONTINUE_WITH_COPY,
-                                 metadata, reader, addrOffset, dest, src);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, size);
+    handleRefCountsPrecopied(initWithCopyTable, metadata, reader, addrOffset,
+                             dest, src);
 #else
     handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
 #endif
