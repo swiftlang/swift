@@ -1695,14 +1695,14 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
   /// The execution semantics of the resulting closure, such as
-  /// `@called(atMostOnce)`, or nil if it can be called any number of times.
+  /// at-most-once, or nil if it can be called any number of times.
   public var executionSemantics: ExecutionSemantics? {
     let semantics = bridged.PartialApplyInst_getExecutionSemantics()
     return semantics.hasValue ? semantics.value : nil
   }
 
   /// True if the resulting closure can be called at most once, which is the case
-  /// for every kind of `@called` attribute.
+  /// for every kind of execution semantics.
   public var hasCalledAtMostOnceSemantics: Bool { executionSemantics != nil }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack

@@ -110,7 +110,7 @@ sil @closure_without_args : $@convention(thin) () -> ()
 sil @generic_closure_without_args : $@convention(thin) <T> () -> ()
 sil @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
 sil @use_noescape_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
-sil @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
+sil @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @callable(once) @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LABEL: sil @test_partial_apply_without_args
 // CHECK:         [[F:%.*]] = function_ref @closure_without_args
@@ -165,7 +165,7 @@ bb0:
   return %r : $()
 }
 
-// thin_to_thick_function can't produce a @called(atMostOnce) function type.
+// thin_to_thick_function can't produce an at-most-once function type.
 // CHECK-LABEL: sil @test_called_at_most_once_partial_apply_without_args
 // CHECK:         partial_apply [callee_guaranteed] [on_stack] [called_at_most_once]
 // CHECK-NOT:     thin_to_thick_function
@@ -174,9 +174,9 @@ sil @test_called_at_most_once_partial_apply_without_args : $@convention(thin) ()
 bb0:
   %0 = function_ref @closure_without_args : $@convention(thin) () -> ()
   %1 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %0() : $@convention(thin) () -> ()
-  %2 = function_ref @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
-  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @called(atMostOnce) @callee_guaranteed () -> ()) -> ()
-  dealloc_stack %1 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  %2 = function_ref @use_called_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @callable(once) @callee_guaranteed () -> ()) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed @noescape @callable(once) @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %1 : $@noescape @callable(once) @callee_guaranteed () -> ()
   %r = tuple()
   return %r : $()
 }
@@ -215,7 +215,7 @@ bb0(%0 : $*NoncopyableValue<T>):
   %2 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
   %4 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
-  destroy_value %4 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @callable(once) @callee_guaranteed () -> ()
   dealloc_stack %2 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -236,8 +236,8 @@ bb0(%0 : $*NoncopyableValue<T>):
   %2 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
   %4 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
-  apply %4() : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
-  destroy_value %4 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  apply %4() : $@noescape @callable(once) @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @callable(once) @callee_guaranteed () -> ()
   dealloc_stack %2 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -263,7 +263,7 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %3 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %3 : $*NoncopyableValue<T>
   %5 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
-  destroy_value %5 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @callable(once) @callee_guaranteed () -> ()
   dealloc_stack %3 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -282,8 +282,8 @@ sil [ossa] @test_apply_of_called_at_most_once_inout_address : $@convention(thin)
 bb0(%0 : $*NoncopyableValue<T>):
   %1 = function_ref @noncopyable_inout_closure : $@convention(thin) <τ_0_0> (@inout_aliasable NoncopyableValue<τ_0_0>) -> ()
   %2 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %1<T>(%0) : $@convention(thin) <τ_0_0> (@inout_aliasable NoncopyableValue<τ_0_0>) -> ()
-  apply %2() : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
-  destroy_value %2 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  apply %2() : $@noescape @callable(once) @callee_guaranteed () -> ()
+  destroy_value %2 : $@noescape @callable(once) @callee_guaranteed () -> ()
   %r = tuple()
   return %r : $()
 }
@@ -302,8 +302,8 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %3 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %3 : $*NoncopyableValue<T>
   %5 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
-  apply %5() : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
-  destroy_value %5 : $@noescape @called(atMostOnce) @callee_guaranteed () -> ()
+  apply %5() : $@noescape @callable(once) @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @callable(once) @callee_guaranteed () -> ()
   dealloc_stack %3 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -326,7 +326,7 @@ bb0(%0 : $*NoncopyableValue<T>):
   %2 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
   %4 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
-  destroy_value %4 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @once @callee_guaranteed () -> ()
   dealloc_stack %2 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -347,8 +347,8 @@ bb0(%0 : $*NoncopyableValue<T>):
   %2 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %2 : $*NoncopyableValue<T>
   %4 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1<T>(%2) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>) -> ()
-  apply %4() : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
-  destroy_value %4 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  apply %4() : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @once @callee_guaranteed () -> ()
   dealloc_stack %2 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -371,7 +371,7 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %3 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %3 : $*NoncopyableValue<T>
   %5 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
-  destroy_value %5 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @once @callee_guaranteed () -> ()
   dealloc_stack %3 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()
@@ -390,8 +390,8 @@ sil [ossa] @test_apply_of_called_exactly_once_inout_address : $@convention(thin)
 bb0(%0 : $*NoncopyableValue<T>):
   %1 = function_ref @noncopyable_inout_closure : $@convention(thin) <τ_0_0> (@inout_aliasable NoncopyableValue<τ_0_0>) -> ()
   %2 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1<T>(%0) : $@convention(thin) <τ_0_0> (@inout_aliasable NoncopyableValue<τ_0_0>) -> ()
-  apply %2() : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
-  destroy_value %2 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  apply %2() : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %2 : $@noescape @once @callee_guaranteed () -> ()
   %r = tuple()
   return %r : $()
 }
@@ -410,8 +410,8 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %3 = alloc_stack $NoncopyableValue<T>
   copy_addr [take] %0 to [init] %3 : $*NoncopyableValue<T>
   %5 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2<T>(%3, %1) : $@convention(thin) <τ_0_0> (@in NoncopyableValue<τ_0_0>, @inout_aliasable NoncopyableValue<τ_0_0>) -> ()
-  apply %5() : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
-  destroy_value %5 : $@noescape @called(exactlyOnce) @callee_guaranteed () -> ()
+  apply %5() : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @once @callee_guaranteed () -> ()
   dealloc_stack %3 : $*NoncopyableValue<T>
   %r = tuple()
   return %r : $()

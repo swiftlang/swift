@@ -2721,7 +2721,7 @@ void UseAfterSendDiagnosticInferrer::infer() {
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
-    // @called(atMostOnce) closures can have both implicit and explicit
+    // at-most-once closures can have both implicit and explicit
     // `sending` captures.
     if (pai->hasCalledAtMostOnceSemantics()) {
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
@@ -3675,7 +3675,7 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
     }
 
     // Reaching this operand here means it was individually sent as a capture
-    // of a non-isolated `@called(atMostOnce)` closure -- either because it was
+    // of a non-isolated at-most-once closure -- either because it was
     // explicitly `sending`, or because it's an ordinary capture of a
     // non-escaping closure (every non-Sendable capture of those is sent
     // individually, independent of whether the closure as a whole is isolated.

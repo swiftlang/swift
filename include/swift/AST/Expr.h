@@ -4170,7 +4170,7 @@ public:
   bool isSendable() const;
 
   /// Whether this closure can be called at most once, which is true for both
-  /// `@called(atMostOnce)` and `@called(exactlyOnce)` closures.
+  /// at-most-once and exactly-once closures.
   bool hasCalledAtMostOnceSemantics() const;
 
   /// Whether this closure consists of a single expression.

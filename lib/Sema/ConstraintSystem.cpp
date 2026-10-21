@@ -1443,8 +1443,10 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
   std::optional<ExecutionSemantics> executionSemantics;
 
-  if (auto *called = expr->getAttrs().getAttribute<CalledAttr>()) {
-    executionSemantics = called->getSemantics();
+  if (auto *attr = getExecutionSemanticsAttr(expr->getAttrs(),
+                                             expr->getASTContext().SourceMgr)) {
+    executionSemantics = isa<OnceAttr>(attr) ? ExecutionSemantics::Once
+                                             : ExecutionSemantics::AtMostOnce;
   }
 
   if (throws || async) {

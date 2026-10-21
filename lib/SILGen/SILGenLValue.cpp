@@ -1246,7 +1246,7 @@ namespace {
           // handle delayed initialization of the boxes and convert those to
           // initable_but_not_consumable.
           //
-          // `@called(atMostOnce)` values are always consumed by whatever uses
+          // at-most-once values are always consumed by whatever uses
           // them, so a non-read access to one must permit consuming it,
           // unlike an ordinary noncopyable var/let box, which only permits
           // being fully reassigned.

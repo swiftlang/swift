@@ -1118,20 +1118,18 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
   Builtin.unreachable()
 }
 
-/// Calls a closure with a `@called(atMostOnce)` copy of a
-/// `@called(exactlyOnce)` function. You can use this function to call an API
-/// that takes a `@called(atMostOnce)` closure and always calls it in practice,
-/// or to allow an `@escaping @called(exactlyOnce)` function to be stored
-/// temporarily before it is called.
+/// Calls a closure with a `@callable(once)` copy of a `@once` function. You
+/// can use this function to call an API that takes a `@callable(once)` closure
+/// and always calls it in practice, or to allow an `@escaping @once` function
+/// to be stored temporarily before it is called.
 ///
-/// The following example stores the `@called(atMostOnce)` copy in a
-/// noncopyable wrapper, which a final class holds. The class calls the
-/// function through the wrapper from a callback. The callback isn't annotated
-/// as taking a `@called(atMostOnce)` closure, even though it calls the
-/// function only once.
+/// The following example stores the `@callable(once)` copy in a noncopyable
+/// wrapper, which a final class holds. The class calls the function through
+/// the wrapper from a callback. The callback isn't annotated as taking a
+/// `@callable(once)` closure, even though it calls the function only once.
 ///
 ///     struct Deferred: ~Copyable {
-///         var action: @called(atMostOnce) () -> Void
+///         var action: @callable(once) () -> Void
 ///
 ///         consuming func run() { action() }
 ///     }
@@ -1146,20 +1144,20 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
 ///         func run() { deferred.take()?.run() }
 ///     }
 ///
-///     func perform(_ f: consuming @escaping @called(exactlyOnce) () -> Void) {
+///     func perform(_ f: consuming @escaping @once () -> Void) {
 ///         let callback = withoutActuallyDiscarding(f) { action in
 ///             Callback(Deferred(action: action))
 ///         }
 ///         register { callback.run() }
 ///     }
 ///
-/// - Important: If the `@called(atMostOnce)` copy of the function is dropped
+/// - Important: If the `@callable(once)` copy of the function is dropped
 ///   without being called then the program will trap.
 ///
 /// - Parameters:
-///   - closure: A `@called(exactlyOnce)` function that is converted to a `@called(atMostOnce)`
+///   - closure: A `@once` function that is converted to a `@callable(once)`
 ///     function.
-///   - body: A closure that is executed immediately with the `@called(atMostOnce)`
+///   - body: A closure that is executed immediately with the `@callable(once)`
 ///     function as its argument.
 /// - Returns: The return value, if any, of the `body` closure.
 @export(implementation)

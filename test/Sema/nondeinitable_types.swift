@@ -1,12 +1,12 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -verify-additional-prefix copytuples- -verify-ignore-unrelated
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute -enable-experimental-feature MoveOnlyClasses -verify-additional-prefix copytuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -verify-additional-prefix copytuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -enable-experimental-feature MoveOnlyClasses -verify-additional-prefix copytuples- -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_NondeinitableTypes
 // REQUIRES: swift_feature_MoveOnlyTuples
 // REQUIRES: swift_feature_MoveOnlyClasses
-// REQUIRES: swift_feature_CalledAttribute
+// REQUIRES: swift_feature_OnceFunctions
 
 // The NondeinitableTypes feature lets structs, enums, generic parameters, and
 // associated types suppress `Deinitable`, so that the compiler's support for
@@ -221,15 +221,15 @@ func closureCaptureLists(
 ) {
   let _ = { [nd1] in nd1.peek() }
   // expected-error@-1 {{capture list entry 'nd1' of 'Deinitable'-conforming closure has non-'Deinitable' type 'ND'}}
-  let _ = { @called(atMostOnce) [nd2] in nd2.finish() }
+  let _ = { @callable(once) [nd2] in nd2.finish() }
   // expected-error@-1 {{capture list entry 'nd2' of 'Deinitable'-conforming closure has non-'Deinitable' type 'ND'}}
   let _ = { [nc] in nc.finish() } // Ok
 }
 
 func closureConsumedCaptures(_ nd: consuming ND, _ nc: consuming NC) {
-  let _ = { @called(atMostOnce) in nd.finish() }
+  let _ = { @callable(once) in nd.finish() }
   // expected-error@-1 {{consumed capture 'nd' of 'Deinitable'-conforming closure has non-'Deinitable' type 'ND'}}
-  let _ = { @called(atMostOnce) in nc.finish() } // Ok
+  let _ = { @callable(once) in nc.finish() } // Ok
 }
 
 // A borrowed capture stays with its owner.
@@ -246,7 +246,7 @@ func closureGenericCaptures<T: ~Copyable & ~Deinitable>(_ t: consuming T) {
 // MARK: - Unapplied references
 
 // Partial/unapplied references to members of `~Copyable & ~Deinitable` type
-// should produce `@called(exactlyOnce)` types.
+// should produce exactly-once types.
 
 struct NDBox<T>: ~Copyable, ~Deinitable {
   init(_: T) {}
@@ -256,26 +256,26 @@ struct NDBox<T>: ~Copyable, ~Deinitable {
 func unappliedConsumingMethods(
   _ nd1: consuming ND, _ nd2: consuming ND, _ nd3: consuming ND
 ) {
-  let _: @called(exactlyOnce) () -> Void = nd1.finish // Ok
-  let _: @called(atMostOnce) () -> Void = nd2.finish
-  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+  let _: @once () -> Void = nd1.finish // Ok
+  let _: @callable(once) () -> Void = nd2.finish
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> ()' to function type '@callable(once) () -> Void'}}
 
   let finishRef = nd3.finish // Ok
-  let _: @called(atMostOnce) () -> Void = finishRef
-  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+  let _: @callable(once) () -> Void = finishRef
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> ()' to function type '@callable(once) () -> Void'}}
 
-  let _: (consuming ND) -> @called(exactlyOnce) () -> Void = ND.finish // Ok
-  let _: (consuming ND) -> @called(atMostOnce) () -> Void = ND.finish
-  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+  let _: (consuming ND) -> @once () -> Void = ND.finish // Ok
+  let _: (consuming ND) -> @callable(once) () -> Void = ND.finish
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> ()' to function type '@callable(once) () -> Void'}}
 }
 
 // The base's generic arguments may be unresolved when the member is referenced.
 func unappliedConsumingMethodsOnUnresolvedBase() {
-  let _: @called(exactlyOnce) () -> Void = NDBox(42).finish // Ok
-  let _: @called(atMostOnce) () -> Void = NDBox(42).finish
-  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+  let _: @once () -> Void = NDBox(42).finish // Ok
+  let _: @callable(once) () -> Void = NDBox(42).finish
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> ()' to function type '@callable(once) () -> Void'}}
 
   let finishRef = NDBox(42).finish
-  let _: @called(atMostOnce) () -> Void = finishRef
-  // expected-error@-1 {{invalid conversion from '@called(exactlyOnce)' function of type '@called(exactlyOnce) () -> ()' to function type '@called(atMostOnce) () -> Void'}}
+  let _: @callable(once) () -> Void = finishRef
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> ()' to function type '@callable(once) () -> Void'}}
 }

@@ -685,9 +685,9 @@ static StringRef getDumpString(ExplicitSafety safety) {
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
   case ExecutionSemantics::AtMostOnce:
-    return "atMostOnce";
+    return "at_most_once";
   case ExecutionSemantics::Once:
-    return "once";
+    return "exactly_once";
   }
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {
@@ -5132,6 +5132,7 @@ public:
   TRIVIAL_ATTR_PRINTER(AtRethrows, at_rethrows)
   TRIVIAL_ATTR_PRINTER(Borrowed, borrowed)
   TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
+  TRIVIAL_ATTR_PRINTER(Callable, callable)
   TRIVIAL_ATTR_PRINTER(CompileTimeLiteral, compile_time_literal)
   TRIVIAL_ATTR_PRINTER(ConstVal, compile_time_value)
   TRIVIAL_ATTR_PRINTER(ConstInitialized, const_initialized)
@@ -5202,6 +5203,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NonObjC, non_objc)
   TRIVIAL_ATTR_PRINTER(NonOverride, non_override)
   TRIVIAL_ATTR_PRINTER(ObjCMembers, objc_members)
+  TRIVIAL_ATTR_PRINTER(Once, once)
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
@@ -5784,12 +5786,6 @@ public:
       break;
     }
     printField(StringRef{Model}, Label::always("threading"));
-    printFoot();
-  }
-
-  void visitCalledAttr(CalledAttr *Attr, Label label) {
-    printCommon(Attr, "called_attr", label);
-    printField(Attr->getSemantics(), Label::always("semantics"));
     printFoot();
   }
 };
@@ -6778,7 +6774,7 @@ namespace {
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
         if (auto semantics = T->getExecutionSemantics())
-          printField(*semantics, Label::always("called"));
+          printField(*semantics, Label::always("execution_semantics"));
         printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {

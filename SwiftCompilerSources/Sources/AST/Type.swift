@@ -491,5 +491,5 @@ extension CanonicalType: Hashable {
 
 public typealias GenericTypeParameterKind = swift.GenericTypeParamKind
 
-/// The execution semantics of a function type, such as `@called(atMostOnce)`.
+/// The execution semantics of a function type, such as at-most-once.
 public typealias ExecutionSemantics = swift.ExecutionSemantics

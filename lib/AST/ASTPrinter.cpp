@@ -7239,6 +7239,14 @@ public:
     visit(staticSelfT);
   }
 
+  /// Prints `@once` or `@callable(once)`, followed by a space.
+  void printExecutionSemanticsAttr(ExecutionSemantics semantics) {
+    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+    Printer.printAttrName(getExecutionSemanticsAttrSpelling(semantics));
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+    Printer << " ";
+  }
+
   void printFunctionExtInfo(AnyFunctionType *fnType,
                             NonRecursivePrintOptions nrOptions) {
     if (!fnType->hasExtInfo()) {
@@ -7308,14 +7316,11 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
-    if (!Options.excludeAttrKind(TypeAttrKind::Called)) {
-      if (auto semantics = info.getExecutionSemantics()) {
-        Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-        Printer.printAttrName("@called");
-        Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
-        Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-        Printer << " ";
-      }
+    if (auto semantics = info.getExecutionSemantics()) {
+      if (!Options.excludeAttrKind(*semantics == ExecutionSemantics::Once
+                                       ? TypeAttrKind::Once
+                                       : TypeAttrKind::Callable))
+        printExecutionSemanticsAttr(*semantics);
     }
 
     // Print lifetime dependencies using Swift syntax.
@@ -7529,13 +7534,8 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
-    if (auto semantics = info.getExecutionSemantics()) {
-      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-      Printer.printAttrName("@called");
-      Printer << "(" << CalledAttr::getSemanticsName(*semantics) << ")";
-      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-      Printer << " ";
-    }
+    if (auto semantics = info.getExecutionSemantics())
+      printExecutionSemanticsAttr(*semantics);
   }
 
   /// Print a function type's parameter list.

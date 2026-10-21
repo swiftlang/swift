@@ -1461,11 +1461,10 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext,
 
 BRIDGED_OPTIONAL(swift::ExecutionSemantics, ExecutionSemantics)
 
-SWIFT_NAME("BridgedCalledAttr.createParsed(_:atLoc:range:semantics:)")
-BridgedCalledAttr
-BridgedCalledAttr_createParsed(BridgedASTContext cContext,
-                               swift::SourceLoc atLoc, swift::SourceRange range,
-                               swift::ExecutionSemantics semantics);
+SWIFT_NAME("BridgedCallableAttr.createParsed(_:atLoc:range:)")
+BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
+                                                     swift::SourceLoc atLoc,
+                                                     swift::SourceRange range);
 
 //===----------------------------------------------------------------------===//
 // MARK: Decls
@@ -2672,11 +2671,6 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {
   BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation,
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCalledTypeAttrSemantics {
-  BridgedCalledTypeAttrSemantics_AtMostOnce,
-  BridgedCalledTypeAttrSemantics_ExactlyOnce,
-};
-
 SWIFT_NAME("BridgedConventionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
            "name:nameLoc:witnessMethodProtocol:clangType:clangTypeLoc:)")
 BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
@@ -2717,12 +2711,10 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
     swift::SourceRange parens, BridgedStringRef cMangled,
     swift::SourceLoc mangledDoc, size_t index, swift::SourceLoc indexLoc);
 
-SWIFT_NAME("BridgedCalledTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
-           "semantics:semanticsLoc:)")
-BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
+SWIFT_NAME("BridgedCallableTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:)")
+BridgedCallableTypeAttr BridgedCallableTypeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
-    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
-    BridgedCalledTypeAttrSemantics semantics, swift::SourceLoc semanticsLoc);
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange);
 
 class BridgedScopeRepr {
   enum class Kind { ScopeName, AccessedValue, Self, SelfAccess, Immortal } kind;
