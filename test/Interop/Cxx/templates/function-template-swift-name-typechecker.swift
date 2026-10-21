@@ -86,6 +86,43 @@ template <class T, class U>
 __attribute__((swift_name("labeledTopLevel(_:other:)")))
 T labeledTopLevelTemplate(T v, U w) { return v + static_cast<T>(w); }
 
+// An explicit specialization is a separate FunctionDecl.
+// It keeps its own swift_name, and otherwise inherits the primary template's.
+struct HasSpecializations {
+  template <class T>
+  int plain(T v) const { return 0; }
+
+  template <class T>
+  __attribute__((swift_name("renamedPrimary(_:)")))
+  int renamed(T v) const { return 1; }
+};
+
+// Only the specialization is renamed.
+template <>
+__attribute__((swift_name("plainInt(_:)")))
+inline int HasSpecializations::plain<int>(int v) const { return 2; }
+
+// Only the primary template is renamed.
+template <>
+inline int HasSpecializations::renamed<int>(int v) const { return 3; }
+
+// Same as HasSpecializations, but with the specializations declared in the class.
+struct HasInClassSpecializations {
+  template <class T>
+  int plain(T v) const { return 0; }
+
+  template <>
+  __attribute__((swift_name("plainInt(_:)")))
+  int plain<int>(int v) const { return 2; }
+
+  template <class T>
+  __attribute__((swift_name("renamedPrimary(_:)")))
+  int renamed(T v) const { return 1; }
+
+  template <>
+  int renamed<int>(int v) const { return 3; }
+};
+
 //--- test.swift
 import Test
 
@@ -115,3 +152,22 @@ let _: CInt = labeledTopLevel(13 as CInt, other: 14 as CInt)
 
 // The C++ argument labels (none) must not be accepted.
 let _ = l.labeled(2 as CInt, 3 as CInt) // expected-error {{missing argument labels 'first:second:' in call}}
+
+// The primary templates are imported as generic functions named after the primary template.
+let sp = HasSpecializations()
+let _: CInt = sp.plain(1 as CInt)
+let _: CInt = sp.renamedPrimary(2 as CInt)
+
+// An explicit specialization with its own swift_name is imported under that
+// name.
+let _: CInt = sp.plainInt(3)
+
+// An explicit specialization without its own swift_name inherits the primary template's,
+// so it is not available under its C++ name.
+let _ = sp.renamed(4) // expected-error {{value of type 'HasSpecializations' has no member 'renamed'}}
+
+let isp = HasInClassSpecializations()
+let _: CInt = isp.plain(1 as CInt)
+let _: CInt = isp.renamedPrimary(2 as CInt)
+let _: CInt = isp.plainInt(3)
+let _ = isp.renamed(4) // expected-error {{value of type 'HasInClassSpecializations' has no member 'renamed'}}
