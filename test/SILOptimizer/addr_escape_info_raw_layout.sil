@@ -1,0 +1,109 @@
+// RUN: %target-sil-opt %s -test-runner -o /dev/null \
+// RUN:   -enable-experimental-feature RawLayout \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_RawLayout
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@_rawLayout(like: Int32)
+struct RawCell: ~Copyable {
+  deinit
+}
+
+sil @writes_globals : $@convention(thin) () -> ()
+sil @takes_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+sil @takes_in_int32 : $@convention(thin) (@in Int32) -> ()
+
+// The pointer from `addressOfRawLayout` is consumed by a `pointer_to_address`
+// whose only use is a store, so the storage stays local and the call cannot
+// reach it.
+
+// CHECK-LABEL: Address escape information for test_raw_layout_stays_local:
+// CHECK:       value:  %0 = alloc_stack $RawCell
+// CHECK-NEXT:    -     {{%.*}} = apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK:       End function test_raw_layout_stays_local
+sil @test_raw_layout_stays_local : $@convention(thin) () -> () {
+bb0:
+  specify_test "address_escape_info"
+  %0 = alloc_stack $RawCell
+  fix_lifetime %0 : $*RawCell
+  %2 = builtin "prepareInitialization"(%0 : $*RawCell) : $()
+  %3 = builtin "addressOfRawLayout"<RawCell>(%0 : $*RawCell) : $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int32
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  store %6 to %4 : $*Int32
+  %8 = function_ref @writes_globals : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  dealloc_stack %0 : $*RawCell
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// `prepareInitialization` writes its operand but yields no value, so on its own
+// it cannot let the storage escape either.
+
+// CHECK-LABEL: Address escape information for test_prepare_initialization_stays_local:
+// CHECK:       value:  %0 = alloc_stack $RawCell
+// CHECK-NEXT:    -     {{%.*}} = apply {{%.*}}() : $@convention(thin) () -> ()
+// CHECK:       End function test_prepare_initialization_stays_local
+sil @test_prepare_initialization_stays_local : $@convention(thin) () -> () {
+bb0:
+  specify_test "address_escape_info"
+  %0 = alloc_stack $RawCell
+  fix_lifetime %0 : $*RawCell
+  %2 = builtin "prepareInitialization"(%0 : $*RawCell) : $()
+  %3 = function_ref @writes_globals : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  dealloc_stack %0 : $*RawCell
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// Handing the raw pointer itself to a call does let the storage escape: the
+// builtin's user is not a `pointer_to_address`, so the walk gives up.
+
+// CHECK-LABEL: Address escape information for test_raw_pointer_escapes:
+// CHECK:       value:  %0 = alloc_stack $RawCell
+// CHECK-NEXT:    ==>   {{%.*}} = apply {{%.*}}({{%.*}}) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK:       End function test_raw_pointer_escapes
+sil @test_raw_pointer_escapes : $@convention(thin) () -> () {
+bb0:
+  specify_test "address_escape_info"
+  %0 = alloc_stack $RawCell
+  fix_lifetime %0 : $*RawCell
+  %2 = builtin "prepareInitialization"(%0 : $*RawCell) : $()
+  %3 = builtin "addressOfRawLayout"<RawCell>(%0 : $*RawCell) : $Builtin.RawPointer
+  %4 = function_ref @takes_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> ()
+  dealloc_stack %0 : $*RawCell
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The walk continues through the `pointer_to_address`, so passing the projected
+// address to a call escapes as well.
+
+// CHECK-LABEL: Address escape information for test_projected_address_escapes:
+// CHECK:       value:  %0 = alloc_stack $RawCell
+// CHECK-NEXT:    ==>   {{%.*}} = apply {{%.*}}({{%.*}}) : $@convention(thin) (@in Int32) -> ()
+// CHECK:       End function test_projected_address_escapes
+sil @test_projected_address_escapes : $@convention(thin) () -> () {
+bb0:
+  specify_test "address_escape_info"
+  %0 = alloc_stack $RawCell
+  fix_lifetime %0 : $*RawCell
+  %2 = builtin "prepareInitialization"(%0 : $*RawCell) : $()
+  %3 = builtin "addressOfRawLayout"<RawCell>(%0 : $*RawCell) : $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int32
+  %5 = function_ref @takes_in_int32 : $@convention(thin) (@in Int32) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@in Int32) -> ()
+  dealloc_stack %0 : $*RawCell
+  %8 = tuple ()
+  return %8 : $()
+}
