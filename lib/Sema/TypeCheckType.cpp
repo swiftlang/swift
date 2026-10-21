@@ -2478,8 +2478,17 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       break;
     }
 
-    // We have a found multiple type aliases that refer to the same thing.
-    // Ignore the duplicate.
+    // We have found multiple declarations that refer to the same type, e.g. a
+    // type and a typealias to it reached through different imports. Prefer
+    // the strictly more accessible one from here so that access checking
+    // does not depend on import order.
+    auto currentScope = currentDecl->getFormalAccessScope(DC);
+    auto newScope = typeDecl->getFormalAccessScope(DC);
+    if (currentScope != newScope && currentScope.isChildOf(newScope)) {
+      current = type;
+      currentDecl = typeDecl;
+      currentDC = foundDC;
+    }
   }
 
   // Complain about any ambiguities we detected.
