@@ -108,6 +108,8 @@ private:
   bool canSerializeType(SILType type);
   bool canSerializeType(CanType type);
   bool canSerializeDecl(NominalTypeDecl *decl);
+  bool canClientsSubstituteOpaqueType(OpaqueTypeArchetypeType *archetype,
+                                      int maxDepth = 16);
 
   /// Check whether decls imported with certain access levels or attributes
   /// can be serialized.
@@ -677,6 +679,16 @@ bool CrossModuleOptimization::canSerializeFunction(
     }
   }
 
+  // Opaque types can also be hidden in substitutions, e.g.
+  // `@substituted <τ_0_0> () -> @out τ_0_0 for <@_opaqueReturnTypeOf(...)>`.
+  if (fnTy->hasOpaqueArchetype() &&
+      fnTy.findIf([this](Type t) {
+        auto *opaque = t->getAs<OpaqueTypeArchetypeType>();
+        return opaque && !canClientsSubstituteOpaqueType(opaque);
+      })) {
+    return false;
+  }
+
   // Avoid a stack overflow in case of a very deeply nested call graph.
   if (maxDepth <= 0)
     return false;
@@ -883,6 +895,9 @@ bool CrossModuleOptimization::canSerializeType(CanType type) {
        if (auto nominal = subType->getNominalDecl()) {
          return !canSerializeDecl(nominal);
        }
+       if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(subType)) {
+         return !canClientsSubstituteOpaqueType(opaque);
+       }
        // Types that might not have nominal include Builtin types (e.g. Builtin.Int64),
        // generic parameter types (e.g. T as in Foo<T>), SIL function result types
        // (e.g. @convention(method) (Int, @thin Hasher.Type) -> Hasher), etc.
@@ -891,6 +906,49 @@ bool CrossModuleOptimization::canSerializeType(CanType type) {
 
   canTypesChecked[type] = success;
   return success;
+}
+
+/// Returns true if a client module substitutes the opaque archetype
+/// \p archetype with the same underlying type as this module does.
+///
+/// Within this module, opaque types are looked through to their underlying
+/// types, e.g. the argument types of a function with an opaque result type.
+/// A client can only look through opaque types if the underlying types are
+/// visible to it. If a client stops earlier, e.g. because the underlying type
+/// is a private type or the opaque result type of a private function, the
+/// types in a deserialized function don't match.
+bool CrossModuleOptimization::canClientsSubstituteOpaqueType(
+    OpaqueTypeArchetypeType *archetype, int maxDepth) {
+  OpaqueTypeDecl *decl = archetype->getDecl();
+
+  // Opaque types from other modules are substituted the same way in this
+  // module and in clients.
+  if (decl->getModuleContext() != M.getSwiftModule())
+    return true;
+
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
+  if (!subs)
+    return true;
+
+  if (maxDepth <= 0)
+    return false;
+
+  for (Type replType : subs->getReplacementTypes()) {
+    bool notVisible = replType.findIf([&](Type subType) {
+      TypeDecl *typeDecl = subType->getAnyNominal();
+      auto *opaque = subType->getAs<OpaqueTypeArchetypeType>();
+      if (opaque)
+        typeDecl = opaque->getDecl();
+      if (!typeDecl)
+        return false;
+      if (typeDecl->getEffectiveAccess() < AccessLevel::Package)
+        return true;
+      return opaque && !canClientsSubstituteOpaqueType(opaque, maxDepth - 1);
+    });
+    if (notVisible)
+      return false;
+  }
+  return true;
 }
 
 bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
