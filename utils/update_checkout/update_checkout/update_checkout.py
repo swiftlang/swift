@@ -733,9 +733,12 @@ def update_all_repositories(
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
+    retried_update = exponential_retry(max_retries=args.max_retries)(
+        update_single_repository
+    )
     return (
         skipped_repositories,
-        ParallelRunner(update_single_repository, pool_args, args.n_processes).run(),
+        ParallelRunner(retried_update, pool_args, args.n_processes).run(),
     )
 
 
@@ -900,6 +903,9 @@ def obtain_all_additional_swift_sources(
 ):
     skipped_repositories = []
     pool_args = []
+    retried_obtain = exponential_retry(max_retries=args.max_retries)(
+        obtain_additional_swift_sources
+    )
     for repo_name, repo_info in config["repos"].items():
         repo_path = args.source_root.joinpath(repo_name)
         if repo_name in skip_repository_list:
@@ -964,7 +970,7 @@ def obtain_all_additional_swift_sources(
         )
 
         if args.use_submodules:
-            obtain_additional_swift_sources(new_args)
+            retried_obtain(new_args)
         else:
             pool_args.append(new_args)
 
@@ -979,9 +985,7 @@ def obtain_all_additional_swift_sources(
     _move_llvm_project_to_first_index(pool_args)
     return (
         skipped_repositories,
-        ParallelRunner(
-            obtain_additional_swift_sources, pool_args, args.n_processes
-        ).run(),
+        ParallelRunner(retried_obtain, pool_args, args.n_processes).run(),
     )
 
 
