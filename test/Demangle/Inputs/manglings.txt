@@ -549,6 +549,8 @@ $syyYaYdKc ---> @nontransferable () async throws -> ()
 $syyYdScMYcc ---> @Swift.MainActor @nontransferable () -> ()
 $s1M7takesNTyyyyYdcF ---> M.takesNT(@nontransferable () -> ()) -> ()
 $s1M7genericyyxmRi2_zlF ---> M.generic<A where A: ~Swift.Transferable>(A.Type) -> ()
+$sIeg_IegD_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed () -> () to @escaping @callee_guaranteed @nontransferable () -> ()
+$sIegH_IegDH_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> () to @escaping @callee_guaranteed @nontransferable @async () -> ()
 async_Main ---> async main entry point
 async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
 async_MainTQ0_ ---> (1) await resume partial function for async main entry point

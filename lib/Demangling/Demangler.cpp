@@ -2596,6 +2596,12 @@ NodePointer Demangler::demangleImplFunctionType() {
                    *this);
   }
 
+  if (nextIf('D')) {
+    type->addChild(
+        createNode(Node::Kind::ImplFunctionAttribute, "@nontransferable"),
+        *this);
+  }
+
   if (nextIf('H')) {
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@async"),
                    *this);
