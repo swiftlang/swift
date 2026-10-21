@@ -3919,9 +3919,16 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
   {
     std::optional<unsigned> dropFromIdx;
     bool inGenericArgumentContext = false;
+    bool inValueContext = isExpr<AssignExpr>(anchor);
 
     for (unsigned i = 0, n = path.size(); i < n; ++i) {
       const auto &elt = path[i];
+      if (elt.is<LocatorPathElt::ApplyArgToParam>() ||
+          elt.is<LocatorPathElt::ContextualType>() ||
+          elt.is<LocatorPathElt::CoercionOperand>() ||
+          elt.is<LocatorPathElt::ClosureBody>())
+        inValueContext = true;
+
       if (elt.is<LocatorPathElt::GenericType>() ||
           elt.is<LocatorPathElt::LValueConversion>()) {
         if (!dropFromIdx)
@@ -3948,12 +3955,13 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
 
     // If we are not in generic argument context,
     // this conversion don't apply.
-    if (!inGenericArgumentContext || !dropFromIdx)
+    if (!inGenericArgumentContext || (!dropFromIdx && !inValueContext))
       return false;
 
     // Drop all of the elements that would get in a way of
     // finding the underlying declaration reference first.
-    path.pop_back_n(path.size() - *dropFromIdx);
+    if (dropFromIdx)
+      path.pop_back_n(path.size() - *dropFromIdx);
   }
 
   if (!(lhs->isSendableExistential() && rhs->isAny()))
@@ -3961,9 +3969,19 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
 
   std::function<bool(ConstraintLocator *)> isPreconcurrencyContext =
       [&](ConstraintLocator *locator) {
-        if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
-          return isPreconcurrencyContext(
-              cs.getConstraintLocator(simplifyLocatorToAnchor(locator)));
+        auto anchor = locator->getAnchor();
+        auto path = locator->getPath();
+        if (auto *expr = getAsExpr<Expr>(anchor))
+          anchor = expr->getValueProvidingExpr();
+        if (auto *assignment = getAsExpr<AssignExpr>(anchor))
+          anchor = assignment->getSrc();
+        SourceRange range;
+        simplifyLocator(anchor, path, range);
+        // If the anchor or path changed, continue looking for the source
+        // declaration using the updated locator.
+        if (anchor != locator->getAnchor() ||
+            path.size() != locator->getPath().size())
+          return isPreconcurrencyContext(cs.getConstraintLocator(anchor, path));
 
         if (locator->directlyAt<InOutExpr>()) {
           auto *IOE = castToExpr<InOutExpr>(locator->getAnchor());
