@@ -7680,6 +7680,9 @@ public:
     if (info.isSendable()) {
       Printer.printSimpleAttr("@Sendable") << " ";
     }
+    if (info.isNonTransferable()) {
+      Printer.printSimpleAttr("@nontransferable") << " ";
+    }
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }

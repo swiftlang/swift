@@ -5313,6 +5313,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool pseudogeneric = claim<PseudogenericTypeAttr>(attrs);
   bool noescape = claim<NoEscapeTypeAttr>(attrs);
   bool sendable = claim<SendableTypeAttr>(attrs);
+  bool nontransferable = claim<NonTransferableTypeAttr>(attrs);
   bool async = claim<AsyncTypeAttr>(attrs);
   bool unimplementable = claim<UnimplementableTypeAttr>(attrs);
   auto isolation = SILFunctionTypeIsolation::forUnknown();
@@ -5353,9 +5354,9 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
-      representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      executionSemantics, isolation, diffKind, clangFnType,
-      /*LifetimeDependenceInfo*/ {});
+      representation, pseudogeneric, noescape, sendable, nontransferable,
+      async, unimplementable, executionSemantics, isolation, diffKind,
+      clangFnType, /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
   // environment.

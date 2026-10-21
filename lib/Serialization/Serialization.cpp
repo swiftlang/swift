@@ -6454,7 +6454,8 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
+        fnTy->isNonTransferable(), fnTy->isAsync(),
         stableCoroutineKind, stableCalleeConvention, stableRepresentation,
         fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
         getRawStableFunctionTypeExecutionSemantics(

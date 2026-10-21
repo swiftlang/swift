@@ -886,7 +886,8 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo =
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),
-          flags.isSendable(), flags.isAsync(), unimplementable,
+          flags.isSendable(), flags.isNonTransferable(), flags.isAsync(),
+          unimplementable,
           getExecutionSemantics(flags.getExecutionSemantics()),
           isolation, diffKind, clangFnType,
           /*LifetimeDependenceInfo*/ {})
