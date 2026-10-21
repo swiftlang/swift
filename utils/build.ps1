@@ -2913,17 +2913,6 @@ function Build-CDispatch([Hashtable] $Platform,
                          [Hashtable] $CXXCompiler,
                          [string]    $Phase,
                          [switch]    $Static = $false) {
-  $Defines = @{
-    BUILD_SHARED_LIBS = $(if ($Static) { "NO" } else { "YES" });
-    BUILD_TESTING = "NO";
-    ENABLE_SWIFT = "NO";
-  }
-  if ($Platform.OS -eq [OS]::Android) {
-    # libdispatch doesn't use libc++, but with the shared C++ runtime it would
-    # take `__emutls_get_address` from it and depend on libc++_shared.so.
-    $Defines.CMAKE_ANDROID_STL_TYPE = "c++_static"
-  }
-
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
     -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Phase}CDispatch")) `
@@ -2931,7 +2920,17 @@ function Build-CDispatch([Hashtable] $Platform,
     -Platform $Platform `
     -CCompiler $CCompiler `
     -CXXCompiler $CXXCompiler `
-    -Defines $Defines
+    -Defines (@{
+      BUILD_SHARED_LIBS = $(if ($Static) { "NO" } else { "YES" });
+      BUILD_TESTING = "NO";
+      ENABLE_SWIFT = "NO";
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # libdispatch doesn't use libc++, but with the shared C++ runtime it would
+      # take `__emutls_get_address` from it and depend on libc++_shared.so.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Get-CompilersDefines([Hashtable] $Platform,
@@ -3844,17 +3843,6 @@ function Build-RegsGen2([Hashtable] $Platform) {
 }
 
 function Build-DS2([Hashtable] $Platform) {
-  $Defines = @{
-    DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
-    DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
-    BISON_EXECUTABLE = "$(Get-BisonExecutable)";
-    FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
-  }
-  if ($Platform.OS -eq [OS]::Android) {
-    # ds2 is a standalone executable, so keep the static C++ runtime.
-    $Defines.CMAKE_ANDROID_STL_TYPE = "c++_static"
-  }
-
   Build-CMakeProject `
     -Src "$SourceCache\ds2" `
     -Bin "$BinaryCache\$($Platform.Triple)\ds2" `
@@ -3862,7 +3850,17 @@ function Build-DS2([Hashtable] $Platform) {
     -Platform $Platform `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
-    -Defines $Defines
+    -Defines (@{
+      DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
+      DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
+      BISON_EXECUTABLE = "$(Get-BisonExecutable)";
+      FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # ds2 is a standalone executable, so keep the static C++ runtime.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Build-BoringSSL([Hashtable] $Platform,
