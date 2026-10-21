@@ -4,6 +4,8 @@
 // RUN:   -I %t/Inputs %t/test.swift \
 // RUN:   -cxx-interoperability-mode=default
 
+// FIXME: The synthesized conformance of std::vector to CxxVector on android-armv7 is invalid
+// https://github.com/swiftlang/swift/issues/93524
 // XFAIL: OS=linux-androideabi
 
 //--- Inputs/module.modulemap
