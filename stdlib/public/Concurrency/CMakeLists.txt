@@ -82,6 +82,7 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-strict-memory-safety")
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowUnsafeAttribute")
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowIsolatedGlobalActorAttribute")
 
 if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
