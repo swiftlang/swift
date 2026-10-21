@@ -1573,7 +1573,10 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, elementTy, dc, getter->getClangNode());
 
-  thunk->setAccess(getOverridableAccessLevel(dc));
+  // Take the access the subscript was given rather than recomputing it: an
+  // objc_direct subscript is imported 'public' rather than 'open', and the
+  // accessors have to agree with their storage.
+  thunk->setAccess(subscript->getFormalAccess());
 
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
     thunk->addAttribute(objcAttr->clone(C));
@@ -1617,7 +1620,8 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
       valueIndicesPL, TupleType::getEmpty(C), dc,
       setter->getClangNode());
 
-  thunk->setAccess(getOverridableAccessLevel(dc));
+  // As for the getter; the AST verifier checks this one against the storage.
+  thunk->setAccess(subscript->getSetterFormalAccess());
 
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
     thunk->addAttribute(objcAttr->clone(C));

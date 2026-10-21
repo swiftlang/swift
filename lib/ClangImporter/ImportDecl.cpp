@@ -5814,8 +5814,14 @@ namespace {
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 
-      result->setAccess(decl->isDirectMethod() ? AccessLevel::Public
-                                               : getOverridableAccessLevel(dc));
+      // An accessor has its storage's access, which accounts for the other
+      // accessor being direct.
+      if (accessorInfo)
+        result->setAccess(accessorInfo->Storage->getFormalAccess());
+      else
+        result->setAccess(decl->isDirectMethod()
+                              ? AccessLevel::Public
+                              : getOverridableAccessLevel(dc));
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() ==
@@ -6731,8 +6737,17 @@ namespace {
       }
 
       auto type = importedType.getType();
-      const auto access = decl->isDirectProperty() ? AccessLevel::Public
-                                                   : getOverridableAccessLevel(dc);
+      // A direct accessor makes its storage 'final' (see importAttributes),
+      // even when the property isn't direct: a header can redeclare just its
+      // getter or setter objc_direct. A final declaration can't be 'open'.
+      auto isDirect = [](const clang::ObjCMethodDecl *accessor) {
+        return accessor && accessor->isDirectMethod();
+      };
+      const auto access = decl->isDirectProperty() ||
+                                  isDirect(decl->getGetterMethodDecl()) ||
+                                  isDirect(decl->getSetterMethodDecl())
+                              ? AccessLevel::Public
+                              : getOverridableAccessLevel(dc);
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl, access,
           /*IsStatic*/decl->isClassProperty(), VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
@@ -8528,10 +8543,13 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                                                         /*genericParams=*/nullptr,
                                                         getter->getClangNode());
 
+  // As for a property, either accessor being direct makes the subscript final.
   bool IsObjCDirect = false;
   if (auto objCDecl = dyn_cast<clang::ObjCMethodDecl>(getter->getClangDecl())) {
     IsObjCDirect = objCDecl->isDirectMethod();
   }
+  if (setterObjCMethod && setterObjCMethod->isDirectMethod())
+    IsObjCDirect = true;
   const auto access = IsObjCDirect ? AccessLevel::Public
                                    : getOverridableAccessLevel(dc);
   subscript->setAccess(access);
