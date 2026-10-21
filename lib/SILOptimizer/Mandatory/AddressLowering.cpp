@@ -561,6 +561,9 @@ struct AddressLoweringState {
   // checked_cast_br instructions to loadable type which need to be rewritten.
   SmallVector<CheckedCastBranchInst *, 2> nonopaqueResultCCBs;
 
+  // debug_value operands that are an address-only undef.
+  SmallVector<Operand *, 2> undefDebugValueOperands;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
   
@@ -780,11 +783,18 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
   // This must happen after all indirect result types have been added, to match
   // the convention.
   if (auto errorTy = pass.loweredFnConv.getIndirectErrorResultType(typeCtx))
-    createIndirectResult(errorTy, "$error", argIdx++);
+    createIndirectResult(errorTy, SILDebugVariable::ErrorVariableName,
+                         argIdx++);
 
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults() +
                        pass.loweredFnConv.getNumIndirectSILErrorResults());
   return argIdx;
+}
+
+/// Whether `value` is an undef of address-only type in OV-form.
+static bool isAddressOnlyUndef(SILValue value, AddressLoweringState &pass) {
+  return isa<SILUndef>(value) && value->getType().isObject() &&
+         value->getType().isAddressOnly(*pass.function);
 }
 
 namespace {
@@ -835,6 +845,18 @@ void OpaqueValueVisitor::mapValueStorage() {
 
       if (auto *yieldInst = dyn_cast<YieldInst>(&inst)) {
         pass.yieldInsts.push_back(yieldInst);
+      }
+
+      // The verifier allows an object-typed undef for the `$error` variable,
+      // so leave those alone.
+      if (auto *debugInst = dyn_cast<DebugValueInst>(&inst)) {
+        auto varInfo = debugInst->getVarInfo();
+        if (!varInfo || !varInfo->isErrorVariable()) {
+          for (Operand &use : debugInst->getAllOperands()) {
+            if (isAddressOnlyUndef(use.get(), pass))
+              pass.undefDebugValueOperands.push_back(&use);
+          }
+        }
       }
 
       for (auto result : inst.getResults()) {
@@ -4947,6 +4969,15 @@ static void rewriteFunction(AddressLoweringState &pass) {
 
   for (auto *ccbi : pass.nonopaqueResultCCBs) {
     CheckedCastBrRewriter(ccbi, pass).rewrite();
+  }
+
+  // Rewrite `debug_value undef : $T` into the form the address pipeline
+  // produces for the same code: `debug_value undef : $*T, ..., expr op_deref`.
+  for (Operand *use : pass.undefDebugValueOperands) {
+    auto *debugInst = cast<DebugValueInst>(use->getUser());
+    SILType addrType = use->get()->getType().getAddressType();
+    use->set(SILUndef::get(pass.function, addrType));
+    debugInst->prependDeref(use->getOperandNumber());
   }
 
   // Rewrite this function's return value now that all opaque values within the

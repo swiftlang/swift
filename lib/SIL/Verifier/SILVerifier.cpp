@@ -1811,7 +1811,7 @@ public:
     // result), not the function it was inlined into. Look through the
     // debug scope to that function rather than checking the containing
     // function.
-    if (isa<DebugValueInst>(inst) && varInfo->Name == "$error") {
+    if (isa<DebugValueInst>(inst) && varInfo->isErrorVariable()) {
       auto *owningFn = varInfo->Scope->getInlinedFunction();
       require(owningFn->getLoweredFunctionType()->hasErrorResult(),
               "'$error' debug_value may only appear in a function whose "

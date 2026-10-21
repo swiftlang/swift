@@ -752,8 +752,8 @@ bool DebugValueInst::isExprTypeValid() const {
     // Cannot have an object category undef value of an address-only type,
     // except for the $error variable, which is handled differently.
     if (isa<SILUndef>(operand) && valueType.isObject() &&
-        !valueType.isLoadableOrOpaque(*getFunction())
-        && varInfo.Name != "$error") {
+        !valueType.isLoadableOrOpaque(*getFunction()) &&
+        !varInfo.isErrorVariable()) {
       return false;
     }
   } else {

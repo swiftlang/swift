@@ -6343,7 +6343,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   auto VarInfo = i->getCompleteVarInfo();
-  if (SILVal && isa<SILUndef>(SILVal) && VarInfo.Name == "$error") {
+  if (SILVal && isa<SILUndef>(SILVal) && VarInfo.isErrorVariable()) {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
     if (!SILVal->getType().isAddress() && !i->getDebugScope()->InlinedCallSite) {
