@@ -2555,6 +2555,12 @@ def in_process_plugin_server_path : Separate<["-"], "in-process-plugin-server-pa
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Path to dynamic library plugin server">;
 
+def resolved_in_process_plugin_server_path
+  : Separate<["-"], "resolved-in-process-plugin-server-path">,
+  Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+  HelpText<"Path to dynamic library plugin server resolved by the dependency "
+           "scanner. Overrides '-in-process-plugin-server-path'">;
+
 def disable_sandbox:
   Flag<["-"], "disable-sandbox">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
