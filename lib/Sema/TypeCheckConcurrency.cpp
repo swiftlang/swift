@@ -3441,6 +3441,7 @@ namespace {
         // expressions that wrap the closure and cannot wait for the walker
         // to find it in this case.
         determineClosureIsolationInContext(closure, Parent.getAsExpr());
+        checkUnownedIsolatedSelfCapture(captureList);
       }
 
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
@@ -4558,6 +4559,41 @@ namespace {
       value->diagnose(
           diag::kind_declared_here, value->getDescriptiveKind());
       return true;
+    }
+
+    /// Reject an `unowned` or `unowned(unsafe)` capture of 'self' that the
+    /// closure is isolated to, since we cannot lower that isolation.
+    void checkUnownedIsolatedSelfCapture(CaptureListExpr *captureList) {
+      auto isolation = captureList->getClosureBody()->getActorIsolation();
+      if (!isolation.isActorInstanceIsolated())
+        return;
+
+      auto *isolatedVar = isolation.getActorInstance();
+      if (!isolatedVar || !isolatedVar->isSelfParamCapture())
+        return;
+
+      auto *attr =
+          isolatedVar->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+      if (!attr || attr->isInvalid())
+        return;
+
+      switch (attr->get()) {
+      case ReferenceOwnership::Strong:
+      case ReferenceOwnership::Weak:
+        return;
+      case ReferenceOwnership::Unowned:
+      case ReferenceOwnership::Unmanaged:
+        break;
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::actor_isolated_closure_unowned_self_capture,
+                         attr->get());
+      ctx.Diags
+          .diagnose(attr->getLocation(),
+                    diag::actor_isolated_closure_unowned_self_capture_use_weak)
+          .fixItReplace(attr->getRange(), "weak");
+      attr->setInvalid();
     }
 
     ///
