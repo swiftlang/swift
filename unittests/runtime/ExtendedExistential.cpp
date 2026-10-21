@@ -532,3 +532,41 @@ TEST(TestExtendedExistential, defaultMetatypeValueWitnesses) {
   EXPECT_EQ(vwtable2->size, sizeof(void*) + 2 * sizeof(void*));
   EXPECT_TRUE(vwtable2->isPOD());
 }
+
+TEST(TestExtendedExistential, generalizationParamInverses) {
+  // The shape of `any Base<T> & P` for `class Base<T: ~Copyable>`, as older
+  // compilers emitted it.
+  auto shape0 = buildGlobalShape([]{
+    return shape(
+      genSig(param()),
+      special(SpecialKind::Class),
+      shapeType(protocolType(P())),
+      reqSig(param(), param(),
+             conforms(reqParam(1), P()),
+             inverted(reqParam(0), 0, {InvertibleProtocolKind::Copyable}))
+    );
+  });
+  EXPECT_TRUE(shape0->getSelfInvertedProtocols().empty());
+  EXPECT_TRUE(shape0->isCopyable());
+
+  const void *args0[] = { metadata(0) };
+  auto metadata0 = swift_getExtendedExistentialTypeMetadata_unique(shape0, args0);
+  EXPECT_TRUE(metadata0->getValueWitnesses()->flags.isCopyable());
+
+  auto shape1 = buildGlobalShape([]{
+    return shape(
+      genSig(param()),
+      shapeType(protocolType(P())),
+      reqSig(param(), param(),
+             conforms(reqParam(1), P()),
+             inverted(reqParam(1), 1, {InvertibleProtocolKind::Copyable}))
+    );
+  });
+  EXPECT_EQ(shape1->getSelfInvertedProtocols(),
+            InvertibleProtocolSet({InvertibleProtocolKind::Copyable}));
+  EXPECT_FALSE(shape1->isCopyable());
+
+  const void *args1[] = { metadata(0) };
+  auto metadata1 = swift_getExtendedExistentialTypeMetadata_unique(shape1, args1);
+  EXPECT_FALSE(metadata1->getValueWitnesses()->flags.isCopyable());
+}
