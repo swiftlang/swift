@@ -3319,50 +3319,85 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
   const_cast<Expr *>(E)->walk(W);
 }
 
+namespace {
+class CaptureWalker : public BaseDiagnosticWalker {
+  llvm::function_ref<bool(Type)> ShouldCheckClosure;
+  llvm::function_ref<void(ValueDecl *, Type)> CaptureCallback;
+
+public:
+  CaptureWalker(llvm::function_ref<bool(Type)> shouldCheckClosure,
+                llvm::function_ref<void(ValueDecl *, Type)> perCaptureCallback)
+      : ShouldCheckClosure(shouldCheckClosure),
+        CaptureCallback(perCaptureCallback) {}
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    auto *captureList = dyn_cast<CaptureListExpr>(E);
+    if (!captureList)
+      return Action::Continue(E);
+
+    auto closureType = captureList->getClosureBody()->getType();
+    if (!closureType || closureType->hasError() ||
+        !ShouldCheckClosure(closureType))
+      return Action::Continue(E);
+
+    for (const auto &capture : captureList->getCaptureList()) {
+      auto *V = capture.getVar();
+      if (V->isInvalid())
+        continue;
+
+      auto type = V->getTypeInContext();
+      if (type->hasError())
+        continue;
+
+      CaptureCallback(V, type);
+    }
+
+    return Action::Continue(E);
+  }
+};
+} // end anonymous namespace
+
+/// Invokes \p perCapture for each valid capture list entry of every closure
+/// in \p E for which \p shouldCheckClosure holds.
+static void
+walkCaptureListEntries(const Expr *E,
+                       llvm::function_ref<bool(Type)> shouldCheckClosure,
+                       llvm::function_ref<void(ValueDecl *, Type)> perCapture) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  CaptureWalker W(shouldCheckClosure, perCapture);
+  const_cast<Expr *>(E)->walk(W);
+}
+
 /// A closure owns its capture list entries, and destroying a closure destroys
 /// what it owns. So a closure that can be destroyed without running can't own
 /// a value that can't be destroyed implicitly.
 static void diagnoseNondeinitableCaptureListEntries(const Expr *E,
                                                     const DeclContext *DC) {
-  if (!E || isa<ErrorExpr>(E) || !E->getType())
-    return;
+  auto &ctx = DC->getASTContext();
+  walkCaptureListEntries(
+      E, [](Type closureType) { return closureType->isDeinitable(); },
+      [&ctx](ValueDecl *capture, Type captureType) {
+        if (!captureType->isDeinitable())
+          ctx.Diags.diagnose(capture->getLoc(),
+                             diag::deinitable_closure_nondeinitable_capture,
+                             /*captureList=*/1, capture, captureType);
+      });
+}
 
-  class CaptureWalker : public BaseDiagnosticWalker {
-    ASTContext &Ctx;
-
-  public:
-    CaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      auto *captureList = dyn_cast<CaptureListExpr>(E);
-      if (!captureList)
-        return Action::Continue(E);
-
-      auto closureType = captureList->getClosureBody()->getType();
-      if (!closureType || closureType->hasError() ||
-          !closureType->isDeinitable())
-        return Action::Continue(E);
-
-      for (const auto &capture : captureList->getCaptureList()) {
-        auto *V = capture.getVar();
-        if (V->isInvalid())
-          continue;
-
-        auto type = V->getTypeInContext();
-        if (type->hasError() || type->isDeinitable())
-          continue;
-
-        Ctx.Diags.diagnose(V->getLoc(),
-                           diag::deinitable_closure_nondeinitable_capture,
-                           /*captureList=*/1, V, type);
-      }
-
-      return Action::Continue(E);
-    }
-  };
-
-  CaptureWalker W(DC->getASTContext());
-  const_cast<Expr *>(E)->walk(W);
+static void diagnoseNonTransferableCaptureListEntries(const Expr *E,
+                                                      const DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  walkCaptureListEntries(
+      E, [](Type closureType) { return closureType->isTransferable(); },
+      [&ctx](ValueDecl *capture, Type captureType) {
+        if (!captureType->isTransferable())
+          ctx.Diags.diagnose(
+              capture->getLoc(),
+              diag::non_transferable_capture_list_entry_in_transferable_closure,
+              capture, captureType);
+      });
 }
 
 bool TypeChecker::getDefaultGenericArgumentsString(
@@ -7615,6 +7650,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseUnusableForeignTypesInExpr(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
   diagnoseNondeinitableCaptureListEntries(E, DC);
+  diagnoseNonTransferableCaptureListEntries(E, DC);
   diagnoseImplicitForceUnwrap(E, DC);
 }
 

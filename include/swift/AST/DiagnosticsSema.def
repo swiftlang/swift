@@ -10022,6 +10022,16 @@ ERROR(invalid_non_transferable_and_attr_combination,none,
       "%0 attribute is not allowed on '@nontransferable' types",
       (TypeAttribute *))
 
+ERROR(non_transferable_capture_list_entry_in_transferable_closure,none,
+      "capture list entry %0 of 'Transferable'-conforming closure has "
+      "non-'Transferable' type %1",
+      (ValueDecl *, Type))
+
+ERROR(non_transferable_capture_in_transferable_closure,none,
+      "'Transferable'-conforming closure cannot capture non-'Transferable' "
+      "value %0",
+      (ValueDecl *))
+
 //===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//

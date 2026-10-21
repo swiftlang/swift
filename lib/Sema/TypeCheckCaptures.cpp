@@ -67,6 +67,9 @@ class FindCapturedVars : public ASTWalker {
   /// The values whose consumed captures were diagnosed because this closure
   /// can't own them.
   llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedOwnedCaptures;
+  /// The non-Transferable values whose captures were diagnosed because this
+  /// Transferable closure can't capture them.
+  llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedNonTransferableCaptures;
 
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
@@ -78,6 +81,8 @@ class FindCapturedVars : public ASTWalker {
   /// Whether calling this function consumes it, which lets its body consume
   /// captures.
   bool IsCallConsuming;
+  /// Whether calling this function cannot cross an isolation boundary.
+  bool NonTransferable;
   /// Whether this function can be destroyed without running, which is true
   /// for every function except an exactly-once closure.
   bool IsDeinitable;
@@ -88,12 +93,12 @@ class FindCapturedVars : public ASTWalker {
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
-                   bool ObjC, bool IsGenericFunction, bool IsCallConsuming,
-                   bool IsDeinitable = true)
+                   bool NonTransferable, bool ObjC, bool IsGenericFunction,
+                   bool IsCallConsuming, bool IsDeinitable = true)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
         NoEscape(NoEscape), ObjC(ObjC), IsCallConsuming(IsCallConsuming),
-        IsDeinitable(IsDeinitable), HasGenericParamCaptures(IsGenericFunction) {
-  }
+        NonTransferable(NonTransferable), IsDeinitable(IsDeinitable),
+        HasGenericParamCaptures(IsGenericFunction) {}
 
   CaptureInfo getCaptureInfo() const {
     DynamicSelfType *dynamicSelfToRecord = nullptr;
@@ -284,6 +289,7 @@ public:
     }
 
     checkOwnedCapture(capture);
+    checkCaptureTransferability(capture);
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
@@ -487,6 +493,35 @@ public:
       Context.Diags.diagnose(capture.getLoc(),
                              diag::deinitable_closure_nondeinitable_capture,
                              /*captureList=*/0, var, type);
+    }
+  }
+
+  /// A Transferable closure cannot capture non-Transferable values.
+  void checkCaptureTransferability(const CapturedValue &capture) {
+    // ~Transferable closure can capture both Transferable and ~Transferable
+    // values.
+    if (NonTransferable)
+      return;
+
+    // Capture list entries are diagnosed where they're declared.
+    auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+    if (!var || !var->hasInterfaceType())
+      return;
+
+    // The owning closure's capture list entries are diagnosed separately.
+    if (auto *captureList = var->getParentCaptureList()) {
+      if (captureList->getClosureBody() == CurDC)
+        return;
+    }
+
+    auto type = var->getTypeInContext();
+    if (type->hasError() || type->isTransferable())
+      return;
+
+    if (DiagnosedNonTransferableCaptures.insert(var).second) {
+      Context.Diags.diagnose(
+          capture.getLoc(),
+          diag::non_transferable_capture_in_transferable_closure, var);
     }
   }
 
@@ -1138,8 +1173,10 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   auto fnType = type->castTo<AnyFunctionType>();
   bool isNoEscape = fnType->isNoEscape();
-  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, AFD->isObjC(),
-                          AFD->hasGenericParamList(),
+  bool isNonTransferable = fnType->isNonTransferable();
+
+  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, isNonTransferable,
+                          AFD->isObjC(), AFD->hasGenericParamList(),
                           fnType->isCallConsuming());
 
   if (auto *body = AFD->getTypecheckedBody())
@@ -1218,7 +1255,9 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
 
   auto fnType = type->castTo<FunctionType>();
   bool isNoEscape = fnType->isNoEscape();
-  FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
+  bool isNonTransferable = fnType->isNonTransferable();
+
+  FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape, isNonTransferable,
                           /*isObjC=*/false, /*isGeneric=*/false,
                           fnType->isCallConsuming(),
                           !fnType->isNondeinitable());
@@ -1240,14 +1279,15 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   // A generic function always captures outer generic parameters.
   bool isGeneric = DC->isInnermostContextGeneric();
-
   bool isCallConsuming = false;
+  bool isNonTransferable = false;
   if (auto *closure = dyn_cast<AbstractClosureExpr>(E)) {
     isCallConsuming = closure->isCallConsuming();
+    isNonTransferable = closure->isNonTransferable();
   }
 
   FindCapturedVars finder(E->getLoc(), DC,
-                          /*isNoEscape=*/false,
+                          /*isNoEscape=*/false, isNonTransferable,
                           /*isObjC=*/false,
                           /*IsGeneric*/ isGeneric, isCallConsuming);
   E->walk(finder);
@@ -1276,6 +1316,7 @@ CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   FindCapturedVars finder(init->getLoc(), DC,
                           /*NoEscape=*/false,
+                          /*NonTransferable=*/false,
                           /*ObjC=*/false,
                           /*IsGenericFunction*/ false,
                           /*IsCallConsuming=*/false);
