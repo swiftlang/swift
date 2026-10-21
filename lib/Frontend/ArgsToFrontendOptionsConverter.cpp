@@ -158,6 +158,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
+  for (const auto *arg :
+       Args.filtered(OPT_experimental_clang_codegen_dependency))
+    Opts.ClangCodeGenDependencies.push_back(arg->getValue());
 
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);

@@ -63,6 +63,12 @@ class ModuleFileSharedCore {
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The primary target, variant, and native Clang context hash for imports.
+  /// Empty for modules that do not record it.
+  StringRef ClangModuleTarget;
+  SmallVector<StringRef, 4> ClangModuleReferenceTargets;
+  SmallVector<StringRef, 16> ClangContextArguments;
+
   /// The canonical name of the SDK the module was built with.
   StringRef SDKName;
 
@@ -121,6 +127,14 @@ class ModuleFileSharedCore {
   ArrayRef<StringRef> AllowableClientNames;
 
 public:
+  StringRef getClangModuleTarget() const { return ClangModuleTarget; }
+  ArrayRef<StringRef> getClangModuleReferenceTargets() const {
+    return ClangModuleReferenceTargets;
+  }
+  ArrayRef<StringRef> getClangContextArguments() const {
+    return ClangContextArguments;
+  }
+
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:

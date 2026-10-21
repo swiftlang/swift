@@ -10407,6 +10407,7 @@ public:
   };
   StringRef MangledName;
   Identifier OriginalModuleName;
+  Identifier OriginalClangTarget;
   bool OriginalModuleIsObjCHeader = false;
   ArrayRef<XRefPathPiece> OriginalXRefPath;
 

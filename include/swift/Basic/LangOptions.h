@@ -1137,6 +1137,28 @@ namespace swift {
     /// Extra arguments which should be passed to the Clang importer.
     std::vector<std::string> ExtraArgs;
 
+    /// Explicit Clang module inputs for the deployment-target codegen context.
+    /// Each entry has the form module-name=pcm-path.
+    std::vector<std::string> CodeGenModuleFiles;
+
+    /// The effective Swift target whose header definitions are used by this
+    /// explicit-module compilation. Empty outside the experimental mode.
+    std::string TargetContext;
+
+    /// Clang modules for validating declarations from a serialized Swift
+    /// producer, encoded as context=module-name=pcm-path.
+    std::vector<std::string> ProducerModuleFiles;
+
+    /// Saved native arguments for each producer, encoded as context=argument.
+    std::vector<std::string> ProducerContextArguments;
+
+    /// Native invocation identity of the shared SDK semantic module graph.
+    std::string SDKContext;
+
+    /// Complete Clang frontend arguments for a named dependency scan of a
+    /// serialized producer. Starts with -cc1; excludes the synthetic input.
+    std::vector<std::string> ClangContextArguments;
+
     /// A directory for overriding Clang's resource directory.
     std::string OverrideResourceDir;
 
@@ -1263,18 +1285,14 @@ namespace swift {
       using llvm::hash_combine;
       using llvm::hash_combine_range;
 
-      return hash_combine(ModuleCachePath,
-                          hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
-                          OverrideResourceDir,
-                          TargetCPU,
-                          BridgingHeader,
-                          PrecompiledHeaderOutputDir,
-                          static_cast<uint8_t>(Mode),
-                          DetailedPreprocessingRecord,
-                          ImportForwardDeclarations,
-                          DisableSwiftBridgeAttr,
-                          DisableOverlayModules,
-                          EnableClangSPI);
+      auto H = hash_combine(
+          ModuleCachePath,
+          hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
+          OverrideResourceDir, TargetCPU, BridgingHeader,
+          PrecompiledHeaderOutputDir, static_cast<uint8_t>(Mode),
+          DetailedPreprocessingRecord, ImportForwardDeclarations,
+          DisableSwiftBridgeAttr, DisableOverlayModules, EnableClangSPI);
+      return TargetContext.empty() ? H : hash_combine(H, TargetContext);
     }
 
     /// Return a hash code of any components from these options that should

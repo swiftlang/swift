@@ -562,12 +562,13 @@ static const clang::Decl *getTemplateInstantiation(const clang::Decl *D) {
   return nullptr;
 }
 
-static clang::Module *getOwningModule(const clang::Decl *ClangDecl) {
+static clang::Module *getOwningModule(ClangImporter::Implementation &Self,
+                                      const clang::Decl *ClangDecl) {
   std::optional<clang::Module *> M;
   if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
-    M = importer::getClangSubmoduleForDecl(Instance, true);
+    M = Self.getClangSubmoduleForDecl(Instance, true);
   } else {
-    M = importer::getClangSubmoduleForDecl(ClangDecl, true);
+    M = Self.getClangSubmoduleForDecl(ClangDecl, true);
   }
   if (M) {
     // the inner value can be null, so flatten it
@@ -579,9 +580,11 @@ static clang::Module *getOwningModule(const clang::Decl *ClangDecl) {
 struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
   bool hasForwardDeclaredConcreteType = false;
   const clang::Module *Owner;
+  ClangImporter::Implementation &Importer;
 
-  explicit ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner)
-      : Owner(Owner){};
+  ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner,
+                                     ClangImporter::Implementation &Importer)
+      : Owner(Owner), Importer(Importer) {}
 
   Action walkToTypePre(Type ty) override {
     DLOG("Walking type:\n");
@@ -602,7 +605,7 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
       return Action::Continue;
     }
 
-    const clang::Module *M = getOwningModule(ClangDecl);
+    const clang::Module *M = getOwningModule(Importer, ClangDecl);
     if (!M) {
       DLOG("Concrete type is in bridging header, which is always imported\n");
       return Action::Continue;
@@ -710,10 +713,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     return false;
   }
 
-  const clang::Module *OwningModule = getOwningModule(ClangDecl);
+  const clang::Module *OwningModule = getOwningModule(Self, ClangDecl);
   bool IsInBridgingHeader = MappedDecl->getModuleContext()->isClangBridgingHeaderImportModule();
   ASSERT(OwningModule || IsInBridgingHeader);
-  ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
+  ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule, Self);
 
   if (wouldBeIllegalInitializer(MappedDecl)) {
     DLOG("illegal initializer\n");

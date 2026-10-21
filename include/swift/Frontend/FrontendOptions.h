@@ -385,6 +385,9 @@ public:
   /// of the main Swift module's source files.
   bool ImportPrescan = false;
 
+  /// Scan the Clang dependency closure of these modules without Swift overlays.
+  std::vector<std::string> ClangCodeGenDependencies;
+
   /// After performing a dependency scanning action, serialize the scanner's internal state.
   bool SerializeDependencyScannerCache = false;
 

@@ -492,6 +492,11 @@ public:
     return new SwiftBinaryModuleDependencyStorage(*this);
   }
 
+  /// Header contexts required by serialized foreign references.
+  std::vector<std::string> clangTargetContexts;
+  /// Raw Clang arguments prefixed with their producer context and "=".
+  std::vector<std::string> clangContextArguments;
+
   /// The path to the .swiftmodule file.
   const std::string compiledModulePath;
 
@@ -715,6 +720,17 @@ public:
         pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
         nonPathCommandLine, fileDependencies, directoryDependencies,
         linkLibraries, clangIncludeTreeRoot, moduleCacheKey, IsSystem));
+  }
+
+  void setClangContextDependencies(ArrayRef<StringRef> targets,
+                                   ArrayRef<StringRef> arguments) {
+    auto *binary = cast<SwiftBinaryModuleDependencyStorage>(storage.get());
+    binary->clangTargetContexts.clear();
+    binary->clangContextArguments.clear();
+    for (auto target : targets)
+      binary->clangTargetContexts.push_back(target.str());
+    for (auto argument : arguments)
+      binary->clangContextArguments.push_back(argument.str());
   }
 
   /// Retrieve the module-level imports.

@@ -23,6 +23,7 @@
 
 #include "ImporterImpl.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 
 using namespace swift;
@@ -226,6 +227,14 @@ ClangImporter::resolveStableSerializationPath(
       if (!dc) return clang::DeclContext::lookup_result();
     } else {
       dc = clangCtx.getTranslationUnitDecl();
+    }
+
+    if (auto supplemented = Impl.lookupSupplementalClangDecls(dc, name.str());
+        !supplemented) {
+      Impl.SwiftContext.Diags.diagnose(
+          SourceLoc(), diag::error_from_clang,
+          llvm::toString(supplemented.takeError()));
+      return clang::DeclContext::lookup_result();
     }
 
     auto ident = &clangCtx.Idents.get(name.str());

@@ -111,9 +111,12 @@ mostRefinedFunctionRedecl(const clang::FunctionDecl *fn);
 ///
 /// The returned module may be null (but not \c None) if \p D comes from
 /// an imported header.
+/// When supplied, \p owner also provides module provenance for declarations
+/// supplemented from a separate SDK AST.
 std::optional<clang::Module *>
 getClangSubmoduleForDecl(const clang::Decl *D,
-                         bool allowForwardDeclaration = false);
+                         bool allowForwardDeclaration = false,
+                         const ClangImporter::Implementation *owner = nullptr);
 
 /// Retrieve the type of an instance of the given Clang declaration context,
 /// or a null type if the DeclContext does not have a corresponding type.

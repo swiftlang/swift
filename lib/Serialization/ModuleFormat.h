@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1039; // distributed thunk SILDeclRefs serialize their original decl
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1040; // preserve Clang target contexts in serialized references
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1023,6 +1023,9 @@ namespace options_block {
     OSLOG_STRING_SECTION_NAME,
     AGGRESSIVE_CMO,
     LIBRARY_LEVEL,
+    CLANG_MODULE_TARGET,
+    CLANG_MODULE_REFERENCE_TARGET,
+    CLANG_CONTEXT_ARGUMENT,
     // Internal sentinel. MUST remain the last enumerator in this block.
     // Equal to one past the last real record kind. Used by
     // Serialization.cpp to statically assert that OPTIONS_BLOCK's
@@ -1156,6 +1159,21 @@ namespace options_block {
   using LibraryLevelLayout = BCRecordLayout<
     LIBRARY_LEVEL,
     BCFixed<2>
+  >;
+
+  using ClangModuleTargetLayout = BCRecordLayout<
+    CLANG_MODULE_TARGET,
+    BCBlob // primary target, variant target, and native Clang context hash
+  >;
+
+  using ClangModuleReferenceTargetLayout = BCRecordLayout<
+    CLANG_MODULE_REFERENCE_TARGET,
+    BCBlob // a target context needed to resolve serialized Clang references
+  >;
+
+  using ClangContextArgumentLayout = BCRecordLayout<
+    CLANG_CONTEXT_ARGUMENT,
+    BCBlob // context descriptor=raw Clang frontend argument
   >;
 }
 
@@ -2267,7 +2285,8 @@ namespace decls_block {
   using XRefLayout = BCRecordLayout<
     XREF,
     ModuleIDField,  // base module ID
-    BCVBR<4>        // xref path length (cannot be 0)
+    BCVBR<4>,      // xref path length (cannot be 0)
+    IdentifierIDField // Clang target context, or 0 for the module's context
   >;
 
   using XRefTypePathPieceLayout = BCRecordLayout<

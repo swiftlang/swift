@@ -44,6 +44,26 @@ static void addScannerPrefixMapperInvocationArguments(
 /// Create the command line for Clang dependency scanning.
 std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
     ASTContext &ctx) {
+  const auto &savedArguments = ctx.ClangImporterOpts.ClangContextArguments;
+  if (!ctx.ClangImporterOpts.TargetContext.empty() ||
+      (!savedArguments.empty() && savedArguments.front() == "-cc1")) {
+    // Scan with the same resolved language and optimization settings that
+    // parsed this context. Modules still use the scanner's debug container.
+    clang::CompilerInvocation invocation(*Impl.Invocation);
+    invocation.getFrontendOpts().ProgramAction =
+        clang::frontend::ParseSyntaxOnly;
+    invocation.getHeaderSearchOpts().ModuleFormat = "obj";
+    auto &codeGen = invocation.getCodeGenOpts();
+    codeGen.DebugTypeExtRefs = true;
+    codeGen.setDebugInfo(llvm::codegenoptions::FullDebugInfo);
+    std::vector<std::string> arguments{ctx.ClangImporterOpts.clangPath};
+    auto clangArguments = invocation.getCC1CommandLine();
+    arguments.insert(arguments.end(), clangArguments.begin(),
+                     clangArguments.end());
+    addScannerPrefixMapperInvocationArguments(arguments, ctx);
+    arguments.push_back("-finclude-tree-preserve-pch-path");
+    return arguments;
+  }
   std::vector<std::string> commandLineArgs = getClangDriverArguments(ctx);
   addScannerPrefixMapperInvocationArguments(commandLineArgs, ctx);
 

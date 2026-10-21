@@ -67,6 +67,10 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_textual_details.command_line);
     swiftscan_string_dispose(details_impl->swift_textual_details.context_hash);
     swiftscan_string_dispose(
+        details_impl->swift_textual_details.clang_target_context);
+    swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.clang_context_arguments);
+    swiftscan_string_dispose(
         details_impl->swift_textual_details.cas_fs_root_id);
     swiftscan_string_dispose(
         details_impl->swift_textual_details.bridging_header_include_tree);
@@ -99,6 +103,10 @@ void swiftscan_dependency_info_details_dispose(
           details_impl->swift_binary_details.module_cache_key);
       swiftscan_string_dispose(
           details_impl->swift_binary_details.user_module_version);
+      swiftscan_string_set_dispose(
+          details_impl->swift_binary_details.clang_target_contexts);
+      swiftscan_string_set_dispose(
+          details_impl->swift_binary_details.clang_context_arguments);
       break;
   case SWIFTSCAN_DEPENDENCY_INFO_CLANG:
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
@@ -373,6 +381,17 @@ swiftscan_string_ref_t swiftscan_swift_textual_detail_get_context_hash(
   return details->swift_textual_details.context_hash;
 }
 
+swiftscan_string_ref_t swiftscan_swift_textual_detail_get_clang_target_context(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.clang_target_context;
+}
+
+swiftscan_string_set_t *
+swiftscan_swift_textual_detail_get_clang_context_arguments(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.clang_context_arguments;
+}
+
 bool swiftscan_swift_textual_detail_get_is_framework(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.is_framework;
@@ -459,6 +478,17 @@ bool swiftscan_swift_binary_detail_get_is_framework(
 swiftscan_string_ref_t swiftscan_swift_binary_detail_get_module_cache_key(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.module_cache_key;
+}
+
+swiftscan_string_set_t *swiftscan_swift_binary_detail_get_clang_target_contexts(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.clang_target_contexts;
+}
+
+swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_clang_context_arguments(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.clang_context_arguments;
 }
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t

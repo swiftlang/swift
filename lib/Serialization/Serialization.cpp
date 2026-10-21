@@ -886,6 +886,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
   BLOCK_RECORD(options_block, LIBRARY_LEVEL);
+  BLOCK_RECORD(options_block, CLANG_MODULE_TARGET);
+  BLOCK_RECORD(options_block, CLANG_MODULE_REFERENCE_TARGET);
+  BLOCK_RECORD(options_block, CLANG_CONTEXT_ARGUMENT);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -1239,6 +1242,22 @@ void Serializer::writeHeader() {
       options_block::LibraryLevelLayout LibLevel(Out);
       LibLevel.emit(ScratchRecord,
                     unsigned(M->getASTContext().LangOpts.LibraryLevel));
+
+      if (auto *loader = M->getASTContext().getClangModuleLoader()) {
+        auto *importer = static_cast<ClangImporter *>(loader);
+        options_block::ClangModuleTargetLayout ClangModuleTarget(Out);
+        ClangModuleTarget.emit(ScratchRecord,
+                               importer->getSDKReferenceTarget(nullptr));
+        for (const auto &target : importer->getSDKReferenceTargets()) {
+          options_block::ClangModuleReferenceTargetLayout referenceTarget(Out);
+          referenceTarget.emit(ScratchRecord, target);
+          options_block::ClangContextArgumentLayout argument(Out);
+          // A reference may originate in another producer's Clang context.
+          // Preserve each context's options independently of debug information.
+          for (const auto &arg : importer->getSDKReferenceArguments(target))
+            argument.emit(ScratchRecord, target + "=" + arg);
+        }
+      }
 
       if (M->isAggressiveCMOEnabled()) {
         options_block::AggressiveCMOEnabledLayout AggressiveCMOEnabled(Out);
@@ -2399,12 +2418,24 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::Module:
     llvm_unreachable("should only cross-reference something within a file");
 
-  case DeclContextKind::FileUnit:
+  case DeclContextKind::FileUnit: {
+    IdentifierID clangTargetID = 0;
+    if (crossReferencedDecl) {
+      if (auto *clangDecl = crossReferencedDecl->getClangDecl()) {
+        auto *importer = static_cast<ClangImporter *>(
+            getASTContext().getClangModuleLoader());
+        auto target = importer->getSDKReferenceTarget(clangDecl);
+        if (!target.empty())
+          clangTargetID =
+              addDeclBaseNameRef(getASTContext().getIdentifier(target));
+      }
+    }
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
     XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addContainingModuleRef(DC, /*ignoreExport=*/true),
-                           pathLen);
+                           pathLen, clangTargetID);
     break;
+  }
 
   case DeclContextKind::GenericTypeDecl: {
     auto generic = cast<GenericTypeDecl>(DC);
@@ -2651,8 +2682,9 @@ void Serializer::writeHiddenTypeXRef(
   ModuleID moduleID = hidden->OriginalModuleIsObjCHeader
                           ? ModuleID(OBJC_HEADER_MODULE_ID)
                           : addDeclBaseNameRef(hidden->OriginalModuleName);
-  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                         moduleID, hidden->OriginalXRefPath.size());
+  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode, moduleID,
+                         hidden->OriginalXRefPath.size(),
+                         addDeclBaseNameRef(hidden->OriginalClangTarget));
 
   abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
   for (const auto &piece : hidden->OriginalXRefPath) {
@@ -6642,6 +6674,14 @@ public:
       decl->dump(llvm::errs());
       llvm::report_fatal_error("failed to find a stable Swift serialization"
                                " path for the above Clang declaration");
+    }
+
+    auto *importer = static_cast<ClangImporter *>(getClangLoader());
+    auto target = importer->getSDKReferenceTarget(decl);
+    if (!target.empty()) {
+      Record.push_back(/*target-qualified reference*/ 3);
+      Record.push_back(
+          S.addDeclBaseNameRef(S.getASTContext().getIdentifier(target)));
     }
 
     if (path.isSwiftDecl()) {

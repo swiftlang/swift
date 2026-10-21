@@ -2336,6 +2336,67 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ClangScannerModuleCachePath = A->getValue();
   }
 
+  for (const Arg *A :
+       Args.filtered(OPT_experimental_clang_producer_module_file)) {
+    StringRef value = A->getValue();
+    auto [target, moduleFile] = value.split('=');
+    auto [name, path] = moduleFile.split('=');
+    if (target.empty() || name.empty() || path.empty()) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getSpelling(), value);
+      return true;
+    }
+    Opts.ProducerModuleFiles.push_back(value.str());
+  }
+
+  for (const Arg *A :
+       Args.filtered(OPT_experimental_clang_producer_context_argument)) {
+    StringRef value = A->getValue();
+    auto [context, argument] = value.split('=');
+    if (context.empty() || argument.empty()) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getSpelling(), value);
+      return true;
+    }
+    Opts.ProducerContextArguments.push_back(value.str());
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_experimental_clang_sdk_context))
+    Opts.SDKContext = A->getValue();
+
+  if (const Arg *A = Args.getLastArg(OPT_experimental_clang_target_context))
+    Opts.TargetContext = A->getValue();
+
+  if (Opts.TargetContext.empty() &&
+      FrontendOpts.RequestedAction ==
+          FrontendOptions::ActionType::ScanDependencies &&
+      !FrontendOpts.ClangCodeGenDependencies.empty())
+    Opts.TargetContext = LangOpts.Target.str();
+
+  for (const Arg *A : Args.filtered(OPT_experimental_clang_context_argument)) {
+    if (FrontendOpts.RequestedAction !=
+            FrontendOptions::ActionType::ScanDependencies ||
+        FrontendOpts.ClangCodeGenDependencies.empty()) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getSpelling(),
+                     "requires a named Clang dependency scan");
+      return true;
+    }
+    Opts.ClangContextArguments.push_back(A->getValue());
+  }
+
+  for (const Arg *A :
+       Args.filtered(OPT_experimental_clang_codegen_module_file)) {
+    StringRef value = A->getValue();
+    auto [name, path] = value.split('=');
+    if (name.empty() || path.empty()) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getSpelling(), value);
+      return true;
+    }
+    Opts.CodeGenModuleFiles.push_back(value.str());
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_target_cpu))
     Opts.TargetCPU = A->getValue();
 

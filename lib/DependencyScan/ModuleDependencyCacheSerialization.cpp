@@ -711,14 +711,15 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           headerImportID, definingInterfacePathID, searchPathArrayID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
           isFramework, isStatic, isBuiltWithCxxInterop, isResilient,
-          isStrictMemorySafety, moduleCacheKeyID, userModuleVersionID;
+          isStrictMemorySafety, moduleCacheKeyID, userModuleVersionID,
+          clangTargetContextsID, clangContextArgumentsID;
       SwiftBinaryModuleDetailsLayout::readRecord(
           Scratch, compiledModulePathID, moduleDocPathID,
           moduleSourceInfoPathID, headerImportID, definingInterfacePathID,
           headerModuleDependenciesArrayID, headerImportsSourceFilesArrayID,
           searchPathArrayID, isFramework, isStatic, isBuiltWithCxxInterop,
           isResilient, isStrictMemorySafety, moduleCacheKeyID,
-          userModuleVersionID);
+          userModuleVersionID, clangTargetContextsID, clangContextArgumentsID);
 
       auto compiledModulePath = getIdentifier(compiledModulePathID);
       if (!compiledModulePath)
@@ -755,6 +756,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           *searchPaths, *headerImport, *definingInterfacePath, isFramework,
           isStatic, isBuiltWithCxxInterop, isResilient, isStrictMemorySafety,
           *moduleCacheKey, *userModuleVersion);
+      auto contexts = getStringArray(clangTargetContextsID);
+      auto contextArguments = getStringArray(clangContextArgumentsID);
+      if (!contexts || !contextArguments)
+        llvm::report_fatal_error("Bad binary Clang context dependencies");
+      SmallVector<StringRef, 4> contextRefs(contexts->begin(), contexts->end());
+      SmallVector<StringRef, 16> argumentRefs(contextArguments->begin(),
+                                              contextArguments->end());
+      moduleDep.setClangContextDependencies(contextRefs, argumentRefs);
 
       addCommonDependencyInfo(moduleDep);
       addSwiftCommonDependencyInfo(moduleDep);
@@ -1092,6 +1101,8 @@ enum ModuleIdentifierArrayKind : uint8_t {
   DirectoryDependencies,
   VisibleClangModulesFromLookup,
   DependencyOnlyImports,
+  ClangTargetContexts,
+  ClangContextArguments,
   LastArrayKind
 };
 
@@ -1698,7 +1709,11 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
         swiftBinDeps->isStatic, swiftBinDeps->isBuiltWithCxxInterop,
         swiftBinDeps->isResilient, swiftBinDeps->isStrictMemorySafety,
         getIdentifier(swiftBinDeps->moduleCacheKey),
-        getIdentifier(swiftBinDeps->userModuleVersion));
+        getIdentifier(swiftBinDeps->userModuleVersion),
+        getIdentifierArrayID(moduleID,
+                             ModuleIdentifierArrayKind::ClangTargetContexts),
+        getIdentifierArrayID(moduleID,
+                             ModuleIdentifierArrayKind::ClangContextArguments));
     break;
   }
   case swift::ModuleDependencyKind::Clang: {
@@ -1964,6 +1979,11 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
             moduleID,
             ModuleIdentifierArrayKind::HeaderInputDependencySourceFiles,
             swiftBinDeps->headerSourceFiles);
+        addStringArray(moduleID, ModuleIdentifierArrayKind::ClangTargetContexts,
+                       swiftBinDeps->clangTargetContexts);
+        addStringArray(moduleID,
+                       ModuleIdentifierArrayKind::ClangContextArguments,
+                       swiftBinDeps->clangContextArguments);
         llvm::for_each(swiftBinDeps->serializedSearchPaths,
                        [this](auto &sp) { addIdentifier(sp.Path); });
         break;
