@@ -26,11 +26,11 @@ public struct S {
 
 public func function() {}
 
-// CHECK: @"$s6Expose12thinFunctionyyXfvp" = {{.*}}global ptr {{.*}}@"$s6Expose8functionyyF"{{.*}} [[THIN_FUNCTION:#[0-9]+]]
+// CHECK: @"$s6Expose12thinFunctionyyXfvp" = {{.*}}global ptr {{.*}}@"$s6Expose8functionyyF{{(\.ptrauth)?}}"{{.*}} [[THIN_FUNCTION:#[0-9]+]]
 @_expose(wasm)
 public var thinFunction: @convention(thin) () -> Void = function
 
-// CHECK: @"$s6Expose13thickFunctionyycvp" = {{.*}}global %swift.function { ptr {{.*}}@"$s6Expose8functionyyF"{{.*}}, ptr null }, {{.*}} [[THICK_FUNCTION:#[0-9]+]]
+// CHECK: @"$s6Expose13thickFunctionyycvp" = {{.*}}global %swift.function { ptr {{.*}}@"$s6Expose8functionyyF{{(\.ptrauth)?}}"{{.*}}, ptr null }, {{.*}} [[THICK_FUNCTION:#[0-9]+]]
 @_expose(wasm)
 public var thickFunction: () -> Void = function
 
