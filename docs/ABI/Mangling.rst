@@ -786,7 +786,7 @@ Types
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
-  function-signature ::= result-type params-type async? sendable? throws? differentiable? function-isolation? sending-result? // results and parameters
+  function-signature ::= result-type params-type async? sendable? nontransferable? throws? differentiable? function-isolation? sending-result? // results and parameters
 
   result-type ::= type
   result-type ::= empty-list                 // shortcut for ()
@@ -809,6 +809,9 @@ Types
   #endif
   #if SWIFT_RUNTIME_VERSION >= 6.2
     function-isolation :== 'YC'              // nonisolated(nonsending) on function type
+  #endif
+  #if SWIFT_RUNTIME_VERSION >= 6.5
+    nontransferable ::= 'Yd'                 // @nontransferable on function types
   #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type

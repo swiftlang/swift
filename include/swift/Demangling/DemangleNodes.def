@@ -434,6 +434,7 @@ NODE(YieldTypes)
 NODE(CalledAtMostOnceFunctionType)
 NODE(ImplCalledAtMostOnceFunction)
 NODE(BackDeploymentCopy)
+NODE(NonTransferableFunctionType)
 
 #undef CONTEXT_NODE
 #undef NODE

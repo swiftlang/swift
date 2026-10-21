@@ -873,6 +873,11 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
       }
     }
+    if (func->getExtendedFlags().getInvertedProtocols().contains(
+            InvertibleProtocolKind::Transferable)) {
+      funcNode->addChild(
+          Dem.createNode(Node::Kind::NonTransferableFunctionType), Dem);
+    }
     if (func->isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);

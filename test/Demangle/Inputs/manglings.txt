@@ -541,6 +541,14 @@ $syyXOD ---> @once () -> ()
 $syyXOoD ---> @callable(once) () -> ()
 $sSiIeOxd_SiIeOxr_TR ---> {T:} reabstraction thunk helper from @escaping @once @callee_owned () -> (@unowned Swift.Int) to @escaping @once @callee_owned () -> (@out Swift.Int)
 $sSiIeOoxd_SiIeOoxr_TR ---> {T:} reabstraction thunk helper from @escaping @callable(once) @callee_owned () -> (@unowned Swift.Int) to @escaping @callable(once) @callee_owned () -> (@out Swift.Int)
+$syyYdc ---> @nontransferable () -> ()
+$syyYdcD ---> @nontransferable () -> ()
+$syyYdcMd ---> demangling cache variable for type metadata for @nontransferable () -> ()
+$syyYdXE ---> @nontransferable () -> ()
+$syyYaYdKc ---> @nontransferable () async throws -> ()
+$syyYdScMYcc ---> @Swift.MainActor @nontransferable () -> ()
+$s1M7takesNTyyyyYdcF ---> M.takesNT(@nontransferable () -> ()) -> ()
+$s1M7genericyyxmRi2_zlF ---> M.generic<A where A: ~Swift.Transferable>(A.Type) -> ()
 async_Main ---> async main entry point
 async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
 async_MainTQ0_ ---> (1) await resume partial function for async main entry point

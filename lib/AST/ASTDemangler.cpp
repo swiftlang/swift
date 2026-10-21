@@ -624,6 +624,8 @@ Type ASTBuilder::createFunctionType(
                    getExecutionSemantics(extFlags.getExecutionSemantics()))
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
+                   .withNonTransferable(extFlags.getInvertedProtocols().contains(
+                       InvertibleProtocolKind::Transferable))
                    .build();
 
   return FunctionType::get(funcParams, /* yields */ {}, output, einfo);

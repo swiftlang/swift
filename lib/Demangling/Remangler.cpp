@@ -3670,6 +3670,12 @@ ManglingError Remangler::mangleConcurrentFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleNonTransferableFunctionType(Node *node,
+                                                           unsigned depth) {
+  Buffer << "Yd";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleAsyncAnnotation(Node *node, unsigned depth) {
   Buffer << "Ya";
   return ManglingError::Success;
