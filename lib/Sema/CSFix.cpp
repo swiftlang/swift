@@ -184,14 +184,28 @@ bool CoerceToCheckedCast::diagnose(const Solution &solution,
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   bool useConditionalCast,
-                                                  ConstraintLocator *locator) {
+                                                  ConstraintLocatorBuilder locator) {
   // If any of the types have type variables or holes, don't add the fix.
   // `typeCheckCheckedCast` doesn't support checking such types.
   if (fromType->hasTypeVariableOrHole() || toType->hasTypeVariableOrHole()) {
     return nullptr;
   }
 
-  auto anchor = locator->getAnchor();
+  // FIXME: Is there a better way of doing this? trySimplifyToExpr() returns
+  // the operand, not the CoerceExpr itself.
+  SmallVector<LocatorPathElt, 4> pathBuffer;
+  auto anchor = locator.getLocatorParts(pathBuffer);
+
+  if (!pathBuffer.empty() &&
+      pathBuffer.back().is<LocatorPathElt::CoercionOperand>()) {
+    pathBuffer.pop_back();
+  }
+
+  ArrayRef<LocatorPathElt> path = pathBuffer;
+
+  SourceRange range;
+  simplifyLocator(anchor, path, range);
+
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();
   auto *coerceExpr = getAsExpr<CoerceExpr>(anchor);
@@ -206,7 +220,8 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
     return nullptr;
 
   return new (cs.getAllocator())
-      CoerceToCheckedCast(cs, fromType, toType, useConditionalCast, locator);
+      CoerceToCheckedCast(cs, fromType, toType, useConditionalCast,
+                          cs.getConstraintLocator(locator));
 }
 
 bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,

@@ -1,11 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -Xllvm -sil-print-types -target %target-future-triple -I %t | %FileCheck %s --enable-var-scope
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// FIXME(distributed): test fails on optimized build: OSS - Swift (Tools Opt+No Assert,  Stdlib Opt+DebInfo, Test Simulator) - macOS
-// REQUIRES: radar97074020
 
 // This test checks that we resign the identity for local deallocations,
 // destroy only the correct stored properties whether remote or local, and also
@@ -36,6 +33,7 @@ distributed actor MyDistActor {
 // MARK: Destroying deinit
 
 // CHECK-LABEL: // MyDistActor.deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit11MyDistActorCfd : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[SELF:%[0-9]+]] : $MyDistActor):
 
@@ -46,7 +44,6 @@ distributed actor MyDistActor {
 // CHECK:  [[SYS_LOAD:%[0-9]+]] = load [[SYS_REF]] : $*FakeActorSystem
 // CHECK:  [[FN_REF:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV8resignIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
 // CHECK:  [[DROP:%[0-9]+]] = apply [[FN_REF]]([[ID_LOAD]], [[SYS_LOAD]]) : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
-// CHECK:  [[DROP:%[0-9]+]] = tuple ()
 
 // Destroy implicit Distributed Actor field: id
 // CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
@@ -82,6 +79,7 @@ distributed actor MyDistActor {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: MyDistActor.__deallocating_deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden @$s14default_deinit11MyDistActorCfD : $@convention(method) (@owned MyDistActor) -> () {
 // CHECK: bb0([[SELF:%[0-9]+]] : $MyDistActor):
 // CHECK:  [[EXI_SELF:%[0-9]+]] = init_existential_ref [[SELF]] : $MyDistActor : $MyDistActor, $AnyObject
@@ -109,34 +107,16 @@ distributed actor MyDistActor {
 // CHECK: // remoteActorDeinitBB
 // CHECK: [[REMOTE_ACTOR_DEINIT_BB]]:
 
-// The remote proxy invokes resignRemoteID before destroying its stored properties.
-// CHECK:  [[ID_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:  [[SYS_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
-// CHECK:  [[ID_LOAD_R:%[0-9]+]] = load [[ID_REF_R]] : $*ActorAddress
-// CHECK:  [[SYS_LOAD_R:%[0-9]+]] = load [[SYS_REF_R]] : $*FakeActorSystem
-// CHECK:  [[FN_REF_R:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV14resignRemoteIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
-// CHECK:  {{.*}} = apply [[FN_REF_R]]([[ID_LOAD_R]], [[SYS_LOAD_R]]) : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
-
-// Even just the remote deinit branch must destroy the ID
-// CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:  [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]] : $*ActorAddress
-// CHECK:  destroy_addr [[ACCESS]] : $*ActorAddress
-// CHECK:  end_access [[ACCESS]] : $*ActorAddress
-
-// As well as the actor system:
-// CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
-// CHECK:  [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]] : $*FakeActorSystem
-// CHECK:  destroy_addr [[ACCESS]] : $*FakeActorSystem
-// CHECK:  end_access [[ACCESS]] : $*FakeActorSystem
-
-// Destroy default actor implementation
-// CHECK:  [[BUILTIN:%[0-9]+]] = builtin "destroyDefaultActor"([[SELF]] : $MyDistActor) : $()
-
-// And deallocate the proxy
-// CHECK:  dealloc_ref [[SELF]] : $MyDistActor
-
-// Return
-// CHECK:  br [[FINISH_DEINIT_BB]]
+// The remote proxy invokes resignRemoteID (behind an availability check on some
+// platforms) and destroys its stored properties, so the order of these blocks is
+// not checked
+// CHECK-DAG:  witness_method $FakeActorSystem, #DistributedActorSystem.resignRemoteID
+// CHECK-DAG:  begin_access [deinit] [static] {{%[0-9]+}} : $*ActorAddress
+// CHECK-DAG:  destroy_addr {{%[0-9]+}} : $*ActorAddress
+// CHECK-DAG:  begin_access [deinit] [static] {{%[0-9]+}} : $*FakeActorSystem
+// CHECK-DAG:  destroy_addr {{%[0-9]+}} : $*FakeActorSystem
+// CHECK-DAG:  builtin "destroyDefaultActor"([[SELF]] : $MyDistActor) : $()
+// CHECK-DAG:  dealloc_ref [[SELF]] : $MyDistActor
 
 // CHECK: } // end sil function '$s14default_deinit11MyDistActorCfD'
 
@@ -152,7 +132,7 @@ distributed actor MyDistActorIsolated {
     self.localOnlyField = SomeClass()
   }
     
-  deinit {
+  isolated deinit {
     doIt()
   }
 }
@@ -160,6 +140,7 @@ distributed actor MyDistActorIsolated {
 // MARK: Destroying deinit
 
 // CHECK-LABEL: // MyDistActorIsolated.deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit19MyDistActorIsolatedCfd : $@convention(method) (@guaranteed MyDistActorIsolated) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[SELF:%[0-9]+]] : $MyDistActorIsolated):
 
@@ -170,7 +151,6 @@ distributed actor MyDistActorIsolated {
 // CHECK:  [[SYS_LOAD:%[0-9]+]] = load [[SYS_REF]] : $*FakeActorSystem
 // CHECK:  [[FN_REF:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV8resignIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
 // CHECK:  [[DROP:%[0-9]+]] = apply [[FN_REF]]([[ID_LOAD]], [[SYS_LOAD]]) : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
-// CHECK:  [[DROP:%[0-9]+]] = tuple ()
 
 // Destroy implicit Distributed Actor field: id
 // CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.id
@@ -200,6 +180,7 @@ distributed actor MyDistActorIsolated {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: MyDistActorIsolated.__isolated_deallocating_deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden @$s14default_deinit19MyDistActorIsolatedCfZ : $@convention(thin) (@owned MyDistActorIsolated) -> () {
 // CHECK: bb0([[SELF:%[0-9]+]] : $MyDistActorIsolated):
 // CHECK: [[DESTROYER_REF:%[0-9]+]] = function_ref @$s14default_deinit19MyDistActorIsolatedCfd : $@convention(method) (@guaranteed MyDistActorIsolated) -> @owned Builtin.NativeObject
@@ -214,6 +195,7 @@ distributed actor MyDistActorIsolated {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: MyDistActorIsolated.__deallocating_deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden @$s14default_deinit19MyDistActorIsolatedCfD : $@convention(method) (@owned MyDistActorIsolated) -> () {
 // CHECK: bb0([[SELF:%[0-9]+]] : $MyDistActorIsolated):
 // CHECK:  [[EXI_SELF:%[0-9]+]] = init_existential_ref [[SELF]] : $MyDistActorIsolated : $MyDistActorIsolated, $AnyObject
@@ -227,10 +209,11 @@ distributed actor MyDistActorIsolated {
 // CHECK: [[LOCAL_ACTOR_DEINIT_BB]]:
 // CHECK: [[ISOLATED_REF:%[0-9]+]] = function_ref @$s14default_deinit19MyDistActorIsolatedCfZ : $@convention(thin) (@owned MyDistActorIsolated) -> ()
 // CHECK: [[EXECUTOR:%[0-9]+]] = extract_executor [[SELF]] : $MyDistActorIsolated
-// CHECK: [[PERFORM_REF:%[0-9]+]] = function_ref @swift_task_deinitOnExecutor : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor) -> ()
-// CHECK: [[SELF_AS_ANY_OBJECT:%[0-9]+]] = unchecked_bitwise_cast [[SELF]] : $MyDistActorIsolated to $AnyObject
+// CHECK: [[PERFORM_REF:%[0-9]+]] = function_ref @swift_task_deinitOnExecutor : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor, Builtin.Word) -> ()
+// CHECK: [[SELF_AS_ANY_OBJECT:%[0-9]+]] = init_existential_ref [[SELF]] : $MyDistActorIsolated : $MyDistActorIsolated, $AnyObject
 // CHECK: [[ISOLATED_CASTED:%[0-9]+]] = convert_function [[ISOLATED_REF]] : $@convention(thin) (@owned MyDistActorIsolated) -> () to $@convention(thin) (@owned AnyObject) -> ()
-// CHECK: [[DROP:%[0-9]+]] = apply [[PERFORM_REF]]([[SELF_AS_ANY_OBJECT]], [[ISOLATED_CASTED]], [[EXECUTOR]]) : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor) -> ()
+// CHECK: [[FLAGS:%[0-9]+]] = integer_literal $Builtin.Word, 0
+// CHECK: [[DROP:%[0-9]+]] = apply [[PERFORM_REF]]([[SELF_AS_ANY_OBJECT]], [[ISOLATED_CASTED]], [[EXECUTOR]], [[FLAGS]]) : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor, Builtin.Word) -> ()
 // CHECK:  br [[FINISH_DEINIT_BB:bb[0-9]+]]
 
 // ===== -----------------------------------------------------------------------
@@ -243,34 +226,16 @@ distributed actor MyDistActorIsolated {
 // CHECK: // remoteActorDeinitBB
 // CHECK: [[REMOTE_ACTOR_DEINIT_BB]]:
 
-// The remote proxy invokes resignRemoteID before destroying its stored properties.
-// CHECK:  [[ID_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.id
-// CHECK:  [[SYS_REF_R:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.actorSystem
-// CHECK:  [[ID_LOAD_R:%[0-9]+]] = load [[ID_REF_R]] : $*ActorAddress
-// CHECK:  [[SYS_LOAD_R:%[0-9]+]] = load [[SYS_REF_R]] : $*FakeActorSystem
-// CHECK:  [[FN_REF_R:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV14resignRemoteIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
-// CHECK:  {{.*}} = apply [[FN_REF_R]]([[ID_LOAD_R]], [[SYS_LOAD_R]]) : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
-
-// Even just the remote deinit branch must destroy the ID
-// CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.id
-// CHECK:  [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]] : $*ActorAddress
-// CHECK:  destroy_addr [[ACCESS]] : $*ActorAddress
-// CHECK:  end_access [[ACCESS]] : $*ActorAddress
-
-// As well as the actor system:
-// CHECK:  [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActorIsolated, #MyDistActorIsolated.actorSystem
-// CHECK:  [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]] : $*FakeActorSystem
-// CHECK:  destroy_addr [[ACCESS]] : $*FakeActorSystem
-// CHECK:  end_access [[ACCESS]] : $*FakeActorSystem
-
-// Destroy default actor implementation
-// CHECK:  [[BUILTIN:%[0-9]+]] = builtin "destroyDefaultActor"([[SELF]] : $MyDistActorIsolated) : $()
-
-// And deallocate the proxy
-// CHECK:  dealloc_ref [[SELF]] : $MyDistActorIsolated
-
-// Return
-// CHECK:  br [[FINISH_DEINIT_BB]]
+// The remote proxy invokes resignRemoteID (behind an availability check on some
+// platforms) and destroys its stored properties, so the order of these blocks is
+// not checked
+// CHECK-DAG:  witness_method $FakeActorSystem, #DistributedActorSystem.resignRemoteID
+// CHECK-DAG:  begin_access [deinit] [static] {{%[0-9]+}} : $*ActorAddress
+// CHECK-DAG:  destroy_addr {{%[0-9]+}} : $*ActorAddress
+// CHECK-DAG:  begin_access [deinit] [static] {{%[0-9]+}} : $*FakeActorSystem
+// CHECK-DAG:  destroy_addr {{%[0-9]+}} : $*FakeActorSystem
+// CHECK-DAG:  builtin "destroyDefaultActor"([[SELF]] : $MyDistActorIsolated) : $()
+// CHECK-DAG:  dealloc_ref [[SELF]] : $MyDistActorIsolated
 
 // CHECK: } // end sil function '$s14default_deinit19MyDistActorIsolatedCfD'
 
@@ -290,6 +255,7 @@ actor SimpleActor {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: // SimpleActor.deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit11SimpleActorCfd : $@convention(method) (@guaranteed SimpleActor) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[SELF:%[0-9]+]] : $SimpleActor):
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $SimpleActor, #SimpleActor.someField
@@ -311,6 +277,7 @@ actor SimpleActor {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: // SimpleActor.__deallocating_deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit11SimpleActorCfD : $@convention(method) (@owned SimpleActor) -> () {
 // CHECK: bb0([[SELF:%[0-9]+]] : $SimpleActor):
 // CHECK: [[DESTROYER_REF:%[0-9]+]] = function_ref @$s14default_deinit11SimpleActorCfd : $@convention(method) (@guaranteed SimpleActor) -> @owned Builtin.NativeObject
@@ -329,7 +296,7 @@ actor SimpleActorIsolated {
   init() {
     self.someField = SomeClass()
   }
-  deinit {
+  isolated deinit {
     doIt()
   }
 }
@@ -338,6 +305,7 @@ actor SimpleActorIsolated {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: // SimpleActorIsolated.deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit19SimpleActorIsolatedCfd : $@convention(method) (@guaranteed SimpleActorIsolated) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[SELF:%[0-9]+]] : $SimpleActorIsolated):
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $SimpleActorIsolated, #SimpleActorIsolated.someField
@@ -353,6 +321,7 @@ actor SimpleActorIsolated {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: // SimpleActorIsolated.__isolated_deallocating_deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit19SimpleActorIsolatedCfZ : $@convention(thin) (@owned SimpleActorIsolated) -> () {
 // CHECK: bb0([[SELF:%[0-9]+]] : $SimpleActorIsolated):
 // CHECK: [[DESTROYER_REF:%[0-9]+]] = function_ref @$s14default_deinit19SimpleActorIsolatedCfd : $@convention(method) (@guaranteed SimpleActorIsolated) -> @owned Builtin.NativeObject
@@ -367,14 +336,16 @@ actor SimpleActorIsolated {
 
 // ===== -----------------------------------------------------------------------
 // CHECK-LABEL: // SimpleActorIsolated.__deallocating_deinit
+// CHECK-NEXT: // Isolation: {{.*}}
 // CHECK-NEXT: sil hidden{{.*}} @$s14default_deinit19SimpleActorIsolatedCfD : $@convention(method) (@owned SimpleActorIsolated) -> () {
 // CHECK: bb0([[SELF:%[0-9]+]] : $SimpleActorIsolated):
 // CHECK: [[ISOLATED_REF:%[0-9]+]] = function_ref @$s14default_deinit19SimpleActorIsolatedCfZ : $@convention(thin) (@owned SimpleActorIsolated) -> ()
 // CHECK: [[EXECUTOR:%[0-9]+]] = extract_executor [[SELF]] : $SimpleActorIsolated
-// CHECK: [[PERFORM_REF:%[0-9]+]] = function_ref @swift_task_deinitOnExecutor : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor) -> ()
-// CHECK: [[SELF_AS_ANY_OBJECT:%[0-9]+]] = unchecked_bitwise_cast [[SELF]] : $SimpleActorIsolated to $AnyObject
+// CHECK: [[PERFORM_REF:%[0-9]+]] = function_ref @swift_task_deinitOnExecutor : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor, Builtin.Word) -> ()
+// CHECK: [[SELF_AS_ANY_OBJECT:%[0-9]+]] = init_existential_ref [[SELF]] : $SimpleActorIsolated : $SimpleActorIsolated, $AnyObject
 // CHECK: [[ISOLATED_CASTED:%[0-9]+]] = convert_function [[ISOLATED_REF]] : $@convention(thin) (@owned SimpleActorIsolated) -> () to $@convention(thin) (@owned AnyObject) -> ()
-// CHECK: [[DROP:%[0-9]+]] = apply [[PERFORM_REF]]([[SELF_AS_ANY_OBJECT]], [[ISOLATED_CASTED]], [[EXECUTOR]]) : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor) -> ()
+// CHECK: [[FLAGS:%[0-9]+]] = integer_literal $Builtin.Word, 0
+// CHECK: [[DROP:%[0-9]+]] = apply [[PERFORM_REF]]([[SELF_AS_ANY_OBJECT]], [[ISOLATED_CASTED]], [[EXECUTOR]], [[FLAGS]]) : $@convention(thin) (@owned AnyObject, @convention(thin) (@owned AnyObject) -> (), Builtin.Executor, Builtin.Word) -> ()
 // CHECK:  [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:  return [[RESULT]] : $()
 // CHECK: } // end sil function '$s14default_deinit19SimpleActorIsolatedCfD'
