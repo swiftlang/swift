@@ -27,9 +27,7 @@ class Foo: NSObject {
   // CHECK-DAG: define hidden i64 @"-[Foo aPlusBWithInt:b:]D"(ptr %0, i64 %1, i64 %2)
   @objcDirect final func aPlusB(int: Int, b: Int) -> Int { return int + b }
 
-  // A non-direct @objc method keeps its selector-based thunk, which does take
-  // _cmd. This is the contrast for the two --implicit-check-not selector
-  // assertions on the RUN line above.
+  // Contrast: a non-direct @objc method keeps its thunk, which takes _cmd.
   // CHECK-DAG: define internal void @"$s{{.*}}12normalMethodyyFTo"(ptr %0, ptr %1)
   // CHECK-DAG: @"\01L_selector_data(normalMethod)"
   @objc final func normalMethod() {}
@@ -48,9 +46,7 @@ class Inits: NSObject {
   @objcDirect init(x: Int, y: Int) { super.init() }
 }
 
-// The class-name segment is the printed @interface identifier, not the mangled
-// runtime name -- guarded by --implicit-check-not='-[_TtC' above. A clang caller
-// references -[PlainClass ...]D, so emitting -[_TtC...]D would fail to link.
+// The class segment is the printed @interface name, not the mangled _TtC name.
 @objc public class PlainClass: NSObject {
   // CHECK-DAG: define i64 @"-[PlainClass returnOne]D"(ptr %0)
   @objcDirect public final func returnOne() -> Int { return 1 }
@@ -78,10 +74,8 @@ class Inits: NSObject {
   }
 }
 
-// Visibility follows the context-capped effective access: a public member of an
-// internal class is not externally reachable, so it stays hidden. Forcing the
-// linkage on the LinkInfo before createFunction() is what makes this hold;
-// markGlobalAsUsedBasedOnLinkage() would otherwise pin External + Default.
+// Visibility follows effective access, so a public member of an internal class
+// stays hidden.
 @objc public class Visibility: NSObject {
   // CHECK-DAG: define void @"-[Visibility publicDirect]D"(ptr %0)
   @objcDirect public  final func publicDirect()   {}
@@ -91,17 +85,7 @@ class Inits: NSObject {
   @objcDirect package final func packageDirect()  {}
 }
 
-// At -O nothing takes the address of a non-public direct symbol, so the linker
-// can strip it -- pinning either one would silently cost the whole size win.
-// Asserted with --implicit-check-not on the RUN line rather than with trailing
-// negative directives: llvm.used is emitted above every 'define', so a negative
-// directive placed after a define-matching one is scoped past it and can never
-// fire. The pattern anchors on 'ptr @', the form a symbol takes inside the used
-// array, because the bare name would also match packageDirect's surviving
-// hidden definition.
-//
-// Not asserted at -Onone. The non-public symbols have been seen in llvm.used
-// there, by a route LinkInfo::isUsed() does not explain; until that is pinned
-// down this test says nothing about -Onone rather than guessing.
+// At -O, non-public direct symbols stay out of llvm.used so they can be stripped.
+// Not checked at -Onone, where they show up in llvm.used for an unknown reason.
 // OPT: @llvm.used = {{.*}}"-[Visibility publicDirect]D"
 // OPT: define void @"-[Visibility publicDirect]D"(

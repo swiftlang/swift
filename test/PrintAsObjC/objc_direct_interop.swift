@@ -1,10 +1,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ObjCDirect
 
-// The Swift callee and the clang caller have to agree on the direct symbol, and
-// a mismatch shows up as a link error rather than a failed CHECK -- so the link
-// step below is itself an assertion. Everything here is static: nothing is run,
-// so this does not need executable_test.
+// The link step is itself a check: Swift and Clang must agree on the symbol.
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -36,11 +33,7 @@
 // RUN: %llvm-nm -u %t/use.o | %FileCheck %s -check-prefix=CLIENT
 // RUN: %target-clang %t/use.o %t/libMod.dylib -lobjc -framework Foundation -o %t/a.out
 
-// The client links and runs correctly, printing "1" then "0" -- the second from
-// a nil receiver going through clang's thunk. Running it needs a test host, so
-// it is not a RUN line; to check it by hand:
-//
-//     %target-codesign %t/a.out && %target-run %t/a.out
+// Not run, since that needs a test host; it prints 1, then 0 for nil.
 
 // HEADER: - (NSInteger)returnOne SWIFT_WARN_UNUSED_RESULT SWIFT_OBJC_DIRECT;
 // HEADER: - (void)normalMethod;
@@ -50,17 +43,13 @@
 // SELECTORS-NOT: {{^}}returnOne{{$}}
 // SELECTORS: {{^}}normalMethod{{$}}
 
-// The client emits an undefined reference to the callee's exported symbol, and
-// a local linkonce_odr thunk. It does not reference objc_msgSend for the direct
-// method.
+// The client calls the exported symbol through a local thunk, not objc_msgSend.
 // CLIENT: {{_?}}-[Direct returnOne]D
 
 // The call site branches to the caller-side thunk rather than objc_msgSend.
 // ASM: bl "_-[Direct returnOne]D_thunk"
 
-// The thunk holds the nil check the callee no longer has (cbz on self), and
-// reaches the true implementation with a tail call -- b, not bl. That musttail
-// is what keeps the thunk transparent to ARC.
+// The thunk nil-checks self (cbz) and tail-calls the implementation (b).
 // ASM-LABEL: "_-[Direct returnOne]D_thunk":
 // ASM: cbz
 // ASM: b "_-[Direct returnOne]D"
@@ -81,9 +70,7 @@ int main() {
   Direct *d = [[Direct alloc] init];
   printf("%ld\n", (long)[d returnOne]);
 
-  // A nullable receiver must go through the caller-side thunk, which returns a
-  // zero-initialized value instead of dereferencing nil. The callee contains no
-  // nil check at all under this ABI.
+  // A nil receiver goes through the caller-side thunk, which returns zero.
   Direct *maybeNil = nil;
   printf("%ld\n", (long)[maybeNil returnOne]);
   return 0;

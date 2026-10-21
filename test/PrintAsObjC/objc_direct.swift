@@ -15,10 +15,8 @@
 
 import ObjectiveC
 
-// The SWIFT_OBJC_DIRECT macro is defined in the header preamble, guarded on
-// __has_attribute so the header stays usable with a compiler that lacks
-// objc_direct. This has to be checked before the @interface: FileCheck's plain
-// CHECK directives match in order, and the preamble precedes the classes.
+// The macro is guarded on __has_attribute so the header stays usable with a
+// compiler that lacks objc_direct.
 // CHECK: # if __has_attribute(objc_direct)
 // CHECK-NEXT: #  define SWIFT_OBJC_DIRECT __attribute__((objc_direct))
 // CHECK-NEXT: # else

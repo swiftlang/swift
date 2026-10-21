@@ -5,19 +5,12 @@
 
 import Foundation
 
-// A direct method is absent from its class's Objective-C method list, so any
-// construct that reaches a method by selector at runtime is unsound against it.
+// MARK: - Runtime dispatch
 
 class DispatchConflicts: NSObject {
-  // 'final' does not exclude 'dynamic': IsDynamicRequest honours an explicit
-  // 'dynamic' before it consults isSemanticallyFinal(), so this has to be
-  // rejected on its own. Checked before the 'final' rule, hence no 'final'
-  // here -- if the order were wrong this would report "must be final" instead.
   @objcDirect dynamic func dynamicMethod() {}
   // expected-error@-1 {{'@objcDirect' cannot be applied to a 'dynamic' method; 'dynamic' requires dispatch through the Objective-C runtime}}
 
-  // An action is wired up by selector from a nib or storyboard, which the
-  // compiler never sees.
   @objcDirect @IBAction func action(_ sender: Any) {}
   // expected-error@-1 {{'@objcDirect' cannot be applied to an '@IBAction' or '@IBSegueAction' method; the action is invoked by selector}}
 
@@ -28,9 +21,6 @@ class DispatchConflicts: NSObject {
   @objcDirect final func plainDirect() {}
 }
 
-// An @objc protocol requirement is dispatched by selector, so a direct witness
-// would fail at every call made through the protocol -- far from the
-// declaration that carries the attribute.
 @objc protocol Greeter {
   func greet() // expected-note {{requirement 'greet()' declared here}}
   func wave()
@@ -44,16 +34,8 @@ class DirectGreeter: NSObject, Greeter {
   func wave() {}
 }
 
-// AnyObject dispatch sends by selector, so a direct method must not be a
-// candidate. It is excluded from the lookup rather than diagnosed, matching
-// what the compiler already does for methods imported from Clang's
-// objc_direct -- which turns the call into a compile error at the use site
-// instead of an unrecognized selector at runtime.
-//
-// Known limitation: if some *other* visible type has a non-direct method with
-// the same name and signature, that one is found instead and the call compiles.
-// Sending it to an instance of the direct class then fails at runtime, which is
-// the ambient hazard of AnyObject dispatch rather than one this attribute adds.
+// AnyObject lookup skips direct methods, as it does Clang's objc_direct ones.
+// A same-named method of another type is still found, and fails at run time.
 @objc class DirectOnly: NSObject {
   @objcDirect final func onlyDirect() -> Int { return 0 }
   @objc final func alsoNormal() -> Int { return 0 }
@@ -65,4 +47,29 @@ func anyObjectDispatch(_ x: AnyObject) {
 
   // Control: the sibling @objc method is still reachable dynamically.
   let _ = x.alsoNormal()
+}
+
+// MARK: - #selector
+
+// Two '#selector' uses give two notes on the declaration's line.
+@objc class SelectorTarget: NSObject {
+  // expected-note@+1 2 {{a direct method is not added to its class's Objective-C method list}}
+  @objcDirect final func directHandler() {}
+  // expected-note@+1 {{a direct method is not added to its class's Objective-C method list}}
+  @objcDirect public final func publicDirectHandler() {}
+
+  @objc final func normalHandler() {}
+}
+
+func formSelectors(_ target: SelectorTarget) {
+  _ = #selector(SelectorTarget.directHandler)
+  // expected-error@-1 {{argument of '#selector' refers to instance method 'directHandler()' that is a direct method}}
+
+  _ = #selector(SelectorTarget.publicDirectHandler)
+  // expected-error@-1 {{argument of '#selector' refers to instance method 'publicDirectHandler()' that is a direct method}}
+
+  _ = #selector(target.directHandler)
+  // expected-error@-1 {{argument of '#selector' refers to instance method 'directHandler()' that is a direct method}}
+
+  _ = #selector(SelectorTarget.normalHandler)
 }

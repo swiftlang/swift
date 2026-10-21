@@ -966,7 +966,7 @@ SIMPLE_DECL_ATTR(yield_once, Coroutine,
 // visitObjCDirectAttr rejects it.
 SIMPLE_DECL_ATTR(objcDirect, ObjCDirect,
   OnFunc | OnConstructor | OnDestructor,
-  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   181)
 DECL_ATTR_FEATURE_REQUIREMENT(ObjCDirect, ObjCDirect)
 

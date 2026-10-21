@@ -819,6 +819,10 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 UNINTERESTING_FEATURE(BuiltinRelaxedFP)
 
+static bool usesFeatureObjCDirect(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ObjCDirectAttr>();
+}
+
 static bool usesFeatureNondeinitableTypes(Decl *decl) {
   auto &ctx = decl->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::NondeinitableTypes))
