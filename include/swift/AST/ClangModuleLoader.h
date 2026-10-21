@@ -37,8 +37,10 @@ namespace swift {
 class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
+class ConstructorDecl;
 class Decl;
 class FuncDecl;
+class NominalTypeDecl;
 class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
@@ -377,6 +379,11 @@ public:
                                          SourceLoc useLoc) = 0;
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
+  /// Constructor that converts a foreign reference to the SWIFT_REFCOUNTED_PTR
+  /// \p smartPtr, or null if \p smartPtr is not a valid SWIFT_REFCOUNTED_PTR.
+  virtual ConstructorDecl *
+  getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) = 0;
 
   /// Determine whether this is a functional C++ type, e.g. std::function, for
   /// which Swift provides a synthesized constructor that takes a Swift closure

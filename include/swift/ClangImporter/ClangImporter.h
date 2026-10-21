@@ -783,6 +783,9 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  ConstructorDecl *
+  getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) override;
+
   bool needsClosureConstructor(
       const clang::CXXRecordDecl *recordDecl) const override;
 
@@ -1100,31 +1103,6 @@ getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
-
-enum class RefCountedPtrError {
-  NotAnnotated,
-  MissingToRawPointer,
-  ToRawPointerLookupFailure,
-  ToRawPointerLookupAmbiguity,
-  ToRawPointerNotFunction,
-  ToRawPointerWrongSignature,
-  CtorLookupAmbiguity,
-  CtorLookupFailure,
-  CtorWrongParamType
-};
-
-struct RefCountedPtrInfo {
-  ConstructorDecl *toSmartPtr;
-};
-
-struct RefCountedPtrRequestResult {
-  std::variant<RefCountedPtrInfo, RefCountedPtrError> result;
-  ValueDecl *toRawPtrFunc = nullptr;
-  StringRef toRawPtrName = "";
-};
-
-RefCountedPtrRequestResult
-getClangRefCountedSmartPointer(NominalTypeDecl *decl);
 
 /// Iterator categories, based on the std iterator tags
 enum class CxxIteratorCategory {

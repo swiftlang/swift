@@ -4156,14 +4156,13 @@ private:
   emitNativeToCppBridgedSmartPtr(ArgumentSource &&argSrc,
                                  const clang::CXXRecordDecl *rd,
                                  SILType destType, SILGenFunction &SGF) {
-    auto decl = cast<StructDecl>(
-        SGF.getASTContext().getClangModuleLoader()->lookupImportedDecl(rd));
-    auto result = importer::getClangRefCountedSmartPointer(decl);
+    auto *clangLoader = SGF.getASTContext().getClangModuleLoader();
+    auto decl = cast<StructDecl>(clangLoader->lookupImportedDecl(rd));
 
-    // We always have a RefCountedPtrInfo here as this is validated when the
-    // type is imported.
-    ConstructorDecl *selected =
-        std::get<importer::RefCountedPtrInfo>(result.result).toSmartPtr;
+    // The bridging constructor is always found here, since the smart pointer
+    // is validated when it is imported.
+    ConstructorDecl *selected = clangLoader->getRefCountedPtrBridgingCtor(decl);
+    ASSERT(selected && "BridgedSmartPtr should have bridging constructor");
     SILLocation loc = argSrc.getLocation();
     SILDeclRef c(selected, SILDeclRef::Kind::Allocator, true);
     SILValue bridgingFn = SGF.emitGlobalFunctionRef(loc, c);
