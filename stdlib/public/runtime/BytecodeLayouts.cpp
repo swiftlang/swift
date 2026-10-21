@@ -233,28 +233,76 @@ static constexpr bool platformSupportsTaggedPointers() {
     goto *dispatchTable[TAG];                                                  \
   } while (false)
 
-#define handleRefCounts(FN_TABLE, CONTINUE, METADATA, READER, ADDR_OFFSET,     \
-                        ...)                                                   \
+// Walks a layout string with computed-goto dispatch. With INLINE_ENUMS, the
+// active payload of a multi-payload enum is walked by the same loop instead of
+// a call to multiPayloadEnum*: the loop saves where the enum ends, continues
+// with the payload's ref counts and resumes after the enum at the payload's
+// End. Only one enum is walked inline at a time; enums inside its payload take
+// the call. Only for witnesses whose multi-payload handlers walk the active
+// payload with the same table (destroy, initWithCopy, initWithTake).
+#define handleRefCountsImpl(FN_TABLE, CONTINUE, INLINE_ENUMS, METADATA,        \
+                            READER, ADDR_OFFSET, ...)                          \
   do {                                                                         \
+    LayoutStringReader1 _resumeReader{nullptr};                                \
+    uintptr_t _resumeAddrOffset = 0;                                           \
     while (true) {                                                             \
       uint64_t TAG = 0;                                                        \
       uintptr_t OFFSET = 0;                                                    \
                                                                                \
-      _Pragma("clang diagnostic push") _Pragma(                                \
-          "clang diagnostic ignored \"-Wgnu-label-as-value\"")                 \
-          const void *dispatchTable[] = {                                      \
-              &&done,       &&Error,   &&NativeStrong,   &&NativeUnowned,      \
-              &&NativeWeak, &&Unknown, &&UnknownUnowned, &&UnknownWeak,        \
-              &&Bridge,     &&Block,   &&ObjC,           &&NativeSwiftObjC,    \
-              &&Metatype,   &&Generic, &&Existential,    &&Resilient,          \
-              &&Default,    &&Default, &&Default,        &&Default,            \
-              &&Default,    &&Default, &&Default,                              \
+      _Pragma("clang diagnostic push")                                         \
+          _Pragma("clang diagnostic ignored \"-Wgnu-label-as-value\"")         \
+              const void *dispatchTable[] = {                                  \
+                  &&End,                                                       \
+                  &&Error,                                                     \
+                  &&NativeStrong,                                              \
+                  &&NativeUnowned,                                             \
+                  &&NativeWeak,                                                \
+                  &&Unknown,                                                   \
+                  &&UnknownUnowned,                                            \
+                  &&UnknownWeak,                                               \
+                  &&Bridge,                                                    \
+                  &&Block,                                                     \
+                  &&ObjC,                                                      \
+                  &&NativeSwiftObjC,                                           \
+                  &&Metatype,                                                  \
+                  &&Generic,                                                   \
+                  &&Existential,                                               \
+                  &&Resilient,                                                 \
+                  &&Default,                                                   \
+                  &&Default,                                                   \
+                  &&Default,                                                   \
+                  &&Default,                                                   \
+                  &&MultiPayloadEnumFN,                                        \
+                  &&MultiPayloadEnumFNResolved,                                \
+                  &&MultiPayloadEnumGeneric,                                   \
       };                                                                       \
                                                                                \
       [[clang::nomerge]] {                                                     \
         CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
       }                                                                        \
                                                                                \
+      [[clang::nomerge]] {                                                     \
+      End:                                                                     \
+        if (INLINE_ENUMS && _resumeReader.layoutStr) {                         \
+          if (_resumeAddrOffset != ADDR_OFFSET) {                              \
+            copyPayloadBytes(ADDR_OFFSET, _resumeAddrOffset - ADDR_OFFSET,     \
+                             __VA_ARGS__);                                     \
+          }                                                                    \
+          ADDR_OFFSET = _resumeAddrOffset;                                     \
+          READER = _resumeReader;                                              \
+          _resumeReader.layoutStr = nullptr;                                   \
+          CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                \
+        }                                                                      \
+        goto done;                                                             \
+      }                                                                        \
+      INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFN, CONTINUE, INLINE_ENUMS,    \
+                                METADATA, READER, ADDR_OFFSET, __VA_ARGS__)    \
+      INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFNResolved, CONTINUE,          \
+                                INLINE_ENUMS, METADATA, READER, ADDR_OFFSET,   \
+                                __VA_ARGS__)                                   \
+      INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumGeneric, CONTINUE,             \
+                                INLINE_ENUMS, METADATA, READER, ADDR_OFFSET,   \
+                                __VA_ARGS__)                                   \
       [[clang::nomerge]] {                                                     \
       Error:                                                                   \
                                                                                \
@@ -344,6 +392,36 @@ static constexpr bool platformSupportsTaggedPointers() {
   done:                                                                        \
     break;                                                                     \
   } while (false)
+
+// The label for a multi-payload enum kind in handleRefCountsImpl. If the enum
+// can't be walked inline, it takes the call through the table.
+#define INLINE_MULTI_PAYLOAD_ENUM(KIND, CONTINUE, INLINE_ENUMS, METADATA,      \
+                                  READER, ADDR_OFFSET, ...)                    \
+  [[clang::nomerge]] {                                                         \
+  KIND:                                                                        \
+    if (INLINE_ENUMS && !_resumeReader.layoutStr) {                            \
+      uintptr_t enumStart = ADDR_OFFSET;                                       \
+      size_t enumSize;                                                         \
+      LayoutStringReader1 payloadReader;                                       \
+      if (readMultiPayloadEnum<RefCountingKind::KIND>(                         \
+              READER, payloadSourceAddr(__VA_ARGS__) + enumStart, enumSize,    \
+              payloadReader)) {                                                \
+        _resumeReader = READER;                                                \
+        _resumeAddrOffset = enumStart + enumSize;                              \
+        READER = payloadReader;                                                \
+      } else {                                                                 \
+        copyPayloadBytes(enumStart, enumSize, __VA_ARGS__);                    \
+        ADDR_OFFSET = enumStart + enumSize;                                    \
+      }                                                                        \
+      CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                    \
+    }                                                                          \
+    goto Default;                                                              \
+  }
+
+#define handleRefCounts(FN_TABLE, CONTINUE, ...)                               \
+  handleRefCountsImpl(FN_TABLE, CONTINUE, false, __VA_ARGS__)
+#define handleRefCountsInliningEnums(FN_TABLE, CONTINUE, ...)                  \
+  handleRefCountsImpl(FN_TABLE, CONTINUE, true, __VA_ARGS__)
 #endif
 
 typedef void (*DestrFn)(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -520,6 +598,69 @@ static void singlePayloadEnumSimple(const Metadata *metadata,
 }
 
 typedef unsigned (*GetEnumTagFn)(const uint8_t *);
+
+#if defined(__APPLE__) && defined(__arm64__)
+// Reads the header of a multi-payload enum at `addr` and advances `reader`
+// past the enum. Returns true, with `payloadReader` at the active payload's
+// ref counts, if that payload has ref-counted fields.
+template <RefCountingKind Kind>
+SWIFT_ALWAYS_INLINE static inline bool
+readMultiPayloadEnum(LayoutStringReader1 &reader, const uint8_t *addr,
+                     size_t &enumSize, LayoutStringReader1 &payloadReader) {
+  size_t numPayloads;
+  size_t refCountBytes;
+  uint64_t enumTag;
+  if constexpr (Kind == RefCountingKind::MultiPayloadEnumGeneric) {
+    size_t tagBytes;
+    reader.readBytes(tagBytes, numPayloads, refCountBytes, enumSize);
+    enumTag = readTagBytes(addr + enumSize - tagBytes, tagBytes);
+  } else {
+    GetEnumTagFn getEnumTag;
+    if constexpr (Kind == RefCountingKind::MultiPayloadEnumFN) {
+      getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
+    } else {
+      static_assert(Kind == RefCountingKind::MultiPayloadEnumFNResolved);
+      getEnumTag = reader.readBytes<GetEnumTagFn>();
+    }
+    reader.readBytes(numPayloads, refCountBytes, enumSize);
+    enumTag = getEnumTag(addr);
+  }
+
+  LayoutStringReader1 payloadOffsets = reader;
+  reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
+  if (SWIFT_UNLIKELY(enumTag >= numPayloads))
+    return false;
+
+  payloadReader = payloadOffsets;
+  size_t refCountOffset =
+      payloadOffsets.peekBytes<size_t>(enumTag * sizeof(size_t));
+  payloadReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+  return (payloadReader.peekBytes<uint64_t>() >> 56) !=
+         (uint64_t)RefCountingKind::End;
+}
+
+// Helpers for handleRefCountsImpl, overloaded on the witness's address
+// arguments: (addr) for destroy, (dest, src) for the copying witnesses.
+SWIFT_ALWAYS_INLINE static inline const uint8_t *
+payloadSourceAddr(uint8_t *addr) {
+  return addr;
+}
+
+SWIFT_ALWAYS_INLINE static inline const uint8_t *
+payloadSourceAddr(uint8_t *dest, uint8_t *src) {
+  return src;
+}
+
+SWIFT_ALWAYS_INLINE static inline void
+copyPayloadBytes(uintptr_t addrOffset, size_t size, uint8_t *addr) {}
+
+SWIFT_ALWAYS_INLINE static inline void copyPayloadBytes(uintptr_t addrOffset,
+                                                        size_t size,
+                                                        uint8_t *dest,
+                                                        uint8_t *src) {
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, size);
+}
+#endif
 
 static void singlePayloadEnumFN(const Metadata *metadata,
                                 LayoutStringReader1 &reader,
@@ -1073,8 +1214,8 @@ static void swift_cvw_destroyImpl(swift::OpaqueValue *address,
   uint8_t *addr = (uint8_t *)address;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCounts(destroyTable, CONTINUE_NO_COPY, metadata, reader, addrOffset,
-                  addr);
+  handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata, reader,
+                               addrOffset, addr);
 #else
   handleRefCountsDestroy(metadata, reader, addrOffset, addr);
 #endif
@@ -1089,8 +1230,8 @@ void swift::swift_cvw_arrayDestroy(swift::OpaqueValue *address, size_t count,
     uintptr_t addrOffset = i * stride;
 
 #if defined(__APPLE__) && defined(__arm64__)
-    handleRefCounts(destroyTable, CONTINUE_NO_COPY, metadata, reader,
-                    addrOffset, addr);
+    handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata,
+                                 reader, addrOffset, addr);
 #else
     handleRefCountsDestroy(metadata, reader, addrOffset, addr);
 #endif
@@ -1328,8 +1469,8 @@ swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
   uint8_t *src = (uint8_t *)_src;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCounts(initWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
-                  addrOffset, dest, src);
+  handleRefCountsInliningEnums(initWithCopyTable, CONTINUE_WITH_COPY, metadata,
+                               reader, addrOffset, dest, src);
 #else
   handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
 #endif
@@ -1350,8 +1491,8 @@ void swift::swift_cvw_arrayInitWithCopy(swift::OpaqueValue *_dest,
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
 #if defined(__APPLE__) && defined(__arm64__)
-    handleRefCounts(initWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
-                    addrOffset, dest, src);
+    handleRefCountsInliningEnums(initWithCopyTable, CONTINUE_WITH_COPY,
+                                 metadata, reader, addrOffset, dest, src);
 #else
     handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
 #endif
@@ -1491,8 +1632,8 @@ swift_cvw_initWithTakeImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
   uintptr_t addrOffset = 0;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCounts(initWithTakeTable, CONTINUE_WITH_COPY, metadata, reader,
-                  addrOffset, dest, src);
+  handleRefCountsInliningEnums(initWithTakeTable, CONTINUE_WITH_COPY, metadata,
+                               reader, addrOffset, dest, src);
 #else
   handleRefCountsInitWithTake(metadata, reader, addrOffset, dest, src);
 #endif
