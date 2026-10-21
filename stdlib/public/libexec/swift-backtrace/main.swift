@@ -126,8 +126,8 @@ internal struct SwiftBacktrace {
   static func write(_ string: String, flush: Bool = false) {
     #if os(Windows)
     if let eventLogText {
-      // we are collating the output to a string for writing at the
-      // end into the event log
+    // we are collating the output to a string for writing at the
+    // end into the event log
       eventLogText.append(string)
       return
     }
@@ -145,8 +145,8 @@ internal struct SwiftBacktrace {
   static func writeln(_ string: String, flush: Bool = false) {
     #if os(Windows)
     if let eventLogText {
-      // we are collating the output to a string for writing at the
-      // end into the event log
+    // we are collating the output to a string for writing at the
+    // end into the event log
       eventLogText.append(string)
       eventLogText.append("\n")
       return
@@ -796,11 +796,11 @@ Generate a backtrace for the parent process.
     }
 
     #if os(Windows)
-    if let eventLogText {
-      if !reportToEventLog(eventLogText, source: "Swift Backtrace") {
-        print("swift-backtrace: unable to write to the event log",
-              to: &standardError)
-      }
+    if let eventLogText,
+       !reportToEventLog(eventLogText, source: "Swift Backtrace") {
+      print("swift-backtrace: unable to write to the event log; "
+              + "writing the backtrace here instead", to: &standardError)
+      print(eventLogText, terminator: "", to: &standardError)
     }
     #endif
 
