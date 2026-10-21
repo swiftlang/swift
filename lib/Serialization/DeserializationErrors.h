@@ -309,7 +309,50 @@ public:
   static const void *classID() { return &ID; }
 };
 
-class XRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError> {
+// Service class for errors with an underlying cause.
+class ErrorWithUnderlyingReason {
+  std::unique_ptr<llvm::ErrorInfoBase> underlyingReason;
+
+public:
+  explicit ErrorWithUnderlyingReason (std::unique_ptr<llvm::ErrorInfoBase> reason) :
+    underlyingReason(std::move(reason)) {}
+
+  template <typename UnderlyingErrorT>
+  bool underlyingReasonIsA() const {
+    if (!underlyingReason)
+      return false;
+    return underlyingReason->isA<UnderlyingErrorT>();
+  }
+
+  void log(raw_ostream &OS) const {
+    if (underlyingReason) {
+      OS << "\nCaused by: ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  // Returns \c true if the error was diagnosed.
+  template <typename HandlerT>
+  bool diagnoseUnderlyingReason(HandlerT &&handler) {
+    if (underlyingReason &&
+        llvm::ErrorHandlerTraits<HandlerT>::appliesTo(*underlyingReason)) {
+      auto error = llvm::ErrorHandlerTraits<HandlerT>::apply(
+                                               std::forward<HandlerT>(handler),
+                                               std::move(underlyingReason));
+      if (!error) {
+        // The underlying reason was diagnosed.
+        return true;
+      } else {
+        underlyingReason = takeErrorInfo(std::move(error));
+        return false;
+      }
+    }
+    return false;
+  }
+};
+
+class XRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError>,
+                  public ErrorWithUnderlyingReason {
   friend ErrorInfo;
   static const char ID;
   void anchor() override;
@@ -318,14 +361,18 @@ class XRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError> {
   const char *message;
 public:
   template <size_t N>
-  XRefError(const char (&message)[N], XRefTracePath path, DeclName name)
-      : path(path), message(message) {
+  XRefError(
+      const char (&message)[N], XRefTracePath path, DeclName name,
+      std::unique_ptr<llvm::ErrorInfoBase> reason = nullptr)
+      : ErrorWithUnderlyingReason(std::move(reason)), path(path),
+        message(message) {
     this->name = name;
   }
 
   void log(raw_ostream &OS) const override {
     OS << message << " (" << name << ")\n";
     path.print(OS);
+    ErrorWithUnderlyingReason::log(OS);
   }
 
   std::error_code convertToErrorCode() const override {
@@ -436,7 +483,8 @@ public:
 };
 
 class OverrideError : public llvm::ErrorInfo<OverrideError,
-                                             DeclDeserializationError> {
+                                             DeclDeserializationError>,
+                      public ErrorWithUnderlyingReason {
 private:
   friend ErrorInfo;
   static const char ID;
@@ -444,7 +492,9 @@ private:
 
 public:
   explicit OverrideError(DeclName name,
-                         Flags flags={}, unsigned numTableEntries=0) {
+                         Flags flags={}, unsigned numTableEntries=0,
+                         std::unique_ptr<llvm::ErrorInfoBase> reason = nullptr)
+      : ErrorWithUnderlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
     this->numTableEntries = numTableEntries;
@@ -452,52 +502,11 @@ public:
 
   void log(raw_ostream &OS) const override {
     OS << "could not find '" << name << "' in parent class";
+    ErrorWithUnderlyingReason::log(OS);
   }
 
   std::error_code convertToErrorCode() const override {
     return llvm::inconvertibleErrorCode();
-  }
-};
-
-// Service class for errors with an underlying cause.
-class ErrorWithUnderlyingReason {
-  std::unique_ptr<llvm::ErrorInfoBase> underlyingReason;
-
-public:
-  explicit ErrorWithUnderlyingReason (std::unique_ptr<llvm::ErrorInfoBase> reason) :
-    underlyingReason(std::move(reason)) {}
-
-  template <typename UnderlyingErrorT>
-  bool underlyingReasonIsA() const {
-    if (!underlyingReason)
-      return false;
-    return underlyingReason->isA<UnderlyingErrorT>();
-  }
-
-  void log(raw_ostream &OS) const {
-    if (underlyingReason) {
-      OS << "\nCaused by: ";
-      underlyingReason->log(OS);
-    }
-  }
-
-  // Returns \c true if the error was diagnosed.
-  template <typename HandlerT>
-  bool diagnoseUnderlyingReason(HandlerT &&handler) {
-    if (underlyingReason &&
-        llvm::ErrorHandlerTraits<HandlerT>::appliesTo(*underlyingReason)) {
-      auto error = llvm::ErrorHandlerTraits<HandlerT>::apply(
-                                               std::forward<HandlerT>(handler),
-                                               std::move(underlyingReason));
-      if (!error) {
-        // The underlying reason was diagnosed.
-        return true;
-      } else {
-        underlyingReason = takeErrorInfo(std::move(error));
-        return false;
-      }
-    }
-    return false;
   }
 };
 
