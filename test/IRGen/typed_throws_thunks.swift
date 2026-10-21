@@ -115,10 +115,38 @@ protocol P2 {
 // CHECK:       success:
 // CHECK-NEXT:    ret i8 %{{.*}}
     func i() throws(Int8) -> Int8
+// CHECK-LABEL: define{{.*}} swiftcc { i64, i64 } @"$s19typed_throws_thunks2P2P1jAA9FiveBytesVSgyAA9FixedSizeVYKFTj"(
+// CHECK:         [[PAYLOAD:%.*]] = load i40, ptr
+// CHECK:         [[TAG:%.*]] = load i8, ptr
+// CHECK:       success:
+// CHECK:         store i40 [[PAYLOAD]], ptr [[RESULT:%.*]],
+// CHECK-NEXT:    [[TAG_ADDR:%.*]] = getelementptr inbounds{{.*}} %T19typed_throws_thunks9FiveBytesVSg, ptr [[RESULT]], i32 0, i32 1
+// CHECK-NEXT:    store i8 [[TAG]], ptr [[TAG_ADDR]]
+// CHECK-NEXT:    [[RESULT_ADDR:%.*]] = getelementptr inbounds{{.*}} { i64 }, ptr [[RESULT]], i32 0, i32 0
+// CHECK-NEXT:    [[NATIVE:%.*]] = load i64, ptr [[RESULT_ADDR]]
+// CHECK:         [[COMBINED:%.*]] = insertvalue { i64, i64 } undef, i64 [[NATIVE]], 0
+// CHECK-NEXT:    ret { i64, i64 } [[COMBINED]]
+    func j() throws(FixedSize) -> FiveBytes?
+// CHECK-LABEL: define{{.*}} swifttailcc void @"$s19typed_throws_thunks2P2P1kAA9FiveBytesVSgyYaAA1EOYKFTj"(
+// CHECK:         [[PAYLOAD:%.*]] = load i40, ptr
+// CHECK:         [[TAG:%.*]] = load i8, ptr
+// CHECK:       success:
+// CHECK:         store i40 [[PAYLOAD]], ptr [[RESULT:%.*]],
+// CHECK-NEXT:    [[TAG_ADDR:%.*]] = getelementptr inbounds{{.*}} %T19typed_throws_thunks9FiveBytesVSg, ptr [[RESULT]], i32 0, i32 1
+// CHECK-NEXT:    store i8 [[TAG]], ptr [[TAG_ADDR]]
+// CHECK-NEXT:    [[RESULT_ADDR:%.*]] = getelementptr inbounds{{.*}} { i64 }, ptr [[RESULT]], i32 0, i32 0
+// CHECK-NEXT:    [[NATIVE:%.*]] = load i64, ptr [[RESULT_ADDR]]
+// CHECK:         call void (ptr, i1, ...) @llvm.coro.end.async({{.*}}, i64 [[NATIVE]], ptr
+    func k() async throws(E) -> FiveBytes?
 }
 
 extension Int8 : Error {}
 
 enum E: Error {
     case e
+}
+
+struct FiveBytes {
+    var a: UInt32 = 0
+    var b: UInt8 = 0
 }
