@@ -24,6 +24,7 @@
 #include "swift/ABI/System.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/InstrumentsSupport.h"
 #include "llvm/Support/SwapByteOrder.h"
 #include <cstdint>
 #include <functional>
@@ -140,6 +141,100 @@ static inline void layoutStringMemcpy(void *dest, const void *src,
   layoutStringMemcpyArm64(dest, src, size);
 #else
   memcpy(dest, src, size);
+#endif
+}
+
+// Retain and release with the fast path inlined into the handlers, like the
+// swift_*Direct entry points of SwiftDirectRuntime. This uses the same inline
+// fast paths as swift_retain/swift_release, so side tables, overflow and deinit
+// still go to the out-of-line slow paths. When Instruments has swizzled the
+// ref counting functions, or for ObjC objects, the runtime entry points are
+// called instead.
+#if defined(__APPLE__) && defined(__arm64__) && defined(__LP64__) &&           \
+    defined(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE) &&                        \
+    !defined(SWIFT_THREADING_NONE) &&                                          \
+    !defined(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+#define SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE 1
+#endif
+
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+SWIFT_ALWAYS_INLINE
+static inline bool refCountingIsSwizzled() {
+  return _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly
+      .load(std::memory_order_relaxed);
+}
+
+/// Is the given BridgeObject a tagged value, or an ObjC object? (The same
+/// tests as swift_bridgeObjectRetain/Release.)
+SWIFT_ALWAYS_INLINE
+static inline bool isTaggedOrNonNativeBridgeObject(void *object) {
+  constexpr uintptr_t objectPointerIsObjCBit = 0x4000000000000000ULL;
+  static_assert((heap_object_abi::SwiftSpareBitsMask &
+                 objectPointerIsObjCBit) == objectPointerIsObjCBit,
+                "isObjC bit not within spare bits");
+  return (uintptr_t(object) & (heap_object_abi::ObjCReservedBitsMask |
+                               heap_object_abi::BridgeObjectTagBitsMask |
+                               objectPointerIsObjCBit)) != 0;
+}
+#endif
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringRetain(HeapObject *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(refCountingIsSwizzled())) {
+    swift_retain(object);
+    return;
+  }
+  // No branch hint here: the null edge leads straight to the code after the
+  // retain, and hot/cold splitting would treat that as cold and outline the
+  // whole fast path.
+  if ((intptr_t)object > 0)
+    object->refCounts.increment(object, 1);
+#else
+  swift_retain(object);
+#endif
+}
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringRelease(HeapObject *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(refCountingIsSwizzled())) {
+    swift_release(object);
+    return;
+  }
+  // No branch hint, see layoutStringRetain.
+  if ((intptr_t)object > 0)
+    object->refCounts.decrementAndMaybeDeinit(1, nullptr);
+#else
+  swift_release(object);
+#endif
+}
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringBridgeRetain(void *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(isTaggedOrNonNativeBridgeObject(object))) {
+    swift_bridgeObjectRetain(object);
+    return;
+  }
+  layoutStringRetain(
+      (HeapObject *)(uintptr_t(object) & ~heap_object_abi::SwiftSpareBitsMask));
+#else
+  swift_bridgeObjectRetain(object);
+#endif
+}
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringBridgeRelease(void *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(isTaggedOrNonNativeBridgeObject(object))) {
+    swift_bridgeObjectRelease(object);
+    return;
+  }
+  layoutStringRelease(
+      (HeapObject *)(uintptr_t(object) & ~heap_object_abi::SwiftSpareBitsMask));
+#else
+  swift_bridgeObjectRelease(object);
 #endif
 }
 
@@ -514,7 +609,7 @@ static void nativeStrongDestroy(const Metadata *metadata,
                                 uintptr_t &addrOffset, uint8_t *addr) {
   HeapObject *object = (HeapObject*)((*(uintptr_t *)(addr + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
   addrOffset += sizeof(HeapObject*);
-  swift_release(object);
+  layoutStringRelease(object);
 }
 
 static void unownedDestroy(const Metadata *metadata,
@@ -563,7 +658,7 @@ static void bridgeDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                           uintptr_t &addrOffset, uint8_t *addr) {
   auto *object = *(void **)(addr + addrOffset);
   addrOffset += sizeof(void*);
-  swift_bridgeObjectRelease(object);
+  layoutStringBridgeRelease(object);
 }
 
 static void singlePayloadEnumSimple(const Metadata *metadata,
@@ -1268,7 +1363,7 @@ static void nativeStrongRetain(const Metadata *metadata,
   memcpy(dest + _addrOffset, &object, sizeof(HeapObject*));
   object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(HeapObject *);
-  swift_retain((HeapObject *)object);
+  layoutStringRetain((HeapObject *)object);
 }
 
 static void unownedRetain(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -1330,7 +1425,7 @@ static void bridgeRetain(const Metadata *metadata, LayoutStringReader1 &reader,
   void *object = *(void **)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void*);
-  swift_bridgeObjectRetain(object);
+  layoutStringBridgeRetain(object);
 }
 
 static void blockCopy(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -1690,8 +1785,8 @@ static void nativeStrongAssignWithCopy(const Metadata *metadata,
   srcObject &= ~_swift_abi_SwiftSpareBitsMask;
   destObject &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(HeapObject *);
-  swift_release((HeapObject *)destObject);
-  swift_retain((HeapObject *)srcObject);
+  layoutStringRelease((HeapObject *)destObject);
+  layoutStringRetain((HeapObject *)srcObject);
 }
 
 static void unownedAssignWithCopy(const Metadata *metadata,
@@ -1736,8 +1831,8 @@ static void bridgeAssignWithCopy(const Metadata *metadata,
   void *srcObject = *(void **)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void *);
-  swift_bridgeObjectRelease(destObject);
-  swift_bridgeObjectRetain(srcObject);
+  layoutStringBridgeRelease(destObject);
+  layoutStringBridgeRetain(srcObject);
 }
 
 static void weakAssignWithCopy(const Metadata *metadata,
