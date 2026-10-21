@@ -188,6 +188,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #endif
 #define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
+// Debuggers find these variables by name, and a linked wasm module names a data
+// symbol only if it is exported.
+#if defined(__wasm__)
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name) __attribute__((export_name(#name)))
+#else
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name)
+#endif
+
 // Define mappings for calling conventions.
 
 // Annotation for specifying a calling convention of
