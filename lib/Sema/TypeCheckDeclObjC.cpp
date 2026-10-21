@@ -1662,6 +1662,9 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
     (void) VD->isDynamic();
     return ObjCReason(ObjCReason::ExplicitlyNSManaged, attr);
   }
+  // @objcDirect implies @objc.
+  if (auto attr = VD->getAttrs().getAttribute<ObjCDirectAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyObjC, attr);
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol) {
     if (!VD->isProtocolRequirement())

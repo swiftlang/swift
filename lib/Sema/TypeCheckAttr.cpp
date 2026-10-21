@@ -2003,12 +2003,9 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
   // runtime. A direct method is absent from the class's Objective-C method
   // list, so such a dispatch would find nothing.
   //
-  // 'dynamic' is checked semantically rather than as an attribute: the 'final'
-  // requirement below does not exclude it, because IsDynamicRequest honours an
-  // explicit 'dynamic' before it consults isSemanticallyFinal() -- 'final' only
-  // blocks *inference* of 'dynamic'. Asking isDynamic() also covers @NSManaged,
-  // which implies 'dynamic'. This must precede the 'final' check so that a
-  // non-final 'dynamic' method reports the real conflict.
+  // 'dynamic' is checked semantically, which also covers @NSManaged (it implies
+  // 'dynamic'). The implied 'final' does not exclude an explicit 'dynamic':
+  // IsDynamicRequest honours it before it consults finality.
   if (fn->isDynamic()) {
     diagnoseAndRemoveAttr(attr, diag::objc_direct_dynamic);
     return;
@@ -2022,8 +2019,7 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
-  // No 'final' requirement; TypeCheckDeclOverride makes sure it is not
-  // overridden.
+  // No 'final' requirement: '@objcDirect' implies 'final' (see IsFinalRequest).
 
   // Required initializers must be inherited - incompatible with direct.
   if (auto *ctor = dyn_cast<ConstructorDecl>(fn)) {
@@ -2051,19 +2047,8 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
-  // @objcDirect implies @objc. Add an implicit unnamed @objc if the decl does
-  // not already have one, and let the normal @objc machinery validate it, so a
-  // signature that is not representable in Objective-C is still rejected by the
-  // standard @objc diagnostics rather than slipping through. An explicit
-  // @objc(name:) rename is left alone: the mangler uses the renamed selector
-  // and the generated header prints the same name, so a rename flows through
-  // end to end.
-  if (!fn->getAttrs().hasAttribute<ObjCAttr>())
-    fn->getAttrs().add(ObjCAttr::createUnnamedImplicit(Ctx));
-
-  // Force the standard @objc checking now, so any representability error is
-  // diagnosed as part of applying @objcDirect. The request is memoized, so this
-  // does not double-diagnose against the later natural evaluation.
+  // '@objcDirect' implies '@objc' (see shouldMarkAsObjC). Evaluate it now, so a
+  // signature Objective-C cannot represent is diagnosed with the attribute.
   (void)fn->isObjC();
 }
 

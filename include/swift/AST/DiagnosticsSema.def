@@ -2637,10 +2637,9 @@ ERROR(optional_attribute_missing_explicit_objc,none,
 ERROR(objcmembers_attribute_nonclass,none,
       "'@objcMembers' attribute can only be applied to a class", ())
 
-ERROR(override_of_objc_direct,none,
-      "cannot override a method declared '@objcDirect'; a direct method has "
-      "no method-list entry, so an Objective-C caller would reach the "
-      "superclass implementation", ())
+NOTE(objc_direct_implies_final,none,
+     "%kind0 is implicitly 'final' because of '@objcDirect'",
+     (const ValueDecl *))
 ERROR(objc_direct_in_protocol,none,
       "'@objcDirect' cannot be applied to protocol requirements", ())
 ERROR(objc_direct_access_level,none,
@@ -4153,12 +4152,12 @@ ERROR(open_decl_cannot_be_final,none,
       (const Decl *))
 ERROR(implicitly_final_cannot_be_open,none,
       "%select{'let' properties|members of 'final' classes|"
-      "static declarations}0 are implicitly 'final'; use 'public' instead of "
-      "'open'", (unsigned))
+      "static declarations|'@objcDirect' declarations}0 are implicitly "
+      "'final'; use 'public' instead of 'open'", (unsigned))
 WARNING(implicitly_final_cannot_be_open_swift4,none,
         "%select{'let' properties|members of 'final' classes|"
-        "static declarations}0 are implicitly 'final'; use 'public' instead of "
-        "'open'", (unsigned))
+        "static declarations|'@objcDirect' declarations}0 are implicitly "
+        "'final'; use 'public' instead of 'open'", (unsigned))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,

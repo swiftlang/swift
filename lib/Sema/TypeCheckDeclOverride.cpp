@@ -2198,6 +2198,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
               prop->getInterfaceType()->getAnyNominal() == ctx.getUnownedSerialExecutorDecl());
     };
 
+    bool overridingFinal = false;
     if (isActorUnownedExecutor()) {
       override->diagnose(diag::override_implicit_unowned_executor);
     } else {
@@ -2211,11 +2212,14 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
         break;
       default:
         override->diagnose(diag::override_final, override, base);
+        overridingFinal = true;
         break;
       }
     }
 
     base->diagnose(diag::overridden_here);
+    if (overridingFinal && base->getAttrs().hasAttribute<ObjCDirectAttr>())
+      base->diagnose(diag::objc_direct_implies_final, base);
 
     return true;
   }
@@ -2293,21 +2297,6 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   AttributeOverrideChecker attrChecker(base, override);
   for (auto attr : base->getAttrs()) {
     attrChecker.visit(attr);
-  }
-
-  // An override of a direct declaration is rejected here, whether the base is
-  // '@objcDirect' or imported from Clang as 'objc_direct'. The opposite
-  // direction, an '@objcDirect' override of a declaration that is not direct,
-  // is reported once, by the attribute checker.
-  if (auto *baseFunc = dyn_cast<AbstractFunctionDecl>(base)) {
-    if (baseFunc->isObjCDirectDispatched()) {
-      // The ObjC entry point resolves its callee with a static function_ref, so
-      // an Objective-C caller invoking the direct symbol on a subclass instance
-      // would silently run the base implementation. Clang rejects overriding a
-      // direct method on its side for the same reason.
-      ctx.Diags.diagnose(override, diag::override_of_objc_direct);
-      ctx.Diags.diagnose(base, diag::overridden_here);
-    }
   }
 
   return false;

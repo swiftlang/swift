@@ -289,15 +289,25 @@ enum class ImplicitlyFinalReason : unsigned {
   /// The containing class is final.
   FinalClass,
   /// A member was declared as 'static'.
-  Static
+  Static,
+  /// A member was declared '@objcDirect'.
+  ObjCDirect
 };
+}
+
+/// Whether \p D is declared in an '@objc @implementation' extension, where
+/// 'final' marks a Swift-only helper rather than an implementation of the
+/// header's declaration.
+static bool isMemberOfObjCImplementation(const ValueDecl *D) {
+  auto *ED = dyn_cast<ExtensionDecl>(D->getDeclContext());
+  return ED && ED->isObjCImplementation();
 }
 
 static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
                                           FinalAttr *explicitFinalAttr,
                                           StaticSpellingKind staticSpelling) {
-  // Are there any reasons to infer 'final'? Prefer 'static' over the class
-  // being final for the purposes of diagnostics.
+  // Are there any reasons to infer 'final'? Prefer 'static', then
+  // '@objcDirect', over the class being final for the purposes of diagnostics.
   std::optional<ImplicitlyFinalReason> reason;
   if (staticSpelling == StaticSpellingKind::KeywordStatic) {
     reason = ImplicitlyFinalReason::Static;
@@ -310,6 +320,11 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
         .fixItRemove(finalRange);
       }
     }
+  } else if (D->getAttrs().hasAttribute<ObjCDirectAttr>() &&
+             !isMemberOfObjCImplementation(D)) {
+    // FIXME: This can run before the attribute checker rejects the attribute;
+    // an override checked first then reports the member as 'final'.
+    reason = ImplicitlyFinalReason::ObjCDirect;
   } else if (cls->isFinal()) {
     reason = ImplicitlyFinalReason::FinalClass;
   }
@@ -320,7 +335,10 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (D->getFormalAccess() == AccessLevel::Open) {
     auto &context = D->getASTContext();
     auto diagID = diag::implicitly_final_cannot_be_open;
-    if (!context.isLanguageModeAtLeast(LanguageMode::v5))
+    // '@objcDirect' is new, so it has no Swift 4 code to stay compatible with,
+    // whichever reason is reported.
+    if (!context.isLanguageModeAtLeast(LanguageMode::v5) &&
+        !D->getAttrs().hasAttribute<ObjCDirectAttr>())
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
                                     static_cast<unsigned>(reason.value()));

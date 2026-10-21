@@ -6,33 +6,34 @@
 import Foundation
 
 class ObjCDirectClass: NSObject {
-  @objc @objcDirect
+  @objcDirect
   public final func direct() { return }
 
-  @objc @objcDirect
+  @objcDirect
   public final func withParams(x: Int, y: String) { return }
 
   @objc(RenamedMethod) @objcDirect
   public final func renamed() { return }
 
-  @objc @objcDirect
+  @objcDirect
   public static func staticMethod() -> Int { return 42 }
 
-  @objc @objcDirect
+  @objcDirect
   public func nonFinal() { return }
   // expected-note@-1 {{overridden declaration is here}}
+  // expected-note@-2 {{instance method 'nonFinal()' is implicitly 'final' because of '@objcDirect'}}
 
-  @objc @objcDirect
+  @objcDirect
   public final func variadic(format: String, args: CVarArg...) { return }
   // expected-error@-1 {{instance method cannot be marked '@objc' because it has a variadic parameter}}
 
-  @objc @objcDirect
+  @objcDirect
   private final func privateMethod() { return }
   // expected-error@-2 {{'private' or 'fileprivate' methods cannot be '@objcDirect'}}
 }
 
 final class FinalClass: NSObject {
-  @objc @objcDirect
+  @objcDirect
   public func implicitlyFinal() { return }
 
   @objcDirect
@@ -62,10 +63,10 @@ struct NotObjCRepresentable {}
 
 class InitClass: NSObject {
   // init is exempt from the `final` requirement.
-  @objc @objcDirect
+  @objcDirect
   init(ok value: Int) { super.init() }
 
-  @objc @objcDirect
+  @objcDirect
   required init(bad value: String) { super.init() }
   // expected-error@-2 {{'@objcDirect' cannot be applied to 'required' initializers}}
 }
@@ -91,7 +92,7 @@ class PropertyClass: NSObject {
 }
 
 extension ObjCDirectClass {
-  @objc @objcDirect
+  @objcDirect
   public final func inExtension() { return }
 }
 
@@ -104,29 +105,29 @@ class SubClass: ObjCDirectClass {
   @objcDirect
   public final func notAnOverride() { return }
 
-  @objc @objcDirect
+  @objcDirect
   public final func asyncMethod() async -> Int { return 1 }
   // expected-error@-2 {{'@objcDirect' is not supported with 'async' methods}}
 
-  @objc @objcDirect
+  @objcDirect
   public override final func overridable() { return }
   // expected-error@-2 {{'@objcDirect' methods cannot override superclass methods}}
 
-  // The reverse direction, which the dropped 'final' requirement used to cover.
+  // '@objcDirect' implies 'final'.
   public override func nonFinal() { return }
-  // expected-error@-1 {{cannot override a method declared '@objcDirect'}}
+  // expected-error@-1 {{instance method overrides a 'final' instance method}}
 }
 
 @objc
 protocol DirectProtocol {
-  @objc @objcDirect
+  @objcDirect
   func requirement()
   // expected-error@-2 {{'@objcDirect' cannot be applied to protocol requirements}}
 }
 
 // A generic class is never printed to the generated header.
 class GenericClass<T>: NSObject {
-  @objc @objcDirect
+  @objcDirect
   public final func inGeneric() { return }
   // expected-error@-2 {{'@objcDirect' cannot be applied to members of a generic class}}
 }
