@@ -2227,81 +2227,6 @@ namespace {
       cacheImmortalLifetime(fd);
     }
 
-    bool
-    injectBridgingConversionsForRefCountedSmartPtrs(NominalTypeDecl *smartPtr) {
-      auto clangDecl = cast<clang::TagDecl>(smartPtr->getClangDecl());
-      auto [refCountedSmartPtr, toRawPtrFunc, toRawPtrFuncName] =
-          getClangRefCountedSmartPointer(smartPtr);
-      if (auto error = std::get_if<RefCountedPtrError>(&refCountedSmartPtr)) {
-        switch (*error) {
-        case RefCountedPtrError::MissingToRawPointer:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_missing_torawpointer, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerLookupFailure:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_lookup_failure,
-                         Impl.SwiftContext.AllocateCopy(toRawPtrFuncName.str()),
-                         clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerLookupAmbiguity:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_lookup_ambiguity,
-                         Impl.SwiftContext.AllocateCopy(toRawPtrFuncName.str()),
-                         clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerNotFunction:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_not_function,
-                         toRawPtrFunc, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerWrongSignature:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_wrong_signature,
-                         toRawPtrFunc, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::CtorLookupAmbiguity:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_ctor_lookup_ambiguity, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::CtorLookupFailure:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_ctor_lookup_failure, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::CtorWrongParamType:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_ctor_wrong_parameter_type,
-                         clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::NotAnnotated:
-          return true;
-        }
-      } else {
-        ASSERT(toRawPtrFunc);
-        auto asReferenceDecl = synthesizer.createSmartPtrBridgingProperty(
-            cast<FuncDecl>(toRawPtrFunc));
-        smartPtr->addMember(asReferenceDecl);
-        smartPtr->addMemberToLookupTable(asReferenceDecl);
-        return true;
-      }
-    }
-
     void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) const {
       auto inheritedTypes = D->getInherited();
       SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
@@ -3014,7 +2939,8 @@ namespace {
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
 
-      if (!injectBridgingConversionsForRefCountedSmartPtrs(result)) {
+      // Do not import a smart pointer with an invalid SWIFT_REFCOUNTED_PTR.
+      if (Impl.validateRefCountedPtr(result).diagnose(Impl, decl)) {
         eraseCacheOnBailOut();
         return nullptr;
       }
@@ -11193,6 +11119,7 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     (void)Impl.lookupAndImportSuccessor(swiftDecl);
     (void)Impl.lookupAndImportOperatorBool(swiftDecl);
     (void)Impl.lookupAndImportSubscripts(swiftDecl);
+    (void)Impl.lookupAndImportAsReference(swiftDecl);
   }
 }
 } // namespace

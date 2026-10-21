@@ -221,9 +221,9 @@ inline RefRefOnlyOfBase bridgedFunctionRefOnly_returns() {
 }
 
 // A derived smart pointer that itself is *not* annotated with
-// SWIFT_REFCOUNTED_PTR. Inheriting from the annotated Ref<T> means the
-// bridging `asReference` property is cloned onto this class via the
-// inheritance lookup, so the user can convert to the FRT explicitly.
+// SWIFT_REFCOUNTED_PTR. Inheriting from the annotated Ref<T> means this
+// class gets its own `asReference` property that calls Ref<T>'s ToRawPointer
+// function, so the user can convert to the FRT explicitly.
 // No implicit bridging happens at function boundaries because this
 // type itself doesn't carry the macro.
 template <class T>
@@ -237,6 +237,19 @@ inline UnannotatedRefOfBase makeUnannotatedRef() {
   return UnannotatedRefOfBase(RefCountedBase::forSmartPtr());
 }
 
+// An unannotated smart pointer two levels below the annotated Ref<T>, with
+// the unannotated UnannotatedRef<T> in between.
+template <class T>
+struct UnannotatedRef2 : UnannotatedRef<T> {
+  UnannotatedRef2(T *_Nonnull ptr) : UnannotatedRef<T>(ptr) {}
+};
+
+using UnannotatedRef2OfBase = UnannotatedRef2<RefCountedBase>;
+
+inline UnannotatedRef2OfBase makeUnannotatedRef2() {
+  return UnannotatedRef2OfBase(RefCountedBase::forSmartPtr());
+}
+
 namespace errors { // expected-note * {{'errors' declared here}}
 struct __attribute__((
     swift_attr("@_refCountedPtr(Nullability: \"Nullable\")"))) MissingToRawPtr {};
@@ -244,20 +257,30 @@ struct __attribute__((
 
 struct SWIFT_REFCOUNTED_PTR(.getPtr) MissingConversionFunction {};
 // expected-note@-1 * {{cannot find function '.getPtr' specified in '_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR 'MissingConversionFunction'}}
+// expected-note@-2 * {{cannot find constructor to create smart pointer from a raw pointer to a shared reference 'MissingConversionFunction'}}
 
 struct SWIFT_REFCOUNTED_PTR(.getPtr) MultipleConversionFunctions {
 // expected-note@-1 * {{there are multiple candidates of function '.getPtr' specified in '_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR 'MultipleConversionFunctions'}}
+// expected-note@-2 * {{cannot find constructor to create smart pointer from a raw pointer to a shared reference 'MultipleConversionFunctions'}}
   void getPtr();
   void getPtr(int a);
 };
 
 struct SWIFT_REFCOUNTED_PTR(.getPtr) WrongConversionSignature {
 // expected-note@-1 * {{function 'getPtr()' specified in '_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR on 'WrongConversionSignature' has incorrect signature; expected a function that takes no arguments and returns a pointer to a foreign reference type}}
+// expected-note@-2 * {{cannot find constructor to create smart pointer from a raw pointer to a shared reference 'WrongConversionSignature'}}
   void getPtr();
+};
+
+struct SWIFT_REFCOUNTED_PTR(.getPtr) NotAFunction {
+  // expected-note@-1 * {{'getPtr' specified in '_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR on 'NotAFunction' is not a function}}
+  // expected-note@-2 * {{cannot find constructor to create smart pointer from a raw pointer to a shared reference 'NotAFunction'}}
+  RefCountedBase *_Nullable getPtr;
 };
 
 class SWIFT_REFCOUNTED_PTR(.getPtr) PrivateConversionFunction {
   // expected-note@-1 * {{cannot find function '.getPtr' specified in '_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR 'PrivateConversionFunction'}}
+  // expected-note@-2 * {{cannot find constructor to create smart pointer from a raw pointer to a shared reference 'PrivateConversionFunction'}}
   RefCountedBase *_Nonnull getPtr();
 };
 
