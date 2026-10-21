@@ -43,6 +43,17 @@
 namespace swift {
 namespace autodiff {
 
+/// The number of SIL arguments of an apply of \p fnTy emitted into \p caller.
+/// An address-only result is a direct result, not an argument, while \p caller
+/// is still in opaque-value form.
+static unsigned getNumApplyArguments(CanSILFunctionType fnTy,
+                                     const SILFunction &caller) {
+  SILFunctionConventions convs(fnTy,
+                               SILAddressConventions::forFunction(caller));
+  return convs.getNumParameters() + convs.getNumIndirectSILResults() +
+         convs.getNumIndirectSILErrorResults();
+}
+
 class VJPCloner::Implementation final
     : public TypeSubstCloner<VJPCloner::Implementation> {
   friend class VJPCloner;
@@ -798,8 +809,7 @@ public:
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> vjpArgs;
     auto vjpFnTy = getOpType(vjpValue->getType()).castTo<SILFunctionType>();
-    auto numVJPArgs =
-        vjpFnTy->getNumParameters() + vjpFnTy->getNumIndirectFormalResults();
+    auto numVJPArgs = getNumApplyArguments(vjpFnTy, *vjp);
     vjpArgs.reserve(numVJPArgs);
     // Collect substituted arguments.
     for (auto origArg : bai->getArguments())
@@ -913,8 +923,7 @@ public:
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> vjpArgs;
     auto vjpFnTy = getOpType(vjpValue->getType()).castTo<SILFunctionType>();
-    auto numVJPArgs =
-        vjpFnTy->getNumParameters() + vjpFnTy->getNumIndirectFormalResults();
+    auto numVJPArgs = getNumApplyArguments(vjpFnTy, *vjp);
     vjpArgs.reserve(numVJPArgs);
     // Collect substituted arguments.
     for (auto origArg : ai->getArguments())
@@ -1054,9 +1063,7 @@ public:
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> vjpArgs;
     auto vjpFnTy = getOpType(vjpValue->getType()).castTo<SILFunctionType>();
-    auto numVJPArgs = vjpFnTy->getNumParameters() +
-                      vjpFnTy->getNumIndirectFormalResults() +
-                      (vjpFnTy->hasIndirectErrorResult() ? 1 : 0);
+    auto numVJPArgs = getNumApplyArguments(vjpFnTy, *vjp);
     vjpArgs.reserve(numVJPArgs);
     // Collect substituted arguments.
     for (auto origArg : tai->getArguments())
@@ -1073,10 +1080,12 @@ public:
     // Create placeholder trampoline BB for normal destination
     auto *normalBB =
         vjp->createBasicBlockBefore(getOpBasicBlock(tai->getNormalBB()));
+    // The normal result type depends on whether the VJP is in lowered-address
+    // form: address-only results are direct results in opaque-value form.
+    SILFunctionConventions vjpConv(vjpFnTy,
+                                   SILAddressConventions::forFunction(*vjp));
     normalBB->createPhiArgument(
-        vjpFnTy->getDirectFormalResultsType(getModule(),
-                                            TypeExpansionContext::minimal(),
-                                            vjp->hasLoweredAddresses()),
+        vjpConv.getSILResultType(TypeExpansionContext::minimal()),
         OwnershipKind::Owned);
 
     // Apply the VJP.
@@ -1522,6 +1531,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
   pullback->inheritDerivedFrom(original);
+  // The pullback body is emitted in lowered-address form (adjoint buffers,
+  // indirect results), even when the original is still in opaque-value form.
+  pullback->setHasLoweredAddresses(true);
 
   return pullback;
 }

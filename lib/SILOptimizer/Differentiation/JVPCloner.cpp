@@ -45,6 +45,17 @@ using namespace autodiff;
 namespace swift {
 namespace autodiff {
 
+/// The number of SIL arguments of an apply of \p fnTy emitted into \p caller.
+/// An address-only result is a direct result, not an argument, while \p caller
+/// is still in opaque-value form.
+static unsigned getNumApplyArguments(CanSILFunctionType fnTy,
+                                     const SILFunction &caller) {
+  SILFunctionConventions convs(fnTy,
+                               SILAddressConventions::forFunction(caller));
+  return convs.getNumParameters() + convs.getNumIndirectSILResults() +
+         convs.getNumIndirectSILErrorResults();
+}
+
 class JVPCloner::Implementation final
     : public TypeSubstCloner<JVPCloner::Implementation> {
 private:
@@ -705,8 +716,7 @@ public:
     // Call the JVP using the original parameters.
     SmallVector<SILValue, 8> jvpArgs;
     auto jvpFnTy = getOpType(jvpValue->getType()).castTo<SILFunctionType>();
-    auto numJVPArgs =
-        jvpFnTy->getNumParameters() + jvpFnTy->getNumIndirectFormalResults();
+    auto numJVPArgs = getNumApplyArguments(jvpFnTy, *jvp);
     jvpArgs.reserve(numJVPArgs);
     // Collect substituted arguments.
     for (auto origArg : ai->getArguments())
@@ -1031,6 +1041,22 @@ public:
         loc, uccai->getCheckedCastOptions(), tanSrc,
         tanSrc->getType().getASTType(), tanDest,
         tanDest->getType().getASTType(), uccai->isCopy());
+  }
+
+  /// Handle `unconditional_checked_cast` instruction, the object form of
+  /// `unconditional_checked_cast_addr` used with opaque values.
+  ///   Original: y = unconditional_checked_cast x
+  ///    Tangent: tan[y] = unconditional_checked_cast tan[x]
+  CLONE_AND_EMIT_TANGENT(UnconditionalCheckedCast, ucci) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto loc = ucci->getLoc();
+    // Like the original, the cast forwards the ownership of its operand.
+    auto tanSrc = materializeTangent(getTangentValue(ucci->getOperand()), loc);
+    auto tanDestType = getRemappedTangentType(ucci->getType());
+    auto *tanDest = diffBuilder.createUnconditionalCheckedCast(
+        loc, ucci->getCheckedCastOptions(), tanSrc, tanDestType,
+        tanDestType.getASTType());
+    setTangentValue(ucci->getParent(), ucci, makeConcreteTangentValue(tanDest));
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
