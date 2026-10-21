@@ -82,6 +82,9 @@ struct ResolvableRoot {
 
   let isLexical: Bool
 
+  /// Whether the storage corresponds to a `@noImplicitCopy` parameter.
+  let isNoImplicitCopy: Bool
+
   // Does this address start fully initialized?
   let startsInitialized: Bool
 
@@ -218,6 +221,18 @@ struct ResolvableRoot {
     }
 
     extraLivenessUses = extraUses
+
+    if let arg = storage as? FunctionArgument {
+      isNoImplicitCopy = arg.isNoImplicitCopy
+    } else {
+      // For `consuming` args, we typically store the result in memory because it's mutable, so look for that store.
+      // TODO: For performance, it's worth investigating whether this set of addresses should be cached per-function.
+      let address = self.address
+      isNoImplicitCopy = address.parentFunction.arguments.contains { arg in
+        arg.isNoImplicitCopy
+          && arg.uses.users(ofType: StoreInst.self).contains { $0.source == arg && $0.destination == address }
+      }
+    }
   }
 
   // Change the storage such that it indicates a dynamic lifetime.
@@ -426,21 +441,21 @@ private struct Resolver {
     switch kind {
     case .take where someDemand:
       // A consume with demand still below it (use-after-consume): legalize with a copy.
-      newKind = transform(kind, to: .load(.copy), root.isLexical)
+      newKind = transform(kind, to: .load(.copy), root)
 
     case .use(_, .own) where someDemand:
       // A use demanding ownership, where there is some demand following it, can only be satisfied with a copy.
-      newKind = transform(kind, to: .load(.copy), root.isLexical)
+      newKind = transform(kind, to: .load(.copy), root)
 
     case .use(_, .own) where noDemand:
       // Canonicalize it into a take, as this is the last use.
-      newKind = transform(kind, to: .load(.take), root.isLexical)
+      newKind = transform(kind, to: .load(.take), root)
 
     case .use(_, .borrow) where someDemand:
       // A noncopyable type forces a load_borrow here, since there's demand for the memory
       // after this use no matter what nested accesses we may be nested within.
       if root.address.type.objectType.isMoveOnly {
-        newKind = transform(kind, to: .loadBorrow, root.isLexical)
+        newKind = transform(kind, to: .loadBorrow, root)
         break
       }
 
@@ -454,7 +469,7 @@ private struct Resolver {
       // TODO: If ownership originally was guaranteed, yet we're choosing to do a take,
       //          we'd need to insert destroy_value's on non-consuming paths. It's probably hard to
       //          emit a load_borrow for a copyable type, given access scopes may end.
-      newKind = transform(kind, to: .load(.take), root.isLexical)
+      newKind = transform(kind, to: .load(.take), root)
 
     case let .root(r) where someDemand && !r.startsInitialized:
       // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
@@ -487,17 +502,17 @@ private struct Resolver {
     }
   }
 
-  func transform(_ kind: EventList.Kind, to request: TransformRequest, _ isLexical: Bool) -> EventList.Kind {
-    log("requested transform \(isLexical ? "(lexical) " : "")to \(request), given \(kind))")
+  func transform(_ kind: EventList.Kind, to request: TransformRequest, _ root: ResolvableRoot) -> EventList.Kind {
+    log("requested transform \(root.isLexical ? "(lexical) " : "")to \(request), given \(kind))")
 
     let newOp: Operand
     let newDem: Demand
     switch kind {
     case let .use(op, dem):
-      newOp = transformOperand(op, to: request, wasTake: false, isLexical)
+      newOp = transformOperand(op, to: request, wasTake: false, root)
       newDem = dem
     case let .take(op, dem):
-      newOp = transformOperand(op, to: request, wasTake: true, isLexical)
+      newOp = transformOperand(op, to: request, wasTake: true, root)
       newDem = dem
     default:
       fatalError("unexpected event kind to transform: \(kind)")
@@ -511,8 +526,22 @@ private struct Resolver {
   }
 
   // Performs the requested transformation.
-  // If we're turning a take into a copy, or copying a noncopyable type, we add a `diagnose` instruction.
-  func transformOperand(_ op: Operand, to request: TransformRequest, wasTake: Bool, _ isLexical: Bool) -> Operand {
+  // If we're turning a take into a copy, or copying a noncopyable type or `@noImplicitCopy` binding,
+  // we add a `diagnose` instruction.
+  func transformOperand(_ op: Operand, to request: TransformRequest, wasTake: Bool,
+                        _ root: ResolvableRoot) -> Operand {
+
+    // Whether a copy of a value with the given type is unpermitted.
+    func isUnpermittedCopy(of type: Type) -> Bool {
+      if type.isMoveOnly || wasTake {
+        return true
+      }
+
+      // If we aren't converting from a take, then we still need to diagnose implicit copies
+      // if it was a no-implicit-copy binding.
+      return root.isNoImplicitCopy && op.value.accessPath.projectionPath.isEmpty
+    }
+
     switch op.instruction {
     case let apply as FullApplySite:
       // We can only handle transform that provides a copy to the apply.
@@ -523,14 +552,14 @@ private struct Resolver {
       // Copy the value into a temporary alloc_stack and pass that to the apply, i.e,
       //    %alloc = alloc_stack
       //    copy_addr %op to [init] %alloc
-      //    diagnose %op [unpermitted_copy]  <-- only if it's move-only
+      //    diagnose %op [unpermitted_copy]
       //    apply(%alloc) : (@in) -> ...
       //    dealloc_stack %alloc
       let type = op.value.type.objectType
       let allocBuilder = Builder(before: apply, context)
       let alloc = allocBuilder.createAllocStack(type)
       allocBuilder.createCopyAddr(from: op.value, to: alloc, takeSource: false, initializeDest: true)
-      if type.isMoveOnly {
+      if isUnpermittedCopy(of: op.value.type) {
         allocBuilder.createDiagnose(operand: op.value, kind: .unpermittedCopy)
       }
       op.set(to: alloc, context)
@@ -548,7 +577,7 @@ private struct Resolver {
       let becomesCopy = newOwnership != .take
       copyAddr.set(isTakeOfSource: !becomesCopy, context)
 
-      if becomesCopy && (wasTake || copyAddr.type.isMoveOnly) {
+      if becomesCopy && isUnpermittedCopy(of: copyAddr.type) {
         Builder(after: copyAddr, context).createDiagnose(operand: op.value, kind: .unpermittedCopy)
       }
       return op
@@ -559,7 +588,7 @@ private struct Resolver {
       case let .load(newOwnership):
         load.set(ownership: newOwnership, context)
 
-        if newOwnership == .copy && (wasTake || load.type.isMoveOnly) {
+        if newOwnership == .copy && isUnpermittedCopy(of: load.type) {
           Builder(after: load, context).createDiagnose(operand: load, kind: .unpermittedCopy)
         }
         return load.operand
@@ -572,7 +601,7 @@ private struct Resolver {
         // Build a live range of the current users of the load.
         var loadUsers = PartitionedUses(of: load, context)
         defer { loadUsers.deinitialize() }
-        loadUsers.partitionUses(withDeinitBarriers: isLexical)
+        loadUsers.partitionUses(withDeinitBarriers: root.isLexical)
 
         assert(loadUsers.consumes.isEmpty,
           "Can't transform load with these non-destroy consumers existing: \(loadUsers.consumes)")

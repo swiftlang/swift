@@ -758,6 +758,11 @@ bool BridgedArgument::FunctionArgument_isClosureCapture() const {
     getArgument())->isClosureCapture();
 }
 
+bool BridgedArgument::FunctionArgument_isNoImplicitCopy() const {
+  return llvm::cast<swift::SILFunctionArgument>(
+    getArgument())->isNoImplicitCopy();
+}
+
 OptionalBridgedDeclObj BridgedArgument::getDecl() const {
   return {getArgument()->getDecl()};
 }

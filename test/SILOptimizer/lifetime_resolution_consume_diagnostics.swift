@@ -91,7 +91,7 @@ func inoutReinitialized(_ x: inout NC) {
 
 func inoutConsumeOperator(_ s: inout String) {
   if .random() {
-    _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+    _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   }
 }
 
@@ -104,20 +104,20 @@ struct ArrayBuffer {
   var pending: [UInt8] = []
 
   mutating func flush(to sink: (consuming [UInt8]) throws -> Void) rethrows {
-    let bytes = consume pending // expected-error {{missing reinitialization of inout parameter 'self.pending' after consume}}
+    let bytes = consume pending // expected-error {{missing reinitialization of inout parameter 'self.pending' after consume}} // expected-note {{write 'copy self.pending' to keep 'self.pending' valid after this consume}}
     try sink(bytes) // expected-note@:9 {{if this call throws, the function exits without reinitializing 'self.pending'}}
     pending = []
   }
 }
 
 func inoutExplicitThrow(_ s: inout String, _ b: Bool) throws {
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   if b { throw E() } // expected-note@:10 {{the function exits here by throwing an error without reinitializing 's'}}
   s = ""
 }
 
 func inoutTypedThrow(_ s: inout String, _ b: Bool) throws(E) {
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   if b {
     throw E() // expected-note@:5 {{the function exits here by throwing an error without reinitializing 's'}}
   }
@@ -127,14 +127,14 @@ func inoutTypedThrow(_ s: inout String, _ b: Bool) throws(E) {
 // Both calls share the block that throws, so the note points at the first call on the way there.
 func inoutSeveralThrowingCalls(_ s: inout String) throws {
   defer { _ = 0 }
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   try mayThrow() // expected-note {{if this call throws, the function exits without reinitializing 's'}}
   try mayThrow()
   s = ""
 }
 
 func inoutRethrowFromCatch(_ s: inout String) throws {
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   do {
     try mayThrow() // expected-note {{if this call throws, the function exits without reinitializing 's'}}
   } catch {
@@ -144,7 +144,7 @@ func inoutRethrowFromCatch(_ s: inout String) throws {
 }
 
 func inoutCaughtError(_ s: inout String) throws {
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   do {
     try mayThrow()
     s = ""
@@ -167,14 +167,14 @@ func inoutNoncopyableThrow(_ x: inout NC) throws { // expected-note {{'x' declar
 
 extension ArrayBuffer {
   mutating func earlyReturn() {
-    _ = consume pending // expected-error {{missing reinitialization of inout parameter 'self.pending' after consume}}
+    _ = consume pending // expected-error {{missing reinitialization of inout parameter 'self.pending' after consume}} // expected-note {{write 'copy self.pending' to keep 'self.pending' valid after this consume}}
     guard .random() else { return } // expected-note@:28 {{the function returns here without reinitializing 'self.pending'}}
     pending = []
   }
 }
 
 func inoutEarlyReturnValue(_ s: inout String, _ b: Bool) -> Int {
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   if b {
     return 1 // expected-note@:5 {{the function returns here without reinitializing 's'}}
   }
@@ -184,14 +184,14 @@ func inoutEarlyReturnValue(_ s: inout String, _ b: Bool) -> Int {
 
 func inoutEarlyReturnWithDefer(_ s: inout String, _ b: Bool) {
   defer { _ = 0 }
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   if b { return } // expected-note {{the function returns here without reinitializing 's'}}
   s = ""
 }
 
 // Reaching the end of the function needs no note.
 func inoutFallsOffTheEnd(_ s: inout String, _ b: Bool) {
-  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+  _ = consume s // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   if b { s = "" }
 }
 
@@ -199,26 +199,26 @@ func inoutFallsOffTheEnd(_ s: inout String, _ b: Bool) {
 
 func copyableUsedAfterConsume() {
   let x = C()
-  _ = consume x // expected-note {{consumed here}}
+  _ = consume x // expected-note {{consumed here}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   use(x) // expected-error {{'x' used after consume}}
 }
 
 func copyableConsumedIntoParameter() {
   let x = C()
-  take(consume x) // expected-note {{consumed here}}
+  take(consume x) // expected-note {{consumed here}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   use(x) // expected-error {{'x' used after consume}}
 }
 
 func copyableConsumedInLoop(_ b: Bool) {
   let x = C()
   while b {
-    _ = consume x // expected-error {{'x' consumed in a loop}}
+    _ = consume x // expected-error {{'x' consumed in a loop}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   }
 }
 
 func copyableCapturedAfterConsume() {
   var x = C()
-  _ = consume x // expected-note {{consumed here}}
+  _ = consume x // expected-note {{consumed here}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   let g = { use(x) } // expected-error {{'x' used after consume}}
   g()
   x = C()
@@ -226,8 +226,35 @@ func copyableCapturedAfterConsume() {
 
 func genericCopyable<T>(_ t: T) {
   let x = t
-  _ = consume x // expected-note {{consumed here}}
+  _ = consume x // expected-note {{consumed here}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   useGeneric(x) // expected-error {{'x' used after consume}}
+}
+
+// --- writing `consume copy` keeps the value valid ---
+
+func copyableConsumeCopyThenUse() {
+  let x = C()
+  _ = consume copy x
+  use(x)
+}
+
+func copyableConsumeCopyIntoParameter() {
+  let x = C()
+  take(consume copy x)
+  use(x)
+}
+
+func copyableConsumeCopyInLoop(_ b: Bool) {
+  let x = C()
+  while b {
+    _ = consume copy x
+  }
+}
+
+func genericConsumeCopyThenUse<T>(_ t: T) {
+  let x = t
+  _ = consume copy x
+  useGeneric(x)
 }
 
 // --- fields ---
@@ -237,7 +264,7 @@ struct Pair { var a: C; var b: C }
 func fieldUsedAfterConsume() {
   var p: Pair
   p = Pair(a: C(), b: C())
-  _ = consume p.a // expected-note {{consumed here}}
+  _ = consume p.a // expected-note {{consumed here}} // expected-note {{write 'copy p.a' to keep 'p.a' valid after this consume}}
   use(p.a) // expected-error {{'p.a' used after consume}}
   use(p.b)
 }
@@ -245,21 +272,21 @@ func fieldUsedAfterConsume() {
 func tupleElementUsedAfterConsume() {
   var t: (first: C, second: C)
   t = (C(), C())
-  _ = consume t.first // expected-note {{consumed here}}
+  _ = consume t.first // expected-note {{consumed here}} // expected-note {{write 'copy t.first' to keep 't.first' valid after this consume}}
   use(t.first) // expected-error {{'t.first' used after consume}}
 }
 
 func usedAfterPartialConsume() {
   var p: Pair
   p = Pair(a: C(), b: C())
-  _ = consume p.a // expected-note {{partially consumed here}}
+  _ = consume p.a // expected-note {{partially consumed here}} // expected-note {{write 'copy p' to keep 'p' valid after this consume}}
   let q = p // expected-error {{cannot use 'p' after partial consume}}
   _ = q
 }
 
 func fieldOfValueUsedAfterConsume() {
   let p = Pair(a: C(), b: C())
-  _ = consume p // expected-note {{consumed here}}
+  _ = consume p // expected-note {{consumed here}} // expected-note {{write 'copy p' to keep 'p' valid after this consume}}
   use(p.a) // expected-error {{'p' used after consume}}
 }
 
@@ -279,7 +306,7 @@ func ncFieldUsedAfterConsume(_ p: consuming NCPair) { // expected-note {{'p' dec
 
 func copyableConsumedIntoBindingTwice() {
   let x = C()
-  let a = consume x // expected-note {{consumed here}}
+  let a = consume x // expected-note {{consumed here}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   let b = consume x // expected-error {{'x' consumed more than once}}
   use(a)
   use(b)
