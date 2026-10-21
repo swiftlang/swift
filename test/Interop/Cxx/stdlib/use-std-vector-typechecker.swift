@@ -4,6 +4,10 @@ import StdVector
 import StdVectorNoCPlusPlusRequirement
 import CxxStdlib
 
+// FIXME: The synthesized conformance of std::vector to CxxVector on android-armv7 is invalid
+// https://github.com/swiftlang/swift/issues/93524
+// XFAIL: OS=linux-androideabi
+
 func takeCopyable<T: Copyable>(_ x: T) {} // expected-note *{{'where T: Copyable' is implicit here}}
 func takeCxxVector<V: CxxVector>(_ v: V) {} // expected-note {{where 'V' = 'VectorOfNonCopyable'}}
 
