@@ -368,41 +368,32 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 }
 
 const char *
-CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
-  switch (semantics) {
-  case CalledTypeAttr::Semantics::AtMostOnce:
-    return "atMostOnce";
-  case CalledTypeAttr::Semantics::ExactlyOnce:
-    return "exactlyOnce";
-  }
-  llvm_unreachable("bad kind");
-}
-
-ExecutionSemantics CalledTypeAttr::getExecutionSemantics() const {
-  switch (getSemantics()) {
-  case Semantics::AtMostOnce:
-    return ExecutionSemantics::AtMostOnce;
-  case Semantics::ExactlyOnce:
-    return ExecutionSemantics::Once;
-  }
-  llvm_unreachable("bad kind");
-}
-
-const char *CalledAttr::getSemanticsName(ExecutionSemantics semantics) {
+swift::getExecutionSemanticsAttrSpelling(ExecutionSemantics semantics) {
   switch (semantics) {
   case ExecutionSemantics::AtMostOnce:
-    return "atMostOnce";
+    return "@callable(once)";
   case ExecutionSemantics::Once:
-    return "exactlyOnce";
+    return "@once";
   }
   llvm_unreachable("bad kind");
 }
 
-void CalledTypeAttr::printImpl(ASTPrinter &printer,
-                               const PrintOptions &options) const {
+const DeclAttribute *
+swift::getExecutionSemanticsAttr(const DeclAttributes &attrs,
+                                 const SourceManager &SM) {
+  const DeclAttribute *once = attrs.getAttribute<OnceAttr>();
+  const DeclAttribute *callable = attrs.getAttribute<CallableAttr>();
+  if (!once || !callable)
+    return once ? once : callable;
+  return SM.isBefore(callable->getLocation(), once->getLocation()) ? callable
+                                                                   : once;
+}
+
+void CallableTypeAttr::printImpl(ASTPrinter &printer,
+                                 const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  printer.printAttrName("@called");
-  printer << "(" << getSemanticsName() << ")";
+  printer.printAttrName(
+      getExecutionSemanticsAttrSpelling(ExecutionSemantics::AtMostOnce));
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -2010,6 +2001,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Callable:
+    Printer.printAttrName(
+        getExecutionSemanticsAttrSpelling(ExecutionSemantics::AtMostOnce));
+    break;
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -2268,13 +2264,8 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
-  case DeclAttrKind::Called:
-    switch (cast<CalledAttr>(this)->getSemantics()) {
-    case ExecutionSemantics::AtMostOnce:
-      return "called(atMostOnce)";
-    case ExecutionSemantics::Once:
-      return "called(exactlyOnce)";
-    }
+  case DeclAttrKind::Callable:
+    return "callable(once)";
   case DeclAttrKind::Target:
     return "_target";
   }

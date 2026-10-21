@@ -852,7 +852,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Consuming: {
       assert(!isPack);
       assert(val->getType().isAddress() &&
-             "@called(atMostOnce) values are bound as local boxed storage");
+             "at-most-once values are bound as local boxed storage");
 
       auto &tl = getTypeLowering(valueType);
 
@@ -1117,11 +1117,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
-    // A `@called(atMostOnce)` closure value's callee convention must be
+    // An at-most-once closure value's callee convention must be
     // `Direct_Owned` to match DefaultCalledAtMostOnceSemanticsConventions, or
     // the ABI-difference check treats it as needing a reabstraction thunk
-    // (which then fails: thunks are always Thin, and Thin + `@called` is an
-    // invalid combination).
+    // (which then fails: thunks are always Thin, and a Thin function can't
+    // have execution semantics).
     auto calleeConvention =
         typeContext.ExpectedLoweredType->hasCalledAtMostOnceSemantics()
             ? ParameterConvention::Direct_Owned

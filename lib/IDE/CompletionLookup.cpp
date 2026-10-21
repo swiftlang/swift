@@ -3048,6 +3048,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
   addTypeAttr(TypeAttrKind::Convention, "convention(c)");
   addTypeAttr(TypeAttrKind::Convention, "convention(thin)");
   addTypeAttr(TypeAttrKind::Isolated, "isolated(any)");
+  addTypeAttr(TypeAttrKind::Callable, "callable(once)");
 }
 
 void CompletionLookup::collectPrecedenceGroups() {

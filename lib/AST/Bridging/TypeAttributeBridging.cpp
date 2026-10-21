@@ -100,21 +100,12 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
       {static_cast<unsigned int>(index), indexLoc});
 }
 
-BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
-    SourceRange parensRange, BridgedCalledTypeAttrSemantics bridgedSemantics,
-    SourceLoc semanticsLoc) {
-  auto semantics = [=] {
-    switch (bridgedSemantics) {
-    case BridgedCalledTypeAttrSemantics_AtMostOnce:
-      return CalledTypeAttr::Semantics::AtMostOnce;
-    case BridgedCalledTypeAttrSemantics_ExactlyOnce:
-      return CalledTypeAttr::Semantics::ExactlyOnce;
-    }
-    llvm_unreachable("bad kind");
-  }();
+BridgedCallableTypeAttr
+BridgedCallableTypeAttr_createParsed(BridgedASTContext cContext,
+                                     SourceLoc atLoc, SourceLoc nameLoc,
+                                     SourceRange parensRange) {
   return new (cContext.unbridged())
-      CalledTypeAttr(atLoc, nameLoc, parensRange, {semantics, semanticsLoc});
+      CallableTypeAttr(atLoc, nameLoc, parensRange);
 }
 
 ScopeRepr BridgedScopeRepr::unbridged() const {

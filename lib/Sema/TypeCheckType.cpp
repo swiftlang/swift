@@ -3408,6 +3408,7 @@ static constexpr TypeAttrKind TAR_SILCoroutine = TypeAttrKind::YieldOnce;
 static constexpr TypeAttrKind TAR_SILCalleeConvention =
     TypeAttrKind::CalleeOwned;
 static constexpr TypeAttrKind TAR_SILReferenceStorage = TypeAttrKind::SILWeak;
+static constexpr TypeAttrKind TAR_ExecutionSemantics = TypeAttrKind::Once;
 
 TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   switch (kind) {
@@ -3452,6 +3453,11 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
 #include "swift/AST/ReferenceStorage.def"
     return TAR_SILReferenceStorage;
 
+  // A function type has at most one kind of execution semantics.
+  case TypeAttrKind::Once:
+  case TypeAttrKind::Callable:
+    return TAR_ExecutionSemantics;
+
   // These are total transforms on the type, and one of them can apply
   // at once.
   case TypeAttrKind::Opened:
@@ -3459,6 +3465,20 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   case TypeAttrKind::OpaqueReturnTypeOf:
     return TAR_TypeTransformer;
   };
+}
+
+/// Claims the `@once` or `@callable(once)` attribute of a function type, if
+/// any. The two are mutually exclusive, so \c TypeAttrSet::accumulate already
+/// diagnosed a second one.
+static TypeAttribute *claimExecutionSemanticsAttr(TypeAttrSet *attrs) {
+  return attrs ? claim<TAR_ExecutionSemantics>(*attrs) : nullptr;
+}
+
+/// Returns the execution semantics that \p attr, an `@once` or
+/// `@callable(once)` attribute, gives a function type.
+static ExecutionSemantics getExecutionSemantics(TypeAttribute *attr) {
+  return isa<OnceTypeAttr>(attr) ? ExecutionSemantics::Once
+                                 : ExecutionSemantics::AtMostOnce;
 }
 
 TypeRepr *TypeAttrSet::accumulate(AttributedTypeRepr *attrRepr) {
@@ -3618,7 +3638,8 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
       TypeAttrKind::Isolated,
-      TypeAttrKind::Called,
+      TypeAttrKind::Once,
+      TypeAttrKind::Callable,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -4369,9 +4390,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
-        diagnose(eltTypeRepr->getLoc(),
-                 diag::called_attr_cannot_be_used_with_borrowing,
-                 CalledAttr::getSemanticsName(*fnTy->getExecutionSemantics()));
+        diagnose(
+            eltTypeRepr->getLoc(),
+            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
+            getExecutionSemanticsAttrSpelling(*fnTy->getExecutionSemantics()));
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
 
@@ -4381,7 +4403,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(atMostOnce) is consuming by default and we don't
+      // at-most-once is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;
@@ -5284,22 +5306,25 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto called = claim<CalledTypeAttr>(attrs)) {
-    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+  if (auto *semanticsAttr = claimExecutionSemanticsAttr(attrs)) {
+    auto semantics = getExecutionSemantics(semanticsAttr);
+    if (ctx.LangOpts.hasFeature(Feature::OnceFunctions)) {
       if (representation != FunctionTypeRepresentation::Swift) {
         diagnoseInvalid(repr, conventionAttr->getAtLoc(),
-                        diag::invalid_called_and_attr_attributes,
-                        conventionAttr);
+                        diag::invalid_execution_semantics_and_attr_attributes,
+                        conventionAttr,
+                        getExecutionSemanticsAttrSpelling(semantics));
         representation = FunctionType::Representation::Swift;
         parsedClangFunctionType = nullptr;
       }
 
       if (!repr->isInvalid())
-        executionSemantics = called->getExecutionSemantics();
+        executionSemantics = semantics;
     } else {
-      diagnoseInvalid(repr, called->getAttrLoc(),
-                      diag::requires_experimental_feature, "@called", false,
-                      Feature::CalledAttribute.getName());
+      diagnoseInvalid(repr, semanticsAttr->getAttrLoc(),
+                      diag::requires_experimental_feature,
+                      getExecutionSemanticsAttrSpelling(semantics), false,
+                      Feature::OnceFunctions.getName());
     }
   }
 
@@ -5562,14 +5587,17 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // Function values with execution semantics own their context, so they must
   // be thick.
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+  if (auto *semanticsAttr = claimExecutionSemanticsAttr(attrs)) {
+    auto semantics = getExecutionSemantics(semanticsAttr);
     if (representation != SILFunctionType::Representation::Thick) {
       assert(conventionAttr);
       diagnoseInvalid(repr, conventionAttr->getAtLoc(),
-                      diag::invalid_called_and_attr_attributes, conventionAttr);
+                      diag::invalid_execution_semantics_and_attr_attributes,
+                      conventionAttr,
+                      getExecutionSemanticsAttrSpelling(semantics));
       hasError = true;
     } else {
-      executionSemantics = called->getExecutionSemantics();
+      executionSemantics = semantics;
     }
   }
 
@@ -6308,7 +6336,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        // `@called(atMostOnce)` functions always have consuming semantics
+        // at-most-once functions always have consuming semantics
         // regardless of whether they are @escaping or not.
         if (fnTy->hasCalledAtMostOnceSemantics())
           break;

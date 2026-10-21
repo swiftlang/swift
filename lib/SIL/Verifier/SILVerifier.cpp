@@ -2578,7 +2578,7 @@ public:
                 "value");
       }
       if (PAI->isOnStack()) {
-        // A `@called(atMostOnce)` closure is allowed to have consuming captures
+        // An at-most-once closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
         require(PAI->hasCalledAtMostOnceSemantics() ||

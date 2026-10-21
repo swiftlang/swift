@@ -905,7 +905,7 @@ public:
   bool isDifferentiable(SILModule &M) const;
 
   /// Returns true if this SILType is a function type whose values can be
-  /// called at most once, which is true for every kind of `@called` attribute.
+  /// called at most once, which is true for every kind of execution semantics.
   /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
   bool hasCalledAtMostOnceSemantics() const;
 

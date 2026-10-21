@@ -668,8 +668,8 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 
-/// Allow use of `@called(...)` on function types.
-EXPERIMENTAL_FEATURE(CalledAttribute, false)
+/// Allow `@once` and `@callable(once)` function types.
+EXPERIMENTAL_FEATURE(OnceFunctions, false)
 
 /// Allow structs, enums, and generic parameters to suppress `Deinitable`, for
 /// testing the compiler's support for `~Deinitable` types.

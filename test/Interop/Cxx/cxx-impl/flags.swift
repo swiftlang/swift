@@ -17,4 +17,4 @@
 func foo(_ x: Int32) -> Int32 { return x }
 
 // NO-INTEROP: error: 'cxx' requires C++ interoperability; enable it with '-cxx-interoperability-mode=default'
-// NO-FEATURE: error: 'cxx' attribute is only valid when experimental feature CxxImplementation is enabled
+// NO-FEATURE: error: '@cxx' attribute is only valid when experimental feature CxxImplementation is enabled

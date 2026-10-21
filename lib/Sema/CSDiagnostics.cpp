@@ -7644,16 +7644,20 @@ bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     return std::nullopt;
   };
 
-  // The source has the execution semantics, unless the constraint required
-  // the two types to be equal.
-  auto semantics = getSemantics(getFromType());
-  if (!semantics)
-    semantics = getSemantics(getToType());
+  // Usually the source has the execution semantics. When the constraint
+  // requires the two types to be equal, only the destination might.
+  if (auto semantics = getSemantics(getFromType())) {
+    emitDiagnostic(diag::execution_semantics_function_type_mismatch,
+                   getExecutionSemanticsAttrSpelling(*semantics), getFromType(),
+                   getToType());
+    return true;
+  }
 
-  emitDiagnostic(diag::called_attr_function_type_mismatch,
-                 CalledAttr::getSemanticsName(
-                     semantics.value_or(ExecutionSemantics::AtMostOnce)),
-                 getFromType(), getToType());
+  emitDiagnostic(
+      diag::execution_semantics_function_type_mismatch_to, getFromType(),
+      getExecutionSemanticsAttrSpelling(
+          getSemantics(getToType()).value_or(ExecutionSemantics::AtMostOnce)),
+      getToType());
   return true;
 }
 

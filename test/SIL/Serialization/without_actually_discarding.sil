@@ -1,17 +1,17 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature CalledAttribute %s -emit-sib -o %t/tmp.sib -module-name without_actually_discarding
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature CalledAttribute %t/tmp.sib -o %t/tmp.2.sib -module-name without_actually_discarding
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature CalledAttribute %t/tmp.2.sib -module-name without_actually_discarding | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature OnceFunctions %s -emit-sib -o %t/tmp.sib -module-name without_actually_discarding
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature OnceFunctions %t/tmp.sib -o %t/tmp.2.sib -module-name without_actually_discarding
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature OnceFunctions %t/tmp.2.sib -module-name without_actually_discarding | %FileCheck %s
 
-// REQUIRES: swift_feature_CalledAttribute
+// REQUIRES: swift_feature_OnceFunctions
 
 // Check that the convert_function [without_actually_discarding] attribute
 // survives serialization.
-// CHECK-LABEL: sil hidden [ossa] @f1_testWithoutActuallyDiscarding : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @called(atMostOnce) @callee_owned () -> () {
-// CHECK: convert_function %0 : $@called(exactlyOnce) @callee_owned () -> () to [without_actually_discarding] $@called(atMostOnce) @callee_owned () -> ()
-sil hidden [ossa] @f1_testWithoutActuallyDiscarding : $@convention(thin) (@owned @called(exactlyOnce) @callee_owned () -> ()) -> @owned @called(atMostOnce) @callee_owned () -> () {
-bb0(%0 : @owned $@called(exactlyOnce) @callee_owned () -> ()):
-  %1 = convert_function %0 : $@called(exactlyOnce) @callee_owned () -> () to [without_actually_discarding] $@called(atMostOnce) @callee_owned () -> ()
-  return %1 : $@called(atMostOnce) @callee_owned () -> ()
+// CHECK-LABEL: sil hidden [ossa] @f1_testWithoutActuallyDiscarding : $@convention(thin) (@owned @once @callee_owned () -> ()) -> @owned @callable(once) @callee_owned () -> () {
+// CHECK: convert_function %0 : $@once @callee_owned () -> () to [without_actually_discarding] $@callable(once) @callee_owned () -> ()
+sil hidden [ossa] @f1_testWithoutActuallyDiscarding : $@convention(thin) (@owned @once @callee_owned () -> ()) -> @owned @callable(once) @callee_owned () -> () {
+bb0(%0 : @owned $@once @callee_owned () -> ()):
+  %1 = convert_function %0 : $@once @callee_owned () -> () to [without_actually_discarding] $@callable(once) @callee_owned () -> ()
+  return %1 : $@callable(once) @callee_owned () -> ()
 }

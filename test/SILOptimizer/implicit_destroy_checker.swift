@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s -o /dev/null -enable-experimental-feature NondeinitableTypes -enable-experimental-feature CalledAttribute
+// RUN: %target-swift-frontend -emit-sil -verify %s -o /dev/null -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions
 
 // REQUIRES: swift_feature_NondeinitableTypes
-// REQUIRES: swift_feature_CalledAttribute
+// REQUIRES: swift_feature_OnceFunctions
 
 // FIXME: [deinitable] The synthesized setter of `x` overwrites the only stored property, which the move-only checker
 // handles by destroying the whole struct. See "Partial reinitialization" below.
@@ -311,7 +311,7 @@ struct Payload: ~Copyable, ~Deinitable {
 }
 
 struct HoldsCallback: ~Copyable, ~Deinitable {
-  let callback: @called(exactlyOnce) () -> Void
+  let callback: @once () -> Void
   let payload: Payload
 
   // The dropped stored property is an exactly-once function, so it has to be called.
