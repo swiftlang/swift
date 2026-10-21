@@ -4611,12 +4611,18 @@ static bool hasAccessScope(ParamDecl *param, AbstractFunctionDecl *fn) {
 /// The name of the parameter a written scope refers to, if any: `&a` is an
 /// access to `a`, and the scope name `a` is the scope of the parameter `a`.
 static std::optional<Identifier> getReferencedParamName(ScopeRepr repr) {
-  if (repr.getSubject() != ScopeRepr::Subject::Name)
-    return std::nullopt;
-  if (repr.isAccess())
+  switch (repr.getKind()) {
+  case ScopeRepr::Kind::AccessedValue:
     return repr.getAccessedValue();
-  // FIXME: Prefer explicitly named scopes here.
-  return repr.getScopeName().getIdentifier();
+  case ScopeRepr::Kind::ScopeName:
+    // FIXME: Prefer explicitly named scopes here.
+    return repr.getScopeName().getIdentifier();
+  case ScopeRepr::Kind::Self:
+  case ScopeRepr::Kind::AccessedSelf:
+  case ScopeRepr::Kind::Immortal:
+    return std::nullopt;
+  }
+  llvm_unreachable("unhandled kind");
 }
 
 /// (For now) diagnoses a `@_scoped` within a function type that names one of
@@ -4747,8 +4753,7 @@ Type TypeResolver::resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr,
 
   auto written = restrictions.front().getScope();
   // A static method's `self` is an escapable metatype.
-  if (written.getSubject() == ScopeRepr::Subject::Self && !written.isAccess() &&
-      !fn->isStatic()) {
+  if (written.getKind() == ScopeRepr::Kind::Self && !fn->isStatic()) {
     auto *selfNominal = fn->getDeclContext()->getSelfNominalTypeDecl();
     if (selfNominal &&
         selfNominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always)
@@ -4772,17 +4777,32 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
                                                    ScopeRepr repr) {
   auto &ctx = getASTContext();
 
-  switch (repr.getSubject()) {
-  case ScopeRepr::Subject::Immortal:
-    return ScopeRef::forImmortal();
-
-  case ScopeRepr::Subject::Self: {
-    if (!fn->hasImplicitSelfDecl()) {
-      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
+  auto *params = fn->getParameters();
+  auto findParam = [&](Identifier name) -> std::optional<unsigned> {
+    auto found = llvm::find_if(*params, [&](ParamDecl *param) {
+      return param->getParameterName() == name;
+    });
+    if (found == params->end()) {
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, name);
       return std::nullopt;
     }
-    if (!repr.isAccess()) {
+    return found - params->begin();
+  };
+
+  switch (repr.getKind()) {
+  case ScopeRepr::Kind::Immortal:
+    return ScopeRef::forImmortal();
+
+  case ScopeRepr::Kind::Self:
+    if (fn->hasImplicitSelfDecl())
       diagnose(repr.getLoc(), diag::scoped_escapable_param, ctx.Id_self);
+    else
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
+    return std::nullopt;
+
+  case ScopeRepr::Kind::AccessedSelf:
+    if (!fn->hasImplicitSelfDecl()) {
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
       return std::nullopt;
     }
     if (fn->isStatic() || isa<ConstructorDecl>(fn)) {
@@ -4796,40 +4816,37 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
     }
     // `self` is the parameter of the outer function type of a method.
     return ScopeRef::forParam(depth.deeper(), /*index=*/0);
-  }
 
-  case ScopeRepr::Subject::Name: {
-    // FIXME: Doing params like this is a hack... better to introduce scopes explicitly.
-    auto name = *getReferencedParamName(repr);
-    auto *params = fn->getParameters();
-    auto found = llvm::find_if(*params, [&](ParamDecl *param) {
-      return param->getParameterName() == name;
-    });
-    if (found == params->end()) {
-      diagnose(repr.getLoc(), diag::scoped_unknown_param, name);
+  case ScopeRepr::Kind::AccessedValue: {
+    auto name = repr.getAccessedValue();
+    auto index = findParam(name);
+    if (!index)
+      return std::nullopt;
+    auto *param = params->get(*index);
+    if (!hasAccessScope(param, fn)) {
+      diagnose(repr.getLoc(), diag::scoped_consuming_param);
+      if (param->getValueOwnership() != ValueOwnership::Default) {
+        diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);
+      } else {
+        ASSERT(isa<ConstructorDecl>(fn) &&
+               "only initializers consume parameters by default");
+        diagnose(param->getLoc(), diag::scoped_init_param_consuming_by_default);
+      }
       return std::nullopt;
     }
-    auto *param = *found;
+    return ScopeRef::forParam(depth, *index);
+  }
 
-    if (repr.isAccess()) {
-      if (!hasAccessScope(param, fn)) {
-        diagnose(repr.getLoc(), diag::scoped_consuming_param);
-        if (param->getValueOwnership() != ValueOwnership::Default) {
-          diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);
-        } else {
-          ASSERT(isa<ConstructorDecl>(fn) &&
-                 "only initializers consume parameters by default");
-          diagnose(param->getLoc(),
-                   diag::scoped_init_param_consuming_by_default);
-        }
-        return std::nullopt;
-      }
-      return ScopeRef::forParam(depth, found - params->begin());
-    }
+  case ScopeRepr::Kind::ScopeName: {
+    // FIXME: Doing params like this is a hack... better to introduce scopes explicitly.
+    auto name = repr.getScopeName().getIdentifier();
+    auto index = findParam(name);
+    if (!index)
+      return std::nullopt;
 
     // Does this make sense when values can have multiple scopes?
     // TODO: Support forward references?
-    auto paramTy = param->getInterfaceType();
+    auto paramTy = params->get(*index)->getInterfaceType();
     if (paramTy->hasError())
       return std::nullopt;
     if (fn->mapTypeIntoEnvironment(paramTy)->isEscapable()) {
@@ -4852,7 +4869,7 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
     return paramScopes.front().shifted(depth);
   }
   }
-  llvm_unreachable("unhandled subject");
+  llvm_unreachable("unhandled kind");
 }
 
 /// Fills in the scope arguments that \p ty leaves unspecified with fresh scope

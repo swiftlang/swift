@@ -268,6 +268,35 @@ ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc, SourceLoc kwLoc,
   return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, restrictions);
 }
 
+static void printScopeName(ASTPrinter &printer, Identifier name) {
+  if (name.is("immortal"))
+    printer << "`immortal`";
+  else
+    printer.printName(name, PrintNameContext::Attribute);
+}
+
+static void printScope(ASTPrinter &printer, ScopeRepr scope) {
+  switch (scope.getKind()) {
+  case ScopeRepr::Kind::ScopeName:
+    printScopeName(printer, scope.getScopeName().getIdentifier());
+    return;
+  case ScopeRepr::Kind::AccessedValue:
+    printer << "&";
+    printScopeName(printer, scope.getAccessedValue());
+    return;
+  case ScopeRepr::Kind::Self:
+    printer << "self";
+    return;
+  case ScopeRepr::Kind::AccessedSelf:
+    printer << "&self";
+    return;
+  case ScopeRepr::Kind::Immortal:
+    printer << "immortal";
+    return;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
 void ScopedTypeAttr::printImpl(ASTPrinter &printer,
                                const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
@@ -282,27 +311,7 @@ void ScopedTypeAttr::printImpl(ASTPrinter &printer,
           printer << ": ";
         }
 
-        auto scope = restriction.getScope();
-        if (scope.isAccess())
-          printer << "&";
-
-        switch (scope.getSubject()) {
-        case ScopeRepr::Subject::Name: {
-          auto name = scope.isAccess() ? scope.getAccessedValue()
-                                       : scope.getScopeName().getIdentifier();
-          if (name.is("immortal"))
-            printer << "`immortal`";
-          else
-            printer.printName(name, PrintNameContext::Attribute);
-          break;
-        }
-        case ScopeRepr::Subject::Self:
-          printer << "self";
-          break;
-        case ScopeRepr::Subject::Immortal:
-          printer << "immortal";
-          break;
-        }
+        printScope(printer, restriction.getScope());
       },
       [&] { printer << ", "; });
   printer << ")";

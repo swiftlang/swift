@@ -2717,7 +2717,7 @@ BridgedCallableTypeAttr BridgedCallableTypeAttr_createParsed(
     swift::SourceLoc nameLoc, swift::SourceRange parensRange);
 
 class BridgedScopeRepr {
-  enum class Kind { ScopeName, AccessedValue, Self, SelfAccess, Immortal } kind;
+  enum class Kind { ScopeName, AccessedValue, Self, AccessedSelf, Immortal } kind;
   swift::Identifier name;
   swift::SourceLoc loc;
 
@@ -2739,7 +2739,8 @@ public:
 
   SWIFT_NAME("forSelf(loc:isAccess:)")
   static BridgedScopeRepr forSelf(swift::SourceLoc loc, bool isAccess) {
-    return {isAccess ? Kind::SelfAccess : Kind::Self, swift::Identifier(), loc};
+    return {isAccess ? Kind::AccessedSelf : Kind::Self, swift::Identifier(),
+            loc};
   }
 
   SWIFT_NAME("forImmortal(loc:)")

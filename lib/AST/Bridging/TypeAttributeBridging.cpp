@@ -116,7 +116,7 @@ ScopeRepr BridgedScopeRepr::unbridged() const {
     return ScopeRepr::forAccessedValue({name, loc});
   case Kind::Self:
     return ScopeRepr::forSelf(loc, /*isAccess=*/false);
-  case Kind::SelfAccess:
+  case Kind::AccessedSelf:
     return ScopeRepr::forSelf(loc, /*isAccess=*/true);
   case Kind::Immortal:
     return ScopeRepr::forImmortal(loc);
