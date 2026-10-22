@@ -89,7 +89,6 @@ distributed actor MyDistActor {
 // CHECK:  cond_br [[RAW_BOOL]], [[REMOTE_ACTOR_DEINIT_BB:bb[0-9]+]], [[LOCAL_ACTOR_DEINIT_BB:bb[0-9]+]]
 
 // ===== -----------------------------------------------------------------------
-// CHECK: // localActorDeinitBB
 // CHECK: [[LOCAL_ACTOR_DEINIT_BB]]:
 // CHECK: [[DESTROYER_REF:%[0-9]+]] = function_ref @$s14default_deinit11MyDistActorCfd : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.NativeObject
 // CHECK: [[UNTYPED_DESTOY_RESULT:%[0-9]+]] = apply [[DESTROYER_REF]]([[SELF]]) : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.NativeObject
@@ -98,13 +97,11 @@ distributed actor MyDistActor {
 // CHECK:  br [[FINISH_DEINIT_BB:bb[0-9]+]]
 
 // ===== -----------------------------------------------------------------------
-// CHECK: // finishDeinitBB
 // CHECK: [[FINISH_DEINIT_BB]]:
 // CHECK:  [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:  return [[RESULT]] : $()
 
 // ===== -----------------------------------------------------------------------
-// CHECK: // remoteActorDeinitBB
 // CHECK: [[REMOTE_ACTOR_DEINIT_BB]]:
 
 // The remote proxy invokes resignRemoteID (behind an availability check on some
@@ -205,7 +202,6 @@ distributed actor MyDistActorIsolated {
 // CHECK:  cond_br [[RAW_BOOL]], [[REMOTE_ACTOR_DEINIT_BB:bb[0-9]+]], [[LOCAL_ACTOR_DEINIT_BB:bb[0-9]+]]
 
 // ===== -----------------------------------------------------------------------
-// CHECK: // localActorDeinitBB
 // CHECK: [[LOCAL_ACTOR_DEINIT_BB]]:
 // CHECK: [[ISOLATED_REF:%[0-9]+]] = function_ref @$s14default_deinit19MyDistActorIsolatedCfZ : $@convention(thin) (@owned MyDistActorIsolated) -> ()
 // CHECK: [[EXECUTOR:%[0-9]+]] = extract_executor [[SELF]] : $MyDistActorIsolated
@@ -217,13 +213,11 @@ distributed actor MyDistActorIsolated {
 // CHECK:  br [[FINISH_DEINIT_BB:bb[0-9]+]]
 
 // ===== -----------------------------------------------------------------------
-// CHECK: // finishDeinitBB
 // CHECK: [[FINISH_DEINIT_BB]]:
 // CHECK:  [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:  return [[RESULT]] : $()
 
 // ===== -----------------------------------------------------------------------
-// CHECK: // remoteActorDeinitBB
 // CHECK: [[REMOTE_ACTOR_DEINIT_BB]]:
 
 // The remote proxy invokes resignRemoteID (behind an availability check on some
