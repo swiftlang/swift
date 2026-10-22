@@ -865,11 +865,6 @@ class BuildScriptInvocation(object):
 
         # And then perform the rest of the non-core epilogue actions.
 
-        # If any test failures were deferred, report them now and exit.
-        if self._test_failures:
-            self._print_test_failure_summary()
-            raise SystemExit(f"ERROR: {len(self._test_failures)} test action(s) failed.\n")
-
         # Extract symbols...
         for host_target in all_hosts:
             self._execute_extract_symbols_action(host_target)
@@ -880,6 +875,12 @@ class BuildScriptInvocation(object):
 
         # Lipo...
         self._execute_merged_host_lipo_action()
+
+        # If any test failures were deferred, report them now and exit.
+        if self._test_failures:
+            self._print_test_failure_summary()
+            raise SystemExit(f"ERROR: {len(self._test_failures)} test action(s) failed.\n")
+
 
     def _execute_impl(self, pipeline, all_hosts, should_run_epilogue_operations):
         # Build...
