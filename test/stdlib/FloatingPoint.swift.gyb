@@ -289,7 +289,6 @@ FloatingPoint.test("Float/staticProperties") {
 #endif
   expectBitwiseEqual(bitPattern: 0x7f80_0000, Ty.infinity)
   expectBitwiseEqual(0x1.ffff_fe__p127, Ty.greatestFiniteMagnitude)
-  expectBitwiseEqual(0x1.921f_b6__p1, Ty.pi)
   expectBitwiseEqual(0x1.0p-23, Ty.ulpOfOne)
   expectBitwiseEqual(0x1.0p-126, Ty.leastNormalMagnitude)
 #if arch(arm)
@@ -301,6 +300,13 @@ FloatingPoint.test("Float/staticProperties") {
   // From the BinaryFloatingPoint protocol.
   expectEqual(8, Ty.exponentBitCount)
   expectEqual(23, Ty.significandBitCount)
+}
+
+// The rounding for Float.pi changed in Swift 6.5 (SE-0552)
+FloatingPoint.test("Float/pi")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  expectBitwiseEqual(0x1.921f_b6__p1, Float.pi)
 }
 
 // Tests the float and int conversions work correctly. Each case is special.
