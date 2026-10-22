@@ -229,6 +229,21 @@ public:
               ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
               ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>());
 
+  /// Source compatibility for clients that still pass whether the function has
+  /// generic parameter captures as a 'bool' (e.g. LLDB)
+  // TODO: Remove once LLDB passes the 'OptionSet<Flags>' instead
+  CaptureInfo(ASTContext &ctx,
+              ArrayRef<CapturedValue> captures,
+              DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
+              bool genericParamCaptures,
+              ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
+              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>())
+      : CaptureInfo(ctx, captures, dynamicSelf, opaqueValue,
+                    genericParamCaptures
+                        ? OptionSet<Flags>(Flags::HasGenericParamCaptures)
+                        : OptionSet<Flags>(),
+                    genericEnv, capturedTypes) {}
+
   /// A CaptureInfo representing no captures at all.
   static CaptureInfo empty();
 
@@ -270,6 +285,11 @@ public:
     ASSERT(hasBeenComputed());
     return StorageAndFlags.getInt().contains(
         Flags::NeedsImplicitIsolationCapture);
+  }
+
+  OptionSet<Flags> getFlags() const {
+    ASSERT(hasBeenComputed());
+    return StorageAndFlags.getInt();
   }
 
   /// \returns true if the function captures the dynamic Self type.
