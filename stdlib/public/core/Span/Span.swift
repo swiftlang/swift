@@ -133,11 +133,6 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
-
     let span = unsafe Span(
       _unchecked: UnsafeRawPointer(buffer.baseAddress),
       count: buffer.count

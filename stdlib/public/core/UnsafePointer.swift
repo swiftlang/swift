@@ -496,9 +496,10 @@ extension UnsafePointer where Pointee: ~Copyable {
 
 extension UnsafePointer where Pointee: ~Copyable {
   @safe
-  @export(implementation)
+  @export(implementation) @_transparent
+  @available(*, deprecated, message: "Pointers are always well-aligned.")
   public func _isWellAligned() -> Bool {
-    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+    true
   }
 }
 
@@ -1447,9 +1448,10 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   @safe
-  @export(implementation)
+  @export(implementation) @_transparent
+  @available(*, deprecated, message: "Pointers are always well-aligned.")
   public func _isWellAligned() -> Bool {
-    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+    true
   }
 }
 
