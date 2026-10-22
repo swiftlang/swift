@@ -1679,6 +1679,10 @@ public:
 
   ParserStatus parseYieldTypes(TupleTypeRepr *&yieldTypes);
 
+  bool isStartOfSingleYieldResult();
+
+  ParserResult<TypeRepr> parseSingleYieldResult();
+
   /// Returns 'true' if \p T is consider a throwing effect specifier.
   static bool isThrowsEffectSpecifier(const Token &T);
 

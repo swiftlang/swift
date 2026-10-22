@@ -407,6 +407,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   return makeParserResult(attrs.applyAttributesToType(*this, repr));
 }
 
+/// The CoroutineFunctions feature specifies yields in the effects position:
+///   func f() yields (T) -> R
 ParserStatus Parser::parseYieldTypes(TupleTypeRepr *&yieldTypes) {
   if (!Tok.isContextualKeyword("yields"))
     return makeParserSuccess();
@@ -447,6 +449,40 @@ ParserStatus Parser::parseYieldTypes(TupleTypeRepr *&yieldTypes) {
   yieldTypes =
       TupleTypeRepr::create(Context, ElementsR, SourceRange(LPLoc, RPLoc));
   return status;
+}
+
+bool Parser::isStartOfSingleYieldResult() {
+  if (!Tok.isContextualKeyword("yield")) {
+    return false;
+  }
+  BacktrackingScope backtrack(*this);
+  consumeToken();
+  if (Tok.isContextualKeyword("borrow") || Tok.is(tok::kw_inout)) {
+    consumeToken();
+  }
+  return canParseType();
+}
+
+/// The SingleYieldFunctions feature specifies the yield type in the result
+/// position:
+///   func f() -> yield [borrow|inout] T
+ParserResult<TypeRepr> Parser::parseSingleYieldResult() {
+  SourceLoc yieldLoc = consumeToken();
+  ParamSpecifier specifier = ParamSpecifier::Consuming;
+  if (Tok.isContextualKeyword("borrow")) {
+    consumeToken();
+    specifier = ParamSpecifier::Borrowing;
+  } else if (Tok.is(tok::kw_inout)) {
+    consumeToken(tok::kw_inout);
+    specifier = ParamSpecifier::InOut;
+  }
+
+  ParserResult<TypeRepr> type = parseType(diag::expected_type_function_result);
+  if (type.isNull()) {
+    return type;
+  }
+  return makeParserResult(
+      type, new (Context) YieldTypeRepr(type.get(), yieldLoc, specifier));
 }
 
 /// parseTypeScalar
@@ -539,8 +575,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
                            thrownTy);
 
     ParserResult<TypeRepr> SecondHalf =
-        parseTypeScalar(diag::expected_type_function_result,
-                        ParseTypeReason::Unspecified);
+        isStartOfSingleYieldResult()
+            ? parseSingleYieldResult()
+            : parseTypeScalar(diag::expected_type_function_result,
+                              ParseTypeReason::Unspecified);
     status |= SecondHalf;
     if (SecondHalf.isNull()) {
       status.setIsParseError();

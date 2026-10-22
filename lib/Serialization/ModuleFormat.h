@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1042; // User module sub-build version
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1043; // yield list kind of a function
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -484,6 +484,13 @@ enum class SelfAccessKind : uint8_t {
   Borrowing,
 };
 using SelfAccessKindField = BCFixed<3>;
+
+enum class YieldListKind : uint8_t {
+  None = 0,
+  YieldsClause,
+  YieldResult,
+};
+using YieldListKindField = BCFixed<2>;
   
 /// Translates an operator decl fixity to a Serialization fixity, whose values
 /// are guaranteed to be stable.
@@ -1860,6 +1867,7 @@ namespace decls_block {
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
     BCFixed<1>,   // has sending result
+    YieldListKindField, // kind of the yield list, if any
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
