@@ -953,6 +953,12 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
   if (coroAllocFn->getLinkage() != llvm::GlobalValue::ExternalWeakLinkage)
     return coroAllocFn;
 
+  auto availability = IGM.Context.getTypedCoroAllocAvailability();
+  auto &sdkVersion = IGM.Context.LangOpts.SDKVersion;
+  bool sdkHasCoroFrameAlloc =
+      !sdkVersion || !availability.hasMinimumVersion() ||
+      *sdkVersion >= availability.getRawMinimumVersion();
+
   // Otherwise, create a stub function to call it when available, or malloc
   // when it isn't.
   return IGM.getOrCreateHelperFunction(
@@ -960,6 +966,15 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
       [&](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
         auto *size = parameters.claimNext();
+        // The weak reference still has to be resolved by the static linker
+        // for Darwin, so if the SDK's Swift runtime predates
+        // swift_coroFrameAlloc, always use malloc.
+        if (!sdkHasCoroFrameAlloc) {
+          (void)parameters.claimNext(); // The type id is unused.
+          IGF.Builder.CreateRet(IGF.Builder.CreateCall(
+              IGF.IGM.getMallocFunctionPointer(), {size}));
+          return;
+        }
         auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
         auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
             llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
