@@ -46,6 +46,12 @@
 // RUN: %target-swift-frontend -typecheck -verify %t/consumer.swift -I %t -I %t/top
 // RUN: %target-swift-frontend -typecheck -verify %t/consumer.swift -I %t -I %t/bottom
 
+// RUN: %target-swift-emit-module-interface(%t/Introduced.swiftinterface) -module-name Introduced \
+// RUN:     -define-availability 'MyLib_v1_0:iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0' \
+// RUN:     %t/introduced.swift %t/stricter_default.swift
+// RUN: %target-swift-typecheck-module-from-interface(%t/Introduced.swiftinterface) -module-name Introduced
+// RUN: %FileCheck %s --check-prefix=INTRODUCED --input-file %t/Introduced.swiftinterface
+
 //--- legacy.swift
 // The `default` declaration itself must not appear in the emitted interface.
 // CHECK-NOT: default @available
@@ -120,3 +126,26 @@ func useOrdering() {
   defaultedOrderedFunc() // expected-warning {{'defaultedOrderedFunc()' is deprecated: second default}}
   orderedFunc() // expected-warning {{'orderedFunc()' is deprecated: explicit}}
 }
+
+//--- introduced.swift
+default @available(MyLib_v1_0, *)
+
+// INTRODUCED-NOT: default @available
+// INTRODUCED: @available(watchOS 6.0, tvOS 13.0, macOS 10.15, iOS 13.0, *)
+// INTRODUCED-NEXT: public func defaultedIntroduction()
+public func defaultedIntroduction() {}
+
+// A declaration can impose a stricter requirement than the file default.
+// INTRODUCED-NEXT: @available(watchOS 6.0, tvOS 13.0, macOS 15.0, iOS 13.0, *)
+// INTRODUCED-NEXT: public func stricterDeclaration()
+@available(macOS 15.0, *)
+public func stricterDeclaration() {}
+
+//--- stricter_default.swift
+default @available(macOS 15.0, *)
+
+// A weaker explicit requirement must not relax the file default.
+// INTRODUCED-NEXT: @available(macOS 15.0, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+// INTRODUCED-NEXT: public func stricterFileDefault()
+@available(MyLib_v1_0, *)
+public func stricterFileDefault() {}

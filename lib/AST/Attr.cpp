@@ -991,8 +991,18 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
           swiftVersionAvailableAttribute.emplace(*semanticAttr);
         else if (semanticAttr->isPackageDescriptionVersionSpecific())
           packageDescriptionVersionAvailableAttribute.emplace(*semanticAttr);
-        else
-          shortAvailableAttributes.push_back(*semanticAttr);
+        else {
+          // Separate attributes can specify the same domain, but a combined
+          // short-form attribute must mention each domain only once. Preserve
+          // the strongest introduction requirement when coalescing them.
+          auto existing = llvm::find_if(shortAvailableAttributes, [&](auto attr) {
+            return attr.getDomain() == semanticAttr->getDomain();
+          });
+          if (existing == shortAvailableAttributes.end())
+            shortAvailableAttributes.push_back(*semanticAttr);
+          else if (existing->getIntroduced() < semanticAttr->getIntroduced())
+            *existing = *semanticAttr;
+        }
 
         continue;
       }
