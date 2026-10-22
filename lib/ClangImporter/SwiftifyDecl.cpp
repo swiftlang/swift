@@ -663,12 +663,6 @@ static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {
   return ParentClass->getForeignClassKind() != ClassDecl::ForeignKind::Normal;
 }
 
-template <typename T>
-static bool
-getFirstImplicitObjectParamAnnotation(const clang::ObjCMethodDecl *D) {
-  return false; // Only C++ methods have implicit params
-}
-
 static bool shouldSkipModule(ModuleDecl *M) {
   if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
