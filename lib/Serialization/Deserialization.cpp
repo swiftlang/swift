@@ -3342,6 +3342,18 @@ getActualSelfAccessKind(uint8_t raw) {
   return std::nullopt;
 }
 
+static std::optional<swift::YieldListKind> getYieldListKind(uint8_t raw) {
+  switch (serialization::YieldListKind(raw)) {
+  case serialization::YieldListKind::None:
+    break;
+  case serialization::YieldListKind::YieldsClause:
+    return swift::YieldListKind::YieldsClause;
+  case serialization::YieldListKind::YieldResult:
+    return swift::YieldListKind::YieldResult;
+  }
+  return std::nullopt;
+}
+
 static std::optional<swift::OpaqueReadOwnership>
 getActualOpaqueReadOwnership(unsigned rawKind) {
   switch (serialization::OpaqueReadOwnership(rawKind)) {
@@ -4514,6 +4526,7 @@ public:
     bool isUserAccessible = false;
     bool isDistributedThunk;
     bool hasSendingResult = false;
+    uint8_t rawYieldListKind = 0;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -4534,6 +4547,7 @@ public:
                                           isUserAccessible,
                                           isDistributedThunk,
                                           hasSendingResult,
+                                          rawYieldListKind,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -4721,12 +4735,20 @@ public:
       SET_OR_RETURN_ERROR(yields, MF.readYieldList());
 
       // Sanity check: non-coroutines should have empty yields and
-      // coroutines shoud have non-empty yields.
-      if (fn->isCoroutine() != !yields.empty())
+      // coroutines should have non-empty yields.
+      bool hasYieldList =
+          rawYieldListKind != uint8_t(serialization::YieldListKind::None);
+      if (hasYieldList == yields.empty()) {
         return MF.diagnoseFatal();
+      }
 
-      if (yields.size())
-        fn->setYields(YieldList::create(ctx, yields));
+      if (hasYieldList) {
+        auto yieldListKind = getYieldListKind(rawYieldListKind);
+        if (!yieldListKind) {
+          return MF.diagnoseFatal();
+        }
+        fn->setYields(YieldList::create(ctx, yields, *yieldListKind));
+      }
     }
 
     SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;

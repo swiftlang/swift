@@ -547,8 +547,17 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 
 static bool usesFeatureCoroutineFunctions(Decl *decl) {
   if (auto *FD = dyn_cast<FuncDecl>(decl))
-    return FD->isCoroutine() && !isa<AccessorDecl>(FD);
-  
+    return FD->isCoroutine() && !isa<AccessorDecl>(FD) &&
+           !FD->isSingleYieldFunction();
+
+  return false;
+}
+
+static bool usesFeatureSingleYieldFunctions(Decl *decl) {
+  if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+    return FD->isSingleYieldFunction();
+  }
+
   return false;
 }
 
