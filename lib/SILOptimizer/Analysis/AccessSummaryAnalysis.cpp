@@ -11,12 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
+#include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SIL/DebugUtils.h"
 
 using namespace swift;
 
@@ -461,6 +462,12 @@ bool AccessSummaryAnalysis::propagateFromCalleeToCaller(
 
 AccessSummaryAnalysis::FunctionInfo *
 AccessSummaryAnalysis::getFunctionInfo(SILFunction *F) {
+  // Only bodies of non-escaping closures are summarized (processFunction); for
+  // other callees only the signature is read. A closure group transform may
+  // only read bodies in its group.
+  ASSERT((!isNonEscapingClosure(F->getLoweredFunctionType()) ||
+          PM->isInCurrentClosureGroup(F)) &&
+         "access summary reads a body outside the group");
   FunctionInfo *&FInfo = FunctionInfos[F];
   if (!FInfo) {
     FInfo = new (Allocator.Allocate()) FunctionInfo(F);
