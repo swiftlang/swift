@@ -604,6 +604,34 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
     }
   }
 
+  /// Exchanges the values at the specified indices of the array.
+  ///
+  /// Both parameters must be valid indices of the array and not
+  /// equal to `endIndex`. Passing the same index as both `i` and `j` has no
+  /// effect.
+  ///
+  /// - Parameters:
+  ///   - i: The index of the first value to swap.
+  ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
+  @export(implementation)
+  public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else {
+      return
+    }
+    _makeMutableAndUnique()
+    _checkSubscript_native(i)
+    _checkSubscript_native(j)
+    let base = unsafe _buffer.getSubscriptBaseAddress()
+    let pi = unsafe base + i
+    let pj = unsafe base + j
+    let tmp = unsafe pi.move()
+    unsafe pi.initialize(to: pj.move())
+    unsafe pj.initialize(to: tmp)
+    _endMutation()
+  }
+
   /// The number of elements in the array.
   @inlinable
   public var count: Int {
