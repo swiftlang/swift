@@ -1524,7 +1524,7 @@ bool IsPatternInitialization::tryInitializeFromStorageReference(
   if (!pattern->getType()->isNoncopyable())
     return false;
 
-  // Borrowing the source requires a plain address-based value cast
+  // Ensure we have a plain address-based value cast before emitting anything
   if (pattern->getCastKind() != CheckedCastKind::ValueCast)
     return false;
 
@@ -1555,7 +1555,7 @@ static bool emitTakeCastAndBind(SILGenFunction &SGF, SILLocation loc,
   auto &targetTL = SGF.getTypeLowering(targetType);
 
   // Destination buffer for the extracted payload. Note the target may be
-  // loadable (only the source has to be address-only)
+  // loadable (only the source has to actually be in memory).
   // checked_cast_addr_br writes through an address either way.
   SILValue destAddr = SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
 

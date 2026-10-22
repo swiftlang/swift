@@ -2013,7 +2013,7 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
   for (auto &row : rows) {
     auto *sub = cast<IsPattern>(row.Pattern)->getSubPattern();
     if (row.HasGuard ||
-	(sub && sub->isRefutablePattern(/*allowIsPatternCoercion=*/false)))
+        (sub && sub->isRefutablePattern(/*allowIsPatternCoercion=*/false)))
       canDeferBinding = false;
   }
 
@@ -2026,7 +2026,7 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
       return false;
     }
   } else if (!canUseTypeTestForIsa(SGF, sourceType, targetType,
-				     firstPattern->getCastKind())) {
+                                   firstPattern->getCastKind())) {
     // Result is not statically known, so we need a type-test, but
     // this isn't a shape that a type-test can handle
     return false;
@@ -2041,9 +2041,9 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
       subjectIsCopyable)
     return false;
 
-  // A noncopyable subject has no such fallback: the ordinary lowering hands the
-  // pattern machinery a cast value whose consumption kind bindBorrow() asserts
-  // on, so falling through is a compiler crash rather than an error. Diagnose.
+  // A noncopyable subject can't fall back to the ordinary lowering.
+  // It hands the pattern machinery a cast value whose consumption
+  // kind bindBorrow() asserts on.  Diagnose.
   bool unimplementedBinding = wantsPayload && !canDeferBinding;
   if (unimplementedBinding) {
     for (auto &row : rows) {

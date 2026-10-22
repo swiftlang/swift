@@ -116,11 +116,7 @@ func concreteLetStoredProperty(_ h: consuming LetHolder) -> Int {
   return -2
 }
 
-// MARK: - Known limitation
-
-// Re-reading the *original* subject's own storage -- rather than using the
-// variable a successful pattern just bound -- can report "used after
-// consume".
+// MARK: - Reusing original value is use-after-consume
 
 func concreteRereadAfterCoercionFallback(_ box: consuming Small) -> Int {
   // expected-error @-1 {{'box' used after consume}}
