@@ -24,11 +24,13 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/LanguageMode.h"
 #include "llvm/ADT/SmallVector.h"
@@ -644,6 +646,62 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
   }
 }
 
+// Returns true if an override with the given parameter ownership specifier is
+// allowed over a base method with a given parameter ownership specifier.
+static bool paramSpecifiersMatch(const ValueDecl *baseDecl,
+                                 ParamSpecifier baseSpec,
+                                 ParamSpecifier derivedSpec) {
+  // We allow for specifier mismatches between imported ObjC base methods and
+  // Swift overrides.
+  if (baseDecl->isObjC() && baseDecl->hasClangNode()) {
+    return true;
+  }
+  
+  // The default ownership for initializer parameters is consuming. For other
+  // declarations it's borrowing.
+  auto defaultSpecifier = isa<ConstructorDecl>(baseDecl)
+    ? ParamSpecifier::Consuming
+    : ParamSpecifier::Borrowing;
+  
+  baseSpec = baseSpec == ParamSpecifier::Default
+    ? defaultSpecifier : baseSpec;
+  derivedSpec = derivedSpec == ParamSpecifier::Default
+    ? defaultSpecifier : derivedSpec;
+  
+#define SPECS(b, d) (unsigned(b) << 16 | unsigned(d))
+  switch ((SPECS(baseSpec, derivedSpec))) {
+  // Exact matches are OK.
+  case SPECS(ParamSpecifier::InOut, ParamSpecifier::InOut):
+  case SPECS(ParamSpecifier::Borrowing, ParamSpecifier::Borrowing):
+  case SPECS(ParamSpecifier::Consuming, ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::LegacyShared, ParamSpecifier::LegacyShared):
+  case SPECS(ParamSpecifier::LegacyOwned, ParamSpecifier::LegacyOwned):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  
+  // Modifiers from different eras may be matched as long as they have the same
+  // external ownership behavior.
+  case SPECS(ParamSpecifier::Borrowing, ParamSpecifier::LegacyShared):
+  case SPECS(ParamSpecifier::LegacyShared, ParamSpecifier::Borrowing):
+  case SPECS(ParamSpecifier::Consuming, ParamSpecifier::LegacyOwned):
+  case SPECS(ParamSpecifier::Consuming,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  case SPECS(ParamSpecifier::LegacyOwned, ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::LegacyOwned,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::LegacyOwned):
+    
+    return true;
+  
+  default:
+    return false;
+  }
+#undef SPECS
+}
+
 static bool parameterTypesMatch(const ValueDecl *derivedDecl,
                                 const ValueDecl *baseDecl,
                                 TypeMatchOptions matchMode) {
@@ -669,8 +727,9 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
     auto *baseParam = baseParams->get(i);
     auto *derivedParam = derivedParams->get(i);
 
-    // Make sure inout-ness and varargs match.
-    if (baseParam->isInOut() != derivedParam->isInOut() ||
+    // Make sure ownership specifiers and varargs match.
+    if (!paramSpecifiersMatch(baseDecl, baseParam->getSpecifier(),
+                                       derivedParam->getSpecifier()) ||
         baseParam->isVariadic() != derivedParam->isVariadic()) {
       return false;
     }
