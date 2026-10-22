@@ -623,9 +623,10 @@ protected:
 };
 
 void AccessEnforcementSelection::run() {
-  auto *CSA = getAnalysis<ClosureScopeAnalysis>();
-  ClosureFunctionOrder closureOrder(CSA);
-  closureOrder.compute();
+  SmallVector<SILFunction *, 64> functions;
+  for (SILFunction &function : *getModule())
+    functions.push_back(&function);
+  ClosureFunctionOrder closureOrder(functions);
 
   dynamicCaptures = std::make_unique<DynamicCaptures>();
   SWIFT_DEFER { dynamicCaptures.reset(); };
