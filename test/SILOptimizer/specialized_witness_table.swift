@@ -96,7 +96,8 @@ public func makeBase() -> any Copies {
   return Base<Int>()
 }
 
-// Negative cases: no specialized witness tables for the following.
+// Witnesses which cannot be specialized are kept as generic witnesses. They get the generic
+// parameters of the conformance from the type metadata of Self.
 
 // A default implementation needs the dynamic Self type of a non-final class, which can be
 // a sub-class. Such a witness has a generic Self and is not specialized for the class type.
@@ -108,11 +109,14 @@ extension Named {
   public func name() -> String { "\(type(of: self))" }
 }
 
+// CHECK-LABEL: sil_witness_table shared [specialized] Base<Int>: specialize <Int> (<T> Base<T>: Named module test) {
+// CHECK-NEXT:    method #Named.name: {{.*}} : @$s4test4BaseCyqd__GAA5NamedA2aEP4nameSSyFTW{{([[:space:]].*)?$}}
+// CHECK-NEXT:  }
 public func makeNamed() -> any Named {
   return Base<Int>()
 }
 
-// A generic requirement cannot be fully specialized.
+// A generic method requirement cannot be fully specialized and is kept as the generic witness.
 public protocol HasGenericMethod {
   func g<U>(_ u: U) -> Int
 }
@@ -122,10 +126,24 @@ public struct GBox<T>: HasGenericMethod {
   public func g<U>(_ u: U) -> Int { MemoryLayout<U>.size }
 }
 
+// CHECK-LABEL: sil_witness_table shared [specialized] GBox<Int>: specialize <Int> (<T> GBox<T>: HasGenericMethod module test) {
+// CHECK-NEXT:    method #HasGenericMethod.g: {{.*}} : @$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW{{([[:space:]].*)?$}}
+// CHECK-NEXT:  }
 public func makeGBox() -> any HasGenericMethod {
   return GBox(t: 1)
 }
 
+// Negative cases: no specialized witness tables for the following.
+
+// A generic witness of a conditional conformance would need the conditional conformances,
+// which are only stored in a runtime-instantiated witness table.
+extension Cond: HasGenericMethod where T: P {
+  public func g<U>(_ u: U) -> Int { t.foo() + MemoryLayout<U>.size }
+}
+
+public func makeCondGeneric() -> any HasGenericMethod {
+  return Cond(t: Box(t: 1))
+}
+
 // NEG-NOT: [specialized] RBox
-// NEG-NOT: [specialized] Base<Int>: specialize <Int> (<T> Base<T>: Named
-// NEG-NOT: [specialized] GBox
+// NEG-NOT: [specialized] Cond<Box<Int>>: specialize <Box<Int>> (<T where T : P> Cond<T>: HasGenericMethod

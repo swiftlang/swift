@@ -46,6 +46,9 @@ extension Cond: P where T: P {
 
 // CHECK-DAG: @"$s4test4CondVyAA3BoxVySdGGAA1PAAWP" = linkonce_odr hidden {{.*}}@"$s4test4CondVyxGAA1PA2aERzlMc"
 
+// A witness which cannot be specialized is the generic witness in the static table.
+// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW"
+
 // No additional conformance descriptor is emitted for a specialized witness table.
 // DESC:     @"$s4test7WrapperVyxGAA1QAAMc" =
 // DESC-NOT: @"$s4test7WrapperVyxGAA1QAAMc" =
@@ -65,6 +68,23 @@ public func makeBox() -> any P {
 // CHECK:       }
 public func makeWrapper() -> any Q {
   return Wrapper(t: true)
+}
+
+public protocol HasGenericMethod {
+  func g<U>(_ u: U) -> Int
+}
+
+public struct GBox<T>: HasGenericMethod {
+  var t: T
+  public func g<U>(_ u: U) -> Int { MemoryLayout<U>.size }
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test8makeGBoxAA16HasGenericMethod_pyF"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP"
+// CHECK:       }
+public func makeGBox() -> any HasGenericMethod {
+  return GBox(t: 1)
 }
 
 // The conditional conformance is not instantiated at runtime.
