@@ -58,6 +58,7 @@ class SwiftSyntax(product.Product):
         if self.args.verbose_build:
             build_cmd.append('--vv')
         build_cmd += [
+            '-j', str(self.args.build_jobs),
             '--package-path', script_path,
             'swift-syntax-dev-utils',
             command,
@@ -99,6 +100,7 @@ class SwiftSyntax(product.Product):
             run_cmd.append('--vv')
         run_cmd += [
             '--package-path', swift_syntax_dev_utils,
+            '-j', str(self.args.build_jobs),
             'swift-syntax-dev-utils',
             command
         ]

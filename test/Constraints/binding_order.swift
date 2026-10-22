@@ -97,7 +97,15 @@ do {
     let _: [any Command] = [a, b]
     let _: [any Command] = Array([a, b])
     let _: [any Command] = [a, b].filter { _ in true }
+
+    let _: [any Command] = [a, b].compactMap { .some($0) }
+    // expected-error@-1 {{argument type 'Super' does not conform to expected type 'Command'}}
+    let _: [any Command] = [a, b].compactMap { Optional($0) }
+    // expected-error@-1 {{cannot convert value of type 'Optional<Super>' to closure result type '(any Command)?'}}
+
     let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
+    let _: [any Command] = [Optional(a), Optional(b)].compactMap { $0 }
+    let _: [any Command] = [.some(a), .some(b)].compactMap { $0 }
 
     let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
     // expected-error@-1 {{cannot convert value of type 'A?' to expected element type 'any Command'}}
@@ -417,44 +425,6 @@ do {
       })
     ]
     return result
-  }
-}
-
-// https://github.com/swiftlang/swift/issues/77003
-do {
-  struct Task<E> {
-    init(_: () -> ()) where E == Never {}
-    init(_: () throws -> ()) where E == Error {}
-  }
-
-  func f0<T, U>(_: T.Type, _ fn: (T) -> U, _: (U) -> ()) {}
-
-  func f1<T, U>(_: T.Type, _ fn: (T) -> U?, _: (U) -> ()) {}
-
-  func g1(x: Int?.Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f1(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f2<T, U>(_: T.Type, _ fn: (T) -> (U, U), _: (U) -> ()) {}
-
-  func g2(x: (Int, Int).Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f2(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f3<T, U>(_: T.Type, _ fn: (T) -> [U], _: (U) -> ()) {}
-
-  func g3(x: [Int].Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f3(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f4<T, U>(_: T.Type, _ fn: (T) -> [U?], _: (U) -> ()) {}
-
-  func g4(x: [Int?].Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f4(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
   }
 }
 

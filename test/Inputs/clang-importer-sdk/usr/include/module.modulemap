@@ -161,3 +161,5 @@ module CompletionHandlerGlobals {
 module ImportedMacroError {
   header "imported_macro_error.h"
 }
+
+extern module ObjectiveC "objc/module.modulemap"

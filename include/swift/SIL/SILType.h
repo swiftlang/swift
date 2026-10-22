@@ -243,9 +243,7 @@ public:
 
   /// Whether the type is an enum, struct, or tuple.
   bool isAggregate() const {
-    return is<TupleType>() || is<StructType>() ||
-           is<BoundGenericStructType>() || is<EnumType>() ||
-           is<BoundGenericEnumType>();
+    return is<TupleType>() || is<StructType>() || is<EnumType>();
   }
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
@@ -907,9 +905,15 @@ public:
   bool isDifferentiable(SILModule &M) const;
 
   /// Returns true if this SILType is a function type whose values can be
-  /// called at most once, which is true for every kind of `@called` attribute.
+  /// called at most once, which is true for every kind of execution semantics.
   /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
   bool hasCalledAtMostOnceSemantics() const;
+
+  /// Returns true if the type conforms to Deinitable, which means its values
+  /// may be destroyed implicitly. Otherwise, its values must instead be
+  /// consumed on every path that doesn't end in `unreachable`. A box is
+  /// implicitly destroyable if its contents are.
+  bool isImplicitlyDestroyable(const SILFunction &fn) const;
 
   /// Returns the @_rawLayout attribute on this type if it has one.
   RawLayoutAttr *getRawLayout() const {

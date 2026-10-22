@@ -8,7 +8,7 @@ class KlassModern: ~Copyable {}
 class Konditional<T: ~Copyable> {}
 
 func checks<T: ~Copyable, C>(
-          _ b: KlassModern, // expected-error {{parameter of noncopyable type 'KlassModern' must specify ownership}} // expected-note 3{{add}}
+          _ b: KlassModern, // expected-error {{parameter of non-'Copyable' type 'KlassModern' must specify ownership}} // expected-note 3{{add}}
           _ c: Konditional<T>,
           _ d: Konditional<C>) {}
 

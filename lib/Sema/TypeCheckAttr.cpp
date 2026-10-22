@@ -67,6 +67,12 @@
 
 using namespace swift;
 
+/// Returns the name of \p attr as written in source for a diagnostic, with the
+/// `@` of an attribute, such as `@callable(once)`.
+static std::string getAttrNameForDiagnostics(const DeclAttribute *attr) {
+  return (attr->isDeclModifier() ? "" : "@") + attr->getAttrName().str();
+}
+
 namespace {
 /// This visits each attribute on a decl.  The visitor should return true if
 /// the attribute is invalid and should be marked as such.
@@ -186,6 +192,7 @@ public:
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(ClangImporterSynthesizedType)
+  IGNORED_ATTR(Callable) // Only valid on closures; see ClosureAttributeChecker.
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
@@ -196,6 +203,7 @@ public:
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
+  IGNORED_ATTR(Once) // Only valid on closures; see ClosureAttributeChecker.
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
@@ -546,7 +554,6 @@ public:
   void visitUnsafeAttr(UnsafeAttr *attr);
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
-  void visitCalledAttr(CalledAttr *attr);
   void visitCoroutineAttr(CoroutineAttr *attr);
 };
 
@@ -797,8 +804,22 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
 
 void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
-  if (D->getAttrs().hasAttribute<TransparentAttr>())
+  if (D->getAttrs().hasAttribute<TransparentAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
+    return;
+  }
+
+  // Embedded Swift does not support dynamic replacement, so 'dynamic' is
+  // ignored (see IsDynamicRequest).
+  if (attr->isImplicit())
+    return;
+  auto *dc = isa<DeclContext>(D) ? cast<DeclContext>(D) : D->getDeclContext();
+  if (auto behavior =
+          shouldDiagnoseEmbeddedLimitations(dc, attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::dynamic_in_embedded_swift, D)
+        .limitBehavior(*behavior)
+        .fixItRemove(attr->getRange());
+  }
 }
 
 /// Replaces asynchronous IBActionAttr/IBSegueActionAttr function declarations
@@ -1070,7 +1091,7 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
     isArray = true;
 
     // Handle Array<T>. T must be an Objective-C class or protocol.
-    auto boundTy = type->castTo<BoundGenericStructType>();
+    auto boundTy = type->castTo<StructType>();
     auto boundArgs = boundTy->getGenericArgs();
     assert(boundArgs.size() == 1 && "invalid Array declaration");
     Type elementTy = boundArgs.front();
@@ -1981,7 +2002,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
       if (!attr->isImplicit()
             && !D->getASTContext().LangOpts.hasFeature(*feature)) {
         Checker.diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature,
-                                      attr->getAttrName(), false,
+                                      getAttrNameForDiagnostics(attr), false,
                                       feature->getName());
         continue;
       }
@@ -2608,9 +2629,13 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   switch (attr->getExposureKind()) {
   case ExposureKind::Wasm: {
-    // Only top-level func decls are currently supported.
-    if (!isa<FuncDecl>(D) || D->getDeclContext()->isTypeContext())
-      diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
+    const bool isGlobalFunc =
+        isa<FuncDecl>(D) && !D->getDeclContext()->isTypeContext();
+    auto *VD = dyn_cast<VarDecl>(D);
+    const bool isGlobalVar = VD && VD->hasStorage() &&
+                             (VD->isGlobalStorage() || VD->isTopLevelGlobal());
+    if (!isGlobalFunc && !isGlobalVar)
+      diagnose(attr->getLocation(), diag::expose_wasm_unsupported_decl);
     break;
   }
   case ExposureKind::NotCxx:
@@ -3760,6 +3785,39 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
 /// Type check that a set of requirements provided by @_specialize/@specialize.
 /// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
+  if (attr->isExported()) {
+    if (!Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
+      diagnose(attr->getLocation(),
+               diag::specialized_attr_exported_experimental);
+    else if (D->getModuleContext()->isResilient())
+      diagnose(attr->getLocation(),
+               diag::specialized_attr_exported_library_evolution);
+    // The library can't own the specialized body of code that is emitted
+    // into its clients.
+    else if (D->getAttrs().hasAttribute<TransparentAttr>())
+      diagnose(attr->getLocation(),
+               diag::specialized_attr_exported_emitted_into_client,
+               /*@_transparent*/ 2);
+    else if (D->getExplicitCodeGenerationModel() ==
+             CodeGenerationModel::Implementation) {
+      // An accessor can take '@_alwaysEmitIntoClient' from its storage.
+      auto *accessor = dyn_cast<AccessorDecl>(D);
+      bool alwaysEmitIntoClient =
+          D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+          (accessor && accessor->getStorage()
+                           ->getAttrs()
+                           .hasAttribute<AlwaysEmitIntoClientAttr>());
+      diagnose(attr->getLocation(),
+               diag::specialized_attr_exported_emitted_into_client,
+               alwaysEmitIntoClient ? /*@_alwaysEmitIntoClient*/ 1
+                                    : /*@export(implementation)*/ 0);
+    }
+    else if (D->getModuleContext()->codeGenerationModel() ==
+             CodeGenerationModel::Implementation)
+      diagnose(attr->getLocation(),
+               diag::specialized_attr_exported_emitted_into_client,
+               /*implementation code generation model*/ 3);
+  }
   visitAbstractSpecializeAttr(attr);
 }
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
@@ -4450,6 +4508,21 @@ findReplacedStorageDecl(DeclNameRef replacedFunctionName,
 void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr) {
   assert(isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D));
   auto *replacement = cast<ValueDecl>(D);
+
+  // Embedded Swift does not support dynamic replacement, so the attribute is
+  // ignored (see DynamicallyReplacedDeclRequest).
+  auto *dc = isa<DeclContext>(D) ? cast<DeclContext>(D) : D->getDeclContext();
+  if (auto behavior =
+          shouldDiagnoseEmbeddedLimitations(dc, attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::dynamic_replacement_in_embedded_swift,
+             D)
+        .limitBehavior(*behavior)
+        .fixItRemove(attr->getRangeWithAt());
+  }
+  if (Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    attr->setInvalid();
+    return;
+  }
 
   if (!isa<ExtensionDecl>(replacement->getDeclContext()) &&
       !replacement->getDeclContext()->isModuleScopeContext()) {
@@ -6342,6 +6415,10 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
                                          ValueDecl *VD) const {
   // Dynamic replacements must be explicit.
   if (VD->isImplicit())
+    return nullptr;
+
+  // Embedded Swift does not support dynamic replacement.
+  if (VD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return nullptr;
 
   auto *attr = VD->getAttrs().getAttribute<DynamicReplacementAttr>();
@@ -9298,14 +9375,6 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
                      diag::unsafe_self_dependent_result_attr_on_invalid_decl);
 }
 
-void AttributeChecker::visitCalledAttr(CalledAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
-    diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature, "@called",
-                          false, Feature::CalledAttribute.getName());
-    return;
-  }
-}
-
 namespace {
 
 class ClosureAttributeChecker
@@ -9369,13 +9438,26 @@ public:
     }
   }
 
-  void visitCalledAttr(CalledAttr *attr) {
-    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+  /// Diagnoses `@once` together with `@callable(once)`. The first one in
+  /// source order gives the closure its execution semantics.
+  void checkExecutionSemanticsAttr(DeclAttribute *attr) {
+    auto *winner =
+        getExecutionSemanticsAttr(closure->getAttrs(), ctx.SourceMgr);
+    if (winner == attr)
       return;
 
-    ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
-                       "@called", false, Feature::CalledAttribute.getName());
+    ctx.Diags
+        .diagnose(attr->getLocation(), diag::mutually_exclusive_attr_names,
+                  getAttrNameForDiagnostics(attr),
+                  getAttrNameForDiagnostics(winner), /*isModifier=*/false)
+        .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
+  }
+
+  void visitOnceAttr(OnceAttr *attr) { checkExecutionSemanticsAttr(attr); }
+
+  void visitCallableAttr(CallableAttr *attr) {
+    checkExecutionSemanticsAttr(attr);
   }
 
   void visitCustomAttr(CustomAttr *attr) {
@@ -9426,8 +9508,21 @@ public:
 }
 
 void TypeChecker::checkClosureAttributes(ClosureExpr *closure) {
+  auto &ctx = closure->getASTContext();
   ClosureAttributeChecker checker(closure);
   for (auto attr : closure->getAttrs()) {
+    // If the attribute requires a feature that isn't enabled, diagnose and
+    // disable it, as for an attribute on a declaration.
+    if (auto feature = DeclAttribute::getRequiredFeature(attr->getKind())) {
+      if (!attr->isImplicit() && !ctx.LangOpts.hasFeature(*feature)) {
+        ctx.Diags.diagnose(
+            attr->getLocation(), diag::requires_experimental_feature,
+            getAttrNameForDiagnostics(attr), false, feature->getName());
+        attr->setInvalid();
+        continue;
+      }
+    }
+
     checker.visit(attr);
   }
 }

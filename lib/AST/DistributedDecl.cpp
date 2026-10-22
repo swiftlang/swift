@@ -1563,6 +1563,25 @@ AbstractFunctionDecl::getDistributedThunk() const {
       nullptr);
 }
 
+AbstractFunctionDecl *swift::getDistributedThunkOriginalDecl(FuncDecl *thunk) {
+  assert(thunk->isDistributedThunk());
+
+  // Thunks are neither members of their context nor registered accessors of
+  // their storage, so recover the original from its context.
+  if (auto *accessor = dyn_cast<AccessorDecl>(thunk))
+    return accessor->getStorage()->getAccessor(AccessorKind::Get);
+
+  if (auto *nominal = thunk->getDeclContext()->getSelfNominalTypeDecl()) {
+    for (auto *member : nominal->lookupDirect(thunk->getName())) {
+      auto *afd = dyn_cast<AbstractFunctionDecl>(member);
+      if (afd && afd->isDistributed() && !afd->isDistributedThunk() &&
+          afd->getDistributedThunk() == thunk)
+        return afd;
+    }
+  }
+  return nullptr;
+}
+
 FuncDecl *
 AbstractStorageDecl::getDistributedResolvableProxyAdapterThunk() const {
   if (!isDistributed())

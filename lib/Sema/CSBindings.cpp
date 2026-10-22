@@ -74,8 +74,8 @@ static bool isDirectRequirement(ConstraintSystem &cs,
 ///
 /// $T1 bind (x: Int, y: String)
 static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
-  auto *boundTy = containerTy->getAs<BoundGenericStructType>();
-  if (!boundTy)
+  auto *boundTy = containerTy->getAs<StructType>();
+  if (!boundTy || !boundTy->hasGenericArgs())
     return containerTy;
 
   // We should never form a type like Array<@noescape () -> ()>, because
@@ -90,7 +90,7 @@ static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
   if (decl == ctx.getArrayDecl())
     return ArraySliceType::get(elementTy);
   else if (decl == ctx.getSetDecl())
-    return BoundGenericType::get(decl, /*parent=*/Type(), {elementTy});
+    return NominalType::get(decl, /*parent=*/Type(), {elementTy}, ctx);
 
   return containerTy;
 }
@@ -274,9 +274,11 @@ void BindingSet::computeJoinsAndMeets() {
   MergedBinding subtypes;
   std::optional<unsigned> firstSubtype;
 
+  auto &ctx = CS.getASTContext();
+
   // FIXME: Remove this.
-  bool allowTypeVariableJoins =
-      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool allowTypeVariableJoins = ctx.TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool enableShortConversions = ctx.TypeCheckerOpts.SolverEnableShortConversions;
 
   for (unsigned i : indices(Bindings)) {
     auto binding = Bindings[i];
@@ -337,14 +339,16 @@ void BindingSet::computeJoinsAndMeets() {
       return;
     }
 
-    // Don't allow this for now, because it leads to infinite recursion
-    // in constraint simplification. Once optional conversions are no
-    // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSupertype->getOptionalObjectType()) {
-      if (objectType->is<JoinType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
-                                << commonSupertype << "\n");
-        return;
+    if (!enableShortConversions) {
+      // Don't allow this for now, because it leads to infinite recursion
+      // in constraint simplification. Once optional conversions are no
+      // longer presented as a disjunction, this case be removed.
+      if (auto objectType = commonSupertype->getOptionalObjectType()) {
+        if (objectType->is<JoinType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
+                                  << commonSupertype << "\n");
+          return;
+        }
       }
     }
 
@@ -403,7 +407,7 @@ void BindingSet::computeJoinsAndMeets() {
       newBindings.clear();
 
       // Add an exact binding. It should always fail when attempted.
-      newBindings.emplace_back(commonSubtype, AllowedBindingKind::Exact,
+      newBindings.emplace_back(subtypes.types[0], AllowedBindingKind::Exact,
                                subtypes.bindingSource,
                                subtypes.originator);
 
@@ -426,11 +430,13 @@ void BindingSet::computeJoinsAndMeets() {
     // Don't allow this for now, because it leads to infinite recursion
     // in constraint simplification. Once optional conversions are no
     // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSubtype->getOptionalObjectType()) {
-      if (objectType->is<MeetType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
-                                << commonSubtype << "\n");
-        return;
+    if (!enableShortConversions) {
+      if (auto objectType = commonSubtype->getOptionalObjectType()) {
+        if (objectType->is<MeetType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
+                                  << commonSubtype << "\n");
+          return;
+        }
       }
     }
 
@@ -702,10 +708,10 @@ bool BindingSet::isDelayed() const {
       return true;
 
     // When inferring the type of a variable in a pattern, delay its resolution
-    // so that we resolve type variables inside the expression as placeholders
-    // instead of marking the type of the variable itself as a placeholder. This
+    // so that we resolve type variables inside the expression as holes
+    // instead of marking the type of the variable itself as a hole. This
     // allows us to produce more specific errors because the type variable in
-    // the expression that introduced the placeholder might be diagnosable using
+    // the expression that introduced the hole might be diagnosable using
     // fixForHole.
     if (locator->isLastElement<LocatorPathElt::PatternDecl>()) {
       return true;
@@ -1044,7 +1050,7 @@ void BindingSet::inferTransitiveKeyPathBindingFrom(
     if (bindingTy->isAnyKeyPath())
       return;
 
-    auto *BGT = bindingTy->castTo<BoundGenericType>();
+    auto *BGT = bindingTy->castTo<NominalType>();
     inferredRootTy = BGT->getGenericArgs()[0];
 
     // The generic argument of a keypath type is invariant.
@@ -1276,7 +1282,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       auto type = binding.BindingType;
 
-      if (type->isPlaceholder())
+      if (type->is<HoleType>())
         continue;
 
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
@@ -1368,18 +1374,21 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   Type keyPathTy;
   switch (mutability) {
   case KeyPathMutability::ReadOnly:
-    keyPathTy = BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
-                                      {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
 
   case KeyPathMutability::Writable:
-    keyPathTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                      /*parent=*/Type(), {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getWritableKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
 
   case KeyPathMutability::ReferenceWritable:
-    keyPathTy = BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
-                                      /*parent=*/Type(), {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getReferenceWritableKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
   }
 
@@ -1472,7 +1481,7 @@ bool BindingSet::finalizeKeyPathBindings() {
           // If key path is structurally correct and has a resolved root
           // type, let's promote the fallback type into a binding because
           // root would have been inferred from explicit type already and
-          // it's benefitial for diagnostics to assign a non-placeholder
+          // it's benefitial for diagnostics to assign a non-hole
           // type to key path literal to propagate root/value to the context.
           if (!keyPath->hasSingleInvalidComponent() &&
               (keyPath->getParsedRoot() ||
@@ -2317,7 +2326,7 @@ void BindingSet::promoteBindings() {
     // introducing Void will just cause local solution ambiguities.
     auto *locator = TypeVar->getImpl().getLocator();
     if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
-        !binding.BindingType->isPlaceholder()) {
+        !binding.BindingType->is<HoleType>()) {
       auto voidType = CS.getASTContext().TheEmptyTupleType;
       addBinding(binding.withSameSource(
           voidType, AllowedBindingKind::Fallback));
@@ -2919,7 +2928,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   do {
     // Conformance check on type variable would always return true,
     // but type variable can't cover anything until it's bound.
-    if (type->isTypeVariableOrMember() || type->isPlaceholder())
+    if (type->isTypeVariableOrMember() || type->is<HoleType>())
       return std::make_pair(false, Type());
 
     if (isCoveredBy(binding.Kind, type, CS)) {
@@ -3614,12 +3623,19 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   }
 
   // We allow a funny function conversion (...) -> T conv (...) -> Void
-  // in certain positions. To handle this correctly, we must not attempt
-  // a Void binding too soon in this situation. Handle it like a fallback
-  // instead of a real subtype relationship, since it isn't one.
+  // in locations with single expression closures (SEC), regardless of the
+  // declared type. To handle this correctly, we must avoid binding to Void too
+  // soon, and thus produce a Fallback binding when the constraint locator has
+  // result conversion kind indicating (SEC), or if TypeVar or any member of its
+  // equivalence class has a locator with the same property.
+  // The constraint locator check identifies cases with a concrete result type but a
+  // type variable inside the closure
+  // The type variable locator check handles the other cases, including where equivalence
+  // class merging has made the closure result non-representative.
   if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
-    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
-    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+    auto conRKind = CS.getImpliedResultConversionKind(constraint->getLocator());
+    if (conRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid ||
+        isToVoidTypeVar(TypeVar, &CS)) {
       kind = AllowedBindingKind::Fallback;
     }
   }
@@ -3628,6 +3644,23 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 }
 
 #undef DEBUG_BAILOUT
+
+bool PotentialBindings::isToVoidTypeVar(TypeVariableType *typeVar,
+                                        ConstraintSystem *CS) {
+  if (CS->getImpliedResultConversionKind(typeVar->getImpl().getLocator()) ==
+      ConstraintSystem::ImpliedResultConversionKind::ToVoid)
+    return true;
+  auto &typeNode = CS->getConstraintGraph()[typeVar];
+  auto equivalenceClass = typeNode.getEquivalenceClass();
+  for (auto tv : equivalenceClass) {
+    auto tvRKind =
+        CS->getImpliedResultConversionKind(tv->getImpl().getLocator());
+    if (tvRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
@@ -3697,6 +3730,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::DiscardableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
   case ConstraintKind::SyntacticElement:

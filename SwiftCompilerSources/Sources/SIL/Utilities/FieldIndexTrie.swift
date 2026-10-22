@@ -186,6 +186,27 @@ public struct FieldIndexTrie: CustomStringConvertible {
     return node.range
   }
 
+  /// Visits the largest subtrees whose leaves are all within `leaves`, in leaf order, passing the
+  /// path from the root to each subtree. Together, the visited subtrees cover exactly `leaves`.
+  /// With `excludingRoot`, a fully covered root is visited as its children instead.
+  public func forEachCoveringSubtree(of leaves: Set<Int>, excludingRoot: Bool = false, _ body: (Path) -> Void) {
+    // Paths are built leaf-to-root, so record each step and assemble the path once a subtree is found.
+    var steps: [(kind: FieldKind, index: Int)] = []
+    func visit(_ node: Node) {
+      if node.range.allSatisfy(leaves.contains) && !(excludingRoot && node === root && node.childKind != nil) {
+        body(steps.reversed().reduce(Path()) { $0.push($1.kind, index: $1.index) })
+        return
+      }
+      guard let childKind = node.childKind else { return }
+      for (index, child) in node.children.enumerated() where child.range.contains(where: leaves.contains) {
+        steps.append((childKind, index))
+        visit(child)
+        steps.removeLast()
+      }
+    }
+    visit(root)
+  }
+
   /// Visits every node in the trie, passing its leaf range and a human-readable path string.
   /// The root itself is visited with the empty path. Intended for debugging and unit testing.
   func forEachNode(_ body: (IndexRange, String) -> Void) {

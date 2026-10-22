@@ -789,8 +789,10 @@ static void collectAdditionalExtensionRequirements(
   }
 
   // If we have a bound generic type, add same-type requirements for each of
-  // its generic arguments.
-  if (auto currentBoundType = type->getAs<BoundGenericType>()) {
+  // its generic arguments. Note that we do need to check for generic args
+  // here so that we don't get tripped up by protocol types.
+  if (auto currentBoundType = type->getAs<NominalType>();
+      currentBoundType && currentBoundType->hasGenericArgs()) {
     auto *genericParams = currentBoundType->getDecl()->getGenericParams();
     for (unsigned gpIndex : indices(genericParams->getParams())) {
       auto *gp = genericParams->getParams()[gpIndex];

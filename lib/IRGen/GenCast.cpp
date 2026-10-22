@@ -138,9 +138,12 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
       IGF.Builder.CreateCondBr(call, destroyBB, contBB);
 
       IGF.Builder.emitBlock(destroyBB);
-      targetTI.destroy(IGF, scratch.getAddress(), targetSILType,
-                       /*isOutlined=*/false);
-      IGF.Builder.CreateBr(contBB);
+      {
+        ConditionalDominanceScope condition(IGF);
+        targetTI.destroy(IGF, scratch.getAddress(), targetSILType,
+                         /*isOutlined=*/false);
+        IGF.Builder.CreateBr(contBB);
+      }
 
       IGF.Builder.emitBlock(contBB);
     }

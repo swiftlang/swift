@@ -206,12 +206,6 @@ public:
   }
 
   bool visitNominalType(CanNominalType type1, CanNominalType type2) {
-    assert(type1->getDecl() != type2->getDecl());
-    return asImpl().visitDifferentTypeStructure(type1, type2);
-  }
-
-  bool visitBoundGenericType(CanBoundGenericType type1,
-                             CanBoundGenericType type2) {
     if (type1->getDecl() != type2->getDecl())
       return asImpl().visitDifferentTypeStructure(type1, type2);
 

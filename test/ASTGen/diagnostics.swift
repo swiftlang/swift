@@ -4,12 +4,10 @@
 // RUN:   -target %target-swift-5.9-abi-triple \
 // RUN:   -enable-bare-slash-regex \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature DefaultIsolationPerFile \
 // RUN:   -enable-experimental-feature ScopeRestrictions
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 // REQUIRES: swift_feature_ScopeRestrictions
 
 // rdar://116686158

@@ -1152,6 +1152,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     assert(kind == SIL_SPECIALIZE_ATTR && "Missing specialization attribute");
 
     unsigned exported;
+    unsigned specializedSpelling;
     unsigned specializationKindVal;
     GenericSignatureID specializedSigID;
     IdentifierID targetFunctionID;
@@ -1160,7 +1161,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     ArrayRef<uint64_t> typeErasedParamsIDs;
     unsigned LIST_VER_TUPLE_PIECES(available);
     SILSpecializeAttrLayout::readRecord(
-        scratch, exported, specializationKindVal, specializedSigID,
+        scratch, exported, specializedSpelling, specializationKindVal,
+        specializedSigID,
         targetFunctionID, spiGroupID, spiModuleID,
         LIST_VER_TUPLE_PIECES(available), typeErasedParamsIDs);
 
@@ -1197,7 +1199,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, typeErasedParams,
           exported != 0, specializationKind, target,
-          spiGroup, spiModule, availability));
+          spiGroup, spiModule, availability, specializedSpelling != 0));
     }
   }
 
@@ -1516,9 +1518,14 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
                                 unsigned &NextIdx) {
   assert(ListOfValues.size() >= NextIdx+3 &&
          "Expect 3 numbers for SILDeclRef");
-  SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
-                  (SILDeclRef::Kind)ListOfValues[NextIdx+1],
-                  /*isForeign=*/ListOfValues[NextIdx+2] > 0);
+  auto *decl = cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx]));
+  auto kind = (SILDeclRef::Kind)ListOfValues[NextIdx+1];
+  // Distributed thunks are serialized as the decl they were synthesized for.
+  if (kind == SILDeclRef::Kind::DistributedThunk)
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
+      if (auto *thunk = afd->getDistributedThunk())
+        decl = thunk;
+  SILDeclRef DRef(decl, kind, /*isForeign=*/ListOfValues[NextIdx+2] > 0);
   NextIdx += 3;
   return DRef;
 }
@@ -2264,14 +2271,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::ConvertFunctionInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
            && "Layout should be OneTypeOneOperand.");
-    bool withoutActuallyEscaping = Attr & 0x01;
+    assert((Attr & 0x03) <=
+               unsigned(ConvertFunctionInst::Kind::WithoutActuallyDiscarding) &&
+           "Unknown convert_function kind");
+    auto conversionKind = ConvertFunctionInst::Kind(Attr & 0x03);
     ResultInst = Builder.createConvertFunction(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        withoutActuallyEscaping);
+        conversionKind);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {

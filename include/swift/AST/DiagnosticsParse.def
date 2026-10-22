@@ -448,9 +448,9 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
-      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+      "deinitializers may only be declared within a class, actor, or non-'Copyable' type", ())
 ERROR(destructor_decl_on_noncopyable_enum,none,
-      "deinitializers are not yet supported on noncopyable enums", ())
+      "deinitializers are not yet supported on non-'Copyable' enums", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -1868,13 +1868,11 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
 
-// called
-ERROR(attr_called_expected_rparen,none,
-      "expected ')' after execution semantics", ())
-ERROR(attr_called_expected_semantics,none,
-      "expected 'exactlyOnce' or 'atMostOnce' as the '@called' execution "
-      "semantics",
-      ())
+// callable
+ERROR(attr_callable_expected_rparen,none,
+      "expected ')' after 'once'", ())
+ERROR(attr_callable_expected_once,none,
+      "expected 'once' in '@callable' attribute", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -2249,7 +2247,7 @@ ERROR(sil_failed_to_parse_sil_optional,none,
 // MARK: Scope restrictions
 //------------------------------------------------------------------------------
 
-ERROR(expected_scope_specifier, PointsToFirstBadToken,
+ERROR(expected_scope, PointsToFirstBadToken,
       "expected identifier or 'self' in '_scoped' attribute", ())
 ERROR(immortal_scope_cannot_be_access, none,
       "cannot depend on the access scope of 'immortal'", ())
@@ -2273,9 +2271,6 @@ ERROR(nonisolated_nonsending_repeated,none,
 ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
       "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
-ERROR(experimental_file_default_disabled,PointsToFirstBadToken,
-      "file-level defaults are an experimental feature that is currently "
-      "disabled", ())
 ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
       "attribute cannot be attached to a file-level default", ())
 

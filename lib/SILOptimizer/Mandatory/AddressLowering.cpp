@@ -185,6 +185,13 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
       SILAddressConventions::forFullyLoweredModule(call.getModule()));
 }
 
+/// Moving a trivial value is a copy. A trivial address-only value has no
+/// copy_value to give it its own storage, so it may project out of borrowed
+/// storage, which a [take] would illegally consume.
+static IsTake_t getMoveKind(SILType type, SILFunction *function) {
+  return type.isTrivial(*function) ? IsNotTake : IsTake;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Multi-Result
 //
@@ -561,6 +568,9 @@ struct AddressLoweringState {
   // checked_cast_br instructions to loadable type which need to be rewritten.
   SmallVector<CheckedCastBranchInst *, 2> nonopaqueResultCCBs;
 
+  // debug_value operands that are an address-only undef.
+  SmallVector<Operand *, 2> undefDebugValueOperands;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
   
@@ -758,6 +768,7 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
         ParamDecl(SourceLoc(), SourceLoc(), astCtx.getIdentifier(internalName),
                   SourceLoc(), astCtx.getIdentifier(internalName), declCtx);
     var->setSpecifier(ParamSpecifier::InOut);
+    var->setImplicit();
 
     SILFunctionArgument *funcArg =
         pass.function->begin()->insertFunctionArgument(
@@ -779,11 +790,18 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
   // This must happen after all indirect result types have been added, to match
   // the convention.
   if (auto errorTy = pass.loweredFnConv.getIndirectErrorResultType(typeCtx))
-    createIndirectResult(errorTy, "$error", argIdx++);
+    createIndirectResult(errorTy, SILDebugVariable::ErrorVariableName,
+                         argIdx++);
 
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults() +
                        pass.loweredFnConv.getNumIndirectSILErrorResults());
   return argIdx;
+}
+
+/// Whether `value` is an undef of address-only type in OV-form.
+static bool isAddressOnlyUndef(SILValue value, AddressLoweringState &pass) {
+  return isa<SILUndef>(value) && value->getType().isObject() &&
+         value->getType().isAddressOnly(*pass.function);
 }
 
 namespace {
@@ -834,6 +852,18 @@ void OpaqueValueVisitor::mapValueStorage() {
 
       if (auto *yieldInst = dyn_cast<YieldInst>(&inst)) {
         pass.yieldInsts.push_back(yieldInst);
+      }
+
+      // The verifier allows an object-typed undef for the `$error` variable,
+      // so leave those alone.
+      if (auto *debugInst = dyn_cast<DebugValueInst>(&inst)) {
+        auto varInfo = debugInst->getVarInfo();
+        if (!varInfo || !varInfo->isErrorVariable()) {
+          for (Operand &use : debugInst->getAllOperands()) {
+            if (isAddressOnlyUndef(use.get(), pass))
+              pass.undefDebugValueOperands.push_back(&use);
+          }
+        }
       }
 
       for (auto result : inst.getResults()) {
@@ -1895,7 +1925,8 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
     auto destAddr =
         materializeProjectionIntoUse(operand, /*intoPhiOperand*/ false);
     moveBuilder.createCopyAddr(operand->getUser()->getLoc(),
-                               storage.storageAddress, destAddr, IsTake,
+                               storage.storageAddress, destAddr,
+                               getMoveKind(def->getType(), pass.function),
                                IsInitialization);
     return;
   }
@@ -2220,8 +2251,9 @@ protected:
   PhiRewriter &operator=(const PhiRewriter &) = delete;
 
   CopyAddrInst *createPhiMove(SILBuilder &builder, SILValue from, SILValue to) {
-    auto *move = builder.createCopyAddr(pass.genLoc(), from, to, IsTake,
-                                        IsInitialization);
+    auto *move = builder.createCopyAddr(
+        pass.genLoc(), from, to,
+        getMoveKind(from->getType(), pass.function), IsInitialization);
     phiMoves.insert(move);
     return move;
   }
@@ -3493,7 +3525,8 @@ void ReturnRewriter::rewriteElement(SILValue oldResult,
     if (resultAddr != newResultArg) {
       // Copy the result from local storage into the result argument.
       returnBuilder.createCopyAddr(pass.genLoc(), resultAddr, newResultArg,
-                                   IsTake, IsInitialization);
+                                   getMoveKind(resultTy, pass.function),
+                                   IsInitialization);
     }
   } else {
     // Store the result into the result argument.
@@ -3747,7 +3780,8 @@ protected:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::TaskLocalValuePush:
-    case BuiltinValueKind::GetEnumTag: {
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::AddressOfRawLayout: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
@@ -3783,6 +3817,13 @@ protected:
   }
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
+
+  // In Raw SIL, extend_lifetime marks the end of a variable's scope for values
+  // that have no destroy_value. There is no address form of the instruction:
+  // the value's storage is already scoped by its alloc_stack.
+  void visitExtendLifetimeInst(ExtendLifetimeInst *eli) {
+    pass.deleter.forceDelete(eli);
+  }
 
   void visitFixLifetimeInst(FixLifetimeInst *fli) {
     SILValue value = fli->getOperand();
@@ -3854,6 +3895,22 @@ protected:
       builder.createCopyAddr(copyInst->getLoc(), srcAddr, destAddr, IsNotTake,
                              IsInitialization);
     }
+    markRewritten(copyInst, destAddr);
+  }
+
+  // Explicitly copy from an opaque source operand.
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *copyInst) {
+    SILValue srcVal = copyInst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    AddressMaterialization addrMat(pass, copyInst, builder);
+    SILValue destAddr = addrMat.materializeAddress(copyInst);
+    // Unlike copy_value, explicit_copy_value is never a def-projection of its
+    // operand, and the operand stays live across it, so they can't share
+    // storage.
+    assert(destAddr != srcAddr && "explicit_copy_value must not alias source");
+    builder.createExplicitCopyAddr(copyInst->getLoc(), srcAddr, destAddr,
+                                   IsNotTake, IsInitialization);
     markRewritten(copyInst, destAddr);
   }
 
@@ -4174,7 +4231,7 @@ void UseRewriter::rewriteStore(SILValue srcVal, SILValue destAddr,
   ValueStorage &storage = pass.valueStorageMap.getStorage(srcVal);
   SILValue srcAddr = storage.storageAddress;
 
-  IsTake_t isTake = IsTake;
+  IsTake_t isTake = getMoveKind(srcVal->getType(), pass.function);
   if (auto *copy = dyn_cast<CopyValueInst>(srcVal)) {
     if (storage.isDefProjection) {
       SILValue copySrcAddr =
@@ -4524,6 +4581,13 @@ void UseRewriter::visitUncheckedEnumDataInst(
   auto *enumAddrInst =
       builder.createUncheckedEnumDataAddrForTake(loc, srcAddr, elt, destTy);
 
+  if (!enumDataInst->getType().isAddressOnly(*pass.function)) {
+    auto *load = builder.createTrivialLoadOr(loc, enumAddrInst,
+                                             LoadOwnershipQualifier::Take);
+    enumDataInst->replaceAllUsesWith(load);
+    pass.deleter.forceDelete(enumDataInst);
+    return;
+  }
   markRewritten(enumDataInst, enumAddrInst);
 }
 
@@ -4930,6 +4994,15 @@ static void rewriteFunction(AddressLoweringState &pass) {
 
   for (auto *ccbi : pass.nonopaqueResultCCBs) {
     CheckedCastBrRewriter(ccbi, pass).rewrite();
+  }
+
+  // Rewrite `debug_value undef : $T` into the form the address pipeline
+  // produces for the same code: `debug_value undef : $*T, ..., expr op_deref`.
+  for (Operand *use : pass.undefDebugValueOperands) {
+    auto *debugInst = cast<DebugValueInst>(use->getUser());
+    SILType addrType = use->get()->getType().getAddressType();
+    use->set(SILUndef::get(pass.function, addrType));
+    debugInst->prependDeref(use->getOperandNumber());
   }
 
   // Rewrite this function's return value now that all opaque values within the

@@ -47,7 +47,7 @@ import CxxTest
 
 extension BorrowMe {
     borrowing func getX() -> CInt {
-        __xUnsafe().pointee
+        unsafe x().pointee
     }
 
     var x: CInt {

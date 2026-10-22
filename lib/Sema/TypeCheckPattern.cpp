@@ -862,7 +862,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
-      return PlaceholderType::get(Context, P);
+      return PlaceholderType::get(Context, /*repr*/ nullptr);
 
     Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     if (auto named = dyn_cast<NamedPattern>(P)) {
@@ -937,8 +937,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
                              diag::refutable_pattern_requires_initializer);
       return ErrorType::get(Context);
     }
-
-    return PlaceholderType::get(Context, P);
+    return PlaceholderType::get(Context, /*repr*/ nullptr);
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -1257,10 +1256,10 @@ Pattern *TypeChecker::coercePatternToType(
         diag = isOptional ? diag::type_inferred_to_undesirable_type
                           : diag::type_inferred_to_uninhabited_tuple_type;
       } else {
-        assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
-          "unknown structurally uninhabited type");
+        assert(diagTy->is<EnumType>() &&
+               "unknown structurally uninhabited type");
       }
-    } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
+    } else if (auto *BST = diagTy->getAs<NominalType>()) {
       if (BST->isArray())
         shouldRequireType = BST->getGenericArgs()[0]->isVoid();
     }
@@ -1712,7 +1711,7 @@ Pattern *TypeChecker::coercePatternToType(
         SourceLoc loc = OP->getQuestionLoc();
         // Produce tailored diagnostic for if/let and other conditions.
         if (OP->isImplicit()) {
-          diagID = diag::condition_optional_element_pattern_not_valid_type;
+          diagID = diag::condition_binding_non_optional_type;
           loc = OP->getLoc();
         }
 

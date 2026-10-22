@@ -531,7 +531,7 @@ public:
   Type simplifyType(Type type, bool wantInterfaceType = false,
                     bool forCompletion = false) const;
 
-  // To aid code completion, we need to attempt to convert type placeholders
+  // To aid code completion, we need to attempt to convert type holes
   // back into underlying generic parameters if possible, since type
   // of the code completion expression is used as "expected" (or contextual)
   // type so it's helpful to know what requirements it has to filter

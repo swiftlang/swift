@@ -177,7 +177,7 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
     if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
       if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
         if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
-          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+          return createConvertFunction(Loc, Op, Ty);
         }
       }
     }
@@ -211,7 +211,7 @@ SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
     if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
       if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
         if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
-          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+          return createConvertFunction(Loc, Op, Ty);
         }
       }
     }
@@ -671,6 +671,17 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc,
   return insert(DebugValueInst::create(DebugLoc, operands, getModule(),
                                        *substituteAnonymousArgs(Name, Var, Loc),
                                        moved, trace));
+}
+
+DebugValueInst *SILBuilder::createVoidVariableDebugValue(
+    SILLocation Loc, SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
+  SILType voidTy = SILType::getEmptyTupleType(getASTContext());
+  Var.Type = voidTy;
+  Var.DIExpr.clear();
+
+  return createDebugValue(Loc, SILUndef::get(&getFunction(), voidTy), Var,
+                          wasMoved, trace);
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

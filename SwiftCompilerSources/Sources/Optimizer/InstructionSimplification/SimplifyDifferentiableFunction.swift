@@ -130,8 +130,7 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
       if differentiableFunctionExtract.type != effectiveExtractee.type {
         let convertBuilder = Builder(before: differentiableFunctionExtract, context)
         let newField = convertBuilder.createConvertFunction(
-          originalFunction: effectiveExtractee, resultType: differentiableFunctionExtract.type,
-          withoutActuallyEscaping: false)
+          originalFunction: effectiveExtractee, resultType: differentiableFunctionExtract.type)
         differentiableFunctionExtract.replace(with: newField, context)
       } else {
         differentiableFunctionExtract.replace(with: effectiveExtractee, context)
@@ -147,8 +146,7 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
       if differentiableFunctionExtract.type != effectiveExtractee.type {
         let convertBuilder = Builder(before: differentiableFunctionExtract, context)
         let newField = convertBuilder.createConvertFunction(
-          originalFunction: borrowedField, resultType: differentiableFunctionExtract.type,
-          withoutActuallyEscaping: false)
+          originalFunction: borrowedField, resultType: differentiableFunctionExtract.type)
         differentiableFunctionExtract.replace(with: newField, context)
       } else {
         differentiableFunctionExtract.replace(with: borrowedField, context)

@@ -277,7 +277,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     /// We make an exception for some types in the stdlib, like Optional, since
     /// the runtime should still be able to demangle them, based on the
     /// availability of the type.
-    if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
+    if (auto nominalTy = dyn_cast<NominalType>(t)) {
       auto *nom = nominalTy->getDecl();
       if (auto sig = nom->getGenericSignature()) {
         SmallVector<InverseRequirement, 2> inverses;

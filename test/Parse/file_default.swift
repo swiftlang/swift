@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature DefaultIsolationPerFile
-
-// REQUIRES: swift_feature_DefaultIsolationPerFile
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: concurrency
 

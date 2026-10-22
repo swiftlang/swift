@@ -222,9 +222,6 @@ namespace {
     Decl *visitUnboundGenericType(UnboundGenericType *type) {
       return type->getDecl();
     }
-    Decl *visitBoundGenericType(BoundGenericType *type) {
-      return type->getDecl();
-    }
     Decl *visitNominalType(NominalType *type) {
       return type->getDecl();
     }

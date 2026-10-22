@@ -451,6 +451,10 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     guard let callee = partialApply.referencedFunction,
           !partialApply.hasSubstitutions,
 
+          // Captures are appended to the specialized function's parameters. A
+          // dynamic-Self metadata argument must remain the last parameter.
+          (!callee.isDefinition || !callee.mayBindDynamicSelf),
+
           // Avoid an infinite specialization loop caused by repeated runs of ClosureSpecialization and
           // ConstantCapturePropagation.
           // ConstantCapturePropagation propagates constant function-literals. Such function specializations
@@ -687,7 +691,7 @@ private struct SpecializationInfo {
       let clonedRootClosure = cloner.getClonedValue(of: rootClosure) as! PartialApplyInst
       let argsAreKeptAlive = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
       // Unlike a regular closure (which only ever borrows, or independently copies, its captures),
-      // a `@called(atMostOnce)` closure can have consuming captures. When the fold above transfers a
+      // an at-most-once closure can have consuming captures. When the fold above transfers a
       // non-Copyable capture to the new direct call, it can't copy it, so it leaves `Undef` in
       // `clonedRootClosure`'s own operand instead. Leaving such a closure's `partial_apply` behind
       // would still run its destructor at runtime, which would release whatever garbage is left
@@ -760,7 +764,7 @@ private struct SpecializationInfo {
       partialApply.argumentOperands.map { argOp -> Value in
         let capturedArg = argOp.value
         if partialApply.hasCalledAtMostOnceSemantics {
-          // A `@called(atMostOnce)` closure can consume its captures and always gets a destructor even
+          // An at-most-once closure can consume its captures and always gets a destructor even
           // if it's stack-promoted. So all of the arguments that are consumed have to be passed
           // the same way to the specialized version.
           if capturedArg.ownership != .none &&

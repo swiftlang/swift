@@ -541,6 +541,10 @@ public:
       return pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
                               : SILArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Indirect_In:
+      if (hasContextOwnedAddressArgument(oper))
+        return SILArgumentConvention::Indirect_In;
+      return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
+                              : SILArgumentConvention::Indirect_In;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_In_CXX:
       return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
@@ -554,6 +558,17 @@ public:
       llvm_unreachable("partial_apply cannot have an @out operand");
     }
     llvm_unreachable("covered switch");
+  }
+
+  /// Returns true if \p oper is an address argument of an on-stack
+  /// `partial_apply` that the closure's context owns.
+  bool hasContextOwnedAddressArgument(const Operand &oper) const {
+    auto *pai = dyn_cast<PartialApplyInst>(Inst);
+    if (!pai || !pai->isOnStack() || !pai->hasCalledAtMostOnceSemantics())
+      return false;
+    SILType type = oper.get()->getType();
+    return type.isAddress() && type.isMoveOnly() &&
+           getArgumentConvention(oper) == SILArgumentConvention::Indirect_In;
   }
 
   /// Return true if 'self' is an applied argument.

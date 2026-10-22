@@ -75,7 +75,7 @@ class FindCapturedVars : public ASTWalker {
   DeclContext *CurDC;
   bool NoEscape, ObjC, HasCalledAtMostOnceSemantics;
   /// Whether this function can be destroyed without running, which is true
-  /// for every function except a @called(exactlyOnce) closure.
+  /// for every function except an exactly-once closure.
   bool IsDeinitable;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
@@ -791,7 +791,7 @@ public:
         recordConsumingUse(V);
     }
 
-    // - calling `@called(atMostOnce)` value
+    // - calling at-most-once value
     // - passing a value to a `consuming` parameter
     // - calling a `consuming` method ("self" is consumed).
     if (auto *callSite = dyn_cast<ApplyExpr>(E)) {
@@ -800,7 +800,7 @@ public:
       bool isInitializer = false;
       if (auto *callee =
               callSite->getCalledValue(/*skipFunctionConversions=*/true)) {
-        // Calling a `@called(atMostOnce)` value is a consuming operation.
+        // Calling an at-most-once value is a consuming operation.
         if (fnTy->hasCalledAtMostOnceSemantics())
           recordConsumingUse(callee);
 

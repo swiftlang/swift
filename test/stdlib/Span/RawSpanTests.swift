@@ -523,8 +523,9 @@ suite.test("init(bytesOf:) from value: round trip")
 
 suite.test("init(bytesOf:) from value: compare with indirect approach")
 .require(.minimumStdlib(.stdlib_6_5)).code {
-  let value = Duration.seconds(3) + .nanoseconds(14)
+  guard #available(SwiftStdlib 5.7, *) else { return }
 
+  let value = Duration.seconds(3) + .nanoseconds(14 as Int)
   let direct = RawSpan(bytesOf: value)
   let viaSpan = Span(ofOne: value).bytes
   expectTrue(direct.isIdentical(to: viaSpan))

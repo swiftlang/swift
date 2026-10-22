@@ -2255,6 +2255,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_promote_supertypes,
                    Opts.SolverEnablePromoteSupertypes);
 
+  Opts.SolverEnableShortConversions =
+      Args.hasFlag(OPT_solver_enable_short_conversions,
+                   OPT_solver_disable_short_conversions,
+                   Opts.SolverEnableShortConversions);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
@@ -2613,6 +2618,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
     Opts.InProcessPluginServerPath = A->getValue();
+  if (const Arg *A =
+          Args.getLastArg(OPT_resolved_in_process_plugin_server_path))
+    Opts.ResolvedInProcessPluginServerPath = A->getValue();
 
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'
@@ -2721,7 +2729,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMapPath = A->getValue();
-  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
+  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file_EQ)) {
     if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
                                               Opts.ExplicitSwiftModuleInputs))
       return true;
@@ -3621,10 +3629,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
-
-  Opts.EnableAddressDependencies = Args.hasFlag(
-      OPT_enable_address_dependencies, OPT_disable_address_dependencies,
-      Opts.EnableAddressDependencies);
 
   if (LangOpts.Target.isOSDarwin() || LangOpts.Target.isOSLinux()) {
     // On Darwin and Linux, use yield_once_2 by default.

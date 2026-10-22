@@ -9,6 +9,8 @@
 // RUN: %target-codesign %t/test-opt
 // RUN: %target-run %t/test-opt %t/%target-library-name(COM) %t/%target-library-name(Library) | %FileCheck %s
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Library
 import ForeignCOM

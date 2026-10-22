@@ -62,14 +62,14 @@ func nonescapableExistential(_ x: consuming any P & ~Escapable) -> Bool {
 func noncopyableArgument<T>(_ x: Tag<NC>, _: T.Type) -> Bool {
   // expected-below60-note @-1 {{add '@available' attribute to enclosing global function}}
   return x is T
-  // expected-below60-error @-1 {{runtime support for casting types with noncopyable generic arguments is only available in macOS 15.0.0 or newer}}
+  // expected-below60-error @-1 {{runtime support for casting types with non-'Copyable' generic arguments is only available in macOS 15.0.0 or newer}}
   // expected-below60-note @-2 {{add 'if #available' version check}}
 }
 
 func nonescapableArgument<T>(_ x: Tag<NE>, _: T.Type) -> Bool {
   // expected-below60-note @-1 {{add '@available' attribute to enclosing global function}}
   return x is T
-  // expected-below60-error @-1 {{runtime support for casting types with nonescapable generic arguments is only available in macOS 15.0.0 or newer}}
+  // expected-below60-error @-1 {{runtime support for casting types with non-'Escapable' generic arguments is only available in macOS 15.0.0 or newer}}
   // expected-below60-note @-2 {{add 'if #available' version check}}
 }
 

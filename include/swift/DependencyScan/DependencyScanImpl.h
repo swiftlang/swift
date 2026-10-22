@@ -208,6 +208,9 @@ typedef struct {
   /// Options to the compile command required to build this clang modulemap
   swiftscan_string_set_t *command_line;
 
+  /// Directories whose contents this clang module enumerated
+  swiftscan_string_set_t *directory_deps;
+
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t clang_include_tree;
 
@@ -234,6 +237,7 @@ struct swiftscan_import_set_s {
 struct swiftscan_scan_invocation_s {
   swiftscan_string_ref_t working_directory;
   swiftscan_string_set_t *argv;
+  swiftscan_string_ref_t main_executable_path;
 };
 
 struct swiftscan_diagnostic_info_s {

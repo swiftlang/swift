@@ -15,14 +15,14 @@ import Operators
 
 extension Vector {
   @unsafe @cxx(`operator==`) @implementation
-  func equals(_ other: Vector) -> Bool { return x == other.x }
+  func equals(_ other: borrowing Vector) -> Bool { return x == other.x }
 
   @unsafe @cxx(`operator<`) @implementation
-  func less(_ other: Vector) -> Bool { return x < other.x }
+  func less(_ other: borrowing Vector) -> Bool { return x < other.x }
 
   // Overloads are selected by parameter types...
   @unsafe @cxx(`operator+`) @implementation
-  func plus(_ other: Vector) -> Vector { return Vector(x: x + other.x) }
+  func plus(_ other: borrowing Vector) -> Vector { return Vector(x: x + other.x) }
 
   @cxx(`operator+`) @implementation
   func plus(_ k: Int32) -> Vector { return Vector(x: x + k) }
@@ -32,11 +32,11 @@ extension Vector {
   func negated() -> Vector { return Vector(x: -x) }
 
   @unsafe @cxx(`operator-`) @implementation
-  func minus(_ other: Vector) -> Vector { return Vector(x: x - other.x) }
+  func minus(_ other: borrowing Vector) -> Vector { return Vector(x: x - other.x) }
 
   // The importer drops the `Vector &` result; return it as a pointer.
   @unsafe @cxx(`operator+=`) @implementation
-  mutating func plusEquals(_ other: Vector) -> UnsafeMutablePointer<Vector> {
+  mutating func plusEquals(_ other: borrowing Vector) -> UnsafeMutablePointer<Vector> {
     x += other.x
     return withUnsafeMutablePointer(to: &self) { $0 }
   }
@@ -65,20 +65,20 @@ extension Vector {
 // Free operators are implemented at the top level, even if namespaced.
 
 @unsafe @cxx @implementation
-func != (a: Vector, b: Vector) -> Bool { return a.x != b.x }
+func != (a: borrowing Vector, b: borrowing Vector) -> Bool { return a.x != b.x }
 
 @unsafe @cxx(`operator*`) @implementation
-func times(_ a: Vector, _ k: Int32) -> Vector { return Vector(x: a.x * k) }
+func times(_ a: borrowing Vector, _ k: Int32) -> Vector { return Vector(x: a.x * k) }
 
 @unsafe @cxx @implementation
-func == (a: Outer.Point, b: Outer.Point) -> Bool { return a.v == b.v }
+func == (a: borrowing Outer.Point, b: borrowing Outer.Point) -> Bool { return a.v == b.v }
 
 // Foreign reference type
 
 @available(SwiftStdlib 5.8, *)
 extension Handle {
   @cxx(`operator==`) @implementation
-  func equals(_ other: Handle) -> Bool { return value == other.value }
+  func equals(_ other: borrowing Handle) -> Bool { return value == other.value }
 
   // Returns an unretained foreign reference.
   // expected-error@+2{{instance method 'plusEquals' cannot implement C++ function 'operator+=' because it returns a foreign reference type without a 'SWIFT_RETURNS_RETAINED' annotation, which is not yet supported}}
@@ -90,7 +90,7 @@ extension Handle {
 
 extension RawIdentifier {
   @unsafe @cxx @implementation
-  func `operator==`(_ other: RawIdentifier) -> Bool { return x == other.x }
+  func `operator==`(_ other: borrowing RawIdentifier) -> Bool { return x == other.x }
 
   @cxx @implementation
   func `operator[]`(_ i: Int32) -> Int32 { return x + i }
@@ -100,18 +100,18 @@ extension RawIdentifier {
 }
 
 @unsafe @cxx @implementation
-func `operator!=`(_ a: RawIdentifier, _ b: RawIdentifier) -> Bool { return a.x != b.x }
+func `operator!=`(_ a: borrowing RawIdentifier, _ b: borrowing RawIdentifier) -> Bool { return a.x != b.x }
 
 // Rejections
 
 extension Defined {
   // expected-error@+2{{instance method 'equals' cannot implement C++ function 'operator==' because it already has a definition}}
   @unsafe @cxx(`operator==`) @implementation
-  func equals(_ other: Defined) -> Bool { return true }
+  func equals(_ other: borrowing Defined) -> Bool { return true }
 
   // expected-error@+2{{instance method 'less' cannot implement C++ function 'operator<' because it is declared 'inline'}}
   @unsafe @cxx(`operator<`) @implementation
-  func less(_ other: Defined) -> Bool { return true }
+  func less(_ other: borrowing Defined) -> Bool { return true }
 }
 
 extension Rejections {
@@ -150,11 +150,11 @@ extension Rejections {
 
 // expected-note@+2{{previously implemented here}}
 @unsafe @cxx @implementation
-func != (a: Duplicate, b: Duplicate) -> Bool { return true }
+func != (a: borrowing Duplicate, b: borrowing Duplicate) -> Bool { return true }
 
 // expected-error@+1{{duplicate implementation of imported operator function '!='}}
 @unsafe @cxx(`operator!=`) @implementation
-func notEqual(_ a: Duplicate, _ b: Duplicate) -> Bool { return true }
+func notEqual(_ a: borrowing Duplicate, _ b: borrowing Duplicate) -> Bool { return true }
 
 // Not supported yet
 

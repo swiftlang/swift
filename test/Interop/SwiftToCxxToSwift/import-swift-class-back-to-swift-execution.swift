@@ -16,6 +16,33 @@
 #ifndef FIRSTPASS
 
 #include "swiftMod.h"
+#include <type_traits>
+
+static_assert(std::is_trivial<SwiftMod::PaddedValue>::value, "");
+
+// Swift value wrappers cannot yet be imported directly back into Swift.
+// Test their effect on the C++ ABI through a containing C++ class.
+class PaddedValueHolder {
+    SwiftMod::PaddedValue value;
+public:
+    PaddedValueHolder(double x, float y) : value(SwiftMod::PaddedValue::init(x, y)) {}
+    double getX() const { return value.getX(); }
+    float getY() const { return value.getY(); }
+    void increment() { value.setY(value.getY() + 1); }
+};
+
+static_assert(std::is_trivially_copyable<PaddedValueHolder>::value, "");
+
+inline PaddedValueHolder createSwiftValueInCxx() {
+    return PaddedValueHolder(1.25, -5);
+}
+
+__attribute__((noinline)) inline PaddedValueHolder
+passThroughSwiftValue(PaddedValueHolder value) {
+    auto copy = value;
+    copy.increment();
+    return copy;
+}
 
 inline SwiftMod::ExposedToCxx createSwiftClassInCxx() {
     return SwiftMod::ExposedToCxx::init();
@@ -62,6 +89,16 @@ module SwiftToCxxTest {
 //--- swiftMod.swift
 import SwiftToCxxTest
 
+public struct PaddedValue {
+    public var x: Double
+    public var y: Float
+
+    public init(x: Double, y: Float) {
+        self.x = x
+        self.y = y
+    }
+}
+
 public class ExposedToCxx {
     public init() {
         i = 0
@@ -79,6 +116,11 @@ public class ExposedToCxx {
 }
 
 #if SECOND_PASS
+
+let value = createSwiftValueInCxx()
+let copy = passThroughSwiftValue(value)
+precondition(value.getX() == 1.25 && value.getY() == -5)
+precondition(copy.getX() == 1.25 && copy.getY() == -4)
 
 func testReceiveAndPassSwiftClass() {
     let classInstance = createSwiftClassInCxx()

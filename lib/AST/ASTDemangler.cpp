@@ -426,7 +426,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
     return Type();
 
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
-    return BoundGenericType::get(nominalDecl, parent, args);
+    return NominalType::get(nominalDecl, parent, args, Ctx);
 
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
   auto *dc = aliasDecl->getDeclContext();
@@ -513,16 +513,17 @@ void ASTBuilder::endPackExpansion() {
   ActivePackExpansions.pop_back();
 }
 
-/// A function type records its execution semantics as the invertible
-/// protocols that it suppresses: an at-most-once function type isn't Copyable,
-/// and an exactly-once one isn't Deinitable either.
 static std::optional<ExecutionSemantics>
-getExecutionSemantics(InvertibleProtocolSet inverted) {
-  if (!inverted.contains(InvertibleProtocolKind::Copyable))
+getExecutionSemantics(FunctionMetadataExecutionSemantics semantics) {
+  switch (semantics) {
+  case FunctionMetadataExecutionSemantics::None:
     return std::nullopt;
-  if (inverted.contains(InvertibleProtocolKind::Deinitable))
+  case FunctionMetadataExecutionSemantics::AtMostOnce:
+    return ExecutionSemantics::AtMostOnce;
+  case FunctionMetadataExecutionSemantics::Once:
     return ExecutionSemantics::Once;
-  return ExecutionSemantics::AtMostOnce;
+  }
+  llvm_unreachable("unknown execution semantics");
 }
 
 Type ASTBuilder::createFunctionType(
@@ -619,7 +620,7 @@ Type ASTBuilder::createFunctionType(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
                    /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult(),
-                   getExecutionSemantics(extFlags.getInvertedProtocols()))
+                   getExecutionSemantics(extFlags.getExecutionSemantics()))
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
                    .build();
@@ -1386,8 +1387,7 @@ Type ASTBuilder::createBoundGenericObjCClassType(StringRef name,
     parent = dc->getDeclaredInterfaceType();
   }
 
-  return BoundGenericClassType::get(cast<ClassDecl>(typeDecl),
-                                    parent, args);
+  return ClassType::get(cast<ClassDecl>(typeDecl), parent, args, Ctx);
 }
 
 ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {
@@ -1440,7 +1440,10 @@ Type ASTBuilder::createIntegerType(intptr_t value) {
 }
 
 Type ASTBuilder::createNegativeIntegerType(intptr_t value) {
-  return IntegerType::get(std::to_string(value), /*isNegative*/ true, Ctx);
+  // `value` is the signed (negative) value, but IntegerType stores the sign
+  // separately from the digits, so pass only the magnitude as text.
+  auto magnitude = -static_cast<uintptr_t>(value);
+  return IntegerType::get(std::to_string(magnitude), /*isNegative*/ true, Ctx);
 }
 
 Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
@@ -1512,6 +1515,11 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
   } else if (kind == Demangle::Node::Kind::Protocol) {
     return dyn_cast<ProtocolDecl>(decl);
   } else if (kind == Demangle::Node::Kind::Structure) {
+    // C++ foreign reference types are imported as classes, but are mangled as
+    // structs, like any other Clang tag type.
+    if (auto classDecl = dyn_cast<ClassDecl>(decl))
+      if (classDecl->isForeignReferenceType())
+        return classDecl;
     return dyn_cast<StructDecl>(decl);
   } else {
     assert(kind == Demangle::Node::Kind::TypeAlias);

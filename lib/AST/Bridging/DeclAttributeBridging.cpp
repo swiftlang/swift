@@ -881,9 +881,8 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return new (cContext.unbridged()) UnsafeAttr(atLoc, range, isAlways);
 }
 
-BridgedCalledAttr
-BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                               SourceRange range,
-                               swift::ExecutionSemantics semantics) {
-  return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
+BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
+                                                     SourceLoc atLoc,
+                                                     SourceRange range) {
+  return new (cContext.unbridged()) CallableAttr(atLoc, range);
 }

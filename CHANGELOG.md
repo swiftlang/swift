@@ -5,6 +5,32 @@
 
 ## Swift (next)
 
+* [SE-0478][]:
+  Introduced file-level default declarations for `nonisolated`, `@MainActor`,
+  `@available`, and `@diagnose`. A `default` declaration applies to all
+  top-level declarations in the file:
+
+  ```swift
+  default @MainActor
+  default @available(macOS 15, *)
+
+  func foo() {}             // @MainActor, available in macOS 15 or newer
+
+  nonisolated func bar() {} // nonisolated overrides @MainActor
+
+  @available(macOS 26, *)
+  func baz() {}             // narrows the default availability
+  ```
+
+  File defaults are applied before attributes and modifiers written on
+  individual declarations, so file default isolation and warning behavior can
+  be overridden and narrower availability can be specified for each
+  declaration.
+
+  During the evolution process, this feature existed under the experimental
+  feature named `DefaultIsolationPerFile`, but its scope expanded to a limited
+  set of other attributes.
+
 * [SE-0551][]:
   `Span` and `MutableSpan` have new initializers that form a single-element span over a value, borrowing it (or mutating it) in place: `Span(ofOne:)` and `MutableSpan(ofOne:)`.
   Because they do not need to copy the value, they can support noncopyable types.
@@ -11302,6 +11328,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
+[SE-0478]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0478-default-isolation-typealias.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0489]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0489-codable-error-printing.md
 [SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md

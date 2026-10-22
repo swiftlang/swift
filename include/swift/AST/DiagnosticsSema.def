@@ -333,7 +333,7 @@ ERROR(cannot_convert_initializer_value_anyobject,none,
       "class-constrained type",
       (Type, Type))
 ERROR(cannot_convert_noncopyable_value_to_anyobject,none,
-      "value of noncopyable type %0 cannot be converted to %1", (Type, Type))
+      "value of non-'Copyable' type %0 cannot be converted to %1", (Type, Type))
 ERROR(cannot_convert_initializer_value_nil,none,
       "'nil' cannot initialize specified type %0", (Type))
 
@@ -663,9 +663,9 @@ ERROR(expr_keypath_type_of_property,none,
 ERROR(expr_keypath_generic_type,none,
       "key path cannot refer to generic type %0", (Identifier))
 ERROR(expr_keypath_noncopyable_type,none,
-      "key path cannot refer to noncopyable type %0", (Type))
+      "key path cannot refer to non-'Copyable' type %0", (Type))
 ERROR(expr_keypath_nonescapable_type,none,
-      "key path cannot refer to nonescapable type %0", (Type))
+      "key path cannot refer to non-'Escapable' type %0", (Type))
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))
@@ -1479,6 +1479,9 @@ ERROR(cannot_jump_in_single_value_stmt,none,
       (StmtKind, StmtKind))
 WARNING(effect_marker_on_single_value_stmt,none,
       "'%0' has no effect on '%1' expression", (StringRef, StmtKind))
+ERROR(without_actually_discarding_requires_exactly_once,none,
+      "'withoutActuallyDiscarding' requires a '@once' function, "
+      "but argument has type %0", (Type))
 ERROR(out_of_place_then_stmt,none,
       "'then' may only appear as the last statement in an 'if', 'switch', or "
       "'do' expression", ())
@@ -2300,9 +2303,13 @@ ERROR(cxx_mutating_mismatch,none,
       "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
       (ValueDecl *, unsigned, const ValueDecl *))
 ERROR(cxx_param_ownership_unsupported,none,
-      "%kindonly0 cannot be marked '@cxx' because parameter %1 of non-trivial "
-      "C++ class type is '%select{borrowing|consuming}2'",
-      (const AbstractFunctionDecl *, const ParamDecl *, unsigned))
+      "%kind0 cannot implement C++ function '%1' because parameter %2 of "
+      "non-trivial C++ class type is '%select{borrowing|consuming}3'",
+      (ValueDecl *, StringRef, const ParamDecl *, bool))
+ERROR(cxx_const_ref_param_requires_borrowing,none,
+      "%kind0 cannot implement C++ function '%1' because parameter %2 must be "
+      "'borrowing' to match a C++ 'const' reference",
+      (ValueDecl *, StringRef, const ParamDecl *))
 ERROR(cxx_rvalue_references_unsupported,none,
       "%kind0 cannot implement C++ function '%1' because rvalue reference "
       "parameters and return types are not yet supported",
@@ -2442,7 +2449,7 @@ ERROR(metatype_extension_associated_type, none,
 ERROR(attr_static_exclusive_only_disabled,none,
       "attribute requires '-enable-experimental feature StaticExclusiveOnly'", ())
 ERROR(attr_static_exclusive_only_noncopyable,none,
-      "'@_staticExclusiveOnly' can only be applied to noncopyable types", ())
+      "'@_staticExclusiveOnly' can only be applied to non-'Copyable' types", ())
 ERROR(attr_static_exclusive_only_let_only,none,
       "variable of type %0 must be declared with a 'let'", (Type))
 NOTE(attr_static_exclusive_only_type_nonmutating,none,
@@ -2481,9 +2488,9 @@ ERROR(c_func_throws,none,
       "raising errors from C functions is not supported", ())
 ERROR(c_var_computed,none,
       "computed variable cannot be represented in C", ())
-ERROR(expose_wasm_not_at_top_level_func,none,
+ERROR(expose_wasm_unsupported_decl,none,
       "'@_expose' with 'wasm' can only be applied to global "
-      "functions", ())
+      "functions and to global or static stored variables", ())
 
 ERROR(expose_only_non_other_attr,none,
       "'@_expose' cannot be applied to an '%0' declaration",
@@ -2506,6 +2513,8 @@ ERROR(expose_unsupported_client_emission_to_cxx,none,
       "%kind0 can not be exposed to C++ as it requires code to be emitted into client", (ValueDecl *))
 ERROR(expose_generic_decl_to_cxx,none,
       "generic %kind0 can not yet be exposed to C++", (ValueDecl *))
+ERROR(expose_generic_superclass_to_cxx,none,
+      "%kind0 inherits from a generic class and can not yet be exposed to C++", (ValueDecl *))
 ERROR(expose_generic_requirement_to_cxx,none,
       "generic requirements for %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_throwing_to_cxx,none,
@@ -2519,7 +2528,7 @@ ERROR(expose_enum_case_tuple_to_cxx,none,
 ERROR(expose_protocol_to_cxx_unsupported,none,
       "protocol %0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_move_only_to_cxx,none,
-      "noncopyable %kind0 can not yet be represented in C++", (ValueDecl *))
+      "non-'Copyable' %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
@@ -2690,19 +2699,22 @@ WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
 
-// @called
-ERROR(called_attr_cannot_be_used_with_borrowing,none,
-      "'@called(%0)' cannot be used together with 'borrowing'", (StringRef))
-ERROR(called_attr_function_type_mismatch,none,
-      "invalid conversion from '@called(%0)' function of type %1 "
+// @once and @callable(once)
+ERROR(execution_semantics_attr_cannot_be_used_with_borrowing,none,
+      "'%0' cannot be used together with 'borrowing'", (StringRef))
+ERROR(execution_semantics_function_type_mismatch,none,
+      "invalid conversion from '%0' function of type %1 "
       "to function type %2", (StringRef, Type, Type))
+ERROR(execution_semantics_function_type_mismatch_to,none,
+      "invalid conversion from function of type %0 "
+      "to '%1' function of type %2", (Type, StringRef, Type))
 ERROR(sending_capture_requires_experimental_feature,none,
       "'sending' capture is only valid when experimental feature "
-      "'CalledAttribute' is enabled",
+      "'OnceFunctions' is enabled",
       ())
-ERROR(sending_capture_decl_requires_called_closure,none,
-      "'sending' capture may only be declared in a '@called(atMostOnce)' or "
-      "'@called(exactlyOnce)' closure",
+ERROR(sending_capture_decl_requires_once_closure,none,
+      "'sending' capture may only be declared in a '@once' or "
+      "'@callable(once)' closure",
       ())
 
 // Alignment attribute
@@ -3092,7 +3104,7 @@ ERROR(deinitable_nominal_inverse_requires_noncopyable,none,
       "'Copyable'", (const ValueDecl *))
 ERROR(nondeinitable_storage,none,
       "%select{global variable|static property|lazy property|"
-      "'async let' binding}0 %1 cannot have non-Deinitable type %2",
+      "'async let' binding}0 %1 cannot have non-'Deinitable' type %2",
       (unsigned, DeclName, Type))
 ERROR(deinitable_illegal_deinit,none,
       "deinitializer cannot be declared in %kind0, which suppresses "
@@ -4198,7 +4210,7 @@ NOTE(enum_declares_rawrep_with_raw_type,none,
       "%0 declares raw type %1, which implies RawRepresentable", (Type, Type))
 ERROR(enum_raw_type_nonconforming_and_noncopyable,none,
       "%0 declares raw type %1, but cannot yet conform to RawRepresentable "
-      "because it is noncopyable", (Type, Type))
+      "because it is non-'Copyable'", (Type, Type))
 ERROR(enum_raw_type_access,none,
       "enum %select{must be declared %select{"
       "%select{private|fileprivate|internal|package|%error|%error}1|private or fileprivate}3"
@@ -4676,7 +4688,7 @@ ERROR(eagermove_and_lexical_combined,none,
       "'@_eagerMove' and '@_noEagerMove' are alternate styles of lifetimes "
       "and can't be combined", ())
 ERROR(eagermove_and_noncopyable_combined,none,
-      "'@_eagerMove' cannot be applied to NonCopyable types", ())
+      "'@_eagerMove' cannot be applied to non-'Copyable' types", ())
 
 ERROR(autoclosure_function_type,none,
       "'@autoclosure' only applies to function types",
@@ -5548,6 +5560,15 @@ NOTE(iuo_to_any_coercion_note,none,
 NOTE(iuo_to_any_coercion_note_func_result,none,
      "%kind0 with implicitly unwrapped result type is declared here",
      (const ValueDecl *))
+GROUPED_WARNING(implicit_force_unwrap,ImplicitForceUnwrap,none,
+        "implicit force unwrap of %select{implicitly unwrapped optional|"
+        "dynamic lookup result}0 of type %1",
+        (bool, Type))
+GROUPED_WARNING(implicit_force_unwrap_of_iuo_param,ImplicitForceUnwrap,none,
+        "implicit force unwrap of implicitly unwrapped optional "
+        "%select{parameter|value}0 of type %1 %select{in override of|"
+        "in witness for}2 %kind3",
+        (bool, Type, bool, const ValueDecl *))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(default_optional_parameter,none,
@@ -5874,7 +5895,7 @@ ERROR(discard_wrong_context_misc,none,
       "'discard' statement cannot appear in this context",
       ())
 ERROR(discard_wrong_context_copyable,none,
-      "'discard' statement can only appear in noncopyable type's member",
+      "'discard' statement can only appear in non-'Copyable' type's member",
       ())
 ERROR(discard_wrong_context_nonconsuming,none,
       "'discard' statement can only appear in consuming %kindonly0",
@@ -5971,9 +5992,10 @@ ERROR(enum_element_pattern_member_not_found,none,
 ERROR(optional_element_pattern_not_valid_type,none,
       "optional pattern '?' cannot match value of non-optional type %0",
       (Type))
-ERROR(condition_optional_element_pattern_not_valid_type,none,
-      "initializer for conditional binding must have Optional type, not %0",
-      (Type))
+GROUPED_WARNING(condition_binding_non_optional_type,
+                ConditionalBindingNonOptionalType,none,
+                "initializer for conditional binding has non-optional type %0",
+                (Type))
 ERROR(ambiguous_enum_pattern_type,none,
       "generic enum type %0 is ambiguous without explicit generic parameters "
       "when matching value of type %1", (Type, Type))
@@ -6313,6 +6335,12 @@ NOTE(marked_nonisolated_here,none,
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %kind0 can not be partially applied",
         (const ValueDecl *))
+ERROR(actor_isolated_closure_unowned_self_capture,none,
+      "actor-isolated closure cannot capture 'self' as %0",
+      (ReferenceOwnership))
+NOTE(actor_isolated_closure_unowned_self_capture_use_weak,none,
+      "capture 'self' as 'weak' instead",
+      ())
 ERROR(concurrent_access_local,none,
         "use of local %kind0 in concurrently-executing code",
         (const ValueDecl *))
@@ -6370,6 +6398,10 @@ NOTE(actor_isolated_sync_func_value,none,
 NOTE(actor_isolation_source,none,
      "%noun0 inferred from %1",
      (ActorIsolation, IsolationSource))
+NOTE(actor_instance_may_not_be_global_actor,none,
+     "%select{the actor instance|%1}0 may be a different instance of %2 than "
+     "global actor %3",
+     (bool, const ValueDecl *, const ValueDecl *, Type))
 
 NOTE(note_distributed_actor_isolated_method,none,
      "distributed actor-isolated %kind0 declared here",
@@ -6411,9 +6443,6 @@ ERROR(distributed_embedded_distributed_var_not_supported,none,
       "'distributed' computed properties are not supported in Embedded Swift; "
       "use a 'distributed func' instead",
       (DeclName))
-ERROR(distributed_embedded_requires_feature,none,
-      "'distributed actor' in Embedded Swift requires '-enable-experimental-feature EmbeddedDistributed'",
-      ())
 ERROR(distributed_actor_func_param_resolvable_actor_system_mismatch,none,
       "parameter %0 of type %1 in %kindonly2 must match the enclosing actor's "
       "ActorSystem (%5)",
@@ -6948,13 +6977,13 @@ ERROR(tuple_pack_element_label,none,
       "cannot use label with pack expansion tuple element",
       ())
 ERROR(tuple_move_only_not_supported,none,
-      "tuple with noncopyable element type %0 is not supported", (Type))
+      "tuple with non-'Copyable' element type %0 is not supported", (Type))
 ERROR(deinitable_closure_nondeinitable_capture,none,
       "%select{consumed capture|capture list entry}0 %1 of "
-      "'Deinitable'-conforming closure has non-Deinitable type %2",
+      "'Deinitable'-conforming closure has non-'Deinitable' type %2",
       (unsigned, const ValueDecl *, Type))
 ERROR(tuple_nondeinitable_element,none,
-      "tuple cannot contain non-Deinitable element type %0", (Type))
+      "tuple cannot contain non-'Deinitable' element type %0", (Type))
 ERROR(vararg_not_allowed,none,
       "variadic parameter cannot appear outside of a function parameter list",
       ())
@@ -7100,9 +7129,9 @@ ERROR(unsupported_convention,none,
 ERROR(invalid_isolated_and_convention_attributes,none,
       "'@convention(%0)' attribute is not allowed on '@isolated' types",
       (StringRef))
-ERROR(invalid_called_and_attr_attributes,none,
-      "%0 attribute is not allowed on '@called' types",
-      (TypeAttribute *))
+ERROR(invalid_execution_semantics_and_attr_attributes,none,
+      "%0 attribute is not allowed on '%1' types",
+      (TypeAttribute *, StringRef))
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(non_inferrable_opaque_generic_parameter,none,
@@ -7805,12 +7834,12 @@ ERROR(availability_isolated_any_only_version_newer, none,
       (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_copyable_generics_casting_only_version_newer, none,
-      "runtime support for casting types with noncopyable generic arguments "
+      "runtime support for casting types with non-'Copyable' generic arguments "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_escapable_generics_casting_only_version_newer, none,
-      "runtime support for casting types with nonescapable generic arguments "
+      "runtime support for casting types with non-'Escapable' generic arguments "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
@@ -8124,6 +8153,17 @@ ERROR(specialize_attr_unsupported_kind_of_req,none,
       "only same-type and layout requirements are supported by '_specialize' attribute", ())
 ERROR(specialized_attr_unsupported_kind_of_req,none,
       "only same-type are supported by 'specialized' attribute", ())
+ERROR(specialized_attr_exported_experimental,none,
+      "'@specialized(exported: true)' requires "
+      "'-enable-experimental-feature ExtendedSpecializedAttribute'", ())
+ERROR(specialized_attr_exported_library_evolution,none,
+      "'@specialized(exported: true)' is not supported in a module built "
+      "with library evolution", ())
+ERROR(specialized_attr_exported_emitted_into_client,none,
+      "'@specialized(exported: true)' cannot be combined with "
+      "%select{'@export(implementation)'|'@_alwaysEmitIntoClient'|"
+      "'@_transparent'|the 'implementation' code generation model}0",
+      (unsigned))
 ERROR(specialize_target_function_not_found, none,
      "target function %0 could not be found", (DeclNameRef))
 ERROR(specialize_target_function_of_type_not_found, none,
@@ -8906,7 +8946,7 @@ ERROR(inverse_cannot_be_conditional_on_requirement, none,
       (const ProtocolDecl *, Type, unsigned, Type))
 ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'%4'-conforming %kind3 has non-%4 type %0",
+      "'%4'-conforming %kind3 has non-'%4' type %0",
       (Type, bool, DeclName, const ValueDecl *, StringRef))
 NOTE(add_inverse,none,
      "consider adding '~%1' to %kind0",
@@ -8985,9 +9025,9 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
-      "parameter of noncopyable type %0 must specify ownership", (Type))
+      "parameter of non-'Copyable' type %0 must specify ownership", (Type))
 ERROR(noncopyable_parameter_subscript_unsupported, none,
-      "subscripts cannot have noncopyable parameters yet", ())
+      "subscripts cannot have non-'Copyable' parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
@@ -9001,14 +9041,14 @@ NOTE(noncopyable_generics_implicit_composition, none,
      "'%noformat0 & %noformat1' is implicit here",
      (Type, Type))
 ERROR(noncopyable_effectful_getter,none,
-      "%kindonly0 of noncopyable type cannot be 'async' or 'throws'",
+      "%kindonly0 of non-'Copyable' type cannot be 'async' or 'throws'",
       (const AccessorDecl *))
 ERROR(noncopyable_enums_do_not_support_indirect,none,
-      "noncopyable enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
+      "non-'Copyable' enum %0 cannot be marked indirect or have indirect cases yet", (Identifier))
 ERROR(noncopyable_cast,none,
-      "noncopyable types cannot be conditionally cast", ())
+      "non-'Copyable' types cannot be conditionally cast", ())
 ERROR(noncopyable_objc_enum, none,
-      "noncopyable enums cannot be marked '@objc'", ())
+      "non-'Copyable' enums cannot be marked '@objc'", ())
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
 ERROR(moveOnly_deprecated,none,
@@ -9022,7 +9062,7 @@ WARNING(consume_of_bitwisecopyable_noop,none,
 ERROR(consume_expression_not_passed_lvalue,none,
       "'consume' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(consume_expression_partial_copyable,none,
-      "'consume' can only be used to partially consume storage of a noncopyable type", ())
+      "'consume' can only be used to partially consume storage of a non-'Copyable' type", ())
 ERROR(consume_expression_non_storage,none,
       "'consume' can only be used to partially consume storage", ())
 NOTE(note_consume_expression_non_storage_call,none,
@@ -9036,7 +9076,7 @@ ERROR(borrow_expression_not_passed_lvalue,none,
 ERROR(copy_expression_not_passed_lvalue,none,
       "'copy' can only be applied to a local binding ('let', 'var', or parameter)", ())
 ERROR(copy_expression_cannot_be_used_with_noncopyable_types,none,
-      "'copy' cannot be applied to noncopyable types", ())
+      "'copy' cannot be applied to non-'Copyable' types", ())
 
 // Experimental noncopyable feature diagnostics:
 ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
@@ -9046,9 +9086,9 @@ ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
 ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
-      "'@_noImplicitCopy' has no effect when applied to a noncopyable type", ())
+      "'@_noImplicitCopy' has no effect when applied to a non-'Copyable' type", ())
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
-      "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
+      "non-'Copyable' %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
 ERROR(for_loop_sequence_conformance_unavailable,none,
@@ -9099,6 +9139,54 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
 
 ERROR(pack_iteration_where_clause_not_supported, none,
       "'where' clause in pack iteration is not supported", ())
+
+//------------------------------------------------------------------------------
+// MARK: Scope Restrictions
+//------------------------------------------------------------------------------
+
+// TODO: support these cases!
+ERROR(scoped_unsupported_position, none,
+      "'@_scoped' is not supported here", ())
+ERROR(scoped_applied_repeatedly, none,
+      "scope restrictions cannot be specified more than once", ())
+ERROR(scoped_labeled, none,
+      "labeled scope restrictions are not supported", ())
+ERROR(scoped_multiple, none,
+      "multiple scope restrictions are not supported", ())
+ERROR(scoped_nonescapable_self, none,
+      "the scope of a non-escapable 'self' is not supported", ())
+ERROR(scoped_function_type_param, none,
+      "scopes named by function type parameters are not supported", ())
+ERROR(scoped_nonescapable_in_param_position, none,
+      "non-escapable type in this position is not supported when scope "
+      "restrictions are enabled", ())
+ERROR(scoped_nonescapable_param_context, none,
+      "non-escapable parameters are only supported in functions and "
+      "initializers when scope restrictions are enabled", ())
+ERROR(scoped_nonescapable_in_typealias, none,
+      "non-escapable type in a typealias is not supported when scope "
+      "restrictions are enabled", ())
+ERROR(scoped_nonescapable_in_generic_argument, none,
+      "non-escapable type in a generic argument is not supported when scope "
+      "restrictions are enabled", ())
+ERROR(scoped_elided_result, none,
+      "non-escapable result of a function with scope restrictions must have "
+      "its scope written with '@_scoped'", ())
+ERROR(scoped_param_scope_unsupported, none,
+      "the scope of %0 is not supported", (Identifier))
+
+ERROR(scoped_unknown_param, none,
+      "cannot find parameter %0 for scope restriction", (Identifier))
+ERROR(scoped_consuming_param, none,
+      "consumed parameters have no access scope", ())
+NOTE(scoped_consuming_param_here, none,
+     "%0 is consumed", (Identifier))
+NOTE(scoped_init_param_consuming_by_default, none,
+     "initializer parameters are 'consuming' by default", ())
+ERROR(scoped_self_no_access, none,
+      "'self' has no access scope here", ())
+ERROR(scoped_escapable_param, none,
+      "%0 has an escapable type, so it has no scope", (Identifier))
 
 
 //------------------------------------------------------------------------------
@@ -9163,21 +9251,21 @@ ERROR(lifetime_dependence_unknown_type, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_feature_required_return, none,
-      "%0 cannot return a ~Escapable result", (StringRef))
+      "%0 cannot return a non-'Escapable' result", (StringRef))
 ERROR(lifetime_dependence_feature_required_mutating, none,
-      "%0 cannot have a ~Escapable 'self'", (StringRef))
+      "%0 cannot have a non-'Escapable' 'self'", (StringRef))
 ERROR(lifetime_dependence_feature_required_inout, none,
-      "%0 cannot have a ~Escapable 'inout' parameter '%1' in addition to other ~Escapable parameters",
+      "%0 cannot have a non-'Escapable' 'inout' parameter '%1' in addition to other non-'Escapable' parameters",
       // this arg list must be compatible with
       // lifetime_dependence_cannot_infer_inout
       (StringRef, StringRef))
 
 ERROR(lifetime_dependence_cannot_infer_return, none,
-      "%0 with a ~Escapable result requires '@_lifetime(...)'", (StringRef))
+      "%0 with a non-'Escapable' result requires '@_lifetime(...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_mutating, none,
-      "%0 with a ~Escapable 'self' requires '@_lifetime(self: ...)'", (StringRef))
+      "%0 with a non-'Escapable' 'self' requires '@_lifetime(self: ...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_inout, none,
-      "%0 with a ~Escapable 'inout' parameter requires '@_lifetime(%1: ...)'",
+      "%0 with a non-'Escapable' 'inout' parameter requires '@_lifetime(%1: ...)'",
       (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
@@ -9185,7 +9273,7 @@ ERROR(lifetime_dependence_cannot_infer_inout, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_cannot_infer_return_no_param, none,
-      "%0 with a ~Escapable result needs a parameter to depend on",
+      "%0 with a non-'Escapable' result needs a parameter to depend on",
       (StringRef))
 NOTE(lifetime_dependence_cannot_infer_return_immortal, none,
      "'@_lifetime(immortal)' can be used to indicate that values produced by "
@@ -9195,7 +9283,7 @@ ERROR(lifetime_dependence_cannot_infer_bitwisecopyable, none,
       "specify '@_lifetime(borrow self)'",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_infer_kind, none,
-      "cannot infer the lifetime dependence scope on %0 with a ~Escapable "
+      "cannot infer the lifetime dependence scope on %0 with a non-'Escapable' "
       "parameter, specify '@_lifetime(borrow %1)' or '@_lifetime(copy %1)'",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
@@ -9217,7 +9305,7 @@ ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
 
 ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
       "cannot infer lifetime dependence%0, no parameters found that are either "
-      "~Escapable or Escapable with a borrowing ownership", (StringRef))
+      "non-'Escapable' or 'Escapable' with a borrowing ownership", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence%0, multiple parameters qualify as a candidate", (StringRef))
 
@@ -9429,6 +9517,16 @@ GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               "a generic argument of the superclass refers to the subclass itself, "
               "creating a circular metadata dependency",
               (Type, Type))
+
+GROUPED_WARNING(dynamic_in_embedded_swift, EmbeddedRestrictions, none,
+                "%kind0 cannot be 'dynamic' in Embedded Swift; 'dynamic' will "
+                "be ignored",
+                (const Decl *))
+GROUPED_WARNING(dynamic_replacement_in_embedded_swift, EmbeddedRestrictions,
+                none,
+                "%kind0 cannot be a dynamic replacement in Embedded Swift; "
+                "'@_dynamicReplacement' will be ignored",
+                (const Decl *))
 
 GROUPED_ERROR(export_interface_on_generic_in_embedded_swift,
               EmbeddedRestrictions, none,

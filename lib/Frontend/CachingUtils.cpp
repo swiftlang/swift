@@ -573,6 +573,43 @@ createCASFileSystem(ObjectStore &CAS, const std::string &IncludeTree,
   return nullptr;
 }
 
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+createCASFileSystemFromCacheKey(ObjectStore &CAS, ObjectRef CacheKey) {
+  auto Key = CAS.getProxy(CacheKey);
+  if (!Key)
+    return Key.takeError();
+  if (Key->getNumReferences() != 1)
+    return createStringError("invalid cache key");
+  auto Base = CAS.getProxy(Key->getReference(0));
+  if (!Base)
+    return Base.takeError();
+  if (Base->getNumReferences() <
+      static_cast<unsigned>(CompileJobBaseKeyRef::NumFixedRefs))
+    return createStringError("invalid base cache key");
+
+  // The include tree that is not used is an empty blob.
+  auto getIncludeTree =
+      [&](CompileJobBaseKeyRef Ref) -> llvm::Expected<std::string> {
+    auto IncludeTree =
+        CAS.getProxy(Base->getReference(static_cast<unsigned>(Ref)));
+    if (!IncludeTree)
+      return IncludeTree.takeError();
+    if (!IncludeTree->getNumReferences() && IncludeTree->getData().empty())
+      return std::string();
+    return IncludeTree->getID().toString();
+  };
+  auto IncludeTreeRoot = getIncludeTree(CompileJobBaseKeyRef::IncludeTreeRoot);
+  if (!IncludeTreeRoot)
+    return IncludeTreeRoot.takeError();
+  auto IncludeTreeFileList =
+      getIncludeTree(CompileJobBaseKeyRef::IncludeTreeFileList);
+  if (!IncludeTreeFileList)
+    return IncludeTreeFileList.takeError();
+  if (IncludeTreeRoot->empty() && IncludeTreeFileList->empty())
+    return createStringError("no clang include tree in cache key");
+  return createCASFileSystem(CAS, *IncludeTreeRoot, *IncludeTreeFileList);
+}
+
 std::vector<std::string> remapPathsFromCommandLine(
     ArrayRef<std::string> commandLine,
     llvm::function_ref<std::string(StringRef)> RemapCallback) {

@@ -160,16 +160,70 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (!CondBr)
     return std::nullopt;
 
-  // Match an add 1 recurrence.
+  // Match an add 1 or sub 1 recurrence.
 
   auto *Cmp = dyn_cast<BuiltinInst>(CondBr->getCondition());
   if (!Cmp)
     return std::nullopt;
 
+  // Only accept integer comparison builtins.
+  auto CmpBuiltinKind = Cmp->getBuiltinInfo().ID;
+  switch (CmpBuiltinKind) {
+  case BuiltinValueKind::ICMP_EQ:
+  case BuiltinValueKind::ICMP_NE:
+  case BuiltinValueKind::ICMP_SGE:
+  case BuiltinValueKind::ICMP_SGT:
+  case BuiltinValueKind::ICMP_SLE:
+  case BuiltinValueKind::ICMP_SLT:
+    break;
+  default:
+    return std::nullopt;
+  }
+
+  SILValue RecNext = Cmp->getArguments()[0];
+  SILPhiArgument *RecArg;
+
+  // Whether the loop counter is incremented on each iteration. If not, it is
+  // decremented on each iteration.
+  bool stepWithAdd;
+  // Match signed add/sub with overflow, unsigned add/sub with overflow and
+  // add/sub without overflow.
+  if (match(RecNext, m_TupleExtractOperation(
+                         m_ApplyInst(BuiltinValueKind::SAddOver,
+                                     m_SILPhiArgument(RecArg), m_One()),
+                         0)) ||
+      match(RecNext, m_TupleExtractOperation(
+                         m_ApplyInst(BuiltinValueKind::UAddOver,
+                                     m_SILPhiArgument(RecArg), m_One()),
+                         0)) ||
+      match(RecNext, m_ApplyInst(BuiltinValueKind::Add,
+                                 m_SILPhiArgument(RecArg), m_One()))) {
+    stepWithAdd = true;
+  } else if (match(RecNext, m_TupleExtractOperation(
+                                m_ApplyInst(BuiltinValueKind::SSubOver,
+                                            m_SILPhiArgument(RecArg), m_One()),
+                                0)) ||
+             match(RecNext, m_TupleExtractOperation(
+                                m_ApplyInst(BuiltinValueKind::USubOver,
+                                            m_SILPhiArgument(RecArg), m_One()),
+                                0)) ||
+             match(RecNext, m_ApplyInst(BuiltinValueKind::Sub,
+                                        m_SILPhiArgument(RecArg), m_One()))) {
+    stepWithAdd = false;
+  } else {
+    return std::nullopt;
+  }
+
+  if (RecArg->getParent() != Header)
+    return std::nullopt;
+
+  // Identify the exit block and account for extra iterations due to the branch
+  // condition's boundary cases. When stepping with sub, the handling of
+  // "greater" and "less" are reversed.
   unsigned Adjust = 0;
   SILBasicBlock *Exit = CondBr->getTrueBB();
-
-  switch (Cmp->getBuiltinInfo().ID) {
+  if (stepWithAdd) {
+    switch (CmpBuiltinKind) {
     case BuiltinValueKind::ICMP_EQ:
     case BuiltinValueKind::ICMP_SGE:
       break;
@@ -186,6 +240,26 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
       break;
     default:
       return std::nullopt;
+    }
+  } else {
+    switch (CmpBuiltinKind) {
+    case BuiltinValueKind::ICMP_EQ:
+    case BuiltinValueKind::ICMP_SLE:
+      break;
+    case BuiltinValueKind::ICMP_SLT:
+      Adjust = 1;
+      break;
+    case BuiltinValueKind::ICMP_SGE:
+      Exit = CondBr->getFalseBB();
+      Adjust = 1;
+      break;
+    case BuiltinValueKind::ICMP_NE:
+    case BuiltinValueKind::ICMP_SGT:
+      Exit = CondBr->getFalseBB();
+      break;
+    default:
+      return std::nullopt;
+    }
   }
 
   if (Loop->contains(Exit))
@@ -193,27 +267,6 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   auto *End = dyn_cast<IntegerLiteralInst>(Cmp->getArguments()[1]);
   if (!End)
-    return std::nullopt;
-
-  SILValue RecNext = Cmp->getArguments()[0];
-  SILPhiArgument *RecArg;
-
-  // Match signed add with overflow, unsigned add with overflow and
-  // add without overflow.
-  if (!match(RecNext, m_TupleExtractOperation(
-                          m_ApplyInst(BuiltinValueKind::SAddOver,
-                                      m_SILPhiArgument(RecArg), m_One()),
-                          0)) &&
-      !match(RecNext, m_TupleExtractOperation(
-                          m_ApplyInst(BuiltinValueKind::UAddOver,
-                                      m_SILPhiArgument(RecArg), m_One()),
-                          0)) &&
-      !match(RecNext, m_ApplyInst(BuiltinValueKind::Add,
-                                      m_SILPhiArgument(RecArg), m_One()))) {
-    return std::nullopt;
-  }
-
-  if (RecArg->getParent() != Header)
     return std::nullopt;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
@@ -224,19 +277,27 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
   if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
     return std::nullopt;
 
-  auto StartVal = Start->getValue();
-  auto EndVal = End->getValue();
-  if (StartVal.sgt(EndVal))
+  APInt MinVal, MaxVal;
+  if (stepWithAdd) {
+    MinVal = Start->getValue();
+    MaxVal = End->getValue();
+  } else {
+    MaxVal = Start->getValue();
+    MinVal = End->getValue();
+  }
+  if (MinVal.sgt(MaxVal))
     return std::nullopt;
 
-  auto Dist = EndVal - StartVal;
+  auto Dist = MaxVal - MinVal;
+  if (Dist.isZero())
+    return std::nullopt;
+
+  Dist += Adjust;
+
   if (Dist.getBitWidth() > 64)
     return std::nullopt;
 
-  if (Dist == 0)
-    return std::nullopt;
-
-  return Dist.getZExtValue() + Adjust;
+  return Dist.getZExtValue();
 }
 
 /// A loop that iterates over the elements of a variadic generic pack uses its

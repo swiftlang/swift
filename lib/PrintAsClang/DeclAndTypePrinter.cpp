@@ -2102,7 +2102,7 @@ private:
     if (auto unwrapped = ty->getOptionalObjectType())
       ty = unwrapped;
 
-    auto genericTy = ty->getAs<BoundGenericStructType>();
+    auto genericTy = ty->getAs<StructType>();
     if (!genericTy || !genericTy->isArray())
       return false;
 
@@ -2216,7 +2216,7 @@ private:
         } else if (copyTy->isUnmanaged()) {
           os << ", unsafe_unretained";
           // Don't print unsafe_unretained twice.
-          if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
+          if (auto boundTy = copyTy->castTo<NominalType>()) {
             ty = boundTy->getGenericArgs().front();
             if (isOptional)
               ty = OptionalType::get(ty);
@@ -2593,6 +2593,9 @@ private:
 
   void visitStructType(StructType *ST,
                        std::optional<OptionalTypeKind> optionalKind) {
+    if (ST->hasGenericArgs())
+      return printBoundGenericStructType(ST, optionalKind);
+
     const StructDecl *SD = ST->getStructDecl();
 
     // Handle known type names.
@@ -2643,9 +2646,9 @@ private:
 
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
-  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+  bool printIfKnownGenericStruct(const StructType *BGT,
                                  std::optional<OptionalTypeKind> optionalKind) {
-    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
+    auto bgsTy = Type(const_cast<StructType *>(BGT));
 
     if (bgsTy->isUnmanaged()) {
       auto args = BGT->getGenericArgs();
@@ -2678,7 +2681,13 @@ private:
   }
 
   void
-  visitBoundGenericStructType(BoundGenericStructType *BGT,
+  printBoundGenericEnumType(EnumType *BGT,
+                            std::optional<OptionalTypeKind> optionalKind) {
+    printBoundGenericType(BGT, optionalKind);
+  }
+
+  void
+  printBoundGenericStructType(StructType *BGT,
                               std::optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (printIfObjCBridgeable(BGT->getDecl(), BGT->getGenericArgs(),
@@ -2688,10 +2697,10 @@ private:
     if (printIfKnownGenericStruct(BGT, optionalKind))
       return;
 
-    visitBoundGenericType(BGT, optionalKind);
+    printBoundGenericType(BGT, optionalKind);
   }
 
-  void printGenericArgs(BoundGenericType *BGT) {
+  void printGenericArgs(NominalType *BGT) {
     printGenericArgs(BGT->getGenericArgs());
   }
 
@@ -2704,7 +2713,7 @@ private:
   }
 
   void
-  visitBoundGenericClassType(BoundGenericClassType *BGT,
+  printBoundGenericClassType(ClassType *BGT,
                              std::optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
     auto CD = BGT->getClassDecl();
@@ -2726,7 +2735,7 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitBoundGenericType(BoundGenericType *BGT,
+  void printBoundGenericType(NominalType *BGT,
                              std::optional<OptionalTypeKind> optionalKind) {
     // Handle bridged types.
     if (!isa<StructDecl>(BGT->getDecl()) &&
@@ -2742,6 +2751,9 @@ private:
 
   void visitEnumType(EnumType *ET,
                      std::optional<OptionalTypeKind> optionalKind) {
+    if (ET->hasGenericArgs())
+      return printBoundGenericEnumType(ET, optionalKind);
+
     const EnumDecl *ED = ET->getDecl();
 
     // Handle bridged types.
@@ -2754,6 +2766,9 @@ private:
 
   void visitClassType(ClassType *CT,
                       std::optional<OptionalTypeKind> optionalKind) {
+    if (CT->hasGenericArgs())
+      return printBoundGenericClassType(CT, optionalKind);
+
     const ClassDecl *CD = CT->getClassDecl();
     assert(CD->isObjC() || CD->isForeignReferenceType());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
@@ -2794,7 +2809,8 @@ private:
         os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       } else {
         os << getNameForObjC(CD);
-        if (auto *BGT = superclass->getAs<BoundGenericClassType>())
+        if (auto *BGT = superclass->getAs<ClassType>();
+            BGT && BGT->hasGenericArgs())
           printGenericArgs(BGT);
       }
     } else {

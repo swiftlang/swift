@@ -322,10 +322,6 @@ public:
   /// optimizer.
   bool UseAggressiveReg2MemForCodeSize = true;
 
-  /// Enable enforcement of lifetime dependencies on addressable arguments.
-  /// Temporarily used to bootstrap the AddressableParameters feature.
-  bool EnableAddressDependencies = true;
-
   // Whether to allow merging traps and cond_fails.
   bool MergeableTraps = false;
 

@@ -164,6 +164,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly. This relies on the move-only
+  // checker having made every destroy explicit.
+  P.addImplicitDestroyChecker();
+
   // Check no uses after consume operator of a value in an address.
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
@@ -244,6 +249,13 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // before the next module-pass (= MandatoryPerformanceOptimizations) after
   // OSLogOptimization and MandatoryDeadObjectElimination.
   P.addOnoneSimplification();
+
+  // Create the specialized bodies exported by `@specialized(exported: true)`
+  // before MandatoryPerformanceOptimizations so that
+  // MandatoryPerformanceOptimizations applies to those specialized bodies.
+  if (P.getOptions().EmbeddedSwift) {
+    P.addEmbeddedExportedPrespecializations();
+  }
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
@@ -561,6 +573,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+  P.addPackTypeElimination();
 
   // Promote stack allocations to values and eliminate redundant
   // loads.

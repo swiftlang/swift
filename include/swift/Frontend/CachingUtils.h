@@ -79,6 +79,12 @@ createCASFileSystem(llvm::cas::ObjectStore &CAS,
                     const std::string &IncludeTreeRoot,
                     const std::string &IncludeTreeFileList);
 
+/// Create the CAS file system from the clang include tree referenced by the
+/// compile job cache key for an output.
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+createCASFileSystemFromCacheKey(llvm::cas::ObjectStore &CAS,
+                                llvm::cas::ObjectRef CacheKey);
+
 std::vector<std::string> remapPathsFromCommandLine(
     ArrayRef<std::string> Args,
     llvm::function_ref<std::string(StringRef)> RemapCallback);

@@ -373,7 +373,8 @@ bb0(%0 : @guaranteed $Holder):
 // CHECK:   apply %{{.*}}([[CP]]) : $@convention(thin) (@guaranteed RawSpan) -> ()
 // CHECK:   destroy_value [[CP]]
 // CHECK:   end_apply
-// CHECK:   destroy_addr
+// CHECK-NOT: destroy_addr
+// CHECK:   dealloc_stack
 // CHECK-LABEL: } // end sil function 'testYieldSpan'
 sil [ossa] @testYieldSpan : $@convention(thin) (@in A) -> () {
 bb0(%0 : $*A):
@@ -1178,4 +1179,40 @@ bb0:
   destroy_value %8
   %14 = tuple ()
   return %14
+}
+
+sil @getObject : $@convention(thin) () -> @owned AnyObject
+sil @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+
+// rdar://189111544 (Non-escapable result of a protocol extension method can't outlive its declaration when the
+// receiver is a temporary)
+//
+// Extend both the destroy and the deallocation of a temporary stack location.
+//
+// CHECK-LABEL: sil [ossa] @testExtendTemporaryDestroy : $@convention(thin) () -> () {
+// CHECK:   [[TEMP:%.*]] = alloc_stack $AnyObject
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[TEMP]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[NE]] on [[TEMP]]
+// CHECK-NOT: destroy_addr
+// CHECK:   apply %{{.*}}([[MD]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK:   destroy_value [[MD]]
+// CHECK-NEXT:   destroy_addr [[TEMP]]
+// CHECK-NEXT:   dealloc_stack [[TEMP]]
+// CHECK-LABEL: } // end sil function 'testExtendTemporaryDestroy'
+sil [ossa] @testExtendTemporaryDestroy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
+  %1 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %2 = alloc_stack $AnyObject
+  store %1 to [init] %2
+  %4 = function_ref @getNEFromObject : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE
+  %6 = mark_dependence [unresolved] %5 on %2
+  destroy_addr %2
+  dealloc_stack %2
+  %9 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %10 = apply %9(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %6
+  %12 = tuple ()
+  return %12
 }

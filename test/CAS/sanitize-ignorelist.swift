@@ -4,6 +4,7 @@
 // compile fails to open the ignorelist file.
 
 // REQUIRES: OS=macosx
+// REQUIRES: asan_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

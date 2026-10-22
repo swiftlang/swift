@@ -19,14 +19,14 @@ struct Big: ~Copyable, P { var tag: Int }
 
 func toOtherExistential(_ box: borrowing any P & ~Copyable) -> Bool {
   return box is any Q & ~Copyable
-  // expected-error @-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error @-1 {{non-'Copyable' types cannot be conditionally cast}}
   // expected-warning @-2 {{cast from 'any P & ~Copyable' to unrelated type 'any Q & ~Copyable' always fails}}
 }
 
 func toGenericParameter<T: ~Copyable>(_ box: borrowing any P & ~Copyable,
                                       _: T.Type) -> Bool {
   return box is T
-  // expected-error @-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error @-1 {{non-'Copyable' types cannot be conditionally cast}}
   // expected-warning @-2 {{cast from 'any P & ~Copyable' to unrelated type 'T' always fails}}
 }
 

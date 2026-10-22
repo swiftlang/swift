@@ -65,6 +65,7 @@ extension ASTGenVisitor {
         .Local,
         .NoMetadata,
         .Nonisolated,
+        .Once,
         .PackGuaranteed,
         .PackInout,
         .PackOut,
@@ -95,8 +96,8 @@ extension ASTGenVisitor {
       case .Isolated:
         return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .Called:
-        return (self.generateCalledTypeAttr(attribute: node)?.asTypeAttribute)
+      case .Callable:
+        return (self.generateCallableTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       case .Scoped:
@@ -301,21 +302,8 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCalledTypeAttr(attribute node: AttributeSyntax) -> BridgedCalledTypeAttr? {
-    let semanticsLoc = self.generateSourceLoc(node.arguments)
-    let semantics: BridgedCalledTypeAttrSemantics? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "exactlyOnce": return .exactlyOnce
-        case "atMostOnce": return .atMostOnce
-        default:
-          // TODO: Diagnose.
-          return nil
-        }
-      }
-    )
-    guard let semantics else {
+  func generateCallableTypeAttr(attribute node: AttributeSyntax) -> BridgedCallableTypeAttr? {
+    guard self.generateCallableAttrArgument(attribute: node) else {
       return nil
     }
 
@@ -323,11 +311,11 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      semantics: semantics,
-      semanticsLoc: semanticsLoc
+      parensRange: self.generateAttrParensRange(attribute: node)
     )
   }
+
+
 
   /// E.g.
   ///   ```
@@ -351,13 +339,13 @@ extension ASTGenVisitor {
       return nil
     }
 
-    var specifiers: [BridgedScopeSpecifier] = []
+    var restrictions: [BridgedScopeRestrictionRepr] = []
     for arg in args {
-      guard let specifier = self.generateScopeSpecifier(arg) else {
+      guard let restriction = self.generateScopeRestriction(arg) else {
         self.diagnose(.invalidArgumentInAttribute(node, arg))
         return nil
       }
-      specifiers.append(specifier)
+      restrictions.append(restriction)
     }
 
     return .createParsed(
@@ -365,11 +353,11 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       parensRange: self.generateAttrParensRange(attribute: node),
-      specifiers: specifiers.lazy.bridgedArray(in: self)
+      restrictions: restrictions.lazy.bridgedArray(in: self)
     )
   }
 
-  func generateScopeSpecifier(_ arg: LabeledExprSyntax) -> BridgedScopeSpecifier? {
+  func generateScopeRestriction(_ arg: LabeledExprSyntax) -> BridgedScopeRestrictionRepr? {
     var label: Identifier = nil
     var labelLoc = SourceLoc()
     if let labelToken = arg.label {
@@ -399,7 +387,7 @@ extension ASTGenVisitor {
     }
 
     let loc = self.generateSourceLoc(declRefExpr)
-    let scope: BridgedScopeDescriptor
+    let scope: BridgedScopeRepr
     switch declRefExpr.baseName.tokenKind {
     case .keyword(.`self`):
       scope = .forSelf(loc: loc, isAccess: isAccess)

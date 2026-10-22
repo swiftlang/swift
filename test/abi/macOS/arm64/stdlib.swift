@@ -1370,6 +1370,9 @@ Added: __swift_isRestrictedProcess
 // cannot be copied. See CastConsumptionKind::TestOnly.
 Added: _swift_dynamicCastTest
 
+// Crash when an exactly-once closure is destroyed without being called.
+Added: _swift_onceClosureDestroyedError
+
 // Setter for typed willThrow hook.
 Added: __swift_setWillThrowTypedHandler
 

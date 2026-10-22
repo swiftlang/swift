@@ -519,6 +519,7 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<ArchetypeType>() &&
           !substType->isTypeVariableOrMember() &&
           !substType->is<PlaceholderType>() &&
+          !substType->is<HoleType>() &&
           !substType->is<ErrorType>()) {
         ABORT([&](auto &out) {
           out << "Unexpected abstract conformance in substitution map:\n";

@@ -44,6 +44,11 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
+// The option's argument is a combination of <key>=<path>, where
+// <path> is a file-system path that may be affected by the current
+// working directory.
+def ArgumentIsEqualKeyedPath: OptionFlag;
+
 // The option should be written into a .swiftinterface module interface file,
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
@@ -77,6 +82,11 @@ def ArgumentIsFileList : OptionFlag;
 // affects the location of the output file, or `-emit-module` which defines
 // which action is performed.
 def CacheInvariant : OptionFlag;
+
+// The option's argument is a CAS ID (or `<name>=<CAS ID>`) when compilation
+// caching is enabled. The referenced CAS object is added to the cache key as a
+// reference instead of the argument string.
+def ArgumentIsCASID : OptionFlag;
 
 /////////
 // Options
@@ -183,6 +193,11 @@ def no_strict_implicit_module_context :
   Flag<["-"], "no-strict-implicit-module-context">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
+
+def swift_module_file_EQ :
+  Joined<["-"], "swift-module-file=">,
+  Flags<[FrontendOption, ArgumentIsEqualKeyedPath, ArgumentIsCASID, NewDriverOnlyOption]>,
+  HelpText<"Specify Swift module dependency input explicitly">, MetaVarName<"<name>=<path>">;
 
 def compiler_assertions :
   Flag<["-"], "compiler-assertions">,
@@ -676,9 +691,10 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def debug_module_path : Separate<["-"], "debug-module-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, ArgumentIsCASID]>,
   HelpText<"Path or cache key to this module's binary swiftmodule artifact (required by debug info)">;
-def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption, ArgumentIsPath]>,
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">,
+  Flags<[FrontendOption, ArgumentIsPath, ArgumentIsCASID]>,
   Alias<debug_module_path>;
 def debug_module_self_key : Flag<["-"], "debug-module-self-key">,
   Flags<[FrontendOption]>,
@@ -2538,6 +2554,12 @@ def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,
 def in_process_plugin_server_path : Separate<["-"], "in-process-plugin-server-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Path to dynamic library plugin server">;
+
+def resolved_in_process_plugin_server_path
+  : Separate<["-"], "resolved-in-process-plugin-server-path">,
+  Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+  HelpText<"Path to dynamic library plugin server resolved by the dependency "
+           "scanner. Overrides '-in-process-plugin-server-path'">;
 
 def disable_sandbox:
   Flag<["-"], "disable-sandbox">,

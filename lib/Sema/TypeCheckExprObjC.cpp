@@ -89,7 +89,7 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
 
     // We're updating to a property. Determine whether we're looking
     // into a bridged Swift collection of some sort.
-    if (auto boundGeneric = newType->getAs<BoundGenericType>()) {
+    if (auto boundGeneric = newType->getAs<NominalType>()) {
       // Array<T>
       if (boundGeneric->isArray()) {
         // Further lookups into the element type.

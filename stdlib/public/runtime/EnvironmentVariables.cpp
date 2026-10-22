@@ -22,6 +22,13 @@
 #include <string.h>
 #include <inttypes.h>
 
+#if defined(_WIN32)
+#include <Windows.h>
+#include "swift/Runtime/Win32.h"
+
+#include <vector>
+#endif
+
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
 #endif
@@ -180,19 +187,6 @@ swift::once_t swift::runtime::environment::initializeToken;
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
 extern "C" char **environ;
 #define ENVIRON environ
-#elif defined(_WIN32)
-// `_environ` is DLL-imported unless we are linking against the static C runtime
-// (via `/MT` or `/MTd`).
-#if defined(_DLL)
-extern "C" __declspec(dllimport) char **_environ;
-#else
-extern "C" char **_environ;
-#endif
-// `_environ` is unavailable in the Windows Runtime environment.
-// https://docs.microsoft.com/en-us/cpp/c-runtime-library/environ-wenviron?view=msvc-160
-#if !defined(_WINRT_DLL)
-#define ENVIRON _environ
-#endif
 #endif
 
 #if defined(__ANDROID__)
@@ -276,6 +270,60 @@ void swift::runtime::environment::initialize(void *context) {
                      (int)(equals - *var), *var);
     }
   }
+
+  platformInitialize(context);
+
+  if (SWIFT_DEBUG_HELP_variable)
+    printHelp(nullptr);
+}
+#elif defined(_WIN32)
+
+static char *copyEnvironmentVariable(const wchar_t *name) {
+  std::vector<wchar_t> buffer;
+  DWORD size = 0;
+  for (unsigned attempt = 0; attempt < 256; ++attempt) {
+    // If the buffer is too small, GetEnvironmentVariableW leaves its contents
+    // unspecified and returns the required size, including the terminator.
+    DWORD length = GetEnvironmentVariableW(name, buffer.data(), size);
+    if (length == 0 || length > (1 << 15))
+      return nullptr;
+    if (length < size) {
+      return _swift_win32_copyUTF8FromWide(buffer.data());
+    } else {
+      // length >= size, resize buffer and try again
+      size = length;
+      buffer.resize(size);
+    }
+  }
+  // ran out of tries, something odd happened, bail out
+  return nullptr;
+}
+
+void swift::runtime::environment::initialize(void *context) {
+  // Don't allow the user executing this process to modify the environment if
+  // it's privileged (setuid/setgid).
+  if (_swift_isPrivilegedProcess())
+    return;
+
+  bool SWIFT_DEBUG_HELP_variable = false;
+
+  // Placeholder variable, we never use the result but the macros want to write
+  // to it.
+  bool SWIFT_DEBUG_HELP_isSet_variable = false;
+  (void)SWIFT_DEBUG_HELP_isSet_variable; // Silence warnings about unused vars.
+
+#define VARIABLE(name, type, defaultValue, help)                               \
+  if (char *vEnv = copyEnvironmentVariable(L"" #name)) {                       \
+    name##_isSet_variable = true;                                              \
+    name##_variable = parse_##type(#name, vEnv, defaultValue);                 \
+    free(vEnv);                                                                \
+  }
+
+  // SWIFT_DEBUG_HELP is not in the variables list. Parse it like the other
+  // variables.
+  VARIABLE(SWIFT_DEBUG_HELP, boolean, false, )
+
+  #include "EnvironmentVariables.def"
 
   platformInitialize(context);
 

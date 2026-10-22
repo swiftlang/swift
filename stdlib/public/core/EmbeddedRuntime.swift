@@ -226,12 +226,17 @@ public struct HeapObject {
 #endif
 
 #if _pointerBitWidth(_64)
-  static let bridgeObjectToPlainObjectMask = UInt(0x8fff_ffff_ffff_fff8)
+  static let bridgeObjectToPlainObjectMask = UInt(0x0fff_ffff_ffff_fff8)
 #elseif _pointerBitWidth(_32)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff_ffff)
 #elseif _pointerBitWidth(_16)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff)
 #endif
+
+  // High bits to OR into a bridgeObject pointer after masking out the flags to
+  // reconstruct a full valid pointer. This can be used to accommodate targets
+  // that use the high part of the address space. Most targets use zero.
+  static let bridgeObjectPointerHighBits = UInt(0x0000_0000_0000_0000)
 }
 
 
@@ -893,10 +898,6 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
   if objectBits == 0 { return false }
 
-  #if _pointerBitWidth(_64)
-  if (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
-  #endif
-
   return true
 }
 
@@ -1017,17 +1018,42 @@ func tryRetain(object: UnsafeMutablePointer<HeapObject>) -> Int {
 }
 #endif
 
+func isImmortalBridgeObject(_ object: Builtin.RawPointer) -> Bool {
+#if _pointerBitWidth(_64)
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  return (objectBits & HeapObject.immortalObjectPointerBit) != 0
+#else
+  return false
+#endif
+}
+
+func untaggedBridgeObject(_ object: Builtin.RawPointer) -> Builtin.RawPointer {
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  let withoutFlags = objectBits & HeapObject.bridgeObjectToPlainObjectMask
+  // Keep null as null rather than giving it the high bits.
+  if withoutFlags == 0 {
+    return Builtin.inttoptr_Word(0._builtinWordValue)
+  }
+  let withHighBits = withoutFlags | HeapObject.bridgeObjectPointerHighBits
+  return Builtin.inttoptr_Word(withHighBits._builtinWordValue)
+}
+
 @c
 @discardableResult
 public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
-  return swift_bridgeObjectRetain_n(object: object, n: 1)
+  return bridgeObjectRetain_n(object: object, n: 1)
 }
 
 @c
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
-  let objectBits = UInt(Builtin.ptrtoint_Word(object))
-  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  _ = swift_retain_n(object: untaggedObject, n: n)
+  return bridgeObjectRetain_n(object: object, n: n)
+}
+
+@inline(__always)
+func bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
+  if !isImmortalBridgeObject(object) {
+    _ = swift_retain_n(object: untaggedBridgeObject(object), n: n)
+  }
   return object
 }
 
@@ -1182,14 +1208,19 @@ public func swift_releaseBoxTyped(_ box: UnsafeMutableRawPointer, _ typeId: UInt
 
 @c
 public func swift_bridgeObjectRelease(object: Builtin.RawPointer) {
-  swift_bridgeObjectRelease_n(object: object, n: 1)
+  bridgeObjectRelease_n(object: object, n: 1)
 }
 
 @c
 public func swift_bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
-  let objectBits = UInt(Builtin.ptrtoint_Word(object))
-  let untaggedObject = Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  swift_release_n(object: untaggedObject, n: n)
+  bridgeObjectRelease_n(object: object, n: n)
+}
+
+@inline(__always)
+func bridgeObjectRelease_n(object: Builtin.RawPointer, n: UInt32) {
+  if !isImmortalBridgeObject(object) {
+    swift_release_n(object: untaggedBridgeObject(object), n: n)
+  }
 }
 
 @c

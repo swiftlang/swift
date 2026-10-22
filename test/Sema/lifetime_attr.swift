@@ -96,12 +96,12 @@ do {
     var v2: NE
   }
 
-  _ = \Test.v1 // expected-error {{key path cannot refer to nonescapable type 'Test'}}
-  _ = \Test.v2 // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+  _ = \Test.v1 // expected-error {{key path cannot refer to non-'Escapable' type 'Test'}}
+  _ = \Test.v2 // expected-error {{key path cannot refer to non-'Escapable' type 'Test'}} expected-error {{key path cannot refer to non-'Escapable' type 'NE'}}
 
   func use(t: Test) {
-    t[keyPath: \.v1] // expected-error {{key path cannot refer to nonescapable type 'Test'}}
-    t[keyPath: \.v2] // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+    t[keyPath: \.v1] // expected-error {{key path cannot refer to non-'Escapable' type 'Test'}}
+    t[keyPath: \.v2] // expected-error {{key path cannot refer to non-'Escapable' type 'Test'}} expected-error {{key path cannot refer to non-'Escapable' type 'NE'}}
   }
 }
 
@@ -142,7 +142,7 @@ struct Wrapper : ~Escapable {
     }
     @_lifetime(self: &self)
     nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
-      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
+      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a non-'Escapable' parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
     }
   }
 

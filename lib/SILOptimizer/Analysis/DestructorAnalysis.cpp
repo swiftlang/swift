@@ -126,7 +126,7 @@ bool DestructorAnalysis::implementsDestructorSafeContainerProtocol(
 }
 
 bool DestructorAnalysis::areTypeParametersSafe(CanType Ty) {
-  auto BGT = dyn_cast<BoundGenericType>(Ty);
+  auto BGT = dyn_cast<NominalType>(Ty);
   if (!BGT)
     return false;
 

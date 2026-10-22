@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
 // A call can name 'Greeter.hello(name:)' by the actor's own thunk or by the

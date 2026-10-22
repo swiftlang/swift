@@ -118,13 +118,10 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     // function type not in a parameter is, more or less, implicitly @escaping.
     // For Sendable, we want to behave as though it was not necessary because
     // function types that aren't in a parameter can be Sendable or not.
-    // For `@called(atMostOnce)`, we want to behave as though it was not
-    // necessary because function types that aren't in a parameter can be
-    // called once or not.
-    // For `@called(atMostOnce)`, we want to behave as though it was necessary,
-    // just like noescape, because a plain function type can always satisfy a
-    // `@called(atMostOnce)` requirement but a `@called(atMostOnce)` function
-    // type cannot satisfy a plain one.
+    // For execution semantics, we want to behave as though it was necessary,
+    // just like noescape, because a plain function type can always satisfy an
+    // at-most-once requirement, but an at-most-once function type can't
+    // satisfy a plain one.
     // FIXME: Should we check for a Sendable bound on the requirement type?
     bool inRequirement =
         (adjustment != TypeAdjustment::NoescapeToEscaping &&
@@ -981,6 +978,7 @@ RequirementMatch swift::matchWitness(
       }
 
       // Check that lifetime dependencies match
+      // TODO: Also check scopes eventually.
       if (auto result = matchLifetimes(
               LifetimeDependentInterface::fromValueDecl(witness, witnessFnType),
               LifetimeDependentInterface::fromValueDecl(req, reqFnType))) {
@@ -4777,6 +4775,15 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       }
     }
 
+    if (requirement->isObjC()) {
+      getASTContext().addDelayedConformanceDiag(
+          Conformance, /*isError=*/false,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            diagnoseImplicitForceUnwrapOfIUOParams(witness, requirement,
+                                                   /*isWitness=*/true);
+          });
+    }
+
     auto check = checkWitness(requirement, best);
 
     switch (check.getKind()) {
@@ -8010,7 +8017,8 @@ bool swift::forEachConformance(
       type = sugarType->getImplementationType();
     }
 
-    if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
+    if (auto boundGeneric = dyn_cast<NominalType>(type.getPointer());
+        boundGeneric && boundGeneric->hasGenericArgs()) {
       auto subs = boundGeneric->getContextSubstitutionMap();
       if (forEachConformance(subs, body, visitedConformances))
         return true;

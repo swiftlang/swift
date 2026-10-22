@@ -17,10 +17,10 @@ extension Quad_NC {
   consuming func explicitEveryLeaf() {
     _ = consume p1.u1
     _ = consume p1.u2
-    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
     _ = consume p2.u1
     _ = consume p2.u2
-    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 
   consuming func explicitSomeNonStorage() {
@@ -117,12 +117,12 @@ extension Quad_NCG where T : ~Copyable {
     _ = consume p1.u1.t
     _ = consume p1.u2
     _ = consume p1.u2.t
-    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
     _ = consume p2.u1
     _ = consume p2.u1.t
     _ = consume p2.u2
     _ = consume p2.u2.t
-    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 
   consuming func explicitSomeNonStorage() {
@@ -227,24 +227,24 @@ func decompose<T : ~Copyable>(_ c: consuming Container_NCG<T>) {
 
 extension Quad_C {
   consuming func explicitEveryLeaf() {
-    _ = consume p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 
   consuming func explicitSomeNonStorage() {
-    _ = consume p1.u3 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.getUr_C() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1[] // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward(self) // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward_self() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward(p1) // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward(p1.u1) // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p1.u3 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.getUr_C() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1[] // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward(self) // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward_self() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward(p1) // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward(p1.u1) // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 }
 
@@ -282,18 +282,18 @@ class Container_C {
   var q: Quad_C
   init() { fatalError() }
   deinit {
-    _ = consume q // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume q // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 }
 
 func decompose(_ c: consuming Container_C) {
-  _ = consume c.q.p1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+  _ = consume c.q.p1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
 }
 
 // =============================================================================
@@ -306,30 +306,30 @@ func decompose(_ c: consuming Container_C) {
 
 extension Quad_CG {
   consuming func explicitEveryLeaf() {
-    _ = consume p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u1.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u2.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.u1.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.u2.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u1.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u2.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.u1.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.u2.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p2.c // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 
   consuming func explicitSomeNonStorage() {
-    _ = consume p1.u3 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.getUr_CG() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1[] // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1[].t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward(self) // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward_self() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward(p1) // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume forward(p1.u1) // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume p1.u1.forward_self().t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume p1.u3 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.getUr_CG() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1[] // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1[].t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward(self) // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward_self() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward(p1) // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume forward(p1.u1) // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u1.forward_self() // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume p1.u1.forward_self().t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 }
 
@@ -368,21 +368,21 @@ class Container_CG<T> {
   var q: Quad_CG<T>
   init() { fatalError() }
   deinit {
-    _ = consume q.p1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1.u1.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p1.u2.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2.u1.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
-    _ = consume q.p2.u2.t // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+    _ = consume q.p1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1.u1.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p1.u2.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2.u1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2.u1.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2.u2 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
+    _ = consume q.p2.u2.t // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   }
 }
 
 func decompose<T>(_ c: consuming Container_CG<T>) {
-  _ = consume c.q.p1 // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+  _ = consume c.q.p1 // expected-error{{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
 }
 
 // =============================================================================

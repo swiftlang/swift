@@ -1811,7 +1811,7 @@ public:
     // result), not the function it was inlined into. Look through the
     // debug scope to that function rather than checking the containing
     // function.
-    if (isa<DebugValueInst>(inst) && varInfo->Name == "$error") {
+    if (isa<DebugValueInst>(inst) && varInfo->isErrorVariable()) {
       auto *owningFn = varInfo->Scope->getInlinedFunction();
       require(owningFn->getLoweredFunctionType()->hasErrorResult(),
               "'$error' debug_value may only appear in a function whose "
@@ -2578,7 +2578,7 @@ public:
                 "value");
       }
       if (PAI->isOnStack()) {
-        // A `@called(atMostOnce)` closure is allowed to have consuming captures
+        // An at-most-once closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
         require(PAI->hasCalledAtMostOnceSemantics() ||
@@ -4082,8 +4082,7 @@ public:
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
-    require(IUAI->getOperand()->getType().is<EnumType>()
-              || IUAI->getOperand()->getType().is<BoundGenericEnumType>(),
+    require(IUAI->getOperand()->getType().is<EnumType>(),
             "InjectEnumAddrInst must take an enum operand");
     require(IUAI->getElement()->getParentEnum()
               == IUAI->getOperand()->getType().getEnumDecl(),
@@ -5748,6 +5747,15 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
+
+    if (ICI->withoutActuallyDiscarding()) {
+      require(opTI->isCalledOnce() &&
+                  resTI->getExecutionSemantics() ==
+                      std::optional(ExecutionSemantics::AtMostOnce),
+              "convert_function [without_actually_discarding] must convert an "
+              "exactly-once function to an at-most-once function");
+      return;
+    }
 
     require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
                                          resTI->getExecutionSemantics()),

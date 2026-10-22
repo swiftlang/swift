@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
-#include "../../IRGen/IRGenModule.h"
 #include "../../IRGen/GenClass.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
 using namespace swift;
 
@@ -587,6 +588,15 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
 
 bool BeginApply_canInline(BridgedInstruction beginApply) {
   return swift::SILInliner::canInlineBeginApply(beginApply.getAs<BeginApplyInst>());
+}
+
+BridgedInferredVariableName
+VariableNameInferrer_inferNameAndRoot(BridgedValue value) {
+  auto nameAndRoot =
+      VariableNameInferrer::inferNameAndRoot(value.getSILValue());
+  if (!nameAndRoot)
+    return {BridgedStringRef(), {nullptr}};
+  return {nameAndRoot->first.str(), {nameAndRoot->second}};
 }
 
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, BridgedCanType destTy,

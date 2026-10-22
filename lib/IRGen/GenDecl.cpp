@@ -1779,11 +1779,8 @@ void IRGenerator::noteUseOfCanonicalSpecializedMetadataAccessor(
 static bool typeKindCanBePrespecialized(TypeKind theKind) {
   switch (theKind) {
   case TypeKind::Struct:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::Enum:
-  case TypeKind::BoundGenericEnum:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
     return true;
   default:
     return false;
@@ -2952,6 +2949,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       gvar->setSection(var->section());
   }
   if (forDefinition && !gvar->hasInitializer()) {
+    if (const ExposeAttr *expose = var->getWasmExposeAttr())
+      gvar->addAttribute("wasm-export-name",
+                         expose->Name.empty() ? gvar->getName() : expose->Name);
     if (initVal) {
       gvar->setInitializer(initVal);
       if (var->isLet() &&

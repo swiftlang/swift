@@ -521,6 +521,8 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(
         liveness.updateForUse(user, /*lifetimeEnding=*/true);
         return true;
       }
+      if (use->getOperandOwnership() == OperandOwnership::DebugUse)
+        return true;
       liveness.updateForUse(user, /*lifetimeEnding=*/false);
       for (auto result : user->getResults()) {
         auto shouldComplete =

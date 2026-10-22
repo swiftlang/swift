@@ -16,6 +16,7 @@
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-PUB %s < %t/Bar.swiftinterface
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV,CHECK-PRIV-ONLY %s < %t/Bar.private.swiftinterface
 // RUN: %FileCheck --check-prefixes=CHECK,CHECK-PRIV,CHECK-PKG %s < %t/Bar.package.swiftinterface
+// RUN: %FileCheck --check-prefix=NEGATIVE-PKG %s < %t/Bar.package.swiftinterface
 
 
 //--- Bar.swift
@@ -289,6 +290,16 @@ extension PkgProto {
 // CHECK-PKG:   package func g3()
 // CHECK-PKG: }
 
+public enum PubOuter {
+  public enum PubMid {
+    package protocol NestedPkgProto: Sendable { static func n1() }
+  }
+}
+// CHECK-PKG: extension Bar::PubOuter.Bar::PubMid.Bar::NestedPkgProto {
+// CHECK-PKG:   package static func n1()
+// CHECK-PKG: }
+extension PubOuter.PubMid.NestedPkgProto { package static func n1() {} }
+
 public func pub(x: Int, y: String) { print("pub func") }
 // CHECK: public func pub(x: Swift::Int, y: Swift::String)
 
@@ -308,5 +319,36 @@ private func priv(x: Int, y: String) { print("priv func") }
 
 // CHECK: extension Bar::PubEnum : Swift::Equatable {}
 // CHECK: extension Bar::PubEnum : Swift::Hashable {}
+// CHECK-PKG: extension Bar::PkgEnum : Swift::Equatable {}
+// CHECK-PKG: extension Bar::PkgEnum : Swift::Hashable {}
 // CHECK: extension Bar::FrozenPub : Swift::Sendable {}
 
+
+/// Conformances that are only implied by a protocol that can't be printed get
+/// synthesized extensions at the end of the interface.
+package protocol PkgBaseProto {}
+internal protocol InternalRefinesPkgBaseProto: PkgBaseProto {}
+internal protocol InternalRefinesHashable: Hashable {}
+package protocol PkgRefinesHashable: Hashable {}
+internal protocol InternalProto {}
+
+package struct PkgConformsToInternalRefinesPkg: InternalRefinesPkgBaseProto {}
+package struct PkgConformsToInternalRefinesHashable: InternalRefinesHashable {}
+public struct PubConformsToInternalRefinesPkg: InternalRefinesPkgBaseProto {}
+public struct PubConformsToPkgRefinesHashable: PkgRefinesHashable {}
+package struct PkgGenericWithHiddenConditionalConformance<T> {}
+extension PkgGenericWithHiddenConditionalConformance: Equatable where T: InternalProto {}
+
+// CHECK-PKG: extension Bar::PkgConformsToInternalRefinesPkg : Bar::PkgBaseProto {}
+// CHECK-PKG: extension Bar::PkgConformsToInternalRefinesHashable : Swift::Hashable {}
+// CHECK-PKG: extension Bar::PubConformsToInternalRefinesPkg : Bar::PkgBaseProto {}
+
+/// The package interface prints the conformance to PkgRefinesHashable directly,
+/// so it must not restate the conformance to Hashable.
+// CHECK-PUB: extension Bar::PubConformsToPkgRefinesHashable : Swift::Hashable {}
+// CHECK-PRIV-ONLY: extension Bar::PubConformsToPkgRefinesHashable : Swift::Hashable {}
+// NEGATIVE-PKG-NOT: extension Bar::PubConformsToPkgRefinesHashable : Swift::Hashable
+
+// CHECK-PKG:      @_spi(_ConstraintThatIsNotPartOfTheAPIOfThisLibrary)
+// CHECK-PKG-NEXT: @available(*, unavailable)
+// CHECK-PKG-NEXT: extension Bar::PkgGenericWithHiddenConditionalConformance : Swift::Equatable where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}

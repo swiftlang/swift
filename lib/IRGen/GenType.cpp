@@ -2952,10 +2952,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::Enum:
   case TypeKind::Struct:
     return convertAnyNominalType(ty, cast<NominalType>(ty)->getDecl());
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-    return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::SILMoveOnlyWrapped:
     llvm_unreachable("implement this");
   case TypeKind::InOut:

@@ -16,13 +16,13 @@ public enum MoveOnlyEnum: ~Copyable {
     case a
 }
 
-// CHECK: class MoveOnlyEnum { } SWIFT_UNAVAILABLE_MSG("noncopyable enum 'MoveOnlyEnum' can not yet be represented in C++");
+// CHECK: class MoveOnlyEnum { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' enum 'MoveOnlyEnum' can not yet be represented in C++");
 
 public struct MoveOnlyStruct: ~Copyable {
     let x: Int
 }
 
-// CHECK: class MoveOnlyStruct { } SWIFT_UNAVAILABLE_MSG("noncopyable struct 'MoveOnlyStruct' can not yet be represented in C++");
+// CHECK: class MoveOnlyStruct { } SWIFT_UNAVAILABLE_MSG("non-'Copyable' struct 'MoveOnlyStruct' can not yet be represented in C++");
 
 public protocol TestProtocol {}
 

@@ -58,8 +58,10 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 9; // add isMarkerProtocol on conformances
+const uint8_t DIGESTER_JSON_VERSION = 10; // add thrownType on functions
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
+const uint8_t DIGESTER_JSON_VERSION_FROM_EXTENSION = 8; // First version that records whether a decl is from an extension.
+const uint8_t DIGESTER_JSON_VERSION_THROWN_TYPE = 10; // First version that records the thrown error type.
 const StringRef ABIRootKey = "ABIRoot";
 const StringRef ConstValuesKey = "ConstValues";
 
@@ -396,6 +398,7 @@ public:
   bool isOverriding() const { return IsOverriding; };
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::Optional); }
   bool isOpen() const { return IsOpen; }
+  bool isOverridable() const;
   bool isInternal() const { return IsInternal; }
   bool isFromExtension() const { return IsFromExtension; }
   StringRef getGenericSignature() const { return GenericSig; }
@@ -685,6 +688,7 @@ public:
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
+  StringRef ThrownType;
   bool ReqNewWitnessTableEntry;
   std::optional<uint8_t> SelfIndex;
 
@@ -693,6 +697,7 @@ protected:
   virtual ~SDKNodeDeclAbstractFunc() = default;
 public:
   bool isThrowing() const { return IsThrowing; }
+  StringRef getThrownType() const { return ThrownType; }
   bool reqNewWitnessTableEntry() const { return ReqNewWitnessTableEntry; }
   uint8_t getSelfIndex() const { return SelfIndex.value(); }
   std::optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }

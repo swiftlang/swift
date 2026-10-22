@@ -422,8 +422,7 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
         /* invocationSubs */ {}, getASTContext());
     SILType workFuncType = SILType::getPrimitiveObjectType(workFuncType1);
     SILValue dtx = dtorValue.getValue();
-    auto castedDeallocator =
-        B.createConvertFunction(loc, dtx, workFuncType, false);
+    auto castedDeallocator = B.createConvertFunction(loc, dtx, workFuncType);
 
     auto wordTy = SILType::getBuiltinWordType(getASTContext());
     auto *flagsInst =

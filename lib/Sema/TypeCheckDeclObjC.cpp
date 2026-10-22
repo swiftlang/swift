@@ -228,8 +228,9 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     return;
   }
 
-  // Special diagnostic for enums.
-  if (T->is<EnumType>()) {
+  // Special diagnostic for non-generic enums.
+  if (auto enumTy = T->getAs<EnumType>();
+      enumTy && !enumTy->hasGenericArgs()) {
     // New dialog mentioning @c.
     diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
                    language)
@@ -395,28 +396,6 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
                        language)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
-      Reason.describe(AFD);
-
-      return false;
-    }
-
-    // The C++ ABI decides whether the callee owns a non-trivial class passed
-    // by value (it does not under Itanium, it does under Microsoft), so
-    // `borrowing` and `consuming` each contradict one ABI. Only the default
-    // ownership follows the ABI.
-    auto ownership = param->getValueOwnership();
-    if (language == ForeignLanguage::Cxx &&
-        (ownership == ValueOwnership::Shared ||
-         ownership == ValueOwnership::Owned) &&
-        importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
-      softenIfAccessNote(AFD, Reason.getAttr(),
-                         diags
-                             .diagnose(param->getStartLoc(),
-                                       diag::cxx_param_ownership_unsupported,
-                                       AFD, param,
-                                       ownership == ValueOwnership::Owned)
-                             .highlight(param->getSourceRange())
-                             .limitBehavior(behavior));
       Reason.describe(AFD);
 
       return false;
@@ -695,10 +674,8 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   case ForeignRepresentableKind::None:
     // Special case: If the type is Unmanaged<T>, then return true, because
     // Unmanaged<T> can be represented in Objective-C (if T can be).
-    if (auto BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->isUnmanaged()) {
-        return true;
-      }
+    if (type->isUnmanaged()) {
+      return true;
     }
     return false;
 
@@ -1091,10 +1068,10 @@ bool swift::isRepresentableInLanguage(
     if (nsErrorTy) {
       errorParameterType = OptionalType::get(nsErrorTy);
       errorParameterType
-        = BoundGenericType::get(
+        = NominalType::get(
             ctx.getAutoreleasingUnsafeMutablePointerDecl(),
             nullptr,
-            errorParameterType);
+            errorParameterType, ctx);
       errorParameterType = OptionalType::get(errorParameterType);
     }
 
@@ -4077,7 +4054,7 @@ private:
     if (!implTy->isUnmanaged() || !reqTy->isAnyClassReferenceType())
       return false;
 
-    auto boundGenericType = implTy->getAs<BoundGenericType>();
+    auto boundGenericType = implTy->getAs<NominalType>();
     if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
       return false;
 
@@ -4439,14 +4416,53 @@ private:
       return true;
     }
 
-    // An lvalue reference parameter is implemented by an `inout` or a by-value
-    // parameter. C++ callers may pass aliasing references, which `inout` and
-    // by-value parameters let the optimizer assume away, so the implementation
+    auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+
+    // Check value ownership.
+    for (unsigned i = 0, n = params->size(); i != n; ++i) {
+      auto *param = params->get(i);
+      auto ownership = param->getValueOwnership();
+      clang::QualType clangType = clangFD->getParamDecl(i)->getType();
+
+      // A `const T &` parameter is borrowed for the call, so the implementation
+      // must spell it `borrowing`.
+      if (clangType->isLValueReferenceType() &&
+          clangType->getPointeeType().isConstQualified()) {
+        if (ownership == ValueOwnership::Shared)
+          continue;
+        auto diag = diagnose(param->getStartLoc(),
+                             diag::cxx_const_ref_param_requires_borrowing, cand,
+                             cxxName, param);
+        diag.highlight(param->getSourceRange());
+        if (const auto *repr = param->getTypeRepr()) {
+          if (const auto *ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr))
+            diag.fixItReplace(ownershipRepr->getSpecifierLoc(), "borrowing");
+          else
+            diag.fixItInsert(repr->getStartLoc(), "borrowing ");
+        }
+        return true;
+      }
+
+      // The C++ ABI decides whether the callee owns a non-trivial class passed
+      // by value (it does not under Itanium, it does under Microsoft), so
+      // `borrowing` and `consuming` each contradict one ABI.
+      if ((ownership == ValueOwnership::Shared ||
+           ownership == ValueOwnership::Owned) &&
+          importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
+        diagnose(param->getStartLoc(), diag::cxx_param_ownership_unsupported,
+                 cand, cxxName, param, ownership == ValueOwnership::Owned)
+            .highlight(param->getSourceRange());
+        return true;
+      }
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a
+    // `borrowing` parameter. C++ callers may pass aliasing references, which
+    // such parameters let the optimizer assume away, so the implementation
     // must be marked `@unsafe`. A reference to a foreign reference type is
     // exempt: the parameter carries the object, not the reference.
     if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
       auto *loader = cand->getASTContext().getClangModuleLoader();
-      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
       bool diagnosed = false;
       for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
         const auto *clangParam = clangFD->getParamDecl(i);

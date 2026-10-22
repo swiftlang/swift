@@ -52,6 +52,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
@@ -186,7 +187,6 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
-  case TypeResolverContext::ValueGenericArgument:
   case TypeResolverContext::RawLayoutAttr:
     break;
   }
@@ -596,6 +596,9 @@ private:
   NeverNullType resolveASTFunctionType(FunctionTypeRepr *repr,
                                        TypeResolutionOptions options,
                                        TypeAttrSet *attrs);
+  Type resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr, Type ty);
+  std::optional<ScopeRef> resolveScope(AbstractFunctionDecl *fn,
+                                       ScopeDepth depth, ScopeRepr repr);
   SmallVector<AnyFunctionType::Param, 8>
   resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                TypeResolutionOptions options,
@@ -1119,7 +1122,7 @@ TypeResolver::resolveDependentMemberType(Type baseTy,
 static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   if (Ty.isNull())
     return false;
-  auto *BGT = Ty->getAs<BoundGenericType>();
+  auto *BGT = Ty->getAs<NominalType>();
   if (!BGT)
     return false;
   if (!BGT->isUnsafePointer() && !BGT->isUnsafeMutablePointer())
@@ -1129,6 +1132,11 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
+/// Given a nested type declaration that doesn't introduce its own
+/// generic parameters, check that the given parent type satisfies the
+/// requirements of the nested type's generic signature. This can
+/// happen if the nested type adds extra requirements on its
+/// enclosing type parameters.
 bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
                                               Type parentTy, SourceLoc loc,
                                               GenericSignature contextSig) {
@@ -1150,15 +1158,37 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   if (!nominalParent)
     return true;
 
+  // Type definitions cannot be validly nested within protocols, and
+  // the possibility messes up our check below about matching genericity,
+  // so just skip checking requirements when we see this. But we do get
+  // here when naming protocol associated types, so we need to check
+  // specifically for a nominal member type.
+  if (isa<ProtocolDecl>(nominalParent) && isa<NominalTypeDecl>(decl))
+    return true;
+
   const auto genericSig = decl->getGenericSignature();
 
+  // The common case is that the nested type doesn't add any generic
+  // requirements, in which case its generic signature should perfectly
+  // match the signature of the parent type. In this case, we have nothing
+  // new to check.
   if (genericSig.getPointer() ==
       nominalParent->getGenericSignature().getPointer()) {
     return true;
   }
 
-  // Otherwise, our decl has a where clause of its own, or its inside of a
-  // constrained extension.
+  // Otherwise, our declaration either has a where clause of its own or
+  // is inside of a constrained extension. We'd better not be adding
+  // to the set of generic parameters, though, because we won't have
+  // a binding for the new ones that we can check.
+  assert(nominalParent->getGenericSignature().getGenericParams().size()
+           == genericSig.getGenericParams().size() &&
+         "expected nested type to be non-generic");
+
+  // Use a source location associated with the declaration unless we're
+  // inside a constrained extension and the signature of the declaration
+  // matches the signature of the extension (in which case we didn't
+  // add meaningful requirements on the declaration).
   SourceLoc noteLoc;
   {
     const auto ext = dyn_cast<ExtensionDecl>(dc);
@@ -1352,20 +1382,14 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
   auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
     return paramDecl->isParameterPack();
   });
-  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
-    return paramDecl->isValue();
-  });
 
   // If the type declares at least one parameter pack, allow pack expansions
   // anywhere in the argument list. We'll use the PackMatcher to ensure that
   // everything lines up. Otherwise, don't allow pack expansions to appear
   // at all.
   auto argOptions = options.withoutContext().withContext(
-      hasParameterPack
-      ? TypeResolverContext::VariadicGenericArgument
-      : TypeResolverContext::ScalarGenericArgument);
-  if (hasValueParam)
-    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
+      hasParameterPack ? TypeResolverContext::VariadicGenericArgument
+                       : TypeResolverContext::ScalarGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -1386,6 +1410,15 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
     Type substTy = genericResolution.resolveType(tyR, silContext);
     if (!substTy || substTy->hasError())
       return true;
+
+    // TODO: Support elided scopes in generic arguments.
+    if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+        hasScopeUnsaturatedType(substTy)) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(tyR->getStartLoc(),
+                 diag::scoped_nonescapable_in_generic_argument);
+      return true;
+    }
 
     args.push_back(substTy);
   }
@@ -1464,7 +1497,9 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
 
 /// Apply generic arguments to the given type.
 ///
-/// If the type is itself not generic, this does nothing.
+/// If the type is not itself generic, we just check to check whether it's
+/// a nested type that might have imposed any new requirements on the
+/// outer generic parameters.
 ///
 /// This function emits diagnostics about an invalid type or the wrong number
 /// of generic arguments, whereas
@@ -1474,7 +1509,7 @@ bool TypeResolver::resolveGenericArguments(ValueDecl *decl,
 /// \param type The generic type to which to apply arguments.
 /// \param repr The syntactic representation of \p type, with a possible
 /// generic argument list to apply.
-/// \returns A BoundGenericType bound to the given arguments, or ErrorType on
+/// \returns A NominalType bound to the given arguments, or ErrorType on
 /// error.
 ///
 /// \see TypeResolution::applyUnboundGenericArguments
@@ -1509,7 +1544,8 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
     if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
       decl = aliasTy->getDecl();
       parentTy = aliasTy->getParent();
-    } else if (auto *nominalTy = type->getAs<NominalType>()) {
+    } else if (auto *nominalTy = type->getAs<NominalType>();
+               nominalTy && !nominalTy->hasGenericArgs()) {
       decl = nominalTy->getDecl();
       parentTy = nominalTy->getParent();
     } else {
@@ -1583,8 +1619,8 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
   // Builtins have special handling.
   if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
     // We don't have any variadic builtins yet, but we do have value arguments.
-    auto argOptions = options.withoutContext()
-      .withContext(TypeResolverContext::ValueGenericArgument);
+    auto argOptions = options.withoutContext().withContext(
+        TypeResolverContext::ScalarGenericArgument);
     auto genericResolution = resolution.withOptions(argOptions);
 
     // Resolve the types of the generic arguments.
@@ -1706,12 +1742,31 @@ Type TypeResolution::applyUnboundGenericArguments(
          "and collect arguments to pack generic parameters");
 
   auto &ctx = getASTContext();
-  TypeSubstitutionMap subs;
 
   // Get the interface type for the declaration. We will be substituting
   // type parameters that appear inside this type with the provided
   // generic arguments.
-  auto resultType = decl->getDeclaredInterfaceType();
+  Type resultType;
+
+  auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl);
+  if (typeAliasDecl) {
+    if (stage == TypeResolutionStage::Structural) {
+      // Use the structural type if possible, to avoid requesting generic
+      // signatures.
+      resultType = typeAliasDecl->getStructuralType();
+
+      // However, fall back to the interface type if the structural type
+      // contains unbound dependent member types. We cannot substitute
+      // those.
+      if (resultType->findUnresolvedDependentMemberType() != nullptr)
+        resultType = typeAliasDecl->getUnderlyingType();
+
+    } else {
+      resultType = typeAliasDecl->getUnderlyingType();
+    }
+  } else {
+    resultType = decl->getDeclaredInterfaceType();
+  }
 
   // If types involved in requirements check have either type variables
   // or unbound generics, let's skip the check here, and let the solver
@@ -1726,6 +1781,8 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
+  TypeSubstitutionMap subs;
+
   // Get the substitutions for outer generic parameters from the parent
   // type.
   if (parentTy) {
@@ -1733,27 +1790,28 @@ Type TypeResolution::applyUnboundGenericArguments(
       // If we're working with a nominal type declaration, just construct
       // a bound generic type without checking the generic arguments.
       if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl)) {
-        return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
+        return NominalType::get(nominalDecl, parentTy, genericArgs, ctx);
       }
 
-      // We have a generic type alias referenced with an unbound generic
-      // base, which is only valid if all of the unbound generic type's
-      // generic parameters are fixed to concrete types by the generic
-      // signature of the type alias, eg:
-      //
-      // struct G<T> {
-      //   typealias A<U> = Int where T == String
-      // }
-      if (!resultType->hasTypeParameter())
-        return resultType;
-
-      auto genericSig = decl->getGenericSignature();
-      auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      for (auto gp : parentSig.getGenericParams()) {
-        ASSERT(genericSig->isConcreteType(gp));
-        subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-            genericSig->getConcreteType(gp);
+      if (resultType->hasTypeParameter()) {
+        // We have a generic type alias referenced with an unbound generic
+        // base, which is only valid if all of the unbound generic type's
+        // generic parameters are fixed to concrete types by the generic
+        // signature of the type alias, eg:
+        //
+        // struct G<T> {
+        //   typealias A<U> = Int where T == String
+        // }
+        auto genericSig = decl->getGenericSignature();
+        auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
+        for (auto gp : parentSig.getGenericParams()) {
+          ASSERT(genericSig->isConcreteType(gp));
+          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+              genericSig->getConcreteType(gp);
+        }
       }
+
+      skipRequirementsCheck = true;
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
@@ -1770,7 +1828,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  // Realize the types of the generic arguments and add them to the
+  // Next, resolve the types of the generic arguments and add them to the
   // substitution map.
   auto innerParams = decl->getGenericParams()->getParams();
   for (unsigned i : indices(innerParams)) {
@@ -1806,28 +1864,28 @@ Type TypeResolution::applyUnboundGenericArguments(
     skipRequirementsCheck |= substTy->hasUnboundGenericType();
   }
 
-  const auto substitutions = [&](SubstitutableType *type) -> Type {
-    auto result = QueryTypeSubstitutionMap{subs}(type);
-    if (result->hasTypeParameter()) {
-      if (const auto contextSig = getGenericSignature()) {
-        auto *genericEnv = contextSig.getGenericEnvironment();
-        // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
-        // because we sometimes have type parameters here that are invalid for
-        // our generic signature. This can happen if the type parameter was
-        // found via unqualified lookup, but the current context's
-        // generic signature failed to build because of circularity or
-        // completion failure.
-        return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
-                            LookUpConformanceInModule(),
-                            SubstFlags::PreservePackExpansionLevel);
-      }
-    }
-    return result;
-  };
-
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
+    const auto substitutions = [&](SubstitutableType *type) -> Type {
+      auto result = QueryTypeSubstitutionMap{subs}(type);
+      if (result->hasTypeParameter()) {
+        if (const auto contextSig = getGenericSignature()) {
+          auto *genericEnv = contextSig.getGenericEnvironment();
+          // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
+          // because we sometimes have type parameters here that are invalid for
+          // our generic signature. This can happen if the type parameter was
+          // found via unqualified lookup, but the current context's
+          // generic signature failed to build because of circularity or
+          // completion failure.
+          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                              LookUpConformanceInModule(),
+                              SubstFlags::PreservePackExpansionLevel);
+        }
+      }
+      return result;
+    };
+
     if (hasTypeVariables) {
       ASSERT(requirementOpener && "Must have requirement opener for type vars");
       requirementOpener(decl, substitutions);
@@ -1860,20 +1918,15 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  // For a typealias, use the underlying type. We'll wrap up the result
-  // later.
-  auto typealias = dyn_cast<TypeAliasDecl>(decl);
-  if (typealias) {
-    resultType = typealias->getUnderlyingType();
+  // Apply the substitution map to the interface type of the declaration.
+  if (resultType->hasTypeParameter()) {
+    resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
+                                  LookUpConformanceInModule());
   }
 
-  // Apply the substitution map to the interface type of the declaration.
-  resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule());
-
-  // Form a sugared typealias reference.
-  if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
-    resultType = TypeAliasType::get(typealias, parentTy, genericArgs,
+  // Form a sugared typealias reference if necessary.
+  if (typeAliasDecl && (!parentTy || !parentTy->isAnyExistentialType())) {
+    resultType = TypeAliasType::get(typeAliasDecl, parentTy, genericArgs,
                                     resultType);
   }
 
@@ -2425,8 +2478,17 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       break;
     }
 
-    // We have a found multiple type aliases that refer to the same thing.
-    // Ignore the duplicate.
+    // We have found multiple declarations that refer to the same type, e.g. a
+    // type and a typealias to it reached through different imports. Prefer
+    // the strictly more accessible one from here so that access checking
+    // does not depend on import order.
+    auto currentScope = currentDecl->getFormalAccessScope(DC);
+    auto newScope = typeDecl->getFormalAccessScope(DC);
+    if (currentScope != newScope && currentScope.isChildOf(newScope)) {
+      current = type;
+      currentDecl = typeDecl;
+      currentDC = foundDC;
+    }
   }
 
   // Complain about any ambiguities we detected.
@@ -3355,6 +3417,7 @@ static constexpr TypeAttrKind TAR_SILCoroutine = TypeAttrKind::YieldOnce;
 static constexpr TypeAttrKind TAR_SILCalleeConvention =
     TypeAttrKind::CalleeOwned;
 static constexpr TypeAttrKind TAR_SILReferenceStorage = TypeAttrKind::SILWeak;
+static constexpr TypeAttrKind TAR_ExecutionSemantics = TypeAttrKind::Once;
 
 TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   switch (kind) {
@@ -3399,6 +3462,11 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
 #include "swift/AST/ReferenceStorage.def"
     return TAR_SILReferenceStorage;
 
+  // A function type has at most one kind of execution semantics.
+  case TypeAttrKind::Once:
+  case TypeAttrKind::Callable:
+    return TAR_ExecutionSemantics;
+
   // These are total transforms on the type, and one of them can apply
   // at once.
   case TypeAttrKind::Opened:
@@ -3406,6 +3474,20 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   case TypeAttrKind::OpaqueReturnTypeOf:
     return TAR_TypeTransformer;
   };
+}
+
+/// Claims the `@once` or `@callable(once)` attribute of a function type, if
+/// any. The two are mutually exclusive, so \c TypeAttrSet::accumulate already
+/// diagnosed a second one.
+static TypeAttribute *claimExecutionSemanticsAttr(TypeAttrSet *attrs) {
+  return attrs ? claim<TAR_ExecutionSemantics>(*attrs) : nullptr;
+}
+
+/// Returns the execution semantics that \p attr, an `@once` or
+/// `@callable(once)` attribute, gives a function type.
+static ExecutionSemantics getExecutionSemantics(TypeAttribute *attr) {
+  return isa<OnceTypeAttr>(attr) ? ExecutionSemantics::Once
+                                 : ExecutionSemantics::AtMostOnce;
 }
 
 TypeRepr *TypeAttrSet::accumulate(AttributedTypeRepr *attrRepr) {
@@ -3565,7 +3647,8 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
       TypeAttrKind::Isolated,
-      TypeAttrKind::Called,
+      TypeAttrKind::Once,
+      TypeAttrKind::Callable,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -3819,14 +3902,18 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
-  // TODO: Lower the specifiers into a type scope application instead of
-  // dropping the attribute.
   if (auto scoped = claim<ScopedTypeAttr>(attrs)) {
-    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions) &&
-        !scoped->isInvalid()) {
-      diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
-               "@_scoped", false, Feature::ScopeRestrictions.getName());
-      scoped->setInvalid();
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+      if (!scoped->isInvalid()) {
+        diagnose(scoped->getAttrLoc(), diag::requires_experimental_feature,
+                 "@_scoped", false, Feature::ScopeRestrictions.getName());
+        scoped->setInvalid();
+      }
+    } else if (scoped->isInvalid()) {
+      // An unsupported scope restriction was diagnosed.
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->hasError()) {
+      ty = resolveScopedType(scoped, repr, ty);
     }
   }
 
@@ -4312,9 +4399,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
-        diagnose(eltTypeRepr->getLoc(),
-                 diag::called_attr_cannot_be_used_with_borrowing,
-                 CalledAttr::getSemanticsName(*fnTy->getExecutionSemantics()));
+        diagnose(
+            eltTypeRepr->getLoc(),
+            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
+            getExecutionSemanticsAttrSpelling(*fnTy->getExecutionSemantics()));
         elements.emplace_back(ErrorType::get(getASTContext()));
         continue;
 
@@ -4324,7 +4412,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(atMostOnce) is consuming by default and we don't
+      // at-most-once is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;
@@ -4385,6 +4473,8 @@ NeverNullType
 TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                       unsigned ordinal,
                                       TypeResolutionOptions options) {
+  auto loc = repr->getLoc();
+
   // Use type reconstruction to summon the opaque type decl.
   Demangler demangle;
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
@@ -4426,8 +4516,11 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
       // This matches the old behavior of the ASTPrinter.
       auto *unqualIdentRepr = cast<UnqualifiedIdentTypeRepr>(repr);
 
+      auto argOptions = options.withoutContext().withContext(
+          TypeResolverContext::ScalarGenericArgument);
+
       for (auto argRepr : unqualIdentRepr->getGenericArgs()) {
-        auto argTy = resolveType(argRepr, options);
+        auto argTy = resolveType(argRepr, argOptions);
         // If we cannot resolve the generic parameter, propagate the error out.
         if (argTy->hasError()) {
           return ErrorType::get(getASTContext());
@@ -4474,6 +4567,27 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
       }
     }
 
+    // Values may only be passed for value parameters, and vice versa.
+    bool hadError = false;
+    for (auto [paramTy, argTy] :
+         llvm::zip(genericSig.getGenericParams(), args)) {
+      // For parameter packs, check each element in the pack individually.
+      if (auto *packTy = argTy->getAs<PackType>()) {
+        for (auto eltTy : packTy->getElementTypes()) {
+          // Look through pack expansions to the pattern type.
+          if (auto *expTy = eltTy->getAs<PackExpansionType>())
+            eltTy = expTy->getPatternType();
+          if (ValueMatchVisitor::check(getASTContext(), paramTy, eltTy, loc))
+            hadError = true;
+        }
+      } else if (ValueMatchVisitor::check(getASTContext(), paramTy, argTy,
+                                          loc)) {
+        hadError = true;
+      }
+    }
+    if (hadError)
+      return ErrorType::get(getASTContext());
+
     subs = SubstitutionMap::get(genericSig, args,
                                 LookUpConformanceInModule());
   }
@@ -4487,10 +4601,376 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
   return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
+/// Whether a parameter is borrowed or mutated for the call rather than
+/// consumed, so that it has an access scope.
+static bool hasAccessScope(ParamDecl *param, AbstractFunctionDecl *fn) {
+  return getLoweredOwnership(param->getValueOwnership(), fn,
+                             param->isSelfParameter()) != ValueOwnership::Owned;
+}
+
+/// The name of the parameter a written scope refers to, if any: `&a` is an
+/// access to `a`, and the scope name `a` is the scope of the parameter `a`.
+static std::optional<Identifier> getReferencedParamName(ScopeRepr repr) {
+  if (repr.getSubject() != ScopeRepr::Subject::Name)
+    return std::nullopt;
+  if (repr.isAccess())
+    return repr.getAccessedValue();
+  // FIXME: Prefer explicitly named scopes here.
+  return repr.getScopeName().getIdentifier();
+}
+
+/// (For now) diagnoses a `@_scoped` within a function type that names one of
+/// its parameters.
+///
+/// We want to reject this until we decide what to do about it:
+/// ```
+/// func functionTypeParam(_ body: (_ x: MyRef) -> @_scoped(x) MyRef) {}
+/// ```
+/// ...since `x` might also be a parameter in the outer function.
+static void diagnoseScopeNamingOwnParam(ASTContext &ctx,
+                                        FunctionTypeRepr *repr) {
+  SmallVector<Identifier, 4> paramNames;
+  for (auto &elt : repr->getArgsTypeRepr()->getElements())
+    for (auto name : {elt.Name, elt.SecondName})
+      if (!name.empty())
+        paramNames.push_back(name);
+  if (paramNames.empty())
+    return;
+
+  repr->findIf([&](TypeRepr *nested) {
+    auto *attributed = dyn_cast<AttributedTypeRepr>(nested);
+    if (!attributed)
+      return false;
+    for (auto attr : attributed->getAttrs()) {
+      auto *scoped =
+          dyn_cast_or_null<ScopedTypeAttr>(attr.dyn_cast<TypeAttribute *>());
+      if (!scoped || scoped->isInvalid())
+        continue;
+      for (auto restriction : scoped->getRestrictions()) {
+        auto name = getReferencedParamName(restriction.getScope());
+        if (name && llvm::is_contained(paramNames, *name)) {
+          ctx.Diags.diagnose(restriction.getScope().getLoc(),
+                             diag::scoped_function_type_param);
+          scoped->setInvalid();
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+}
+
+/// The number of function types enclosing \p target within \p repr, or
+/// `nullopt` if it isn't in a supported position there.
+static std::optional<ScopeDepth>
+findFunctionTypeDepth(TypeRepr *repr, const TypeRepr *target,
+                      ScopeDepth depth) {
+  // Do this recursive dyn_cast so we don't accidentally walk into anything we
+  // didn't expect / can't handle.
+  if (repr == target)
+    return depth;
+  if (auto *attributed = dyn_cast<AttributedTypeRepr>(repr))
+    return findFunctionTypeDepth(attributed->getTypeRepr(), target, depth);
+  if (auto *specifier = dyn_cast<SpecifierTypeRepr>(repr))
+    return findFunctionTypeDepth(specifier->getBase(), target, depth);
+  if (auto *tuple = dyn_cast<TupleTypeRepr>(repr); tuple && tuple->isParenType())
+    return findFunctionTypeDepth(tuple->getElementType(0), target, depth);
+  if (auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr)) {
+    for (auto &elt : fnRepr->getArgsTypeRepr()->getElements())
+      if (auto found = findFunctionTypeDepth(elt.Type, target, depth.deeper()))
+        return found;
+    return findFunctionTypeDepth(fnRepr->getResultTypeRepr(), target,
+                                 depth.deeper());
+  }
+  // TODO: Support other positions. Generic arguments in particular can be
+  // substituted under function types without shifting their scope references.
+  return std::nullopt;
+}
+
+/// The number of function types enclosing \p target in \p fn's parameter and
+/// result types, or `nullopt` if it isn't in a supported position in them.
+static std::optional<ScopeDepth> findInSignature(AbstractFunctionDecl *fn,
+                                                 const TypeRepr *target) {
+  // This can't easily be tracked while resolving, because generic arguments and
+  // pack expansion patterns are resolved by separate `TypeResolver`s.
+  // TODO: Resolve scope names in a lexical environment of the binders being
+  // resolved instead, so the depth is the number of binders passed.
+  // TODO: If a repr was reused in multiple params, this would silently return
+  // the first one...
+  for (auto *param : *fn->getParameters())
+    if (auto *repr = param->getTypeRepr())
+      if (auto depth = findFunctionTypeDepth(repr, target, ScopeDepth::zero()))
+        return depth;
+  if (auto *func = dyn_cast<FuncDecl>(fn))
+    if (auto *repr = func->getResultTypeRepr())
+      return findFunctionTypeDepth(repr, target, ScopeDepth::zero());
+  return std::nullopt;
+}
+
+Type TypeResolver::resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr,
+                                     Type ty) {
+  // FIXME: Diagnose scope restrictions on types without scope parameters, such
+  // as escapable types.
+  auto *nominal = ty->getAs<NominalType>();
+  if (!nominal || getNumScopeParams(nominal->getDecl()) == 0)
+    return ty;
+
+  auto diagnoseUnsupported = [&](SourceLoc loc, Diag<> id) -> Type {
+    diagnose(loc, id);
+    attr->setInvalid();
+    return ErrorType::get(getASTContext());
+  };
+
+  auto *fn = dyn_cast<AbstractFunctionDecl>(getDeclContext());
+  std::optional<ScopeDepth> depth;
+  // TODO: Support accessors, whose parameters are consumed by default.
+  if (fn && !isa<AccessorDecl>(fn))
+    depth = findInSignature(fn, repr);
+  if (!depth)
+    return diagnoseUnsupported(attr->getAttrLoc(),
+                               diag::scoped_unsupported_position);
+
+  // Earlier stages, like requirement inference, resolve the same type reprs.
+  if (!inStage(TypeResolutionStage::Interface))
+    return ty;
+
+  if (nominal->hasScopeArgs())
+    return diagnoseUnsupported(attr->getAttrLoc(),
+                               diag::scoped_applied_repeatedly);
+
+  auto restrictions = attr->getRestrictions();
+  if (restrictions.size() != 1)
+    return diagnoseUnsupported(restrictions[1].getScope().getLoc(),
+                               diag::scoped_multiple);
+  if (auto label = restrictions.front().getLabel())
+    return diagnoseUnsupported(label->Loc, diag::scoped_labeled);
+
+  auto written = restrictions.front().getScope();
+  // A static method's `self` is an escapable metatype.
+  if (written.getSubject() == ScopeRepr::Subject::Self && !written.isAccess() &&
+      !fn->isStatic()) {
+    auto *selfNominal = fn->getDeclContext()->getSelfNominalTypeDecl();
+    if (selfNominal &&
+        selfNominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always)
+      return diagnoseUnsupported(written.getLoc(),
+                                 diag::scoped_nonescapable_self);
+  }
+
+  auto &ctx = getASTContext();
+  auto scope = resolveScope(fn, *depth, written);
+  if (!scope) {
+    attr->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  return NominalType::get(nominal->getDecl(), nominal->getParent(),
+                          nominal->getGenericArgs(), ctx, *scope);
+}
+
+std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
+                                                   ScopeDepth depth,
+                                                   ScopeRepr repr) {
+  auto &ctx = getASTContext();
+
+  switch (repr.getSubject()) {
+  case ScopeRepr::Subject::Immortal:
+    return ScopeRef::forImmortal();
+
+  case ScopeRepr::Subject::Self: {
+    if (!fn->hasImplicitSelfDecl()) {
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
+      return std::nullopt;
+    }
+    if (!repr.isAccess()) {
+      diagnose(repr.getLoc(), diag::scoped_escapable_param, ctx.Id_self);
+      return std::nullopt;
+    }
+    if (fn->isStatic() || isa<ConstructorDecl>(fn)) {
+      diagnose(repr.getLoc(), diag::scoped_self_no_access);
+      return std::nullopt;
+    }
+    if (!hasAccessScope(fn->getImplicitSelfDecl(), fn)) {
+      diagnose(repr.getLoc(), diag::scoped_consuming_param);
+      diagnose(fn->getLoc(), diag::scoped_consuming_param_here, ctx.Id_self);
+      return std::nullopt;
+    }
+    // `self` is the parameter of the outer function type of a method.
+    return ScopeRef::forParam(depth.deeper(), /*index=*/0);
+  }
+
+  case ScopeRepr::Subject::Name: {
+    // FIXME: Doing params like this is a hack... better to introduce scopes explicitly.
+    auto name = *getReferencedParamName(repr);
+    auto *params = fn->getParameters();
+    auto found = llvm::find_if(*params, [&](ParamDecl *param) {
+      return param->getParameterName() == name;
+    });
+    if (found == params->end()) {
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, name);
+      return std::nullopt;
+    }
+    auto *param = *found;
+
+    if (repr.isAccess()) {
+      if (!hasAccessScope(param, fn)) {
+        diagnose(repr.getLoc(), diag::scoped_consuming_param);
+        if (param->getValueOwnership() != ValueOwnership::Default) {
+          diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);
+        } else {
+          ASSERT(isa<ConstructorDecl>(fn) &&
+                 "only initializers consume parameters by default");
+          diagnose(param->getLoc(),
+                   diag::scoped_init_param_consuming_by_default);
+        }
+        return std::nullopt;
+      }
+      return ScopeRef::forParam(depth, found - params->begin());
+    }
+
+    // Does this make sense when values can have multiple scopes?
+    // TODO: Support forward references?
+    auto paramTy = param->getInterfaceType();
+    if (paramTy->hasError())
+      return std::nullopt;
+    if (fn->mapTypeIntoEnvironment(paramTy)->isEscapable()) {
+      diagnose(repr.getLoc(), diag::scoped_escapable_param, name);
+      return std::nullopt;
+    }
+    auto *paramNominal = paramTy->getAs<NominalType>();
+    auto paramScopes =
+        paramNominal ? paramNominal->getScopeArgs() : ArrayRef<ScopeRef>();
+    // TODO: Support the scopes of generic, imported, and conditionally
+    // non-escapable types.
+    if (paramScopes.empty()) {
+      diagnose(repr.getLoc(), diag::scoped_param_scope_unsupported, name);
+      return std::nullopt;
+    }
+    // FIXME: Support multiple scopes in types instead of blindly assuming
+    // exactly one for ~E.
+    // TODO: When that is supported, treat this as ambiguous.
+    ASSERT(paramScopes.size() == 1 && "a type has at most one repr parameter");
+    return paramScopes.front().shifted(depth);
+  }
+  }
+  llvm_unreachable("unhandled subject");
+}
+
+/// Fills in the scope arguments that \p ty leaves unspecified with fresh scope
+/// parameters starting after \p nextIndex.
+static Type fillScopeArgs(ASTContext &ctx, Type ty, unsigned &nextIndex) {
+  if (auto *nominal = ty->getAs<NominalType>()) {
+    if (nominal->hasScopeArgs() || getNumScopeParams(nominal->getDecl()) == 0)
+      return ty;
+    auto scope = ScopeRef::forParam(ScopeDepth::zero(), nextIndex++);
+    return NominalType::get(nominal->getDecl(), nominal->getParent(),
+                            nominal->getGenericArgs(), ctx, scope);
+  }
+
+  // The parameters of a function-typed parameter are bound by its own type.
+  if (auto *fnTy = ty->getAs<FunctionType>()) {
+    unsigned innerNextIndex = fnTy->getNumParams();
+    SmallVector<AnyFunctionType::Param, 4> params;
+    for (auto &param : fnTy->getParams())
+      params.push_back(param.withType(
+          fillScopeArgs(ctx, param.getPlainType(), innerNextIndex)));
+    std::optional<AnyFunctionType::ExtInfo> info;
+    if (fnTy->hasExtInfo())
+      info = fnTy->getExtInfo();
+    return FunctionType::get(params, fnTy->getYields(), fnTy->getResult(),
+                             info);
+  }
+
+  return ty;
+}
+
+namespace {
+/// Finds the first scope parameter of a function type that the parameter types
+/// being walked don't use.
+class NextScopeParamFinder : public TypeWalker {
+  ScopeDepth Depth = ScopeDepth::zero();
+
+public:
+  unsigned Next;
+
+  explicit NextScopeParamFinder(unsigned first) : Next(first) {}
+
+  Action walkToTypePre(Type ty) override {
+    if (isa<AnyFunctionType>(ty.getPointer())) {
+      Depth = Depth.deeper();
+      return Action::Continue;
+    }
+    auto *nominal = dyn_cast<NominalType>(ty.getPointer());
+    if (!nominal)
+      return Action::Continue;
+    for (auto scope : nominal->getScopeArgs())
+      if (scope.getKind() == ScopeRef::Kind::Param && scope.getDepth() == Depth)
+        Next = std::max(Next, scope.getIndex() + 1);
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type ty) override {
+    if (isa<AnyFunctionType>(ty.getPointer()))
+      Depth = Depth.shallower();
+    return Action::Continue;
+  }
+};
+} // end anonymous namespace
+
+/// The index of the first scope parameter of \p fn's function type that the
+/// parameters before \p param don't use.
+///
+/// Scope parameters after the access scopes are numbered by first occurrence.
+static unsigned getNextScopeParamIndex(AbstractFunctionDecl *fn,
+                                       ParamDecl *param) {
+  auto *params = fn->getParameters();
+  // TODO: Number scope parameters once per signature instead of rewalking the
+  // earlier parameters for each one.
+  NextScopeParamFinder finder(/*first=*/params->size());
+  for (auto *earlier : *params) {
+    if (earlier == param)
+      break;
+    // Type walks don't look through typealiases.
+    earlier->getInterfaceType()->getCanonicalType().walk(finder);
+  }
+  return finder.Next;
+}
+
+Type swift::fillElidedScopes(ParamDecl *param, Type ty) {
+  auto &ctx = param->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ScopeRestrictions))
+    return ty;
+  if (ty->hasError())
+    return ty;
+
+  auto loc = param->getTypeRepr()->getStartLoc();
+  auto diagnoseIfUnsaturated = [&](Type filled, Diag<> id) -> Type {
+    if (!hasScopeUnsaturatedType(filled))
+      return filled;
+    ctx.Diags.diagnose(loc, id);
+    return ErrorType::get(ctx);
+  };
+
+  auto *fn = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
+  // TODO: Support accessors, closures, subscripts, and enum elements.
+  if (!fn || isa<AccessorDecl>(fn))
+    return diagnoseIfUnsaturated(ty, diag::scoped_nonescapable_param_context);
+
+  unsigned nextIndex = getNextScopeParamIndex(fn, param);
+  // TODO: Fill in scope arguments in function results, generic arguments,
+  // tuples, and other structure.
+  return diagnoseIfUnsaturated(fillScopeArgs(ctx, ty, nextIndex),
+                               diag::scoped_nonescapable_in_param_position);
+}
+
 NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     TypeAttrSet *attrs) {
   auto &ctx = getASTContext();
+
+  // FIXME: Pick actual rules for shadowing or get rid of inferring scopes from
+  // param names.
+  if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions))
+    diagnoseScopeNamingOwnParam(ctx, repr);
 
   auto isolatedAttr = claim<IsolatedTypeAttr>(attrs);
 
@@ -4835,22 +5315,25 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto called = claim<CalledTypeAttr>(attrs)) {
-    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+  if (auto *semanticsAttr = claimExecutionSemanticsAttr(attrs)) {
+    auto semantics = getExecutionSemantics(semanticsAttr);
+    if (ctx.LangOpts.hasFeature(Feature::OnceFunctions)) {
       if (representation != FunctionTypeRepresentation::Swift) {
         diagnoseInvalid(repr, conventionAttr->getAtLoc(),
-                        diag::invalid_called_and_attr_attributes,
-                        conventionAttr);
+                        diag::invalid_execution_semantics_and_attr_attributes,
+                        conventionAttr,
+                        getExecutionSemanticsAttrSpelling(semantics));
         representation = FunctionType::Representation::Swift;
         parsedClangFunctionType = nullptr;
       }
 
       if (!repr->isInvalid())
-        executionSemantics = called->getExecutionSemantics();
+        executionSemantics = semantics;
     } else {
-      diagnoseInvalid(repr, called->getAttrLoc(),
-                      diag::requires_experimental_feature, "@called", false,
-                      Feature::CalledAttribute.getName());
+      diagnoseInvalid(repr, semanticsAttr->getAttrLoc(),
+                      diag::requires_experimental_feature,
+                      getExecutionSemanticsAttrSpelling(semantics), false,
+                      Feature::OnceFunctions.getName());
     }
   }
 
@@ -4906,6 +5389,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   if (inStage(TypeResolutionStage::Interface)) {
+    // FIXME: With scope restrictions, this infers lifetime dependencies that
+    // conflict with the scopes written in the function type.
     if (auto const resolvedLifetimeDependence =
             LifetimeDependenceInfo::getFromAST(
                 repr, aft, lifetimeAttributes, getDeclContext(),
@@ -5111,14 +5596,17 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // Function values with execution semantics own their context, so they must
   // be thick.
   std::optional<ExecutionSemantics> executionSemantics;
-  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+  if (auto *semanticsAttr = claimExecutionSemanticsAttr(attrs)) {
+    auto semantics = getExecutionSemantics(semanticsAttr);
     if (representation != SILFunctionType::Representation::Thick) {
       assert(conventionAttr);
       diagnoseInvalid(repr, conventionAttr->getAtLoc(),
-                      diag::invalid_called_and_attr_attributes, conventionAttr);
+                      diag::invalid_execution_semantics_and_attr_attributes,
+                      conventionAttr,
+                      getExecutionSemanticsAttrSpelling(semantics));
       hasError = true;
     } else {
-      executionSemantics = called->getExecutionSemantics();
+      executionSemantics = semantics;
     }
   }
 
@@ -5857,7 +6345,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        // `@called(atMostOnce)` functions always have consuming semantics
+        // at-most-once functions always have consuming semantics
         // regardless of whether they are @escaping or not.
         if (fnTy->hasCalledAtMostOnceSemantics())
           break;
@@ -6033,7 +6521,7 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
                                      TypeResolutionOptions options) {
   ASTContext &ctx = getASTContext();
   auto argOptions = options.withoutContext().withContext(
-      TypeResolverContext::ValueGenericArgument);
+      TypeResolverContext::ScalarGenericArgument);
 
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
@@ -6150,7 +6638,6 @@ NeverNullType TypeResolver::resolveGenericArgumentExprTypeRepr(
     TypeResolutionOptions options) {
   if (!options.is(TypeResolverContext::ScalarGenericArgument) &&
       !options.is(TypeResolverContext::VariadicGenericArgument) &&
-      !options.is(TypeResolverContext::ValueGenericArgument) &&
       !options.is(TypeResolverContext::SameTypeRequirement) &&
       !options.is(TypeResolverContext::RawLayoutAttr) &&
       !options.contains(TypeResolutionFlags::SILMode)) {
@@ -6331,7 +6818,6 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
-  case TypeResolverContext::ValueGenericArgument:
   case TypeResolverContext::RawLayoutAttr:
     doDiag = true;
     break;
@@ -6525,12 +7011,16 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
   }
 
   if (resolution.getStage() == TypeResolutionStage::Interface) {
+    bool hadError = false;
     for (auto type : rootParameterPacks) {
       if (!genericSig->haveSameShape(type, shapeType)) {
         diagnose(repr->getLoc(), diag::expansion_not_same_shape, result,
                  shapeType, type);
+        hadError = true;
       }
     }
+    if (hadError)
+      return ErrorType::get(ctx);
   }
 
   return result;
@@ -6565,7 +7055,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
           Lexer::getLocForEndOfToken(ctx.SourceMgr, eachLoc);
       diag.fixItRemoveChars(eachLoc, eachLocEnd);
     }
-    return packReference;
+    return ErrorType::get(ctx);
   }
 
   if (!options.contains(TypeResolutionFlags::AllowPackReferences) &&

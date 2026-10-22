@@ -1572,8 +1572,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     // If either of the types have holes or unresolved type variables, we can't
     // compare them. `isSubtypeOf` cannot be used with solver-allocated types.
-    if (type1->hasTypeVariableOrPlaceholder() ||
-        type2->hasTypeVariableOrPlaceholder()) {
+    if (type1->hasTypeVariableOrHole() || type2->hasTypeVariableOrHole()) {
       identical = false;
       continue;
     }

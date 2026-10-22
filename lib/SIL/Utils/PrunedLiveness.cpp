@@ -308,6 +308,8 @@ AddressUseKind PrunedLiveRange<LivenessWithDefs>::checkAndUpdateInteriorPointer(
   SmallVector<Operand *, 8> uses;
   auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
   for (auto *use : uses) {
+    if (use->getOperandOwnership() == OperandOwnership::DebugUse)
+      continue;
     updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   if (uses.empty()) {

@@ -3003,7 +3003,11 @@ static std::string getContextHash(const CompilerInvocation &CI,
 
       // COM model conditions can select different declarations from the same
       // textual interface.
-      getCOMInteropCacheState(CI.getLangOptions()));
+      getCOMInteropCacheState(CI.getLangOptions()),
+
+      // Sanitizers are forwarded to interface builds and change both the
+      // serialized SIL (e.g. TSan instrumentation) and the Clang dependencies.
+      CI.getSILOptions().Sanitizers.toRaw());
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

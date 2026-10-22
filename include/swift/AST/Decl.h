@@ -1052,6 +1052,13 @@ public:
   LLVM_READONLY
   ModuleDecl *getModuleContextForNameLookup() const;
 
+  /// Retrieve every module in which this declaration would be found by name
+  /// lookup queries. A Cxx `namespace` can be declared in more than one Clang
+  /// module and is found through each of them. For any other declaration, the
+  /// only result is `getModuleContextForNameLookup()`.
+  void
+  getModuleContextsForNameLookup(SmallVectorImpl<ModuleDecl *> &modules) const;
+
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
   ASTContext &getASTContext() const {
@@ -5316,7 +5323,7 @@ class StructDecl final : public NominalTypeDecl {
   //
   // What we need is to serialize enough information to be
   // able to instantiate C++ class template on deserialization. It turns out
-  // that all that information is conveniently covered by the BoundGenericType,
+  // that all that information is conveniently covered by the NominalType,
   // which we store in this field. The field is set during the typechecking at
   // the time when we instantiate the C++ class template.
   //
@@ -7956,10 +7963,10 @@ private:
     setIndices(Indices);
   }
 
-  /// Returns the given type as a `BoundGenericType` if it is a
+  /// Returns the given type as a `NominalType` if it is a
   /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
   /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
-  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
+  static NominalType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -8034,7 +8041,7 @@ public:
   /// If `useDC` is provided (where the decl is being used), validates that
   /// access control is being used consistently and that `decl` is appropriately
   /// accessible, returning `nullptr` if inaccessible.
-  BoundGenericType *getDynamicMemberLookupKeyPathType() const;
+  NominalType *getDynamicMemberLookupKeyPathType() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(

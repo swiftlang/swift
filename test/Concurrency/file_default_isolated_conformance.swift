@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 6 -enable-experimental-feature DefaultIsolationPerFile -enable-upcoming-feature InferIsolatedConformances %t/types.swift %t/ext.swift
+// RUN: %target-swift-frontend -typecheck -verify -swift-version 6 -enable-upcoming-feature InferIsolatedConformances %t/types.swift %t/ext.swift
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 // REQUIRES: swift_feature_InferIsolatedConformances
 
 //--- types.swift

@@ -36,6 +36,11 @@ struct Base {
     View fromPointer(const int *p [[clang::lifetimebound]]) const {
         return View();
     }
+    // Every 'lifetime_capture_by' on a parameter is carried over, not just the
+    // first one.
+    void captureInto(View &out, View v [[clang::lifetime_capture_by_global]] [[clang::lifetime_capture_by(out)]]) const {
+        out = v;
+    }
 };
 
 struct Derived : public Base {};
@@ -103,6 +108,11 @@ func inheritedBoth(_ d: borrowing Derived, _ v: View) -> View {
   return d.both(v)
 }
 
+@_lifetime(out: copy out, copy v)
+func inheritedCaptureInto(_ d: borrowing Derived, _ out: inout View, _ v: View) {
+  d.captureInto(&out, v)
+}
+
 // A thunked virtual method keeps the annotation on its parameters: the result
 // depends on 'a' alone.
 @available(SwiftStdlib 5.8, *)
@@ -138,6 +148,7 @@ func viaProperty(_ s: Synthesized) -> View { return s.property }
 // CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_borrowsSelf{{.*}}] {{.*}} : $@convention(cxx_method) (@in_guaranteed Derived) -> @lifetime(borrow address_for_deps 0) @owned View
 // CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_independent{{.*}}] {{.*}} : $@convention(cxx_method) (@in_guaranteed Derived) -> @lifetime(immortal) @owned View
 // CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_both{{.*}}] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Derived) -> @lifetime(copy 0, borrow address_for_deps 1) @owned View
+// CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_captureInto{{.*}}] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, View, @in_guaranteed Derived) -> ()
 // CHECK-DAG: sil {{.*}}[clang Ref.pick] {{.*}} : $@convention(cxx_method) (View, View, Ref) -> @lifetime(copy 0) @owned View
 
 //--- escapes.swift

@@ -14,6 +14,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
@@ -295,17 +296,22 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()) {}
 
+void DependencyScanningTool::addInvalidatedPath(StringRef Path) {
+  ScanningService->addInvalidatedPath(Path);
+}
+
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
-                                        StringRef WorkingDirectory) {
+                                        StringRef WorkingDirectory,
+                                        StringRef MainExecutablePath) {
   // Diagnostics which may get collected during scanning instance
   // initialization
   std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
       InitializationDiagnostics;
 
   // The primary instance used to scan the query Swift source-code
-  auto QueryContext = createScanQueryContext(Command, WorkingDirectory,
-                                             InitializationDiagnostics);
+  auto QueryContext = createScanQueryContext(
+      Command, WorkingDirectory, InitializationDiagnostics, MainExecutablePath);
   if (QueryContext.getError())
     return generateHollowDiagnosticOutput(InitializationDiagnostics);
   auto ScanInstance = QueryContext->ScanInstance.get();
@@ -327,15 +333,16 @@ DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
 
 llvm::ErrorOr<swiftscan_import_set_t>
 DependencyScanningTool::getImports(ArrayRef<const char *> Command,
-                                   StringRef WorkingDirectory) {
+                                   StringRef WorkingDirectory,
+                                   StringRef MainExecutablePath) {
   // Diagnostics which may get collected during scanning instance
   // initialization
   std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
       InitializationDiagnostics;
 
   // The primary instance used to scan the query Swift source-code
-  auto QueryContext = createScanQueryContext(Command, WorkingDirectory,
-                                             InitializationDiagnostics);
+  auto QueryContext = createScanQueryContext(
+      Command, WorkingDirectory, InitializationDiagnostics, MainExecutablePath);
   if (QueryContext.getError())
     return generateHollowDiagnosticOutputImportSet(InitializationDiagnostics);
   auto ScanInstance = QueryContext->ScanInstance.get();
@@ -387,7 +394,8 @@ createSerializedDiagnosticsConsumer(const CompilerInvocation &Invocation) {
 llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
     ArrayRef<const char *> CommandArgs, StringRef WorkingDir,
     std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
-        &InitializationDiagnostics) {
+        &InitializationDiagnostics,
+    StringRef MainExecutablePath) {
   // The remainder of this method operates on shared state in the
   // scanning service
   llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
@@ -422,9 +430,9 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
     if (WorkingDirectory.empty())
       llvm::sys::fs::current_path(WorkingDirectory);
 
-    llvm::ErrorOr<CompilerInvocation> Invocation =
-        ConstructInvocation(CommandArgs, "swiftc", WorkingDirectory,
-                            Instance->getDiags());
+    llvm::ErrorOr<CompilerInvocation> Invocation = ConstructInvocation(
+        CommandArgs, MainExecutablePath.empty() ? "swiftc" : MainExecutablePath,
+        WorkingDirectory, Instance->getDiags());
     if (std::error_code EC = Invocation.getError())
       return EC;
 
@@ -435,8 +443,11 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
 
     // Setup the instance
     std::string InstanceSetupError;
-    if (Instance->setup(*Invocation, InstanceSetupError))
+    if (Instance->setup(*Invocation, InstanceSetupError)) {
+      if (auto *stats = Instance->getStatsReporter())
+        stats->noteCurrentProcessExitStatus(EXIT_FAILURE);
       return std::make_error_code(std::errc::not_supported);
+    }
 
     Invocation->getFrontendOptions().LLVMArgs.clear();
 

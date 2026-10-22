@@ -1706,6 +1706,7 @@ bb0(%0 : @owned $E):
 // CHECK-NEXT: switch_enum [[BORROW]]
 // CHECK: bb1([[GUARANTEED:%.*]] : @guaranteed
 // CHECK-NEXT: end_borrow [[BORROW]]
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: load [copy]
 // CHECK-NEXT: unchecked_enum_data
 // CHECK-NEXT: return

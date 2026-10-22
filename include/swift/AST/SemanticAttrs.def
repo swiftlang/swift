@@ -99,6 +99,7 @@ SEMANTICS_ATTR(ATOMICS_REQUIRES_CONSTANT_ORDERINGS, "atomics.requires_constant_o
 SEMANTICS_ATTR(TYPE_CHECKER_OPEN_EXISTENTIAL, "typechecker._openExistential(_:do:)")
 SEMANTICS_ATTR(TYPE_CHECKER_TYPE, "typechecker.type(of:)")
 SEMANTICS_ATTR(TYPE_CHECKER_WITHOUT_ACTUALLY_ESCAPING, "typechecker.withoutActuallyEscaping(_:do:)")
+SEMANTICS_ATTR(TYPE_CHECKER_WITHOUT_ACTUALLY_DISCARDING, "typechecker.withoutActuallyDiscarding(_:do:)")
 
 SEMANTICS_ATTR(AVAILABILITY_OSVERSION, "availability.osversion")
 

@@ -216,12 +216,14 @@ import StringReplaceSubrange
 import StringSplitting
 import StringSwitch
 import StringTests
+import StringValidating
 import StringWalk
 import SubstringTest
 import Suffix
 import SuperChars
 import TaskGroups
 import TaskIsCancelledCancellationScopes
+import TaskIDBenchmark
 import TaskLocalGet
 import TaskRegistryStress
 import ToddCoxeter
@@ -442,12 +444,14 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 
 register(StringSwitch.benchmarks)
 register(StringTests.benchmarks)
+register(StringValidating.benchmarks)
 register(StringWalk.benchmarks)
 register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskIsCancelledCancellationScopes.benchmarks)
+register(TaskIDBenchmark.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)

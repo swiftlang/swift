@@ -183,6 +183,7 @@ param
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $PythonVersion = "3.10.1",
+  [switch] $DependenciesOnly = $False,
 
   # Toolchain Version Info
   [string] $ProductVersion = "0.0.0",
@@ -712,6 +713,21 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
 
+if ($Summary) {
+  Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
+[DllImport("kernel32.dll")]
+public static extern bool GetSystemTimes(out long lpIdleTime, out long lpKernelTime, out long lpUserTime);
+"@
+}
+
+# Returns the time all processors have spent busy and idle since boot.
+function Get-ProcessorTimes {
+  $IdleTime = $KernelTime = $UserTime = [long] 0
+  $null = [Win32.Kernel32]::GetSystemTimes([ref] $IdleTime, [ref] $KernelTime, [ref] $UserTime)
+  # The kernel time includes the idle time.
+  return @{ Busy = $KernelTime + $UserTime - $IdleTime; Idle = $IdleTime }
+}
+
 function Add-TimingData {
   param
   (
@@ -727,6 +743,7 @@ function Add-TimingData {
     Platform = $Platform.OS.ToString()
     "Build Step" = $BuildStep
     "Elapsed Time" = [TimeSpan]::Zero
+    CPU = 0
     Parent = $Parent
     Children = @()
   }
@@ -755,6 +772,7 @@ function Record-OperationTime {
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+  $StartTimes = Get-ProcessorTimes
   $TimingEntry = Add-TimingData $Platform $BuildStep $script:CurrentOperation
   $script:CurrentOperation = $TimingEntry
 
@@ -762,7 +780,11 @@ function Record-OperationTime {
     & $ScriptBlock
   } finally {
     $Stopwatch.Stop()
+    $EndTimes = Get-ProcessorTimes
+    $BusyTime = $EndTimes.Busy - $StartTimes.Busy
+    $TotalTime = $BusyTime + $EndTimes.Idle - $StartTimes.Idle
     $TimingEntry."Elapsed Time" = $Stopwatch.Elapsed
+    $TimingEntry.CPU = if ($TotalTime -gt 0) { $BusyTime / $TotalTime } else { 0 }
     $script:CurrentOperation = $TimingEntry.Parent
   }
 }
@@ -786,6 +808,7 @@ function Flatten-TimingEntry {
     Arch = $Entry.Arch
     "Elapsed Time" = $FormattedTime
     "%" = "$Percentage%"
+    CPU = "$([math]::Round($Entry.CPU * 100))%"
   }
 
   $SortedChildren = $Entry.Children | Sort-Object -Descending -Property "Elapsed Time"
@@ -798,9 +821,11 @@ function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
   $TotalTime = [TimeSpan]::Zero
+  $BusySeconds = 0
   foreach ($Entry in $TimingData) {
     if (-not $Entry.Parent) {
       $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
+      $BusySeconds += $Entry.CPU * $Entry."Elapsed Time".TotalSeconds
     }
   }
 
@@ -816,6 +841,7 @@ function Write-Summary {
     Arch = ""
     "Elapsed Time" = $FormattedTotalTime
     "%" = "100.0%"
+    CPU = "$([math]::Round($BusySeconds / $TotalTime.TotalSeconds * 100))%"
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
@@ -5910,6 +5936,10 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
 try {
 
 Get-Dependencies
+
+if ($DependenciesOnly) {
+  exit 0;
+}
 
 if ($Clean) {
   # Fail instead of leaving a partially-cleaned tree behind.

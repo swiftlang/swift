@@ -631,6 +631,8 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::TypeOf;
     if (semantics->Value == "typechecker.withoutActuallyEscaping(_:do:)")
       return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
+    if (semantics->Value == "typechecker.withoutActuallyDiscarding(_:do:)")
+      return DeclTypeCheckingSemantics::WithoutActuallyDiscarding;
     if (semantics->Value == "typechecker._openExistential(_:do:)")
       return DeclTypeCheckingSemantics::OpenExistential;
   }

@@ -118,10 +118,17 @@ public:
   create(SILModule &M, GenericSignature specializedSignature,
          ArrayRef<Type> typeErasedParams, bool exported,
          SpecializationKind kind, SILFunction *target, Identifier spiGroup,
-         const ModuleDecl *spiModule, AvailabilityRange availability);
+         const ModuleDecl *spiModule, AvailabilityRange availability,
+         bool isSpecializedSpelling = false);
 
   bool isExported() const {
     return exported;
+  }
+
+  /// Whether this attribute was written as `@specialized` rather than
+  /// `@_specialize`.
+  bool isSpecializedSpelling() const {
+    return specializedSpelling;
   }
 
   bool isFullSpecialization() const {
@@ -173,6 +180,7 @@ public:
 private:
   SpecializationKind kind;
   bool exported;
+  bool specializedSpelling = false;
   GenericSignature specializedSignature;
   GenericSignature unerasedSpecializedSignature;
   llvm::SmallVector<Type, 2> typeErasedParams;
@@ -510,6 +518,11 @@ private:
 
   unsigned NeedBreakInfiniteLoops : 1;
   unsigned NeedCompleteLifetimes : 1;
+
+  /// Set by mandatory generic specialization if specializations of this
+  /// generic function form an infinitely growing loop.
+  /// Note that this flag is not serialized.
+  unsigned HasInfiniteSpecializationLoop : 1;
 
   /// Set when this function's arguments and instructions have been lowered to
   /// address form by the AddressLowering function pass.
@@ -1098,6 +1111,14 @@ public:
   bool needsStackProtection() const { return stackProtection; }
   void setNeedStackProtection(bool needSP) { stackProtection = needSP; }
 
+  /// Whether this function is the specialized body that an exported
+  /// `@specialized` attribute exports, such as `sum<Int>` for
+  /// `@specialized(exported: true, where T == Int) func sum<T>`. This holds both
+  /// in the defining module, which creates the body, and in its clients, which
+  /// deserialize it. The defining module owns the only definition, so clients
+  /// reference it instead of emitting their own.
+  bool isExportedSpecialization() const;
+
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }
 
@@ -1192,6 +1213,15 @@ public:
 
   void setIsPerformanceConstraint(bool flag = true) {
     IsPerformanceConstraint = flag;
+  }
+
+  // see `HasInfiniteSpecializationLoop`
+  bool hasInfiniteSpecializationLoop() const {
+    return HasInfiniteSpecializationLoop;
+  }
+
+  void setHasInfiniteSpecializationLoop(bool flag = true) {
+    HasInfiniteSpecializationLoop = flag;
   }
 
   /// True if the current pass has deleted any basic blocks.

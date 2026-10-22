@@ -665,17 +665,19 @@ decodeShape(NodePointer Node) {
   return {Protocol, Requirements};
 }
 
-/// Returns the node kind for an escaping Swift function type that suppresses
-/// \p inverted. Function types record their execution semantics as the
-/// invertible protocols that they suppress: an at-most-once function type
-/// isn't Copyable, and an exactly-once one isn't Deinitable either.
+/// Returns the node kind for an escaping Swift function type with the given
+/// execution semantics.
 inline Node::Kind
-getEscapingSwiftFunctionNodeKind(InvertibleProtocolSet inverted) {
-  if (!inverted.contains(InvertibleProtocolKind::Copyable))
+getEscapingSwiftFunctionNodeKind(FunctionMetadataExecutionSemantics semantics) {
+  switch (semantics) {
+  case FunctionMetadataExecutionSemantics::None:
     return Node::Kind::FunctionType;
-  if (inverted.contains(InvertibleProtocolKind::Deinitable))
+  case FunctionMetadataExecutionSemantics::AtMostOnce:
+    return Node::Kind::CalledAtMostOnceFunctionType;
+  case FunctionMetadataExecutionSemantics::Once:
     return Node::Kind::CalledOnceFunctionType;
-  return Node::Kind::CalledAtMostOnceFunctionType;
+  }
+  return Node::Kind::FunctionType;
 }
 
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
@@ -1205,13 +1207,17 @@ protected:
                   Node->getKind() == NodeKind::CalledOnceFunctionType ||
                   Node->getKind() == NodeKind::CalledAtMostOnceFunctionType);
 
-      // Function types record their execution semantics as the invertible
-      // protocols that they suppress.
+      // Function types record their execution semantics, along with the
+      // invertible protocols that they suppress.
       if (Node->getKind() == NodeKind::CalledOnceFunctionType ||
           Node->getKind() == NodeKind::CalledAtMostOnceFunctionType) {
+        bool isOnce = Node->getKind() == NodeKind::CalledOnceFunctionType;
+        extFlags = extFlags.withExecutionSemantics(
+            isOnce ? FunctionMetadataExecutionSemantics::Once
+                   : FunctionMetadataExecutionSemantics::AtMostOnce);
         auto inverted = extFlags.getInvertedProtocols();
         inverted.insert(InvertibleProtocolKind::Copyable);
-        if (Node->getKind() == NodeKind::CalledOnceFunctionType)
+        if (isOnce)
           inverted.insert(InvertibleProtocolKind::Deinitable);
         extFlags = extFlags.withInvertedProtocols(inverted);
       }

@@ -29,6 +29,7 @@ namespace swift {
 
 class ASTContext;
 enum class CodeGenerationModel: uint8_t;
+class ExposeAttr;
 class SILFunction;
 class SILInstruction;
 class SILModule;
@@ -181,6 +182,9 @@ public:
   /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
+
+  /// Return the variable's `@_expose(wasm)` attribute, if any.
+  const ExposeAttr *getWasmExposeAttr() const;
 
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 

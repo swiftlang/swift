@@ -214,13 +214,31 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
 
 } // end anonymous namespace
 
+/// Whether any variable bound by the given pattern binding entry must be
+/// initialized statically. Mirrors
+/// SILGlobalVariable::mustBeInitializedStatically() for a global definition.
+static bool mustBeInitializedStatically(PatternBindingDecl *pd,
+                                        unsigned pbdEntry) {
+  SmallVector<VarDecl *, 4> vars;
+  pd->getPattern(pbdEntry)->collectVariables(vars);
+  return llvm::any_of(vars, [](VarDecl *var) {
+    auto &attrs = var->getAttrs();
+    return var->getSection() || attrs.hasAttribute<SILGenNameAttr>() ||
+           attrs.hasAttribute<ConstValAttr>() ||
+           attrs.hasAttribute<ConstInitializedAttr>();
+  });
+}
+
 /// Emit a global initialization.
 void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                             unsigned pbdEntry) {
-  // The SIL emitted for global initialization is never needed clients of
+  // The SIL emitted for global initialization is never needed by clients of
   // resilient modules, so skip it if -experimental-skip-non-exportable-decls
-  // is specified.
-  if (M.getOptions().SkipNonExportableDecls)
+  // is specified. A global that must be initialized statically is the
+  // exception: its static initializer is formed from this SIL, and mandatory
+  // diagnostics reject the global if it has none.
+  if (M.getOptions().SkipNonExportableDecls &&
+      !mustBeInitializedStatically(pd, pbdEntry))
     return;
 
   // Generic and dynamic static properties require lazy initialization, which

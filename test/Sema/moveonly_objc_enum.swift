@@ -5,14 +5,14 @@
 
 // Validate that we can't mark an objc enum as move only.
 
-@objc enum Foo : Int, ~Copyable { // expected-error {{noncopyable enums cannot be marked '@objc'}}
-                       // expected-error@-1 {{'Foo' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is noncopyable}}
+@objc enum Foo : Int, ~Copyable { // expected-error {{non-'Copyable' enums cannot be marked '@objc'}}
+                       // expected-error@-1 {{'Foo' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is non-'Copyable'}}
   case X, Y, Z
   deinit {}
 }
 
-@objc enum Foo2 : Int, ~Copyable { // expected-error {{noncopyable enums cannot be marked '@objc'}}
-                        // expected-error@-1 {{'Foo2' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is noncopyable}}
+@objc enum Foo2 : Int, ~Copyable { // expected-error {{non-'Copyable' enums cannot be marked '@objc'}}
+                        // expected-error@-1 {{'Foo2' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is non-'Copyable'}}
   case X, Y, Z
 }
 

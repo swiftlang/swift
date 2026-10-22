@@ -485,6 +485,9 @@ private:
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
 
+  /// Owns the stats reporter used for build/lookup instrumentation.
+  ASTContext &SwiftCtx;
+
   /// Entries whose effective contexts could not be resolved, and
   /// therefore will need to be added later.
   SmallVector<std::tuple<DeclName, SingleEntry, EffectiveClangContext>, 4>
@@ -507,11 +510,24 @@ private:
                      SmallVectorImpl<StoredSingleEntry> &entries);
 
 public:
-  explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
+  explicit SwiftLookupTable(SwiftLookupTableReader *reader,
+                            ASTContext &swiftCtx)
+      : Reader(reader), SwiftCtx(swiftCtx) {}
 
   /// Maps a stored declaration entry to an actual Clang declaration.
-  clang::NamedDecl *mapStoredDecl(StoredSingleEntry &entry);
+  clang::NamedDecl *mapStoredDecl(StoredSingleEntry &entry) {
+    assert(entry.isDeclEntry() && "Not a declaration entry");
+    if (entry.isASTNodeEntry())
+      return static_cast<clang::NamedDecl *>(entry.getASTNode());
+    return resolveStoredDecl(entry);
+  }
 
+private:
+  /// Deserializes the declaration for a serialization-ID entry, and updates
+  /// the entry to point at it.
+  clang::NamedDecl *resolveStoredDecl(StoredSingleEntry &entry);
+
+public:
   /// Maps a stored macro entry to an actual Clang macro.
   SingleEntry mapStoredMacro(StoredSingleEntry &entry,
                              bool assumeModule = false);

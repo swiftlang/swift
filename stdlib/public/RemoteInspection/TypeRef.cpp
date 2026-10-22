@@ -212,14 +212,15 @@ public:
     if (F->getExtFlags().isNonisolatedNonsending()) {
       printField("execution", "caller");
     }
-    // Function types record their execution semantics as the invertible
-    // protocols that they suppress.
-    auto inverted = F->getExtFlags().getInvertedProtocols();
-    if (inverted.contains(InvertibleProtocolKind::Copyable)) {
-      printField("execution-semantics",
-                 inverted.contains(InvertibleProtocolKind::Deinitable)
-                     ? "exactly-once"
-                     : "at-most-once");
+    switch (F->getExtFlags().getExecutionSemantics()) {
+    case FunctionMetadataExecutionSemantics::None:
+      break;
+    case FunctionMetadataExecutionSemantics::AtMostOnce:
+      printField("execution-semantics", "at-most-once");
+      break;
+    case FunctionMetadataExecutionSemantics::Once:
+      printField("execution-semantics", "exactly-once");
+      break;
     }
 
     stream << "\n";
@@ -1127,7 +1128,7 @@ public:
       kind = !F->getFlags().isEscaping()
                  ? Node::Kind::NoEscapeFunctionType
                  : getEscapingSwiftFunctionNodeKind(
-                       F->getExtFlags().getInvertedProtocols());
+                       F->getExtFlags().getExecutionSemantics());
       break;
     case FunctionMetadataConvention::Block:
       kind = Node::Kind::ObjCBlock;

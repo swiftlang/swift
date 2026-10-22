@@ -207,6 +207,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(BridgeObjectToRef)
   NO_UPDATE_NEEDED(Builtin)
   NO_UPDATE_NEEDED(CheckedCastBranch)
+  NO_UPDATE_NEEDED(CheckedCastAddrBranch)
   NO_UPDATE_NEEDED(ClassMethod)
   NO_UPDATE_NEEDED(COMMethod)
   NO_UPDATE_NEEDED(ConvertFunction)
@@ -284,9 +285,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     auto newOrigCalleeSILType =
         SILType::getPrimitiveObjectType(newOrigCalleeType);
     SILBuilderWithScope b(*ai);
-    auto *newCallee = b.createConvertFunction(
-        ai->getLoc(), ai.getCallee(), newOrigCalleeSILType,
-        false /*without actually escaping*/);
+    auto *newCallee = b.createConvertFunction(ai->getLoc(), ai.getCallee(),
+                                              newOrigCalleeSILType);
     ai.setCallee(newCallee);
 
     // Then fix up the subst function type.

@@ -358,6 +358,16 @@ The boxing implies that the following operations will allocate and store a new v
 
 **NOTE**: A fixed-layout structure that contains a resilient structure as a stored property is also boxed on the C++ side.
 
+Moving a boxed value with a C++ move constructor or move assignment transfers its heap allocation and leaves the source empty. The Swift value is not copied and no new allocation is made. The same applies to resilient enumerations and to generic types whose layout depends on their generic arguments, such as `swift::Optional`. A copyable value with a fixed layout has no move operations yet, so moving it calls the copy constructor and the source keeps its value.
+
+```c++
+auto url = Foundation::URL::init("https://swift.org");
+auto moved = std::move(url); // `url` is now empty.
+url = moved;                 // Copy a value back into `url`.
+```
+
+An empty object can be destroyed, assigned another value, copied, or moved. A copy or move of an empty object is empty too. Calling a Swift method on an empty object, accessing its properties, or passing it to Swift aborts the program.
+
 ## Calling Swift Methods
 
 Swift’s structures, enumerations and classes can define instance methods. An instance method that’s declared in a Swift type gets its own C++ member function declaration in the C++ class that corresponds to the underlying Swift type in the generated C++ interface for a Swift module.

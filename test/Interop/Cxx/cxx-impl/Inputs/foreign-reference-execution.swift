@@ -14,7 +14,7 @@ public func reseatNode(_ p: inout Node, _ to: Node) { p = to }
 
 // int readNodePtr(Node *_Nonnull const &p);
 @unsafe @cxx @implementation
-public func readNodePtr(_ p: Node) -> Int32 { return p.value }
+public func readNodePtr(_ p: borrowing Node) -> Int32 { return p.value }
 
 // Node *_Nonnull returnsRetainedNode(Node *_Nonnull n)
 //     __attribute__((swift_attr("returns_retained")));

@@ -73,6 +73,15 @@ func unannotatedDerived() {
     print(frt.method())
 }
 
+// An unannotated smart pointer two levels below the annotated Ref<T>, with
+// an unannotated smart pointer in between, also gets `asReference`.
+func unannotatedDerivedTwoLevels() {
+    print("unannotatedDerivedTwoLevels")
+    let smartPtr = makeUnannotatedRef2()
+    let frt = smartPtr.asReference
+    print(frt.method())
+}
+
 conversions(RefCountedBase())
 // CHECK: created
 // CHECK: conversions
@@ -125,4 +134,8 @@ bridgedFunctionsRefOnly(RefCountedBase())
 
 unannotatedDerived()
 // CHECK: unannotatedDerived
+// CHECK: 42
+
+unannotatedDerivedTwoLevels()
+// CHECK: unannotatedDerivedTwoLevels
 // CHECK: 42

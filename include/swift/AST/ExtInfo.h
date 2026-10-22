@@ -603,8 +603,8 @@ getExecutionSemanticsSuppressing(InvertibleProtocolSet inverses) {
 /// be converted to a function type with the execution semantics \p to.
 ///
 /// A conversion can suppress more invertible protocols, but never fewer. So a
-/// plain function can become `@called(atMostOnce)`, and either one can become
-/// `@called(exactlyOnce)`.
+/// plain function can become at-most-once, and either one can become
+/// exactly-once.
 constexpr bool
 canConvertExecutionSemantics(std::optional<ExecutionSemantics> from,
                              std::optional<ExecutionSemantics> to) {
@@ -662,7 +662,7 @@ class ASTExtInfoBuilder {
   Type sendableDependentType;
 
   /// A dependent type that determines the execution semantics of the function,
-  /// such as @called(atMostOnce). Only used within the constraint system, and
+  /// such as at-most-once. Only used within the constraint system, and
   /// must contain type variables, a concrete dependent type should set the
   /// execution semantics instead.
   Type executionSemanticsDependentType;
@@ -757,7 +757,7 @@ public:
   }
 
   /// Returns true if values of this function type must be called exactly
-  /// once, which is true only for `@called(exactlyOnce)` function types.
+  /// once, which is true only for exactly-once function types.
   constexpr bool isCalledOnce() const {
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
@@ -790,7 +790,7 @@ public:
   Type getSendableDependentType() const { return sendableDependentType; }
 
   /// A dependent type that determines whether the function is
-  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// at-most-once. This is only used within the constraint system, and
   /// will contain type variables if present.
   Type getExecutionSemanticsDependentType() const {
     return executionSemanticsDependentType;
@@ -1100,7 +1100,7 @@ public:
   }
 
   /// A dependent type that determines whether the function is
-  /// @called(atMostOnce). This is only used within the constraint system, and
+  /// at-most-once. This is only used within the constraint system, and
   /// will contain type variables if present.
   Type getExecutionSemanticsDependentType() const {
     return builder.getExecutionSemanticsDependentType();
@@ -1126,7 +1126,7 @@ public:
   }
 
   /// Returns true if values of this function type must be called exactly
-  /// once, which is true only for `@called(exactlyOnce)` function types.
+  /// once, which is true only for exactly-once function types.
   constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
 
   /// Helper method for changing the representation.
@@ -1431,7 +1431,7 @@ public:
   }
 
   /// Returns true if values of this function type must be called exactly
-  /// once, which is true only for `@called(exactlyOnce)` function types.
+  /// once, which is true only for exactly-once function types.
   constexpr bool isCalledOnce() const {
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
@@ -1705,7 +1705,7 @@ public:
   }
 
   /// Returns true if values of this function type must be called exactly
-  /// once, which is true only for `@called(exactlyOnce)` function types.
+  /// once, which is true only for exactly-once function types.
   constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
 
   constexpr bool hasNonisolatedNonsendingIsolation() const {

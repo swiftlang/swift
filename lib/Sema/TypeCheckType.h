@@ -107,20 +107,19 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether we are checking generic arguments of a non-variadic bound generic
   /// type. This includes parameterized protocol types. We don't allow pack
-  /// expansions here.
+  /// expansions here. Integer types and value parameters are allowed, and we
+  /// use the ValueMatchVisitor to ensure that they line up with value
+  /// parameters.
   ScalarGenericArgument,
 
   /// Whether we are checking generic arguments of a variadic generic type.
   /// We allow pack expansions in all argument positions, and then use the
   /// PackMatcher to ensure that scalar parameters line up with scalar
   /// arguments, and pack expansion parameters line up with pack expansion
-  /// arguments.
+  /// arguments. As with ScalarGenericArgument, integer types and value
+  /// parameters are allowed, and we use the ValueMatchVisitor to ensure that
+  /// they line up with value parameters.
   VariadicGenericArgument,
-
-  /// Whether we are checking generic arguments of a bound generic type with
-  /// value parameters. We use the ValueMatchVisitor to ensure that all value
-  /// parameters line up with integer types or other value parameters.
-  ValueGenericArgument,
 
   /// Whether we are checking a tuple element type.
   TupleElement,
@@ -320,7 +319,6 @@ public:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
     case Context::Inverted:
-    case Context::ValueGenericArgument:
     case Context::PatternBindingDecl:
     case Context::RawLayoutAttr:
       return false;
@@ -367,7 +365,6 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return true;
     }
@@ -411,7 +408,6 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return false;
     }
@@ -422,7 +418,6 @@ public:
     switch (context) {
     case Context::ScalarGenericArgument:
     case Context::VariadicGenericArgument:
-    case Context::ValueGenericArgument:
       return true;
 
     case Context::None:
@@ -502,7 +497,6 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::Inverted:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return false;
     }
@@ -577,7 +571,7 @@ public:
 };
 
 /// A function reference used to "open" the given unbound generic type
-/// by introducing generic arguments and constructing a \c BoundGenericType
+/// by introducing generic arguments and constructing a \c NominalType
 /// out of them.
 ///
 /// \returns the \c null type on failure.
@@ -758,7 +752,7 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param genericArgs The list of generic arguments to apply.
   ///
-  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// \returns A NominalType bound to the given arguments, or null on
   /// error.
   ///
   /// \see applyGenericArguments
@@ -780,6 +774,10 @@ void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
 bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
                               const TypeResolution &resolution);
+
+/// Fills in the scope arguments that a parameter's written type leaves
+/// unspecified with fresh scope parameters from the binding function type.
+Type fillElidedScopes(ParamDecl *param, Type ty);
 
 } // end namespace swift
 

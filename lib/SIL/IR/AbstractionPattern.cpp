@@ -2802,11 +2802,6 @@ public:
     return bga->getWithSubstitutions(newSubs);
   }
 
-  CanType visitBoundGenericType(CanBoundGenericType bgt,
-                                AbstractionPattern pattern) {
-    return handleGenericNominalType(pattern, bgt);
-  }
-
   CanType visitPackType(CanPackType pack, AbstractionPattern pattern) {
     assert(pattern.isPack());
 

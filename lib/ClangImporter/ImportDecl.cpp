@@ -100,7 +100,6 @@
 
 #define DEBUG_TYPE "Clang module importer"
 
-STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
 STATISTIC(NumFactoryMethodsAsInitializers,
           "# of factory methods mapped to initializers");
 STATISTIC(
@@ -1316,6 +1315,9 @@ namespace {
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
       for (auto redecl : decl->redecls()) {
+        FrontendStatsTracer StatsTracer(
+            Impl.SwiftContext.Stats,
+            "add-namespace-redecl-to-bridging-header-lookup-table", redecl);
         // Because a namespaces's decl context is the bridging header, make sure
         // we add them to the bridging header lookup table.
         addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
@@ -2225,81 +2227,6 @@ namespace {
       cacheImmortalLifetime(fd);
     }
 
-    bool
-    injectBridgingConversionsForRefCountedSmartPtrs(NominalTypeDecl *smartPtr) {
-      auto clangDecl = cast<clang::TagDecl>(smartPtr->getClangDecl());
-      auto [refCountedSmartPtr, toRawPtrFunc, toRawPtrFuncName] =
-          getClangRefCountedSmartPointer(smartPtr);
-      if (auto error = std::get_if<RefCountedPtrError>(&refCountedSmartPtr)) {
-        switch (*error) {
-        case RefCountedPtrError::MissingToRawPointer:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_missing_torawpointer, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerLookupFailure:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_lookup_failure,
-                         Impl.SwiftContext.AllocateCopy(toRawPtrFuncName.str()),
-                         clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerLookupAmbiguity:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_lookup_ambiguity,
-                         Impl.SwiftContext.AllocateCopy(toRawPtrFuncName.str()),
-                         clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerNotFunction:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_not_function,
-                         toRawPtrFunc, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::ToRawPointerWrongSignature:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_torawpointer_wrong_signature,
-                         toRawPtrFunc, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::CtorLookupAmbiguity:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_ctor_lookup_ambiguity, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::CtorLookupFailure:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_ctor_lookup_failure, clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::CtorWrongParamType:
-          Impl.addImportDiagnostic(
-              clangDecl,
-              Diagnostic(diag::refcounted_ptr_ctor_wrong_parameter_type,
-                         clangDecl),
-              clangDecl->getLocation());
-          return false;
-        case RefCountedPtrError::NotAnnotated:
-          return true;
-        }
-      } else {
-        ASSERT(toRawPtrFunc);
-        auto asReferenceDecl = synthesizer.createSmartPtrBridgingProperty(
-            cast<FuncDecl>(toRawPtrFunc));
-        smartPtr->addMember(asReferenceDecl);
-        smartPtr->addMemberToLookupTable(asReferenceDecl);
-        return true;
-      }
-    }
-
     void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) const {
       auto inheritedTypes = D->getInherited();
       SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
@@ -3012,7 +2939,8 @@ namespace {
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
 
-      if (!injectBridgingConversionsForRefCountedSmartPtrs(result)) {
+      // Do not import a smart pointer with an invalid SWIFT_REFCOUNTED_PTR.
+      if (Impl.validateRefCountedPtr(result).diagnose(Impl, decl)) {
         eraseCacheOnBailOut();
         return nullptr;
       }
@@ -4200,7 +4128,7 @@ namespace {
             func->setSelfAccessKind(SelfAccessKind::Mutating);
           } else {
             if (selfIsBorrowing ||
-                getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+                getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
                     decl))
               func->setSelfAccessKind(SelfAccessKind::Borrowing);
             else
@@ -4441,22 +4369,34 @@ namespace {
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
-              clang::QualType ty) {
+              clang::QualType ty, bool forSelf = false) {
             // When the captured parameter is passed by reference, the callee
             // may store the address of the referent into the capturing
             // parameter. Model this as a scoped ('borrow') dependency: the
             // capturing value must not outlive the borrow of this argument.
             //
-            // FIXME: for a non-reference escapable parameter we have no way to
+            // For a non-reference escapable parameter we have no way to
             // express that its address escapes (it is imported by value and we
-            // assume its address does not escape), so we still skip it. We
-            // should diagnose that case instead.
+            // assume its address does not escape), so import the API as
+            // @unsafe.
             bool isScoped = ty->isReferenceType();
-            if (!isScoped && isEscapable(ty))
+            const clang::NamedDecl *annotated =
+                forSelf ? nullptr : decl->getParamDecl(idx);
+            // Swift cannot express an escape to a global or unknown location.
+            if (llvm::any_of(attr->params(), [](int param) {
+                  return param == clang::LifetimeCaptureByAttr::Global ||
+                         param == clang::LifetimeCaptureByAttr::Unknown;
+                }))
+              skipLifetime(onAnnotated(
+                  diag::cxx_unsafe_skipped_lifetime_captured_globally,
+                  annotated));
+            if (!isScoped && isEscapable(ty)) {
+              skipLifetime(onAnnotated(
+                  diag::cxx_unsafe_skipped_lifetime_escapable_capture,
+                  annotated));
               return;
+            }
             for (auto param : attr->params()) {
-              // FIXME: Swift assumes no escaping to globals. We should diagnose
-              // this.
               if (param == clang::LifetimeCaptureByAttr::Global ||
                   param == clang::LifetimeCaptureByAttr::Unknown ||
                   param == clang::LifetimeCaptureByAttr::Invalid)
@@ -4481,20 +4421,22 @@ namespace {
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (param->hasAttr<clang::LifetimeBoundAttr>())
           processLifetimeBound(idx, param->getType());
-        if (const auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
+        for (const auto *attr :
+             param->specific_attrs<clang::LifetimeCaptureByAttr>())
           processLifetimeCaptureBy(attr, idx, param->getType());
       }
-      if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
+      if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
         processLifetimeBound(
             result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
             /*forSelf=*/true);
-      if (auto attr =
-              getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
-                  decl))
+      for (const auto *attr :
+           getImplicitObjectParamAnnotations<clang::LifetimeCaptureByAttr>(
+               decl))
         processLifetimeCaptureBy(
             attr, result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
+            /*forSelf=*/true);
 
       for (auto &[idx, depIndices] : capturedArgDependences) {
         lifetimeDependencies.emplace_back(
@@ -4671,12 +4613,10 @@ namespace {
                  .Default(false);
     }
 
-    /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
-    ///
-    /// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, the method keeps its original
-    /// name and is marked '@unsafe(always)' here instead, and the renamed
-    /// spelling is imported a second time as a deprecated migration stub, which
-    /// is only '@unsafe'.
+    /// Mark \a swiftDecl, imported from \a clangDecl, as '@unsafe(always)' if
+    /// it is hard to use correctly, and import its old '__<name>Unsafe'
+    /// spelling a second time as a deprecated migration stub, which is only
+    /// '@unsafe'.
     void renameToUnsafeIfNeeded(
         const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
         const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
@@ -4702,12 +4642,6 @@ namespace {
                                 : DeclName(unsafeId);
       if (currentName == unsafeName)
         return;
-
-      if (!Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
-        swiftDecl->setName(unsafeName);
-        return;
-      }
 
       // Keeping the original name means every use has to be acknowledged.
       auto *unsafeAttr = swiftDecl->getAttrs().getAttribute<UnsafeAttr>();
@@ -5883,7 +5817,6 @@ namespace {
         }
       }
 
-      Impl.swiftify(result);
       return result;
     }
 
@@ -6518,8 +6451,7 @@ namespace {
             ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
             isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
         if (superclassType) {
-          assert(superclassType->is<ClassType>() ||
-                 superclassType->is<BoundGenericClassType>());
+          assert(superclassType->is<ClassType>());
           inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
         }
       }
@@ -7153,7 +7085,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // If the type is Unmanaged, that is it is not CF ARC audited,
   // we will store the underlying type and leave it up to the use site
   // to determine whether to use this new_type, or an Unmanaged<CF...> type.
-  if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
+  if (auto genericType = storedUnderlyingType->getAs<NominalType>()) {
     if (genericType->isUnmanaged()) {
       assert(genericType->getGenericArgs().size() == 1 && "other args?");
       storedUnderlyingType = genericType->getGenericArgs()[0];
@@ -10381,8 +10313,6 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 }
 
 void ClangImporter::Implementation::startedImportingEntity() {
-  ++NumTotalImportedEntities;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (auto *Stats = SwiftContext.Stats)
     ++Stats->getFrontendCounters().NumTotalClangImportedEntities;
 }
@@ -10530,10 +10460,21 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 
   auto Known = importDeclCached(ClangDecl, version, UseCanonicalDecl);
   if (Known.has_value()) {
+    if (auto *Stats = SwiftContext.Stats)
+      ++Stats->getFrontendCounters().ClangImportDeclCacheHit;
     if (!SuperfluousTypedefsAreTransparent &&
         SuperfluousTypedefs.count(Canon))
       return nullptr;
     return Known.value();
+  }
+
+  ++importDeclRecursionDepth;
+  SWIFT_DEFER { --importDeclRecursionDepth; };
+
+  if (auto *Stats = SwiftContext.Stats) {
+    ++Stats->getFrontendCounters().ClangImportDeclCacheMiss;
+    auto &maxDepth = Stats->getFrontendCounters().ClangImportDeclRecursionDepth;
+    maxDepth = std::max(maxDepth, importDeclRecursionDepth);
   }
 
   bool TypedefIsSuperfluous = false;
@@ -11178,6 +11119,7 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     (void)Impl.lookupAndImportSuccessor(swiftDecl);
     (void)Impl.lookupAndImportOperatorBool(swiftDecl);
     (void)Impl.lookupAndImportSubscripts(swiftDecl);
+    (void)Impl.lookupAndImportAsReference(swiftDecl);
   }
 }
 } // namespace
@@ -11531,6 +11473,7 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const clang::Decl *CD = static_cast<const clang::Decl *>(Entity);
+    OS << CD->getDeclKindName() << ' ';
     if (auto const *ND = dyn_cast<const clang::NamedDecl>(CD)) {
       ND->printName(OS);
     } else {

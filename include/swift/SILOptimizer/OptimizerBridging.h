@@ -316,7 +316,6 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool noAllocations() const;
 
   // Temporary for AddressableParameters Bootstrapping.
-  BRIDGED_INLINE bool enableAddressDependencies() const;
 
   // Closure specializer
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
@@ -333,6 +332,16 @@ struct BridgedPassContext {
 };
 
 bool BeginApply_canInline(BridgedInstruction beginApply);
+
+struct BridgedInferredVariableName {
+  /// Empty if no name could be inferred.
+  BridgedStringRef name;
+  OptionalBridgedValue root;
+};
+
+/// See `VariableNameInferrer::inferNameAndRoot()`.
+BridgedInferredVariableName
+VariableNameInferrer_inferNameAndRoot(BridgedValue value);
 
 enum class BridgedDynamicCastResult {
   willSucceed,

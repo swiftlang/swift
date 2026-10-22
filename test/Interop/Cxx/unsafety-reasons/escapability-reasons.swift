@@ -79,7 +79,7 @@ struct Buffer {
 // A record that provides its own destruction, so its non-escapable member
 // cannot settle it. Reaching it through a container keeps it imported, and the
 // chain ends on the record the user can annotate.
-// expected-note@+1 2 {{this type has unknown escapability: its member 'v' is non-escapable, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: its member 'v' is non-'Escapable', but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct DtorWithView {
   View v;
   ~DtorWithView();
@@ -92,7 +92,7 @@ struct HoldsView {
 // The non-escapable type sits below the record that demoted it, so the note
 // blames the record without naming a member of it: 'v' belongs to HoldsView,
 // and HoldsView is plainly non-escapable rather than unknown.
-// expected-note@+1 2 {{this type has unknown escapability: it holds a non-escapable type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: it holds a non-'Escapable' type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct DtorWrapsHoldsView {
   HoldsView h;
 
@@ -102,7 +102,7 @@ struct DtorWrapsHoldsView {
 // The non-escapable type arrives as a conditional template argument, which
 // records no member to name, so the note still has to blame this record rather
 // than the Buffer it came through.
-// expected-note@+1 2 {{this type has unknown escapability: it holds a non-escapable type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: it holds a non-'Escapable' type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
 struct DtorWithBufferOfView {
   Buffer<View> b;
 

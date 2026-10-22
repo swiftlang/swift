@@ -2258,6 +2258,16 @@ FUNCTION(DeletedMethodError, Swift, swift_deletedMethodError, C_CC, AlwaysAvaila
         EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_onceClosureDestroyedError(HeapObject *context);
+FUNCTION(OnceClosureDestroyedError, Swift,
+         swift_onceClosureDestroyedError, C_CC,
+         OnceClosureDestroyedErrorAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoReturn, NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
 // void swift_deletedAsyncMethodError();
 FUNCTION(DeletedAsyncMethodError, _Concurrency, swift_deletedAsyncMethodError, SwiftAsyncCC,
         ConcurrencyAvailability,

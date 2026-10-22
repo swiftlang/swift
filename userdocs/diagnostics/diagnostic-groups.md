@@ -40,6 +40,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:foreign-reference-type>
 - <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
+- <doc:implicit-force-unwrap>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
@@ -97,6 +98,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:getting-non-sendable-values-out-of-actors>
 - <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
+- <doc:implicit-force-unwrap>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>

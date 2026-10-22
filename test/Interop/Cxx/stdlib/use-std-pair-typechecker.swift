@@ -3,9 +3,9 @@
 import StdPair
 
 let u = HasMethodThatReturnsUnsafePair()
-u.getUnsafePair() // expected-error {{value of type 'HasMethodThatReturnsUnsafePair' has no member 'getUnsafePair'}}
+u.getUnsafePair() // expected-error {{must be marked with 'unsafe'}}
 
-u.getIteratorPair() // expected-error {{value of type 'HasMethodThatReturnsUnsafePair' has no member 'getIteratorPair'}}
+u.getIteratorPair() // expected-error {{must be marked with 'unsafe'}}
 
 func takeCopyable<T: Copyable>(_ _: T) {} 
 func takeCopyablePair(_ _: any CxxPair) {} 

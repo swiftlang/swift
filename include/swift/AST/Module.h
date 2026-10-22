@@ -321,6 +321,9 @@ private:
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
 
+  /// The macro expansion files of this module, in the order they were created.
+  SmallVector<SourceFile *, 0> MacroExpansionFiles;
+
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
   /// or \@NSApplicationMain, or because it is a script file.
@@ -922,6 +925,25 @@ public:
   void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const {
     lookupValue(Name, LookupKind, {}, Result);
+  }
+
+  /// Look up the module-scope declarations named \p name, a unique macro name,
+  /// that are visible from \p loc. Unique names are only visible inside the
+  /// macro expansion that introduced them, so this only looks into the macro
+  /// expansion buffers enclosing \p loc, and appends the results to
+  /// \p results.
+  void lookupUniqueMacroNameInEnclosingExpansions(
+      DeclName name, SourceLoc loc, SmallVectorImpl<ValueDecl *> &results);
+
+  /// Record \p sourceFile, a macro expansion file of this module.
+  void addMacroExpansionFile(SourceFile *sourceFile) {
+    MacroExpansionFiles.push_back(sourceFile);
+  }
+
+  /// Returns the macro expansion files of this module, in the order they were
+  /// created.
+  ArrayRef<SourceFile *> getMacroExpansionFiles() const {
+    return MacroExpansionFiles;
   }
 
   /// Look up a local type declaration by its mangled name.

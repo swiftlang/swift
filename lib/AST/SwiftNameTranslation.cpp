@@ -322,9 +322,7 @@ bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(
   // per specialization, so only an always-noncopyable type qualifies.
   if (typeDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never)
     return false;
-  // The moved-from flag is stored next to the Swift value, so the layout has
-  // to be statically known.
-  return !typeDecl->isGenericContext() && !typeDecl->isResilient();
+  return !typeDecl->isGenericContext();
 }
 
 bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(Type type) {
@@ -365,17 +363,23 @@ swift::cxx_translation::getDeclRepresentation(
     }
     // A noncopyable type is exposed as a move-only C++ class. One imported from
     // C/C++ is exposed back as itself, as C++ already knows how to handle it.
-    // 'isOpaqueLayout' is asked last: it lowers the type in IRGen.
     if (!typeDecl->canBeCopyable() && !typeDecl->hasClangNode() &&
-        (!isNoncopyableValueTypeExposableToCxx(typeDecl) ||
-         (layoutQueries && layoutQueries->isOpaqueLayout(typeDecl))))
+        !isNoncopyableValueTypeExposableToCxx(typeDecl))
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
-    if (typeDecl->hasGenericParamList()) {
-      if (isa<ClassDecl>(VD))
-        return {Unsupported, UnrepresentableGeneric};
+    if (isa<ClassDecl>(VD) && typeDecl->isGenericContext())
+      return {Unsupported, UnrepresentableGeneric};
+    if (typeDecl->hasGenericParamList())
       genericSignature = typeDecl->getGenericSignature();
+    // The C++ class for a Swift class derives from the C++ class of its
+    // superclass, which can't be emitted if the superclass is generic.
+    if (const auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
+      for (auto base = classDecl->getSuperclassDecl(); base;
+           base = base->getSuperclassDecl()) {
+        if (!base->hasClangNode() && base->isGenericContext())
+          return {Unsupported, UnrepresentableGenericSuperclass};
+      }
     }
     if (!isa<ClassDecl>(typeDecl) && layoutQueries &&
         layoutQueries->isZeroSized(typeDecl))
@@ -508,6 +512,8 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_unsupported_client_emission_to_cxx, vd);
   case UnrepresentableGeneric:
     return Diagnostic(diag::expose_generic_decl_to_cxx, vd);
+  case UnrepresentableGenericSuperclass:
+    return Diagnostic(diag::expose_generic_superclass_to_cxx, vd);
   case UnrepresentableGenericRequirements:
     return Diagnostic(diag::expose_generic_requirement_to_cxx, vd);
   case UnrepresentableThrows:

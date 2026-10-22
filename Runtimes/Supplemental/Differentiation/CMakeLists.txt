@@ -101,11 +101,13 @@ gyb_expand(FloatingPointDifferentiation.swift.gyb
   FloatingPointDifferentiation.swift)
 
 add_library(swift_Differentiation
+  AdditiveArithmeticDifferentiation.swift
   AnyDifferentiable.swift
   ArrayDifferentiation.swift
   Differentiable.swift
   DifferentialOperators.swift
   DifferentiationUtilities.swift
+  NumericDifferentiation.swift
   OptionalDifferentiation.swift
   $<$<BOOL:${${PROJECT_NAME}_ENABLE_VECTOR_TYPES}>:SIMDDifferentiation.swift>
   TgmathDerivatives.swift

@@ -1,0 +1,31 @@
+// Test that we diagnose a value passed for a type parameter, or a type passed
+// for a value parameter, in an opaque result type reference.
+//
+// RUN: %target-typecheck-verify-swift -module-name OpaqueTypes -target %target-swift-6.2-abi-triple
+//
+
+public protocol P {}
+
+public struct V<T, let N : Swift::Int> {
+  public func f() -> some Any
+}
+
+public struct G<T : OpaqueTypes::P> {
+  public func f() -> some Any
+}
+
+public typealias Good1 = @_opaqueReturnTypeOf("$s11OpaqueTypes1VV1fQryF", 0) __<Swift::Int, 2>
+public typealias Good2<let M : Swift::Int> = @_opaqueReturnTypeOf("$s11OpaqueTypes1VV1fQryF", 0) __<Swift::Int, M>
+
+// Arguments of the wrong kinds
+public typealias Bad1 = @_opaqueReturnTypeOf("$s11OpaqueTypes1VV1fQryF", 0) __<2, Swift::Int>
+// expected-error@-1 {{cannot use value type '2' for generic argument 'T'}}
+// expected-error@-2 {{cannot pass type 'Int' as a value for generic value 'N'}}
+
+// Value parameter passed for a type parameter
+public typealias Bad2<let M : Swift::Int> = @_opaqueReturnTypeOf("$s11OpaqueTypes1VV1fQryF", 0) __<M, M>
+// expected-error@-1 {{cannot use value type 'M' for generic argument 'T'}}
+
+// Value passed for a type parameter of a type with no value parameters
+public typealias Bad3 = @_opaqueReturnTypeOf("$s11OpaqueTypes1GV1fQryF", 0) __<3>
+// expected-error@-1 {{cannot use value type '3' for generic argument 'T'}}

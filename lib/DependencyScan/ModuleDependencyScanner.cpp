@@ -2537,8 +2537,9 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   llvm::StringSet<> alreadyAddedModules;
   auto bridgedDependencyInfo = ModuleDependencyInfo::forClangModule(
       pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
-      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries,
-      IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
+      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps,
+      clangModuleDep.DirectoryDeps, LinkLibraries, IncludeTree,
+      /*module-cache-key*/ "", clangModuleDep.IsSystem);
   bridgedDependencyInfo.setLibraryLevel(
       clangModuleDep.ModuleMapIsPrivate
           ? LibraryLevel::SPI

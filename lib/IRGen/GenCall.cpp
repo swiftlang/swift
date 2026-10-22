@@ -3362,8 +3362,13 @@ public:
       contextPtr = nullptr;
     };
 
-    // Add the indirect typed error result if we have one.
-    SILFunctionConventions fnConv(fnType, IGF.IGM.silConv);
+    // Add the indirect typed error result if we have one. Use the substituted
+    // type, like SyncCallEmission does: the error edge of the try_apply reads
+    // the error back out of the slot for the substituted error type, and
+    // getCalleeTypedErrorResultSlot only reuses a slot of the same storage
+    // type.
+    auto substFnType = CurCallee.getSubstFunctionType();
+    SILFunctionConventions fnConv(substFnType, IGF.IGM.silConv);
     if (fnType->hasErrorResult() && fnConv.isTypedError()) {
       // The invariant is that this is always zero-initialized, so we
       // don't need to do anything extra here.

@@ -436,10 +436,10 @@ bool TBDGenVisitor::willVisitDecl(Decl *D) {
                             AFD->getAttrs().hasAttribute<ExternAttr>()))
       return false;
 
-  // Likewise for a @_silgen_name("...") or @_extern(c) variable without an
-  // initial value.
+  // Likewise for a @_silgen_name("...") or @_extern(c) global variable without
+  // an initial value. Computed properties never have one, so they don't count.
   if (auto VD = dyn_cast<VarDecl>(D))
-    if (!VD->hasInitialValue() &&
+    if (VD->isGlobalStorage() && !VD->hasInitialValue() &&
         (VD->getAttrs().hasAttribute<SILGenNameAttr>() ||
          ExternAttr::find(VD->getAttrs(), ExternKind::C)))
       return false;
@@ -719,6 +719,14 @@ class APIGenRecorder final : public APIRecorder {
     // should be SPIs.
     if (module->getLibraryLevel() < swift::LibraryLevel::API)
       return true;
+
+    // Symbols that belong to an extension itself are SPI if the extended
+    // nominal type is SPI, e.g. the conformance descriptors, witness tables
+    // and witness thunks of the conformances it declares.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+      if (auto *nominal = ext->getExtendedNominal())
+        if (isSPI(nominal))
+          return true;
 
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       auto accessScope =

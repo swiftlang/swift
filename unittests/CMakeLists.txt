@@ -21,10 +21,10 @@ if(SWIFT_INCLUDE_TOOLS)
 
   add_subdirectory(Threading)
 
-  if(SWIFT_BUILD_SDK_OVERLAY)
-    # Runtime tests depend on symbols in StdlibUnittest.
-    #
-    # FIXME: cross-compile runtime unittests.
+  # Runtime tests depend on symbols in StdlibUnittest.
+  #
+  # FIXME: cross-compile runtime unittests.
+  if(TARGET swiftStdlibUnittest${SWIFT_PRIMARY_VARIANT_SUFFIX})
     add_subdirectory(runtime)
     add_subdirectory(Reflection)
   endif()

@@ -764,8 +764,8 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
-  FUNCTION-KIND ::= 'O'                      // `@called(exactlyOnce)` function type
-  FUNCTION-KIND ::= 'Oo'                     // `@called(atMostOnce)` function type
+  FUNCTION-KIND ::= 'O'                      // `@once` function type
+  FUNCTION-KIND ::= 'Oo'                     // `@callable(once)` function type
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
@@ -887,8 +887,8 @@ mangled in to disambiguate.
 #endif
 
 #if SWIFT_RUNTIME_VERSION >= 6.5
-  CALLED-ONCE ::= 'O'                        // @called(exactlyOnce)
-  CALLED-ONCE ::= 'Oo'                       // @called(atMostOnce)
+  CALLED-ONCE ::= 'O'                        // @once
+  CALLED-ONCE ::= 'Oo'                       // @callable(once)
 #endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable

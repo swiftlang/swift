@@ -6333,8 +6333,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     if (linearMapFnType != linearMapUnsubstFnType) {
       auto unsubstType =
           SILType::getPrimitiveObjectType(linearMapUnsubstFnType);
-      linearMap = B.createConvertFunction(loc, linearMap, unsubstType,
-                                          /*withoutActuallyEscaping*/ false);
+      linearMap = B.createConvertFunction(loc, linearMap, unsubstType);
     }
     auto thunkedFn = createPartialApplyOfThunk(
         *this, loc, thunk, interfaceSubs, dynamicSelfType, toType, linearMap,
@@ -6845,9 +6844,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto targetLinearMapUnsubstFnType =
       SILType::getPrimitiveObjectType(targetLinearMapFnType);
   if (linearMap.getType() != targetLinearMapUnsubstFnType) {
-    linearMap = thunkSGF.B.createConvertFunction(
-        loc, linearMap, targetLinearMapUnsubstFnType,
-        /*withoutActuallyEscaping*/ false);
+    linearMap = thunkSGF.B.createConvertFunction(loc, linearMap,
+                                                 targetLinearMapUnsubstFnType);
   }
 
   // Return original results and thunked differential/pullback.

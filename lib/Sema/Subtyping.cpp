@@ -283,7 +283,20 @@ swift::constraints::getConversionBehavior(Type type) {
     auto structTy = cast<StructType>(canType);
     auto *decl = structTy->getDecl();
 
-    if (decl == ctx.getAnyHashableDecl())
+    // These are all non-generic declarations.
+    if (decl == ctx.getArrayDecl())
+      return ConversionBehavior::Array;
+    else if (decl == ctx.getDictionaryDecl())
+      return ConversionBehavior::Dictionary;
+    else if (decl == ctx.getSetDecl())
+      return ConversionBehavior::Set;
+    else if (decl == ctx.getUnsafePointerDecl() ||
+             decl == ctx.getUnsafeMutablePointerDecl() ||
+             decl == ctx.getAutoreleasingUnsafeMutablePointerDecl())
+      return ConversionBehavior::Pointer;
+
+    // These are all generic declarations.
+    else if (decl == ctx.getAnyHashableDecl())
       return ConversionBehavior::AnyHashable;
     else if (decl == ctx.getStringDecl())
       return ConversionBehavior::String;
@@ -297,34 +310,12 @@ swift::constraints::getConversionBehavior(Type type) {
     return ConversionBehavior::None;
   }
 
-  case TypeKind::BoundGenericStruct: {
-    auto structTy = cast<BoundGenericStructType>(canType);
-    auto *decl = structTy->getDecl();
-
-    if (decl == ctx.getArrayDecl())
-      return ConversionBehavior::Array;
-    else if (decl == ctx.getDictionaryDecl())
-      return ConversionBehavior::Dictionary;
-    else if (decl == ctx.getSetDecl())
-      return ConversionBehavior::Set;
-    else if (decl == ctx.getUnsafePointerDecl() ||
-             decl == ctx.getUnsafeMutablePointerDecl() ||
-             decl == ctx.getAutoreleasingUnsafeMutablePointerDecl())
-      return ConversionBehavior::Pointer;
-
-    return ConversionBehavior::None;
-  }
-
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
   case TypeKind::DynamicSelf:
     return ConversionBehavior::Class;
 
-  case TypeKind::Enum:
-    return ConversionBehavior::None;
-
-  case TypeKind::BoundGenericEnum: {
-    auto enumTy = cast<BoundGenericEnumType>(canType);
+  case TypeKind::Enum: {
+    auto enumTy = cast<EnumType>(canType);
     if (enumTy->getDecl() == ctx.getOptionalDecl())
       return ConversionBehavior::Optional;
 
@@ -377,6 +368,7 @@ swift::constraints::getConversionBehavior(Type type) {
 
   case TypeKind::Error:
   case TypeKind::Placeholder:
+  case TypeKind::Hole:
   case TypeKind::UnboundGeneric:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
@@ -1405,7 +1397,7 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
       auto result = rec(lhsElt, rhsElt);
 
       auto &ctx = lhs->getASTContext();
-      return BoundGenericType::get(ctx.getSetDecl(), Type(), result);
+      return NominalType::get(ctx.getSetDecl(), Type(), result, ctx);
     }
 
     case ConversionBehavior::Double:
@@ -1752,9 +1744,11 @@ Type swift::constraints::subtypeMeet(Type lhs, Type rhs,
 /// This could almost use Type::transformWithPosition(), however that would give
 /// us no way to construct the correct locator.
 static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
-                                     ConstraintLocatorBuilder locator) {
+                                     ConstraintLocatorBuilder locator,
+                                     bool allowNoEscape) {
   auto rec = [&](Type type, LocatorPathElt elt,
-                 std::optional<LocatorPathElt> secondElt=std::nullopt) -> Type {
+                 bool allowNoEscape = false,
+                 std::optional<LocatorPathElt> secondElt = std::nullopt) -> Type {
     if (!type->hasJoinOrMeet())
       return type;
 
@@ -1762,44 +1756,47 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
     return openTypeJoinsAndMeetsRec(cs, type,
                                     (secondElt.has_value()
                                      ? subLocator.withPathElement(*secondElt)
-                                     : subLocator));
+                                     : subLocator),
+                                    allowNoEscape);
   };
 
   if (type->is<MeetType>() || type->is<JoinType>()) {
     unsigned options = TVO_PrefersSubtypeBinding | TVO_CanBindToHole;
+    if (allowNoEscape)
+      options |= TVO_CanBindToNoEscape;
     return cs.createTypeVariable(cs.getConstraintLocator(locator), options);
   }
 
   switch (getConversionBehavior(type)) {
   case ConversionBehavior::Optional: {
     auto result = rec(type->getOptionalObjectType(),
-                      LocatorPathElt::GenericArgument(0));
+                      ConstraintLocator::OptionalPayload);
     return OptionalType::get(result);
   }
 
   case ConversionBehavior::Array: {
-    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto *boundTy = type->castTo<StructType>();
     auto result = rec(boundTy->getGenericArgs()[0],
                       LocatorPathElt::GenericArgument(0));
     return ArraySliceType::get(result);
   }
 
   case ConversionBehavior::Dictionary: {
-    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto *boundTy = type->castTo<StructType>();
     auto keyTy = rec(boundTy->getGenericArgs()[0],
-                      LocatorPathElt::GenericArgument(0));
+                     LocatorPathElt::GenericArgument(0));
     auto valueTy = rec(boundTy->getGenericArgs()[1],
                        LocatorPathElt::GenericArgument(1));
     return DictionaryType::get(keyTy, valueTy);
   }
 
   case ConversionBehavior::Set: {
-    auto *boundTy = type->castTo<BoundGenericStructType>();
+    auto *boundTy = type->castTo<StructType>();
     auto eltTy = rec(boundTy->getGenericArgs()[0],
                      LocatorPathElt::GenericArgument(0));
 
     auto &ctx = cs.getASTContext();
-    return BoundGenericType::get(ctx.getSetDecl(), Type(), eltTy);
+    return NominalType::get(ctx.getSetDecl(), Type(), eltTy, ctx);
   }
 
   case ConversionBehavior::Function: {
@@ -1810,9 +1807,11 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
 
     SmallVector<AnyFunctionType::Param, 4> params;
     for (unsigned i : indices(funcTy->getParams())) {
+      // Note: This is the only spot where allowNoEscape is true.
       const auto &param = funcTy->getParams()[i];
       auto paramType = rec(param.getPlainType(),
                            LocatorPathElt::FunctionArgument(),
+                           /*allowNoEscape=*/true,
                            LocatorPathElt::TupleElement(i));
       params.push_back(param.withType(paramType));
     }
@@ -1822,6 +1821,7 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
       const auto &yield = funcTy->getYields()[i];
       auto yieldType = rec(yield.getType(),
                            LocatorPathElt::FunctionYield(),
+                           /*allowNoEscape=*/false,
                            LocatorPathElt::TupleElement(i));
       yields.push_back(yield.withType(yieldType));
     }
@@ -1864,7 +1864,7 @@ Type swift::constraints::openTypeJoinsAndMeets(ConstraintSystem &cs, Type type,
   // These should never appear at the top level, or we'll enter an infinite loop.
   ASSERT(!type->is<JoinType>() && !type->is<MeetType>());
 
-  return openTypeJoinsAndMeetsRec(cs, type, locator);
+  return openTypeJoinsAndMeetsRec(cs, type, locator, /*allowNoEscape=*/false);
 }
 
 bool swift::constraints::isPackExpansionType(Type type) {

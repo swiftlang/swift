@@ -585,10 +585,6 @@ struct SILOptOptions {
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
 
-  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
-      "enable-address-dependencies",
-      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
-
   llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
       "disable-aggressive-reg2mem",
       llvm::cl::desc("Disable aggressive reg2mem optimizations."),
@@ -935,7 +931,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
 
-  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
   if (options.DisaleAggressiveReg2Mem)
     SILOpts.UseAggressiveReg2MemForCodeSize = false;
   if (options.EnableCalleeAllocatedCoroAbi)

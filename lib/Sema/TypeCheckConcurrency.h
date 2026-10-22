@@ -53,6 +53,15 @@ class TypeBase;
 class ValueDecl;
 class VarDecl;
 
+/// Emit a note when an actor instance and a global actor of the same type may
+/// be different instances, so code isolated to one can't use the other without
+/// 'await'.
+///
+/// \param selfArgument The use's 'self' argument, if any.
+void noteActorInstanceMayNotBeGlobalActor(
+    SourceLoc loc, const ActorIsolation &contextIsolation,
+    const ActorIsolation &requiredIsolation, const Expr *selfArgument);
+
 /// Add notes suggesting the addition of 'async', as appropriate,
 /// to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(AbstractFunctionDecl const* func);

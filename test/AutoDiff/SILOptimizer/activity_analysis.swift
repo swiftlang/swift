@@ -886,3 +886,39 @@ func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
 // CHECK: [ACTIVE] {{.*}} = alloc_stack [lexical] [var_decl] $T, let, name "y2"
 // CHECK: bb3:
 // CHECK: [NONE]   {{.*}} = tuple ()
+
+func asyncWorkload(_ a: Float, _ b: Float) async -> Float {
+    a + b
+}
+
+// CHECK-LABEL: [AD] Activity info for $s17activity_analysis13testAsyncWorkyS2f_SftYaF at parameter indices (0, 1) and result indices (0):
+// CHECK: bb0:
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Float
+// CHECK: [ACTIVE] %1 = argument of bb0 : $Float
+// CHECK: [NONE]   %4 = enum $Optional<any Actor>, #Optional.none!enumelt
+// CHECK: [ACTIVE]   %6 = alloc_stack $Float
+// CHECK: [ACTIVE]   %7 = address_to_pointer %6 : $*Float to $Builtin.RawPointer
+// CHECK: [NONE]   %8 = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+// CHECK: [USEFUL]   // function_ref implicit closure #1 in testAsyncWork(_:_:)
+// CHECK:  %9 = function_ref @$s17activity_analysis13testAsyncWorkyS2f_SftYaFSfyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Float, Float) -> (@out τ_0_0, @error any Error) for <Float>
+// CHECK: [ACTIVE]   %10 = partial_apply [callee_guaranteed] %9(%0, %1) : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Float, Float) -> (@out τ_0_0, @error any Error) for <Float>
+// CHECK: [ACTIVE]   %11 = convert_function %10 : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Float> to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Float>
+// CHECK: [VARIED]   %12 = convert_escape_to_noescape [not_guaranteed] %11 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Float> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Float>
+// CHECK: [NONE]   %13 = builtin "startAsyncLetWithLocalBuffer"<Float>(%8 : $Optional<Builtin.RawPointer>, %12 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Float>, %7 : $Builtin.RawPointer) : $Builtin.RawPointer
+// CHECK: [NONE]   // function_ref swift_asyncLet_get
+// CHECK:  %14 = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+// CHECK: [NONE]   %15 = apply %14(%13, %7) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+// CHECK: [ACTIVE]   %17 = pointer_to_address %7 : $Builtin.RawPointer to [strict] [invariant] $*Float
+// CHECK: [ACTIVE]   %18 = load [trivial] %17 : $*Float
+// CHECK: [VARIED]   %19 = builtin "finishAsyncLet"(%13 : $Builtin.RawPointer, %7 : $Builtin.RawPointer) : $()
+// CHECK: [NONE]   %21 = builtin "endAsyncLetLifetime"(%13 : $Builtin.RawPointer) : $()
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(reverse)
+// expected-note @+1 {{when differentiating this function definition}}
+func testAsyncWork(_ a: Float, _ b: Float) async -> Float {
+// expected-note @+1 {{expression is not differentiable}}
+  async let result = asyncWorkload(a, b)
+
+  return await result
+}
