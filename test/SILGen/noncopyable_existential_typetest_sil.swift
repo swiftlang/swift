@@ -76,13 +76,24 @@ func ifCaseIs(_ box: borrowing any P & ~Copyable) -> Bool {
   return false
 }
 
-// MARK: - `as?` is still consuming, and must not be rewritten
+// MARK: - `as?` as a plain value is still consuming; `if let` over it is not
 
 // The value-producing form keeps its take: it hands back a payload, so there is
 // no failure edge to leave the subject on.
 //
-// CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil10asOptional{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil15asOptionalValue{{[_0-9a-zA-Z]*}}F
 // CHECK:           checked_cast_addr_br take_always any P & ~Copyable in {{%.*}} to Big in {{%.*}}, bb
+// CHECK-NOT:       test_only
+// CHECK:         } // end sil function
+func asOptionalValue(_ box: consuming any P & ~Copyable) {
+  _ = box as? Big
+}
+
+// `if let` over `as?` branches on the cast, so it can consume only on success
+// and leave the subject alone on the failure edge.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s36noncopyable_existential_typetest_sil10asOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:           checked_cast_addr_br take_on_success any P & ~Copyable in {{%.*}} to Big in {{%.*}}, bb
 // CHECK-NOT:       test_only
 // CHECK:         } // end sil function
 func asOptional(_ box: consuming any P & ~Copyable) -> Int {

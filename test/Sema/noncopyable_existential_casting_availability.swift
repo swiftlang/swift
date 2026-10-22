@@ -109,9 +109,6 @@ func copyableTargetBinding(_ box: consuming any P & ~Copyable) -> Int {
 // Even a 'Copyable' existential target is gated, because a non-'Copyable'
 // payload can inhabit one: `any Q & ~Copyable` accepts it outright, and
 // 'AnyObject' accepts anything by boxing it in '__SwiftValue', which copies.
-// Only pattern position is checked here; an existential target in expression
-// position is rejected outright, so the gate never gets a look at it (see
-// test/Sema/noncopyable_existential_is_targets.swift).
 
 protocol R: ~Copyable {}
 
@@ -121,11 +118,16 @@ func existentialTargetPatternIs(_ box: borrowing any P & ~Copyable) -> Int {
   case is any R & ~Copyable: return 1
   // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
-  // Unrelated to availability: no type here is known to conform to both. The
-  // cast is still emitted, so the gate still has to fire.
-  // expected-warning @-5 {{cast from 'any P & ~Copyable' to unrelated type 'any R & ~Copyable' always fails}}
   default: return -1
   }
+}
+
+// Runtime support for noncopyable type tests is only available with newer runtimes
+func existentialTargetExprIs(_ box: borrowing any P & ~Copyable) -> Bool {
+  // expected-note @-1 {{add '@available' attribute to enclosing global function}}
+  return box is any R & ~Copyable
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-note @-2 {{add 'if #available' version check}}
 }
 
 // MARK: - A copyable existential is unaffected

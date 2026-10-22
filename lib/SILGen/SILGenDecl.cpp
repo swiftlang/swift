@@ -1186,6 +1186,9 @@ public:
                             RefutablePatternInitInfo initInfo, SILLocation loc,
                             SILGenFunction &SGF);
 
+  bool tryInitializeFromStorageReference(SILGenFunction &SGF, Expr *initializer,
+                                         SILLocation loc) override;
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1424,13 +1427,6 @@ public:
   bool tryInitializeFromStorageReference(SILGenFunction &SGF, Expr *initializer,
                                          SILLocation loc) override;
 
-  /// True if this is a cast pattern whose subject is a noncopyable
-  /// existential, which is the case the direct-branch lowering handles.
-  bool isNoncopyableExistentialSubject() const {
-    Type subjectType = pattern->getType();
-    return subjectType->isNoncopyable() && subjectType->isExistentialType();
-  }
-
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1523,9 +1519,13 @@ bool IsPatternInitialization::tryInitializeFromStorageReference(
   }
 
   // Binding the payload consumes the subject out of its own storage so that a
-  // *failed* cast can leave it intact. That is specific to a noncopyable
-  // existential; a copyable one has no reason to avoid the ordinary copy.
-  if (!isNoncopyableExistentialSubject())
+  // *failed* cast can leave it intact. That is specific to a non-`Copyable`
+  // subject; a copyable one has no reason to avoid the ordinary copy.
+  if (!pattern->getType()->isNoncopyable())
+    return false;
+
+  // Ensure we have a plain address-based value cast before emitting anything
+  if (pattern->getCastKind() != CheckedCastKind::ValueCast)
     return false;
 
   // Is the subject stored where we can use it directly?  If not, return
@@ -1541,6 +1541,97 @@ bool IsPatternInitialization::tryInitializeFromStorageReference(
   ManagedValue addr = SGF.emitConsumedLValue(loc, std::move(lv));
 
   return tryEmitNoncopyablePatternMatch(SGF, loc, addr);
+}
+
+/// Emit `checked_cast_addr_br [take_on_success]` from \p srcAddr, branching to
+/// \p failureDest on failure and initializing \p subInit with the payload on
+/// success. A failed cast leaves the source untouched.
+static bool emitTakeCastAndBind(SILGenFunction &SGF, SILLocation loc,
+                                ManagedValue srcAddr, CanType sourceType,
+                                CanType targetType,
+                                Initialization *subInitialization,
+                                const RefutablePatternInitInfo &initInfo,
+                                JumpDest failureDest) {
+  auto &targetTL = SGF.getTypeLowering(targetType);
+
+  // Destination buffer for the extracted payload. Note the target may be
+  // loadable (only the source has to actually be in memory).
+  // checked_cast_addr_br writes through an address either way.
+  SILValue destAddr = SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
+
+  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
+  SILBasicBlock *failBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
+
+  SGF.B.createCheckedCastAddrBranch(
+      loc, CheckedCastInstOptions(), CastConsumptionKind::TakeOnSuccess,
+      srcAddr.forward(SGF), sourceType, destAddr, targetType, contBB, failBB,
+      initInfo.numTrueTaken, initInfo.numFalseTaken);
+
+  // On the success edge the payload has been moved into destAddr and is ours
+  // to bind.
+  SGF.B.setInsertionPoint(contBB);
+  ManagedValue payload;
+  if (!targetTL.isLoadableOrOpaque(SGF.F)) {
+    payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
+  } else {
+    payload = SGF.emitManagedRValueWithCleanup(
+        SGF.B.createTrivialLoadOr(loc, destAddr, LoadOwnershipQualifier::Take),
+        targetTL);
+  }
+  subInitialization->copyOrInitValueInto(SGF, loc, payload, /*isInit=*/true);
+  // Note: our own finishInitialization() forwards to subInitialization, so
+  // don't finish it here -- doing so would emit the local twice.
+  return true;
+}
+
+/// `if let v = x as? T` (and `guard let`, `while let`) over a non-`Copyable`
+/// subject. Rather than constructing an `Optional<T>` with the cast result
+/// (which would consume `x` even if the cast fails), emit it the same way as
+/// `if case let v as T = x`, using a conditional cast that only consumes on
+/// success.
+bool EnumElementPatternInitialization::tryInitializeFromStorageReference(
+    SILGenFunction &SGF, Expr *initializer, SILLocation loc) {
+  if (!subInitialization.get())
+    return false;
+
+  auto *cast =
+      dyn_cast<ConditionalCheckedCastExpr>(initializer->getSemanticsProvidingExpr());
+  if (!cast || cast->getCastKind() != CheckedCastKind::ValueCast)
+    return false;
+
+  Expr *subject = cast->getSubExpr();
+  Type sourceType = subject->getType();
+  if (!sourceType->isNoncopyable())
+    return false;
+
+  // Deliberately last: getOptionalSomeDecl() can force Optional's members to
+  // load, which ordinary `if let` over a Copyable subject must never trigger
+  // from here.
+  if (ElementDecl != SGF.getASTContext().getOptionalSomeDecl())
+    return false;
+
+  // The take-cast below produces exactly a T. Today an outermost `x as? T`
+  // always has type Optional<T>: CSApply splits an optional source into
+  // bind/inject layers around an inner cast, so it never reaches here. If that
+  // ever changes, fall back to the ordinary lowering rather than mis-bind.
+  CanType targetType = cast->getCastType()->getCanonicalType();
+  Type resultObject = cast->getType()->getOptionalObjectType();
+  if (!resultObject || resultObject->getCanonicalType() != targetType)
+    return false;
+
+  Expr *storageExpr = findConsumableStorageReference(subject);
+  if (!storageExpr)
+    return false;
+
+  FormalEvaluationScope scope(SGF);
+  LValue lv = SGF.emitLValue(storageExpr, SGFAccessKind::OwnedAddressConsume);
+  ManagedValue addr = SGF.emitConsumedLValue(loc, std::move(lv));
+  if (!addr.getType().isAddress())
+    return false;
+
+  return emitTakeCastAndBind(SGF, loc, addr, sourceType->getCanonicalType(),
+                             targetType, subInitialization.get(), getInitInfo(),
+                             getFailureDest());
 }
 
 // If possible, emit a cast that consumes only on success.
@@ -1573,37 +1664,9 @@ bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
     return true;
   }
 
-  auto &targetTL = SGF.getTypeLowering(targetType);
-
-  // Destination buffer for the extracted payload. Note the target may be
-  // loadable (only the existential source has to be address-only);
-  // checked_cast_addr_br writes through an address either way.
-  SILValue destAddr = SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
-
-  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
-  SILBasicBlock *failBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
-
-  SGF.B.createCheckedCastAddrBranch(
-      loc, CheckedCastInstOptions(), CastConsumptionKind::TakeOnSuccess,
-      value.forward(SGF), sourceType, destAddr, targetType, contBB, failBB,
-      initInfo.numTrueTaken, initInfo.numFalseTaken);
-
-  // On the success edge the payload has been moved into destAddr and is ours
-  // to bind.
-  SGF.B.setInsertionPoint(contBB);
-  ManagedValue payload;
-  if (!targetTL.isLoadableOrOpaque(SGF.F)) {
-    payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
-  } else {
-    // A copyable payload in a non-Copyable existential can be trivial
-    payload = SGF.emitManagedRValueWithCleanup(
-        SGF.B.createTrivialLoadOr(loc, destAddr, LoadOwnershipQualifier::Take),
-        targetTL);
-  }
-  subInitialization->copyOrInitValueInto(SGF, loc, payload, /*isInit=*/true);
-  // Note: our own finishInitialization() forwards to subInitialization, so
-  // don't finish it here -- doing so would emit the local twice.
-  return true;
+  return emitTakeCastAndBind(SGF, loc, value, sourceType, targetType,
+                             subInitialization.get(), initInfo,
+                             getFailureDest());
 }
 
 void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
@@ -1612,11 +1675,11 @@ void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
                                                       bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
-  // For a noncopyable existential, first try emitting the direct-branch form
+  // For a non-`Copyable` subject, first try emitting the direct-branch form
   // without producing the intermediate optional.  That encodes the success
   // status in the CFG which makes it possible to selectively consume only on
   // success.
-  if (isNoncopyableExistentialSubject() &&
+  if (pattern->getType()->isNoncopyable() &&
       tryEmitNoncopyablePatternMatch(SGF, loc, value)) {
     return;
   }
@@ -1736,19 +1799,6 @@ public:
 
 namespace {
 
-/// Formally, `case is T` has the same meaning as `case _ as T`;
-/// they both verify the type without binding any payload in the result.
-///
-/// Duplicated from SILGenPattern.cpp, which asks the same thing of `switch`
-/// cases; the two should be unified.
-static bool patternNeedsNoPayload(const Pattern *pattern) {
-  // True for `case is T`
-  if (!pattern)
-    return true;
-  // True for `case _ as T` (and variations thereof)
-  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
-}
-
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
 /// Initialization representing the needed initializations.
@@ -1835,6 +1885,11 @@ struct InitializationForPattern
     return InitializationPtr(res);
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
+    // A statically-satisfied test that binds nothing matches any value, so it
+    // needs no test and no storage -- it behaves exactly like `_`.
+    if (isWildcardIsPattern(P))
+      return InitializationPtr(new BlackHoleInitialization());
+
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
       if (!patternNeedsNoPayload(subP)) {
