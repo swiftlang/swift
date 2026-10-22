@@ -98,6 +98,11 @@ public:
   std::vector<ScannerDiagnosticInfo> getDiagnostics() const {
     return Diagnostics;
   }
+  bool hadError() const {
+    return llvm::any_of(Diagnostics, [](const ScannerDiagnosticInfo &info) {
+      return info.Severity == llvm::SourceMgr::DK_Error;
+    });
+  }
   const std::vector<ScannerDiagnosticInfo> &getDiagnosticsRef() const {
     return Diagnostics;
   }

@@ -336,6 +336,11 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
     return convertSIMDType</*templateArgument=*/false>(argType, width.value());
   }
 
+  // If the struct type isn't canonical (e.g. because of a sugared parent
+  // type), try again with the canonical type, just in case it helps.
+  if (!type->isCanonical())
+    return convert(type->getCanonicalType());
+
   // Out of ideas, there must've been some error. :(
   return clang::QualType();
 }
@@ -393,15 +398,6 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
     assert(Cache.find(Type(type)) == Cache.end());
     return clang::QualType();
   }
-
-  // All of the builtin types we cache this way are non-generic and
-  // parentless, so we don't need to do anything if we see a type with
-  // interesting substructure.
-  if (type->hasGenericArgs() || type->getParent())
-    return clang::QualType();
-
-  // This also implies that the type is canonical.
-  assert(type->isCanonical());
 
   auto stdlib = Context.getStdlibModule();
   assert(stdlib && "translating stdlib type to C without stdlib module?");
@@ -463,8 +459,7 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
   StdlibTypesAreCached = true;
 
   // Now check the cache again to see if any of the types we just added
-  // match the type we're looking at. Since the type is known to be
-  // canonical, we can just look it up directly.
+  // match the type we're looking at.
   auto it = Cache.find(Type(type));
   if (it != Cache.end())
     return it->second;
