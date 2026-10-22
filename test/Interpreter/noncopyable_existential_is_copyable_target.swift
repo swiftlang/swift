@@ -2,6 +2,8 @@
 
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // A `~Copyable` existential can hold a copyable payload, and the target of a
 // cast out of one can be a copyable type. That combination exercises code the
