@@ -48,6 +48,20 @@ func switchWithBindingAmongTests(_ box: consuming any P & ~Copyable) -> Int {
   }
 }
 
+// MARK: - Binding under a `where` guard
+//
+// A consuming switch tests its cases under a borrow and binds the payload only
+// once a case is chosen, but a `where` guard runs before that and would need the
+// binding. Guarded cases therefore stay unimplemented.
+
+func consumingSwitchWithGuard(_ box: consuming any P & ~Copyable) -> Int {
+  switch consume box {
+  case let b as Big where b.tag > 0: return b.tag
+  // expected-error @-1 {{binding the payload of a non-'Copyable' value with a cast pattern is not implemented; use 'case is' to test the type without binding}}
+  default: return -1
+  }
+}
+
 // MARK: - Multiple patterns per case label, and fallthrough
 //
 // Rejected by the shared-case-block machinery, independent of this patch. These
