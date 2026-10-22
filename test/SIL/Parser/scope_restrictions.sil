@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt %s -enable-experimental-feature ScopeRestrictions -verify
+
+// REQUIRES: swift_feature_ScopeRestrictions
+
+sil_stage raw
+
+import Swift
+
+struct E {}
+enum NE: ~Escapable { case none }
+
+// Lowered functions don't have parameter names, so all used scopes need to appear in scopeParams
+
+sil @named : $@convention(thin) @_scopeParams(σ_0) (@guaranteed @_accessScope(σ_0) E) -> @owned @_scoped(σ_0) NE
+// expected-error@-1:34{{explicit scope parameters are not supported}}
+// expected-error@-2:67{{binding the access scope of a parameter is not supported}}
+// expected-error@-3:100{{'@_scoped' is not supported here}}

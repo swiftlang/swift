@@ -597,6 +597,7 @@ private:
                                        TypeResolutionOptions options,
                                        TypeAttrSet *attrs);
   Type resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr, Type ty);
+  void diagnoseScopeParams(TypeAttrSet *attrs);
   std::optional<ScopeRef> resolveScope(AbstractFunctionDecl *fn,
                                        ScopeDepth depth, ScopeRepr repr);
   SmallVector<AnyFunctionType::Param, 8>
@@ -3649,6 +3650,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::Isolated,
       TypeAttrKind::Once,
       TypeAttrKind::Callable,
+      TypeAttrKind::ScopeParams,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -3915,6 +3917,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     } else if (!ty->hasError()) {
       ty = resolveScopedType(scoped, repr, ty);
     }
+  }
+
+  if (auto accessScope = claim<AccessScopeTypeAttr>(attrs)) {
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+      diagnose(accessScope->getAttrLoc(), diag::requires_experimental_feature,
+               "@_accessScope", false, Feature::ScopeRestrictions.getName());
+    } else {
+      // TODO: Support binding the access scopes of parameters.
+      diagnose(accessScope->getAttrLoc(), diag::access_scope_unsupported);
+    }
+    accessScope->setInvalid();
   }
 
   // Handle a type attribute that can only be used in inheritance clauses.
@@ -4871,6 +4884,20 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
   llvm_unreachable("unhandled kind");
 }
 
+void TypeResolver::diagnoseScopeParams(TypeAttrSet *attrs) {
+  auto *attr = claim<ScopeParamsTypeAttr>(attrs);
+  if (!attr)
+    return;
+  if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+    diagnose(attr->getAttrLoc(), diag::requires_experimental_feature,
+             "@_scopeParams", false, Feature::ScopeRestrictions.getName());
+  } else {
+    // TODO: Support explicit scope parameters.
+    diagnose(attr->getAttrLoc(), diag::scope_params_unsupported);
+  }
+  attr->setInvalid();
+}
+
 /// Fills in the scope arguments that \p ty leaves unspecified with fresh scope
 /// parameters starting after \p nextIndex.
 static Type fillScopeArgs(ASTContext &ctx, Type ty, unsigned &nextIndex) {
@@ -4987,6 +5014,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // param names.
   if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions))
     diagnoseScopeNamingOwnParam(ctx, repr);
+
+  diagnoseScopeParams(attrs);
 
   auto isolatedAttr = claim<IsolatedTypeAttr>(attrs);
 
@@ -5490,6 +5519,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   options.setContext(std::nullopt);
 
   bool hasError = false;
+
+  diagnoseScopeParams(attrs);
 
   auto coroutineKind = SILCoroutineKind::None;
   if (auto coroAttr = attrs ? claim<TAR_SILCoroutine>(*attrs) : nullptr) {

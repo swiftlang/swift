@@ -773,6 +773,18 @@ BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                 /*Implicit=*/false);
 }
 
+BridgedScopeParamsAttr
+BridgedScopeParamsAttr_createParsed(BridgedASTContext cContext,
+                                    SourceLoc atLoc, SourceRange range,
+                                    BridgedArrayRef cParams) {
+  SmallVector<Located<ScopeName>, 2> params;
+  for (auto cParam : cParams.unbridged<BridgedLocatedIdentifier>())
+    params.push_back({ScopeName(cParam.Name), cParam.NameLoc});
+  auto &ctx = cContext.unbridged();
+  return new (ctx)
+      ScopeParamsAttr(atLoc, range, ScopeParamListRepr::create(ctx, params));
+}
+
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
                                      SourceRange range,

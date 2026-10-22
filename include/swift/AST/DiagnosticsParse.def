@@ -2248,9 +2248,13 @@ ERROR(sil_failed_to_parse_sil_optional,none,
 //------------------------------------------------------------------------------
 
 ERROR(expected_scope, PointsToFirstBadToken,
-      "expected identifier or 'self' in '_scoped' attribute", ())
+      "expected identifier or 'self' in '%0' attribute", (StringRef))
 ERROR(immortal_scope_cannot_be_access, none,
       "cannot depend on the access scope of 'immortal'", ())
+ERROR(expected_scope_param, PointsToFirstBadToken,
+      "expected scope parameter name in '_scopeParams' attribute", ())
+ERROR(immortal_scope_param, none,
+      "'immortal' cannot be used as a scope parameter name", ())
 
 //------------------------------------------------------------------------------
 // MARK: nonisolated(nonsending)
