@@ -107,8 +107,9 @@ public:
 
   SILFunction *lookupStdlibFunction(StringRef name) override;
 
-  /// Called by the pass manager before the pass starts running.
-  void startModulePassRun(SILModuleTransform *transform);
+  /// Called by the pass manager before a multi-function pass (a module or
+  /// closure group pass) starts running.
+  void startMultiFunctionPassRun(SILTransform *transform);
 
   /// Called by the pass manager before the pass starts running.
   void startFunctionPassRun(SILFunctionTransform *transform);
@@ -116,8 +117,8 @@ public:
   /// Called by the SILCombiner before the instruction pass starts running.
   void startInstructionPassRun(SILInstruction *inst);
 
-  /// Called by the pass manager when the pass has finished.
-  void finishedModulePassRun();
+  /// Called by the pass manager when a multi-function pass has finished.
+  void finishedMultiFunctionPassRun();
 
   /// Called by the pass manager when the pass has finished.
   void finishedFunctionPassRun();
@@ -234,6 +235,10 @@ class SILPassManager {
 
   std::chrono::nanoseconds totalPassRuntime = std::chrono::nanoseconds(0);
 
+  /// State of the running closure group block; null outside one.
+  struct ClosureGroupBlock;
+  ClosureGroupBlock *closureGroupBlock = nullptr;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
@@ -314,6 +319,10 @@ public:
   /// Broadcast the invalidation of the function to all analysis.
   void invalidateAnalysis(SILFunction *F,
                           SILAnalysis::InvalidationKind K) {
+    if (closureGroupBlock)
+      ASSERT(isInCurrentClosureGroup(F) &&
+             "closure group transform changed a function outside its group");
+
     // Invalidate the analysis (unless they are locked)
     for (auto AP : Analyses)
       if (!AP->isLocked())
@@ -338,8 +347,21 @@ public:
     CompletedPassesMap.clear();
   }
 
+  /// The running closure group transform's group: its definitions when the
+  /// transform started, in schedule order, then functions that joined it.
+  llvm::ArrayRef<SILFunction *> getCurrentClosureGroup() const;
+
+  /// True while a closure group transform runs.
+  bool isRunningClosureGroupTransform() const;
+
+  /// True if no closure group transform is running, or \p F is in its group.
+  /// So \p F may be read or changed when this returns true.
+  bool isInCurrentClosureGroup(SILFunction *F) const;
+
   /// Iterate over all analysis and notify them of a deleted function.
   void notifyWillDeleteFunction(SILFunction *F) {
+    if (closureGroupBlock)
+      noteClosureGroupFunctionDeleted(F);
     // Invalidate the analysis (unless they are locked)
     for (auto AP : Analyses)
       if (!AP->isLocked())
@@ -426,11 +448,59 @@ private:
   /// the module.
   void runModulePass(unsigned TransIdx);
 
+  /// Verifies the module, its analyses, and its Swift-side invariants.
+  void verifyModule();
+
+  /// Verifies \p F, then all analyses if \p allAnalyses or else \p F's, then
+  /// \p F's Swift-side invariants.
+  void verifyFunction(SILFunction *F, bool allAnalyses);
+
+  /// Prints the -sil-print-pass-time line for \p T, naming \p F if not null.
+  void printPassTime(SILTransform *T, std::chrono::nanoseconds duration,
+                     SILFunction *F);
+
+  /// If the running pass changed SIL, prints the -sil-print-pass-md5 line for
+  /// pass \p TransIdx: the MD5 of the SIL \p print writes, labeled with \p F.
+  void printPassMD5(unsigned TransIdx, SILFunction *F,
+                    llvm::function_ref<void(llvm::raw_ostream &)> print);
+
+  /// Handles the per-function print, break, and force-verify options before
+  /// pass \p TransIdx runs on \p F.
+  void beforePassOnFunction(unsigned TransIdx, SILFunction *F);
+
+  /// Handles the per-function force-verify and print options after pass
+  /// \p TransIdx ran on \p F.
+  void afterPassOnFunction(unsigned TransIdx, SILFunction *F);
+
+  /// Verifies \p Functions after transform \p T ran on them, as the verify
+  /// options require.
+  void verifyAfterPass(SILTransform *T,
+                       llvm::ArrayRef<SILFunction *> Functions);
+
+  /// Runs \p T, a module or closure group transform, through \p run as a
+  /// multi-function pass, then flushes the instructions it deleted. Returns
+  /// the run time.
+  std::chrono::nanoseconds runTransformBody(SILTransform *T,
+                                            llvm::function_ref<void()> run);
+
   /// Run the \p TransIdx'th pass on the function \p F.
   void runPassOnFunction(unsigned TransIdx, SILFunction *F);
 
   /// Run the passes in Transform from \p FromTransIdx to \p ToTransIdx.
   void runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx);
+
+  /// Run the closure group transforms from \p FromTransIdx to \p ToTransIdx as
+  /// one block: all of them on one group before the next, callees first.
+  void runClosureGroupPasses(unsigned FromTransIdx, unsigned ToTransIdx);
+
+  /// Run closure group transform \p TransIdx once on the current group's
+  /// definitions: the schedule's members, then functions that joined the
+  /// group.
+  void runClosureGroupPass(unsigned TransIdx);
+
+  /// Asserts that \p F, deleted by the running closure group transform, is in
+  /// its group, then removes \p F from the group.
+  void noteClosureGroupFunctionDeleted(SILFunction *F);
 
   /// Helper function to check if the function pass should be run mandatorily
   /// All passes in mandatory pass pipeline and ownership model elimination are
@@ -442,7 +512,7 @@ private:
   bool continueTransforming();
 
   /// Break before running a pass.
-  bool breakBeforeRunning(StringRef fnName, SILFunctionTransform *SFT);
+  bool breakBeforeRunning(StringRef fnName, SILTransform *SFT);
 
   /// Return true if all analyses are unlocked.
   bool analysesUnlocked();
