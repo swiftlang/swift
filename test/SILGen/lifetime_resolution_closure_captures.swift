@@ -10,7 +10,7 @@ func callNonEscaping(_ f: () -> ()) { f() }
 func callEscaping(_ f: @escaping () -> ()) { f() }
 func useGeneric<T>(_ t: borrowing T) {}
 
-// CHECK-LABEL: sil private [ossa] {{.*}}@$s4main16borrowingCaptureyyAA1CCFyyXEfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] {{.*}}@$s4main16borrowingCaptureyyAA1CCFyyXEfU_ :
 // LR:          bb0([[C:%.*]] : @noImplicitCopy @closureCapture @guaranteed $C):
 // LR-NOT:      copyable_to_moveonlywrapper
 // WRAPPER:     bb0([[C:%.*]] : @closureCapture @guaranteed $C):
@@ -20,7 +20,7 @@ func borrowingCapture(_ c: borrowing C) {
   callNonEscaping { useC(c) }
 }
 
-// CHECK-LABEL: sil private [ossa] {{.*}}@$s4main27borrowingAddressOnlyCaptureyyxlFyyXEfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] {{.*}}@$s4main27borrowingAddressOnlyCaptureyyxlFyyXEfU_ :
 // LR:          bb0({{%.*}} : @noImplicitCopy @closureCapture @guaranteed $T):
 // LR-NOT:      copyable_to_moveonlywrapper
 // WRAPPER:     bb0([[T:%.*]] : @closureCapture $*T):
@@ -30,7 +30,7 @@ func borrowingAddressOnlyCapture<T>(_ t: borrowing T) {
   callNonEscaping { useGeneric(t) }
 }
 
-// CHECK-LABEL: sil private [ossa] {{.*}}@$s4main16consumingCaptureyyAA1CCnFyyXEfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] {{.*}}@$s4main16consumingCaptureyyAA1CCnFyyXEfU_ :
 // LR:          bb0({{%.*}} : @noImplicitCopy @closureCapture $*C):
 // LR-NOT:      copyable_to_moveonlywrapper
 // WRAPPER:     bb0([[C:%.*]] : @closureCapture $*C):
@@ -40,7 +40,7 @@ func consumingCapture(_ c: consuming C) {
   callNonEscaping { useC(c) }
 }
 
-// CHECK-LABEL: sil private [ossa] {{.*}}@$s4main24consumingEscapingCaptureyyAA1CCnFyycfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] {{.*}}@$s4main24consumingEscapingCaptureyyAA1CCnFyycfU_ :
 // LR:          bb0({{%.*}} : @noImplicitCopy @closureCapture @guaranteed ${ var C }):
 // LR-NOT:      copyable_to_moveonlywrapper
 // WRAPPER:     bb0({{%.*}} : @closureCapture @guaranteed ${ var C }):
@@ -50,7 +50,7 @@ func consumingEscapingCapture(_ c: consuming C) {
   callEscaping { useC(c) }
 }
 
-// CHECK-LABEL: sil private [ossa] {{.*}}@$s4main14defaultCaptureyyAA1CCFyyXEfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] {{.*}}@$s4main14defaultCaptureyyAA1CCFyyXEfU_ :
 // CHECK:       bb0({{%.*}} : @closureCapture @guaranteed $C):
 // CHECK-LABEL: } // end sil function '$s4main14defaultCaptureyyAA1CCFyyXEfU_'
 func defaultCapture(_ c: C) {

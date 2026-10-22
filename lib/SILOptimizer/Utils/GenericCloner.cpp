@@ -86,6 +86,7 @@ SILFunction *GenericCloner::createDeclaration(
   }
 
   NewF->inheritDerivedFrom(Orig);
+  NewF->setIsClosure(Orig->isClosure());
 
   // A specialization of a function goes into the same section as the original
   // function.

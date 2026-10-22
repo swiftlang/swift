@@ -216,7 +216,7 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
   // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-4]]:10
 
-  // CHECK-LABEL: sil private [ossa] @$s13sil_locations14captures_tuple{{.*}}fU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s13sil_locations14captures_tuple{{.*}}fU_
   // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:11
 }
 

@@ -473,7 +473,7 @@ public class Sub : Base {
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '$s7dynamic3SubC1xSbvg'
 
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error any Error) {
+  // CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error any Error) {
   // CHECK: bb0([[VALUE:%.*]] : @closureCapture @guaranteed $Sub):
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CAST_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]

@@ -187,7 +187,7 @@ func methodCalls(
 // CHECK: function_ref @$[[THUNK1_NAME:[_a-zA-Z0-9]+]]
 // CHECK: } // end sil function '$s21subclass_existentials29methodCallsOnProtocolMetatypeyyF'
 //
-// CHECK: sil private [ossa] @$[[THUNK1_NAME]] : $@convention(thin) (@guaranteed any Base<Int> & P) -> @owned @callee_guaranteed () -> @owned any Base<Int> & P {
+// CHECK: sil private [closure] [ossa] @$[[THUNK1_NAME]] : $@convention(thin) (@guaranteed any Base<Int> & P) -> @owned @callee_guaranteed () -> @owned any Base<Int> & P {
 // CHECK: bb0(%0 : @guaranteed $any Base<Int> & P):
 // CHECK:   [[THUNK2:%[0-9]+]] = function_ref @$[[THUNK2_NAME:[_a-zA-Z0-9]+]]
 // CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value %0
@@ -195,7 +195,7 @@ func methodCalls(
 // CHECK:  return [[RESULT]]
 // CHECK: } // end sil function '$[[THUNK1_NAME]]'
 //
-// CHECK: sil private [ossa] @$[[THUNK2_NAME]] : $@convention(thin) (@guaranteed any Base<Int> & P) -> @owned any Base<Int> & P {
+// CHECK: sil private [closure] [ossa] @$[[THUNK2_NAME]] : $@convention(thin) (@guaranteed any Base<Int> & P) -> @owned any Base<Int> & P {
 // CHECK: bb0(%0 : @closureCapture @guaranteed $any Base<Int> & P):
 // CHECK:  [[OPENED:%[0-9]+]] = open_existential_ref %0 : $any Base<Int> & P to $[[OPENED_TY:@opened\([0-9]+, any Base<Int> & P\) Self]]
 // CHECK:  [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]

@@ -240,37 +240,37 @@ public func foo(_ x: Double) {
 }
 // CHECK: } // end sil function '$s10cf_members3foo{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcfu_ : $@convention(thin) (Double) -> Struct1 {
+// CHECK-LABEL: sil private [closure] [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcfu_ : $@convention(thin) (Double) -> Struct1 {
 // CHECK:       bb0([[X:%.*]] : $Double):
 // CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V5valueABSd_tcfCTo : $@convention(c) (Double) -> Struct1
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ADSdcfu1_ : $@convention(thin) (Double, Struct1) -> Struct1 {
+// CHECK-LABEL: sil private [closure] [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ADSdcfu1_ : $@convention(thin) (Double, Struct1) -> Struct1 {
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V9translate7radiansABSd_tFTo : $@convention(c) (@in Struct1, Double) -> Struct1
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ADSdcfu5_ : $@convention(thin) (Double, Struct1) -> Struct1 {
+// CHECK-LABEL: sil private [closure] [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ADSdcfu5_ : $@convention(thin) (Double, Struct1) -> Struct1 {
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V5scaleyABSdFTo : $@convention(c) (Struct1, Double) -> Struct1
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32
+// CHECK-LABEL: sil private [closure] [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32
 // CHECK:       bb0:
 // CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V12staticMethods5Int32VyFZTo : $@convention(c) () -> Int32
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL:sil private [ossa] @$s10cf_members3fooyySdFySdcSo10IAMStruct1Vcfu11_ySdcfu12_ : $@convention(thin) (Double, Struct1) -> () {
+// CHECK-LABEL:sil private [closure] [ossa] @$s10cf_members3fooyySdFySdcSo10IAMStruct1Vcfu11_ySdcfu12_ : $@convention(thin) (Double, Struct1) -> () {
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V13selfComesLast1xySd_tFTo : $@convention(c) (Double, Struct1) -> ()
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFys5Int32V_SfSdtcSo10IAMStruct1Vcfu13_yAD_SfSdtcfu14_ : $@convention(thin) (Int32, Float, Double, Struct1) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s10cf_members3fooyySdFys5Int32V_SfSdtcSo10IAMStruct1Vcfu13_yAD_SfSdtcfu14_ : $@convention(thin) (Int32, Float, Double, Struct1) -> () {
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTo : $@convention(c) (Int32, Float, Struct1, Double) -> ()
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])

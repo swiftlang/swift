@@ -38,19 +38,19 @@ func outer<T>(x: Int, y: AnyObject, z: Any, w: T) {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local1L_ACySi_tlFfA_ : $@convention(thin) (Int) -> Int
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local1L_ACySi_tlF : $@convention(thin) (Int, Int) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local1L_ACySi_tlF : $@convention(thin) (Int, Int) -> ()
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local2L_ADyyXl_tlFfA_ : $@convention(thin) (@guaranteed AnyObject) -> @owned AnyObject
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local2L_ADyyXl_tlF : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local2L_ADyyXl_tlF : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> ()
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlFfA_ : $@convention(thin) (@in_guaranteed Any) -> @out Any
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlF : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> ()
-// CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local4L_AFyx_tlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local3L_AEyyp_tlF : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local4L_AFyx_tlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> ()
 // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF6local5L_1uAFyqd___xtr__lFfA0_ : $@convention(thin) <T><U> (@in_guaranteed T) -> @out T
 
 class ArtClass<T> {
   // CHECK-LABEL: sil hidden [ossa] @$s23default_arguments_local8ArtClassC10selfMethod1uyqd___tlF : $@convention(method) <T><U> (@in_guaranteed U, @guaranteed ArtClass<T>) -> ()
   func selfMethod<U>(u: U) {
     // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local8ArtClassC10selfMethod1uyqd___tlF0C0L_1vAE1syqd0___qd__Sitr___lFfA1_ : $@convention(thin) <T><U><V> (@thick @dynamic_self ArtClass<T>.Type) -> Int
-    // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local8ArtClassC10selfMethod1uyqd___tlF0C0L_1vAE1syqd0___qd__Sitr___lF : $@convention(thin) <T><U><V> (@in_guaranteed V, @in_guaranteed U, Int, @thick @dynamic_self ArtClass<T>.Type) -> ()
+    // CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local8ArtClassC10selfMethod1uyqd___tlF0C0L_1vAE1syqd0___qd__Sitr___lF : $@convention(thin) <T><U><V> (@in_guaranteed V, @in_guaranteed U, Int, @thick @dynamic_self ArtClass<T>.Type) -> ()
     func local<V>(v: V, u: U, s: Int = Self.intMethod()) {}
   }
 
@@ -67,7 +67,7 @@ class ArtClass<T> {
 @inlinable public func outer() {
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tFfA_ : $@convention(thin) () -> Int {
 
-  // CHECK-LABEL: sil shared [serialized] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tF : $@convention(thin) (Int) -> () {
+  // CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s23default_arguments_local5outeryyF5innerL_1xySi_tF : $@convention(thin) (Int) -> () {
   func inner(x: Int = 0) {}
 
   inner()
@@ -75,13 +75,13 @@ class ArtClass<T> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s23default_arguments_local5outeryyxlF : $@convention(thin) <T> (@in_guaranteed T) -> ()
 func outer<T>(_: T) {
-  // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outeryyxlF5innerL_yylF : $@convention(thin) <T> () -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local5outeryyxlF5innerL_yylF : $@convention(thin) <T> () -> ()
   func inner() { print(T.self) }
 
   // default argument 0 of hasDefault #1 <A>(x:) in outer<A>(_:)
   // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outeryyxlF10hasDefaultL_1xySi_tlFfA_ : $@convention(thin) <T> () -> Int
 
-  // CHECK-LABEL: sil private [ossa] @$s23default_arguments_local5outeryyxlF10hasDefaultL_1xySi_tlF : $@convention(thin) <T> (Int) -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s23default_arguments_local5outeryyxlF10hasDefaultL_1xySi_tlF : $@convention(thin) <T> (Int) -> ()
   func hasDefault(x: Int = { inner(); return 3 }()) {}
   hasDefault()
 }

@@ -68,11 +68,11 @@ public func testDeadClosureCycle(a: Apply, x: inout Int) {
 
 // CHECK: main 'main'
 // CHECK: testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF'
-// CHECK: CYCLE HEAD: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
+// CHECK: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK: Int.init(_builtinIntegerLiteral:) '$sSi22_builtinIntegerLiteralSiBI_tcfC'
 // CHECK: static Int.+= infix(_:_:) '$sSi2peoiyySiz_SitFZ'
 
 // CHECK: testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF'
-// CHECK: CYCLE HEAD: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
+// CHECK: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'

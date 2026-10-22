@@ -46,7 +46,7 @@ public class CircleManager : ShapeManager {
 // CHECK: function_ref @$s4test17inlinableFunctionyyFyycfU_
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serialized] [canonical] [stage=canonical] [ossa] @$s4test17inlinableFunctionyyFyycfU_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil shared [serialized] [closure] [canonical] [stage=canonical] [ossa] @$s4test17inlinableFunctionyyFyycfU_ : $@convention(thin) () -> () {
 // CHECK: function_ref @$s4test17versionedFunctionyyF
 // CHECK: }
 

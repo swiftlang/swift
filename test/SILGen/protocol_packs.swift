@@ -31,7 +31,7 @@ func testClosure<E: PackProvider<(String, Int)>>(provider: E) {
   //   Just check that we emitted the closure with a pack argument, which
   //   implies that we've done substitution into the AP and aligned the
   //   types properly.
-  // CHECK-LABEL: sil private [ossa] @$s4test0A7Closure8provideryx_tAA12PackProviderRzSS_Sit0D0RtzlFySS_SitXEfU_ : $@convention(thin) @substituted <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> () for <Pack{String, Int}>
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test0A7Closure8provideryx_tAA12PackProviderRzSS_Sit0D0RtzlFySS_SitXEfU_ : $@convention(thin) @substituted <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> () for <Pack{String, Int}>
   provider.withFunction { (first, second) in }
 }
 

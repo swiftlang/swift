@@ -20,7 +20,7 @@ func formNoEscapeClosure<each T>(x: repeat each T) {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s4main19formNoEscapeClosure1xyxxQp_tRvzlFyyXEfU_ : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s4main19formNoEscapeClosure1xyxxQp_tRvzlFyyXEfU_ : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
 // CHECK: bb0(%0 : @closureCapture $*(repeat each T)):
 // CHECK: [[PACK:%.*]] = alloc_pack $Pack{repeat each T}
 

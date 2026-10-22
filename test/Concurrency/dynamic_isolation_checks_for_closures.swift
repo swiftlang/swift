@@ -31,7 +31,7 @@ func localCompute(_: (() -> Void)?) {}
 
 func forceIsolation(isolation: isolated (any Actor)?) {}
 
-// CHECK-LABEL: sil private [ossa] @$s6Client17test_global_actoryyFyycfU_ : $@convention(thin) () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s6Client17test_global_actoryyFyycfU_ : $@convention(thin) () -> ()
 // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
 // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK: %11 = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
@@ -42,7 +42,7 @@ func test_global_actor() {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s6Client13test_isolated9isolationyScMYi_tFyycfU_ : $@convention(thin) (@sil_isolated @guaranteed MainActor) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s6Client13test_isolated9isolationyScMYi_tFyycfU_ : $@convention(thin) (@sil_isolated @guaranteed MainActor) -> ()
 // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
 // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK: %11 = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
@@ -53,7 +53,7 @@ func test_isolated(isolation: isolated MainActor) {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s6Client55test_concurrency_checked_global_isolation_has_no_checksyyFyycfU_ : $@convention(thin) () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s6Client55test_concurrency_checked_global_isolation_has_no_checksyyFyycfU_ : $@convention(thin) () -> ()
 // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK: } // end sil function '$s6Client55test_concurrency_checked_global_isolation_has_no_checksyyFyycfU_'
 @MainActor
@@ -62,7 +62,7 @@ func test_concurrency_checked_global_isolation_has_no_checks() {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s6Client47test_concurrency_checked_isolated_has_no_checks9isolationyScMYi_tFyycfU_ : $@convention(thin) (@sil_isolated @guaranteed MainActor) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s6Client47test_concurrency_checked_isolated_has_no_checks9isolationyScMYi_tFyycfU_ : $@convention(thin) (@sil_isolated @guaranteed MainActor) -> ()
 // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK: } // end sil function '$s6Client47test_concurrency_checked_isolated_has_no_checks9isolationyScMYi_tFyycfU_'
 func test_concurrency_checked_isolated_has_no_checks(isolation: isolated MainActor) {
@@ -71,7 +71,7 @@ func test_concurrency_checked_isolated_has_no_checks(isolation: isolated MainAct
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s6Client24test_direct_closure_callyyFyyXEfU_ : $@convention(thin) () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s6Client24test_direct_closure_callyyFyyXEfU_ : $@convention(thin) () -> ()
 // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK: [[INNER_CLOSURE_REF:%.*]] = function_ref @$s6Client24test_direct_closure_callyyFyyXEfU_yycfU_ : $@convention(thin) () -> ()
 // CHECK-NEXT: [[INNER_CLOSURE:%.*]] = thin_to_thick_function [[INNER_CLOSURE_REF]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
@@ -80,7 +80,7 @@ func test_concurrency_checked_isolated_has_no_checks(isolation: isolated MainAct
 // CHECK-NEXT: apply [[COMPUTE_FN]]([[OPT_INNER_CLOSURE]]) : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> ()>) -> ()
 // CHECK: } // end sil function '$s6Client24test_direct_closure_callyyFyyXEfU_'
 
-// CHECK-LABEL: sil private [ossa] @$s6Client24test_direct_closure_callyyFyyXEfU_yycfU_ : $@convention(thin) () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s6Client24test_direct_closure_callyyFyyXEfU_yycfU_ : $@convention(thin) () -> ()
 // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
 // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK: %11 = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
@@ -95,13 +95,13 @@ func test_direct_closure_call() {
 
 @MainActor
 func test_global_actor_sendable_and_sending_closures() {
-  // CHECK-LABEL: sil private [ossa] @$s6Client47test_global_actor_sendable_and_sending_closuresyyFyyYbcfU_ : $@convention(thin) @Sendable () -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s6Client47test_global_actor_sendable_and_sending_closuresyyFyyYbcfU_ : $@convention(thin) @Sendable () -> ()
   // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
   // CHECK: } // end sil function '$s6Client47test_global_actor_sendable_and_sending_closuresyyFyyYbcfU_'
   computeSendable {   
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s6Client47test_global_actor_sendable_and_sending_closuresyyFyycfU0_ : $@convention(thin) () -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s6Client47test_global_actor_sendable_and_sending_closuresyyFyycfU0_ : $@convention(thin) () -> ()
   // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
   // CHECK: } // end sil function '$s6Client47test_global_actor_sendable_and_sending_closuresyyFyycfU0_'
   computeSending {
@@ -111,13 +111,13 @@ func test_global_actor_sendable_and_sending_closures() {
 
 @MainActor
 func test_isolated_any_and_closures() {
-  // CHECK-LABEL: sil private [ossa] @$s6Client30test_isolated_any_and_closuresyyFyyYbXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s6Client30test_isolated_any_and_closuresyyFyyYbXEfU_
   // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
   // CHECK: } // end sil function '$s6Client30test_isolated_any_and_closuresyyFyyYbXEfU_'
   computeIsolatedAny {
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s6Client30test_isolated_any_and_closuresyyFyyYbScMYcXEfU0_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s6Client30test_isolated_any_and_closuresyyFyyYbScMYcXEfU0_
   // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
   // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
   // CHECK: apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
