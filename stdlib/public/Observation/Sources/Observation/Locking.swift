@@ -169,7 +169,7 @@ internal struct Lock {
   ///
   /// - Parameter body: The block to execute while holding the lock.
   /// - Returns: The value returned by the block.
-  func withLock<T>(_ body: () throws -> T) rethrows -> T {
+  func withLock<T>(_ body: @once () throws -> T) rethrows -> T {
     self.lock()
     defer {
       self.unlock()
@@ -178,7 +178,7 @@ internal struct Lock {
   }
 
   // specialise Void return (for performance)
-  func withLockVoid(_ body: () throws -> Void) rethrows {
+  func withLockVoid(_ body: @once () throws -> Void) rethrows {
     try self.withLock(body)
   }
 }
@@ -199,7 +199,7 @@ struct _ManagedCriticalState<State> {
     }
   }
 
-  func withCriticalRegion<R>(_ critical: (inout State) throws -> R) rethrows -> R {
+  func withCriticalRegion<R>(_ critical: @once (inout State) throws -> R) rethrows -> R {
     try buffer.withUnsafeMutablePointers { header, lock in
       Lock.lock(lock)
       defer { Lock.unlock(lock) }

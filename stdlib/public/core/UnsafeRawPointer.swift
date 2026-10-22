@@ -396,7 +396,7 @@ extension UnsafeRawPointer {
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
+    _ body: @once (_ pointer: UnsafePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
@@ -1010,7 +1010,7 @@ extension UnsafeMutableRawPointer {
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
+    _ body: @once (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,

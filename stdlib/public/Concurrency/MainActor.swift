@@ -84,7 +84,7 @@ extension MainActor {
   @export(implementation)
   public static func run<T: Sendable>(
     resultType: T.Type = T.self,
-    body: @MainActor @Sendable () throws -> T
+    body: @MainActor @Sendable @once () throws -> T
   ) async rethrows -> T {
     return try await body()
   }

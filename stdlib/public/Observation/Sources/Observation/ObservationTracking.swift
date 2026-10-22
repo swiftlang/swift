@@ -380,7 +380,7 @@ struct AccessListResult<T: ~Copyable>: ~Copyable {
 
 @available(SwiftStdlib 5.9, *)
 fileprivate func generateAccessList<T: ~Copyable, Failure: Error>(
-  _ apply: () throws(Failure) -> T
+  _ apply: @once () throws(Failure) -> T
 ) throws(Failure) -> AccessListResult<T> {
   var accessList: ObservationTracking._AccessList?
   let result = try withUnsafeMutablePointer(to: &accessList) { (ptr: UnsafeMutablePointer<ObservationTracking._AccessList?>) throws(Failure) -> T in
@@ -407,7 +407,7 @@ fileprivate func generateAccessList<T: ~Copyable, Failure: Error>(
 @available(SwiftStdlib 6.4, *)
 public func withObservationTracking<Result: ~Copyable, Failure: Error>(
   options: ObservationTracking.Options,
-  _ apply: () throws(Failure) -> Result,
+  _ apply: @once () throws(Failure) -> Result,
   onChange: @escaping @Sendable (borrowing ObservationTracking.Event) -> Void
 ) throws(Failure) -> Result {
   let accessListResult = try generateAccessList(apply)
@@ -473,8 +473,8 @@ public func withObservationTracking<Result: ~Copyable, Failure: Error>(
 /// value; otherwise, there is no return value.
 @available(SwiftStdlib 5.9, *)
 public func withObservationTracking<T>(
-  _ apply: () -> T,
-  onChange: @autoclosure () -> @Sendable () -> Void
+  _ apply: @once () -> T,
+  onChange: @autoclosure @callable(once) () -> @Sendable () -> Void
 ) -> T {
   let accessListResult = generateAccessList(apply)
   if let accessList = accessListResult.accessList {
@@ -483,10 +483,22 @@ public func withObservationTracking<T>(
   return accessListResult.result
 }
 
+// ABI: Preserves the entry point from before `apply` was exactly-once.
+@available(SwiftStdlib 5.9, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$s11Observation04withA8Tracking_8onChangexxyXE_yyYbcyXKtlF")
+@usableFromInline
+internal func __abi_withObservationTracking<T>(
+  _ apply: () -> T,
+  onChange: @autoclosure () -> @Sendable () -> Void
+) -> T {
+  return withObservationTracking(apply, onChange: onChange())
+}
+
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftUI)
 public func withObservationTracking<T>(
-  _ apply: () -> T,
+  _ apply: @once () -> T,
   willSet: @escaping @Sendable (ObservationTracking) -> Void,
   didSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
@@ -495,10 +507,23 @@ public func withObservationTracking<T>(
   return accessListResult.result
 }
 
+// ABI: Preserves the entry point from before `apply` was exactly-once.
+@available(SwiftStdlib 5.9, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$s11Observation04withA8Tracking_7willSet03didE0xxyXE_yAA0aC0VYbcyAFYbctlF")
+@usableFromInline
+internal func __abi_withObservationTracking<T>(
+  _ apply: () -> T,
+  willSet: @escaping @Sendable (ObservationTracking) -> Void,
+  didSet: @escaping @Sendable (ObservationTracking) -> Void
+) -> T {
+  return withObservationTracking(apply, willSet: willSet, didSet: didSet)
+}
+
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftUI)
 public func withObservationTracking<T>(
-  _ apply: () -> T,
+  _ apply: @once () -> T,
   willSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
   let accessListResult = generateAccessList(apply)
@@ -509,10 +534,22 @@ public func withObservationTracking<T>(
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftUI)
 public func withObservationTracking<T>(
-  _ apply: () -> T,
+  _ apply: @once () -> T,
   didSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
   let accessListResult = generateAccessList(apply)
   ObservationTracking._installTracking(ObservationTracking(accessListResult.accessList), willSet: nil, didSet: didSet)
   return accessListResult.result
+}
+
+// ABI: Preserves the entry point from before `apply` was exactly-once.
+@available(SwiftStdlib 5.9, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$s11Observation04withA8Tracking_6didSetxxyXE_yAA0aC0VYbctlF")
+@usableFromInline
+internal func __abi_withObservationTracking<T>(
+  _ apply: () -> T,
+  didSet: @escaping @Sendable (ObservationTracking) -> Void
+) -> T {
+  return withObservationTracking(apply, didSet: didSet)
 }

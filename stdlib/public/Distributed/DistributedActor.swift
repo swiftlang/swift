@@ -387,7 +387,7 @@ extension DistributedActor {
   // and even though this is @AEIC, the symbol name would conflict.
   @_silgen_name("$s11Distributed0A5ActorPAAE20whenLocalTypedThrowsyqd__Sgqd__xYiYaYbqd_0_YKXEYaqd_0_YKs8SendableRd__s5ErrorRd_0_r0_lF")
   public nonisolated func whenLocal<T: Sendable, E>(
-    _ body: @Sendable (isolated Self) async throws(E) -> T
+    _ body: @Sendable @callable(once) (isolated Self) async throws(E) -> T
   ) async throws(E) -> T? {
     if __isLocalActor(self) {
        _local let localSelf = self

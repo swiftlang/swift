@@ -1126,7 +1126,7 @@ extension ArraySlice: RangeReplaceableCollection {
   @inlinable
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
@@ -1137,7 +1137,7 @@ extension ArraySlice: RangeReplaceableCollection {
   @inlinable
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
@@ -1148,7 +1148,7 @@ extension ArraySlice: RangeReplaceableCollection {
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
@@ -1247,7 +1247,7 @@ extension ArraySlice {
   @export(implementation)
   @safe
   public func withUnsafeBufferPointer<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
@@ -1330,7 +1330,7 @@ extension ArraySlice {
   // once we allocate noescape closures on the stack.
   @safe
   public mutating func withUnsafeMutableBufferPointer<R, E>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     let count = self.count
     // Ensure unique storage
@@ -1579,7 +1579,7 @@ extension ArraySlice {
   @inlinable
   @safe
   public mutating func withUnsafeMutableBytes<R>(
-    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+    _ body: @once (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
@@ -1616,11 +1616,21 @@ extension ArraySlice {
   @inlinable
   @safe
   public func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
+    _ body: @once (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss10ArraySliceV15withUnsafeBytesyqd__qd__SWKXEKlF")
+  @usableFromInline
+  internal func __abi_withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeBytes(body)
   }
 }
 

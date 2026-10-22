@@ -39,7 +39,7 @@ public func withExtendedLifetime<
   Result: ~Copyable
 >(
   _ x: borrowing T,
-  _ body: () throws(E) -> Result
+  _ body: @once () throws(E) -> Result
 ) throws(E) -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -73,7 +73,7 @@ public func withExtendedLifetime<
   Result: ~Copyable
 >(
   _ x: borrowing T,
-  _ body: (borrowing T) throws(E) -> Result
+  _ body: @once (borrowing T) throws(E) -> Result
 ) throws(E) -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
@@ -126,7 +126,7 @@ public func withUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
   to value: inout T,
-  _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
+  _ body: @once (UnsafeMutablePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
   try unsafe body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
@@ -151,7 +151,7 @@ public func _withUnprotectedUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
   to value: inout T,
-  _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
+  _ body: @once (UnsafeMutablePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
 {
 #if $BuiltinUnprotectedAddressOf
@@ -186,7 +186,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 @safe
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: borrowing T,
-  _ body: (UnsafePointer<T>) throws(E) -> Result
+  _ body: @once (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
 {
   return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
@@ -236,7 +236,7 @@ internal func __abi_withUnsafePointer<T, Result>(
 @safe
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
-  _ body: (UnsafePointer<T>) throws(E) -> Result
+  _ body: @once (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
   try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
@@ -265,7 +265,7 @@ public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
   to value: inout T,
-  _ body: (UnsafePointer<T>) throws(E) -> Result
+  _ body: @once (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
   return try unsafe body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
@@ -284,7 +284,7 @@ public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
   to value: borrowing T,
-  _ body: (UnsafePointer<T>) throws(E) -> Result
+  _ body: @once (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
   return try unsafe body(UnsafePointer<T>(Builtin.unprotectedAddressOfBorrow(value)))
 }

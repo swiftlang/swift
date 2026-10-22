@@ -436,7 +436,7 @@ extension OutputSpan where Element: ~Copyable {
   @_lifetime(self: copy self)
   @unsafe
   public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
-    _ body: (
+    _ body: @once (
       UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int
     ) throws(E) -> R

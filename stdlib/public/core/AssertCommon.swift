@@ -454,7 +454,7 @@ func _unimplementedInitializer(className: StaticString,
 /// Previously used to evaluate editor placeholders.
 @usableFromInline // COMPILER_INTRINSIC
 internal func _undefined<T>(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailure(kind: .fatal(), message(), file: file, line: line, flags: 0)
@@ -465,7 +465,7 @@ internal func _undefined<T>(
 /// Previously used to evaluate editor placeholders.
 @usableFromInline // COMPILER_INTRINSIC
 internal func _undefined<T>(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailure(kind: .fatal(), message(), file: file, line: line, flags: 0)

@@ -723,7 +723,7 @@ extension String {
   @inline(__always)
   internal init<E: Error>(
     _uninitializedCapacity capacity: Int,
-    initializingUTF8With initializer: (
+    initializingUTF8With initializer: @once (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) {
@@ -762,7 +762,7 @@ extension String {
   @export(implementation) // (Primarily @inlinable) fast-path: already C-string compatible
   @safe
   public func withCString<Result, E: Error>(
-    _ body: (UnsafePointer<Int8>) throws(E) -> Result
+    _ body: @once (UnsafePointer<Int8>) throws(E) -> Result
   ) throws(E) -> Result {
     return try unsafe _guts.withCString(body)
   }
@@ -803,7 +803,7 @@ extension String {
   @safe
   public func withCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+    _ body: @once (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
   ) throws(E) -> Result {
     if targetEncoding == UTF8.self {
       return try self.withCString {
@@ -838,7 +838,7 @@ extension String {
   @_effects(releasenone)
   internal func _slowWithCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+    _ body: @once (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
   ) throws(E) -> Result {
     var copy = self
     return try copy.withUTF8 { utf8 throws(E) in

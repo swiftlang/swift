@@ -1031,7 +1031,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   @inlinable
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
@@ -1042,7 +1042,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   @inlinable
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
@@ -1053,7 +1053,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
@@ -1137,7 +1137,7 @@ extension ContiguousArray {
   @export(implementation)
   public init<E>(
     unsafeUninitializedCapacity: Int,
-    initializingWith initializer: (
+    initializingWith initializer: @once (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws(E) -> Void
   ) throws(E) {
@@ -1191,7 +1191,7 @@ extension ContiguousArray {
   @export(implementation)
   public init<E: Error>(
     capacity: Int,
-    initializingWith initializer: (
+    initializingWith initializer: @once (
       _ span: inout OutputSpan<Element>
     ) throws(E) -> Void
   ) throws(E) {
@@ -1238,7 +1238,7 @@ extension ContiguousArray {
   @export(implementation)
   public mutating func append<E: Error>(
     addingCapacity uninitializedCount: Int,
-    initializingWith initializer: (
+    initializingWith initializer: @once (
       _ span: inout OutputSpan<Element>
     ) throws(E) -> Void
   ) throws(E) {
@@ -1313,7 +1313,7 @@ extension ContiguousArray {
   @export(implementation)
   @safe
   public func withUnsafeBufferPointer<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     return try _buffer.withUnsafeBufferPointer(body)
   }
@@ -1396,7 +1396,7 @@ extension ContiguousArray {
   // once we allocate noescape closures on the stack.
   @safe
   public mutating func withUnsafeMutableBufferPointer<R, E>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     _makeMutableAndUnique()
     let count = _buffer.mutableCount
@@ -1638,7 +1638,7 @@ extension ContiguousArray {
   @inlinable
   @safe
   public mutating func withUnsafeMutableBytes<R>(
-    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+    _ body: @once (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
@@ -1675,7 +1675,7 @@ extension ContiguousArray {
   @inlinable
   @safe
   public func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
+    _ body: @once (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))

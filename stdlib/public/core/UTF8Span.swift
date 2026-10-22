@@ -164,7 +164,7 @@ extension UTF8Span {
   borrowing public func _withUnsafeBufferPointer<
     E: Error, Result: ~Copyable //& ~Escapable
   >(
-    _ body: (_ buffer: /*borrowing*/ UnsafeBufferPointer<UInt8>) throws(E) -> Result
+    _ body: @once (_ buffer: /*borrowing*/ UnsafeBufferPointer<UInt8>) throws(E) -> Result
   ) throws(E) -> Result {
     try unsafe body(_start()._ubp(0..<count))
   }

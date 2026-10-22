@@ -122,7 +122,7 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
 @export(implementation)
 @available(StdlibDeploymentTarget 6.5, *)
 public nonisolated(nonsending) func __withTaskCancellationScope<Return, Failure>(
-  _ operation: nonisolated(nonsending) (borrowing TaskCancellationScope) async throws(Failure) -> Return
+  _ operation: nonisolated(nonsending) @once (borrowing TaskCancellationScope) async throws(Failure) -> Return
 ) async throws(Failure) -> Return where Return: ~Copyable, Failure: Error {
 #if $BuiltinTaskCancellationScope
   let record = unsafe Builtin.taskCancellationScopePush()

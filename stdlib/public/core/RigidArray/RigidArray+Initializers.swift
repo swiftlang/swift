@@ -51,7 +51,7 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal init<E: Error>(
     capacity: Int,
-    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith initializer: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     self.init(capacity: capacity)
     try edit(initializer)

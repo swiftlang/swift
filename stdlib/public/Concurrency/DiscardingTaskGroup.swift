@@ -75,7 +75,7 @@ import Swift
 public func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
-  body: (inout DiscardingTaskGroup) async -> GroupResult
+  body: @once (inout DiscardingTaskGroup) async -> GroupResult
 ) async -> GroupResult {
   let flags = taskGroupCreateFlags(
     discardResults: true
@@ -90,6 +90,20 @@ public func withDiscardingTaskGroup<GroupResult>(
   try! await group.awaitAllRemainingTasks() // try!-safe, cannot throw since this is a non throwing group
 
   return result
+}
+
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@available(SwiftStdlib 5.9, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEtYalF")
+@usableFromInline
+internal func __abi_withDiscardingTaskGroup<GroupResult>(
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout DiscardingTaskGroup) async -> GroupResult
+) async -> GroupResult {
+  return await withDiscardingTaskGroup(
+    returning: returnType, isolation: isolation, body: body)
 }
 
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
@@ -358,7 +372,7 @@ extension DiscardingTaskGroup: Sendable { }
 public func withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type = GroupResult.self,
     isolation: isolated (any Actor)? = #isolation,
-    body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+    body: @once (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
 ) async throws -> GroupResult {
   let flags = taskGroupCreateFlags(
       discardResults: true
@@ -382,6 +396,20 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
   try await group.awaitAllRemainingTasks(bodyError: nil)
 
   return result
+}
+
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@available(SwiftStdlib 5.9, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss31withThrowingDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcdE0Vys5Error_pGzYaKXEtYaKlF")
+@usableFromInline
+internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
+    returning returnType: GroupResult.Type,
+    isolation: isolated (any Actor)?,
+    body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+) async throws -> GroupResult {
+  return try await withThrowingDiscardingTaskGroup(
+    returning: returnType, isolation: isolation, body: body)
 }
 
 @available(SwiftStdlib 5.9, *)

@@ -506,7 +506,7 @@ extension Unicode.UTF32: UnicodeCodec {
   @inlinable
   public static func encode(
     _ input: Unicode.Scalar,
-    into processCodeUnit: (CodeUnit) -> Void
+    into processCodeUnit: @once (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }

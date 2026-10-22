@@ -42,8 +42,8 @@
 @_disfavoredOverload
 #endif
 public func assert(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> String = String(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
@@ -58,8 +58,8 @@ public func assert(
 #if $Embedded
 @_transparent
 public func assert(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
@@ -104,8 +104,8 @@ public func assert(
 @_disfavoredOverload
 #endif
 public func precondition(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> String = String(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -124,8 +124,8 @@ public func precondition(
 #if $Embedded
 @_transparent
 public func precondition(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -167,7 +167,7 @@ public func precondition(
 @_disfavoredOverload
 #endif
 public func assertionFailure(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
@@ -183,7 +183,7 @@ public func assertionFailure(
 #if $Embedded
 @_transparent
 public func assertionFailure(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
@@ -229,7 +229,7 @@ public func assertionFailure(
 @_disfavoredOverload
 #endif
 public func preconditionFailure(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
@@ -246,7 +246,7 @@ public func preconditionFailure(
 #if $Embedded
 @_transparent
 public func preconditionFailure(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
@@ -273,7 +273,7 @@ public func preconditionFailure(
 @_disfavoredOverload
 #endif
 public func fatalError(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
 #if !$Embedded
@@ -294,7 +294,7 @@ public func fatalError(
 #if $Embedded
 @_transparent
 public func fatalError(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   if _isDebugAssertConfiguration() {
@@ -315,7 +315,7 @@ public func fatalError(
 /// and abort.
 @usableFromInline @_transparent
 internal func _precondition(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -370,7 +370,7 @@ public func _overflowChecked<T>(
 /// all possible errors.
 @usableFromInline @_transparent
 internal func _debugPrecondition(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
@@ -409,7 +409,7 @@ internal func _debugPreconditionFailure(
 /// call to this function is a noop.
 @usableFromInline @_transparent
 internal func _internalInvariant(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
@@ -424,7 +424,7 @@ internal func _internalInvariant(
 @export(implementation) // Swift 5.1
 @_transparent
 internal func _internalInvariant_5_1(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
@@ -449,7 +449,7 @@ internal func _internalInvariant_5_1(
 @_transparent
 internal func _precondition(
   ifLinkedOnOrAfter version: _SwiftStdlibVersion,
-  _ condition: @autoclosure () -> Bool,
+  _ condition: @autoclosure @callable(once) () -> Bool,
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {

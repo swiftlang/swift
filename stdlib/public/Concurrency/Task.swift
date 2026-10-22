@@ -838,12 +838,23 @@ extension Task where Success == Never, Failure == Never {
 ///
 /// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 5.1, *)
-public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
+public func withUnsafeCurrentTask<T>(body: @once (UnsafeCurrentTask?) throws -> T) rethrows -> T {
   guard let _task = unsafe _getCurrentAsyncTask() else {
     return try body(nil)
   }
 
   return try unsafe body(UnsafeCurrentTask(_task))
+}
+
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@available(SwiftStdlib 5.1, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss21withUnsafeCurrentTask4bodyxxSctSgKXE_tKlF")
+@usableFromInline
+internal func __abi_withUnsafeCurrentTask<T>(
+  body: (UnsafeCurrentTask?) throws -> T
+) rethrows -> T {
+  return try unsafe withUnsafeCurrentTask(body: body)
 }
 
 /// Calls a closure with an unsafe reference to the current task.
@@ -875,11 +886,11 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 @export(implementation)
 @abi(
   nonisolated(nonsending) func withUnsafeCurrentTaskNonsendingExportedImpl<T>(
-    body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+    body: nonisolated(nonsending) @once (UnsafeCurrentTask?) async throws -> T
   ) async rethrows -> T
 )
 public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
-  body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+  body: nonisolated(nonsending) @once (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
   // This is a backdeployment workaround!
   // We cannot use the UnsafeCurrentTask initializer since it can't be used from a backdeployed function.

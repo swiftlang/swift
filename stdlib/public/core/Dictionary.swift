@@ -936,7 +936,7 @@ extension Dictionary {
   ///   `defaultValue`.
   @inlinable
   public subscript(
-    key: Key, default defaultValue: @autoclosure () -> Value
+    key: Key, default defaultValue: @autoclosure @callable(once) () -> Value
   ) -> Value {
     @inline(__always)
     get {

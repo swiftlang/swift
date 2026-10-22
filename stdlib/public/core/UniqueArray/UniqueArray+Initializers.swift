@@ -44,7 +44,7 @@ extension UniqueArray where Element: ~Copyable {
   @export(implementation)
   public init<E: Error>(
     capacity: Int,
-    initializingWith body: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith body: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     self.init(capacity: capacity)
     try edit(body)

@@ -96,7 +96,7 @@ extension DistributedActor {
   @available(SwiftStdlib 5.9, *)
   @_transparent
   public nonisolated func assertIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() else {

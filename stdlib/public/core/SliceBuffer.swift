@@ -457,7 +457,7 @@ internal struct _SliceBuffer<Element>
   /// underlying contiguous storage.
   @export(implementation)
   internal func withUnsafeBufferPointer<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try unsafe body(UnsafeBufferPointer(start: firstElementAddress,
@@ -480,7 +480,7 @@ internal struct _SliceBuffer<Element>
   /// over the underlying contiguous storage.
   @export(implementation)
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try unsafe body(

@@ -119,7 +119,7 @@ internal func _withUnsafeTemporaryAllocation<
   of type: T.Type,
   capacity: Int,
   alignment: Int,
-  _ body: (Builtin.RawPointer) throws(E) -> R
+  _ body: @once (Builtin.RawPointer) throws(E) -> R
 ) throws(E) -> R {
   // How many bytes do we need to allocate?
   let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
@@ -148,7 +148,7 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
   of type: T.Type,
   capacity: Int,
   alignment: Int,
-  _ body: (Builtin.RawPointer) throws(E) -> R
+  _ body: @once (Builtin.RawPointer) throws(E) -> R
 ) throws(E) -> R {
   // How many bytes do we need to allocate?
   let byteCount = _byteCountForTemporaryAllocation(of: type, capacity: capacity)
@@ -174,7 +174,7 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
 internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
-  _ body: (Builtin.RawPointer) throws(E) -> R
+  _ body: @once (Builtin.RawPointer) throws(E) -> R
 ) throws(E) -> R {
   let buffer = UnsafeMutableRawPointer.allocate(
     byteCount: byteCount,
@@ -220,7 +220,7 @@ internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
 public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
-  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> R
+  _ body: @once (UnsafeMutableRawBufferPointer) throws(E) -> R
 ) throws(E) -> R {
   return try _withUnsafeTemporaryAllocation(
     of: Int8.self,
@@ -261,7 +261,7 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
   of type: T.Type,
   capacity: Int,
-  _ body: (inout OutputSpan<T>) throws(E) -> R
+  _ body: @once (inout OutputSpan<T>) throws(E) -> R
 ) throws(E) -> R where T : ~Copyable, R : ~Copyable {
   try withUnsafeTemporaryAllocation(of: type, capacity: capacity) {
     (buffer) throws(E) in
@@ -303,7 +303,7 @@ public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
 public func withTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
-  _ body: (inout OutputRawSpan) throws(E) -> R
+  _ body: @once (inout OutputRawSpan) throws(E) -> R
 ) throws(E) -> R where R: ~Copyable {
   try withUnsafeTemporaryAllocation(byteCount: byteCount, alignment: alignment) {
     (buffer) throws(E) in
@@ -325,7 +325,7 @@ public func withTemporaryAllocation<R: ~Copyable, E: Error>(
 public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
-  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> R
+  _ body: @once (UnsafeMutableRawBufferPointer) throws(E) -> R
 ) throws(E) -> R {
   return try _withUnprotectedUnsafeTemporaryAllocation(
     of: Int8.self,
@@ -375,7 +375,7 @@ public func withUnsafeTemporaryAllocation<
 >(
   of type: T.Type,
   capacity: Int,
-  _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> R
+  _ body: @once (UnsafeMutableBufferPointer<T>) throws(E) -> R
 ) throws(E) -> R {
   return try _withUnsafeTemporaryAllocation(
     of: type,
@@ -403,7 +403,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<
 >(
   of type: T.Type,
   capacity: Int,
-  _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> R
+  _ body: @once (UnsafeMutableBufferPointer<T>) throws(E) -> R
 ) throws(E) -> R {
   return try _withUnprotectedUnsafeTemporaryAllocation(
     of: type,

@@ -276,7 +276,7 @@ extension Bool {
   ///   - rhs: The right-hand side of the operation.
   @_transparent
   @inline(__always)
-  public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  public static func && (lhs: Bool, rhs: @autoclosure @callable(once) () throws -> Bool) rethrows
       -> Bool {
     return lhs ? try rhs() : false
   }
@@ -316,7 +316,7 @@ extension Bool {
   ///   - rhs: The right-hand side of the operation.
   @_transparent
   @inline(__always)
-  public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  public static func || (lhs: Bool, rhs: @autoclosure @callable(once) () throws -> Bool) rethrows
       -> Bool {
     return lhs ? true : try rhs()
   }

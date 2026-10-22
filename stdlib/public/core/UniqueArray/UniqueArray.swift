@@ -111,7 +111,7 @@ extension UniqueArray where Element: ~Copyable {
   @export(implementation)
   @_transparent
   public mutating func edit<E: Error, R: ~Copyable>(
-    _ body: (inout OutputSpan<Element>) throws(E) -> R
+    _ body: @once (inout OutputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
     try _storage.edit(body)
   }

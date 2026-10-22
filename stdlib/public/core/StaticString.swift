@@ -200,7 +200,7 @@ public struct StaticString: Sendable {
   @_transparent
   @safe
   public func withUTF8Buffer<R>(
-    _ body: (UnsafeBufferPointer<UInt8>) -> R
+    _ body: @once (UnsafeBufferPointer<UInt8>) -> R
   ) -> R {
     if hasPointerRepresentation {
       return unsafe body(UnsafeBufferPointer(

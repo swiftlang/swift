@@ -232,7 +232,7 @@ extension _SmallString {
   @export(implementation) @inline(__always)
   @safe
   internal func withUTF8<Result, E: Error>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> Result
+    _ f: @once (UnsafeBufferPointer<UInt8>) throws(E) -> Result
   ) throws(E) -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
@@ -269,7 +269,7 @@ extension _SmallString {
   // between the last code unit and the discriminator are unset.
   @inline(__always)
   fileprivate mutating func withMutableCapacity<E: Error>(
-    _ f: (UnsafeMutableRawBufferPointer) throws(E) -> Int
+    _ f: @once (UnsafeMutableRawBufferPointer) throws(E) -> Int
   ) throws(E) {
     let len = try withUnsafeMutableBytes(of: &_storage) { buffer throws(E) in
       try unsafe f(.init(start: buffer.baseAddress, count: _SmallString.capacity))
@@ -336,7 +336,7 @@ extension _SmallString {
 
   @inline(__always)
   internal init<E: Error>(
-    initializingUTF8With initializer: (
+    initializingUTF8With initializer: @once (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) {

@@ -222,7 +222,7 @@ public struct Unmanaged<Instance: AnyObject> {
   @inlinable // unsafe-performance
   @_transparent
   public func _withUnsafeGuaranteedRef<Result>(
-    _ body: (Instance) throws -> Result
+    _ body: @once (Instance) throws -> Result
   ) rethrows -> Result {
     var tmp = unsafe self
     // Builtin.convertUnownedUnsafeToGuaranteed expects to have a base value

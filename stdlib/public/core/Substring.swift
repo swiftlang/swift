@@ -520,7 +520,7 @@ extension Substring: StringProtocol {
   @export(implementation) // (Primarily @inlinable) specialization
   @safe
   public func withCString<Result, E: Error>(
-    _ body: (UnsafePointer<CChar>) throws(E) -> Result) throws(E) -> Result {
+    _ body: @once (UnsafePointer<CChar>) throws(E) -> Result) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
     return try String(self).withCString(body)
@@ -561,7 +561,7 @@ extension Substring: StringProtocol {
   @safe
   public func withCString<Result, TargetEncoding: _UnicodeEncoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+    _ body: @once (UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
   ) throws(E) -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.

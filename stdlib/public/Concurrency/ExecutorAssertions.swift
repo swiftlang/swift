@@ -48,7 +48,7 @@ extension SerialExecutor {
   @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableInEmbedded
   public func preconditionIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
@@ -95,7 +95,7 @@ extension Actor {
   @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableInEmbedded
   public nonisolated func preconditionIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
@@ -143,10 +143,23 @@ extension GlobalActor {
   @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableInEmbedded
   public static func preconditionIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     Self.shared.preconditionIsolated(message(), file: file, line: line)
+  }
+
+  // ABI: Preserves the entry point from before `message` was at-most-once.
+  @available(SwiftStdlib 5.1, *)
+  @_unavailableInEmbedded
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss11GlobalActorPsE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutFZ")
+  @usableFromInline
+  internal static func __abi_preconditionIsolated(
+      _ message: @autoclosure () -> String,
+      file: StaticString, line: UInt
+  ) {
+    preconditionIsolated(message(), file: file, line: line)
   }
 }
 
@@ -183,7 +196,7 @@ extension SerialExecutor {
   @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableInEmbedded
   public func assertIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() else {
@@ -230,7 +243,7 @@ extension Actor {
   @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableInEmbedded
   public nonisolated func assertIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() else {
@@ -243,6 +256,19 @@ extension Actor {
       assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
       return
     }
+  }
+
+  // ABI: Preserves the entry point from before `message` was at-most-once.
+  @available(SwiftStdlib 5.1, *)
+  @_unavailableInEmbedded
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sScAsE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutF")
+  @usableFromInline
+  internal nonisolated func __abi_assertIsolated(
+      _ message: @autoclosure () -> String,
+      file: StaticString, line: UInt
+  ) {
+    assertIsolated(message(), file: file, line: line)
   }
 }
 
@@ -276,10 +302,23 @@ extension GlobalActor {
   @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableInEmbedded
   public static func assertIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     Self.shared.assertIsolated(message(), file: file, line: line)
+  }
+
+  // ABI: Preserves the entry point from before `message` was at-most-once.
+  @available(SwiftStdlib 5.1, *)
+  @_unavailableInEmbedded
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss11GlobalActorPsE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutFZ")
+  @usableFromInline
+  internal static func __abi_assertIsolated(
+      _ message: @autoclosure () -> String,
+      file: StaticString, line: UInt
+  ) {
+    assertIsolated(message(), file: file, line: line)
   }
 }
 
