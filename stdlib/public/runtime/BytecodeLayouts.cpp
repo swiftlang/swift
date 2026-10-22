@@ -24,6 +24,7 @@
 #include "swift/ABI/System.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/InstrumentsSupport.h"
 #include "llvm/Support/SwapByteOrder.h"
 #include <cstdint>
 #include <functional>
@@ -41,6 +42,201 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 
 using namespace swift;
+
+// memcpy for the copies of dynamic size in the value witnesses, which are
+// mostly small (the bytes between ref-counted fields, or whole small values).
+// For those, this was measured to be faster than calling memcpy; copies over
+// 128 bytes tail call memcpy. src and dest must not overlap.
+//
+//   0..15     scalar loads/stores from both ends
+//   16..32    one 16-byte load/store from each end
+//   33..128   32 bytes from each end, plus 32 more from each end over 64 bytes
+//
+// Excluded on arm64_32, where size_t is 32 bits and the upper half of x2 is
+// undefined.
+#if defined(__aarch64__) && defined(__LP64__)
+#define SWIFT_LAYOUT_STRING_ARM64_MEMCPY 1
+
+__attribute__((naked, aligned(64))) static void
+layoutStringMemcpyArm64(void *dest, const void *src, size_t size) {
+  asm volatile(R"(
+    add     x4, x1, x2              // src end
+    add     x5, x0, x2              // dst end
+    cmp     x2, #128
+    b.hi    7f
+    cmp     x2, #32
+    b.hi    5f
+    cmp     x2, #16
+    b.lo    1f
+
+    // 16..32 bytes
+    ldr     q0, [x1]
+    ldr     q1, [x4, #-16]
+    str     q0, [x0]
+    str     q1, [x5, #-16]
+    ret
+
+1:  // 0..15 bytes
+    tbz     x2, #3, 2f
+    // 8..15 bytes
+    ldr     x6, [x1]
+    ldr     x7, [x4, #-8]
+    str     x6, [x0]
+    str     x7, [x5, #-8]
+    ret
+
+2:  // 0..7 bytes
+    tbz     x2, #2, 3f
+    // 4..7 bytes
+    ldr     w6, [x1]
+    ldr     w7, [x4, #-4]
+    str     w6, [x0]
+    str     w7, [x5, #-4]
+    ret
+
+3:  // 0..3 bytes
+    // 0..3 bytes: copy first, middle and last byte
+    cbz     x2, 4f
+    lsr     x8, x2, #1
+    ldrb    w6, [x1]
+    ldrb    w7, [x4, #-1]
+    ldrb    w9, [x1, x8]
+    strb    w6, [x0]
+    strb    w9, [x0, x8]
+    strb    w7, [x5, #-1]
+4:  // return
+    ret
+
+    .p2align 4
+5:  // 33..128 bytes
+    ldp     q0, q1, [x1]
+    ldp     q2, q3, [x4, #-32]
+    cmp     x2, #64
+    b.hi    6f
+    // 33..64 bytes
+    stp     q0, q1, [x0]
+    stp     q2, q3, [x5, #-32]
+    ret
+
+6:  // 65..128 bytes
+    ldp     q4, q5, [x1, #32]
+    ldp     q6, q7, [x4, #-64]
+    stp     q0, q1, [x0]
+    stp     q4, q5, [x0, #32]
+    stp     q6, q7, [x5, #-64]
+    stp     q2, q3, [x5, #-32]
+    ret
+
+7:  // > 128 bytes
+    b       _memcpy
+)");
+}
+#endif
+
+/// memcpy for copies whose size is only known at runtime.
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringMemcpy(void *dest, const void *src,
+                                      size_t size) {
+#ifdef SWIFT_LAYOUT_STRING_ARM64_MEMCPY
+  layoutStringMemcpyArm64(dest, src, size);
+#else
+  memcpy(dest, src, size);
+#endif
+}
+
+// Retain and release with the fast path inlined into the handlers, like the
+// swift_*Direct entry points of SwiftDirectRuntime. This uses the same inline
+// fast paths as swift_retain/swift_release, so side tables, overflow and deinit
+// still go to the out-of-line slow paths. When Instruments has swizzled the
+// ref counting functions, or for ObjC objects, the runtime entry points are
+// called instead.
+#if defined(__APPLE__) && defined(__arm64__) && defined(__LP64__) &&           \
+    defined(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE) &&                        \
+    !defined(SWIFT_THREADING_NONE) &&                                          \
+    !defined(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+#define SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE 1
+#endif
+
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+SWIFT_ALWAYS_INLINE
+static inline bool refCountingIsSwizzled() {
+  return _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly
+      .load(std::memory_order_relaxed);
+}
+
+/// Is the given BridgeObject a tagged value, or an ObjC object? (The same
+/// tests as swift_bridgeObjectRetain/Release.)
+SWIFT_ALWAYS_INLINE
+static inline bool isTaggedOrNonNativeBridgeObject(void *object) {
+  constexpr uintptr_t objectPointerIsObjCBit = 0x4000000000000000ULL;
+  static_assert((heap_object_abi::SwiftSpareBitsMask &
+                 objectPointerIsObjCBit) == objectPointerIsObjCBit,
+                "isObjC bit not within spare bits");
+  return (uintptr_t(object) & (heap_object_abi::ObjCReservedBitsMask |
+                               heap_object_abi::BridgeObjectTagBitsMask |
+                               objectPointerIsObjCBit)) != 0;
+}
+#endif
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringRetain(HeapObject *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(refCountingIsSwizzled())) {
+    swift_retain(object);
+    return;
+  }
+  // No branch hint here: the null edge leads straight to the code after the
+  // retain, and hot/cold splitting would treat that as cold and outline the
+  // whole fast path.
+  if ((intptr_t)object > 0)
+    object->refCounts.increment(object, 1);
+#else
+  swift_retain(object);
+#endif
+}
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringRelease(HeapObject *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(refCountingIsSwizzled())) {
+    swift_release(object);
+    return;
+  }
+  // No branch hint, see layoutStringRetain.
+  if ((intptr_t)object > 0)
+    object->refCounts.decrementAndMaybeDeinit(1, nullptr);
+#else
+  swift_release(object);
+#endif
+}
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringBridgeRetain(void *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(isTaggedOrNonNativeBridgeObject(object))) {
+    swift_bridgeObjectRetain(object);
+    return;
+  }
+  layoutStringRetain(
+      (HeapObject *)(uintptr_t(object) & ~heap_object_abi::SwiftSpareBitsMask));
+#else
+  swift_bridgeObjectRetain(object);
+#endif
+}
+
+SWIFT_ALWAYS_INLINE
+static inline void layoutStringBridgeRelease(void *object) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(isTaggedOrNonNativeBridgeObject(object))) {
+    swift_bridgeObjectRelease(object);
+    return;
+  }
+  layoutStringRelease(
+      (HeapObject *)(uintptr_t(object) & ~heap_object_abi::SwiftSpareBitsMask));
+#else
+  swift_bridgeObjectRelease(object);
+#endif
+}
 
 static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
   return reinterpret_cast<Metadata**>(object)[NumWords_ValueBuffer];
@@ -116,7 +312,7 @@ static constexpr bool platformSupportsTaggedPointers() {
     TAG = READER.readBytes<uint64_t>();                                        \
     OFFSET = (TAG & ~(0xFFULL << 56));                                         \
     if (OFFSET) {                                                              \
-      memcpy(DEST + ADDR_OFFSET, SRC + ADDR_OFFSET, OFFSET);                   \
+      layoutStringMemcpy(DEST + ADDR_OFFSET, SRC + ADDR_OFFSET, OFFSET);       \
     }                                                                          \
     ADDR_OFFSET += OFFSET;                                                     \
     TAG >>= 56;                                                                \
@@ -132,28 +328,84 @@ static constexpr bool platformSupportsTaggedPointers() {
     goto *dispatchTable[TAG];                                                  \
   } while (false)
 
-#define handleRefCounts(FN_TABLE, CONTINUE, METADATA, READER, ADDR_OFFSET,     \
-                        ...)                                                   \
+// For copying witnesses whose caller already copied all of the value's bytes,
+// so only the ref-counted fields need handling.
+#define CONTINUE_PRECOPIED(METADATA, READER, ADDR_OFFSET, DEST, SRC)           \
+  CONTINUE_NO_COPY(METADATA, READER, ADDR_OFFSET, DEST)
+
+// Walks a layout string with computed-goto dispatch. With INLINE_ENUMS, the
+// active payload of a multi-payload enum is walked by the same loop instead of
+// a call to multiPayloadEnum*: the loop saves where the enum ends, continues
+// with the payload's ref counts and resumes after the enum at the payload's
+// End. Only one enum is walked inline at a time; enums inside its payload take
+// the call. Only for witnesses whose multi-payload handlers walk the active
+// payload with the same table (destroy, initWithCopy, initWithTake).
+// COPY_BYTES says whether the bytes of inline enums still need to be copied;
+// false with CONTINUE_PRECOPIED.
+#define handleRefCountsImpl(FN_TABLE, CONTINUE, INLINE_ENUMS, COPY_BYTES,      \
+                            METADATA, READER, ADDR_OFFSET, ...)                \
   do {                                                                         \
+    LayoutStringReader1 _resumeReader{nullptr};                                \
+    uintptr_t _resumeAddrOffset = 0;                                           \
     while (true) {                                                             \
       uint64_t TAG = 0;                                                        \
       uintptr_t OFFSET = 0;                                                    \
                                                                                \
-      _Pragma("clang diagnostic push") _Pragma(                                \
-          "clang diagnostic ignored \"-Wgnu-label-as-value\"")                 \
-          const void *dispatchTable[] = {                                      \
-              &&done,       &&Error,   &&NativeStrong,   &&NativeUnowned,      \
-              &&NativeWeak, &&Unknown, &&UnknownUnowned, &&UnknownWeak,        \
-              &&Bridge,     &&Block,   &&ObjC,           &&NativeSwiftObjC,    \
-              &&Metatype,   &&Generic, &&Existential,    &&Resilient,          \
-              &&Default,    &&Default, &&Default,        &&Default,            \
-              &&Default,    &&Default, &&Default,                              \
+      _Pragma("clang diagnostic push")                                         \
+          _Pragma("clang diagnostic ignored \"-Wgnu-label-as-value\"")         \
+              const void *dispatchTable[] = {                                  \
+                  &&End,                                                       \
+                  &&Error,                                                     \
+                  &&NativeStrong,                                              \
+                  &&NativeUnowned,                                             \
+                  &&NativeWeak,                                                \
+                  &&Unknown,                                                   \
+                  &&UnknownUnowned,                                            \
+                  &&UnknownWeak,                                               \
+                  &&Bridge,                                                    \
+                  &&Block,                                                     \
+                  &&ObjC,                                                      \
+                  &&NativeSwiftObjC,                                           \
+                  &&Metatype,                                                  \
+                  &&Generic,                                                   \
+                  &&Existential,                                               \
+                  &&Resilient,                                                 \
+                  &&Default,                                                   \
+                  &&Default,                                                   \
+                  &&Default,                                                   \
+                  &&Default,                                                   \
+                  &&MultiPayloadEnumFN,                                        \
+                  &&MultiPayloadEnumFNResolved,                                \
+                  &&MultiPayloadEnumGeneric,                                   \
       };                                                                       \
                                                                                \
       [[clang::nomerge]] {                                                     \
         CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
       }                                                                        \
                                                                                \
+      [[clang::nomerge]] {                                                     \
+      End:                                                                     \
+        if (INLINE_ENUMS && _resumeReader.layoutStr) {                         \
+          if (COPY_BYTES && _resumeAddrOffset != ADDR_OFFSET) {                \
+            copyPayloadBytes(ADDR_OFFSET, _resumeAddrOffset - ADDR_OFFSET,     \
+                             __VA_ARGS__);                                     \
+          }                                                                    \
+          ADDR_OFFSET = _resumeAddrOffset;                                     \
+          READER = _resumeReader;                                              \
+          _resumeReader.layoutStr = nullptr;                                   \
+          CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                \
+        }                                                                      \
+        goto done;                                                             \
+      }                                                                        \
+      INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFN, CONTINUE, INLINE_ENUMS,    \
+                                COPY_BYTES, METADATA, READER, ADDR_OFFSET,     \
+                                __VA_ARGS__)                                   \
+      INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFNResolved, CONTINUE,          \
+                                INLINE_ENUMS, COPY_BYTES, METADATA, READER,    \
+                                ADDR_OFFSET, __VA_ARGS__)                      \
+      INLINE_MULTI_PAYLOAD_ENUM(MultiPayloadEnumGeneric, CONTINUE,             \
+                                INLINE_ENUMS, COPY_BYTES, METADATA, READER,    \
+                                ADDR_OFFSET, __VA_ARGS__)                      \
       [[clang::nomerge]] {                                                     \
       Error:                                                                   \
                                                                                \
@@ -243,12 +495,97 @@ static constexpr bool platformSupportsTaggedPointers() {
   done:                                                                        \
     break;                                                                     \
   } while (false)
+
+// The label for a multi-payload enum kind in handleRefCountsImpl. If the enum
+// can't be walked inline, it takes the call through the table.
+#define INLINE_MULTI_PAYLOAD_ENUM(KIND, CONTINUE, INLINE_ENUMS, COPY_BYTES,    \
+                                  METADATA, READER, ADDR_OFFSET, ...)          \
+  [[clang::nomerge]] {                                                         \
+  KIND:                                                                        \
+    if (INLINE_ENUMS && !_resumeReader.layoutStr) {                            \
+      uintptr_t enumStart = ADDR_OFFSET;                                       \
+      size_t enumSize;                                                         \
+      LayoutStringReader1 payloadReader;                                       \
+      if (readMultiPayloadEnum<RefCountingKind::KIND>(                         \
+              READER, payloadSourceAddr(__VA_ARGS__) + enumStart, enumSize,    \
+              payloadReader)) {                                                \
+        _resumeReader = READER;                                                \
+        _resumeAddrOffset = enumStart + enumSize;                              \
+        READER = payloadReader;                                                \
+      } else {                                                                 \
+        if (COPY_BYTES)                                                        \
+          copyPayloadBytes(enumStart, enumSize, __VA_ARGS__);                  \
+        ADDR_OFFSET = enumStart + enumSize;                                    \
+      }                                                                        \
+      CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                    \
+    }                                                                          \
+    goto Default;                                                              \
+  }
+
+#define handleRefCounts(FN_TABLE, CONTINUE, ...)                               \
+  handleRefCountsImpl(FN_TABLE, CONTINUE, false, false, __VA_ARGS__)
+#define handleRefCountsInliningEnums(FN_TABLE, CONTINUE, ...)                  \
+  handleRefCountsImpl(FN_TABLE, CONTINUE, true, true, __VA_ARGS__)
+#define handleRefCountsPrecopied(FN_TABLE, ...)                                \
+  handleRefCountsImpl(FN_TABLE, CONTINUE_PRECOPIED, true, false, __VA_ARGS__)
 #endif
+
+typedef void (*DestrFn)(const Metadata *metadata, LayoutStringReader1 &reader,
+                        uintptr_t &addrOffset, uint8_t *addr);
+
+typedef void (*InitFn)(const Metadata *metadata, LayoutStringReader1 &reader,
+                       uintptr_t &addrOffset, uint8_t *dest, uint8_t *src);
 
 static void handleRefCountsDestroy(const Metadata *metadata,
                           LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
                           uint8_t *addr);
+
+static void handleRefCountsInitWithCopy(const Metadata *metadata,
+                                        LayoutStringReader1 &reader,
+                                        uintptr_t &addrOffset, uint8_t *dest,
+                                        uint8_t *src);
+
+static void handleRefCountsInitWithTake(const Metadata *metadata,
+                                        LayoutStringReader1 &reader,
+                                        uintptr_t &addrOffset, uint8_t *dest,
+                                        uint8_t *src);
+
+#if defined(__APPLE__) && defined(__arm64__)
+// The dispatch tables are defined after the functions they point to, so the
+// multi-payload enum handlers below reach them through these accessors.
+static const DestrFn *getDestroyTable();
+static const InitFn *getInitWithCopyTable();
+static const InitFn *getInitWithTakeTable();
+
+template <auto HandlerFn>
+static const InitFn *getInitTable() {
+  if constexpr (HandlerFn == &handleRefCountsInitWithCopy) {
+    return getInitWithCopyTable();
+  } else {
+    static_assert(HandlerFn == &handleRefCountsInitWithTake);
+    return getInitWithTakeTable();
+  }
+}
+
+// Walks the ref counts of a multi-payload enum's payload. On arm64 this uses
+// the same inlined dispatch as the top-level witnesses, rather than an indirect
+// call through the table for every ref-counted field. Payloads without
+// ref-counted fields skip the walk; the caller copies their bytes. Testing for
+// them with a conditional branch avoids an unpredictable indirect jump when
+// the enum's cases alternate.
+#define handlePayloadRefCounts(HANDLER_FN, FN_TABLE, CONTINUE, METADATA,       \
+                               READER, ...)                                    \
+  do {                                                                         \
+    if (SWIFT_LIKELY((READER.peekBytes<uint64_t>() >> 56) !=                   \
+                     (uint64_t)RefCountingKind::End)) {                        \
+      handleRefCounts(FN_TABLE, CONTINUE, METADATA, READER, __VA_ARGS__);      \
+    }                                                                          \
+  } while (false)
+#else
+#define handlePayloadRefCounts(HANDLER_FN, FN_TABLE, CONTINUE, ...)            \
+  HANDLER_FN(__VA_ARGS__)
+#endif
 
 template <typename ...Params>
 static void handleEnd(const Metadata *metadata,
@@ -272,7 +609,7 @@ static void nativeStrongDestroy(const Metadata *metadata,
                                 uintptr_t &addrOffset, uint8_t *addr) {
   HeapObject *object = (HeapObject*)((*(uintptr_t *)(addr + addrOffset)) & ~_swift_abi_SwiftSpareBitsMask);
   addrOffset += sizeof(HeapObject*);
-  swift_release(object);
+  layoutStringRelease(object);
 }
 
 static void unownedDestroy(const Metadata *metadata,
@@ -321,7 +658,7 @@ static void bridgeDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                           uintptr_t &addrOffset, uint8_t *addr) {
   auto *object = *(void **)(addr + addrOffset);
   addrOffset += sizeof(void*);
-  swift_bridgeObjectRelease(object);
+  layoutStringBridgeRelease(object);
 }
 
 static void singlePayloadEnumSimple(const Metadata *metadata,
@@ -367,6 +704,71 @@ static void singlePayloadEnumSimple(const Metadata *metadata,
 }
 
 typedef unsigned (*GetEnumTagFn)(const uint8_t *);
+
+#if defined(__APPLE__) && defined(__arm64__)
+// Reads the header of a multi-payload enum at `addr` and advances `reader`
+// past the enum. Returns true, with `payloadReader` at the active payload's
+// ref counts, if that payload has ref-counted fields.
+template <RefCountingKind Kind>
+SWIFT_ALWAYS_INLINE static inline bool
+readMultiPayloadEnum(LayoutStringReader1 &reader, const uint8_t *addr,
+                     size_t &enumSize, LayoutStringReader1 &payloadReader) {
+  size_t numPayloads;
+  size_t refCountBytes;
+  uint64_t enumTag;
+  if constexpr (Kind == RefCountingKind::MultiPayloadEnumGeneric) {
+    size_t tagBytes;
+    reader.readBytes(tagBytes, numPayloads, refCountBytes, enumSize);
+    enumTag = readTagBytes(addr + enumSize - tagBytes, tagBytes);
+  } else {
+    GetEnumTagFn getEnumTag;
+    if constexpr (Kind == RefCountingKind::MultiPayloadEnumFN) {
+      getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
+    } else {
+      static_assert(Kind == RefCountingKind::MultiPayloadEnumFNResolved);
+      getEnumTag = reader.readBytes<GetEnumTagFn>();
+    }
+    // Call before reading the rest of the header, so that less is live
+    // across the call.
+    enumTag = getEnumTag(addr);
+    reader.readBytes(numPayloads, refCountBytes, enumSize);
+  }
+
+  LayoutStringReader1 payloadOffsets = reader;
+  reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
+  if (SWIFT_UNLIKELY(enumTag >= numPayloads))
+    return false;
+
+  payloadReader = payloadOffsets;
+  size_t refCountOffset =
+      payloadOffsets.peekBytes<size_t>(enumTag * sizeof(size_t));
+  payloadReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+  return (payloadReader.peekBytes<uint64_t>() >> 56) !=
+         (uint64_t)RefCountingKind::End;
+}
+
+// Helpers for handleRefCountsImpl, overloaded on the witness's address
+// arguments: (addr) for destroy, (dest, src) for the copying witnesses.
+SWIFT_ALWAYS_INLINE static inline const uint8_t *
+payloadSourceAddr(uint8_t *addr) {
+  return addr;
+}
+
+SWIFT_ALWAYS_INLINE static inline const uint8_t *
+payloadSourceAddr(uint8_t *dest, uint8_t *src) {
+  return src;
+}
+
+SWIFT_ALWAYS_INLINE static inline void
+copyPayloadBytes(uintptr_t addrOffset, size_t size, uint8_t *addr) {}
+
+SWIFT_ALWAYS_INLINE static inline void copyPayloadBytes(uintptr_t addrOffset,
+                                                        size_t size,
+                                                        uint8_t *dest,
+                                                        uint8_t *src) {
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, size);
+}
+#endif
 
 static void singlePayloadEnumFN(const Metadata *metadata,
                                 LayoutStringReader1 &reader,
@@ -473,7 +875,8 @@ static void multiPayloadEnumFN(const Metadata *metadata,
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    HandlerFn(metadata, nestedReader, nestedAddrOffset, addr);
+    handlePayloadRefCounts(HandlerFn, getDestroyTable(), CONTINUE_NO_COPY,
+                           metadata, nestedReader, nestedAddrOffset, addr);
   } else {
     addrOffset += enumSize;
   }
@@ -504,7 +907,8 @@ static void multiPayloadEnumFNResolved(const Metadata *metadata,
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    HandlerFn(metadata, nestedReader, nestedAddrOffset, addr);
+    handlePayloadRefCounts(HandlerFn, getDestroyTable(), CONTINUE_NO_COPY,
+                           metadata, nestedReader, nestedAddrOffset, addr);
   } else {
     addrOffset += enumSize;
   }
@@ -537,7 +941,8 @@ static void multiPayloadEnumGeneric(const Metadata *metadata,
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    HandlerFn(metadata, nestedReader, nestedAddrOffset, addr);
+    handlePayloadRefCounts(HandlerFn, getDestroyTable(), CONTINUE_NO_COPY,
+                           metadata, nestedReader, nestedAddrOffset, addr);
   } else {
     addrOffset += enumSize;
   }
@@ -581,7 +986,7 @@ static void singlePayloadEnumSimple(const Metadata *metadata,
       }
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     reader.skip(refCountBytes);
     addrOffset += skip;
   });
@@ -603,7 +1008,7 @@ static void singlePayloadEnumFN(const Metadata *metadata,
       size_t skip;
       reader.readBytes(refCountBytes, skip);
       reader.skip(refCountBytes);
-      memcpy(dest + addrOffset, src + addrOffset, skip);
+      layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
       addrOffset += skip;
     }
   });
@@ -623,7 +1028,7 @@ static void singlePayloadEnumFNResolved(const Metadata *metadata,
 
     if (SWIFT_UNLIKELY(enumTag != 0)) {
       reader.skip(refCountBytes);
-      memcpy(dest + addrOffset, src + addrOffset, skip);
+      layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
       addrOffset += skip;
     }
   });
@@ -668,7 +1073,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     }
 
     reader.skip(refCountBytes);
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -698,12 +1103,15 @@ multiPayloadEnumFN(const Metadata *metadata, LayoutStringReader1 &reader,
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    HandlerFn(metadata, nestedReader, nestedAddrOffset, dest, src);
+    handlePayloadRefCounts(HandlerFn, getInitTable<HandlerFn>(),
+                           CONTINUE_WITH_COPY, metadata, nestedReader,
+                           nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
   } else {
-    memcpy(dest + addrOffset, src + addrOffset, enumSize);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
     addrOffset += enumSize;
   }
 }
@@ -734,12 +1142,15 @@ static void multiPayloadEnumFNResolved(const Metadata *metadata,
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    HandlerFn(metadata, nestedReader, nestedAddrOffset, dest, src);
+    handlePayloadRefCounts(HandlerFn, getInitTable<HandlerFn>(),
+                           CONTINUE_WITH_COPY, metadata, nestedReader,
+                           nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
   } else {
-    memcpy(dest + addrOffset, src + addrOffset, enumSize);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
     addrOffset += enumSize;
   }
 }
@@ -771,12 +1182,15 @@ multiPayloadEnumGeneric(const Metadata *metadata, LayoutStringReader1 &reader,
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(enumTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    HandlerFn(metadata, nestedReader, nestedAddrOffset, dest, src);
+    handlePayloadRefCounts(HandlerFn, getInitTable<HandlerFn>(),
+                           CONTINUE_WITH_COPY, metadata, nestedReader,
+                           nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
   } else {
-    memcpy(dest + addrOffset, src + addrOffset, enumSize);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
     addrOffset += enumSize;
   }
 }
@@ -854,9 +1268,6 @@ static void resilientDestroy(const Metadata *metadata,
   type->vw_destroy(object);
 }
 
-typedef void (*DestrFn)(const Metadata *metadata, LayoutStringReader1 &reader,
-                        uintptr_t &addrOffset, uint8_t *addr);
-
 constexpr DestrFn destroyTable[] = {
     &handleEnd,
     &errorDestroy,
@@ -883,6 +1294,10 @@ constexpr DestrFn destroyTable[] = {
     &multiPayloadEnumGeneric<handleRefCountsDestroy>,
 };
 
+#if defined(__APPLE__) && defined(__arm64__)
+static const DestrFn *getDestroyTable() { return destroyTable; }
+#endif
+
 static void handleRefCountsDestroy(const Metadata *metadata,
                           LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
@@ -899,18 +1314,152 @@ static void handleRefCountsDestroy(const Metadata *metadata,
   }
 }
 
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+// The general destroy walk, starting at `reader`.
+SWIFT_NOINLINE static void destroyRefCounts(const Metadata *metadata,
+                                            LayoutStringReader1 reader,
+                                            uintptr_t addrOffset,
+                                            uint8_t *addr) {
+  handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata, reader,
+                               addrOffset, addr);
+}
+
+// Continues a walk that destroyFast handed off at `reader`. If the walk was in
+// the payload of a multi-payload enum, it finishes the payload and resumes
+// after the enum.
+SWIFT_NOINLINE static void destroySlow(const Metadata *metadata,
+                                       LayoutStringReader1 reader,
+                                       uintptr_t addrOffset, uint8_t *addr,
+                                       LayoutStringReader1 resumeReader,
+                                       uintptr_t resumeAddrOffset) {
+  destroyRefCounts(metadata, reader, addrOffset, addr);
+  if (resumeReader.layoutStr)
+    destroyRefCounts(metadata, resumeReader, resumeAddrOffset, addr);
+}
+
+// Destroys a value with a walk that handles only the most common kinds, so that
+// it needs few registers and saves as few callee-saved registers as possible:
+// End, native strong references, native bridge objects and multi-payload enums
+// one level deep. It calls nothing with the standard calling convention except
+// an enum's getEnumTag; the ref counting slow paths are preserve_most. For
+// anything else, it hands off to destroySlow at the current tag.
+//
+// It is noinline so that hot/cold splitting leaves it alone: outlined cold code
+// is called with the standard calling convention, which would force saving
+// callee-saved registers on every call.
+SWIFT_NOINLINE static void destroyFast(const Metadata *metadata,
+                                       uint8_t *addr) {
+  LayoutStringReader1 reader{metadata->getLayoutString() +
+                             layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  LayoutStringReader1 resumeReader{nullptr};
+  uintptr_t resumeAddrOffset = 0;
+  uint64_t tag;
+
+  _Pragma("clang diagnostic push");
+  _Pragma("clang diagnostic ignored \"-Wgnu-label-as-value\"");
+  // clang-format off
+  static const void *const dispatchTable[] = {
+      &&End,  &&Slow,                 &&NativeStrong, &&Slow,
+      &&Slow, &&Slow,                 &&Slow,         &&Slow,
+      &&Bridge, &&Slow,               &&Slow,         &&Slow,
+      &&Slow, &&Slow,                 &&Slow,         &&Slow,
+      &&Slow, &&Slow,                 &&Slow,         &&Slow,
+      &&MultiPayloadEnumFN, &&MultiPayloadEnumFNResolved,
+      &&MultiPayloadEnumGeneric,
+  };
+  // clang-format on
+
+#define DESTROY_FAST_NEXT()                                                    \
+  do {                                                                         \
+    tag = reader.readBytes<uint64_t>();                                        \
+    addrOffset += tag & ~(0xFFULL << 56);                                      \
+    goto *dispatchTable[tag >> 56];                                            \
+  } while (false)
+
+#define DESTROY_FAST_MULTI_PAYLOAD_ENUM(KIND)                                  \
+  KIND:                                                                        \
+  {                                                                            \
+    if (resumeReader.layoutStr)                                                \
+      goto Slow;                                                               \
+    uintptr_t enumStart = addrOffset;                                          \
+    size_t enumSize;                                                           \
+    LayoutStringReader1 payloadReader;                                         \
+    if (readMultiPayloadEnum<RefCountingKind::KIND>(                           \
+            reader, addr + enumStart, enumSize, payloadReader)) {              \
+      resumeReader = reader;                                                   \
+      resumeAddrOffset = enumStart + enumSize;                                 \
+      reader = payloadReader;                                                  \
+    } else {                                                                   \
+      addrOffset = enumStart + enumSize;                                       \
+    }                                                                          \
+    DESTROY_FAST_NEXT();                                                       \
+  }
+
+  DESTROY_FAST_NEXT();
+
+End:
+  if (resumeReader.layoutStr) {
+    reader = resumeReader;
+    addrOffset = resumeAddrOffset;
+    resumeReader.layoutStr = nullptr;
+    DESTROY_FAST_NEXT();
+  }
+  return;
+
+NativeStrong:
+  {
+    auto *object = (HeapObject *)(*(uintptr_t *)(addr + addrOffset) &
+                                  ~_swift_abi_SwiftSpareBitsMask);
+    addrOffset += sizeof(HeapObject *);
+    layoutStringRelease(object);
+    DESTROY_FAST_NEXT();
+  }
+
+Bridge:
+  {
+    void *object = *(void **)(addr + addrOffset);
+    if (SWIFT_UNLIKELY(isTaggedOrNonNativeBridgeObject(object)))
+      goto Slow;
+    addrOffset += sizeof(void *);
+    layoutStringRelease((HeapObject *)(uintptr_t(object) &
+                                       ~heap_object_abi::SwiftSpareBitsMask));
+    DESTROY_FAST_NEXT();
+  }
+
+  DESTROY_FAST_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFN)
+  DESTROY_FAST_MULTI_PAYLOAD_ENUM(MultiPayloadEnumFNResolved)
+  DESTROY_FAST_MULTI_PAYLOAD_ENUM(MultiPayloadEnumGeneric)
+
+Slow:
+  // Rewind to the current tag and let the general walk take it from there.
+  reader.layoutStr -= sizeof(uint64_t);
+  addrOffset -= tag & ~(0xFFULL << 56);
+  return destroySlow(metadata, reader, addrOffset, addr, resumeReader,
+                     resumeAddrOffset);
+  _Pragma("clang diagnostic pop");
+
+#undef DESTROY_FAST_MULTI_PAYLOAD_ENUM
+#undef DESTROY_FAST_NEXT
+}
+#endif
+
 static void swift_cvw_destroyImpl(swift::OpaqueValue *address,
                                   const Metadata *metadata) {
+#if SWIFT_LAYOUT_STRING_INLINE_RETAIN_RELEASE
+  destroyFast(metadata, (uint8_t *)address);
+#else
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
   uint8_t *addr = (uint8_t *)address;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCounts(destroyTable, CONTINUE_NO_COPY, metadata, reader, addrOffset,
-                  addr);
+  handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata, reader,
+                               addrOffset, addr);
 #else
   handleRefCountsDestroy(metadata, reader, addrOffset, addr);
+#endif
 #endif
 }
 
@@ -918,24 +1467,26 @@ void swift::swift_cvw_arrayDestroy(swift::OpaqueValue *address, size_t count,
                                    size_t stride, const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *addr = (uint8_t *)address;
+#if defined(__APPLE__) && defined(__arm64__)
+  // This doesn't use destroyFast: the loop below saves the callee-saved
+  // registers once per array instead of once per element. It iterates over
+  // element addresses, which keeps fewer values live across the walk than an
+  // index, so that the loop state stays in registers.
+  const uint8_t *body = layoutStr + layoutStringHeaderSize;
+  for (uint8_t *end = addr + count * stride; addr != end; addr += stride) {
+    LayoutStringReader1 reader{body};
+    uintptr_t addrOffset = 0;
+    handleRefCountsInliningEnums(destroyTable, CONTINUE_NO_COPY, metadata,
+                                 reader, addrOffset, addr);
+  }
+#else
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-
-#if defined(__APPLE__) && defined(__arm64__)
-    handleRefCounts(destroyTable, CONTINUE_NO_COPY, metadata, reader,
-                    addrOffset, addr);
-#else
     handleRefCountsDestroy(metadata, reader, addrOffset, addr);
-#endif
   }
+#endif
 }
-
-static void handleRefCountsInitWithCopy(const Metadata *metadata,
-                          LayoutStringReader1 &reader,
-                          uintptr_t &addrOffset,
-                          uint8_t *dest,
-                          uint8_t *src);
 
 static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
@@ -956,7 +1507,7 @@ static void nativeStrongRetain(const Metadata *metadata,
   memcpy(dest + _addrOffset, &object, sizeof(HeapObject*));
   object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(HeapObject *);
-  swift_retain((HeapObject *)object);
+  layoutStringRetain((HeapObject *)object);
 }
 
 static void unownedRetain(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -1018,7 +1569,7 @@ static void bridgeRetain(const Metadata *metadata, LayoutStringReader1 &reader,
   void *object = *(void **)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void*);
-  swift_bridgeObjectRetain(object);
+  layoutStringBridgeRetain(object);
 }
 
 static void blockCopy(const Metadata *metadata, LayoutStringReader1 &reader,
@@ -1106,12 +1657,6 @@ static void resilientInitWithCopy(const Metadata *metadata,
   type->vw_initializeWithCopy(destObject, srcObject);
 }
 
-typedef void (*InitFn)(const Metadata *metadata,
-                                 LayoutStringReader1 &reader,
-                                 uintptr_t &addrOffset,
-                                 uint8_t *dest,
-                                 uint8_t *src);
-
 constexpr InitFn initWithCopyTable[] = {
     &handleEnd,
     &errorRetain,
@@ -1138,6 +1683,10 @@ constexpr InitFn initWithCopyTable[] = {
     &multiPayloadEnumGeneric<handleRefCountsInitWithCopy>,
 };
 
+#if defined(__APPLE__) && defined(__arm64__)
+static const InitFn *getInitWithCopyTable() { return initWithCopyTable; }
+#endif
+
 static void handleRefCountsInitWithCopy(const Metadata *metadata,
                           LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
@@ -1148,7 +1697,7 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
     if (offset) {
-      memcpy(dest + _addrOffset, src + _addrOffset, offset);
+      layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
     tag >>= 56;
@@ -1160,6 +1709,32 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
   }
 }
 
+#if defined(__APPLE__) && defined(__arm64__)
+// arrayInitWithCopy copies elements up to this size with a single memcpy before
+// handling their ref-counted fields. Larger elements copy the bytes between
+// the ref-counted fields along the way instead: for them, copying everything up
+// front was measured to be slower for large arrays, probably because the
+// stores of several cache lines then precede the first atomic ref count
+// operation. (For single values, copying everything up front is faster at
+// all sizes.)
+static constexpr size_t maxPrecopiedArrayElementSize = 128;
+
+// arrayInitWithCopy of elements larger than maxPrecopiedArrayElementSize.
+SWIFT_NOINLINE static void
+arrayInitWithCopyPiecewise(const Metadata *metadata, uint8_t *dest,
+                           uint8_t *src, size_t count, size_t stride) {
+  // Iterates over element addresses; see swift_cvw_arrayDestroy.
+  const uint8_t *body = metadata->getLayoutString() + layoutStringHeaderSize;
+  for (uint8_t *end = dest + count * stride; dest != end;
+       dest += stride, src += stride) {
+    LayoutStringReader1 reader{body};
+    uintptr_t addrOffset = 0;
+    handleRefCountsInliningEnums(initWithCopyTable, CONTINUE_WITH_COPY,
+                                 metadata, reader, addrOffset, dest, src);
+  }
+}
+#endif
+
 static swift::OpaqueValue *
 swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
@@ -1170,8 +1745,11 @@ swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
   uint8_t *src = (uint8_t *)_src;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCounts(initWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
-                  addrOffset, dest, src);
+  // Copy all bytes at once; the walk then only handles the ref-counted fields,
+  // whose handlers initialize their own bytes of dest again.
+  layoutStringMemcpy(dest, src, metadata->vw_size());
+  handleRefCountsPrecopied(initWithCopyTable, metadata, reader, addrOffset,
+                           dest, src);
 #else
   handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
 #endif
@@ -1188,23 +1766,28 @@ void swift::swift_cvw_arrayInitWithCopy(swift::OpaqueValue *_dest,
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *dest = (uint8_t *)_dest;
   uint8_t *src = (uint8_t *)_src;
+#if defined(__APPLE__) && defined(__arm64__)
+  size_t size = metadata->vw_size();
+  if (SWIFT_UNLIKELY(size > maxPrecopiedArrayElementSize))
+    return arrayInitWithCopyPiecewise(metadata, dest, src, count, stride);
+  // Iterates over element addresses; see swift_cvw_arrayDestroy.
+  const uint8_t *body = layoutStr + layoutStringHeaderSize;
+  for (uint8_t *end = dest + count * stride; dest != end;
+       dest += stride, src += stride) {
+    LayoutStringReader1 reader{body};
+    uintptr_t addrOffset = 0;
+    layoutStringMemcpy(dest, src, size);
+    handleRefCountsPrecopied(initWithCopyTable, metadata, reader, addrOffset,
+                             dest, src);
+  }
+#else
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-#if defined(__APPLE__) && defined(__arm64__)
-    handleRefCounts(initWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
-                    addrOffset, dest, src);
-#else
     handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
-#endif
   }
+#endif
 }
-
-static void handleRefCountsInitWithTake(const Metadata *metadata,
-                          LayoutStringReader1 &reader,
-                          uintptr_t &addrOffset,
-                          uint8_t *dest,
-                          uint8_t *src);
 
 static void unknownWeakInitWithTake(const Metadata *metadata,
                              LayoutStringReader1 &reader,
@@ -1296,6 +1879,10 @@ constexpr InitFn initWithTakeTable[] = {
     &multiPayloadEnumGeneric<handleRefCountsInitWithTake>,
 };
 
+#if defined(__APPLE__) && defined(__arm64__)
+static const InitFn *getInitWithTakeTable() { return initWithTakeTable; }
+#endif
+
 static void handleRefCountsInitWithTake(const Metadata *metadata,
                           LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
@@ -1306,7 +1893,7 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
     if (offset) {
-      memcpy(dest + _addrOffset, src + _addrOffset, offset);
+      layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset += offset;
     tag >>= 56;
@@ -1323,7 +1910,7 @@ swift_cvw_initWithTakeImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
   if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     size_t size = metadata->vw_size();
-    memcpy(_dest, _src, size);
+    layoutStringMemcpy(_dest, _src, size);
     return _dest;
   }
 
@@ -1335,8 +1922,8 @@ swift_cvw_initWithTakeImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
   uintptr_t addrOffset = 0;
 
 #if defined(__APPLE__) && defined(__arm64__)
-  handleRefCounts(initWithTakeTable, CONTINUE_WITH_COPY, metadata, reader,
-                  addrOffset, dest, src);
+  handleRefCountsInliningEnums(initWithTakeTable, CONTINUE_WITH_COPY, metadata,
+                               reader, addrOffset, dest, src);
 #else
   handleRefCountsInitWithTake(metadata, reader, addrOffset, dest, src);
 #endif
@@ -1375,8 +1962,8 @@ static void nativeStrongAssignWithCopy(const Metadata *metadata,
   srcObject &= ~_swift_abi_SwiftSpareBitsMask;
   destObject &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(HeapObject *);
-  swift_release((HeapObject *)destObject);
-  swift_retain((HeapObject *)srcObject);
+  layoutStringRelease((HeapObject *)destObject);
+  layoutStringRetain((HeapObject *)srcObject);
 }
 
 static void unownedAssignWithCopy(const Metadata *metadata,
@@ -1421,8 +2008,8 @@ static void bridgeAssignWithCopy(const Metadata *metadata,
   void *srcObject = *(void **)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void *);
-  swift_bridgeObjectRelease(destObject);
-  swift_bridgeObjectRetain(srcObject);
+  layoutStringBridgeRelease(destObject);
+  layoutStringBridgeRetain(srcObject);
 }
 
 static void weakAssignWithCopy(const Metadata *metadata,
@@ -1609,7 +2196,7 @@ static void handleSingleRefCountInitWithCopy(const Metadata *metadata,
   auto _addrOffset = addrOffset;
   auto offset = (tag & ~(0xFFULL << 56));
   if (SWIFT_UNLIKELY(offset)) {
-    memcpy(dest + _addrOffset, src + _addrOffset, offset);
+    layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
   }
   addrOffset = _addrOffset + offset;
   tag >>= 56;
@@ -1677,7 +2264,7 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 
@@ -1716,7 +2303,7 @@ static void singlePayloadEnumFNAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -1753,7 +2340,7 @@ static void singlePayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -1815,7 +2402,7 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
       reader.skip(refCountBytes);
     }
 
-    memcpy(dest + addrOffset, src + addrOffset, skip);
+    layoutStringMemcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
 }
@@ -1859,7 +2446,8 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
@@ -1868,7 +2456,8 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (destTag < numPayloads) {
     size_t refCountOffset =
@@ -1877,7 +2466,7 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
   addrOffset += enumSize;
 }
 
@@ -1918,7 +2507,8 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
@@ -1927,7 +2517,8 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     return;
   } else if (destTag < numPayloads) {
     size_t refCountOffset =
@@ -1936,7 +2527,7 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
   addrOffset += enumSize;
 }
 
@@ -1979,7 +2570,7 @@ static void handleRefCountsAssignWithCopy(const Metadata *metadata,
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
     if (offset) {
-      memcpy(dest + _addrOffset, src + _addrOffset, offset);
+      layoutStringMemcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
     tag >>= 56;
@@ -2046,7 +2637,8 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     }
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes) {
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     }
     return;
   } else if (srcTag < numPayloads) {
@@ -2056,7 +2648,8 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
     auto trailingBytes = addrOffset - nestedAddrOffset;
     if (trailingBytes) {
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+      layoutStringMemcpy(dest + nestedAddrOffset, src + nestedAddrOffset,
+                         trailingBytes);
     }
     return;
   } else if (destTag < numPayloads) {
@@ -2066,7 +2659,7 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  layoutStringMemcpy(dest + addrOffset, src + addrOffset, enumSize);
   addrOffset += enumSize;
 }
 
@@ -2667,7 +3260,7 @@ swift_cvw_initWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
                                              const Metadata *metadata) {
   if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     size_t size = metadata->vw_size();
-    memcpy(_dest, _src, size);
+    layoutStringMemcpy(_dest, _src, size);
     return _dest;
   }
 
