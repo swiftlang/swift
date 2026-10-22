@@ -125,12 +125,10 @@ internal struct SwiftBacktrace {
 
   static func write(_ string: String, flush: Bool = false) {
     #if os(Windows)
-    if let eventLogText {
     // we are collating the output to a string for writing at the
     // end into the event log
-      eventLogText.append(string)
-      return
-    }
+    eventLogText?.append(string)
+    guard eventLogText == nil else { return }
     #endif
 
     precondition(outputStream != nil, "Output stream must be set before calling write")
@@ -144,13 +142,10 @@ internal struct SwiftBacktrace {
 
   static func writeln(_ string: String, flush: Bool = false) {
     #if os(Windows)
-    if let eventLogText {
     // we are collating the output to a string for writing at the
     // end into the event log
-      eventLogText.append(string)
-      eventLogText.append("\n")
-      return
-    }
+    eventLogText?.append(string + "\n")
+    guard eventLogText == nil else { return }
     #endif
 
     precondition(outputStream != nil, "Output stream must be set before calling writeln")
