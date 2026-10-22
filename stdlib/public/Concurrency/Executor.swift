@@ -37,52 +37,145 @@ public protocol Executor: AnyObject, Sendable {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+/// Represents the time at which a scheduled job should run.
+///
+/// A fire time is either relative or absolute, and provides methods to
+/// convert to whichever form a given executor needs.  This lets
+/// `SchedulingExecutor` have a single `enqueue` requirement that accepts
+/// either a `Duration` or an `Instant`.
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.3, *)
+public enum SchedulingExecutorFireTime<C: Clock> {
+  /// A time relative to now.
+  case after(C.Duration)
+
+  /// An absolute time.
+  case at(C.Instant)
+
+  /// Returns the duration from now until the fire time.
+  public func asDuration(clock: C) -> C.Duration {
+    switch self {
+    case let .after(duration):
+      return duration
+    case let .at(instant):
+      return clock.now.duration(to: instant)
+    }
+  }
+
+  /// Returns the absolute time represented by the fire time.
+  public func asInstant(clock: C) -> C.Instant {
+    switch self {
+    case let .after(duration):
+      return clock.now.advanced(by: duration)
+    case let .at(instant):
+      return instant
+    }
+  }
+}
+
+/// Represents a job that has been scheduled for future execution.
+///
+/// Executors create these in `SchedulingExecutor.enqueue(...)`.  Calling
+/// `cancel()` asks the executor to give the job back if it has not yet
+/// started running.
+///
+/// Dropping the token without cancelling does not affect the job; the token's
+/// clean-up function (if any) runs so that the executor can release any
+/// resources it is keeping for cancellation.
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.3, *)
+public struct JobCancellationToken: ~Copyable {
+  /// The executor that the job was scheduled on.
+  public let executor: any SchedulingExecutor
+
+  /// An identifier for the job, assigned by the executor.  Executors that
+  /// identify jobs by ID (rather than via `opaqueData`) must not reuse them.
+  public let jobID: UInt64
+
+  /// Opaque, executor-specific data.
+  public let opaqueData: (Int, Int)
+
+  /// An optional function that is called when the token is destroyed,
+  /// whether or not the job was cancelled.
+  public let cleanUp: (@convention(thin) (borrowing JobCancellationToken) -> ())?
+
+  public init(executor: any SchedulingExecutor,
+              jobID: UInt64,
+              opaqueData: (Int, Int),
+              cleanUp: (@convention(thin) (borrowing JobCancellationToken) -> ())? = nil) {
+    self.executor = executor
+    self.jobID = jobID
+    self.opaqueData = opaqueData
+    self.cleanUp = cleanUp
+  }
+
+  deinit {
+    if let cleanUp {
+      cleanUp(self)
+    }
+  }
+
+  /// Cancel the scheduled job.
+  ///
+  /// If the job had not started running, it is removed from the executor and
+  /// returned; the caller then owns it and must run, enqueue or destroy it.
+  /// Returns `nil` if the job has started, has finished, or cannot be
+  /// cancelled by the executor, in which case it will run (or has run)
+  /// normally.
+  public consuming func cancel() -> ExecutorJob? {
+    return executor.cancel(jobWithToken: self)
+  }
+}
+
+#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol SchedulingExecutor: Executor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  /// Enqueue a job to run after a specified delay.
-  ///
-  /// You need only implement one of the two enqueue functions here;
-  /// the default implementation for the other will then call the one
-  /// you have implemented.
-  ///
-  /// Parameters:
-  ///
-  /// - job:       The job to schedule.
-  /// - after:     A `Duration` specifying the time after which the job
-  ///              is to run.  The job will not be executed before this
-  ///              time has elapsed.
-  /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay.
-  @available(StdlibDeploymentTarget 6.3, *)
-  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                         after delay: C.Duration,
-                         tolerance: C.Duration?,
-                         clock: C)
-
   /// Enqueue a job to run at a specified time.
   ///
-  /// You need only implement one of the two enqueue functions here;
-  /// the default implementation for the other will then call the one
-  /// you have implemented.
-  ///
   /// Parameters:
   ///
   /// - job:       The job to schedule.
-  /// - at:        The `Instant` at which the job should run.  The job
-  ///              will not be executed before this time.
+  /// - run:       A `SchedulingExecutorFireTime` saying when the job should
+  ///              run.  The job will not run before that time.
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay.
+  /// - clock:     The clock used to interpret `run`.
+  ///
+  /// Returns a token that can be used to cancel the job before it runs.
   @available(StdlibDeploymentTarget 6.3, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                         at instant: C.Instant,
+                         run: SchedulingExecutorFireTime<C>,
                          tolerance: C.Duration?,
-                         clock: C)
+                         clock: C) -> JobCancellationToken
+
+  /// Cancel a scheduled job.
+  ///
+  /// If the job identified by the token has not yet started, remove it from
+  /// the executor and return it, handing ownership to the caller.  The
+  /// executor must first undo anything it attached to the job so that the
+  /// caller may run, enqueue or destroy it.
+  ///
+  /// Return `nil` only if the job has already started running or has
+  /// finished; callers take that to mean the job will run (or has run)
+  /// normally.  An executor that is unable to remove pending jobs may always
+  /// return `nil`, but then cancelling a `Task.sleep()` will not wake the task
+  /// until its timer fires, and the timer stays queued until then.
+  ///
+  /// This may be called from any thread.  A token for a job that has already
+  /// run must return `nil` and must never match a different job.
+  ///
+  /// Parameters:
+  ///
+  /// - jobWithToken: The token returned when the job was scheduled.
+  @available(StdlibDeploymentTarget 6.3, *)
+  func cancel(jobWithToken: consuming JobCancellationToken) -> ExecutorJob?
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -172,26 +265,12 @@ extension SchedulingExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+  /// Enqueue a job to run at a specified time, with no tolerance.
   @available(StdlibDeploymentTarget 6.3, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    // If you crash here with a mutual recursion, it's because you didn't
-    // implement one of these two functions
-    enqueue(job, at: clock.now.advanced(by: delay),
-            tolerance: tolerance, clock: clock)
-  }
-
-  @available(StdlibDeploymentTarget 6.3, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    // If you crash here with a mutual recursion, it's because you didn't
-    // implement one of these two functions
-    enqueue(job, after: clock.now.duration(to: instant),
-            tolerance: tolerance, clock: clock)
+                                run: SchedulingExecutorFireTime<C>,
+                                clock: C) -> JobCancellationToken {
+    return enqueue(job, run: run, tolerance: nil, clock: clock)
   }
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

@@ -45,11 +45,16 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
   }
 
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
-                     executor: self, global: false)
+                                run: SchedulingExecutorFireTime<C>,
+                                tolerance: C.Duration?,
+                                clock: C) -> JobCancellationToken {
+    return _dispatchEnqueue(job, run: run, tolerance: tolerance, clock: clock,
+                            executor: self, global: false)
+  }
+
+  public func cancel(jobWithToken token: consuming JobCancellationToken)
+    -> ExecutorJob? {
+    return _dispatchCancel(token.opaqueData.0)
   }
 }
 
@@ -81,11 +86,16 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
   }
 
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
-                     executor: self, global: true)
+                                run: SchedulingExecutorFireTime<C>,
+                                tolerance: C.Duration?,
+                                clock: C) -> JobCancellationToken {
+    return _dispatchEnqueue(job, run: run, tolerance: tolerance, clock: clock,
+                            executor: self, global: true)
+  }
+
+  public func cancel(jobWithToken token: consuming JobCancellationToken)
+    -> ExecutorJob? {
+    return _dispatchCancel(token.opaqueData.0)
   }
 }
 
@@ -137,16 +147,17 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 }
 
 @available(StdlibDeploymentTarget 6.3, *)
-fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
+fileprivate func _dispatchEnqueue<C: Clock, E: SchedulingExecutor>(
   _ job: consuming ExecutorJob,
-  at instant: C.Instant,
+  run: SchedulingExecutorFireTime<C>,
   tolerance: C.Duration?,
   clock: C,
   executor: E,
   global: Bool
-) {
+) -> JobCancellationToken {
   // If it's a clock we know, convert it to something we can use; otherwise,
-  // call the clock's `enqueue` function to schedule the enqueue of the job.
+  // fail.
+  let instant = run.asInstant(clock: clock)
 
   guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                         clock: clock) else {
@@ -162,11 +173,18 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
     tolNanosec = -1
   }
 
-  _dispatchEnqueueWithDeadline(CBool(global),
-                               CLongLong(seconds), CLongLong(nanoseconds),
-                               CLongLong(tolSec), CLongLong(tolNanosec),
-                               clockID.rawValue,
-                               UnownedJob(job))
+  let source = _dispatchEnqueueWithDeadline(CBool(global),
+                                            CLongLong(seconds),
+                                            CLongLong(nanoseconds),
+                                            CLongLong(tolSec),
+                                            CLongLong(tolNanosec),
+                                            clockID.rawValue,
+                                            UnownedJob(job))
+  return JobCancellationToken(
+    executor: executor,
+    jobID: UInt64(UInt(bitPattern: source)),
+    opaqueData: (source, 0),
+    cleanUp: { _dispatchReleaseSource($0.opaqueData.0) })
 }
 
 #endif // !$Embedded && !os(WASI) && !os(Emscripten)

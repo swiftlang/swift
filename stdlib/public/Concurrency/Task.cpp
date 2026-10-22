@@ -2825,6 +2825,21 @@ swift_task_createNullaryContinuationJobImpl(
   return job;
 }
 
+/// Destroy a job that has not run, without running it.
+///
+/// Only the kinds of job that can be handed back by a cancelled schedule
+/// (currently just NullaryContinuationJob) are supported; the caller remains
+/// responsible for whatever the job referred to (e.g. the continuation).
+extern "C" SWIFT_CC(swift)
+void swift_job_destroy(Job *job) {
+  if (auto *nullary = dyn_cast<NullaryContinuationJob>(job)) {
+    swift_cxx_deleteObject(nullary);
+    return;
+  }
+
+  swift_Concurrency_fatalError(0, "cannot destroy a job of this kind");
+}
+
 #if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {

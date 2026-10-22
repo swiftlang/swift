@@ -14,101 +14,27 @@
 
 import Swift
 
-// Store the Timestamp in the executor private data, if it will fit; otherwise,
-// use the allocator to allocate space for it and stash a pointer in the private
-// data area.
-@available(StdlibDeploymentTarget 6.3, *)
-extension ExecutorJob {
-  fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
-    return MemoryLayout<(Int, Int)>.size
-      < MemoryLayout<CooperativeExecutor.Timestamp>.size
-  }
-
-  fileprivate var cooperativeExecutorTimestampPointer: UnsafeMutablePointer<CooperativeExecutor.Timestamp> {
-    get {
-      assert(cooperativeExecutorTimestampIsIndirect)
-      return withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
-          return unsafe $0[0]
-        }
-      }
-    }
-    set {
-      assert(cooperativeExecutorTimestampIsIndirect)
-      withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
-          unsafe $0[0] = newValue
-        }
-      }
-    }
-  }
-
-  fileprivate var cooperativeExecutorTimestamp: CooperativeExecutor.Timestamp {
-    get {
-      if cooperativeExecutorTimestampIsIndirect {
-        let ptr = unsafe cooperativeExecutorTimestampPointer
-        return unsafe ptr.pointee
-      } else {
-        return withUnsafeExecutorPrivateData {
-          return unsafe $0.assumingMemoryBound(
-            to: CooperativeExecutor.Timestamp.self
-          )[0]
-        }
-      }
-    }
-    set {
-      if cooperativeExecutorTimestampIsIndirect {
-        let ptr = unsafe cooperativeExecutorTimestampPointer
-        unsafe ptr.pointee = newValue
-     } else {
-        withUnsafeExecutorPrivateData {
-          unsafe $0.withMemoryRebound(to: CooperativeExecutor.Timestamp.self) {
-            unsafe $0[0] = newValue
-          }
-        }
-      }
-    }
-  }
-
-  fileprivate mutating func setupCooperativeExecutorTimestamp() {
-    // If a Timestamp won't fit, allocate
-    if cooperativeExecutorTimestampIsIndirect {
-      let ptr: UnsafeMutablePointer<CooperativeExecutor.Timestamp>
-      // Try to use the task allocator if it has one
-      if let allocator {
-        unsafe ptr = allocator.allocate(as: CooperativeExecutor.Timestamp.self)
-      } else {
-        unsafe ptr = .allocate(capacity: 1)
-      }
-      unsafe self.cooperativeExecutorTimestampPointer = ptr
-    }
-  }
-
-  fileprivate mutating func clearCooperativeExecutorTimestamp() {
-    // If a Timestamp won't fit, deallocate
-    if cooperativeExecutorTimestampIsIndirect {
-      let ptr = unsafe self.cooperativeExecutorTimestampPointer
-      if let allocator {
-        unsafe allocator.deallocate(ptr)
-      } else {
-        unsafe ptr.deallocate()
-      }
-    }
-  }
-}
-
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A wait queue is a specialised priority queue used to run a timer.
 @available(StdlibDeploymentTarget 6.3, *)
 struct WaitQueue {
-  var queue: PriorityQueue<UnownedJob>
+  /// A job waiting for its deadline.
+  ///
+  /// We keep the deadline and an ID alongside the job, rather than in the
+  /// job's executor private data, so that a cancelled job can be handed back
+  /// exactly as we received it, and so that a stale cancellation can never
+  /// match a different job that happens to reuse the same address.
+  struct Entry {
+    var job: UnownedJob
+    var deadline: CooperativeExecutor.Timestamp
+    var id: UInt64
+  }
+
+  var queue: PriorityQueue<Entry>
   var clock: _ClockID
 
   init(clock: _ClockID) {
-    queue = PriorityQueue(compare: {
-                            ExecutorJob($0).cooperativeExecutorTimestamp
-                              < ExecutorJob($1).cooperativeExecutorTimestamp
-                          })
+    queue = PriorityQueue(compare: { $0.deadline < $1.deadline })
     self.clock = clock
   }
 
@@ -121,31 +47,32 @@ struct WaitQueue {
   }
 
   mutating func enqueue(_ job: consuming ExecutorJob,
-                        after delay: CooperativeExecutor.Duration) {
+                        after delay: CooperativeExecutor.Duration,
+                        id: UInt64) {
     let deadline = currentTime + delay
-    job.setupCooperativeExecutorTimestamp()
-    job.cooperativeExecutorTimestamp = deadline
-    queue.push(UnownedJob(job))
+    queue.push(Entry(job: UnownedJob(job), deadline: deadline, id: id))
   }
 
   mutating func forEachReadyJob(body: (consuming ExecutorJob) -> ()) {
     let now = currentTime
-    while let job = queue.pop(
-            when: {
-              ExecutorJob($0).cooperativeExecutorTimestamp < now
-            }) {
-      var theJob = ExecutorJob(job)
-      theJob.clearCooperativeExecutorTimestamp()
-      body(theJob)
+    while let entry = queue.pop(when: { $0.deadline < now }) {
+      body(ExecutorJob(entry.job))
     }
   }
 
+  /// Remove the job with the specified ID, if it is still waiting.
+  mutating func cancel(id: UInt64) -> ExecutorJob? {
+    if let entry = queue.removeFirst(where: { $0.id == id }) {
+      return ExecutorJob(entry.job)
+    }
+    return nil
+  }
+
   var timeToNextJob: CooperativeExecutor.Duration? {
-    if let job = queue.top {
-      let deadline = ExecutorJob(job).cooperativeExecutorTimestamp
+    if let entry = queue.top {
       let now = currentTime
-      if deadline > now {
-        return deadline - now
+      if entry.deadline > now {
+        return entry.deadline - now
       } else {
         return CooperativeExecutor.Duration(seconds: 0, nanoseconds: 0)
       }
@@ -163,6 +90,10 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var suspendingWaitQueue = WaitQueue(clock: .suspending)
   var continuousWaitQueue = WaitQueue(clock: .continuous)
+
+  /// The ID to give to the next scheduled job; used to identify jobs for
+  /// cancellation.  IDs are never reused.
+  var nextJobID: UInt64 = 1
   #endif
   var shouldStop: Bool = false
 
@@ -255,21 +186,51 @@ extension CooperativeExecutor: SchedulingExecutor {
     return now
   }
 
+  // The values stored in `JobCancellationToken.opaqueData.0`
+  private static var continuousClockToken: Int { 1 }
+  private static var suspendingClockToken: Int { 2 }
+
+  // Note that, like `enqueue(_:)`, none of this is thread-safe; the
+  // cooperative executor is intended to be driven from a single thread, and
+  // `cancel` must be called from that thread too.
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+                                run: SchedulingExecutorFireTime<C>,
+                                tolerance: C.Duration?,
+                                clock: C) -> JobCancellationToken {
+    let id = nextJobID
+    nextJobID += 1
+
     // If it's a clock we know, get the duration to wait
     if let _ = clock as? ContinuousClock {
-      let continuousDuration = delay as! ContinuousClock.Duration
-      let duration = Duration(from: continuousDuration)
-      continuousWaitQueue.enqueue(job, after: duration)
+      let continuousDuration =
+        run.asDuration(clock: clock) as! ContinuousClock.Duration
+      continuousWaitQueue.enqueue(job, after: Duration(from: continuousDuration),
+                                  id: id)
+      return JobCancellationToken(
+        executor: self, jobID: id,
+        opaqueData: (Self.continuousClockToken, 0))
     } else if let _ = clock as? SuspendingClock {
-      let suspendingDuration = delay as! SuspendingClock.Duration
-      let duration = Duration(from: suspendingDuration)
-      suspendingWaitQueue.enqueue(job, after: duration)
+      let suspendingDuration =
+        run.asDuration(clock: clock) as! SuspendingClock.Duration
+      suspendingWaitQueue.enqueue(job, after: Duration(from: suspendingDuration),
+                                  id: id)
+      return JobCancellationToken(
+        executor: self, jobID: id,
+        opaqueData: (Self.suspendingClockToken, 0))
     } else {
       fatalError("Sorry, cannot schedule on an unknown clock")
+    }
+  }
+
+  public func cancel(jobWithToken token: consuming JobCancellationToken)
+    -> ExecutorJob? {
+    switch token.opaqueData.0 {
+    case Self.continuousClockToken:
+      return continuousWaitQueue.cancel(id: token.jobID)
+    case Self.suspendingClockToken:
+      return suspendingWaitQueue.cancel(id: token.jobID)
+    default:
+      return nil
     }
   }
 

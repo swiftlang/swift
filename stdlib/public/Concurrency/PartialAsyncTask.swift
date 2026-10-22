@@ -47,6 +47,11 @@ internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ serialExecutor: UnownedSerialExecutor,
                                          _ taskExecutor: UnownedTaskExecutor) -> ()
 
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_job_destroy")
+@usableFromInline
+internal func _swiftJobDestroy(_ job: UnownedJob)
+
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
 
@@ -458,6 +463,24 @@ extension ExecutorJob {
                                taskExecutor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
   }
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.3, *)
+extension ExecutorJob {
+
+  /// Destroy this job without running it.
+  ///
+  /// This is an unsafe operation; it simply releases the job itself,
+  /// without allowing it to run, which may result in your program making
+  /// no further progress if anything was waiting for the job.  Only use it
+  /// on a job you know can be discarded this way, for example a job handed
+  /// back by `JobCancellationToken.cancel()` whose continuation you have
+  /// resumed yourself.
+  consuming public func destroy() {
+    _swiftJobDestroy(UnownedJob(self))
+  }
+
 }
 
 // Helper to create a trampoline job to execute a job on a specified

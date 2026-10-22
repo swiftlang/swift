@@ -104,9 +104,10 @@ internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(StdlibDeploymentTarget 6.3, *) {
-    Task.defaultExecutor.asSchedulingExecutor!.enqueue(ExecutorJob(unownedJob),
-                                                       after: .nanoseconds(delay),
-                                                       clock: .continuous)
+    _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+      ExecutorJob(unownedJob),
+      run: .after(.nanoseconds(delay)),
+      clock: .continuous)
   } else {
     fatalError("this should never happen")
   }
@@ -130,16 +131,16 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   if #available(StdlibDeploymentTarget 6.3, *) {
     switch clock {
       case _ClockID.suspending.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          after: delay,
+          run: .after(delay),
           tolerance: leeway,
           clock: .suspending
         )
       case _ClockID.continuous.rawValue:
-        Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          after: delay,
+          run: .after(delay),
           tolerance: leeway,
           clock: .continuous
         )

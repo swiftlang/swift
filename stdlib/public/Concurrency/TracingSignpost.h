@@ -283,9 +283,12 @@ inline void task_continuation_init(AsyncTask *task,
                                    ContinuationAsyncContext *context) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, context);
+  // Split continuations are created before any task is waiting on them, so
+  // there may not be a task to report.
+  auto taskID = task ? task->getTaskId() : 0;
   os_signpost_interval_begin(TaskLog, id, SWIFT_LOG_TASK_CONTINUATION,
                              "task=%" PRId64 " context=%p taskPointer=%p",
-                             task->getTaskId(), context, task);
+                             taskID, context, task);
 }
 
 inline void task_continuation_await(ContinuationAsyncContext *context) {

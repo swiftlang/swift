@@ -37,11 +37,11 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
   }
 
   public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+                                run: SchedulingExecutorFireTime<C>,
+                                tolerance: C.Duration?,
+                                clock: C) -> JobCancellationToken {
     // Convert to `Swift.Duration`
-    let duration = delay as! Swift.Duration
+    let duration = run.asDuration(clock: clock) as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
@@ -56,6 +56,14 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return JobCancellationToken(executor: self, jobID: 0, opaqueData: (0, 0))
+  }
+
+  // We can't remove jobs from `asyncAfter`, so we never cancel.
+  public func cancel(jobWithToken: consuming JobCancellationToken)
+    -> ExecutorJob? {
+    return nil
   }
 }
 

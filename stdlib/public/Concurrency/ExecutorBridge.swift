@@ -180,7 +180,20 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
                                            _ tsec: CLongLong,
                                            _ tnsec: CLongLong,
                                            _ clock: CInt,
-                                           _ job: UnownedJob)
+                                           _ job: UnownedJob) -> Int
+
+/// Cancel a job scheduled with `_dispatchEnqueueWithDeadline`, returning it if
+/// it had not yet started.  The caller must still call
+/// `_dispatchReleaseSource`.
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_dispatchCancel")
+internal func _dispatchCancel(_ source: Int) -> ExecutorJob?
+
+/// Release the reference to a scheduled job's state that was returned by
+/// `_dispatchEnqueueWithDeadline`.
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_dispatchReleaseSource")
+internal func _dispatchReleaseSource(_ source: Int)
 
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_dispatchAssertMainQueue")
