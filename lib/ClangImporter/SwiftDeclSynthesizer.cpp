@@ -1538,6 +1538,20 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
   auto modernVD = cast<ValueDecl>(modern);
   auto legacyVD = cast_or_null<ValueDecl>(legacy);
 
+  // Guard against recursion or re-registration.
+  if (auto *existing =
+          modernVD->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+    ASSERT(existing->getProjection() == CArrayProjection::Modern &&
+           existing->getCounterpart() == legacyVD &&
+           "C array projections registered twice with different counterparts");
+
+    // If we're re-registering, the original registration may not have passed
+    // `addAlternate`, so add it before we return (it's idempotent anyway).
+    if (addAlternate && legacyVD)
+      ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+    return;
+  }
+
   // Mark the modern projection even if there's no legacy projection so we give
   // it the right availability.
   addAttrs(modernVD, CArrayProjection::Modern, legacyVD);

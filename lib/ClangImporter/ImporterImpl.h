@@ -58,6 +58,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -1037,8 +1038,7 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version,
-                 CArrayProjection>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
@@ -1416,6 +1416,67 @@ public:
                                          Version version,
                                          bool UseCanonicalDecl = true);
 
+  /// If \p decl needs multiple C array projections, imports it for all of them,
+  /// registers them as counterparts, and returns the projection indicated by
+  /// \p version . Otherwise, imports \p decl only for the modern projection and
+  /// doesn't register it.
+  ///
+  /// \param importVersion Imports \p decl for the version it's given. It's
+  ///        passed a variant of \p version for each projection that should
+  ///        be imported, and should return \c nullptr if the requested
+  ///        projection of \p decl is unimportable.
+  ///
+  /// \param addAlternate Whether to record the legacy projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \p version, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(const clang::NamedDecl *decl, Version version,
+                               BodyFn &&importVersion,
+                               bool addAlternate = true) {
+    using DeclTy =
+        std::remove_pointer_t<std::invoke_result_t<BodyFn &, Version>>;
+    return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
+        decl, version, [&](Version v) -> Decl * { return importVersion(v); },
+        addAlternate));
+  }
+
+  /// If \p needsBoth is true, imports a declaration for both C array
+  /// projections, registering them as counterparts of one another. Otherwise,
+  /// imports only a modern projection and does not register it as a C array
+  /// projection.
+  ///
+  /// \param importProjection Imports the declaration for the projection it's
+  ///        given. It's passed each projection that should be imported, and
+  ///        should return \c nullptr if the requested projection is
+  ///        unimportable.
+  ///
+  /// \param addAlternate Whether to record the legacy projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \c Modern, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(bool needsBoth, BodyFn &&importProjection,
+                               bool addAlternate = true) {
+    using DeclTy =
+        std::remove_pointer_t<std::invoke_result_t<BodyFn &, CArrayProjection>>;
+    return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
+        needsBoth,
+        [&](CArrayProjection p) -> Decl * { return importProjection(p); },
+        addAlternate));
+  }
+
+private:
+  Decl *forEachCArrayProjectionImpl(
+    const clang::NamedDecl *decl, Version version,
+    llvm::function_ref<Decl *(Version)> importVersion, bool addAlternate);
+
+  Decl *forEachCArrayProjectionImpl(
+      bool needsBoth,
+      llvm::function_ref<Decl *(CArrayProjection)> importProjection,
+      bool addAlternate);
+
+public:
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
