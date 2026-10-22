@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D ONE_MODULE %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D SUB_MODULE %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D TWO_MODULES %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/RedeclaredProperties -D ONE_MODULE %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/RedeclaredProperties -D SUB_MODULE %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/RedeclaredProperties -D TWO_MODULES %s -verify
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredProperties -I %S/Inputs/custom-modules -source-filename %s | %FileCheck %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSub -module-to-print RedeclaredPropertiesSub.Private -I %S/Inputs/custom-modules -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SUB
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSplit -module-to-print RedeclaredPropertiesSplit2 -I %S/Inputs/custom-modules -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-TWO
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredProperties -I %S/Inputs/custom-modules/RedeclaredProperties -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSub -module-to-print RedeclaredPropertiesSub.Private -I %S/Inputs/custom-modules/RedeclaredProperties -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SUB
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSplit -module-to-print RedeclaredPropertiesSplit2 -I %S/Inputs/custom-modules/RedeclaredProperties -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-TWO
 
 // REQUIRES: objc_interop
 
