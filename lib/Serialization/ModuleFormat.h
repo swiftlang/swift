@@ -2743,6 +2743,8 @@ namespace decls_block {
     BCFixed<1> // implicit flag
   >;
 
+  using ScopeParamsDeclAttrLayout = BCRecordLayout<ScopeParams_DECL_ATTR>;
+
   constexpr uint8_t NoReferenceCounting =
       static_cast<uint8_t>(ReferenceCounting::Error) + 1;
 

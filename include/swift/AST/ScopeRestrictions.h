@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/ADT/bit.h"
 #include "llvm/Support/MathExtras.h"
 #include <cstdint>
@@ -31,6 +32,7 @@
 
 namespace swift {
 
+class ASTContext;
 class NominalTypeDecl;
 class Type;
 
@@ -135,6 +137,25 @@ public:
   }
 
   ScopeRepr getScope() const { return Scope; }
+};
+
+/// The scope parameters declared by a `@_scopeParams` attribute as written, e.g.
+/// `a` and `b` in `@_scopeParams(a, b)`.
+class ScopeParamListRepr final
+    : private llvm::TrailingObjects<ScopeParamListRepr, Located<ScopeName>> {
+  friend TrailingObjects;
+
+  unsigned NumParams;
+
+  explicit ScopeParamListRepr(ArrayRef<Located<ScopeName>> params);
+
+public:
+  static ScopeParamListRepr *create(const ASTContext &ctx,
+                                    ArrayRef<Located<ScopeName>> params);
+
+  ArrayRef<Located<ScopeName>> getParams() const {
+    return getTrailingObjects(NumParams);
+  }
 };
 
 /// The number of function types between a position in a type and an enclosing

@@ -5789,6 +5789,15 @@ public:
     printField(StringRef{Model}, Label::always("threading"));
     printFoot();
   }
+
+  void visitScopeParamsAttr(ScopeParamsAttr *Attr, Label label) {
+    printCommon(Attr, "scope_params_attr", label);
+    printStringListField(
+        Attr->getParamList()->getParams(),
+        [&](auto param) { return param.Item.getIdentifier().str(); },
+        Label::always("params"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace

@@ -226,6 +226,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Once))
       case .Callable:
         return handle(self.generateCallableAttr(attribute: node)?.asDeclAttribute)
+      case .ScopeParams:
+        return handle(self.generateScopeParamsAttr(attribute: node)?.asDeclAttribute)
       case .Coroutine:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Coroutine))
       case nil where attrName == "_unavailableInEmbedded":
@@ -2820,6 +2822,22 @@ extension ASTGenVisitor {
       atLoc: nil,
       range: self.generateSourceRange(node),
       kind: kind
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_scopeParams(a, b)
+  ///   ```
+  func generateScopeParamsAttr(attribute node: AttributeSyntax) -> BridgedScopeParamsAttr? {
+    guard let params = self.generateScopeParams(attribute: node) else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      params: params.lazy.bridgedArray(in: self)
     )
   }
 

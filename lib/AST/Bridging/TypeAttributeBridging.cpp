@@ -142,3 +142,21 @@ BridgedScopedTypeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return ScopedTypeAttr::create(cContext.unbridged(), atLoc, nameLoc,
                                 parensRange, restrictions);
 }
+
+BridgedAccessScopeTypeAttr BridgedAccessScopeTypeAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedScopeRepr scope) {
+  return new (cContext.unbridged())
+      AccessScopeTypeAttr(atLoc, nameLoc, parensRange, scope.unbridged());
+}
+
+BridgedScopeParamsTypeAttr BridgedScopeParamsTypeAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedArrayRef cParams) {
+  SmallVector<Located<ScopeName>, 2> params;
+  for (auto cParam : cParams.unbridged<BridgedLocatedIdentifier>())
+    params.push_back({ScopeName(cParam.Name), cParam.NameLoc});
+  auto &ctx = cContext.unbridged();
+  return new (ctx) ScopeParamsTypeAttr(atLoc, nameLoc, parensRange,
+                                       ScopeParamListRepr::create(ctx, params));
+}
