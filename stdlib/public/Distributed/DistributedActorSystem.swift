@@ -608,9 +608,9 @@ extension DistributedActorSystem {
     invocationDecoder: inout InvocationDecoder,
     handler: Self.ResultHandler
   ) async throws where Act: DistributedActor {
-    // Must match `SwiftStdlib 6.5`; availability macros cannot be used in an
-    // '@export(implementation)' body
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+    // Must match the availability of `_executeDistributedTargetNonsending`;
+    // availability macros cannot be used in an '@export(implementation)' body
+    if #available(SwiftStdlib 6.5, *) {
       try await _executeDistributedTargetNonsending(
         on: actor,
         target: target,
@@ -649,7 +649,7 @@ extension DistributedActorSystem {
       handler: handler)
   }
 
-  @available(SwiftStdlib 6.5, *)
+  @available(anyAppleOS 27.5, *)
   @usableFromInline
   internal nonisolated(nonsending) func _executeDistributedTargetNonsending<Act>(
     on actor: Act,
