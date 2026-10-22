@@ -15,6 +15,10 @@ typealias AnyObject = Builtin.AnyObject
 class X {
 }
 
+struct WeakX {
+  weak var x: X?
+}
+
 enum TwoCases {
   case A(X)
   case B
@@ -720,14 +724,17 @@ entry(%instance : $*X):
   return %value : $X
 }
 
-// If lexical, hoist even if the pointerified address gets used.
+// Even if lexical, don't hoist if the pointerified address gets used. The
+// pointer could be accessed later by an instruction which is not a deinit
+// barrier, e.g. a "copyArray" builtin.
 //
-// CHECK-LABEL: sil [ossa] @hoist_despite_use_of_pointer : {{.*}} {
+// CHECK-LABEL: sil [ossa] @no_hoist_because_of_use_of_pointer : {{.*}} {
 // CHECK:         [[INSTANCE:%[^,]+]] = alloc_stack [lexical]
-// CHECK-NEXT:    copy_addr {{.*}} to [init] [[INSTANCE]]
+// CHECK:         dealloc_stack
 // CHECK-NEXT:    destroy_addr [[INSTANCE]]
-// CHECK-LABEL: } // end sil function 'hoist_despite_use_of_pointer'
-sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@in_guaranteed X) -> () {
+// CHECK-NEXT:    dealloc_stack [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'no_hoist_because_of_use_of_pointer'
+sil [ossa] @no_hoist_because_of_use_of_pointer : $@convention(thin) (@in_guaranteed X) -> () {
 entry(%original : $*X):
    %instance = alloc_stack [lexical] $X
    copy_addr %original to [init] %instance : $*X
@@ -739,6 +746,55 @@ entry(%original : $*X):
    destroy_addr %instance : $*X
    dealloc_stack %instance : $*X
    return %retval : $()
+}
+
+// Don't hoist above a "copyArray" which reads from the storage through a
+// pointer. "copyArray" is not a deinit barrier.
+//
+// CHECK-LABEL: sil [ossa] @no_hoist_above_copy_array : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = alloc_stack [lexical]
+// CHECK:         builtin "copyArray"
+// CHECK-NEXT:    destroy_addr [[INSTANCE]]
+// CHECK-NEXT:    dealloc_stack [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'no_hoist_above_copy_array'
+sil [ossa] @no_hoist_above_copy_array : $@convention(thin) (@in_guaranteed WeakX, Builtin.RawPointer, Builtin.Word) -> () {
+entry(%original : $*WeakX, %dest : $Builtin.RawPointer, %count : $Builtin.Word):
+  %instance = alloc_stack [lexical] $WeakX
+  copy_addr %original to [init] %instance : $*WeakX
+  %pointer = address_to_pointer [stack_protection] %instance : $*WeakX to $Builtin.RawPointer
+  %metatype = metatype $@thin WeakX.Type
+  %copy = builtin "copyArray"<WeakX>(%metatype : $@thin WeakX.Type, %dest : $Builtin.RawPointer, %pointer : $Builtin.RawPointer, %count : $Builtin.Word) : $()
+  destroy_addr %instance : $*WeakX
+  dealloc_stack %instance : $*WeakX
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Same, but the pointer is forwarded through an UnsafePointer before it is
+// accessed.
+//
+// CHECK-LABEL: sil [ossa] @no_hoist_above_copy_array_forwarded_pointer : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = alloc_stack [lexical]
+// CHECK:         builtin "copyArray"
+// CHECK-NEXT:    destroy_addr [[INSTANCE]]
+// CHECK-NEXT:    dealloc_stack [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'no_hoist_above_copy_array_forwarded_pointer'
+sil [ossa] @no_hoist_above_copy_array_forwarded_pointer : $@convention(thin) (@in_guaranteed WeakX, Builtin.RawPointer, Builtin.Word) -> () {
+entry(%original : $*WeakX, %dest : $Builtin.RawPointer, %count : $Builtin.Word):
+  %instance = alloc_stack [lexical] $WeakX
+  copy_addr %original to [init] %instance : $*WeakX
+  %pointer = address_to_pointer [stack_protection] %instance : $*WeakX to $Builtin.RawPointer
+  %up = struct $UnsafePointer<WeakX> (%pointer : $Builtin.RawPointer)
+  br bb1(%up : $UnsafePointer<WeakX>)
+
+bb1(%arg : $UnsafePointer<WeakX>):
+  %src = struct_extract %arg : $UnsafePointer<WeakX>, #UnsafePointer._rawValue
+  %metatype = metatype $@thin WeakX.Type
+  %copy = builtin "copyArray"<WeakX>(%metatype : $@thin WeakX.Type, %dest : $Builtin.RawPointer, %src : $Builtin.RawPointer, %count : $Builtin.Word) : $()
+  destroy_addr %instance : $*WeakX
+  dealloc_stack %instance : $*WeakX
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // If non-lexical, _don't_ hoist if the pointerified address gets used--deinit
