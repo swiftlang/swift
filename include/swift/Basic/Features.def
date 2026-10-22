@@ -568,6 +568,10 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 /// normal coroutines (as functions)
 EXPERIMENTAL_FEATURE(CoroutineFunctions, false)
 
+/// Single-yield functions, declared with `-> yield T`, `-> yield borrow T`
+/// or `-> yield inout T`.
+EXPERIMENTAL_FEATURE(SingleYieldFunctions, false)
+
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 

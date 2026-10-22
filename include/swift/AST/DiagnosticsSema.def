@@ -9960,5 +9960,21 @@ GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
 GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
               "global variable 'osLogStringSectionName' requires a string literal initializer", ())
 
+//------------------------------------------------------------------------------
+// MARK: single-yield functions
+//------------------------------------------------------------------------------
+
+ERROR(single_yield_requires_feature,none,
+      "'-> yield' requires '-enable-experimental-feature SingleYieldFunctions'",
+      ())
+ERROR(single_yield_operator,none,
+      "operator functions cannot be single-yield functions", ())
+ERROR(single_yield_async_unsupported,none,
+      "single-yield functions cannot be '%0'", (StringRef))
+ERROR(single_yield_function_type_unsupported,none,
+      "single-yield function types are not yet supported", ())
+ERROR(yield_type_invalid_position,none,
+      "'yield' can only be used in the result of a single-yield function", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

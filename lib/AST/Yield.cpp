@@ -35,7 +35,8 @@ YieldList *YieldList::create(const ASTContext &C, SourceLoc LParenLoc,
   auto rawMem = C.Allocate(byteSize, alignof(YieldList));
 
   // Placement initialize the YieldList and the Yield's.
-  auto YL = ::new (rawMem) YieldList(LParenLoc, yieldTypes.size(), RParenLoc);
+  auto YL = ::new (rawMem) YieldList(YieldListKind::YieldsClause, LParenLoc,
+                                     yieldTypes.size(), RParenLoc);
 
   std::uninitialized_copy(yieldTypes.begin(), yieldTypes.end(),
                           YL->getArray().begin());
@@ -44,28 +45,36 @@ YieldList *YieldList::create(const ASTContext &C, SourceLoc LParenLoc,
 }
 
 YieldList *YieldList::create(const ASTContext &C,
-                             ArrayRef<AnyFunctionType::Yield> yields) {
+                             ArrayRef<AnyFunctionType::Yield> yields,
+                             YieldListKind kind) {
   ASSERT(!yields.empty());
+  ASSERT((kind != YieldListKind::YieldResult || yields.size() == 1) &&
+         "a single-yield function has exactly one yield");
 
   auto byteSize = totalSizeToAlloc<Yield>(yields.size());
   auto rawMem = C.Allocate(byteSize, alignof(YieldList));
 
   // Placement initialize the YieldList and the Yield's.
-  auto YL = ::new (rawMem) YieldList(SourceLoc(), yields.size(), SourceLoc());
+  auto YL =
+      ::new (rawMem) YieldList(kind, SourceLoc(), yields.size(), SourceLoc());
 
   std::uninitialized_copy(yields.begin(), yields.end(), YL->getArray().begin());
 
   return YL;
 }
 
-YieldList *YieldList::create(const ASTContext &C, ArrayRef<Yield> yields) {
+YieldList *YieldList::create(const ASTContext &C, ArrayRef<Yield> yields,
+                             YieldListKind kind) {
   ASSERT(!yields.empty());
+  ASSERT((kind != YieldListKind::YieldResult || yields.size() == 1) &&
+         "a single-yield function has exactly one yield");
 
   auto byteSize = totalSizeToAlloc<Yield>(yields.size());
   auto rawMem = C.Allocate(byteSize, alignof(YieldList));
 
   // Placement initialize the YieldList and the Yield's.
-  auto YL = ::new (rawMem) YieldList(SourceLoc(), yields.size(), SourceLoc());
+  auto YL =
+      ::new (rawMem) YieldList(kind, SourceLoc(), yields.size(), SourceLoc());
 
   std::uninitialized_copy(yields.begin(), yields.end(), YL->getArray().begin());
 

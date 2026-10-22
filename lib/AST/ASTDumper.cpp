@@ -4957,6 +4957,13 @@ public:
     printFoot();
   }
 
+  void visitYieldTypeRepr(YieldTypeRepr *T, Label label) {
+    printCommon("type_yield", label);
+    printFlag(getDumpString(T->getSpecifier()));
+    printRec(T->getBase(), Label::optional("base"));
+    printFoot();
+  }
+
   void visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T, Label label) {
     printCommon("_const", label);
     printRec(T->getBase(), Label::optional("base"));

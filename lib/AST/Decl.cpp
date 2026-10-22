@@ -1538,6 +1538,10 @@ bool AbstractFunctionDecl::isCoroutine() const {
   if (getAttrs().hasAttribute<CoroutineAttr>())
     return true;
 
+  if (auto *FD = dyn_cast<FuncDecl>(this)) {
+    return FD->isSingleYieldFunction();
+  }
+
   return false;
 }
 
@@ -12124,6 +12128,14 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       AsyncLoc, Throws, ThrowsLoc, ThrownTyR, GenericParams, Parent,
       ClangNode());
   FD->setParameters(BodyParams);
+  if (auto *yieldRepr = dyn_cast_or_null<YieldTypeRepr>(ResultTyR)) {
+    if (!BodyYields) {
+      BodyYields = YieldList::create(
+          Context, Yield(yieldRepr, YieldTypeFlags(yieldRepr->getSpecifier())),
+          YieldListKind::YieldResult);
+      ResultTyR = nullptr;
+    }
+  }
   FD->setYields(BodyYields);
   FD->FnRetType = TypeLoc(ResultTyR);
   if (llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
@@ -12530,7 +12542,7 @@ void FuncDecl::getYieldInterfaceTypes(
   for (auto [idx, yield] : llvm::enumerate(*yieldList)) {
     auto type = ctx.evaluator(YieldsTypeRequest{mutableThis, unsigned(idx)},
                               [&ctx]() { return ErrorType::get(ctx); });
-    YieldTypeFlags flags;
+    YieldTypeFlags flags = yieldList->get(idx).getFlags();
     if (auto *inoutType = type->getAs<InOutType>()) {
       type = inoutType->getObjectType();
       flags = flags.withInOut(true);
@@ -12538,6 +12550,18 @@ void FuncDecl::getYieldInterfaceTypes(
 
     yields.emplace_back(type, flags);
   }
+}
+
+bool FuncDecl::isSingleYieldFunction() const {
+  auto *yields = getYields();
+  return yields && yields->getKind() == YieldListKind::YieldResult;
+}
+
+AnyFunctionType::Yield FuncDecl::getSingleYieldType() const {
+  ASSERT(isSingleYieldFunction());
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  getYieldInterfaceTypes(yields);
+  return yields.front();
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -12715,6 +12739,13 @@ SourceLoc FuncDecl::getEndLoc() const {
   auto resultTyEnd = getResultTypeSourceRange().End;
   if (resultTyEnd)
     return resultTyEnd;
+
+  if (isSingleYieldFunction()) {
+    auto yieldEnd = getYields()->getSourceRange().End;
+    if (yieldEnd) {
+      return yieldEnd;
+    }
+  }
 
   auto sigEnd = getSignatureSourceRange().End;
   if (sigEnd)

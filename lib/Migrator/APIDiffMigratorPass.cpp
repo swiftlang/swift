@@ -156,6 +156,10 @@ public:
     return visit(T->getBase());
   }
 
+  FoundResult visitYieldTypeRepr(YieldTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
   FoundResult visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T) {
     return visit(T->getBase());
   }

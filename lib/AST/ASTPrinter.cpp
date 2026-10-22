@@ -4854,7 +4854,34 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         printFunctionParameters(decl);
       });
 
-    if (decl->isCoroutine()) {
+    if (decl->isSingleYieldFunction()) {
+      auto yield = decl->getSingleYieldType();
+      Printer.printStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
+      };
+      Printer << " -> ";
+      Printer.printKeyword("yield", Options);
+      switch (yield.getFlags().getOwnershipSpecifier()) {
+      case ParamSpecifier::Borrowing:
+        Printer << " ";
+        Printer.printKeyword("borrow", Options);
+        break;
+      case ParamSpecifier::InOut:
+        Printer << " ";
+        Printer.printKeyword("inout", Options);
+        break;
+      default:
+        break;
+      }
+      Printer << " ";
+      TypeRepr *yieldRepr = decl->getYields()->get(0).getTypeRepr();
+      if (auto *repr = dyn_cast_or_null<YieldTypeRepr>(yieldRepr)) {
+        yieldRepr = repr->getBase();
+      }
+      TypeLoc TheTypeLoc(yieldRepr, yield.getType());
+      printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
+    } else if (decl->isCoroutine()) {
       SmallVector<AnyFunctionType::Yield, 1> yields;
       decl->getYieldInterfaceTypes(yields);
       auto *bodyYields = decl->getYields();
@@ -4863,7 +4890,9 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       SWIFT_DEFER {
         Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
       };
-      Printer << " " << tok::kw_yield << " (";
+      Printer << " ";
+      Printer.printKeyword("yields", Options);
+      Printer << " (";
 
       for (auto [idx, yield] : llvm::enumerate(yields)) {
         if (idx > 0)
@@ -4883,6 +4912,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
         printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
       }
+      Printer << ")";
     }
 
     Type ResultTy = decl->getResultInterfaceType();

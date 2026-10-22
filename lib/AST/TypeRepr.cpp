@@ -771,6 +771,22 @@ void LifetimeDependentTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(getBase(), Printer, Opts, nrOpts);
 }
 
+void YieldTypeRepr::printImpl(ASTPrinter &Printer, const PrintOptions &Opts,
+                              NonRecursivePrintOptions nrOpts) const {
+  Printer.printKeyword("yield", Opts, " ");
+  switch (getSpecifier()) {
+  case ParamSpecifier::Borrowing:
+    Printer.printKeyword("borrow", Opts, " ");
+    break;
+  case ParamSpecifier::InOut:
+    Printer.printKeyword("inout", Opts, " ");
+    break;
+  default:
+    break;
+  }
+  printTypeRepr(getBase(), Printer, Opts, nrOpts);
+}
+
 void VarargTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts,
                                NonRecursivePrintOptions nrOpts) const {
