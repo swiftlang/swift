@@ -54,6 +54,8 @@ SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
 
 #ifdef _WIN32
 // We'll probably want dbghelp.h here
+#include <stdio.h>
+#include <stdlib.h>
 #else
 #include <cxxabi.h>
 #endif
@@ -254,7 +256,7 @@ bool isStdinATty()
 void _swift_processBacktracingSetting(llvm::StringRef key, llvm::StringRef value);
 void _swift_parseBacktracingSettings(const char *);
 
-#if DEBUG_BACKTRACING
+#if DEBUG_BACKTRACING && SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 const char *algorithmToString(UnwindAlgorithm algorithm) {
   switch (algorithm) {
   case UnwindAlgorithm::Auto: return "Auto";
@@ -1316,13 +1318,13 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   #endif
 
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
-  #if DEBUG_BACKTRACING
+  #if DEBUG_BACKTRACING && defined(_WIN32)
     const char *message = "**backtracer disabled** ";
     WriteFile(hOutput, message, strlen(message), NULL, NULL);
   #endif
   return false;
 #else
-  #if DEBUG_BACKTRACING
+  #if DEBUG_BACKTRACING && defined(_WIN32)
     const char *message = "preparing to launch backtracer... ";
     WriteFile(hOutput, message, strlen(message), NULL, NULL);
   #endif
@@ -1544,10 +1546,10 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   if (!bRet) {
     #if DEBUG_BACKTRACING
       char message[256];
-      int len = snprintf_s(message, sizeof(message),
-                          "swift runtime: %lu return code for CreateProcessW (%ls) ",
-                          (unsigned long)bRet,
-                          swiftBacktracePath);
+      int len = snprintf(message, sizeof(message),
+                         "swift runtime: error %lu from CreateProcessW (%ls) ",
+                         (unsigned long)GetLastError(),
+                         swiftBacktracePath);
       if (len > 0) {
         DWORD written;
         WriteFile(hOutput, message, (DWORD)len, &written, NULL);

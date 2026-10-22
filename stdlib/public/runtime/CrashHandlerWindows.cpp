@@ -51,6 +51,7 @@ VOID WINAPI hookRaiseFailFastException(PEXCEPTION_RECORD pExceptionRecord,
                                        PCONTEXT pContextRecord,
                                        DWORD dwFlags);
 void hookFailFastInLoadedModules();
+LONG NTAPI hookFailFastOnException(EXCEPTION_POINTERS *ExceptionInfo);
 
 RaiseFailFastException_t pRealRaiseFailFastException = NULL;
 
@@ -69,15 +70,19 @@ _swift_installCrashHandler()
                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
   altStackTop = (char *)altStackBase + altStackSize;
 
+  // Install the exception handler
+  AddVectoredExceptionHandler(0, reinstallUnhandledExceptionFilter);
+  SetUnhandledExceptionFilter(handleException);
+
   if (_swift_backtraceSettings.hookFailFast) {
     pRealRaiseFailFastException
       = (RaiseFailFastException_t)GetProcAddress(GetModuleHandleW(L"kernelbase.dll"),
                                                  "RaiseFailFastException");
+    if (pRealRaiseFailFastException) {
+      hookFailFastInLoadedModules();
+      AddVectoredExceptionHandler(0, hookFailFastOnException);
+    }
   }
-
-  // Install the exception handler
-  AddVectoredExceptionHandler(0, reinstallUnhandledExceptionFilter);
-  SetUnhandledExceptionFilter(handleException);
 
   return ERROR_SUCCESS;
 }
@@ -99,30 +104,7 @@ bool reinstalled = false;
 // Since we don't have a top-of-main() entry point for Swift, for now we
 // hack things by reinstalling our filter from the vectored exception
 // handler.  This is utterly horrible.
-//
-// If hook-fail-fast is enabled, we also redirect RaiseFailFastException()
-// from here, before any __except filter gets to see a potentially fatal
-// exception.  Some frameworks (e.g. WinUI) call RaiseFailFastException()
-// from their exception filters, which terminates the process without
-// running the unhandled exception filter.
 LONG reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo) {
-  if (pRealRaiseFailFastException) {
-    switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
-    case EXCEPTION_ACCESS_VIOLATION:
-    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-    case EXCEPTION_BREAKPOINT:
-    case EXCEPTION_DATATYPE_MISALIGNMENT:
-    case EXCEPTION_ILLEGAL_INSTRUCTION:
-    case EXCEPTION_IN_PAGE_ERROR:
-    case EXCEPTION_INT_DIVIDE_BY_ZERO:
-    case EXCEPTION_PRIV_INSTRUCTION:
-      hookFailFastInLoadedModules();
-      break;
-    default:
-      break;
-    }
-  }
-
   if (reinstalled)
     return EXCEPTION_CONTINUE_SEARCH;
 
@@ -277,6 +259,8 @@ void hookFailFastInModule(HMODULE hModule) {
 
 SRWLOCK hookLock = SRWLOCK_INIT;
 HMODULE loadedModules[1024];
+HMODULE hookedModules[1024];
+DWORD hookedModuleCount = 0;
 
 void hookFailFastInLoadedModules() {
   // If another thread is already doing this, there's no need to wait
@@ -289,19 +273,60 @@ void hookFailFastInLoadedModules() {
     if (cbNeeded > sizeof(loadedModules))
       cbNeeded = sizeof(loadedModules);
     DWORD count = cbNeeded / sizeof(HMODULE);
-    for (DWORD n = 0; n < count; ++n)
-      hookFailFastInModule(loadedModules[n]);
+
+    // Nothing to do if no modules have been loaded since we last did this
+    if (count != hookedModuleCount
+        || memcmp(loadedModules, hookedModules, cbNeeded) != 0) {
+      for (DWORD n = 0; n < count; ++n)
+        hookFailFastInModule(loadedModules[n]);
+
+      memcpy(hookedModules, loadedModules, cbNeeded);
+      hookedModuleCount = count;
+    }
   }
 
   ReleaseSRWLockExclusive(&hookLock);
 }
 
-volatile LONG inFailFastHook = 0;
+// Modules loaded after _swift_installCrashHandler() (e.g. WinUI's) won't
+// have been hooked yet, so do that before any __except filter gets to see
+// a potentially fatal exception.
+LONG hookFailFastOnException(EXCEPTION_POINTERS *ExceptionInfo) {
+  switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+  case EXCEPTION_ACCESS_VIOLATION:
+  case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+  case EXCEPTION_BREAKPOINT:
+  case EXCEPTION_DATATYPE_MISALIGNMENT:
+  case EXCEPTION_ILLEGAL_INSTRUCTION:
+  case EXCEPTION_IN_PAGE_ERROR:
+  case EXCEPTION_INT_DIVIDE_BY_ZERO:
+  case EXCEPTION_PRIV_INSTRUCTION:
+    hookFailFastInLoadedModules();
+    break;
+  default:
+    break;
+  }
 
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+volatile LONG failFastThread = 0;
+
+// RaiseFailFastException() never returns, so neither does this.
 VOID WINAPI hookRaiseFailFastException(PEXCEPTION_RECORD pExceptionRecord,
                                        PCONTEXT pContextRecord,
                                        DWORD dwFlags) {
-  if (InterlockedExchange(&inFailFastHook, 1) == 0) {
+  LONG currentThread = (LONG)GetCurrentThreadId();
+  LONG owner = InterlockedCompareExchange(&failFastThread, currentThread, 0);
+
+  // If another thread is generating a backtrace, wait for it to terminate
+  // the process; if this thread is, we failed while doing so.
+  if (owner != 0 && owner != currentThread) {
+    for (;;)
+      Sleep(INFINITE);
+  }
+
+  if (owner == 0) {
     EXCEPTION_RECORD exceptionRecord;
     CONTEXT context;
     EXCEPTION_POINTERS exceptionPointers = { pExceptionRecord, pContextRecord };
