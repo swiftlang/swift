@@ -14,6 +14,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
@@ -442,8 +443,11 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
 
     // Setup the instance
     std::string InstanceSetupError;
-    if (Instance->setup(*Invocation, InstanceSetupError))
+    if (Instance->setup(*Invocation, InstanceSetupError)) {
+      if (auto *stats = Instance->getStatsReporter())
+        stats->noteCurrentProcessExitStatus(EXIT_FAILURE);
       return std::make_error_code(std::errc::not_supported);
+    }
 
     Invocation->getFrontendOptions().LLVMArgs.clear();
 

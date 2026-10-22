@@ -1623,20 +1623,36 @@ swift::dependencies::createEncodedModuleKindAndName(ModuleDependencyID id) {
   }
 }
 
+static void noteScanExitStatus(const ScanQueryContext &queryContext,
+                               std::error_code error) {
+  auto &instance = *queryContext.ScanInstance;
+  if (auto *stats = instance.getStatsReporter()) {
+    bool failed = error || instance.getASTContext().hadError() ||
+                  (queryContext.InMemoryDiagnosticCollector &&
+                   queryContext.InMemoryDiagnosticCollector->hadError());
+    stats->noteCurrentProcessExitStatus(failed ? EXIT_FAILURE : EXIT_SUCCESS);
+  }
+}
+
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(SwiftDependencyScanningService &service,
                                        ModuleDependenciesCache &cache,
                                        ScanQueryContext &queryContext) {
-  return performModuleScanImpl(service, queryContext.ScanInstance.get(), cache,
-                               queryContext.InMemoryDiagnosticCollector.get());
+  auto result =
+      performModuleScanImpl(service, queryContext.ScanInstance.get(), cache,
+                            queryContext.InMemoryDiagnosticCollector.get());
+  noteScanExitStatus(queryContext, result.getError());
+  return result;
 }
 
 llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
     SwiftDependencyScanningService &service, ModuleDependenciesCache &cache,
     ScanQueryContext &queryContext) {
-  return performModulePrescanImpl(
-      service, queryContext.ScanInstance.get(), cache,
-      queryContext.InMemoryDiagnosticCollector.get());
+  auto result =
+      performModulePrescanImpl(service, queryContext.ScanInstance.get(), cache,
+                               queryContext.InMemoryDiagnosticCollector.get());
+  noteScanExitStatus(queryContext, result.getError());
+  return result;
 }
 
 void swift::dependencies::incremental::validateInterModuleDependenciesCache(
