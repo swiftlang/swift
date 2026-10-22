@@ -2627,7 +2627,10 @@ private:
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
-    if (Opts.isDebugInfoCodeView() && MangledName != "<unknown>")
+    // CodeView lowers a basic type to an unnamed simple type such as T_UINT8,
+    // and NativePDB only treats records with a Swift mangled unique name as
+    // Swift types. Emit the builtin as an opaque struct named by its mangling.
+    if (Opts.isDebugInfoCodeView())
       return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
                                 AlignInBits, Flags, MangledName, {}, nullptr,
                                 nullptr, NumExtraInhabitants);
