@@ -60,6 +60,12 @@ closure too. The functions that reference a closure are its scopes, and a
 closure group keeps a closure with its scopes. A pass that clones a function to
 replace it, such as a specialization, keeps the attribute.
 
+A function that an apply or `partial_apply` passes a box or an
+`@inout_aliasable` address must be a closure that the applying function
+references, and must not be a thunk. The passes that run per closure group
+read such a callee's body and assert that it is in their group. Hand-written
+SIL must mark these functions `[closure]`.
+
 ### Dynamically replaceable functions
 
 ```

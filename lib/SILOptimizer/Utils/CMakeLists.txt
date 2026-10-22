@@ -6,6 +6,7 @@ target_sources(swiftSILOptimizer PRIVATE
   OSSACanonicalizeGuaranteed.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
+  ClosureGroupSchedule.cpp
   CompileTimeInterpolationUtils.cpp
   ConstantFolding.cpp
   ConstExpr.cpp
