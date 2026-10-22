@@ -8,7 +8,6 @@ target_sources(swiftSILOptimizer PRIVATE
   BasicCalleeAnalysis.cpp
   CallerAnalysis.cpp
   ClassHierarchyAnalysis.cpp
-  ClosureScope.cpp
   ColdBlockInfo.cpp
   DeadEndBlocksAnalysis.cpp
   DestructorAnalysis.cpp
