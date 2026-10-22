@@ -116,11 +116,38 @@ struct GenericValueHolder<T>: ValueHolder {
 @inline(never)
 func makeValueHolder() -> any ValueHolder<Int> { GenericValueHolder(value: 5) }
 
+// A generic method requirement is not specialized. The generic witness in the static
+// table gets T from the metadata of Self.
+protocol HasGenericMethod {
+  func g<U>(_ u: U) -> String
+}
+
+struct GBox<T>: HasGenericMethod {
+  var t: T
+  func g<U>(_ u: U) -> String { "GBox<\(T.self)>.g<\(U.self)>(\(t), \(u))" }
+}
+
+// The generic witness of a conditional conformance needs the conditional conformances from a
+// runtime-instantiated witness table. Therefore no specialized witness table is created.
+extension Cond: HasGenericMethod where T: P {
+  func g<U>(_ u: U) -> String { "Cond.g<\(U.self)>(\(t.foo()), \(u))" }
+}
+
+@inline(never)
+func makeGBox() -> any HasGenericMethod { GBox(t: 1) }
+
+@inline(never)
+func makeCondGeneric() -> any HasGenericMethod { Cond(t: Box(t: 2)) }
+
 // CHECK: 5 5
 print(GenericValueHolder(value: 5).value, makeValueHolder().value)
 
 // CHECK: Box<Int>(27)
 print(callFoo(makeBox()))
+// CHECK: GBox<Int>.g<String>(1, x)
+print(makeGBox().g("x"))
+// CHECK: Cond.g<Bool>(Box<Int>(2), true)
+print(makeCondGeneric().g(true))
 // CHECK: Sub
 print(type(of: makeBaseCopies().copy()))
 // CHECK: Sub

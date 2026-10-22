@@ -2800,6 +2800,10 @@ bool BridgedWitnessTable::isSpecialized() const {
   return table->isSpecialized();
 }
 
+bool BridgedWitnessTable::hasConditionalConformances() const {
+  return !table->getConditionalConformances().empty();
+}
+
 SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
   return SwiftInt(table->getEntries().size());
 }

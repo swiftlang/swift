@@ -258,6 +258,7 @@ struct BridgedPassContext {
   SwiftInt getStaticStride(BridgedType type) const;
   bool canMakeStaticObjectReadOnly(BridgedType type) const;
   bool hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const;
+  bool canReferenceWitnessTableStatically(BridgedConformance conformance) const;
   bool fitsInOpaqueExistentialPayload(BridgedType type) const;
 
   // Stack nesting and other notifications

@@ -40,7 +40,7 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
   }
 
   // Collect the conformances first, because specialization creates new functions.
-  var conformances: [(Conformance, Function)] = []
+  var conformances: [Conformance] = []
   var visited = Set<Conformance>()
 
   for function in moduleContext.functions where function.isDefinition && !function.isGeneric {
@@ -53,13 +53,13 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
       {
         let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
         if baseConf.isSpecialized && visited.insert(conformance.canonical).inserted {
-          conformances.append((conformance, function))
+          conformances.append(conformance)
         }
       }
     }
   }
 
-  for (conformance, function) in conformances {
-    _ = specializeWitnessTableCompletely(for: conformance, referencedFrom: function, moduleContext)
+  for conformance in conformances {
+    _ = specializeWitnessTableForStaticEmission(for: conformance, moduleContext)
   }
 }
