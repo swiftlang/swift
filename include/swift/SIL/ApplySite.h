@@ -22,6 +22,7 @@
 #define SWIFT_SIL_APPLYSITE_H
 
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -1046,6 +1047,17 @@ public:
       return cast<TryApplyInst>(**this)->getIsolationCrossing();
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(**this)->getIsolationCrossing();
+    }
+  }
+
+  SubstitutionMap getSubstitutionMap() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(**this)->getSubstitutionMap();
+    case FullApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(**this)->getSubstitutionMap();
+    case FullApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(**this)->getSubstitutionMap();
     }
   }
 
