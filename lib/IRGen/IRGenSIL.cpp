@@ -8776,6 +8776,12 @@ void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
 
 void IRGenSILFunction::visitTuplePackElementAddrInst(
                                                   TuplePackElementAddrInst *i) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // This should normally be caught by EmbeddedSwiftDiagnostics.
+    llvm::report_fatal_error(
+        "tuple_pack_element_addr unsupported in embedded Swift: tuple type "
+        "metadata does not contain element offsets");
+  }
   Address tuple = getLoweredAddress(i->getTuple());
   llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
 
