@@ -171,6 +171,8 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
+    if (isWildcardIsPattern(isa))
+      return n;
     ++n;
     if (auto sub = isa->getSubPattern())
       return getNumSpecializationsRecursive(sub, n);
@@ -224,10 +226,13 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Expr:
   case PatternKind::Named:
     return true;
-  
+
+  // A statically-satisfied `is` that binds nothing is a wildcard too.
+  case PatternKind::Is:
+    return isWildcardIsPattern(cast<IsPattern>(p));
+
   // Non-wildcards.
   case PatternKind::Tuple:
-  case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
@@ -328,6 +333,9 @@ struct RowToSpecialize {
 
   /// Profile Count of hte row we intend to specialize.
   ProfileCounter Count;
+
+  /// Whether the case this row belongs to has a `where` guard.
+  bool HasGuard;
 };
 
 /// Changes that we wish to apply to a row which we have specialized.
@@ -1249,6 +1257,9 @@ bindRefutablePatterns(const ClauseRow &row, ArgArray args,
       break;
     case PatternKind::Named:
       break;
+    case PatternKind::Is:
+      assert(isWildcardIsPattern(cast<IsPattern>(pattern)));
+      break;
 
     case PatternKind::Expr: {
       ExprPattern *exprPattern = cast<ExprPattern>(pattern);
@@ -1289,6 +1300,9 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
     case PatternKind::Expr: // Ignore expression patterns, which we should have
                             // bound in an earlier pass.
       break;
+    case PatternKind::Is:
+      assert(isWildcardIsPattern(cast<IsPattern>(pattern)));
+      break;
     case PatternKind::Named: {
       NamedPattern *named = cast<NamedPattern>(pattern);
       bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
@@ -1317,6 +1331,9 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
       break;
     case PatternKind::Expr: // Ignore expression patterns, which we should have
                             // bound in an earlier pass.
+      break;
+    case PatternKind::Is:
+      assert(isWildcardIsPattern(cast<IsPattern>(pattern)));
       break;
     case PatternKind::Named: {
       NamedPattern *named = cast<NamedPattern>(pattern);
@@ -1555,7 +1572,8 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     if (caseBlock) {
       count = SGF.loadProfilerCount(caseBlock);
     }
-    rowsToSpecialize.push_back({pattern, rowIndex, irrefutable, count});
+    rowsToSpecialize.push_back({pattern, rowIndex, irrefutable, count,
+                                clauses[rowIndex].getCaseGuardExpr() != nullptr});
   };
 
   ProfileCounter defaultCaseCount = ProfileCounter();
@@ -1964,35 +1982,55 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   return ConsumableManagedValue::forOwned(init->getManagedAddress());
 }
 
-/// Formally, `case is T` has the same meaning as `case _ as T`;
-/// they both verify the type without binding any payload in the result.
-static bool patternNeedsNoPayload(const Pattern *pattern) {
-  // True for `case is T`
-  if (!pattern)
-    return true;
-  // True for `case _ as T` (and variations thereof)
-  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
-}
-
-/// Try to dispatch a cast pattern by testing the subject's type
-/// in place instead of extracting its payload.  This supports
-/// noncopyable types and will also permit using more efficient
-/// test-only runtime functions for other `is` tests in the future.
-///
-/// This only supports the the no-binding form (`is T`, `_ as T`).
-/// Binding the payload additionally needs a borrowed projection out of
-/// the container, which is not yet implemented; that case returns false and is
-/// diagnosed by the caller.
+/// Try to dispatch a cast pattern without copying by testing
+/// the subject's type in place instead of extracting its payload.
 bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase, const FailureHandler &failure) {
   auto *firstPattern = cast<IsPattern>(rows[0].Pattern);
   CanType sourceType = firstPattern->getType()->getCanonicalType();
   CanType targetType = getTargetType(rows[0]);
+  bool subjectIsCopyable = !sourceType->isNoncopyable();
 
-  if (!canUseTypeTestForIsa(SGF, sourceType, targetType,
-                            firstPattern->getCastKind()))
+  // Does any pattern need to extract the payload?
+  bool wantsPayload = false;
+  for (auto &row : rows) {
+    if (!patternNeedsNoPayload(cast<IsPattern>(row.Pattern)->getSubPattern()))
+      wantsPayload = true;
+  }
+  // If so and the payload is easily copied, let our caller handle it.
+  if (wantsPayload && subjectIsCopyable)
     return false;
+
+  // Consuming switches are handled in two passes:  First, borrow the
+  // subject to perform the type tests; then emit bindings.  This
+  // fails if bindings are needed during the type test phase.
+  auto ownership = getNoncopyableOwnership();
+  // By default, we can defer binding if we own the value
+  bool canDeferBinding = ownership && *ownership > ValueOwnership::Shared;
+  // Any use of the binding in a `where` guard or refutable sub-pattern
+  // means we can't defer it
+  for (auto &row : rows) {
+    auto *sub = cast<IsPattern>(row.Pattern)->getSubPattern();
+    if (row.HasGuard ||
+        (sub && sub->isRefutablePattern(/*allowIsPatternCoercion=*/false)))
+      canDeferBinding = false;
+  }
+
+  // Sema categorizes statically-true casts as "coercions"
+  bool isCoercion = firstPattern->getCastKind() == CheckedCastKind::Coercion;
+  if (isCoercion) {
+    // Result is statically known...
+    if (!canDeferBinding) {
+      // ... but the binding is needed early; our caller knows how to emit this
+      return false;
+    }
+  } else if (!canUseTypeTestForIsa(SGF, sourceType, targetType,
+                                   firstPattern->getCastKind())) {
+    // Result is not statically known, so we need a type-test, but
+    // this isn't a shape that a type-test can handle
+    return false;
+  }
 
   // The test reads the subject through a pointer.
   // * Without OpaqueValues, return here if it is copyable and
@@ -2000,28 +2038,14 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
   // * With OpaqueValues, fall through to borrow it into a temporary
   ManagedValue subject = src.getFinalManagedValue();
   if (!subject.getType().isAddress() && SGF.useLoweredAddresses() &&
-      !sourceType->isNoncopyable())
+      subjectIsCopyable)
     return false;
 
-  // We can't yet support binding the payload. For a copyable subject the
-  // ordinary lowering handles that perfectly well, so hand those back
-  // untouched; a noncopyable one has no such fallback and is diagnosed below.
-  bool wantsPayload = false;
-  for (auto &row : rows) {
-    if (!patternNeedsNoPayload(cast<IsPattern>(row.Pattern)->getSubPattern()))
-      wantsPayload = true;
-  }
-  bool subjectIsNoncopyable =
-      sourceType->isNoncopyable() && sourceType->isExistentialType();
-  if (wantsPayload && !subjectIsNoncopyable)
-    return false;
-
-  // For a noncopyable subject there is no ordinary lowering to fall back to:
-  // it hands the pattern machinery a cast value whose consumption kind
-  // bindBorrow() asserts on, so falling through is a compiler crash rather than
-  // an error. Binding needs a borrowed projection out of the container, which is
-  // not implemented yet, so diagnose.
-  if (wantsPayload) {
+  // A noncopyable subject can't fall back to the ordinary lowering.
+  // It hands the pattern machinery a cast value whose consumption
+  // kind bindBorrow() asserts on.  Diagnose.
+  bool unimplementedBinding = wantsPayload && !canDeferBinding;
+  if (unimplementedBinding) {
     for (auto &row : rows) {
       auto *is = cast<IsPattern>(row.Pattern);
       if (!patternNeedsNoPayload(is->getSubPattern()))
@@ -2061,25 +2085,31 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
     SGF.B.createDeallocStack(loc, subjectTemp);
   };
 
-  SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
-  SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
-  emitTypeTestForIsa(SGF, loc, subject, sourceType, targetType, trueBB,
-                     falseBB, rows[0].Count, ProfileCounter());
+  if (!isCoercion) {
+    // If the type test isn't a statically-true "coercion",
+    // emit an `is`-style type test.
+    SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
+    SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
+    emitTypeTestForIsa(SGF, loc, subject, sourceType, targetType, trueBB,
+                       falseBB, rows[0].Count, ProfileCounter());
 
-  // Chain failure to the next case
-  SGF.B.setInsertionPoint(falseBB);
-  endSubjectBorrow();
-  failure(loc);
+    // Chain failure to the next case
+    SGF.B.setInsertionPoint(falseBB);
+    endSubjectBorrow();
+    failure(loc);
+
+    SGF.B.setInsertionPoint(trueBB);
+  }
 
   // Set up the success block.  If we diagnosed above, this is unreachable
-  SGF.B.setInsertionPoint(trueBB);
   endSubjectBorrow();
-  if (wantsPayload) {
+  if (unimplementedBinding) {
     SGF.B.createUnreachable(loc);
     return true;
   }
 
-  // Leave the payload as `undef` since we bound nothing.
+  // Leave the payload as `undef` since we bound nothing (yet, for a consuming
+  // switch).
   SILType payloadTy = SGF.getLoweredType(targetType).getAddressType();
   ConsumableManagedValue payload = {
       ManagedValue::forBorrowedAddressRValue(SILUndef::get(SGF.F, payloadTy)),
@@ -2865,8 +2895,52 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
     }
     
     void visitIsPattern(IsPattern *p, ManagedValue mv) {
-      // TODO
-      llvm_unreachable("cast pattern in noncopyable pattern match not implemented");
+      // The dispatch phase already established that the cast succeeds, without
+      // consuming anything. A pattern that binds nothing just drops the
+      // subject, like `_`.
+      if (patternNeedsNoPayload(p->getSubPattern()))
+        return;
+
+      auto &SGF = emission.SGF;
+      SILLocation loc = p;
+      CanType sourceType = p->getType()->getCanonicalType();
+      CanType targetType = p->getCastType()->getCanonicalType();
+
+      // checked_cast_addr_br needs the subject in memory.
+      SILValue srcAddr;
+      if (mv.getType().isAddress()) {
+        srcAddr = mv.forward(SGF);
+      } else {
+        srcAddr = SGF.emitTemporaryAllocation(loc, mv.getType());
+        SGF.B.emitStoreValueOperation(loc, mv.forward(SGF), srcAddr,
+                                      StoreOwnershipQualifier::Init);
+      }
+
+      auto &targetTL = SGF.getTypeLowering(targetType);
+      SILValue destAddr =
+          SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
+
+      SILBasicBlock *successBB = SGF.createBasicBlock();
+      SILBasicBlock *failureBB = SGF.createBasicBlock();
+      SGF.B.createCheckedCastAddrBranch(
+          loc, CheckedCastInstOptions(), CastConsumptionKind::TakeAlways,
+          srcAddr, sourceType, destAddr, targetType, successBB, failureBB,
+          ProfileCounter(), ProfileCounter());
+
+      SGF.B.emitBlock(failureBB);
+      SGF.B.createUnreachable(loc);
+
+      SGF.B.emitBlock(successBB);
+      ManagedValue payload;
+      if (!targetTL.isLoadableOrOpaque(SGF.F)) {
+        payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
+      } else {
+        payload = SGF.emitManagedRValueWithCleanup(
+            SGF.B.createTrivialLoadOr(loc, destAddr,
+                                      LoadOwnershipQualifier::Take),
+            targetTL);
+      }
+      visit(p->getSubPattern(), payload);
     }
     
     void visitEnumProjection(ManagedValue mv,

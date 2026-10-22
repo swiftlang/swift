@@ -448,6 +448,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       Type fromType = cast->getSubExpr()->getType();
 
+      // `is` never produces a payload, its source is borrowed.
+      // Contine to reject Metatypes for now...
+      bool isTypeTest =
+          isa<IsExpr>(cast) &&
+          Ctx.LangOpts.hasFeature(Feature::NoncopyableCasting) &&
+          !castType->is<AnyMetatypeType>() &&
+          !(fromType && fromType->is<AnyMetatypeType>());
+
       // 'as?'/'as!'/'is' from a noncopyable existential value to a concrete
       // type is permitted under NoncopyableCasting: there, unlike other
       // move-only types, the existential's erased dynamic type is exactly
@@ -462,7 +470,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           !castType->isExistentialType() &&
           !castType->is<ArchetypeType>();
 
-      if (castType->isNoncopyable() && !isSupportedExistentialCast) {
+      if (castType->isNoncopyable() && !isTypeTest &&
+          !isSupportedExistentialCast) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
@@ -470,7 +479,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       // no support for runtime casts from move-only types, except for the
       // existential-to-concrete case handled above.
-      if (fromType && fromType->isNoncopyable() && !isSupportedExistentialCast) {
+      if (fromType && fromType->isNoncopyable() && !isTypeTest &&
+          !isSupportedExistentialCast) {
         // can't cast move-only to anything.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
