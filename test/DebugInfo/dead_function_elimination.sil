@@ -1,0 +1,133 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-deadfuncelim | %FileCheck %s --implicit-check-not=gone_
+
+// Test that DeadFunctionAndGlobalElimination drops references held by debug
+// reconstruction blocks to functions and globals it erases.
+// Functions with the `gone_` prefix must disappear from the output.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK: sil_global @alive_global : $Int
+sil_global @alive_global : $Int
+sil_global private @gone_global : $Int
+
+// CHECK-LABEL: sil @alive_callee
+sil @alive_callee : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil private @gone_callee : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Alive function, alive function_ref: untouched.
+
+// CHECK-LABEL: sil @test_alive_fn_alive_function_ref
+// CHECK:   debug_value (), let, name "fn", transform {
+// CHECK:   bb0:
+// CHECK:     %0 = function_ref @alive_callee : $@convention(thin) () -> ()
+// CHECK:     return %0
+// CHECK:   }
+// CHECK-LABEL: } // end sil function 'test_alive_fn_alive_function_ref'
+sil @test_alive_fn_alive_function_ref : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "fn", transform {
+  bb0:
+    %0 = function_ref @alive_callee : $@convention(thin) () -> ()
+    return %0 : $@convention(thin) () -> ()
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Alive function, dead function_ref: replaced by undef.
+
+// CHECK-LABEL: sil @test_alive_fn_dead_function_ref
+// CHECK:   debug_value (), let, name "fn", transform {
+// CHECK:   bb0:
+// CHECK:     return undef : $@convention(thin) () -> ()
+// CHECK:   }
+// CHECK-LABEL: } // end sil function 'test_alive_fn_dead_function_ref'
+sil @test_alive_fn_dead_function_ref : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "fn", transform {
+  bb0:
+    %0 = function_ref @gone_callee : $@convention(thin) () -> ()
+    return %0 : $@convention(thin) () -> ()
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Dead functions are removed with their debug_values.
+
+sil private @gone_fn_alive_function_ref : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "fn", transform {
+  bb0:
+    %0 = function_ref @alive_callee : $@convention(thin) () -> ()
+    return %0 : $@convention(thin) () -> ()
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil private @gone_fn_dead_function_ref : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "fn", transform {
+  bb0:
+    %0 = function_ref @gone_callee : $@convention(thin) () -> ()
+    return %0 : $@convention(thin) () -> ()
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Alive function, alive global_addr: untouched.
+
+// CHECK-LABEL: sil @test_alive_fn_alive_global_addr
+// CHECK:   debug_value (), let, name "g", transform {
+// CHECK:   bb0:
+// CHECK:     %0 = global_addr @alive_global : $*Int
+// CHECK:     %1 = load %0
+// CHECK:     return %1
+// CHECK:   }
+// CHECK-LABEL: } // end sil function 'test_alive_fn_alive_global_addr'
+sil @test_alive_fn_alive_global_addr : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "g", transform {
+  bb0:
+    %0 = global_addr @alive_global : $*Int
+    %1 = load %0 : $*Int
+    return %1 : $Int
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Alive function, dead global_addr: replaced by undef, the load stays.
+
+// CHECK-LABEL: sil @test_alive_fn_dead_global_addr
+// CHECK:   debug_value (), let, name "g", transform {
+// CHECK:   bb0:
+// CHECK:     %0 = load undef : $*Int
+// CHECK:     return %0
+// CHECK:   }
+// CHECK-LABEL: } // end sil function 'test_alive_fn_dead_global_addr'
+sil @test_alive_fn_dead_global_addr : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "g", transform {
+  bb0:
+    %0 = global_addr @gone_global : $*Int
+    %1 = load %0 : $*Int
+    return %1 : $Int
+  }
+  %r = tuple ()
+  return %r : $()
+}

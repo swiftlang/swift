@@ -2322,6 +2322,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::ConvertEscapeToNoEscapeInst:
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
@@ -2330,8 +2331,15 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::RefTailAddrInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::IndexRawPointerInst:
+  case SILInstructionKind::FunctionRefInst:
     // Instructions with no side effect can be salvaged into the debug
     // reconstruction block.
+    return salvageMultiOperandInst(cast<SingleValueInstruction>(I));
+
+  case SILInstructionKind::GlobalAddrInst:
+    // A dependency token cannot be passed into a debug_value.
+    if (cast<GlobalAddrInst>(I)->hasOperand())
+      return killDebugUses(I);
     return salvageMultiOperandInst(cast<SingleValueInstruction>(I));
 
   case SILInstructionKind::DestructureStructInst:
@@ -2341,6 +2349,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
     return salvageIdentityInst(cast<SingleValueInstruction>(I));
 

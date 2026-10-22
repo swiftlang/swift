@@ -85,6 +85,8 @@ class DeadFunctionAndGlobalElimination {
 
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
 
+  llvm::SmallVector<SingleValueInstruction *, 16> DebugBlockRefs;
+
   bool keepExternalWitnessTablesAlive;
   bool keepStringSwitchIntrinsicAlive;
 
@@ -394,6 +396,16 @@ class DeadFunctionAndGlobalElimination {
           HSI->getReferencedFunctions(fns);
           for (auto fn : fns) {
             ensureAlive(fn);
+          }
+        } else if (auto *DVI = dyn_cast<DebugValueInst>(&I)) {
+          // Reconstruction blocks don't keep anything alive.
+          // References to globals are added to DebugBlockRefs and will be
+          // dropped if they are dead.
+          if (SILBasicBlock *debugBB = DVI->getDebugReconstructionBlock()) {
+            for (SILInstruction &DI : *debugBB) {
+              if (isa<FunctionRefInst>(&DI) || isa<GlobalAddrInst>(&DI))
+                DebugBlockRefs.push_back(cast<SingleValueInstruction>(&DI));
+            }
           }
         }
       }
@@ -747,6 +759,23 @@ public:
     keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive),
     keepStringSwitchIntrinsicAlive(keepStringSwitchIntrinsicAlive) {}
 
+  /// Replaces references to dead globals within debug reconstruction blocks
+  /// with undef.
+  void dropDeadDebugBlockReferences() {
+    for (SingleValueInstruction *ref : DebugBlockRefs) {
+      bool refersToDead;
+      if (auto *FRI = dyn_cast<FunctionRefInst>(ref))
+        refersToDead = !isAlive(FRI->getReferencedFunction());
+      else
+        refersToDead =
+            !isAlive(cast<GlobalAddrInst>(ref)->getReferencedGlobal());
+      if (!refersToDead)
+        continue;
+      ref->replaceAllUsesWithUndef();
+      ref->eraseFromParent();
+    }
+  }
+
   /// The main entry point of the optimization.
   void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
 
@@ -759,6 +788,8 @@ public:
     // reference counts of dead functions.
     llvm::SmallVector<SILFunction *, 16> DeadFunctions;
     llvm::SmallVector<SILGlobalVariable *, 16> DeadGlobals;
+
+    dropDeadDebugBlockReferences();
     for (SILFunction &F : *Module) {
       if (!isAlive(&F)) {
         F.dropAllReferences();

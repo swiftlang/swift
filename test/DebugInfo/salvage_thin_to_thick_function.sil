@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 sil_stage canonical
 
@@ -12,14 +12,18 @@ bb0:
 
 
 // Test that MandatoryInlining salvages the debug_values of a dead thin_to_thick_function it deletes.
-// Salvaging of thin_to_thick_function/function_ref is not supported yet, so they are killed.
 
 
 // CHECK-LABEL: sil [ossa] @test_dead_thin_to_thick_function
 // CHECK-NEXT:  bb0:
-// CHECK-NEXT:    debug_value undef : $@noescape () -> Builtin.Int32, let, name "fn"
+// CHECK-NEXT:    debug_value (), let, name "fn", transform {
+// CHECK:         bb0:
+// CHECK:           %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32
+// CHECK:           %1 = thin_to_thick_function %0 to $@noescape () -> Builtin.Int32
+// CHECK:           return %1
+// CHECK:         }
 // CHECK-NEXT:    [[RES:%[0-9]+]] = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:    return [[RES]] : $Builtin.Int32
+// CHECK-NEXT:    return [[RES]]
 // CHECK-NEXT:  } // end sil function 'test_dead_thin_to_thick_function'
 sil [ossa] @test_dead_thin_to_thick_function : $@convention(thin) () -> Builtin.Int32 {
 bb0:
