@@ -1723,6 +1723,28 @@ exitBB:
 }
 
 
+sil [ossa] @takeInT : $@convention(thin) <T> (@in T) -> ()
+
+// ConsumeOperatorCopyableValuesChecker describes a consumed address-only
+// variable with `debug_value undef : $T`. AddressLowering must give it the
+// address form that the address-based checker emits.
+//
+// CHECK-LABEL: sil [ossa] @f274_debug_value_undef_address_only : {{.*}} {
+// CHECK:       bb0([[ARG:%[^,]+]] : $*T):
+// CHECK:         debug_value [moveable_value_debuginfo] [[ARG]] : $*T, let, name "x", argno 1, expr op_deref
+// CHECK:         debug_value [moveable_value_debuginfo] undef : $*T, let, name "x", argno 1, expr op_deref
+// CHECK-LABEL: } // end sil function 'f274_debug_value_undef_address_only'
+sil [ossa] @f274_debug_value_undef_address_only : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  debug_value [moveable_value_debuginfo] %0 : $T, let, name "x", argno 1
+  %1 = move_value %0 : $T
+  debug_value [moveable_value_debuginfo] undef : $T, let, name "x", argno 1
+  %2 = function_ref @takeInT : $@convention(thin) <T> (@in T) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <T> (@in T) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
 // CHECK:         fix_lifetime [[ADDR]]
