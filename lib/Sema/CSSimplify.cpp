@@ -2881,6 +2881,32 @@ matchFunctionThrowing(ConstraintSystem &cs,
   }
 }
 
+/// Determines the types that \p kind of \p func1 and \p func2 depend on, with
+/// their type variables bound. Returns std::nullopt if either of them still
+/// has unbound type variables, in which case the match has to wait.
+static std::optional<std::pair<Type, Type>>
+getBoundTypeDependencies(ConstraintSystem &cs, FunctionType *func1,
+                         FunctionType *func2, TypeDependenceKind kind) {
+  auto getBound = [&](FunctionType *func) -> std::optional<Type> {
+    auto dependentType = func->getTypeDependencyFor(kind);
+    if (!dependentType)
+      return Type();
+
+    dependentType = cs.simplifyType(dependentType);
+    if (dependentType->hasTypeVariable())
+      return std::nullopt;
+    return dependentType;
+  };
+
+  auto dep1 = getBound(func1);
+  if (!dep1)
+    return std::nullopt;
+  auto dep2 = getBound(func2);
+  if (!dep2)
+    return std::nullopt;
+  return std::make_pair(*dep1, *dep2);
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionSendability(
     FunctionType *func1, FunctionType *func2, ConstraintKind kind,
     ConstraintSystem::TypeMatchOptions flags,
@@ -2896,21 +2922,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionSendability(
     return SolutionKind::Unsolved;
   };
 
-  // First check to see if we have any sendable dependent function types, if
-  // any of them still have unresolved type variables we need to wait until
-  // they're fully resolved.
-  auto dep1 = func1->getSendableDependentType();
-  if (dep1) {
-    dep1 = simplifyType(dep1);
-    if (dep1->hasTypeVariable())
-      return formUnsolved();
-  }
-  auto dep2 = func2->getSendableDependentType();
-  if (dep2) {
-    dep2 = simplifyType(dep2);
-    if (dep2->hasTypeVariable())
-      return formUnsolved();
-  }
+  auto typeDependencies = getBoundTypeDependencies(
+      *this, func1, func2, TypeDependenceKind::Sendable);
+  if (!typeDependencies)
+    return formUnsolved();
+  auto [dep1, dep2] = *typeDependencies;
 
   // Sendability is given by either the sendability of the dependent type if
   // present, otherwise it's given by the function itself.
@@ -2942,21 +2958,11 @@ ConstraintSystem::matchFunctionExecutionSemantics(
     return SolutionKind::Unsolved;
   };
 
-  // First check to see if we have any execution semantics dependent function
-  // types, if any of them still have unresolved type variables we need to wait
-  // until they're fully resolved.
-  auto dep1 = func1->getExecutionSemanticsDependentType();
-  if (dep1) {
-    dep1 = simplifyType(dep1);
-    if (dep1->hasTypeVariable())
-      return formUnsolved();
-  }
-  auto dep2 = func2->getExecutionSemanticsDependentType();
-  if (dep2) {
-    dep2 = simplifyType(dep2);
-    if (dep2->hasTypeVariable())
-      return formUnsolved();
-  }
+  auto typeDependencies = getBoundTypeDependencies(
+      *this, func1, func2, TypeDependenceKind::ExecutionSemantics);
+  if (!typeDependencies)
+    return formUnsolved();
+  auto [dep1, dep2] = *typeDependencies;
 
   // The execution semantics are given by the invertible protocols that the
   // dependent type suppresses if present, otherwise by the function itself.
@@ -9159,11 +9165,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // need to delay if we have Sendable dependence.
   if (auto *fnTy = type->getAs<FunctionType>()) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      if (fnTy->getSendableDependentType()) {
+      if (fnTy->hasTypeDependencyFor(TypeDependenceKind::Sendable)) {
         fnTy = simplifyType(fnTy)->castTo<FunctionType>();
         type = fnTy;
       }
-      if (fnTy->getSendableDependentType())
+      if (fnTy->hasTypeDependencyFor(TypeDependenceKind::Sendable))
         return formUnsolved();
     }
   }
@@ -12686,8 +12692,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (!closureExtInfo.isSendable()) {
-      if (auto sendTy = contextualFnType->getSendableDependentType()) {
-        closureExtInfo = closureExtInfo.withSendableDependentType(sendTy);
+      if (auto sendTy = contextualFnType->getTypeDependencyFor(
+              TypeDependenceKind::Sendable)) {
+        closureExtInfo = closureExtInfo.withTypeDependency(
+            TypeDependenceKind::Sendable, sendTy);
       } else if (contextualFnType->isSendable()) {
         closureExtInfo = closureExtInfo.withSendable();
       }
@@ -12695,10 +12703,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
     // Infer execution semantics from the contextual type.
     if (!closureExtInfo.hasCalledAtMostOnceSemantics()) {
-      if (auto executionSemanticsTy =
-              contextualFnType->getExecutionSemanticsDependentType()) {
-        closureExtInfo = closureExtInfo.withExecutionSemanticsDependentType(
-            executionSemanticsTy);
+      if (auto executionSemanticsTy = contextualFnType->getTypeDependencyFor(
+              TypeDependenceKind::ExecutionSemantics)) {
+        closureExtInfo = closureExtInfo.withTypeDependency(
+            TypeDependenceKind::ExecutionSemantics, executionSemanticsTy);
       } else if (auto semantics = contextualFnType->getExecutionSemantics()) {
         closureExtInfo = closureExtInfo.withExecutionSemantics(semantics);
       }

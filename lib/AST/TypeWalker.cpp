@@ -133,13 +133,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
-    if (auto sendableDep = ty->getSendableDependentType()) {
-      if (doIt(sendableDep))
-        return true;
-    }
-
-    if (auto executionSemanticsDep = ty->getExecutionSemanticsDependentType()) {
-      if (doIt(executionSemanticsDep))
+    for (auto dependentType : ty->getTypeDependencies()) {
+      if (doIt(dependentType.getPointer()))
         return true;
     }
 

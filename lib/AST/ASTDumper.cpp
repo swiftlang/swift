@@ -4281,7 +4281,8 @@ public:
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         printFlag(!fType->getExtInfo().isNoEscape(), "escaping",
                   ClosureModifierColor);
-        if (auto sendableTy = fType->getSendableDependentType()) {
+        if (auto sendableTy =
+                fType->getTypeDependencyFor(TypeDependenceKind::Sendable)) {
           printFieldQuoted(sendableTy.getString(),
                            Label::always("sendable_dep"),
                            ClosureModifierColor);
@@ -6768,13 +6769,15 @@ namespace {
           printField(representation, Label::always("representation"));
         }
         printFlag(!T->isNoEscape(), "escaping");
-        if (!T->getSendableDependentType())
+        if (!T->hasTypeDependencyFor(TypeDependenceKind::Sendable))
           printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
-        if (auto semantics = T->getExecutionSemantics())
-          printField(*semantics, Label::always("execution_semantics"));
+        if (!T->hasTypeDependencyFor(TypeDependenceKind::ExecutionSemantics)) {
+          if (auto semantics = T->getExecutionSemantics())
+            printField(*semantics, Label::always("execution_semantics"));
+        }
         printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
@@ -6815,8 +6818,17 @@ namespace {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
       }
 
-      if (auto sendableTy = T->getSendableDependentType())
-        printRec(sendableTy, Label::always("sendable_dep"));
+      for (auto dependentType : T->getTypeDependencies()) {
+        switch (dependentType.getInt()) {
+        case TypeDependenceKind::Sendable:
+          printRec(dependentType.getPointer(), Label::always("sendable_dep"));
+          break;
+        case TypeDependenceKind::ExecutionSemantics:
+          printRec(dependentType.getPointer(),
+                   Label::always("execution_semantics_dep"));
+          break;
+        }
+      }
 
       if (T->hasLifetimeDependencies()) {
         for (auto &dep : T->getLifetimeDependencies()) {

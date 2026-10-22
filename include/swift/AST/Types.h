@@ -451,7 +451,7 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -459,8 +459,7 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    HasSendableDependence : 1,
-    HasExecutionSemanticsDependence : 1
+    HasTypeDependencies : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -3725,10 +3724,8 @@ protected:
       assert(!Bits.AnyFunctionType.HasThrownError || Info->isThrowing());
       Bits.AnyFunctionType.HasLifetimeDependencies =
           !Info.value().getLifetimeDependencies().empty();
-      Bits.AnyFunctionType.HasSendableDependence =
-          !Info->getSendableDependentType().isNull();
-      Bits.AnyFunctionType.HasExecutionSemanticsDependence =
-          !Info->getExecutionSemanticsDependentType().isNull();
+      Bits.AnyFunctionType.HasTypeDependencies =
+          !Info->getTypeDependencies().empty();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3741,8 +3738,7 @@ protected:
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
-      Bits.AnyFunctionType.HasSendableDependence = false;
-      Bits.AnyFunctionType.HasExecutionSemanticsDependence = false;
+      Bits.AnyFunctionType.HasTypeDependencies = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3813,12 +3809,12 @@ public:
     return Bits.AnyFunctionType.HasThrownError;
   }
 
-  bool hasSendableDependentType() const {
-    return Bits.AnyFunctionType.HasSendableDependence;
+  bool hasTypeDependencies() const {
+    return Bits.AnyFunctionType.HasTypeDependencies;
   }
 
-  bool hasExecutionSemanticsDependentType() const {
-    return Bits.AnyFunctionType.HasExecutionSemanticsDependence;
+  bool hasTypeDependencyFor(TypeDependenceKind kind) const {
+    return hasTypeDependencies() && getTypeDependencyFor(kind);
   }
 
   bool hasLifetimeDependencies() const {
@@ -3835,15 +3831,14 @@ public:
   Type getGlobalActor() const;
   Type getThrownError() const;
 
-  /// A dependent type that determines whether the function is @Sendable. This
-  /// is only used within the constraint system, and will contain type
-  /// variables if present.
-  Type getSendableDependentType() const;
+  /// The type that \p kind of this function type depends on, if any. This is
+  /// only used within the constraint system, and will contain type variables
+  /// if present.
+  Type getTypeDependencyFor(TypeDependenceKind kind) const;
 
-  /// A dependent type that determines whether the function has exactly-once or
-  /// at-most-once execution semantics. This is only used within the constraint
-  /// system, and will contain type variables if present.
-  Type getExecutionSemanticsDependentType() const;
+  /// The types that properties of this function type depend on, ordered by
+  /// kind. This is only used within the constraint system.
+  ArrayRef<ASTExtInfoBuilder::TypeDependency> getTypeDependencies() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3895,10 +3890,9 @@ public:
 
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
-    return ExtInfo(
-        Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(), getGlobalActor(),
-        getThrownError(), getSendableDependentType(),
-        getExecutionSemanticsDependentType(), getLifetimeDependencies());
+    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
+                   getGlobalActor(), getThrownError(), getTypeDependencies(),
+                   getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4162,10 +4156,11 @@ bool hasIsolatedParameter(ArrayRef<AnyFunctionType::Param> params);
 class FunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
-      private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
-                                    AnyFunctionType::Yield, ClangTypeInfo, Type,
-                                    size_t /*NumLifetimeDependencies*/,
-                                    LifetimeDependenceInfo> {
+      private llvm::TrailingObjects<
+          FunctionType, AnyFunctionType::Param, AnyFunctionType::Yield,
+          ClangTypeInfo, Type, uint8_t /*NumTypeDependencies*/,
+          ASTExtInfoBuilder::TypeDependency, size_t /*NumLifetimeDependencies*/,
+          LifetimeDependenceInfo> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
@@ -4181,8 +4176,16 @@ class FunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return hasGlobalActor() + hasThrownError() + hasSendableDependentType() +
-           hasExecutionSemanticsDependentType();
+    return hasGlobalActor() + hasThrownError();
+  }
+
+  size_t numTrailingObjects(OverloadToken<uint8_t>) const {
+    return hasTypeDependencies() ? 1 : 0;
+  }
+
+  size_t
+  numTrailingObjects(OverloadToken<ASTExtInfoBuilder::TypeDependency>) const {
+    return getNumTypeDependencies();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4230,23 +4233,26 @@ public:
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
 
-  /// A dependent type that determines whether the function is @Sendable. This
-  /// is only used within the constraint system, and will contain type
-  /// variables if present.
-  Type getSendableDependentType() const {
-    if (!hasSendableDependentType())
-      return Type();
-    return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError()];
+  /// The type that \p kind of this function type depends on, if any. This is
+  /// only used within the constraint system, and will contain type variables
+  /// if present.
+  Type getTypeDependencyFor(TypeDependenceKind kind) const {
+    return ASTExtInfoBuilder::findTypeDependency(getTypeDependencies(), kind);
   }
 
-  /// A dependent type that determines whether the function is
-  /// at-most-once. This is only used within the constraint system, and
-  /// will contain type variables if present.
-  Type getExecutionSemanticsDependentType() const {
-    if (!hasExecutionSemanticsDependentType())
-      return Type();
-    return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError() +
-                                      hasSendableDependentType()];
+  /// The types that properties of this function type depend on, ordered by
+  /// kind. This is only used within the constraint system.
+  ArrayRef<ASTExtInfoBuilder::TypeDependency> getTypeDependencies() const {
+    if (!hasTypeDependencies())
+      return {};
+    return {getTrailingObjects<ASTExtInfoBuilder::TypeDependency>(),
+            getNumTypeDependencies()};
+  }
+
+  unsigned getNumTypeDependencies() const {
+    if (!hasTypeDependencies())
+      return 0;
+    return getTrailingObjects<uint8_t>()[0];
   }
 
   inline size_t getNumLifetimeDependencies() const {
