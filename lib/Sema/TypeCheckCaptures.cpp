@@ -795,7 +795,7 @@ public:
                                 : AccessorKind::Get;
 
         auto *accessor = property->getAccessor(accessorKind);
-        if (accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
+        if (accessor && accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
           if (auto *base = getReferencedNonCopyableValue(memberRef->getBase()))
             recordConsumingUse(base);
         }
