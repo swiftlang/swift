@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/ClientDeclarationRequirements.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
@@ -2050,6 +2051,9 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
 
   if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
+
+  if (opts.DumpClientDeclarationRequirements)
+    getClientDeclarationRequirements(getMainModule()).print(llvm::errs());
 
 }
 

@@ -37,7 +37,7 @@ namespace clang {
 }
 
 namespace swift {
-  struct HiddenTypeLayoutRequirement;
+  class ClientDeclarationRequirement;
   class SerializableFixedTypeInfoRepresentation;
   struct SerializableLLVMTypeRepresentation;
   class SerializableLoadableClangRecordTypeInfoRepresentation;
@@ -378,7 +378,8 @@ private:
 
   /// Handle a hidden layout requirement discovered by AST analysis.
   void handleHiddenTypeLayoutRequirement(
-      const HiddenTypeLayoutRequirement &requirement);
+      const Decl *declaration,
+      const ClientDeclarationRequirement &requirement);
 
   /// Writes the given decl.
   void writeASTBlockEntity(const Decl *D);

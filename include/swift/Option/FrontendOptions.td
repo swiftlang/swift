@@ -785,6 +785,11 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
+def dump_client_declaration_requirements :
+  Flag<["-"], "dump-client-declaration-requirements">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the client declaration requirements for the main module">;
+
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 

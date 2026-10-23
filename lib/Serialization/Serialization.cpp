@@ -18,6 +18,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ClientDeclarationRequirements.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -25,7 +26,6 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/HiddenTypeLayout.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
@@ -7636,44 +7636,52 @@ bool Serializer::scheduleHiddenTypeLayoutSerialization(const Decl *D) {
 }
 
 void Serializer::handleHiddenTypeLayoutRequirement(
-    const HiddenTypeLayoutRequirement &requirement) {
-  if (!scheduleHiddenTypeLayoutSerialization(requirement.LayoutDecl) ||
+    const Decl *declaration,
+    const ClientDeclarationRequirement &requirement) {
+  assert(requirement.getKind() ==
+         ClientDeclarationRequirement::Kind::AbstractTypeLayoutDeclaration);
+  auto *provenance = requirement.getProvenance();
+  assert(provenance && provenance->HiddenTypeOrigin);
+
+  auto *abiExposedType =
+      cast<NominalTypeDecl>(provenance->RootRequiringDeclaration);
+  auto *layoutAffectingStorage =
+      cast<ValueDecl>(provenance->LeafRequiringDeclaration);
+
+  if (!scheduleHiddenTypeLayoutSerialization(declaration) ||
       !Options.EnableHiddenTypeLayoutSerializationRemarks)
     return;
 
-  auto *abiExposedLeaf = requirement.LayoutAffectingStorage->getDeclContext()
+  auto *abiExposedLeaf = layoutAffectingStorage->getDeclContext()
                              ->getSelfNominalTypeDecl();
   assert(abiExposedLeaf);
 
   auto &diags = getASTContext().Diags;
-  switch (requirement.Origin) {
+  switch (*provenance->HiddenTypeOrigin) {
   case HiddenTypeLayoutOrigin::ImplementationOnly:
     diags.diagnose(
-        requirement.LayoutAffectingStorage->getLoc(),
+        layoutAffectingStorage->getLoc(),
         diag::serialization_scheduled_implementation_only_hidden_type_layout,
-        requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
+        provenance->ReferencedType, abiExposedLeaf, layoutAffectingStorage);
     break;
   case HiddenTypeLayoutOrigin::InternalBridgingHeader:
     diags.diagnose(
-        requirement.LayoutAffectingStorage->getLoc(),
+        layoutAffectingStorage->getLoc(),
         diag::serialization_scheduled_internal_bridging_header_hidden_type_layout,
-        requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
+        provenance->ReferencedType, abiExposedLeaf, layoutAffectingStorage);
     break;
   case HiddenTypeLayoutOrigin::RecoveredHiddenType:
     diags.diagnose(
-        requirement.LayoutAffectingStorage->getLoc(),
+        layoutAffectingStorage->getLoc(),
         diag::serialization_scheduled_recovered_hidden_type_layout,
-        requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
+        provenance->ReferencedType, abiExposedLeaf, layoutAffectingStorage);
     break;
   }
 
-  if (abiExposedLeaf != requirement.ABIExposedType)
-    diags.diagnose(requirement.ABIExposedType->getLoc(),
+  if (abiExposedLeaf != abiExposedType)
+    diags.diagnose(abiExposedType->getLoc(),
                    diag::serialization_hidden_type_layout_abi_exposure,
-                   abiExposedLeaf, requirement.ABIExposedType);
+                   abiExposedLeaf, abiExposedType);
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC) {
@@ -7826,10 +7834,18 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   if (langOpts.hasFeature(
           Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
       M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
-    forEachRequiredHiddenTypeLayout(
-        M, files, [&](const HiddenTypeLayoutRequirement &requirement) {
-          handleHiddenTypeLayoutRequirement(requirement);
-        });
+    if (SF)
+      llvm::report_fatal_error(
+          "partial module serialization is not supported with "
+          "SerializeAbstractTypeLayoutForHiddenTypes");
+
+    auto &requirements = getClientDeclarationRequirements(M);
+    for (auto &[declaration, requirement] : requirements.getRequirements()) {
+      if (requirement.getKind() !=
+          ClientDeclarationRequirement::Kind::AbstractTypeLayoutDeclaration)
+        continue;
+      handleHiddenTypeLayoutRequirement(declaration, requirement);
+    }
   }
 
   writeAllDeclsAndTypes();
