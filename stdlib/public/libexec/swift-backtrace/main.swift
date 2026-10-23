@@ -792,7 +792,7 @@ Generate a backtrace for the parent process.
 
     #if os(Windows)
     if let eventLogText,
-       !reportToEventLog(eventLogText, source: "Swift Backtrace") {
+      backtracerEventLog?.report(eventLogText) != true {
       print("swift-backtrace: unable to write to the event log; "
               + "writing the backtrace here instead", to: &standardError)
       print(eventLogText, terminator: "", to: &standardError)

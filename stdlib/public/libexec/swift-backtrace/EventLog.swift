@@ -3,48 +3,60 @@
 import CRT
 import WinSDK
 
+/// Returns as many whole lines of `log` as fit in an event message.
+private func truncated(_ log: String, to maxLen: Int) -> String {
+  if log.utf16.count <= len {
+    return log
+  }
+
+  let truncationNote =
+  "\r\n...\r\n(truncated; the full crash log is attached as event data)"
+
+  let limit = log.utf16.index(
+    log.startIndex, offsetBy: maxLen - truncationNote.utf16.count)
+  let end = log[..<limit].lastIndex(of: "\r\n") ?? log.startIndex
+  return String(log[..<end]) + truncationNote
+}
+
 // ReportEventW() limits each insertion string to 31,839 UTF-16 code units,
 // so the message holds as much of the crash log as fits, and the whole log
 // is attached as UTF-8 event data.
 private let maxMessageLength = 31_839
 
-private let truncationNote =
-  "\r\n...\r\n(truncated; the full crash log is attached as event data)"
+internal var backtracerEventLog: EventLogHelper? = {
+  EventLogHelper(source: "Swift Backtrace")
+}()
 
-/// Returns as many whole lines of `log` as fit in an event message.
-private func truncatedToFitIfNeeded(_ log: String) -> String {
-  if log.utf16.count <= maxMessageLength {
-    return log
-  }
-  let limit = log.utf16.index(
-    log.startIndex, offsetBy: maxMessageLength - truncationNote.utf16.count)
-  let end = log[..<limit].lastIndex(of: "\r\n") ?? log.startIndex
-  return String(log[..<end]) + truncationNote
-}
+internal class EventLogHelper {
+  let eventLog: EventLog
 
-/// Write `text` to the Application event log as a single error event.
-/// Returns true if the event was logged.
-internal func reportToEventLog(_ text: String, source: String) -> Bool {
-  let hEventLog = source.withCString(encodedAs: UTF16.self) {
-    RegisterEventSourceW(nil, $0)
+  init?(source: String) {
+    let hEventLog = source.withCString(encodedAs: UTF16.self) {
+      RegisterEventSourceW(nil, $0)
+    }
+
+    guard let hEventLog else {
+      return nil
+    }
+
+    self.eventLog = hEventLog
   }
 
-  guard let hEventLog else {
-    return false
+  deinit {
+    _ = DeregisterEventSource(eventSource)
   }
 
-  defer {
-    _ = DeregisterEventSource(hEventLog)
-  }
+  internal func report(_ text: String) -> Bool {
+    let log = text.split(separator: "\n", omittingEmptySubsequences: false)
+      .joined(separator: "\r\n")
 
-  let log = text.split(separator: "\n", omittingEmptySubsequences: false)
-    .joined(separator: "\r\n")
-  var data = Array(log.utf8)
+    var data = Array(log.utf8)
 
-  return truncatedToFitIfNeeded(log).withCString(encodedAs: UTF16.self) {
-    var string: LPCWSTR? = $0
-    return ReportEventW(hEventLog, EVENTLOG_ERROR_TYPE, 0, 1, nil,
-                        1, DWORD(data.count), &string, &data)
+    return truncated(log, to: maxMessageLength).withCString(encodedAs: UTF16.self) {
+      var string: LPCWSTR? = $0
+      return ReportEventW(eventLog, EVENTLOG_ERROR_TYPE, 0, 1, nil,
+                          1, DWORD(data.count), &string, &data)
+    }
   }
 }
 
