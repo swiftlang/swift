@@ -985,7 +985,9 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
 
   // Check protocol requirement(s) if this parameter is a
   // generic parameter type or dependent member type.
-  if (genericSig && paramType->isTypeParameter()) {
+  if (paramType->isTypeParameter()) {
+    ASSERT(genericSig);
+
     // Light-weight check if cases where `checkRequirements` is not
     // applicable.
     auto checkProtocolRequirementsOnly = [&]() -> unsigned {
