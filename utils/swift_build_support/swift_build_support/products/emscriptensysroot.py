@@ -113,7 +113,7 @@ class EmscriptenSysroot(product.Product):
 class EmscriptenLLVMRuntimeLibs(cmake_product.CMakeProduct):
     @classmethod
     def product_source_name(cls):
-        return os.path.join("llvm-project", "runtimes")
+        return os.path.join(cls.llvm_source_dirname, "runtimes")
 
     @classmethod
     def is_build_script_impl_product(cls):
