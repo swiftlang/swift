@@ -391,3 +391,11 @@ func superDuperUnsafe(_ bytes: UnsafeRawBufferPointer) {
   _ = byte
   _ = unsafe bytes.first ?? 0
 }
+
+// Calling a consuming closure parameter is still diagnosed.
+func callConsumingUnsafeClosure(
+  _ body: consuming @escaping (UnsafeRawPointer?) -> Void
+) {
+  body(nil) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1{{reference to parameter 'body' involves unsafe type 'UnsafeRawPointer'}}
+}

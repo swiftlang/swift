@@ -352,3 +352,33 @@ final class ClosureHolder {
     _ = f.take() // expected-error {{cannot consume non-'Copyable' stored property 'self.f' of a class}}
   }
 }
+
+// MARK: - rethrows
+
+struct RethrowsError: Error {}
+
+func rethrowsCallAtMostOnce<R>(
+  _ body: @callable(once) () throws -> R
+) rethrows -> R? {
+  Bool.random() ? try body() : nil
+}
+
+func rethrowsForwardAtMostOnce<R>(
+  _ body: @callable(once) () throws -> R
+) rethrows -> R? {
+  try rethrowsCallAtMostOnce(body)
+}
+
+func rethrowsCallOptionalAtMostOnce(
+  _ body: consuming (@callable(once) () throws -> Void)?
+) rethrows {
+  try body?()
+}
+
+func callRethrowsAtMostOnce() throws {
+  _ = rethrowsCallAtMostOnce { 1 }
+  _ = rethrowsForwardAtMostOnce { 1 }
+  rethrowsCallOptionalAtMostOnce(nil)
+  rethrowsCallOptionalAtMostOnce { }
+  _ = try rethrowsForwardAtMostOnce { () throws -> Int in throw RethrowsError() }
+}

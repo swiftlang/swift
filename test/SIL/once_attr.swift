@@ -276,3 +276,38 @@ func capturedInoutByNonescapingClosure(_ f: @escaping @once () -> Void) {
   g()
 }
 
+// MARK: - rethrows
+
+func rethrowsCallOnce<R>(_ body: @once () throws -> R) rethrows -> R {
+  try body()
+}
+
+func rethrowsCallConsumedOnce<R>(_ body: @once () throws -> R) rethrows -> R {
+  try (consume body)()
+}
+
+func rethrowsForwardOnce<R>(_ body: @once () throws -> R) rethrows -> R {
+  try rethrowsCallOnce(body)
+}
+
+func rethrowsForwardConsumedOnce<R>(
+  _ body: @once () throws -> R
+) rethrows -> R {
+  try rethrowsCallOnce(consume body)
+}
+
+func rethrowsCallCopiedConsuming(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  try (copy body)()
+}
+
+func callRethrowsOnce() throws -> Int {
+  let a = rethrowsCallOnce { 1 }
+  let b = rethrowsCallConsumedOnce { 2 }
+  let c = rethrowsForwardOnce { 3 }
+  let d = rethrowsForwardConsumedOnce { 4 }
+  rethrowsCallCopiedConsuming {}
+  let e = try rethrowsForwardOnce { () throws -> Int in throw SomeError() }
+  return a + b + c + d + e
+}
