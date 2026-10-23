@@ -545,6 +545,10 @@ private extension ForwardingInstruction {
     if numOwnedOperands > 1 {
       return false
     }
+    // Destroying a value with a deinit calls the deinit. Such a destroy cannot be removed.
+    if forwardedResults.contains(where: { $0.type.isValueTypeWithDeinit }) {
+      return false
+    }
     return true
   }
 }

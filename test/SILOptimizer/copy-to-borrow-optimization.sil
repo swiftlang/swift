@@ -2791,3 +2791,32 @@ bb0(%0 : @owned $ClassLet):
   return %r : $()
 }
 
+
+struct NCWithDeinit: ~Copyable {
+  @_hasStorage let c: C
+  deinit
+}
+
+sil @nc_with_deinit_deinit : $@convention(method) (@owned NCWithDeinit) -> ()
+sil @use_nc_with_deinit : $@convention(thin) (@guaranteed NCWithDeinit) -> ()
+
+sil_moveonlydeinit NCWithDeinit {
+  @nc_with_deinit_deinit
+}
+
+// The destroy of the struct calls the deinit and must not be removed.
+// CHECK-LABEL: sil [ossa] @dont_remove_destroy_of_value_with_deinit :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[S:%.*]] = struct $NCWithDeinit ([[C]]
+// CHECK:         destroy_value [[S]]
+// CHECK:       } // end sil function 'dont_remove_destroy_of_value_with_deinit'
+sil [ossa] @dont_remove_destroy_of_value_with_deinit : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0
+  %2 = struct $NCWithDeinit (%1)
+  %3 = function_ref @use_nc_with_deinit : $@convention(thin) (@guaranteed NCWithDeinit) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed NCWithDeinit) -> ()
+  destroy_value %2
+  %6 = tuple ()
+  return %6
+}
