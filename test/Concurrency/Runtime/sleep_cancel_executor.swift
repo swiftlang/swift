@@ -163,6 +163,30 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, executor.pendingCount)
     }
 
+    tests.test("A very short sleep in a cancelled task still throws") {
+      // The default executor doesn't create a timer for sleeps this short, so
+      // it has nothing to cancel; the sleep must still notice the cancellation.
+      for duration in [Duration.nanoseconds(1), .microseconds(10)] {
+        let task = Task {
+          while !Task.isCancelled {
+            await Task.yield()
+          }
+          try await Task.sleep(for: duration)
+        }
+
+        task.cancel()
+
+        do {
+          try await task.value
+          expectUnreachable("sleep should have been cancelled")
+        } catch is CancellationError {
+          // Expected
+        } catch {
+          expectUnreachable("unexpected error \(error)")
+        }
+      }
+    }
+
     tests.test("Cancelling a sleep as its timer fires resumes it exactly once") {
       let executor = CancellableExecutor()
 

@@ -330,6 +330,9 @@ static inline uint64_t seconds_nanos_to_nanos(long long sec, long long nsec) {
 }
 
 extern "C" SWIFT_CC(swift)
+void swift_dispatchEnqueueMain(SwiftJob *job);
+
+extern "C" SWIFT_CC(swift)
 uintptr_t swift_dispatchEnqueueWithDeadline(bool global,
                                             long long sec,
                                             long long nsec,
@@ -354,6 +357,31 @@ uintptr_t swift_dispatchEnqueueWithDeadline(bool global,
   }
 
   dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
+
+  // If the deadline has already passed there is nothing to wait for, and
+  // creating, activating and firing a dispatch source would cost several
+  // times as much as just running the job.  Enqueue it directly and return a
+  // null token, which cancels as "already started".
+  //
+  // We don't do this for deadlines that are merely close: dispatch_after_f()
+  // is no cheaper than a source for anything beyond about a microsecond, and
+  // its coalescing makes sleeps of tens of microseconds take several times
+  // longer than a source does.
+  {
+    long long nowSec, nowNsec;
+    swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
+
+    uint64_t now = seconds_nanos_to_nanos(nowSec, nowNsec);
+    uint64_t deadline = seconds_nanos_to_nanos(sec, nsec);
+
+    if (deadline <= now) {
+      if (global)
+        swift_dispatchEnqueueGlobal(job);
+      else
+        swift_dispatchEnqueueMain(job);
+      return 0;
+    }
+  }
 
   uint64_t leeway;
   if (tnsec == -1) {
@@ -404,6 +432,8 @@ uintptr_t swift_dispatchEnqueueWithDeadline(bool global,
 /// swift_dispatchReleaseSource() for that.
 extern "C" SWIFT_CC(swift)
 SwiftJob *swift_dispatchCancel(uintptr_t token) {
+  if (!token)
+    return nullptr;  // The job was enqueued directly
   auto *jobSource = reinterpret_cast<struct swift_job_source *>(token);
   SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
 
@@ -419,6 +449,8 @@ SwiftJob *swift_dispatchCancel(uintptr_t token) {
 /// swift_dispatchEnqueueWithDeadline().
 extern "C" SWIFT_CC(swift)
 void swift_dispatchReleaseSource(uintptr_t token) {
+  if (!token)
+    return;
   job_source_release(reinterpret_cast<struct swift_job_source *>(token));
 }
 

@@ -131,6 +131,10 @@ extension Task where Success == Never, Failure == Never {
     tolerance: C.Duration?,
     clock: C
   ) async throws {
+    // An executor may decline to cancel a timer that is about to fire, so
+    // make sure a task that is already cancelled doesn't sleep at all.
+    try Task.checkCancellation()
+
     guard #available(StdlibDeploymentTarget 6.3, *),
           let executor = Task.currentSchedulingExecutor else {
       try await _sleepWithoutSchedulingExecutor(
