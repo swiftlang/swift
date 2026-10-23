@@ -623,9 +623,8 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
     _makeMutableAndUnique()
     _checkSubscript_native(i)
     _checkSubscript_native(j)
-    let base = unsafe _buffer.getSubscriptBaseAddress()
-    let pi = unsafe base + i
-    let pj = unsafe base + j
+    let pi = unsafe _buffer.getSubscriptBaseAddress() + i
+    let pj = unsafe _buffer.getSubscriptBaseAddress() + j
     let tmp = unsafe pi.move()
     unsafe pi.initialize(to: pj.move())
     unsafe pj.initialize(to: tmp)
