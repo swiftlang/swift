@@ -885,3 +885,52 @@ func copyOperator(
   _ = copy exactlyOnce // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
   _ = copy atMostOnce // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
 }
+
+// MARK: - Casts
+
+// Casting a value of a non-'Copyable' type requires NoncopyableCasting (see
+// test/SIL/callable_once_attr_consuming_captures.swift).
+
+func casts(
+  _ exactlyOnce: @once () -> Void,
+  _ atMostOnce: @callable(once) () -> Void
+) {
+  _ = exactlyOnce is Int
+  // expected-warning@-1 {{cast from '@once () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+  _ = atMostOnce is Int
+  // expected-warning@-1 {{cast from '@callable(once) () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+  _ = exactlyOnce as? Int
+  // expected-warning@-1 {{cast from '@once () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+  _ = atMostOnce as? Int
+  // expected-warning@-1 {{cast from '@callable(once) () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+  _ = exactlyOnce as! Int
+  // expected-warning@-1 {{cast from '@once () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+  _ = atMostOnce as! Int
+  // expected-warning@-1 {{cast from '@callable(once) () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+}
+
+func andAtMostOnce(
+  _ lhs: Bool, _ rhs: @autoclosure @callable(once) () -> Bool
+) -> Bool {
+  lhs ? rhs() : false
+}
+
+// An `is` check of a function consumes it, so the autoclosure does too.
+func isCheckInAtMostOnceAutoclosure(
+  _ exactlyOnce: @once () -> Void,
+  _ atMostOnce: @callable(once) () -> Void
+) {
+  _ = andAtMostOnce(true, exactlyOnce is Int)
+  // expected-error@-1 {{consumed capture 'exactlyOnce' of 'Deinitable'-conforming closure has non-'Deinitable' type '@once () -> Void'}}
+  // expected-warning@-2 {{cast from '@once () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-3 {{non-'Copyable' types cannot be conditionally cast}}
+  _ = andAtMostOnce(true, atMostOnce is Int)
+  // expected-warning@-1 {{cast from '@callable(once) () -> Void' to unrelated type 'Int' always fails}}
+  // expected-error@-2 {{non-'Copyable' types cannot be conditionally cast}}
+}

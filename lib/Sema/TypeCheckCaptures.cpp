@@ -774,6 +774,48 @@ public:
     return V;
   }
 
+  /// Returns true if the representation of a value of \p type depends on
+  /// abstraction, as that of a function or a metatype does, possibly as an
+  /// element of a tuple or the payload of an optional.
+  static bool hasAbstractionDependentRepresentation(Type type) {
+    type = type->getWithoutSpecifierType();
+    if (auto objectType = type->getOptionalObjectType())
+      return hasAbstractionDependentRepresentation(objectType);
+    if (auto *tuple = type->getAs<TupleType>()) {
+      return llvm::any_of(tuple->getElementTypes(), [](Type elementType) {
+        return hasAbstractionDependentRepresentation(elementType);
+      });
+    }
+    return type->is<AnyFunctionType>() || type->is<AnyMetatypeType>();
+  }
+
+  /// Returns true if \p type is a COM existential, possibly as the payload of
+  /// an optional.
+  static bool isCOMExistential(Type type) {
+    return type->getWithoutSpecifierType()
+        ->lookThroughAllOptionalTypes()
+        ->isCOMExistentialType();
+  }
+
+  /// Returns true if \p cast is an `is` check that only borrows its operand.
+  /// SILGen lowers an `is` check of a value to a type test that reads it in
+  /// place, unless a COM existential is involved or the value's
+  /// representation depends on abstraction (see emitIsa() and
+  /// canUseTypeTestForIsa()).
+  static bool isBorrowingIsCheck(ExplicitCastExpr *cast) {
+    auto *isExpr = dyn_cast<IsExpr>(cast);
+    if (!isExpr || isExpr->getCastKind() != CheckedCastKind::ValueCast)
+      return false;
+
+    auto type = cast->getSubExpr()->getType();
+    auto castType = isExpr->getCastType();
+    if (!type || !castType)
+      return false;
+
+    return !isCOMExistential(type) && !isCOMExistential(castType) &&
+           !hasAbstractionDependentRepresentation(type);
+  }
+
   /// Check whether the given expression represents a consuming use of some
   /// non-Copyable value and record the value as "consumed" by the closure.
   ///
@@ -811,8 +853,9 @@ public:
       }
     }
 
-    // Casts are consuming operations.
-    if (auto *cast = dyn_cast<ExplicitCastExpr>(E)) {
+    // Casts are consuming operations, except for most `is` checks.
+    if (auto *cast = dyn_cast<ExplicitCastExpr>(E);
+        cast && !isBorrowingIsCheck(cast)) {
       if (auto *V = getReferencedConsumableValue(cast->getSubExpr()))
         recordConsumingUse(V);
     }
