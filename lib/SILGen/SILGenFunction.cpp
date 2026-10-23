@@ -710,7 +710,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
-    auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
+    auto getAddressValue = [&](SILValue entryValue, bool callerTakesOwnership,
                                bool forLValue) -> SILValue {
       if (SGM.M.usesOpaqueValues() && !forLValue && !isPack) {
         // In opaque values mode, addresses aren't used except by lvalues.
@@ -722,10 +722,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                 B, loc, entryValue, LoadOwnershipQualifier::Trivial);
             return result;
           }
-          if (forceCopy) {
+          if (callerTakesOwnership) {
             SILValue result =
                 lowering.emitLoadOfCopy(B, loc, entryValue, IsNotTake);
-            enterDestroyCleanup(result);
             return result;
           } else {
             auto load = B.createLoadBorrow(
@@ -735,7 +734,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           }
         } else {
           // Otherwise, just return it, copying if needed.
-          if (forceCopy && !lowering.isTrivial(&F)) {
+          if (callerTakesOwnership && !lowering.isTrivial(&F)) {
             auto result = B.emitCopyValueOperation(loc, entryValue);
             return result;
           }
@@ -760,7 +759,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);
 
-        if (!forceCopy)
+        if (!callerTakesOwnership)
           enterDestroyCleanup(addr);
         return addr;
 
@@ -773,10 +772,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
             .getInducedPackType();
         copyPackElementsToTuple(loc, addr, entryValue, formalPackType);
 
-        if (!forceCopy)
+        if (!callerTakesOwnership)
           enterDestroyCleanup(addr);
         return addr;
-      } else if (forceCopy) {
+      } else if (callerTakesOwnership) {
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
         auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
@@ -875,15 +874,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
         // address of the value.
-        auto addr =
-            getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/false);
+        auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
+                                    /*forLValue=*/false);
         capturedArgs.push_back(
             addr->getOwnershipKind() == OwnershipKind::Owned
                 ? ManagedValue::forOwnedRValue(addr, CleanupHandle::invalid())
                 : ManagedValue::forBorrowedRValue(addr));
       } else {
-        auto addr =
-            getAddressValue(val, /*forceCopy=*/true, /*forLValue=*/false);
+        auto addr = getAddressValue(val, /*callerTakesOwnership=*/true,
+                                    /*forLValue=*/false);
         if (!useLoweredAddresses()) {
           auto &lowering = getTypeLowering(addr->getType());
           auto rvalue =
@@ -906,7 +905,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::StorageAddress: {
       assert(!isPack);
 
-      auto addr = getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/true);
+      auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
+                                  /*forLValue=*/true);
 
       // No-escaping stored declarations are captured as the
       // address of the value.
