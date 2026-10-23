@@ -175,8 +175,9 @@ private extension DebugValueInst {
   /// Returns the debug value, which may be a new instruction if it was reallocated.
   ///
   /// ```
-  ///   debug_value %0, ..., transform { bb0(%a): return %a }  ->  debug_value %0
-  ///   debug_value (), ..., transform { bb0: return undef }   ->  debug_value undef
+  ///   debug_value %0, ..., transform { bb0(%a): return %a }               ->  debug_value %0
+  ///   debug_value %0, ..., transform { bb0(%a): %l = load %a; return %l } ->  debug_value %0, expr op_deref
+  ///   debug_value (), ..., transform { bb0: return undef }                ->  debug_value undef
   /// ```
   func collapseTrivialReconstruction(_ context: FunctionPassContext) -> DebugValueInst {
     guard let debugBB = debugReconstructionBlock,
@@ -186,6 +187,11 @@ private extension DebugValueInst {
     if operands.count == 1, returnInst.returnedValue == debugBB.arguments[0] {
       // Remove the no-op reconstruction block.
       clearDebugReconstructionBlock(context)
+    } else if operands.count == 1, let load = returnInst.returnedValue as? LoadInst,
+              load.address == debugBB.arguments[0] {
+      // A load can be simplified to an op_deref.
+      clearDebugReconstructionBlock(context)
+      prependDeref(index: 0)
     } else if operands.isEmpty, let undef = returnInst.returnedValue as? Undef {
       // This is just undef, no need for a reconstruction block.
       clearDebugReconstructionBlock(context)

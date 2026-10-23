@@ -207,6 +207,41 @@ bb0(%0 : $*any P):
   return %r : $()
 }
 
+// A block which only loads its argument is the same as an op_deref.
+// CHECK-LABEL: sil {{.+}} @test_collapse_load_block
+// CHECK: debug_value %0 : $*Int64, let, name "loaded_arg", expr op_deref
+// CHECK-NOT: transform {
+sil hidden @test_collapse_load_block : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  debug_value %0 : $*Int64, let, name "loaded_arg", transform {
+  bb0(%a : $*Int64):
+    %1 = load %a : $*Int64
+    return %1 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A load of a projection cannot be simplified.
+// CHECK-LABEL: sil {{.+}} @test_load_of_projection_kept
+// CHECK: debug_value %0 : $*MyStruct, let, name "field", transform {
+// CHECK:   bb0(%0 : $*MyStruct):
+// CHECK-NEXT: %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.x
+// CHECK-NEXT: %2 = load %1 : $*Int64
+// CHECK-NEXT: return %2 : $Int64
+// CHECK-NEXT: }
+sil hidden @test_load_of_projection_kept : $@convention(thin) (@inout MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  debug_value %0 : $*MyStruct, let, name "field", transform {
+  bb0(%a : $*MyStruct):
+    %1 = struct_element_addr %a : $*MyStruct, #MyStruct.x
+    %2 = load %1 : $*Int64
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
 // Undef propagates through an address projection just like through a value projection.
 // CHECK-LABEL: sil {{.+}} @test_tuple_element_addr_undef
 // CHECK: debug_value undef : $Int64, let, name "elt"
@@ -240,13 +275,10 @@ bb0:
 }
 
 // Salvaging clones the index literal into the block, so a zero index shows up here and
-// folds to the base. The dead literal is cleaned up with it.
+// folds to the base. The dead literal is cleaned up with it, which leaves only the load.
 // CHECK-LABEL: sil {{.+}} @test_index_addr_zero
-// CHECK: debug_value %0 : $*Int64, let, name "idx", transform {
-// CHECK:   bb0(%0 : $*Int64):
-// CHECK-NEXT: %1 = load %0 : $*Int64
-// CHECK-NEXT: return %1 : $Int64
-// CHECK-NEXT: }
+// CHECK: debug_value %0 : $*Int64, let, name "idx", expr op_deref
+// CHECK-NOT: transform {
 sil hidden @test_index_addr_zero : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   debug_value %0 : $*Int64, let, name "idx", transform {
@@ -396,11 +428,8 @@ bb0(%0 : $Derived):
 }
 
 // CHECK-LABEL: sil {{.+}} @test_address_pointer_round_trip
-// CHECK: debug_value %0 : $*Int64, let, name "addr", transform {
-// CHECK:   bb0(%0 : $*Int64):
-// CHECK-NEXT: %1 = load %0 : $*Int64
-// CHECK-NEXT: return %1 : $Int64
-// CHECK-NEXT: }
+// CHECK: debug_value %0 : $*Int64, let, name "addr", expr op_deref
+// CHECK-NOT: transform {
 sil hidden @test_address_pointer_round_trip : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
   debug_value %0 : $*Int64, let, name "addr", transform {
