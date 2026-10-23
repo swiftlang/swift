@@ -537,3 +537,78 @@ func testGenericConsumingAndInoutCapturesNeverCalled<T>(_ value: T) {
 // CHECK-NEXT: GenericResource(mixed inout unused) used
 // CHECK-NEXT: GenericResource(mixed inout unused) deinit
 testGenericConsumingAndInoutCapturesNeverCalled(1)
+
+@_transparent
+func transparentAnd(
+  _ lhs: Bool, _ rhs: @autoclosure @callable(once) () -> Bool
+) -> Bool {
+  lhs ? rhs() : false
+}
+
+func isPositive(_ t: Tracker, _ value: Int) -> Bool {
+  print("checking \(t.tag)")
+  return value > 0
+}
+
+func testInlinedAutoclosure(_ flag: Bool, _ tag: String) {
+  let t = Tracker(tag)
+  print(transparentAnd(flag, isPositive(t, 1)))
+}
+
+// CHECK-NEXT: checking inlined called
+// CHECK-NEXT: true
+// CHECK-NEXT: Tracker(inlined called) deinit
+testInlinedAutoclosure(true, "inlined called")
+
+// CHECK-NEXT: false
+// CHECK-NEXT: Tracker(inlined never called) deinit
+testInlinedAutoclosure(false, "inlined never called")
+
+@_transparent
+func transparentRebound(_ fn: @callable(once) () -> Void) {
+  let g = fn
+  g()
+}
+
+@_transparent
+func transparentForwarded(_ fn: @callable(once) () -> Void) {
+  transparentRebound(fn)
+}
+
+@_transparent
+func transparentDiscard(_ fn: @callable(once) () -> Void) {
+  _ = consume fn
+}
+
+func testInlinedRebinding() {
+  let t = Tracker("rebound")
+  transparentRebound { print("using \(t.tag)") }
+}
+
+// CHECK-NEXT: using rebound
+// CHECK-NEXT: Tracker(rebound) deinit
+testInlinedRebinding()
+
+func testInlinedForwarding() {
+  let t = Tracker("forwarded")
+  transparentForwarded { print("using \(t.tag)") }
+}
+
+// CHECK-NEXT: using forwarded
+// CHECK-NEXT: Tracker(forwarded) deinit
+testInlinedForwarding()
+
+func testInlinedDiscard() {
+  let r = Resource("discarded")
+  transparentDiscard { r.use() }
+}
+
+// CHECK-NEXT: Resource(discarded) deinit
+testInlinedDiscard()
+
+func genericCallAtMostOnce<R>(_ fn: @callable(once) () -> R) -> R { fn() }
+
+func makeTag() -> String { "thunk" }
+
+// CHECK-NEXT: thunk
+print(genericCallAtMostOnce(makeTag))
