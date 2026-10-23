@@ -2096,3 +2096,37 @@ bb0:
   unreachable
 }
 
+
+sil @closureNCInt : $@convention(thin) (@guaranteed NCInt) -> Builtin.Int64
+
+// An at-most-once closure that borrows %0 is stored into the stack slot of an
+// inlined parameter, where it's destroyed on one path.
+// CHECK-LABEL: begin running test 1 of 1 on testInteriorOnStackClosureInStackSlot: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $NCInt
+// CHECK-DAG: last user:   destroy_addr
+// CHECK-DAG: last user:   %{{.*}} = apply %{{.*}}() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK-LABEL: end running test 1 of 1 on testInteriorOnStackClosureInStackSlot: interior_liveness with: %0
+sil [ossa] @testInteriorOnStackClosureInStackSlot : $@convention(thin) (@guaranteed NCInt, Builtin.Int1) -> Builtin.Int64 {
+bb0(%0 : @guaranteed $NCInt, %1 : $Builtin.Int1):
+  specify_test "interior_liveness %0"
+  %f = function_ref @closureNCInt : $@convention(thin) (@guaranteed NCInt) -> Builtin.Int64
+  %pa = partial_apply [on_stack] [called_at_most_once] %f(%0) : $@convention(thin) (@guaranteed NCInt) -> Builtin.Int64
+  %m = move_value [lexical] %pa : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %slot = alloc_stack [lexical] $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  store %m to [init] %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  cond_br %1, bb1, bb2
+
+bb1:
+  %l = load [take] %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %r = apply %l() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%r : $Builtin.Int64)
+
+bb2:
+  %z = integer_literal $Builtin.Int64, 0
+  destroy_addr %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%z : $Builtin.Int64)
+
+bb3(%a : $Builtin.Int64):
+  dealloc_stack %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  return %a : $Builtin.Int64
+}
