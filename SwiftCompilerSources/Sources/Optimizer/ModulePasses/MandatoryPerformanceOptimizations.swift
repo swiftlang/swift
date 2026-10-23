@@ -337,6 +337,9 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       }
     }
 
+    // Eliminate @pack_element types here to allow any applies that use them to be specialized.
+    tryEliminateOpenedPackElementTypes(in: function, context)
+
     _ = context.specializeApplies(in: function, isMandatory: true)
 
     removeUnusedMetatypeInstructions(in: function, context)

@@ -95,7 +95,7 @@ private func tryRewriteToScalar(
   return
 }
 
-private func tryEliminateOpenedPackElementTypes(
+func tryEliminateOpenedPackElementTypes(
   in function: Function, _ context: FunctionPassContext
 ) {
   var cloner = Cloner(in: function, context)
