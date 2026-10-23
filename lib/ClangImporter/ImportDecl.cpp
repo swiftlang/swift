@@ -9544,12 +9544,13 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
   }
 }
 
-/// Imports the Clang attributes of \p objcMethod onto an inherited constructor
-/// and, if it has one, its other C array projection.
+/// Imports the Clang attributes of \p objcMethod onto an implicitly-created
+/// (inherited or mirrored) constructor and, if it has one, its other C array
+/// projection.
 ///
 /// This has to happen after the projections are registered, because
 /// \c importAttributes() uses the registration to decide on availability.
-static void importInheritedConstructorAttributes(
+static void importImplicitConstructorAttributes(
     ClangImporter::Implementation &impl,
     const clang::ObjCMethodDecl *objcMethod, ConstructorDecl *ctor,
     const clang::ObjCInterfaceDecl *curObjCClass) {
@@ -9599,10 +9600,21 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
     // When mirroring an initializer, make it designated and required.
     if (isInitMethod(objcMethod)) {
       // Import the constructor.
-      if (auto imported = importConstructor(objcMethod, dc, /*implicit=*/true,
-                                            CtorInitializerKind::Designated,
-                                            /*required=*/true)) {
+      auto *imported = Impl.forEachCArrayProjection(
+          objcMethod, getVersion(), [&](ImportNameVersion v) {
+            llvm::SaveAndRestore<ImportNameVersion> save(version, v);
+            return importConstructor(objcMethod, dc, /*implicit=*/true,
+                                     CtorInitializerKind::Designated,
+                                     /*required=*/true);
+          });
+      if (imported) {
+        importImplicitConstructorAttributes(Impl, objcMethod, imported,
+                                            /*curObjCClass=*/nullptr);
         members.push_back(imported);
+        for (auto alternate : Impl.getAlternateDecls(imported)) {
+          if (imported->getDeclContext() == alternate->getDeclContext())
+            members.push_back(alternate);
+        }
       }
       continue;
     }
@@ -9729,8 +9741,8 @@ void SwiftDeclConverter::importInheritedConstructors(
             return imported;
           });
       if (newCtor) {
-        importInheritedConstructorAttributes(Impl, objcMethod, newCtor,
-                                             curObjCClass);
+        importImplicitConstructorAttributes(Impl, objcMethod, newCtor,
+                                            curObjCClass);
         newMembers.push_back(newCtor);
       } else if (existing && existing->getInitKind() ==
                    CtorInitializerKind::ConvenienceFactory &&
@@ -9766,8 +9778,8 @@ void SwiftDeclConverter::importInheritedConstructors(
                                    myKind, isRequired);
         });
     if (newCtor) {
-      importInheritedConstructorAttributes(Impl, objcMethod, newCtor,
-                                           curObjCClass);
+      importImplicitConstructorAttributes(Impl, objcMethod, newCtor,
+                                          curObjCClass);
       newMembers.push_back(newCtor);
     }
   }

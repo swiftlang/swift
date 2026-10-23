@@ -3,6 +3,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_ModernImportedCArrays
+// REQUIRES: swift_feature_ModernImportedCArraysOnly
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -12,6 +13,8 @@
 
 // RUN: %target-swift-frontend -typecheck -verify %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -o /dev/null
+
+// RUN: %target-swift-ide-test -print-module -module-to-print=CLib -source-filename=x -I %t/include --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s
 
 //--- include/module.modulemap
 module CLib {
@@ -92,6 +95,16 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface SvcP : NSObject <AP>
+@end
+
+@protocol R
+- (instancetype)initWithBuf:(int (*)[4])buf;
+@end
+
+// CHECK-LABEL: class RAdopter
+// CHECK: @available({{.*}}, *)
+// CHECK-NEXT: {{.*}}init(buf: UnsafeMutablePointer<[4 of CInt]>)
+@interface RAdopter : NSObject <R>
 @end
 
 // Parameters declared as arrays decay to pointers to arrays, however they are
@@ -229,6 +242,19 @@ func testAsync(
 }
 
 @available(anyAppleOS 26, *)
+func testMirroredInit(
+    tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
+    array: UnsafeMutablePointer<InlineArray<4, Int32>>
+) {
+  _ = RAdopter(buf: tuple)
+  // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  _ = RAdopter(buf: array)
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+}
+
+@available(anyAppleOS 26, *)
 func testProtocolAsync(
     tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
     array: UnsafeMutablePointer<InlineArray<4, Int32>>,
@@ -326,6 +352,11 @@ func testAsync(
 @available(anyAppleOS 26, *)
 func testCompletionHandler(_ pointer: UnsafeMutablePointer<CArray>, _ svc: Svc) {
   svc.fetch(withBuf: pointer) { _, _ in }
+}
+
+@available(anyAppleOS 26, *)
+func testMirroredInit(_ pointer: UnsafeMutablePointer<CArray>) {
+  _ = RAdopter(buf: pointer)
 }
 
 #if MODERN_C_ARRAYS
