@@ -910,39 +910,17 @@ case TypeKind::Id:
           extInfo = extInfo->withGlobalActor(globalActorType);
         }
 
-        // Transform the sendable dependent type if present.
-        if (auto sendableDep = origExtInfo.getSendableDependentType()) {
-          auto [newSendableDep, isSendable] =
-              asDerived().transformSendableDependentType(sendableDep);
-          if (!newSendableDep) {
-            // If we're no longer sendable dependent, update the @Sendable bit.
-            extInfo = extInfo->withSendableDependentType(Type());
-            extInfo = extInfo->withSendable(isSendable);
-            isUnchanged = false;
-          } else if (newSendableDep.getPointer() != sendableDep.getPointer()) {
-            extInfo = extInfo->withSendableDependentType(newSendableDep);
-            isUnchanged = false;
-          }
-        }
+        // Transform the types that properties of the function depend on.
+        for (auto dependentType : origExtInfo.getTypeDependencies()) {
+          auto kind = dependentType.getInt();
+          auto builder = extInfo->intoBuilder();
+          Type newDependentType = asDerived().transformTypeDependency(
+              kind, dependentType.getPointer(), builder);
+          if (newDependentType.getPointer() == dependentType.getPointer())
+            continue;
 
-        // Transform the execution semantics dependent type if present.
-        if (auto executionSemanticsDep =
-                origExtInfo.getExecutionSemanticsDependentType()) {
-          auto [newExecutionSemanticsDep, executionSemantics] =
-              asDerived().transformExecutionSemanticsDependentType(
-                  executionSemanticsDep);
-          if (!newExecutionSemanticsDep) {
-            // If we're no longer execution semantics dependent, update the
-            // execution semantics.
-            extInfo = extInfo->withExecutionSemanticsDependentType(Type());
-            extInfo = extInfo->withExecutionSemantics(executionSemantics);
-            isUnchanged = false;
-          } else if (newExecutionSemanticsDep.getPointer() !=
-                     executionSemanticsDep.getPointer()) {
-            extInfo = extInfo->withExecutionSemanticsDependentType(
-                newExecutionSemanticsDep);
-            isUnchanged = false;
-          }
+          extInfo = builder.withTypeDependency(kind, newDependentType).build();
+          isUnchanged = false;
         }
       }
 
@@ -1200,13 +1178,12 @@ case TypeKind::Id:
 
   bool shouldDesugarTypeAliases() const { return false; }
 
-  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
-    return std::make_pair(ty, false);
-  }
-
-  std::pair<Type, std::optional<ExecutionSemantics>>
-  transformExecutionSemanticsDependentType(Type ty) {
-    return std::make_pair(ty, std::nullopt);
+  /// Transforms the type that \p kind of a function type depends on. Returns
+  /// the new dependent type, or a null type if the dependence is resolved, in
+  /// which case the property it determines must be set in \p extInfo.
+  Type transformTypeDependency(TypeDependenceKind kind, Type ty,
+                               ASTExtInfoBuilder &extInfo) {
+    return ty;
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

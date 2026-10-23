@@ -7561,7 +7561,8 @@ bool swift::contextRequiresStrictConcurrencyChecking(
             // dependence for the purposes of this check since we don't know
             // whether or not the closure is Sendable.
             if (fnType->isAsync() ||
-                (!fnType->getSendableDependentType() && fnType->isSendable())) {
+                (!fnType->hasTypeDependencyFor(TypeDependenceKind::Sendable) &&
+                 fnType->isSendable())) {
               return true;
             }
           }

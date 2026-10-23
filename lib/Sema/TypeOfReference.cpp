@@ -1048,7 +1048,8 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           sendableDepTy = simplifyType(sendableDepTy);
           auto extInfo = referenceTy->getExtInfo();
           if (sendableDepTy->hasTypeVariable()) {
-            extInfo = extInfo.withSendableDependentType(sendableDepTy);
+            extInfo = extInfo.withTypeDependency(TypeDependenceKind::Sendable,
+                                                 sendableDepTy);
           } else {
             extInfo = extInfo.withSendable(isSendableCapture(sendableDepTy));
           }
@@ -2083,8 +2084,8 @@ ConstraintSystem::getTypeOfMemberReferencePre(
 
       std::optional<AnyFunctionType::ExtInfo> newExtInfo;
       if (baseObjTy->hasTypeVariable())
-        newExtInfo = methodTy->getExtInfo().withExecutionSemanticsDependentType(
-            baseObjTy);
+        newExtInfo = methodTy->getExtInfo().withTypeDependency(
+            TypeDependenceKind::ExecutionSemantics, baseObjTy);
       else if (auto semantics =
                    getUnappliedConsumingMethodExecutionSemantics(baseObjTy))
         newExtInfo = methodTy->getExtInfo().withExecutionSemantics(semantics);

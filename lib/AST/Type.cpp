@@ -1652,16 +1652,11 @@ Type TypeBase::replaceTypeVariablesAndHolesWithErrors() {
 
       return std::nullopt;
     }
-    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
-      // Fold away the sendable dependence if present, the function type will
-      // just become non-Sendable.
-      return std::make_pair(Type(), false);
-    }
-    std::pair<Type, std::optional<ExecutionSemantics>>
-    transformExecutionSemanticsDependentType(Type ty) {
-      // Fold away the at-most-once dependence if present, the function
-      // type will just become non-at-most-once.
-      return std::make_pair(Type(), std::nullopt);
+    Type transformTypeDependency(TypeDependenceKind kind, Type ty,
+                                 ASTExtInfoBuilder &extInfo) {
+      // Fold away the dependence, leaving the property it determines at its
+      // default, e.g. non-Sendable.
+      return Type();
     }
   };
   return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
@@ -4589,10 +4584,10 @@ Type AnyFunctionType::getThrownError() const {
   }
 }
 
-Type AnyFunctionType::getSendableDependentType() const {
+Type AnyFunctionType::getTypeDependencyFor(TypeDependenceKind kind) const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getSendableDependentType();
+    return cast<FunctionType>(this)->getTypeDependencyFor(kind);
   case TypeKind::GenericFunction:
     return Type();
   default:
@@ -4600,19 +4595,21 @@ Type AnyFunctionType::getSendableDependentType() const {
   }
 }
 
-Type AnyFunctionType::getExecutionSemanticsDependentType() const {
+ArrayRef<ASTExtInfoBuilder::TypeDependency>
+AnyFunctionType::getTypeDependencies() const {
   switch (getKind()) {
   case TypeKind::Function:
-    return cast<FunctionType>(this)->getExecutionSemanticsDependentType();
+    return cast<FunctionType>(this)->getTypeDependencies();
   case TypeKind::GenericFunction:
-    return Type();
+    return {};
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
 }
 
 bool AnyFunctionType::isSendable() const {
-  ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
+  ASSERT(!hasTypeDependencyFor(TypeDependenceKind::Sendable) &&
+         "Query Sendable dependence first");
   return getExtInfo().isSendable();
 }
 
@@ -4663,7 +4660,7 @@ AnyFunctionType::getLifetimeDependenceForResult(const ValueDecl *decl) const {
 
 std::optional<ExecutionSemantics>
 AnyFunctionType::getExecutionSemantics() const {
-  ASSERT(!hasExecutionSemanticsDependentType() &&
+  ASSERT(!hasTypeDependencyFor(TypeDependenceKind::ExecutionSemantics) &&
          "Query execution semantics dependence first");
   return getExtInfo().getExecutionSemantics();
 }
@@ -4704,20 +4701,29 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
     }
   }
 
-  Type sendableDependentType = getSendableDependentType();
-  if (sendableDependentType)
-    sendableDependentType = sendableDependentType->getCanonicalType();
+  auto typeDependencies = getTypeDependencies();
+  if (llvm::any_of(typeDependencies, [](const auto &dependency) {
+        return !dependency.getPointer()->isCanonical();
+      })) {
+    SmallVector<ASTExtInfoBuilder::TypeDependency, NumTypeDependenceKinds>
+        canonicalTypeDependencies;
+    for (auto dependentType : typeDependencies) {
+      canonicalTypeDependencies.push_back(
+          {dependentType.getPointer()->getCanonicalType().getPointer(),
+           dependentType.getInt()});
+    }
+    // Dependent types contain type variables, so they only live as long as
+    // the constraint solver. Get the context from one of them, because
+    // getting it from this type would canonicalize it again.
+    auto &ctx = canonicalTypeDependencies.front().getPointer()->getASTContext();
+    typeDependencies = ctx.AllocateCopy(canonicalTypeDependencies,
+                                        AllocationArena::ConstraintSolver);
+  }
 
-  Type executionSemanticsDependentType = getExecutionSemanticsDependentType();
-  if (executionSemanticsDependentType)
-    executionSemanticsDependentType =
-        executionSemanticsDependentType->getCanonicalType();
-
-  return ExtInfo(bits,
-                 useClangFunctionType ? getCanonicalClangTypeInfo()
-                                      : ClangTypeInfo(),
-                 globalActor, thrownError, sendableDependentType,
-                 executionSemanticsDependentType, getLifetimeDependencies());
+  return ExtInfo(
+      bits,
+      useClangFunctionType ? getCanonicalClangTypeInfo() : ClangTypeInfo(),
+      globalActor, thrownError, typeDependencies, getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
