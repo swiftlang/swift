@@ -1534,6 +1534,11 @@ private:
   SmallVector<llvm::MDNode *> UsedConditionals;
   void emitUsedConditionals();
 
+  /// The static initializers to add to the global constructors in
+  /// emitGlobalLists(). See addStaticInitializer().
+  SmallVector<llvm::Function *, 2> StaticInitializers;
+  bool EmittedStaticInitializers = false;
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
@@ -1763,6 +1768,14 @@ public:
   /// This can fail, in which it will return false and the module will be
   /// invalid.
   bool finalize();
+
+  /// Adds \p fn to the module's static initializers. They run before the C++
+  /// global constructors that Clang emits into the same module.
+  void addStaticInitializer(llvm::Function *fn) {
+    assert(!EmittedStaticInitializers &&
+           "static initializer added after emitting global constructors");
+    StaticInitializers.push_back(fn);
+  }
 
   void constructInitialFnAttributes(
       llvm::AttrBuilder &Attrs,

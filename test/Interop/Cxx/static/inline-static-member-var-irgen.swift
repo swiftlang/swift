@@ -1,4 +1,7 @@
 // RUN: %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
+// RUN: %if swift_feature_OnceFunctions %{ %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s -enable-experimental-feature OnceFunctions -D EXACTLY_ONCE | %FileCheck %s --check-prefix=STATIC-INIT %}
+// RUN: %if objc_interop && OS=macosx %{ %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s -target %target-cpu-apple-macosx11.0 -D OBJC_ACTOR | %FileCheck %s --check-prefix=STATIC-INIT %}
+// RUN: %if objc_interop && OS=macosx %{ %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s -D EAGER_CLASS_INIT | %FileCheck %s --check-prefix=STATIC-INIT %}
 
 import InlineStaticMemberVar
 
@@ -29,3 +32,49 @@ public func passingVarAsInout() {
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main17passingVarAsInoutyyF"()
 // CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr noalias align 4 captures(none) dereferenceable(4) @{{_ZN22WithInlineStaticMember12staticMemberE|"\?staticMember@WithInlineStaticMember@@2HA"}})
+
+// The dynamic initialization of `staticMemberInitializedAtRuntime` is a C++
+// global constructor, and the compiler's own static initializers are added to
+// the same list of global constructors.
+
+public func readStaticMemberInitializedAtRuntime() -> CInt {
+  return WithInlineStaticMember.staticMemberInitializedAtRuntime
+}
+
+#if EXACTLY_ONCE
+// A captureless exactly-once closure uses a context that is initialized at load
+// time.
+func callExactlyOnce(_ body: @once () -> CInt) -> CInt {
+  body()
+}
+
+public func readInExactlyOnceClosure() -> CInt {
+  callExactlyOnce { WithInlineStaticMember.staticMemberInitializedAtRuntime }
+}
+#endif
+
+#if OBJC_ACTOR
+import Foundation
+
+// Before macOS 12, the superclass of an @objc actor is swizzled at load time.
+@objc actor ObjCActor {}
+#endif
+
+#if EAGER_CLASS_INIT
+import Foundation
+
+class BaseWithCoding: NSObject, NSCoding {
+  required init(coder: NSCoder) { fatalError() }
+  func encode(with coder: NSCoder) { fatalError() }
+}
+
+class Generic<T>: BaseWithCoding {}
+
+// The metadata of a class with a generic ancestor and a custom Objective-C
+// name is initialized at load time.
+@objc(CustomName)
+class GenericAncestryWithCustomName: Generic<Int> {}
+#endif
+
+// STATIC-INIT: @llvm.global_ctors = appending global [2 x { i32, ptr, ptr }] [{ i32, ptr, ptr } { i32 65535, ptr @{{.*}}, ptr {{.*}} }, { i32, ptr, ptr } { i32 60000, ptr @{{.*}}, ptr null }]
+// STATIC-INIT-NOT: @llvm.global_ctors.

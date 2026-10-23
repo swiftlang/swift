@@ -1147,6 +1147,16 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
                  /*isConstant*/false, /*asContiguousArray*/true);
+
+  // @llvm.global_ctors
+
+  // ClangCodeGen creates llvm.global_ctors from scratch when it finishes, so
+  // the static initializers can only be added to it now. Use a priority
+  // slightly lower than the one for C++ global constructors, so that the
+  // static initializers run before the ones in this module.
+  for (auto *fn : StaticInitializers)
+    llvm::appendToGlobalCtors(Module, fn, 60000, nullptr);
+  EmittedStaticInitializers = true;
 }
 
 // Eagerly emit functions that are externally visible. Functions that are
@@ -2185,11 +2195,10 @@ void IRGenerator::emitEagerClassInitialization() {
   }
   RegisterIGF.Builder.CreateRetVoid();
 
-  // Add the registration function as a static initializer. We use a priority
-  // slightly lower than used for C++ global constructors, so that the code is
+  // Add the registration function as a static initializer, so that the code is
   // executed before C++ global constructors (in case someone uses archives
   // from a C++ global constructor).
-  llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
+  IGM->addStaticInitializer(RegisterFn);
 }
 
 void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
@@ -2231,11 +2240,10 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
   }
   RegisterIGF.Builder.CreateRetVoid();
 
-  // Add the registration function as a static initializer. We use a priority
-  // slightly lower than used for C++ global constructors, so that the code is
+  // Add the registration function as a static initializer, so that the code is
   // executed before C++ global constructors (in case someone manages to access
   // an @objc actor from a global constructor).
-  llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
+  IGM->addStaticInitializer(RegisterFn);
 }
 
 /// Emit symbols for eliminated dead methods, which can still be referenced
