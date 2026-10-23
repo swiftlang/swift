@@ -5144,12 +5144,11 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   return result;
 }
 
-static RecursiveTypeProperties
-getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               ArrayRef<AnyFunctionType::Yield> yields,
-                               Type result, Type globalActor, Type thrownError,
-                               Type sendableDependentType,
-                               Type executionSemanticsDependentType) {
+static RecursiveTypeProperties getFunctionRecursiveProperties(
+    ArrayRef<AnyFunctionType::Param> params,
+    ArrayRef<AnyFunctionType::Yield> yields, Type result, Type globalActor,
+    Type thrownError,
+    ArrayRef<ASTExtInfoBuilder::TypeDependency> typeDependencies) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
@@ -5160,13 +5159,8 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
     properties |= globalActor->getRecursiveProperties();
   if (thrownError)
     properties |= thrownError->getRecursiveProperties();
-  if (sendableDependentType) {
-    ASSERT(sendableDependentType->hasTypeVariable());
-    properties |= RecursiveTypeProperties::SolverAllocated;
-    properties |= RecursiveTypeProperties::HasTypeVariable;
-  }
-  if (executionSemanticsDependentType) {
-    ASSERT(executionSemanticsDependentType->hasTypeVariable());
+  for (auto dependentType : typeDependencies) {
+    ASSERT(dependentType.getPointer()->hasTypeVariable());
     properties |= RecursiveTypeProperties::SolverAllocated;
     properties |= RecursiveTypeProperties::HasTypeVariable;
   }
@@ -5414,19 +5408,15 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   assert(yields.size() > 0 == (info.has_value() && info.value().isCoroutine()));
   Type thrownError;
   Type globalActor;
-  Type sendableDependentType;
-  Type executionSemanticsDependentType;
+  ArrayRef<ASTExtInfoBuilder::TypeDependency> typeDependencies;
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
-    sendableDependentType = info->getSendableDependentType();
-    executionSemanticsDependentType =
-        info->getExecutionSemanticsDependentType();
+    typeDependencies = info->getTypeDependencies();
   }
 
   auto properties = getFunctionRecursiveProperties(
-      params, yields, result, globalActor, thrownError, sendableDependentType,
-      executionSemanticsDependentType);
+      params, yields, result, globalActor, thrownError, typeDependencies);
   auto arena = getArena(properties);
 
   if (info.has_value()) {
@@ -5458,9 +5448,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
-  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0) +
-                      (sendableDependentType ? 1 : 0) +
-                      (executionSemanticsDependentType ? 1 : 0);
+  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
@@ -5468,8 +5456,11 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
       hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
   size_t allocSize =
       totalSizeToAlloc<AnyFunctionType::Param, AnyFunctionType::Yield,
-                       ClangTypeInfo, Type, size_t, LifetimeDependenceInfo>(
+                       ClangTypeInfo, Type, uint8_t,
+                       ASTExtInfoBuilder::TypeDependency, size_t,
+                       LifetimeDependenceInfo>(
           params.size(), yields.size(), hasClangInfo ? 1 : 0, numTypes,
+          typeDependencies.empty() ? 0 : 1, typeDependencies.size(),
           hasLifetimeDependenceInfo ? 1 : 0,
           hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
 
@@ -5532,14 +5523,13 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
       getTrailingObjects<Type>()[typeIdx] = thrownError;
       typeIdx += 1;
     }
-    if (Type sendableDependentType = info->getSendableDependentType()) {
-      getTrailingObjects<Type>()[typeIdx] = sendableDependentType;
-      typeIdx += 1;
-    }
-    if (Type executionSemanticsDependentType =
-            info->getExecutionSemanticsDependentType()) {
-      getTrailingObjects<Type>()[typeIdx] = executionSemanticsDependentType;
-      typeIdx += 1;
+    auto typeDependencies = info->getTypeDependencies();
+    if (!typeDependencies.empty()) {
+      ASSERT(typeDependencies.size() <= NumTypeDependenceKinds);
+      *getTrailingObjects<uint8_t>() = typeDependencies.size();
+      std::uninitialized_copy(
+          typeDependencies.begin(), typeDependencies.end(),
+          getTrailingObjects<ASTExtInfoBuilder::TypeDependency>());
     }
     auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
@@ -5614,10 +5604,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
 
-    // Generic functions can't currently have Sendable or execution semantics
-    // dependence.
-    ASSERT(!info->getSendableDependentType());
-    ASSERT(!info->getExecutionSemanticsDependentType());
+    // Generic functions can't currently have dependent types.
+    ASSERT(info->getTypeDependencies().empty());
   }
 
   if (thrownError) {

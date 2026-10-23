@@ -1764,29 +1764,25 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
     return std::nullopt;
   }
 
-  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+  Type transformTypeDependency(TypeDependenceKind kind, Type ty,
+                               ASTExtInfoBuilder &extInfo) {
     ty = simplify(ty);
 
     // If we still have type variables, we keep the dependence.
     if (ty->hasTypeVariable())
-      return std::pair(ty, false);
+      return ty;
 
-    // Otherwise we've flattened the dependence, evaluate Sendable.
-    return std::make_pair(Type(), isSendableCapture(ty));
-  }
-
-  std::pair<Type, std::optional<ExecutionSemantics>>
-  transformExecutionSemanticsDependentType(Type ty) {
-    ty = simplify(ty);
-
-    // If we still have type variables, we keep the dependence.
-    if (ty->hasTypeVariable())
-      return std::make_pair(ty, std::nullopt);
-
-    // Otherwise we've flattened the dependence, evaluate the execution
-    // semantics.
-    return std::make_pair(Type(),
-                          getUnappliedConsumingMethodExecutionSemantics(ty));
+    // Otherwise we've flattened the dependence, evaluate the property.
+    switch (kind) {
+    case TypeDependenceKind::Sendable:
+      extInfo = extInfo.withSendable(isSendableCapture(ty));
+      break;
+    case TypeDependenceKind::ExecutionSemantics:
+      extInfo = extInfo.withExecutionSemantics(
+          getUnappliedConsumingMethodExecutionSemantics(ty));
+      break;
+    }
+    return Type();
   }
 };
 
