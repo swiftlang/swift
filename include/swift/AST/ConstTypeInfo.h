@@ -504,14 +504,22 @@ private:
   std::string MemberLabel;
 };
 
+struct InterpolatedStringSegment {
+  bool IsInterpolation;
+  /// Non-null for raw literal segments (IsInterpolation = false).
+  std::shared_ptr<CompileTimeValue> Value;
+  /// Non-empty for interpolation segments (IsInterpolation = true).
+  std::vector<FunctionParameter> Arguments;
+};
+
 /// A representation of an Interpolated String Literal
 class InterpolatedStringLiteralValue : public CompileTimeValue {
 public:
   InterpolatedStringLiteralValue(
-      std::vector<std::shared_ptr<CompileTimeValue>> Segments)
+      std::vector<InterpolatedStringSegment> Segments)
       : CompileTimeValue(ValueKind::InterpolatedString), Segments(Segments) {}
 
-  std::vector<std::shared_ptr<CompileTimeValue>> getSegments() const {
+  std::vector<InterpolatedStringSegment> getSegments() const {
     return Segments;
   }
 
@@ -520,7 +528,7 @@ public:
   }
 
 private:
-  std::vector<std::shared_ptr<CompileTimeValue>> Segments;
+  std::vector<InterpolatedStringSegment> Segments;
 };
 
 /// A representation of an arbitrary value that does not fall under
