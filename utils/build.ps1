@@ -2394,6 +2394,9 @@ function Build-CMakeProject {
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_API "$AndroidAPILevel"
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_ARCH_ABI $Platform.Architecture.ABI
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_NDK "$AndroidNDKPath"
+        # Use the shared C++ runtime so that libraries like libswiftCore and
+        # _FoundationICU don't carry their own copy.
+        Add-KeyValueIfNew $Defines CMAKE_ANDROID_STL_TYPE c++_shared
         Add-KeyValueIfNew $Defines CMAKE_SYSROOT "$AndroidSysroot"
 
         if ($UseASM) {
@@ -2943,11 +2946,17 @@ function Build-CDispatch([Hashtable] $Platform,
     -Platform $Platform `
     -CCompiler $CCompiler `
     -CXXCompiler $CXXCompiler `
-    -Defines @{
+    -Defines (@{
       BUILD_SHARED_LIBS = $(if ($Static) { "NO" } else { "YES" });
       BUILD_TESTING = "NO";
       ENABLE_SWIFT = "NO";
-    }
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # libdispatch doesn't use libc++, but with the shared C++ runtime it would
+      # take `__emutls_get_address` from it and depend on libc++_shared.so.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Get-CompilersDefines([Hashtable] $Platform,
@@ -3867,12 +3876,17 @@ function Build-DS2([Hashtable] $Platform) {
     -Platform $Platform `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
-    -Defines @{
+    -Defines (@{
       DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
       DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
-    }
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # ds2 is a standalone executable, so keep the static C++ runtime.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Build-BoringSSL([Hashtable] $Platform,
@@ -4718,6 +4732,12 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         dispatch_INSTALL_ARCH_SUBDIR      = "YES";
       }
       $DispatchDefines = $SDKInstallDefines + $DispatchDefines
+      if ($Platform.OS -eq [OS]::Android) {
+        # libdispatch doesn't use libc++, but with the shared C++ runtime it
+        # would take `__emutls_get_address` from it and depend on
+        # libc++_shared.so.
+        $DispatchDefines.CMAKE_ANDROID_STL_TYPE = "c++_static"
+      }
 
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
