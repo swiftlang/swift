@@ -5290,14 +5290,28 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
   collectConstantCaptures(fn);
 
-  // @_inheritActorContext(always) attribute allows implicit
-  // capture of isolation parameter from the context. This
-  // cannot be done as part of computing captures because
-  // isolation is not available at that point because it in
-  // turn depends on captures sometimes.
+  // Handle implicit isolation captures:
   if (auto *closure = fn.getClosureExpr()) {
+    // @_inheritActorContext(always) attribute allows implicit
+    // capture of isolation parameter from the context. This
+    // cannot be done as part of computing captures because
+    // isolation is not available at that point because it in
+    // turn depends on captures sometimes.
     if (closure->alwaysInheritsActorContext()) {
       auto isolation = closure->getActorIsolation();
+      if (isolation.isActorInstanceIsolated()) {
+        if (auto *var = isolation.getActorInstance()) {
+          recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
+        } else if (auto *actorExpr = isolation.getActorInstanceExpr()) {
+          recordCapture(CapturedValue(actorExpr, /*flags=*/0));
+        }
+      }
+    }
+  } else if (auto *deferBody = fn.getDeferBodyFuncDecl()) {
+    // A defer in a closure inherits the isolation of the closure, and may
+    // need to capture the actor it is isolated to.
+    if (deferBody->getCaptureInfo().needsImplicitIsolationCapture()) {
+      auto isolation = getActorIsolation(deferBody);
       if (isolation.isActorInstanceIsolated()) {
         if (auto *var = isolation.getActorInstance()) {
           recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
@@ -5332,9 +5346,11 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the result.
-  CaptureInfo info(Context, resultingCaptures,
-                   capturesDynamicSelf, capturesOpaqueValue,
-                   capturesGenericParams, genericEnv.getArrayRef(),
+  OptionSet<CaptureInfo::Flags> flags;
+  if (capturesGenericParams)
+    flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+  CaptureInfo info(Context, resultingCaptures, capturesDynamicSelf,
+                   capturesOpaqueValue, flags, genericEnv.getArrayRef(),
                    capturedTypes);
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
