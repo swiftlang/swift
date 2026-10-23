@@ -1,4 +1,4 @@
-// {"kind":"emit-ir","original":"7b6e1294","signature":"(anonymous namespace)::EmitTypeMetadataRef::visitBoundGenericType(swift::CanTypeWrapper<swift::BoundGenericType>, swift::irgen::DynamicMetadataRequest)","stackOverflow":true}
+// {"kind":"emit-ir","original":"7b6e1294","signature":"(anonymous namespace)::EmitTypeMetadataRef::visitNominalType(swift::CanTypeWrapper<swift::NominalType>, swift::irgen::DynamicMetadataRequest)","stackOverflow":true}
 // RUN: not --crash %target-swift-frontend -emit-ir %s
 protocol c {
   associatedtype d: Hashable
