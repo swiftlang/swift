@@ -28,9 +28,7 @@ extension UndefFoldingSimplifiable {
 // Note: `enum` is deliberately not listed here, as folding away a known case loses information.
 
 // Casts and conversions.
-extension UpcastInst : UndefFoldingSimplifiable {}
 extension ConvertFunctionInst : UndefFoldingSimplifiable {}
-extension AddressToPointerInst : UndefFoldingSimplifiable {}
 
 // Address projections.
 extension StructElementAddrInst : UndefFoldingSimplifiable {}
@@ -38,3 +36,33 @@ extension TupleElementAddrInst : UndefFoldingSimplifiable {}
 extension RefElementAddrInst : UndefFoldingSimplifiable {}
 extension RefTailAddrInst : UndefFoldingSimplifiable {}
 extension VectorBaseAddrInst : UndefFoldingSimplifiable {}
+extension UncheckedInPlaceEnumDataAddrInst : UndefFoldingSimplifiable {}
+
+extension AddressToPointerInst : DebugReconstructionBlockSimplifiable {
+  /// Folds undef, and removes a `pointer_to_address`-`address_to_pointer` pair, which gives back
+  /// the pointer.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    if let ptr2Addr = address as? PointerToAddressInst {
+      replace(with: ptr2Addr.pointer, context)
+    }
+  }
+}
+
+extension UpcastInst : DebugReconstructionBlockSimplifiable {
+  /// Folds undef, and combines a chain of upcasts:
+  /// ```
+  ///   %1 = upcast %0 : $Derived to $Base
+  ///   %2 = upcast %1 : $Base to $Root   ->   %2 = upcast %0 : $Derived to $Root
+  /// ```
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    while let upcast = fromInstance as? UpcastInst {
+      operand.set(to: upcast.fromInstance, context)
+    }
+  }
+}

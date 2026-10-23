@@ -64,11 +64,9 @@ extension TupleInst : OnoneSimplifiable, SILCombineSimplifiable {
 }
 
 extension TupleInst : DebugReconstructionBlockSimplifiable {
-  /// Just folds an all-undef tuple to undef.
+  /// See `SingleValueInstruction.simplifyAggregateForDebugReconstructionBlock`.
   func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
-    if !operands.isEmpty && operands.allSatisfy({ $0.value is Undef }) {
-      replaceWithUndef(context)
-    }
+    simplifyAggregateForDebugReconstructionBlock(context)
   }
 }
 

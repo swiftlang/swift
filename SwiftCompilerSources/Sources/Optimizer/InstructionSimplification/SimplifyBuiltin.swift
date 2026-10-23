@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable, DebugReconstructionBlockSimplifiable {
+extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:
@@ -74,6 +74,38 @@ extension BuiltinInst : LateOnoneSimplifiable {
       optimizeIsConcrete(allowArchetypes: true, context)
     } else {
       simplify(context)
+    }
+  }
+}
+
+extension BuiltinInst : DebugReconstructionBlockSimplifiable {
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if hasUndefResult(context) {
+      replaceWithUndef(context)
+      return
+    }
+    simplify(context)
+  }
+
+  /// Whether the builtin's result is undef because it depends on an undef argument.
+  ///
+  /// A builtin with substitutions may only depend on its types, e.g. `builtin "sizeof"<T>(undef)`.
+  /// One undef argument only makes the result undef if no value of the other argument
+  /// determines it on its own, which rules out e.g. `builtin "and"(undef, 0)`.
+  private func hasUndefResult(_ context: SimplifyContext) -> Bool {
+    guard substitutionMap.isEmpty else {
+      return false
+    }
+    switch id {
+    case .Add, .Sub, .Xor, .ICMP_EQ, .ICMP_NE:
+      // Any undef operand makes the result undef.
+      return arguments.contains { $0 is Undef }
+    case .SAddOver, .UAddOver, .SSubOver, .USubOver:
+      // The third argument only enables the overflow check.
+      return arguments[0] is Undef || arguments[1] is Undef
+    default:
+      // Conservatively keep the builtin unless every operand is undef.
+      return !arguments.isEmpty && arguments.allSatisfy { $0 is Undef }
     }
   }
 }

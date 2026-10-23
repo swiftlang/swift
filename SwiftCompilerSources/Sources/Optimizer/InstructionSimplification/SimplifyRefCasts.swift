@@ -33,10 +33,24 @@ extension UncheckedRefCastInst : OnoneSimplifiable {
 }
 
 extension UncheckedRefCastInst : DebugReconstructionBlockSimplifiable {
-  /// Only fold undef: the cast-type analysis of `simplify` relies on the surrounding
-  /// function, which a reconstruction block has none of.
+  /// Folds undef, and on top of `simplify`, looks through `unchecked_ref_cast`s and removes a
+  /// cast to the type of its operand:
+  /// ```
+  ///   %1 = upcast %0 : $Derived to $Base
+  ///   %2 = unchecked_ref_cast %1 : $Base to $Derived   ->   %0
+  /// ```
   func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
-    foldUndefOperands(context)
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
+    // These simplifications are missing from the Swift side.
+    if let refCast = fromInstance as? UncheckedRefCastInst {
+      operand.set(to: refCast.fromInstance, context)
+    }
+    if fromInstance.type == type {
+      replace(with: fromInstance, context)
+    }
   }
 }
 
