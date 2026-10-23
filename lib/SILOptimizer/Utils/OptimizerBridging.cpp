@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -314,6 +315,12 @@ bool BridgedPassContext::specializeKeyPathInst(BridgedInstruction kpi) const {
 
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
+}
+
+bool BridgedPassContext::unrollPackLoopsInFunction(
+    BridgedFunction function) const {
+  return swift::unrollPackLoopsInFunction(function.getFunction(),
+                                          invocation->getPassManager());
 }
 
 namespace  {

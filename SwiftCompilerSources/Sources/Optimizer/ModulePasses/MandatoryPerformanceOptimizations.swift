@@ -352,6 +352,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       changed = true
     }
 
+    if context.unrollPackLoops(in: function) {
+      changed = true
+    }
+
     changed = removeDeadStackAllocations(in: function, context) || changed
   }
 
