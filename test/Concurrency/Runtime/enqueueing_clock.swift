@@ -18,7 +18,7 @@ import StdlibUnittest
 
 /// A clock that only moves when it is told to, and which schedules the work
 /// that is given to it itself.
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class ManualClock: EnqueueingClock, JobCanceller, @unchecked Sendable {
   struct Instant: InstantProtocol {
     typealias Duration = Swift.Duration
@@ -82,7 +82,7 @@ final class ManualClock: EnqueueingClock, JobCanceller, @unchecked Sendable {
       pending[id] = (deadline: deadline, job: unowned, destination: nil)
       return id
     }
-    return JobCancellationToken(canceller: self, jobID: id, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: id, opaqueData: [0, 0])
   }
 
   func enqueue(_ job: consuming ExecutorJob,
@@ -102,7 +102,7 @@ final class ManualClock: EnqueueingClock, JobCanceller, @unchecked Sendable {
       pending[id] = (deadline: deadline, job: unowned, destination: executor)
       return id
     }
-    return JobCancellationToken(canceller: self, jobID: id, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: id, opaqueData: [0, 0])
   }
 
   func cancel(jobWithToken token: consuming JobCancellationToken)
@@ -133,7 +133,7 @@ final class ManualClock: EnqueueingClock, JobCanceller, @unchecked Sendable {
 
 /// A task executor that doesn't run jobs, but passes them to a scheduling
 /// executor to be run against some clock.
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class SchedulingProxy: TaskExecutor, @unchecked Sendable {
   private let lock = DispatchSemaphore(value: 1)
   private var _token: JobCancellationToken?
@@ -182,7 +182,7 @@ final class Flag: @unchecked Sendable {
   func set() { queue.sync { _value = true } }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 func waitUntil(_ condition: () -> Bool) async throws {
   var attempts = 0
   while !condition() && attempts < 1000 {
@@ -191,7 +191,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("enqueueing_clock")

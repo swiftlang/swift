@@ -63,7 +63,7 @@ public protocol Clock<Duration>: Sendable {
 /// `JobCancellationToken.canceller`.  If a clock keeps the job itself, it
 /// should also conform to `JobCanceller` and name itself as the canceller.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public protocol EnqueueingClock<Duration>: Clock<Duration> {
   /// Run the given job on an unspecified executor at some point after the
   /// fire time.
@@ -116,7 +116,7 @@ public protocol EnqueueingClock<Duration>: Clock<Duration> {
 }
 
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension EnqueueingClock {
   public func enqueue(_ job: consuming ExecutorJob,
                       on executor: some Executor,
@@ -153,7 +153,7 @@ extension EnqueueingClock {
 }
 
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension ContinuousClock: EnqueueingClock {
   public func run(_ job: consuming ExecutorJob,
                   run at: SchedulingExecutorFireTime<ContinuousClock>,
@@ -176,7 +176,7 @@ extension ContinuousClock: EnqueueingClock {
 }
 
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension SuspendingClock: EnqueueingClock {
   public func run(_ job: consuming ExecutorJob,
                   run at: SchedulingExecutorFireTime<SuspendingClock>,
@@ -201,12 +201,12 @@ extension SuspendingClock: EnqueueingClock {
 // MARK: - Forwarding from executors
 
 /// Returns `true` if `clock` is one that an executor should forward to.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 internal func _isEnqueueingClock<C: Clock>(_ clock: C) -> Bool {
   return clock is any EnqueueingClock
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 private func _open<E: EnqueueingClock, C: Clock>(
   _ enqueueingClock: E,
   _ job: consuming ExecutorJob,
@@ -221,7 +221,7 @@ private func _open<E: EnqueueingClock, C: Clock>(
     tolerance: tolerance as! E.Duration?)
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 private func _open<E: EnqueueingClock, C: Clock>(
   _ enqueueingClock: E,
   resuming continuation: consuming TimerContinuation,
@@ -236,7 +236,7 @@ private func _open<E: EnqueueingClock, C: Clock>(
 
 /// Hand a job to an `EnqueueingClock` to be enqueued on `executor`.  The
 /// caller must already have checked that `clock` is one.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 internal func _enqueueUsingClock<C: Clock>(
   _ job: consuming ExecutorJob,
   on executor: some Executor,
@@ -251,7 +251,7 @@ internal func _enqueueUsingClock<C: Clock>(
 
 /// Hand a continuation to an `EnqueueingClock` to be resumed.  The caller
 /// must already have checked that `clock` is one.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 internal func _resumeUsingClock<C: Clock>(
   _ continuation: consuming TimerContinuation,
   run: SchedulingExecutorFireTime<C>,

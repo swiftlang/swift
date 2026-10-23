@@ -103,7 +103,7 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
+  if #available(StdlibDeploymentTarget 6.5, *) {
     _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
       ExecutorJob(unownedJob),
       run: .after(.nanoseconds(delay)),
@@ -126,33 +126,26 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
                                       clock: CInt,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  // The deadline is an absolute time on `clock`, so work out how far away it
-  // is, clamping it to zero if it has already passed.
-  var nowSeconds: Int64 = 0, nowNanoseconds: Int64 = 0
-  unsafe _getTime(seconds: &nowSeconds, nanoseconds: &nowNanoseconds,
-                  clock: clock)
-  let delay = Swift.max(
-    Duration.zero,
-    Duration.seconds(seconds - nowSeconds)
-      + Duration.nanoseconds(nanoseconds - nowNanoseconds))
+  // The deadline is an absolute time on `clock`, so schedule it as one.
+  let deadline = Duration(_seconds: seconds, nanoseconds: nanoseconds)
 
   // A negative tolerance means that none was specified.
   let leeway: Duration? = leewayNanoseconds < 0 ? nil
     : Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
 
-  if #available(StdlibDeploymentTarget 6.3, *) {
+  if #available(StdlibDeploymentTarget 6.5, *) {
     switch clock {
       case _ClockID.suspending.rawValue:
         _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          run: .after(delay),
+          run: .at(SuspendingClock.Instant(_value: deadline)),
           tolerance: leeway,
           clock: .suspending
         )
       case _ClockID.continuous.rawValue:
         _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          run: .after(delay),
+          run: .at(ContinuousClock.Instant(_value: deadline)),
           tolerance: leeway,
           clock: .continuous
         )

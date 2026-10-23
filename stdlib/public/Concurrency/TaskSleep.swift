@@ -28,7 +28,7 @@ extension Task where Success == Never, Failure == Never {
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
 
-      if #available(StdlibDeploymentTarget 6.3, *) {
+      if #available(StdlibDeploymentTarget 6.5, *) {
         #if !$Embedded
         if let executor = Task.currentSchedulingExecutor {
           // This sleep can't be cancelled, so we have no use for the token.

@@ -63,6 +63,7 @@ struct WaitQueue {
     queue.push(Entry(payload: .job(UnownedJob(job)), deadline: deadline, id: id))
   }
 
+  @available(StdlibDeploymentTarget 6.5, *)
   mutating func enqueue(_ continuation: consuming TimerContinuation,
                         after delay: CooperativeExecutor.Duration,
                         id: UInt64) {
@@ -71,15 +72,17 @@ struct WaitQueue {
                      deadline: deadline, id: id))
   }
 
-  mutating func forEachReady(job: (consuming ExecutorJob) -> (),
-                             continuation: (consuming TimerContinuation) -> ()) {
+  mutating func forEachReady(
+    job: (consuming ExecutorJob) -> (),
+    continuation: (UnsafeContinuation<Void, CancellationError>) -> ()
+  ) {
     let now = currentTime
     while let entry = queue.pop(when: { $0.deadline < now }) {
       switch entry.payload {
       case let .job(unowned):
         job(ExecutorJob(unowned))
       case let .continuation(c):
-        continuation(unsafe TimerContinuation(c))
+        unsafe continuation(c)
       }
     }
   }
@@ -202,7 +205,7 @@ public final class CooperativeExecutor: Executor, @unchecked Sendable {
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @_spi(ExperimentalCustomExecutors)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CooperativeExecutor: SchedulingExecutor {
 
   func currentTime(clock: _ClockID) -> Timestamp {
@@ -213,7 +216,7 @@ extension CooperativeExecutor: SchedulingExecutor {
     return now
   }
 
-  // The values stored in `JobCancellationToken.opaqueData.0`
+  // The values stored in `JobCancellationToken.opaqueData[0]`
   private static var continuousClockToken: Int { 1 }
   private static var suspendingClockToken: Int { 2 }
 
@@ -259,7 +262,7 @@ extension CooperativeExecutor: SchedulingExecutor {
       suspendingWaitQueue.enqueue(job, after: delay, id: id)
     }
     return JobCancellationToken(canceller: self, jobID: id,
-                                opaqueData: (clockToken, 0))
+                                opaqueData: [clockToken, 0])
   }
 
   public func enqueue<C: Clock>(resuming continuation: consuming TimerContinuation,
@@ -281,12 +284,12 @@ extension CooperativeExecutor: SchedulingExecutor {
       suspendingWaitQueue.enqueue(continuation, after: delay, id: id)
     }
     return JobCancellationToken(canceller: self, jobID: id,
-                                opaqueData: (clockToken, 0))
+                                opaqueData: [clockToken, 0])
   }
 
   private func cancel(token: borrowing JobCancellationToken)
     -> WaitQueue.Payload? {
-    switch token.opaqueData.0 {
+    switch token.opaqueData[0] {
     case Self.continuousClockToken:
       return continuousWaitQueue.cancel(id: token.jobID)
     case Self.suspendingClockToken:
@@ -327,12 +330,12 @@ extension CooperativeExecutor: RunLoopExecutor {
     while !shouldStop && !condition() {
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Process the timer queues
-      suspendingWaitQueue.forEachReady(
+      unsafe suspendingWaitQueue.forEachReady(
         job: { runQueue.push(UnownedJob($0)) },
-        continuation: { $0.resume() })
-      continuousWaitQueue.forEachReady(
+        continuation: { unsafe $0.resume() })
+      unsafe continuousWaitQueue.forEachReady(
         job: { runQueue.push(UnownedJob($0)) },
-        continuation: { $0.resume() })
+        continuation: { unsafe $0.resume() })
       #endif
 
       // Now run any queued jobs

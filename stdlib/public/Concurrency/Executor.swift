@@ -46,7 +46,7 @@ public protocol Executor: AnyObject, Sendable {
 /// `SchedulingExecutor` have a single `enqueue` requirement that accepts
 /// either a `Duration` or an `Instant`.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public enum SchedulingExecutorFireTime<C: Clock> {
   /// A time relative to now.
   case after(C.Duration)
@@ -88,7 +88,7 @@ public enum SchedulingExecutorFireTime<C: Clock> {
 /// returning it from `SchedulingExecutor.cancel(continuationWithToken:)`, in
 /// which case the caller resumes it.  It may be resumed from any thread.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @safe
 public struct TimerContinuation: ~Copyable {
   internal var continuation: UnsafeContinuation<Void, _Concurrency.CancellationError>
@@ -141,7 +141,7 @@ public struct TimerContinuation: ~Copyable {
 /// (see `EnqueueingClock`) can conform to this as well, if it needs to be the
 /// target of the cancellation tokens that it hands out.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public protocol JobCanceller: Sendable {
   /// Cancel a scheduled job.
   ///
@@ -188,7 +188,7 @@ public protocol JobCanceller: Sendable {
 }
 
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension JobCanceller {
   public func cancel(continuationWithToken token: consuming JobCancellationToken)
     -> TimerContinuation? {
@@ -213,7 +213,7 @@ extension JobCanceller {
 /// clean-up function (if any) runs so that the executor can release any
 /// resources it is keeping for cancellation.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public struct JobCancellationToken: ~Copyable {
   /// What to ask to cancel the job: the executor that it was scheduled on or,
   /// for work scheduled by a `Clock`, possibly the clock.
@@ -224,7 +224,7 @@ public struct JobCancellationToken: ~Copyable {
   public let jobID: UInt64
 
   /// Opaque, executor-specific data.
-  public let opaqueData: (Int, Int)
+  public let opaqueData: InlineArray<2, Int>
 
   /// An optional function that is called when the token is destroyed,
   /// whether or not the job was cancelled.
@@ -232,7 +232,7 @@ public struct JobCancellationToken: ~Copyable {
 
   public init(canceller: any JobCanceller,
               jobID: UInt64,
-              opaqueData: (Int, Int),
+              opaqueData: InlineArray<2, Int>,
               cleanUp: (@convention(thin) (borrowing JobCancellationToken) -> ())? = nil) {
     self.canceller = canceller
     self.jobID = jobID
@@ -272,7 +272,7 @@ public struct JobCancellationToken: ~Copyable {
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public protocol SchedulingExecutor: Executor, JobCanceller {
 
   /// Enqueue a job to run at a specified time.
@@ -287,7 +287,7 @@ public protocol SchedulingExecutor: Executor, JobCanceller {
   /// - clock:     The clock used to interpret `run`.
   ///
   /// Returns a token that can be used to cancel the job before it runs.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          run: SchedulingExecutorFireTime<C>,
                          tolerance: C.Duration?,
@@ -314,7 +314,7 @@ public protocol SchedulingExecutor: Executor, JobCanceller {
   /// - clock:        The clock used to interpret `run`.
   ///
   /// Returns a token that can be used to cancel the timer before it fires.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   func enqueue<C: Clock>(resuming continuation: consuming TimerContinuation,
                          run: SchedulingExecutorFireTime<C>,
                          tolerance: C.Duration?,
@@ -323,14 +323,14 @@ public protocol SchedulingExecutor: Executor, JobCanceller {
 }
 #else
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public protocol SchedulingExecutor: Executor {
 }
 #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension SchedulingExecutor {
   public func enqueue<C: Clock>(resuming continuation: consuming TimerContinuation,
                                 run: SchedulingExecutorFireTime<C>,
@@ -385,7 +385,7 @@ extension Executor {
   #if !os(Windows)
   @_weakLinked
   #endif
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   internal var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
   }
@@ -427,13 +427,13 @@ extension Executor {
 
 // Delay support
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension SchedulingExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// Enqueue a job to run at a specified time, with no tolerance.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 run: SchedulingExecutorFireTime<C>,
                                 clock: C) -> JobCancellationToken {
@@ -972,7 +972,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulingExecutor`.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
        let scheduling = activeExecutor.asSchedulingExecutor {

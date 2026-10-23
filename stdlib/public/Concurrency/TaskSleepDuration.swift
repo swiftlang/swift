@@ -76,7 +76,7 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 #if !$Embedded
 /// A one-shot holder for a `JobCancellationToken`, so that the (escaping,
 /// `sending`) cancellation handler of a sleep can consume the token.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 fileprivate final class _SleepTokenBox: @unchecked Sendable {
   var token: JobCancellationToken?
 

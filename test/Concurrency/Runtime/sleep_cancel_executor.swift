@@ -18,7 +18,7 @@ import StdlibUnittest
 
 /// A task executor that supports cancelling delayed jobs, and which lets us
 /// see how many timers it is currently holding.
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
                                  @unchecked Sendable {
   private let queue = DispatchQueue(label: "CancellableExecutor")
@@ -68,7 +68,7 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
       }
     }
 
-    return JobCancellationToken(canceller: self, jobID: id, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: id, opaqueData: [0, 0])
   }
 
   public func cancel(jobWithToken token: consuming JobCancellationToken)
@@ -82,7 +82,7 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
 }
 
 /// Holds a continuation that has been scheduled, until it fires or is taken.
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class ContinuationBox: @unchecked Sendable {
   var continuation: TimerContinuation?
   init(_ continuation: consuming TimerContinuation) {
@@ -92,7 +92,7 @@ final class ContinuationBox: @unchecked Sendable {
 
 /// Like `CancellableExecutor`, but implements the continuation-based
 /// requirements natively, so no job is ever created for a sleep.
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class NativeContinuationExecutor: TaskExecutor, SchedulingExecutor,
                                         @unchecked Sendable {
   private let queue = DispatchQueue(label: "NativeContinuationExecutor")
@@ -158,7 +158,7 @@ final class NativeContinuationExecutor: TaskExecutor, SchedulingExecutor,
       }
     }
 
-    return JobCancellationToken(canceller: self, jobID: id, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: id, opaqueData: [0, 0])
   }
 
   public func cancel(continuationWithToken token: consuming JobCancellationToken)
@@ -171,7 +171,7 @@ final class NativeContinuationExecutor: TaskExecutor, SchedulingExecutor,
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 func waitUntil(_ condition: () -> Bool) async throws {
   var attempts = 0
   while !condition() && attempts < 1000 {
@@ -180,7 +180,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_cancel_executor")

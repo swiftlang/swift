@@ -16,14 +16,14 @@ import Dispatch
 import StdlibUnittest
 @_spi(ExperimentalScheduling) import _Concurrency
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 actor MyActor {
   public func doSleep() async {
     try! await Task.sleep(for: .seconds(0.1))
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   var asScheduling: SchedulingExecutor? {
     return self
@@ -57,7 +57,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
 
-    return JobCancellationToken(canceller: self, jobID: 0, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: 0, opaqueData: [0, 0])
   }
 
   // We can't remove jobs from `asyncAfter`, so we never cancel.
@@ -67,7 +67,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_executor")
