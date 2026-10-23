@@ -723,9 +723,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
             return result;
           }
           if (callerTakesOwnership) {
-            SILValue result =
-                lowering.emitLoadOfCopy(B, loc, entryValue, IsNotTake);
-            return result;
+            if (entryValue->getType().isMoveOnly())
+              entryValue = B.createMarkUnresolvedNonCopyableValueInst(
+                  loc, entryValue,
+                  MarkUnresolvedNonCopyableValueInst::CheckKind::
+                      NoConsumeOrAssign);
+            return lowering.emitLoadOfCopy(B, loc, entryValue, IsNotTake);
           } else {
             auto load = B.createLoadBorrow(
                              loc, ManagedValue::forBorrowedRValue(entryValue))
