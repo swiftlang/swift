@@ -9,6 +9,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 protocol P: ~Escapable {}
 
