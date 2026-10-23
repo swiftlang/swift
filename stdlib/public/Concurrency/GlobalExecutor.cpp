@@ -122,6 +122,12 @@ extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
                 *reinterpret_cast<SerialExecutorRef *>(&executor));
 }
 
+extern "C" void
+_swift_timerContinuation_resume_c(SwiftTimerContinuation *continuation)
+{
+  swift_timerContinuation_resume(reinterpret_cast<AsyncTask *>(continuation));
+}
+
 extern "C" SwiftTime swift_time_now(SwiftClockId clock)
 {
   SwiftTime result;

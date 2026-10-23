@@ -126,8 +126,20 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
                                       clock: CInt,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  let delay = Duration.seconds(seconds) + Duration.nanoseconds(nanoseconds)
-  let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
+  // The deadline is an absolute time on `clock`, so work out how far away it
+  // is, clamping it to zero if it has already passed.
+  var nowSeconds: Int64 = 0, nowNanoseconds: Int64 = 0
+  unsafe _getTime(seconds: &nowSeconds, nanoseconds: &nowNanoseconds,
+                  clock: clock)
+  let delay = Swift.max(
+    Duration.zero,
+    Duration.seconds(seconds - nowSeconds)
+      + Duration.nanoseconds(nanoseconds - nowNanoseconds))
+
+  // A negative tolerance means that none was specified.
+  let leeway: Duration? = leewayNanoseconds < 0 ? nil
+    : Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
+
   if #available(StdlibDeploymentTarget 6.3, *) {
     switch clock {
       case _ClockID.suspending.rawValue:

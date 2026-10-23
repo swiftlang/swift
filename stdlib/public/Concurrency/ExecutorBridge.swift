@@ -182,6 +182,29 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
                                            _ clock: CInt,
                                            _ job: UnownedJob) -> Int
 
+/// Like `_dispatchEnqueueWithDeadline`, but resumes a continuation (passed as
+/// the bits of a `TimerContinuation`) instead of running a job.  `priority`
+/// selects the timer queue.
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_dispatchEnqueueContinuationWithDeadline")
+internal func _dispatchEnqueueContinuationWithDeadline(
+  _ global: CBool,
+  _ sec: CLongLong,
+  _ nsec: CLongLong,
+  _ tsec: CLongLong,
+  _ tnsec: CLongLong,
+  _ clock: CInt,
+  _ continuation: Int,
+  _ priority: Int) -> Int
+
+/// Cancel a continuation scheduled with
+/// `_dispatchEnqueueContinuationWithDeadline`, returning its bits if it had
+/// not yet been resumed, or 0.  The caller must still call
+/// `_dispatchReleaseSource`.
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_dispatchCancelContinuation")
+internal func _dispatchCancelContinuationBits(_ source: Int) -> Int
+
 /// Cancel a job scheduled with `_dispatchEnqueueWithDeadline`, returning it if
 /// it had not yet started.  The caller must still call
 /// `_dispatchReleaseSource`.

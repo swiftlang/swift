@@ -50,6 +50,13 @@
 
 namespace swift {
 
+/// Resume the task awaiting a timer's continuation, once the timer has fired.
+///
+/// This is what executors reach, through `swift_timerContinuation_resume()` in
+/// ExecutorImpl.h, to resume the continuation they were given to schedule.
+SWIFT_CC(swift)
+void swift_timerContinuation_resume(AsyncTask *continuation);
+
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0

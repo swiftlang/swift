@@ -102,6 +102,35 @@ swift::swift_task_enqueueGlobalWithDeadline(
 }
 
 SWIFT_CC(swift) static void
+swift_task_enqueueGlobalContinuationWithDeadlineOrig(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, AsyncTask *continuation, size_t priority) {
+  swift_task_enqueueGlobalContinuationWithDeadlineImpl(
+      sec, nsec, tsec, tnsec, clock,
+      reinterpret_cast<SwiftTimerContinuation *>(continuation),
+      static_cast<SwiftJobPriority>(priority));
+}
+
+void
+swift::swift_task_enqueueGlobalContinuationWithDeadline(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, AsyncTask *continuation, size_t priority) {
+  if (SWIFT_UNLIKELY(swift_task_enqueueGlobalContinuationWithDeadline_hook))
+    swift_task_enqueueGlobalContinuationWithDeadline_hook(
+        sec, nsec, tsec, tnsec, clock, continuation, priority,
+        swift_task_enqueueGlobalContinuationWithDeadlineOrig);
+  else
+    swift_task_enqueueGlobalContinuationWithDeadlineOrig(
+        sec, nsec, tsec, tnsec, clock, continuation, priority);
+}
+
+SWIFT_CC(swift) static void
 swift_task_checkIsolatedOrig(SerialExecutorRef executor) {
   swift_task_checkIsolatedImpl(*reinterpret_cast<SwiftExecutorRef *>(&executor));
 }

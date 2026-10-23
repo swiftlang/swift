@@ -56,7 +56,7 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
 
-    return JobCancellationToken(executor: self, jobID: 0, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: 0, opaqueData: (0, 0))
   }
 
   public func cancel(jobWithToken: consuming JobCancellationToken)

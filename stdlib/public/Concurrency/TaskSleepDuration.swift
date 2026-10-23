@@ -116,12 +116,12 @@ extension Task where Success == Never, Failure == Never {
 
   /// Sleep until the given time, or until the task is cancelled.
   ///
-  /// We hand the continuation's resume half to a timer job that we schedule
-  /// on the current scheduling executor, and keep the token that lets us
-  /// cancel it.  If the task is cancelled, we ask the executor for the job
-  /// back.  If we get it, it can never run, so we destroy it and resume the
-  /// continuation ourselves; if we don't, the timer has already fired (or is
-  /// firing) and will resume the continuation normally.  Either way the
+  /// We hand the continuation's resume half to the current scheduling
+  /// executor, which resumes it when the timer fires, and keep the token that
+  /// lets us cancel the timer.  If the task is cancelled, we ask the executor
+  /// for the continuation back.  If we get it, the timer can never fire, so we
+  /// resume the continuation ourselves; if we don't, the timer has already
+  /// fired (or is firing) and will resume it normally.  Either way the
   /// continuation is resumed exactly once, and a cancelled sleep doesn't leave
   /// its timer behind in the executor.
   @available(StdlibDeploymentTarget 6.5, *)
@@ -144,41 +144,55 @@ extension Task where Success == Never, Failure == Never {
       return
     }
 
+    try await _sleepScheduling { timer in
+      executor.enqueue(resuming: timer,
+                       run: fireTime,
+                       tolerance: tolerance,
+                       clock: clock)
+    }
+  }
+
+  /// Suspend the current task until a timer fires, or until the task is
+  /// cancelled.
+  ///
+  /// `schedule` is handed the continuation that resumes the task, and must
+  /// arrange for it to be resumed when the timer fires, returning the token
+  /// that cancels the timer.  If the task is cancelled, we use that token to
+  /// ask for the continuation back.  If we get it, the timer can never fire, so
+  /// we resume the continuation ourselves; if we don't, the timer has already
+  /// fired (or is firing) and will resume it normally.  Either way the
+  /// continuation is resumed exactly once, and a cancelled sleep doesn't leave
+  /// its timer behind.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
+  internal static func _sleepScheduling(
+    _ schedule: (consuming TimerContinuation) -> JobCancellationToken
+  ) async throws {
     try await withContinuation(
       of: Void.self, throwing: _Concurrency.CancellationError.self
     ) { (continuation: consuming Continuation<Void, _Concurrency.CancellationError>,
          waiter: consuming ContinuationWaiter<Void, _Concurrency.CancellationError>)
         async throws(_Concurrency.CancellationError) -> Void in
-      // The timer job and the cancellation handler both need to be able to
-      // resume the continuation, and ownership of the job decides which of
-      // them does, so move to the copyable form.
-      let rawContinuation = continuation._takeContext()
-      let unsafeContinuation = unsafe UnsafeContinuation<Void, _Concurrency.CancellationError>(
-        rawContinuation)
-
-      let job = _taskCreateNullaryContinuationJob(
-        priority: Int(Task.currentPriority.rawValue),
-        continuation: rawContinuation)
+      // Hand the continuation to whatever will resume it, and keep the token
+      // that lets us take it back.
+      let timer = unsafe TimerContinuation(
+        UnsafeContinuation<Void, _Concurrency.CancellationError>(
+          continuation._takeContext()))
 
       // The cancellation handler is `sending` and can't consume the token
       // directly, so hand it over in a box.
-      let box = _SleepTokenBox(
-        executor.enqueue(ExecutorJob(context: job),
-                         run: fireTime,
-                         tolerance: tolerance,
-                         clock: clock))
+      let box = _SleepTokenBox(schedule(timer))
 
       try await waiter.wait(onCancel: {
-        guard let token = box.take(), let job = token.cancel() else {
-          // The timer has already started; it will resume the continuation.
+        guard let token = box.take(),
+              let timer = token.cancelContinuation() else {
+          // The timer has already fired; it will resume the continuation.
           return
         }
 
-        // We got the job back, so it will never run.  Discard it and resume
-        // the continuation ourselves.
-        job.destroy()
-        unsafe unsafeContinuation.resume(
-          throwing: _Concurrency.CancellationError())
+        // We got the continuation back, so the timer will never resume it;
+        // do so ourselves.
+        timer.resume(throwing: _Concurrency.CancellationError())
       })
     }
   }
@@ -195,36 +209,31 @@ extension Task where Success == Never, Failure == Never {
     tolerance: C.Duration?,
     clock: C
   ) async throws {
+    // We are the runtime, so this is always true; the check is only here to
+    // let us use the declarations below.
+    guard #available(StdlibDeploymentTarget 6.5, *) else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
+
     let _: () = await Builtin.withUnsafeContinuation {
       (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(
-        priority: Int(Task.currentPriority.rawValue),
-        continuation: continuation)
-
       let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                       clock: clock)
       let toleranceSeconds: Int64
       let toleranceNanoseconds: Int64
-      if #available(StdlibDeploymentTarget 6.3, *) {
-        if let tolerance = tolerance {
-          (toleranceSeconds, toleranceNanoseconds)
-            = durationComponents(for: tolerance, clock: clock)
-        } else {
-          toleranceSeconds = 0
-          toleranceNanoseconds = -1
-        }
+      if let tolerance = tolerance {
+        (toleranceSeconds, toleranceNanoseconds)
+          = durationComponents(for: tolerance, clock: clock)
       } else {
-        fatalError("we shouldn't get here; if we have, availability is broken")
+        toleranceSeconds = 0
+        toleranceNanoseconds = -1
       }
 
-      if #available(StdlibDeploymentTarget 5.9, *) {
-        _enqueueJobGlobalWithDeadline(
-          seconds, nanoseconds,
-          toleranceSeconds, toleranceNanoseconds,
-          clockID.rawValue, UnownedJob(context: job))
-      } else {
-        fatalError("we shouldn't get here; if we have, availability is broken")
-      }
+      _enqueueContinuationGlobalWithDeadline(
+        seconds, nanoseconds,
+        toleranceSeconds, toleranceNanoseconds,
+        clockID.rawValue, continuation,
+        Int(Task.currentPriority.rawValue))
     }
 
     try Task.checkCancellation()

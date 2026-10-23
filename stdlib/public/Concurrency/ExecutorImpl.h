@@ -252,6 +252,21 @@ static inline void swift_job_run(SwiftJob * _Nonnull job,
   _swift_job_run_c(job, executor);
 }
 
+/// An opaque reference to the suspended half of a sleeping task.  Executors
+/// that are asked to schedule one must resume it, exactly once, when its timer
+/// fires, using `swift_timerContinuation_resume()`.
+typedef struct SwiftTimerContinuation SwiftTimerContinuation;
+
+/// Resume the task awaiting a timer's continuation.  This consumes the
+/// continuation, and may be called from any thread.
+static inline void
+swift_timerContinuation_resume(SwiftTimerContinuation * _Nonnull continuation) {
+  extern void _swift_timerContinuation_resume_c(
+    SwiftTimerContinuation * _Nonnull continuation);
+
+  _swift_timerContinuation_resume_c(continuation);
+}
+
 /// A delay in nanoseconds.
 typedef unsigned long long SwiftJobDelay;
 
@@ -292,6 +307,28 @@ SWIFT_CC(swift) void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                               long long tnsec,
                                                               int clock,
                                                               SwiftJob * _Nonnull job);
+
+/// Enqueue a continuation, to be resumed at a specific deadline.
+///
+/// An executor that implements this should arrange to call
+/// `swift_timerContinuation_resume()` on the continuation, exactly once, at or
+/// after the deadline.  `priority` is the priority of the sleeping task, which
+/// an executor may use to choose how to schedule the timer; unlike for a job,
+/// there is no other way to find it.
+///
+/// You do not have to provide this function.  The runtime supplies a default
+/// that wraps the continuation in a job and calls
+/// `swift_task_enqueueGlobalWithDeadlineImpl()`; it lives in a separate object
+/// file, so when linking statically a definition of your own takes precedence.
+SWIFT_CC(swift) void
+swift_task_enqueueGlobalContinuationWithDeadlineImpl(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock,
+    SwiftTimerContinuation * _Nonnull continuation,
+    SwiftJobPriority priority);
 
 /// Enqueue a job on the main executor (which may or may not be the same as
 /// the global executor).

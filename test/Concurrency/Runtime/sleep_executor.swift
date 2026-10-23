@@ -57,7 +57,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
 
-    return JobCancellationToken(executor: self, jobID: 0, opaqueData: (0, 0))
+    return JobCancellationToken(canceller: self, jobID: 0, opaqueData: (0, 0))
   }
 
   // We can't remove jobs from `asyncAfter`, so we never cancel.

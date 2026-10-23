@@ -246,6 +246,8 @@ public:
   SWIFT_CC(swiftasync)
   static void process(Job *job);
 
+  AsyncTask *getContinuation() const { return Continuation; }
+
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::NullaryContinuation;
   }
