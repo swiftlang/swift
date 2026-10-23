@@ -9465,10 +9465,19 @@ ActorIsolation swift::inferConformanceIsolation(
       continue;
 
     auto witnessIsolation = getActorIsolation(witness);
-    if (witnessIsolation.isActorIsolated()) {
-      anyIsolatedWitness = true;
-      break;
-    }
+    auto requirementIsolation = getActorIsolation(valueReq);
+
+    // This witness doesn't force the conformance to be isolated if it isn't
+    // isolated to begin with, if it can be referenced from any isolation
+    // domain, or if the requirement is already isolated to the witness's
+    // domain (in which case every caller is necessarily in that domain).
+    if (!witnessIsolation.isActorIsolated() ||
+        isAccessibleAcrossActors(witness, witnessIsolation, dc) ||
+        equivalentIsolationContexts(witnessIsolation, requirementIsolation))
+      continue;
+
+    anyIsolatedWitness = true;
+    break;
   }
 
   if (!anyIsolatedWitness) {
