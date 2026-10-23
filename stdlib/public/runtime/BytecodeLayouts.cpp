@@ -54,7 +54,7 @@ using namespace swift;
 //
 // Excluded on arm64_32, where size_t is 32 bits and the upper half of x2 is
 // undefined.
-#if defined(__aarch64__) && defined(__LP64__)
+#if defined(__aarch64__) && defined(__LP64__) && defined(__APPLE__)
 #define SWIFT_LAYOUT_STRING_ARM64_MEMCPY 1
 
 __attribute__((naked, aligned(64))) static void
