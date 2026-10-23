@@ -9,6 +9,7 @@ struct Resource: ~Copyable {
   init() {}
   consuming func use() {}
   borrowing func peek() {}
+  mutating func change() {}
 }
 
 struct Box: ~Copyable {
@@ -254,5 +255,57 @@ func testCasts() {
   func genericErase<T: Usable & ~Copyable>(_ v: consuming T) {
     let fn = { @callable(once) in v as any Usable & ~Copyable }
     _ = fn()
+  }
+}
+
+func calledAtMostOnce(_ fn: @callable(once) () -> Void) { fn() }
+
+// An at-most-once closure can't consume a borrowed capture, just like any
+// other closure.
+func testConsumingBorrowedCapture(r: borrowing Resource) { // expected-error 4 {{non-'Copyable' 'r' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+  func consumeResource(_: consuming Resource) {}
+
+  calledAtMostOnce { _ = consume r } // expected-note {{consumed here}}
+  calledAtMostOnce { consumeResource(r) } // expected-note {{consumed here}}
+  calledAtMostOnce { r.use() } // expected-note {{consumed here}}
+  calledAtMostOnce { _ = r as any ~Copyable } // expected-note {{consumed here}}
+}
+
+func testConsumingBorrowedCaptureInPlainClosure(r: borrowing Resource) { // expected-error {{non-'Copyable' 'r' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+  func plain(_ fn: () -> Void) { fn() }
+  plain { r.use() } // expected-note {{consumed here}}
+}
+
+func testConsumingClosureParameterCapture() {
+  let _: (borrowing Resource) -> Void = { r in // expected-error {{non-'Copyable' 'r' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+    calledAtMostOnce { r.use() } // expected-note {{consumed here}}
+  }
+  let _: (consuming Resource) -> Void = { r in
+    calledAtMostOnce { r.use() }
+  }
+  let _: (inout Resource) -> Void = { r in // expected-error {{missing reinitialization of inout parameter 'r' after consume}}
+    calledAtMostOnce { r.use() } // expected-note {{consumed here}}
+  }
+}
+
+extension Resource {
+  func testBorrowedSelf() {
+    calledAtMostOnce { self.peek() }
+  }
+
+  func testConsumingBorrowedSelf() { // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+    calledAtMostOnce { self.use() } // expected-note {{consumed here}}
+  }
+
+  consuming func testConsumingConsumedSelf() {
+    calledAtMostOnce { self.use() }
+  }
+
+  mutating func testConsumingMutatedSelf() { // expected-error {{missing reinitialization of inout parameter 'self' after consume}}
+    calledAtMostOnce { self.use() } // expected-note {{consumed here}}
+  }
+
+  mutating func testMutatingSelf() {
+    calledAtMostOnce { self.change() }
   }
 }

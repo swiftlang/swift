@@ -736,7 +736,42 @@ public:
 
   void recordConsumingUse(ValueDecl *V) {
     ASSERT(V);
+    if (auto *param = dyn_cast<ParamDecl>(V)) {
+      if (isBorrowedParam(param))
+        return;
+    }
     ConsumedValues.insert(V);
+  }
+
+  static bool isBorrowedParam(ParamDecl *param) {
+    switch (param->getSpecifier()) {
+    case ParamSpecifier::Borrowing:
+    case ParamSpecifier::LegacyShared:
+      return true;
+    case ParamSpecifier::Default:
+      // An unannotated closure parameter has the ownership of the
+      // corresponding parameter of the closure's type, which is inferred.
+      if (auto *closure =
+              dyn_cast<AbstractClosureExpr>(param->getDeclContext())) {
+        auto *fnType = closure->getType()->getAs<AnyFunctionType>();
+        auto params = closure->getParameters()->getArray();
+        auto found = llvm::find(params, param);
+        if (!fnType || found == params.end())
+          return false;
+        auto ownership =
+            fnType->getParams()[found - params.begin()].getValueOwnership();
+        return ownership == ValueOwnership::Default ||
+               ownership == ValueOwnership::Shared;
+      }
+      // An unannotated `self` is borrowed.
+      return param->isSelfParameter();
+    case ParamSpecifier::Consuming:
+    case ParamSpecifier::ImplicitlyCopyableConsuming:
+    case ParamSpecifier::LegacyOwned:
+    case ParamSpecifier::InOut:
+      return false;
+    }
+    llvm_unreachable("invalid ParamSpecifier");
   }
 
   ValueDecl *getReferencedNonCopyableValue(Expr *E) {
