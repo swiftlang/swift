@@ -9417,6 +9417,21 @@ ActorIsolation swift::inferConformanceIsolation(
     return ActorIsolation::forNonisolated(false);
   }
 
+  // An isolated conformance can never satisfy a 'Self: P' requirement of a
+  // protocol whose 'Self' conforms to SendableMetatype. So if the type also
+  // conforms to such a protocol that inherits from this one, there is no
+  // isolation we could infer that would be usable; leave it nonisolated and
+  // let witness checking diagnose any isolated witness directly.
+  if (auto *sendableMetatypeProto =
+          ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
+    auto *proto = conformance->getProtocol();
+    for (auto *other : nominal->getAllProtocols()) {
+      if (other->inheritsFrom(proto) &&
+          other->inheritsFrom(sendableMetatypeProto))
+        return ActorIsolation::forNonisolated(false);
+    }
+  }
+
   // If we are inferring isolated conformances and the conforming type is
   // isolated to a global actor, we may use the conforming type's isolation.
   auto nominalIsolation = getActorIsolation(nominal);
