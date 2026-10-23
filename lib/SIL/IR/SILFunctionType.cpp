@@ -5193,7 +5193,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       SmallVector<FunctionType::Param, 8> params;
       for (auto [baseParam, derivedParam] :
            llvm::zip_equal(baseFunc.getParams(), derivedFunc.getParams())) {
-        assert(derivedParam.getParameterFlags() ==
+        ASSERT(derivedParam.getParameterFlags() ==
                baseParam.getParameterFlags());
         params.emplace_back(
             copyOptionalityFromDerivedToBase(tc, derivedParam.getPlainType(),
