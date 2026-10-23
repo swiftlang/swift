@@ -12,7 +12,7 @@ struct MyArray {}
 
 // FIXME: An unconditionally non-escapable nominal gets one anonymous scope
 // parameter.
-// TODO: @_forall(dep) ?
+// TODO: @_scopeParams(dep) ?
 struct MyRef: ~Escapable {
   // Use a lifetime annotation so we can write the type...
   @_lifetime(immortal)

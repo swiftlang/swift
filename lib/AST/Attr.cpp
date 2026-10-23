@@ -268,6 +268,48 @@ ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc, SourceLoc kwLoc,
   return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, restrictions);
 }
 
+static void printScopeName(ASTPrinter &printer, Identifier name) {
+  if (name.is("immortal"))
+    printer << "`immortal`";
+  else
+    printer.printName(name, PrintNameContext::Attribute);
+}
+
+static void printScope(ASTPrinter &printer, ScopeRepr scope) {
+  switch (scope.getKind()) {
+  case ScopeRepr::Kind::ScopeName:
+    printScopeName(printer, scope.getScopeName().getIdentifier());
+    return;
+  case ScopeRepr::Kind::AccessedValue:
+    printer << "&";
+    printScopeName(printer, scope.getAccessedValue());
+    return;
+  case ScopeRepr::Kind::Self:
+    printer << "self";
+    return;
+  case ScopeRepr::Kind::AccessedSelf:
+    printer << "&self";
+    return;
+  case ScopeRepr::Kind::Immortal:
+    printer << "immortal";
+    return;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+static void printScopeParams(ASTPrinter &printer,
+                             ArrayRef<Located<ScopeName>> params) {
+  printer.printAttrName("@_scopeParams");
+  printer << "(";
+  interleave(
+      params,
+      [&](Located<ScopeName> param) {
+        printScopeName(printer, param.Item.getIdentifier());
+      },
+      [&] { printer << ", "; });
+  printer << ")";
+}
+
 void ScopedTypeAttr::printImpl(ASTPrinter &printer,
                                const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
@@ -282,30 +324,27 @@ void ScopedTypeAttr::printImpl(ASTPrinter &printer,
           printer << ": ";
         }
 
-        auto scope = restriction.getScope();
-        if (scope.isAccess())
-          printer << "&";
-
-        switch (scope.getSubject()) {
-        case ScopeRepr::Subject::Name: {
-          auto name = scope.isAccess() ? scope.getAccessedValue()
-                                       : scope.getScopeName().getIdentifier();
-          if (name.is("immortal"))
-            printer << "`immortal`";
-          else
-            printer.printName(name, PrintNameContext::Attribute);
-          break;
-        }
-        case ScopeRepr::Subject::Self:
-          printer << "self";
-          break;
-        case ScopeRepr::Subject::Immortal:
-          printer << "immortal";
-          break;
-        }
+        printScope(printer, restriction.getScope());
       },
       [&] { printer << ", "; });
   printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void AccessScopeTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_accessScope");
+  printer << "(";
+  printScope(printer, getScope());
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void ScopeParamsTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printScopeParams(printer, getParamList()->getParams());
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -1955,6 +1994,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ScopeParams:
+    printScopeParams(Printer,
+                     cast<ScopeParamsAttr>(this)->getParamList()->getParams());
+    break;
+
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
     if (!attr->isUnderscored() || Options.SuppressLifetimes) {
@@ -2279,6 +2323,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "callable(once)";
   case DeclAttrKind::Target:
     return "_target";
+  case DeclAttrKind::ScopeParams:
+    return "_scopeParams";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

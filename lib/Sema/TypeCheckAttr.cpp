@@ -555,6 +555,7 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCoroutineAttr(CoroutineAttr *attr);
+  void visitScopeParamsAttr(ScopeParamsAttr *attr);
 };
 
 } // end anonymous namespace
@@ -9373,6 +9374,14 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
   }
   Ctx.Diags.diagnose(attr->getLocation(),
                      diag::unsafe_self_dependent_result_attr_on_invalid_decl);
+}
+
+void AttributeChecker::visitScopeParamsAttr(ScopeParamsAttr *attr) {
+  // TODO: What to do for ABI?
+  if (!ABIRoleInfo(D).providesAPI())
+    return;
+  // TODO: Support explicit scope parameters.
+  diagnoseAndRemoveAttr(attr, diag::scope_params_unsupported);
 }
 
 namespace {
