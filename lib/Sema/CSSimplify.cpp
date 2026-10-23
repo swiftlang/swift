@@ -993,6 +993,33 @@ static bool requiresBothTrailingClosureDirections(
   return false;
 }
 
+void ConflictedType::print(llvm::raw_ostream &out) {
+  getTypeForDiagnostics()->print(out);
+  out << " (";
+  getKeyType()->print(out);
+  out << ") @";
+  getLoc()->dump(nullptr, out);
+  out << " due to ";
+  simple_display(out, getReason());
+}
+
+void AmbiguousBindings::print(llvm::raw_ostream &out) const {
+  for (auto binding : conflictMap) {
+    auto &typeVar = binding.first;
+    Type(typeVar).print(out);
+    if (auto *locator = typeVar->getImpl().getLocator()) {
+      out << " @ ";
+      locator->dump(nullptr, out);
+    }
+    out << " with conflicted bindings of ";
+    for (auto conflicted : binding.second) {
+      conflicted->print(out);
+      out << ", ";
+    }
+    out << "\n";
+  }
+}
+
 void MatchCallArgumentResult::dump(llvm::raw_ostream &out) {
   switch (trailingClosureMatching) {
   case TrailingClosureMatching::Forward:
@@ -15940,6 +15967,19 @@ void ConstraintSystem::recordImplicitCallAsFunction(ConstraintLocator *locator,
 
   if (solverState)
     recordChange(SolverTrail::Change::RecordedImplicitCallAsFunction(locator));
+}
+
+void ConstraintSystem::recordConflictedType(TypeVariableType *key,
+                                            Type conflict,
+                                            ConstraintLocator *locator,
+                                            ConflictReason reason) {
+  ConflictedType *conflicted = new (getAllocator())
+      ConflictedType(conflict->getCanonicalType(), conflict, locator, reason);
+  ambiguousBindings.conflictMap[key].insert(conflicted);
+
+  if (solverState) {
+    recordChange(SolverTrail::Change::AddedConflict(key, conflicted));
+  }
 }
 
 void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,

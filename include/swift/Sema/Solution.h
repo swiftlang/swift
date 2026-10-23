@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_SOLUTION_H
 
 #include "swift/Sema/Score.h"
+#include "swift/Sema/Subtyping.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -32,6 +33,43 @@ namespace constraints {
 
 class ConstraintSystem;
 class SyntacticElementTarget;
+
+/// Structure for mapping a type that has been seen in a
+/// conflict, along with potentially sugared diagnostic-printable
+/// version of this type, the constraint locator from the conflict,
+/// and the likely cause of the conflict
+class ConflictedType {
+  CanType typeKey;
+  Type diagnosticType;
+  ConstraintLocator *locator;
+  ConflictReason reason;
+
+public:
+  ConflictedType(CanType typeKey, Type diagnosticType,
+                 ConstraintLocator *locator, ConflictReason reason)
+      : typeKey(typeKey), diagnosticType(diagnosticType), locator(locator),
+        reason(reason) {}
+  ConflictedType(const ConflictedType &) = delete;
+  ConflictedType &operator=(const ConflictedType &) = delete;
+
+  CanType getKeyType() { return typeKey; };
+  Type getTypeForDiagnostics() { return diagnosticType; };
+  ConstraintLocator *getLoc() { return locator; };
+  ConflictReason getReason() { return reason; };
+
+  void print(llvm::raw_ostream &out);
+};
+
+/// Structure for types in conflict, suggesting an ambiuity to
+/// be reported in diagnostics
+/// Note: it is likely to hold more data with merged types a few
+/// PRs down the road
+struct AmbiguousBindings {
+  llvm::DenseMap<TypeVariableType *, llvm::SmallSetVector<ConflictedType *, 4>>
+      conflictMap;
+
+  void print(llvm::raw_ostream &out) const;
+};
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.
@@ -462,6 +500,9 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
+  /// Conflicted types found while analyzing this and similar solutions
+  AmbiguousBindings ambiguousBindings;
+
   /// Maps AST nodes to their target.
   llvm::DenseMap<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
@@ -759,5 +800,21 @@ public:
 }  // end namespace constraints
 
 }  // end namespace swift
+
+namespace llvm {
+
+template <>
+struct DenseMapInfo<swift::constraints::ConflictedType> {
+  static unsigned getHashValue(swift::constraints::ConflictedType Val) {
+    return DenseMapInfo<swift::TypeBase *>::getHashValue(
+        Val.getKeyType().getPointer());
+  }
+  static bool isEqual(swift::constraints::ConflictedType LHS,
+                      swift::constraints::ConflictedType RHS) {
+    return LHS.getKeyType().getPointer() == RHS.getKeyType().getPointer();
+  }
+};
+
+} // namespace llvm
 
 #endif  // SWIFT_SEMA_SOLUTION_H
