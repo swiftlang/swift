@@ -39,6 +39,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
@@ -9361,11 +9362,6 @@ RawConformanceIsolationRequest::evaluate(
     return ActorIsolation::forGlobalActor(globalActorType);
   }
 
-  // If the protocol itself is isolated, don't infer isolation for the
-  // conformance.
-  if (getActorIsolation(proto).isActorIsolated())
-    return ActorIsolation::forNonisolated(false);
-
   // SendableMetatype disables isolation inference.
   auto sendableMetatypeProto =
       ctx.getProtocol(KnownProtocolKind::SendableMetatype);
@@ -9454,9 +9450,30 @@ ActorIsolation swift::inferConformanceIsolation(
       return isolation;
   }
 
+  // At this point we know that none of the associated conformances are isolated
+  // so this one could be isolated or not.
+
+  // If the protocol is isolated and all of its requirements are as well the
+  // conformance doesn't have to be isolated.
+  if (getActorIsolation(protocol).isActorIsolated()) {
+    if (llvm::all_of(protocol->getProtocolRequirements(), [](auto *req) {
+          if (isa<TypeDecl>(req))
+            return true;
+          return getActorIsolation(req).isActorIsolated();
+        }))
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
+  }
+
   bool anyIsolatedWitness = false;
   for (auto requirement : protocol->getProtocolRequirements()) {
     if (isa<TypeDecl>(requirement))
+      continue;
+
+    // Deprecated `var hashValue: Int` synthesized by the compiler is going to
+    // match isolation of the type which should make conformance isolated in
+    // some cases but we skip it here for backward compatibility.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Hashable) &&
+        requirement->getName().isSimpleName(ctx.Id_hashValue))
       continue;
 
     auto valueReq = cast<ValueDecl>(requirement);
