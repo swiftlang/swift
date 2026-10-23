@@ -48,6 +48,9 @@ struct CompilerDebuggingOptions {
   /// upon termination.
   bool DumpClangLookupTables = false;
 
+  /// Dump the client declaration requirements computed for the main module.
+  bool DumpClientDeclarationRequirements = false;
+
 };
 
 /// Options for controlling the behavior of the frontend.

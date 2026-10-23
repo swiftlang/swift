@@ -13,7 +13,11 @@
 #include "swift/AST/ClientDeclarationRequirements.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTContextGlobalCache.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SynthesizedFileUnit.h"
+#include <functional>
 #include <memory>
 
 using namespace swift;
@@ -43,16 +47,102 @@ void ClientDeclarationRequirements::recordRequirement(
   existing = std::move(requirement);
 }
 
+void ClientDeclarationRequirements::print(llvm::raw_ostream &out) const {
+  auto printDecl = [&](const Decl *declaration) {
+    auto *value = dyn_cast<ValueDecl>(declaration);
+    if (!value) {
+      out << Decl::getDescriptiveKindName(declaration->getDescriptiveKind());
+      return;
+    }
+
+    SmallVector<const ValueDecl *, 4> path{value};
+    for (auto *context = value->getDeclContext(); context;
+         context = context->getParent()) {
+      if (auto *parent = dyn_cast_or_null<ValueDecl>(context->getAsDecl()))
+        path.push_back(parent);
+    }
+
+    out << value->getModuleContext()->getName();
+    for (auto entry = path.rbegin(); entry != path.rend(); ++entry) {
+      out << '.';
+      (*entry)->getName().printPretty(out);
+    }
+  };
+
+  auto printKind = [&](ClientDeclarationRequirement::Kind kind) {
+    switch (kind) {
+    case ClientDeclarationRequirement::Kind::None:
+      out << "None";
+      return;
+    case ClientDeclarationRequirement::Kind::OpaqueDeclaration:
+      out << "OpaqueDeclaration";
+      return;
+    case ClientDeclarationRequirement::Kind::AbstractTypeLayoutDeclaration:
+      out << "AbstractTypeLayoutDeclaration";
+      return;
+    case ClientDeclarationRequirement::Kind::FullDeclaration:
+      out << "FullDeclaration";
+      return;
+    }
+    llvm_unreachable("unknown client declaration requirement");
+  };
+
+  out << "Client declaration requirements for module '"
+      << AnalyzedModule->getName() << "':\n";
+  for (auto &[declaration, requirement] : Requirements) {
+    out << "  ";
+    printDecl(declaration);
+    out << ": ";
+    printKind(requirement.getKind());
+    out << '\n';
+  }
+}
+
 class swift::ClientDeclarationRequirementsBuilder {
+  const ModuleDecl *AnalyzedModule;
+  ClientDeclarationRequirements &Result;
+
 public:
-  ClientDeclarationRequirementsBuilder(
-      const ModuleDecl *, ClientDeclarationRequirements &) {}
+  ClientDeclarationRequirementsBuilder(const ModuleDecl *module,
+                                       ClientDeclarationRequirements &result)
+      : AnalyzedModule(module), Result(result) {}
 
   void run();
 };
 
 void ClientDeclarationRequirementsBuilder::run() {
-  llvm_unreachable("client declaration requirement analysis not implemented");
+  std::function<void(Decl *)> processDeclaration = [&](Decl *declaration) {
+    Result.recordRequirement(declaration,
+                             ClientDeclarationRequirement::forNone());
+
+    if (auto *value = dyn_cast<ValueDecl>(declaration)) {
+      auto accessScope = value->getFormalAccessScope(
+          /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+      if (accessScope.isPublic() || accessScope.isPackage())
+        Result.recordRequirement(
+            declaration,
+            ClientDeclarationRequirement::forFullDeclaration());
+    }
+
+    if (auto *iterable = dyn_cast<IterableDeclContext>(declaration)) {
+      for (auto *member : iterable->getAllMembers())
+        processDeclaration(member);
+    }
+  };
+
+  SmallVector<const FileUnit *, 8> files;
+  for (auto *file : AnalyzedModule->getFiles()) {
+    files.push_back(file);
+    if (auto *synthesizedFile = file->getSynthesizedFile())
+      files.push_back(synthesizedFile);
+  }
+
+  for (auto *file : files) {
+    SmallVector<Decl *, 32> fileDeclarations;
+    file->getTopLevelDeclsWithAuxiliaryDecls(fileDeclarations);
+    for (auto *declaration : fileDeclarations)
+      processDeclaration(declaration);
+  }
 }
 
 const ClientDeclarationRequirements &

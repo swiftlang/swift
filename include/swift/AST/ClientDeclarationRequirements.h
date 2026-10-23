@@ -137,6 +137,8 @@ public:
   const RequirementMap &getRequirements() const {
     return Requirements;
   }
+
+  void print(llvm::raw_ostream &out) const;
 };
 
 /// Compute and cache the client declaration requirements imposed by \p module.
