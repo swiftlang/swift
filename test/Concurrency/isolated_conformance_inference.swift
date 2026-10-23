@@ -27,7 +27,7 @@ class CExplicit: P {
   func f() { } // okay! conformance above is isolated
 }
 
-// If the protocol itself is isolated, don't do anything.
+// All of the protocol's requirements are isolated, so the conformance isn't.
 extension CExplicit: Q {
   func g() { }
 }
@@ -148,4 +148,64 @@ struct RecursiveCollectionIsolated: RandomAccessCollection {
   typealias Iterator = MyIndexingIterator<RecursiveCollectionIsolated>
   // expected-error@-1 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
   typealias SubSequence = Slice<RecursiveCollectionIsolated>
+}
+
+// Conformances to isolated protocols.
+
+// The witness for a 'nonisolated' requirement is isolated, so the conformance
+// is too.
+@MainActor
+protocol IsolatedWithNonisolatedRequirement {
+  nonisolated func f()
+}
+
+struct SViaIsolatedWitness: IsolatedWithNonisolatedRequirement {
+  @MainActor func f() { }
+}
+
+// All of the protocol's own requirements are isolated, but the conformance
+// depends on an isolated conformance to an inherited protocol.
+protocol PlainBase {
+  func f()
+}
+
+@MainActor
+protocol IsolatedRefinement: PlainBase {
+  func g()
+}
+
+struct SViaIsolatedInheritedConformance: IsolatedRefinement {
+  func f() { }
+  func g() { }
+}
+
+// The synthesized 'hashValue' is main actor-isolated, but it doesn't make the
+// conformance isolated.
+@MainActor
+struct SHashableViaNonisolatedWitnesses: Hashable {
+  let x: Int
+  nonisolated static func ==(lhs: Self, rhs: Self) -> Bool { lhs.x == rhs.x }
+  nonisolated func hash(into hasher: inout Hasher) { hasher.combine(x) }
+}
+
+@MainActor
+struct SHashableViaIsolatedHashInto: Hashable {
+  let x: Int
+  nonisolated static func ==(lhs: Self, rhs: Self) -> Bool { lhs.x == rhs.x }
+  func hash(into hasher: inout Hasher) { hasher.combine(x) }
+}
+
+nonisolated func testIsolatedProtocolsFromNonisolated() {
+  let _: any IsolatedWithNonisolatedRequirement.Type = SViaIsolatedWitness.self // expected-error{{main actor-isolated conformance of 'SViaIsolatedWitness' to 'IsolatedWithNonisolatedRequirement' cannot be used in nonisolated context}}
+  let _: any PlainBase.Type = SViaIsolatedInheritedConformance.self // expected-error{{main actor-isolated conformance of 'SViaIsolatedInheritedConformance' to 'PlainBase' cannot be used in nonisolated context}}
+  let _: any IsolatedRefinement.Type = SViaIsolatedInheritedConformance.self // expected-error{{main actor-isolated conformance of 'SViaIsolatedInheritedConformance' to 'IsolatedRefinement' cannot be used in nonisolated context}}
+  let _: any Hashable.Type = SHashableViaNonisolatedWitnesses.self
+  let _: any Hashable.Type = SHashableViaIsolatedHashInto.self // expected-error{{main actor-isolated conformance of 'SHashableViaIsolatedHashInto' to 'Hashable' cannot be used in nonisolated context}}
+}
+
+@MainActor func testIsolatedProtocolsFromMainActor() {
+  let _: any IsolatedWithNonisolatedRequirement.Type = SViaIsolatedWitness.self
+  let _: any PlainBase.Type = SViaIsolatedInheritedConformance.self
+  let _: any IsolatedRefinement.Type = SViaIsolatedInheritedConformance.self
+  let _: any Hashable.Type = SHashableViaIsolatedHashInto.self
 }
