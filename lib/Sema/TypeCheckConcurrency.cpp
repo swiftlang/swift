@@ -3216,6 +3216,19 @@ namespace {
       }
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        // The isolation of a defer in a closure must not have been determined
+        // before the isolation of the closure. Unlike 'operator==', consider
+        // nonisolated(nonsending) equal to itself, since both isolations come
+        // from the same context
+        if (isDeferInClosureContext(func)) {
+          auto isolation = getActorIsolation(func);
+          auto contextIsolation =
+              getActorIsolationOfContext(func, getClosureActorIsolation);
+          ASSERT((isolation.isNonisolatedNonsending() &&
+                  contextIsolation.isNonisolatedNonsending()) ||
+                 isolation == contextIsolation);
+        }
+
         if (func->getDeclContext()->isLocalContext()) {
           checkLocalCaptures(func);
         }
@@ -6685,13 +6698,36 @@ static bool shouldSelfIsolationOverrideDefault(
   }
 }
 
+static bool isDeferBody(const Decl *D) {
+  auto *FD = dyn_cast_or_null<FuncDecl>(D);
+  return FD && FD->isDeferBody();
+}
+
+bool swift::isDeferInClosureContext(const Decl *D) {
+  if (!isDeferBody(D))
+    return false;
+
+  // A defer nested in another defer has the context of the outer defer
+  auto *DC = D->getDeclContext();
+  while (auto *outer = DC->getAsDecl()) {
+    if (!isDeferBody(outer))
+      break;
+    DC = outer->getDeclContext();
+  }
+
+  return isa<AbstractClosureExpr>(DC);
+}
+
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
-  // Defer bodies share the actor isolation of their enclosing context.
-  if (value->isDeferBody()) {
-    return {getActorIsolationOfContext(value->getDeclContext()),
+  // Defer bodies share the actor isolation of their enclosing context. For a
+  // defer in a closure, that is the isolation stored on the closure, which
+  // ActorIsolationChecker only sets after the closure body has been
+  // type-checked. Evaluating this request earlier would read the unset
+  // isolation of the closure and cache it, see isDeferInClosureContext
+  if (value->isDeferBody())
+    return {getActorIsolationOfContext(cast<FuncDecl>(value)),
             IsolationSource()};
-  }
 
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
@@ -8436,6 +8472,14 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
   fnType = applyUnsafeConcurrencyToFunctionType(
       fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
+
+  // Avoid triggering actor isolation computation for 'defer' here,
+  // because it might depend on the isolation of a closure it is nested in,
+  // and the isolation of closures isn't computed yet, but will be later
+  // filled in by the ActorIsolationChecker.
+  if (isDeferInClosureContext(decl))
+    return fnType;
+
   std::optional<FunctionTypeIsolation> funcIsolation;
   if (decl) {
     switch (auto isolation = getActorIsolation(decl)) {

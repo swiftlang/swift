@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CAPTURE_INFO_H
 #define SWIFT_AST_CAPTURE_INFO_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -208,10 +209,13 @@ class CaptureInfo {
     }
   };
 
+public:
   enum class Flags : unsigned {
-    HasGenericParamCaptures = 1 << 0
+    HasGenericParamCaptures = 1 << 0,
+    NeedsImplicitIsolationCapture = 1 << 1
   };
 
+private:
   llvm::PointerIntPair<const CaptureInfoStorage *, 2, OptionSet<Flags>>
       StorageAndFlags;
 
@@ -221,9 +225,24 @@ public:
   CaptureInfo(ASTContext &ctx,
               ArrayRef<CapturedValue> captures,
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
-              bool genericParamCaptures,
+              OptionSet<Flags> flags,
               ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
               ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>());
+
+  /// Source compatibility for clients that still pass whether the function has
+  /// generic parameter captures as a 'bool' (e.g. LLDB)
+  // TODO: Remove once LLDB passes the 'OptionSet<Flags>' instead
+  CaptureInfo(ASTContext &ctx,
+              ArrayRef<CapturedValue> captures,
+              DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
+              bool genericParamCaptures,
+              ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
+              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>())
+      : CaptureInfo(ctx, captures, dynamicSelf, opaqueValue,
+                    genericParamCaptures
+                        ? OptionSet<Flags>(Flags::HasGenericParamCaptures)
+                        : OptionSet<Flags>(),
+                    genericEnv, capturedTypes) {}
 
   /// A CaptureInfo representing no captures at all.
   static CaptureInfo empty();
@@ -257,6 +276,20 @@ public:
   bool hasGenericParamCaptures() const {
     assert(hasBeenComputed());
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
+  }
+
+  /// \returns true if the function needs to capture the actor it is isolated
+  /// to. This is then added after closure isolation is computed during
+  /// TypeConverter::getLoweredLocalCaptures.
+  bool needsImplicitIsolationCapture() const {
+    ASSERT(hasBeenComputed());
+    return StorageAndFlags.getInt().contains(
+        Flags::NeedsImplicitIsolationCapture);
+  }
+
+  OptionSet<Flags> getFlags() const {
+    ASSERT(hasBeenComputed());
+    return StorageAndFlags.getInt();
   }
 
   /// \returns true if the function captures the dynamic Self type.

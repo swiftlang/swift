@@ -66,6 +66,10 @@ void noteActorInstanceMayNotBeGlobalActor(
 /// to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(AbstractFunctionDecl const* func);
 
+/// Whether the given declaration is the body of a 'defer' in a closure,
+/// possibly nested in other defers.
+bool isDeferInClosureContext(const Decl *D);
+
 /// Check actor isolation rules.
 void checkTopLevelActorIsolation(TopLevelCodeDecl *decl);
 void checkFunctionActorIsolation(AbstractFunctionDecl *decl);

@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTWalker.h"
@@ -79,6 +80,8 @@ class FindCapturedVars : public ASTWalker {
   bool IsDeinitable;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
+  // True if needs to capture the surrounding context's isolation
+  bool NeedsImplicitIsolationCapture = false;
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
@@ -99,14 +102,23 @@ public:
         dynamicSelfToRecord = DynamicSelf;
     }
 
-    return CaptureInfo(Context, Captures, dynamicSelfToRecord,
-                       OpaqueValue, HasGenericParamCaptures,
-                       CapturedEnvironments.getArrayRef(),
+    OptionSet<CaptureInfo::Flags> flags;
+    if (HasGenericParamCaptures)
+      flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+    if (NeedsImplicitIsolationCapture)
+      flags |= CaptureInfo::Flags::NeedsImplicitIsolationCapture;
+
+    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
+                       flags, CapturedEnvironments.getArrayRef(),
                        CapturedTypes);
   }
 
   bool hasUsesOfCurrentIsolation() const {
     return HasUsesOfCurrentIsolation;
+  }
+
+  void setNeedsImplicitIsolationCapture() {
+    NeedsImplicitIsolationCapture = true;
   }
 
   bool hasGenericParamCaptures() const {
@@ -477,6 +489,11 @@ public:
   }
 
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
+    // E.g. an async defer that captures the actor it must execute on,
+    // necessarily also will use it.
+    if (captureInfo.needsImplicitIsolationCapture())
+      HasUsesOfCurrentIsolation = true;
+
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl() &&
@@ -973,17 +990,10 @@ public:
 
 } // end anonymous namespace
 
-/// Given that a local function is isolated to the given var, should we
-/// force a capture of the var?
-static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
-                                              VarDecl *var,
-                                              bool hasUsesOfCurrentIsolation) {
-  assert(isa<ParamDecl>(var));
-
-  // Don't try to capture an isolated parameter of the function itself.
-  if (var->getDeclContext() == AFD)
-    return false;
-
+/// Given that a local function inherits the isolation of its context,
+/// whether it needs to capture the actor it is isolated to
+static bool shouldLocalFuncCaptureIsolation(AbstractFunctionDecl *AFD,
+                                            bool hasUsesOfCurrentIsolation) {
   // Force capture if we have uses of the isolation in the function body.
   if (hasUsesOfCurrentIsolation)
     return true;
@@ -1001,6 +1011,18 @@ static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
       return false;
 
   return true;
+}
+
+/// Given that a local function is isolated to the given var, should we
+/// force a capture of the var?
+static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
+                                              ParamDecl *var,
+                                              bool hasUsesOfCurrentIsolation) {
+  // Don't try to capture an isolated parameter of the function itself.
+  if (var->getDeclContext() == AFD)
+    return false;
+
+  return shouldLocalFuncCaptureIsolation(AFD, hasUsesOfCurrentIsolation);
 }
 
 CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
@@ -1023,13 +1045,26 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     finder.checkType(type, AFD->getLoc());
   }
 
-  if (AFD->isLocalCapture()) {
+  if (isDeferInClosureContext(AFD)) {
+    // A defer in a closure inherits the isolation of the closure. That
+    // isolation is not known yet: it is determined from the captures of the
+    // closure, which include the captures of the defer, and asking for the
+    // isolation of the defer here would also use, and cache, a stale one. So
+    // the isolated parameter is not captured here. Instead, record that it is
+    // needed, using the same rule as for other local functions, see
+    // shouldLocalFuncCaptureIsolation, and add the capture when the captures
+    // are lowered. This is the same as what is done for closures that always
+    // inherit the actor context, see TypeConverter::getLoweredLocalCaptures
+    if (shouldLocalFuncCaptureIsolation(AFD,
+                                        finder.hasUsesOfCurrentIsolation()))
+      finder.setNeedsImplicitIsolationCapture();
+  } else if (AFD->isLocalCapture()) {
     // If a local function inherits isolation from the enclosing context,
     // make sure we capture the isolated parameter, if we haven't already.
     auto actorIsolation = getActorIsolation(AFD);
     if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
       if (auto *var = actorIsolation.getActorInstance()) {
-        if (shouldCaptureIsolationInLocalFunc(AFD, var,
+        if (shouldCaptureIsolationInLocalFunc(AFD, cast<ParamDecl>(var),
                                               finder.hasUsesOfCurrentIsolation()))
           finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
       }
