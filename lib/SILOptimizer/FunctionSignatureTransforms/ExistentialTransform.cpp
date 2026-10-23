@@ -654,12 +654,20 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     auto NewFGenericEnv = NewFGenericSig.getGenericEnvironment();
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
+    // The specialized function is an internal detail, so we need to
+    // disconnect it from a parent class, if one exists, thus the override
+    // of the classSubclassScope. Inheriting the original's scope would give
+    // the clone external visibility (a private method of an open class gets
+    // effective public linkage for vtable layout), but a specialization has
+    // no vtable slot and no TBD entry, so an exported symbol for it trips
+    // TBD-vs-IR validation.
     NewF = FunctionBuilder.createFunction(
         linkage, Name, NewFTy, F->getActorIsolation(), NewFGenericEnv,
         F->getLocation(), F->isBare(), F->isTransparent(),
         F->getSerializedKind(), IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
-        F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
+        /*classSubclassScope=*/SubclassScope::NotApplicable,
+        F->getInlineStrategy(), F->getEffectsKind(),
         nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
