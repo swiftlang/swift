@@ -1173,9 +1173,16 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
 
-// TaskPushDeadline takes two borrowed generic operands passed by
-// address; at the SIL level address operands are trivial.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
+// TaskPushDeadline's two generic operands are addresses except under opaque
+// values, where the builtin is an instantaneous use of each.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
+                                                         StringRef attr) {
+  if (op.get()->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::InstantaneousUse;
+}
+
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 
