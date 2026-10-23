@@ -1037,6 +1037,15 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  TaskCancellationShieldAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskCancellationShieldAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
