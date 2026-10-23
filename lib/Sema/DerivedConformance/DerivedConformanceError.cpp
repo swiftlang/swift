@@ -114,10 +114,9 @@ deriveBridgedNSError_enum_nsErrorDomain(
   return propDecl;
 }
 
-static std::string getBridgedNSErrorMacroArg(DerivedConformance &derived) {
-  auto scope = derived.Nominal->getFormalAccessScope(
-      derived.Nominal->getModuleScopeContext());
-  if (scope.isPublic() || scope.isInternal()) {
+static std::string getBridgedNSErrorMacroArg(DerivedConformance &derived,
+                                             bool usePrintAsObjCDomain) {
+  if (usePrintAsObjCDomain) {
     std::string res;
     auto os = llvm::raw_string_ostream(res);
     os << "objectiveC(domain: "
@@ -131,8 +130,9 @@ static std::string getBridgedNSErrorMacroArg(DerivedConformance &derived) {
 }
 
 static ValueDecl *deriveBridgedNSErrorViaMacro(DerivedConformance &derived,
-                                               ValueDecl *requirement) {
-  auto arg = getBridgedNSErrorMacroArg(derived);
+                                               ValueDecl *requirement,
+                                               bool usePrintAsObjCDomain) {
+  auto arg = getBridgedNSErrorMacroArg(derived, usePrintAsObjCDomain);
   std::string macro;
   auto os = llvm::raw_string_ostream(macro);
   os << "#_deriveError(" << QuotedString(arg) << ")";
@@ -152,15 +152,17 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
     return nullptr;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros))
-    return deriveBridgedNSErrorViaMacro(*this, requirement);
-  
-  auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
-
+  // PrintAsClang may print this domain, so we should make sure we use the
+  // same string it will.
   auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
-  if (scope.isPublic() || scope.isInternal())
-    // PrintAsClang may print this domain, so we should make sure we use the
-    // same string it will.
+  bool usePrintAsObjCDomain = scope.isPublic() || scope.isInternal();
+
+  if (Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros))
+    return deriveBridgedNSErrorViaMacro(*this, requirement,
+                                        usePrintAsObjCDomain);
+
+  auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
+  if (usePrintAsObjCDomain)
     synthesizer = deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain;
 
   return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
