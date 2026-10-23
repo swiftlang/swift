@@ -8597,6 +8597,34 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   }
 }
 
+/// If \p storage was introduced by a peer macro attached to a property whose
+/// init accessor initializes it, returns that property. The '@Observable'
+/// macro rewrites each stored property this way, so the user's isolation
+/// attributes end up on both declarations.
+static VarDecl *getPropertyInitializingPeerStorage(VarDecl *storage) {
+  auto *sourceFile = storage->getModuleContext()->getSourceFileContainingLocation(
+      storage->getLoc());
+  if (!sourceFile || sourceFile->getFulfilledMacroRole() != MacroRole::Peer)
+    return nullptr;
+  auto *property = dyn_cast_or_null<VarDecl>(
+      dyn_cast_if_present<Decl *>(sourceFile->getMacroExpansion()));
+  if (!property)
+    return nullptr;
+  auto *initAccessor = property->getAccessor(AccessorKind::Init);
+  if (!initAccessor ||
+      !llvm::is_contained(initAccessor->getInitializedProperties(), storage))
+    return nullptr;
+  return property;
+}
+
+/// Whether \p property was rewritten by a macro into a computed property
+/// whose init accessor initializes stored properties.
+static bool hasMacroGeneratedInitAccessor(VarDecl *property) {
+  auto *initAccessor = property->getAccessor(AccessorKind::Init);
+  return initAccessor && initAccessor->isInMacroExpansionInContext() &&
+         !initAccessor->getInitializedProperties().empty();
+}
+
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
@@ -8673,6 +8701,21 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else {
+            // Storage introduced by a macro has the 'nonisolated' that the
+            // user wrote on the property it was rewritten from, so diagnose
+            // it there.
+            if (auto *property = getPropertyInitializingPeerStorage(var)) {
+              if (auto *propertyAttr =
+                      property->getAttrs().getAttribute<NonisolatedAttr>()) {
+                attr->setInvalid();
+                diagnose(propertyAttr->getLocation(),
+                         diag::nonisolated_mutable_storage)
+                    .fixItInsertAfter(propertyAttr->getRange().End, "(unsafe)");
+                property->diagnose(diag::nonisolated_mutable_storage_note,
+                                   property);
+                return;
+              }
+            }
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
               .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             if (var->hasStorage())
@@ -8767,9 +8810,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     //'nonisolated(unsafe)' is meaningless for computed properties, functions etc.
+    // A property that a macro rewrote into a computed property is an
+    // exception: the macro copies the attribute to the storage the property
+    // initializes, where it does take effect.
     auto var = dyn_cast<VarDecl>(VD);
     if (attr->isUnsafe() &&
-        (!var || !var->hasStorage())) {
+        (!var || (!var->hasStorage() && !hasMacroGeneratedInitAccessor(var)))) {
       auto &ctx = VD->getASTContext();
       ctx.Diags
           .diagnose(attr->getStartLoc(),
