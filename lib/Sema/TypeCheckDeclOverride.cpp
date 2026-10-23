@@ -2660,8 +2660,11 @@ bool IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
   auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
       base, decl, baseInterfaceTy);
 
-  return derivedInterfaceTy->matches(overrideInterfaceTy,
-                                     TypeMatchFlags::AllowABICompatible);
+  return derivedInterfaceTy->matches(
+      overrideInterfaceTy,
+      {TypeMatchFlags::AllowABICompatible,
+       TypeMatchFlags::RequireMatchingNestedParamOwnership},
+      decl->getNumCurryLevels());
 }
 
 void swift::checkImplementationOnlyOverride(const ValueDecl *VD) {
