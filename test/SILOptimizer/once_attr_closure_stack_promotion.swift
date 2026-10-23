@@ -114,3 +114,76 @@ func testGenericConsumingAndInoutCaptures<T>(_ nc: consuming GenericNC<T>, _ oth
     other.mutate()
   }
 }
+
+func genericCalledExactlyOnce<R>(_ fn: @once () -> R) -> R { fn() }
+
+func makeInt() -> Int { 42 }
+
+// The function value is reabstracted by an exactly-once thunk that captures
+// another one.
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion29testFunctionValueThroughThunkSiyF : $@convention(thin) () -> Int {
+// CHECK:   [[INNER:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}({{%.*}}) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> Int
+// CHECK:   [[OUTER:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}([[INNER]]) : $@convention(thin) (@owned @noescape @once @callee_owned () -> Int) -> @out Int
+// CHECK:   apply
+// CHECK:   dealloc_stack [[OUTER]]
+// CHECK:   dealloc_stack [[INNER]]
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion29testFunctionValueThroughThunkSiyF'
+func testFunctionValueThroughThunk() -> Int {
+  genericCalledExactlyOnce(makeInt)
+}
+
+@_transparent
+func transparentCalledExactlyOnce<R>(_ fn: @once () -> R) -> R { fn() }
+
+// Once inlined, the closure is stored into the stack slot of the consuming
+// parameter.
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion29testInlinedConsumingParameteryS2iF : $@convention(thin) (Int) -> Int {
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_once]
+// CHECK:   [[SLOT:%.*]] = alloc_stack [lexical] [var_decl] $@noescape @once @callee_owned
+// CHECK:   store [[PA]] to [[SLOT]]
+// CHECK:   apply
+// CHECK:   dealloc_stack [[SLOT]]
+// CHECK:   dealloc_stack [[PA]]
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion29testInlinedConsumingParameteryS2iF'
+func testInlinedConsumingParameter(_ x: Int) -> Int {
+  transparentCalledExactlyOnce { x + 1 }
+}
+
+@_transparent
+func transparentRebound(_ fn: @once () -> Int) -> Int {
+  let g = fn
+  return g()
+}
+
+// Once inlined, the closure is moved from the stack slot of the parameter into
+// the stack slot of `g`.
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion20testInlinedRebindingyS2iF : $@convention(thin) (Int) -> Int {
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_once]
+// CHECK:   [[SLOT:%.*]] = alloc_stack [lexical] [var_decl] $@noescape @once @callee_owned
+// CHECK:   store [[PA]] to [[SLOT]]
+// CHECK:   [[G:%.*]] = alloc_stack [lexical] [var_decl] $@noescape @once @callee_owned
+// CHECK:   copy_addr [take] {{%.*}} to [init] [[G]]
+// CHECK:   apply
+// CHECK:   dealloc_stack [[G]]
+// CHECK:   dealloc_stack [[SLOT]]
+// CHECK:   dealloc_stack [[PA]]
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion20testInlinedRebindingyS2iF'
+func testInlinedRebinding(_ x: Int) -> Int {
+  transparentRebound { x + 1 }
+}
+
+@_transparent
+func transparentForwarded(_ fn: @once () -> Int) -> Int {
+  transparentRebound(fn)
+}
+
+// Once inlined, the closure is taken out of the stack slot of one parameter
+// and stored into the stack slot of another.
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion21testInlinedForwardingyS2iF : $@convention(thin) (Int) -> Int {
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_once]
+// CHECK:   apply
+// CHECK:   dealloc_stack [[PA]]
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion21testInlinedForwardingyS2iF'
+func testInlinedForwarding(_ x: Int) -> Int {
+  transparentForwarded { x + 1 }
+}

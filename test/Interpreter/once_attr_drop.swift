@@ -34,6 +34,14 @@
 // RUN: %target-run %t/opt.out callGenericInout | %FileCheck %s --check-prefix=CALL-callGenericInout
 // RUN: %target-run %t/onone.out callGenericConsumingAndInout | %FileCheck %s --check-prefix=CALL-callGenericConsumingAndInout
 // RUN: %target-run %t/opt.out callGenericConsumingAndInout | %FileCheck %s --check-prefix=CALL-callGenericConsumingAndInout
+// RUN: %target-run %t/onone.out callInlined | %FileCheck %s --check-prefix=CALL-callInlined
+// RUN: %target-run %t/opt.out callInlined | %FileCheck %s --check-prefix=CALL-callInlined
+// RUN: %target-run %t/onone.out callInlinedRebound | %FileCheck %s --check-prefix=CALL-callInlinedRebound
+// RUN: %target-run %t/opt.out callInlinedRebound | %FileCheck %s --check-prefix=CALL-callInlinedRebound
+// RUN: %target-run %t/onone.out callInlinedForwarded | %FileCheck %s --check-prefix=CALL-callInlinedForwarded
+// RUN: %target-run %t/opt.out callInlinedForwarded | %FileCheck %s --check-prefix=CALL-callInlinedForwarded
+// RUN: %target-run %t/onone.out callThroughThunk | %FileCheck %s --check-prefix=CALL-callThroughThunk
+// RUN: %target-run %t/opt.out callThroughThunk | %FileCheck %s --check-prefix=CALL-callThroughThunk
 //
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
@@ -237,6 +245,34 @@ func dropMixed(_ consumed: consuming Resource, _ borrowed: consuming Resource) {
   }
 }
 
+@_transparent
+func transparentCall(_ f: @once () -> Void) {
+  f()
+  print("called")
+}
+
+@_transparent
+func transparentRebound(_ f: @once () -> Void) {
+  let g = f
+  g()
+  print("called")
+}
+
+@_transparent
+func transparentForwarded(_ f: @once () -> Void) {
+  transparentRebound(f)
+}
+
+@inline(never)
+func genericCall<R>(_ f: @once () -> R) -> R {
+  let result = f()
+  print("called")
+  return result
+}
+
+@inline(never)
+func makeGreeting() -> String { "hello" }
+
 @inline(never)
 func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
   switch which {
@@ -266,6 +302,14 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     dropEscaping { print("never") }
   case "dropGlobal":
     dropEscaping(hello)
+  case "callInlined":
+    transparentCall { _ = consume resource }
+  case "callInlinedRebound":
+    transparentRebound { _ = consume resource }
+  case "callInlinedForwarded":
+    transparentForwarded { _ = consume resource }
+  case "callThroughThunk":
+    print(genericCall(makeGreeting))
   case "dropAfterCalls":
     // Closures that share a context must not change the outcome of a later
     // drop.
@@ -319,6 +363,22 @@ default:
 // CALL-callGlobal: hello
 // CALL-callGlobal-NEXT: called
 // CALL-callGlobal-NEXT: Resource r deinit
+
+// CALL-callInlined: Resource r deinit
+// CALL-callInlined-NEXT: called
+// CALL-callInlined-NOT: deinit
+
+// CALL-callInlinedRebound: Resource r deinit
+// CALL-callInlinedRebound-NEXT: called
+// CALL-callInlinedRebound-NOT: deinit
+
+// CALL-callInlinedForwarded: Resource r deinit
+// CALL-callInlinedForwarded-NEXT: called
+// CALL-callInlinedForwarded-NOT: deinit
+
+// CALL-callThroughThunk: called
+// CALL-callThroughThunk-NEXT: hello
+// CALL-callThroughThunk-NEXT: Resource r deinit
 
 // CALL-callCaptureless: body
 // CALL-callCaptureless-NEXT: called

@@ -315,11 +315,20 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
       return handleUsePoint(borrowEnd,
                             UseLifetimeConstraint::NonLifetimeEnding);
     }
-    LLVM_FALLTHROUGH;
+    break;
   }
+  case OperandOwnership::TrivialUse:
+    // A partial_apply [on_stack] that was stored into a stack slot can be
+    // destroyed there.
+    if (isa<DestroyAddrInst>(borrowEnd->getUser())) {
+      return handleUsePoint(borrowEnd,
+                            UseLifetimeConstraint::NonLifetimeEnding);
+    }
+    break;
   default:
-    llvm_unreachable("expected borrow scope end");
+    break;
   }
+  llvm_unreachable("expected borrow scope end");
 }
 
 /// Recursively visit all uses that contribute to the ownership live range of \p
