@@ -152,7 +152,8 @@ public func neverCalledEscaping(_ x: Int) {
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19allBorrowedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
 // CHECK: call swiftcc void @"$s4test19allBorrowedCapturesyySiFyyXEfU_"(ptr {{%.*}}, i64 {{%.*}})
-// CHECK-NEXT: call void @swift_release(ptr %0)
+// The context is on the stack, so it's destroyed without being released.
+// CHECK-NEXT: call swiftcc void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
 // CHECK-NEXT: ret void
 public func allBorrowedCaptures(_ x: Int) {
   let t = Tracker()
@@ -200,7 +201,6 @@ public func noncopyableBorrowedCapture(_ x: Int) {
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test26noncopyableBorrowedCaptureyySiFyyXEfU_TA"(ptr swiftself %0)
 // CHECK: call swiftcc void @"$s4test26noncopyableBorrowedCaptureyySiFyyXEfU_"(ptr {{%.*}})
-// CHECK-NEXT: call void @swift_release(ptr %0)
 // CHECK-NEXT: ret void
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test37noncopyableBorrowedCaptureNeverCalledyySiF"(i64 %0)
@@ -299,5 +299,16 @@ public func genericOwnedAndInoutCaptures<T>(_ c: consuming GenericResource<T>, _
   callAtMostOnce {
     c.use()
     r.mutate()
+  }
+}
+
+// The context of a closure with only trivial captures isn't released by its
+// forwarder.
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test15trivialCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
+// CHECK-NOT: swift_release
+// CHECK: ret void
+public func trivialCaptures(_ x: Int) {
+  callAtMostOnce {
+    _ = x
   }
 }
