@@ -491,7 +491,7 @@ bb0(%0 : $Builtin.Int64):
 
 // One undef is not enough to fold `and`.
 // CHECK-LABEL: sil {{.+}} @test_builtin_and_one_undef_kept
-// CHECK: debug_value %0 : $Builtin.Int64, let, name "masked", type $Builtin.Int64, transform {
+// CHECK: debug_value %0 : $Builtin.Int64, let, name "masked", transform {
 // CHECK:   bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: %1 = builtin "and_Int64"(%0 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
 // CHECK-NEXT: return %1 : $Builtin.Int64
