@@ -2,6 +2,8 @@
 
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // The cast classes that Sema used to reject for `is`, answered at runtime.
 //

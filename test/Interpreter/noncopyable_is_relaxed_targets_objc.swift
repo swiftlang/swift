@@ -3,6 +3,8 @@
 // REQUIRES: swift_feature_NoncopyableCasting
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // The `AnyObject` cases of noncopyable_is_relaxed_targets.swift, which depend on
 // `__SwiftValue` boxing and so need Objective-C interop. The rest of those
