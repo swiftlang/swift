@@ -40,6 +40,8 @@ class Constraint;
 enum ScoreKind : unsigned int;
 struct SyntacticElementTargetKey;
 
+struct ConflictedType;
+
 namespace inference {
 struct PotentialBinding;
 }
@@ -110,6 +112,14 @@ public:
       } Update;
 
       struct {
+        /// The type variable that saw another mergeable type
+        TypeVariableType *TypeVar;
+
+        /// The canonical type that was merged
+        CanType merged;
+      } Merged;
+
+      struct {
         /// The source type.
         Type SrcType;
 
@@ -149,6 +159,11 @@ public:
         PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
         TypeVariableType *Originator;
       } Binding;
+
+      struct {
+        TypeVariableType *TypeVar;
+        ConflictedType *ConflictType;
+      } Conflict;
 
       struct {
         Constraint *Disjunction;
@@ -194,6 +209,9 @@ public:
 
     /// Create a change that added a type variable.
     static Change AddedTypeVariable(TypeVariableType *typeVar);
+
+    /// Create a change that adds a mergeable type to the mergeable set
+    static Change AddedMergeableType(TypeVariableType *typeVar, CanType type);
 
     /// Create a change that extended an equivalence class.
     static Change ExtendedEquivalenceClass(TypeVariableType *typeVar,
@@ -274,6 +292,10 @@ public:
     /// bindings.
     static Change RetractedBinding(TypeVariableType *typeVar,
                                    inference::PotentialBinding binding);
+
+    /// Create a change that adds a conflict for a type variable
+    static Change AddedConflict(TypeVariableType *typeVar,
+                                ConflictedType *conflict);
 
     /// Create a change that disjunction pruning was performed.
     static Change PrunedDisjunction(Constraint *disjunction,
