@@ -984,7 +984,7 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
   }
 
   // Check protocol requirement(s) if this parameter is a
-  // generic parameter type.
+  // generic parameter type or dependent member type.
   if (genericSig && paramType->isTypeParameter()) {
     // Light-weight check if cases where `checkRequirements` is not
     // applicable.
@@ -996,19 +996,14 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
             return conformance &&
                    !cs.isConformanceUnavailable(conformance, locator);
           })) {
-        if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
-          auto *paramDecl = GP->getDecl();
-          if (paramDecl && paramDecl->isOpaqueType())
-            return 100;
-        }
         return 70;
       }
 
       return 0;
     };
 
-    // If candidate is not fully resolved or is matched against a
-    // dependent member type (i.e. `Self.T`), let's check conformances
+    // If the candidate type is not fully resolved or if the parameter type is
+    // a dependent member type (i.e. `Self.T`), let's check conformances
     // only and lower the score.
     if (candidateType->hasTypeVariable() ||
         candidateType->hasUnboundGenericType() ||
@@ -1016,9 +1011,8 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
       return checkProtocolRequirementsOnly();
     }
 
-    // Cannot match anything but generic type parameters here.
-    if (!paramType->is<GenericTypeParamType>())
-      return std::nullopt;
+    // We must have a generic parameter type by now.
+    ASSERT(paramType->is<GenericTypeParamType>());
 
     bool hasUnsatisfiableRequirements = false;
     SmallVector<Requirement, 4> requirements;
