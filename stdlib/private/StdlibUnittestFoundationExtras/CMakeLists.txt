@@ -17,7 +17,7 @@ add_swift_target_library(swiftStdlibUnittestFoundationExtras ${SWIFT_STDLIB_LIBR
   SWIFT_MODULE_DEPENDS_XROS ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
   SWIFT_MODULE_DEPENDS StdlibUnittest
-  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} -Xfrontend -enable-sil-opaque-values
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
 
