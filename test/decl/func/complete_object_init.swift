@@ -4,7 +4,7 @@
 // Declaration of complete object initializers and basic semantic checking
 // ---------------------------------------------------------------------------
 class A {
-  convenience init(int i: Int) { // expected-note{{convenience initializer is declared here}}
+  convenience init(int i: Int) { // expected-note 5 {{convenience initializer is declared here}}
     self.init(double: Double(i))
   }
 
@@ -38,6 +38,38 @@ class DerivesA : A {
     super.init(double: 3.14159) // expected-error{{convenience initializer for 'DerivesA' must delegate (with 'self.init') rather than chaining to a superclass initializer (with 'super.init')}}
   }
 }
+
+// Fixing https://github.com/swiftlang/swift/issues/80311
+class DerivesAWithLet : A {
+  let str: String
+  init(int i: Int) {
+    str = "foo"
+    super.init(int: i) // expected-error{{must call a designated initializer of the superclass 'A'}}
+  }
+}
+
+class DerivesAWithVar : A {
+  var str: String
+  init(int i: Int) {
+    str = "foo"
+    super.init(int: i) // expected-error{{must call a designated initializer of the superclass 'A'}}
+  }
+}
+
+class DerivesAWithDefaultLet : A {
+  let str: String = "foo"
+  init(int i: Int) {
+    super.init(int: i) // expected-error{{must call a designated initializer of the superclass 'A'}}
+  }
+}
+
+class DerivesAWithDefaultVar : A {
+  var str: String = "foo"
+  init(int i: Int) {
+    super.init(int: i) // expected-error{{must call a designated initializer of the superclass 'A'}}
+  }
+}
+
 
 struct S {
   convenience init(int i: Int) { // expected-error{{initializers in structs are not marked with 'convenience'}}
