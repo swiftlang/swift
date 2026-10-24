@@ -276,6 +276,32 @@ Rule::getNestingAndSize() const {
   return std::make_pair(0, 0);
 }
 
+/// Check if we have a concrete type or superclass rule where the right hand
+/// side occurs as a proper prefix of one of its substitutions.
+///
+/// eg, (T.[concrete: G<T.[P:A]>] => T).
+bool Rule::isRecursiveRule() const {
+  auto kind = LHS.back().getKind();
+  if (kind != Symbol::Kind::ConcreteType &&
+      kind != Symbol::Kind::Superclass) {
+    return false;
+  }
+
+  // For superclass requirements, [T : G<T>] is ok.
+  bool isSuperclass = (kind == Symbol::Kind::Superclass);
+
+  for (auto term : LHS.back().getSubstitutions()) {
+    if ((isSuperclass
+         ? term.size() > RHS.size()
+         : term.size() >= RHS.size()) &&
+        std::equal(RHS.begin(), RHS.end(), term.begin())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Linear order on rules; compares LHS followed by RHS.
 std::optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
   std::optional<int> compare = LHS.compare(other.LHS, ctx);
