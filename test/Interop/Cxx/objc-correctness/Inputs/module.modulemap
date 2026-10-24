@@ -55,3 +55,9 @@ module ObjCAsyncNonTrivialCxx {
   requires objc
   requires cplusplus
 }
+
+module ObjCBaseWithCxxParams {
+  header "objc-base-with-cxx-params.h"
+  requires objc
+  requires cplusplus
+}
