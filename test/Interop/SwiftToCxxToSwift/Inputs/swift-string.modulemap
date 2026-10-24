@@ -1,0 +1,4 @@
+module SwiftStringRoundTrip {
+  header "swift-string.h"
+  requires cplusplus
+}
