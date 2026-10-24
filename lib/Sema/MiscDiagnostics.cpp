@@ -447,41 +447,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         return;
 
       Type fromType = cast->getSubExpr()->getType();
+      bool explicitNoncopyable = castType->isNoncopyable() ||
+                                 (fromType && fromType->isNoncopyable());
+      bool hasFeatureEnabled =
+	  Ctx.LangOpts.hasFeature(Feature::NoncopyableCasting);
 
-      // `is` never produces a payload, its source is borrowed.
-      // Contine to reject Metatypes for now...
-      bool isTypeTest =
-          isa<IsExpr>(cast) &&
-          Ctx.LangOpts.hasFeature(Feature::NoncopyableCasting) &&
-          !castType->is<AnyMetatypeType>() &&
-          !(fromType && fromType->is<AnyMetatypeType>());
-
-      // 'as?'/'as!'/'is' from a noncopyable existential value to a concrete
-      // type is permitted under NoncopyableCasting: there, unlike other
-      // move-only types, the existential's erased dynamic type is exactly
-      // the kind of thing a runtime cast can meaningfully recover. The
-      // destination must be a concrete (non-existential, non-archetype)
-      // type; existential-to-existential and existential-to-archetype casts
-      // are not yet supported by the runtime and remain rejected below.
-      bool isSupportedExistentialCast =
-          Ctx.LangOpts.hasFeature(Feature::NoncopyableCasting) &&
-          fromType && fromType->isNoncopyable() &&
-          fromType->isExistentialType() &&
-          !castType->isExistentialType() &&
-          !castType->is<ArchetypeType>();
-
-      if (castType->isNoncopyable() && !isTypeTest &&
-          !isSupportedExistentialCast) {
-        // can't cast anything to move-only; there should be no valid ones.
-        Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
-        return;
-      }
-
-      // no support for runtime casts from move-only types, except for the
-      // existential-to-concrete case handled above.
-      if (fromType && fromType->isNoncopyable() && !isTypeTest &&
-          !isSupportedExistentialCast) {
-        // can't cast move-only to anything.
+      // Reject noncopyable casts without the feature enabled
+      if (explicitNoncopyable && !hasFeatureEnabled) {
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
       }

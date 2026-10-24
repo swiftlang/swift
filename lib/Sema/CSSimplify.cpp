@@ -9909,8 +9909,7 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   }
 
   auto castKind = TypeChecker::typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::None, cs.DC,
-      /*isTypeTest=*/isExpr<IsExpr>(anchor));
+      fromType, toType, CheckedCastContextKind::None, cs.DC);
 
   if (castKind == CheckedCastKind::Unresolved) {
     return AllowCheckedCastToUnrelated::attempt(
