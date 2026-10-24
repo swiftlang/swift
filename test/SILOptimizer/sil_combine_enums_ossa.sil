@@ -725,3 +725,45 @@ bb3:
   return %r : $()
 }
 
+// Salvaging a debug use of the borrow onto a consuming switch operand must not
+// extend that operand's lifetime past the switch and leak the original value.
+//
+// CHECK-LABEL: sil [ossa] @borrowed_enum_debug_use_in_case
+// CHECK:         [[BORROW:%.*]] = begin_borrow
+// CHECK:         switch_enum [[BORROW]] : $Optional<SomeClass>
+// CHECK:         debug_value [[BORROW]] : $Optional<SomeClass>
+// CHECK:       } // end sil function 'borrowed_enum_debug_use_in_case'
+sil [ossa] @borrowed_enum_debug_use_in_case : $@convention(thin) (@owned Optional<SomeClass>, Builtin.Int1) -> @out Optional<SomeClass> {
+bb0(%0 : $*Optional<SomeClass>, %1 : @owned $Optional<SomeClass>, %2 : $Builtin.Int1):
+  cond_br %2, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Optional<SomeClass>)
+
+bb2:
+  destroy_value %1 : $Optional<SomeClass>
+  %5 = enum $Optional<SomeClass>, #Optional.none!enumelt
+  br bb3(%5 : $Optional<SomeClass>)
+
+bb3(%7 : @owned $Optional<SomeClass>):
+  %8 = copy_value %7 : $Optional<SomeClass>
+  store %8 to [init] %0 : $*Optional<SomeClass>
+  %10 = begin_borrow %7 : $Optional<SomeClass>
+  switch_enum %10 : $Optional<SomeClass>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%12 : @guaranteed $SomeClass):
+  debug_value %10 : $Optional<SomeClass>, let, name "e"
+  end_borrow %10 : $Optional<SomeClass>
+  %14 = unchecked_enum_data %7 : $Optional<SomeClass>, #Optional.some!enumelt
+  destroy_value %14 : $SomeClass
+  br bb6
+
+bb5:
+  end_borrow %10 : $Optional<SomeClass>
+  destroy_value %7 : $Optional<SomeClass>
+  br bb6
+
+bb6:
+  %19 = tuple ()
+  return %19 : $()
+}
