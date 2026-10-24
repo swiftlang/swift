@@ -15,10 +15,14 @@ import shutil
 import sys
 
 from build_swift.build_swift import argparse
-from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+from build_swift.build_swift.constants import SWIFT_BUILD_ROOT, SWIFT_SOURCE_ROOT
 
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
+from swift_build_support.swift_build_support.workspace import (
+    find_swift_build_dirs,
+    is_swift_build_dir,
+)
 
 
 TEST_MODES = [
@@ -61,17 +65,6 @@ host_target = StdlibDeploymentTarget.host_target().name
 def error_exit(msg):
     print("%s: %s" % (os.path.basename(sys.argv[0]), msg), file=sys.stderr)
     sys.exit(1)
-
-
-# Return true if the path looks like swift build directory.
-def is_swift_build_dir(path, unified_build_dir):
-    if not unified_build_dir:
-        tests_path = [path, "test-%s" % host_target]
-    else:
-        tests_path = [path, "tools", "swift", "test-%s" % host_target]
-
-    return (os.path.exists(os.path.join(path, "CMakeCache.txt")) and
-            os.path.isdir(os.path.join(*tests_path)))
 
 
 # Return true if the swift build directory is configured with `Xcode`
@@ -179,6 +172,21 @@ def main():
     paths = []
 
     build_dir = args.build_dir
+    if build_dir is None:
+        build_dirs = find_swift_build_dirs(
+            SWIFT_BUILD_ROOT, host_target, args.unified)
+        if len(build_dirs) == 1:
+            build_dir = build_dirs[0]
+        elif len(build_dirs) > 1:
+            choices = '\n'.join(
+                '  --build-dir %s' % path for path in build_dirs)
+            error_exit(
+                "multiple Swift build directories found under '%s'; "
+                "select one with:\n%s" % (SWIFT_BUILD_ROOT, choices))
+        elif not args.paths:
+            error_exit(
+                "no Swift build directories found under '%s'" %
+                SWIFT_BUILD_ROOT)
     if build_dir is not None:
         # Fixup build directory.
         # build_dir can be:
@@ -187,7 +195,7 @@ def main():
         for d in [
                 build_dir,
                 os.path.join(build_dir, 'swift-%s' % host_target)]:
-            if is_swift_build_dir(d, args.unified):
+            if is_swift_build_dir(d, host_target, args.unified):
                 build_dir = d
                 break
         else:
@@ -216,7 +224,7 @@ def main():
             # Traverse the first test path to find the `build_dir`
             d = os.path.dirname(paths[0])
             while d not in ['', os.sep]:
-                if is_swift_build_dir(d, args.unified):
+                if is_swift_build_dir(d, host_target, args.unified):
                     build_dir = d
                     break
                 d = os.path.dirname(d)

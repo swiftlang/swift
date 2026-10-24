@@ -20,6 +20,7 @@ import unittest
 from swift_build_support.workspace import (
     Workspace,
     compute_build_subdir,
+    find_swift_build_dirs,
 )
 
 
@@ -46,6 +47,41 @@ class WorkspaceTestCase(unittest.TestCase):
 
         shutil.rmtree(tmpdir1)
         shutil.rmtree(tmpdir2)
+
+
+class FindSwiftBuildDirsTestCase(unittest.TestCase):
+
+    host_target = 'macosx-arm64'
+
+    def create_swift_build_dir(self, build_root, configuration):
+        build_dir = os.path.join(
+            build_root, configuration, 'swift-%s' % self.host_target)
+        os.makedirs(os.path.join(build_dir, 'test-%s' % self.host_target))
+        open(os.path.join(build_dir, 'CMakeCache.txt'), 'a').close()
+        return os.path.realpath(build_dir)
+
+    def test_no_swift_build_dirs(self):
+        with tempfile.TemporaryDirectory() as build_root:
+            self.assertEqual(
+                find_swift_build_dirs(build_root, self.host_target), [])
+
+    def test_one_swift_build_dir(self):
+        with tempfile.TemporaryDirectory() as build_root:
+            build_dir = self.create_swift_build_dir(
+                build_root, 'Ninja-DebugAssert')
+            self.assertEqual(
+                find_swift_build_dirs(build_root, self.host_target),
+                [build_dir])
+
+    def test_multiple_swift_build_dirs(self):
+        with tempfile.TemporaryDirectory() as build_root:
+            debug = self.create_swift_build_dir(
+                build_root, 'Ninja-DebugAssert')
+            release = self.create_swift_build_dir(
+                build_root, 'Ninja-ReleaseAssert')
+            self.assertEqual(
+                find_swift_build_dirs(build_root, self.host_target),
+                sorted([debug, release]))
 
 
 class ComputeBuildSubdirTestCase(unittest.TestCase):
