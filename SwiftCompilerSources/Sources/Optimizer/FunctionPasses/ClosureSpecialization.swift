@@ -73,6 +73,14 @@ func runClosureSpecialization(function: Function, isRootInvocation: Bool, contex
 
     for inst in function.instructions {
       if let apply = inst as? FullApplySite {
+        if trySpecializeDifferentiableFunction(apply: apply, isRootInvocation: isRootInvocation, context) {
+          changed = true
+        }
+      }
+    }
+
+    for inst in function.instructions {
+      if let apply = inst as? FullApplySite {
         if trySpecialize(apply: apply, isRootInvocation: isRootInvocation, context) {
           changed = true
         }
@@ -328,6 +336,38 @@ private func trySpecialize(apply: ApplySite, isRootInvocation: Bool, _ context: 
   return true
 }
 
+private func trySpecializeDifferentiableFunction(apply: ApplySite, isRootInvocation: Bool, _ context: FunctionPassContext) -> Bool {
+  guard isCalleeSpecializable(of: apply),
+        let (specialization, componentRoots) = analyzeDifferentiableFunctionArguments(of: apply, context)
+  else {
+    return false
+  }
+
+  let specializedParameters = specialization.getSpecializedParameters()
+  guard numberOfIsolatedParameters(specializedParameters) <= 1 else {
+    return false
+  }
+
+  let argumentManglings = specialization.closureArguments.map { (argOp, root) in
+    (apply.calleeArgumentIndex(of: argOp)!, root as! DifferentiableFunctionInst)
+  }
+  let name = context.mangle(withDifferentiableFunctionArguments: argumentManglings,
+                            componentClosureRoots: componentRoots, from: apply.referencedFunction!)
+  let (specializedFunction, isNewFunction) = specialization.getOrCreateSpecializedFunction(
+    specializedParameters, context, named: name)
+
+  specialization.rewriteApply(for: specializedFunction, context)
+
+  if isNewFunction && isRootInvocation {
+    context.buildSpecializedFunction(specializedFunction: specializedFunction) {
+      (specializedFunction, specializedContext) in
+      runClosureSpecialization(function: specializedFunction, isRootInvocation: false, context: specializedContext)
+    }
+  }
+
+  return true
+}
+
 private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
   if let callee = apply.referencedFunction,
      callee.isDefinition,
@@ -391,6 +431,30 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
   }
   return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures,
                             capturedDependencies: capturedDependencies)
+}
+
+private func analyzeDifferentiableFunctionArguments(of apply: ApplySite, _ context: FunctionPassContext)
+  -> (SpecializationInfo, componentRoots: [Closure])? {
+  var argumentsToSpecialize = [(Operand, Closure)]()
+  var componentRoots = [Closure]()
+
+  for argOp in apply.argumentOperands {
+    guard apply.convention(of: argOp) == .directOwned || apply.convention(of: argOp) == .directGuaranteed else {
+      continue
+    }
+    if let (differentiableFunction, roots) = findSpecializableDifferentiableFunction(of: argOp.value, context),
+       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
+    {
+      argumentsToSpecialize.append((argOp, differentiableFunction))
+      componentRoots.append(contentsOf: roots)
+    }
+  }
+  if argumentsToSpecialize.isEmpty {
+    return nil
+  }
+
+  return (SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize,
+                             rootClosures: [], capturedDependencies: []), componentRoots)
 }
 
 // Walks down the use-def chain of a function argument, recursively, to find a rootClosure.
@@ -495,6 +559,48 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
   }
 }
 
+private func findSpecializableDifferentiableFunction(of value: Value, _ context: FunctionPassContext)
+  -> (DifferentiableFunctionInst, componentRoots: [Closure])? {
+  guard !value.type.isMoveOnly else {
+    return nil
+  }
+
+  switch value {
+  case is ConvertFunctionInst,
+       is ConvertEscapeToNoEscapeInst,
+       is MoveValueInst,
+       is CopyValueInst:
+    return findSpecializableDifferentiableFunction(of: (value as! UnaryInstruction).operand.value, context)
+
+  case let differentiableFunction as DifferentiableFunctionInst:
+    guard differentiableFunction.ownership == .owned || differentiableFunction.ownership == .none else {
+      return nil
+    }
+
+    var roots = [Closure]()
+    for component in [DifferentiableFunctionTypeComponent.original, .jvp, .vjp] {
+      guard let value = differentiableFunction.getExtractee(extractee: component),
+            !value.type.isMoveOnly
+      else {
+        return nil
+      }
+      var visited = ValueSet(context)
+      defer { visited.deinitialize() }
+      var capturedDependencies = [CapturedDependency]()
+      guard let root = findSpecializableClosure(of: value, &visited, &capturedDependencies),
+            root is ThinToThickFunctionInst
+      else {
+        return nil
+      }
+      roots.append(root)
+    }
+    return (differentiableFunction, roots)
+
+  default:
+    return nil
+  }
+}
+
 /// Either a `partial_apply` or a `thin_to_thick_function`
 private typealias Closure = SingleValueInstruction
 
@@ -533,9 +639,10 @@ private struct SpecializationInfo {
   private typealias Cloner = SIL.Cloner<FunctionPassContext>
 
   func getOrCreateSpecializedFunction(_ specializedParameters: [ParameterInfo],
-                                      _ context: FunctionPassContext
+                                      _ context: FunctionPassContext,
+                                      named name: String? = nil
   ) -> (Function, isNewFunction: Bool) {
-    let specializedFunctionName = getSpecializedFunctionName(context)
+    let specializedFunctionName = name ?? getSpecializedFunctionName(context)
 
     if let existingSpecializedFunction = context.lookupFunction(name: specializedFunctionName) {
       return (existingSpecializedFunction, false)
@@ -866,7 +973,9 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
     case is ConvertFunctionInst,
          is ConvertEscapeToNoEscapeInst,
          is MoveValueInst,
-         is CopyValueInst:
+         is CopyValueInst,
+         is BeginBorrowInst,
+         is DifferentiableFunctionExtractInst:
       if checkRecursivelyIfClosureIsApplied(use.instruction as! SingleValueInstruction, &handledFuncs) {
         return true
       }
@@ -917,6 +1026,10 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
           return true
         }
       }
+
+    // Assume the closure is applied if its set as a differentiable_function component.
+    case is DifferentiableFunctionInst:
+      return true
 
     default:
       break
