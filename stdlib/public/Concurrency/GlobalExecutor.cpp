@@ -122,27 +122,6 @@ extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
                 *reinterpret_cast<SerialExecutorRef *>(&executor));
 }
 
-extern "C" void
-_swift_timerContinuation_resume_c(SwiftTimerContinuation *continuation)
-{
-  swift_timerContinuation_resume(reinterpret_cast<AsyncTask *>(continuation));
-}
-
-extern "C" SwiftJob *
-_swift_timerContinuation_createJob_c(SwiftTimerContinuation *continuation,
-                                     SwiftJobPriority priority)
-{
-  return reinterpret_cast<SwiftJob *>(swift_task_createNullaryContinuationJob(
-    priority, reinterpret_cast<AsyncTask *>(continuation)));
-}
-
-extern "C" SwiftTimerContinuation *
-_swift_timerContinuation_takeFromJob_c(SwiftJob *job)
-{
-  return reinterpret_cast<SwiftTimerContinuation *>(
-    swift_job_takeNullaryContinuation(reinterpret_cast<Job *>(job)));
-}
-
 extern "C" SwiftTime swift_time_now(SwiftClockId clock)
 {
   SwiftTime result;
@@ -175,13 +154,21 @@ uint64_t swift::swift_task_getCurrentTaskId() {
 }
 
 extern "C" void *swift_job_alloc(SwiftJob *job, size_t size) {
-  auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
-  return _swift_task_alloc_specific(task, size);
+  // Only a task has an allocator; any other kind of job (a split continuation
+  // or a nullary continuation job, say) doesn't, and the caller has to cope.
+  auto *j = reinterpret_cast<Job *>(job);
+  if (!j->isAsyncTask())
+    return nullptr;
+  return _swift_task_alloc_specific(static_cast<AsyncTask *>(j), size);
 }
 
 extern "C" void swift_job_dealloc(SwiftJob *job, void *ptr) {
-  auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
-  return _swift_task_dealloc_specific(task, ptr);
+  // We only ever hand out memory for tasks, so there is nothing to release for
+  // any other kind of job.
+  auto *j = reinterpret_cast<Job *>(job);
+  if (!j->isAsyncTask())
+    return;
+  _swift_task_dealloc_specific(static_cast<AsyncTask *>(j), ptr);
 }
 
 IsIsolatingCurrentContextDecision

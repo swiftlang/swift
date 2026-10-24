@@ -2825,32 +2825,6 @@ swift_task_createNullaryContinuationJobImpl(
   return job;
 }
 
-SWIFT_CC(swift)
-void swift::swift_timerContinuation_resume(AsyncTask *continuation) {
-  auto *context =
-    static_cast<ContinuationAsyncContext*>(continuation->ResumeContext);
-
-  context->setErrorResult(nullptr);
-  swift_continuation_resume(continuation);
-}
-
-/// Destroy a NullaryContinuationJob that has not run, without running it,
-/// and return the continuation that it would have resumed.  The caller is
-/// responsible for resuming the continuation.
-///
-/// This is how a cancelled schedule hands back the job that was standing in
-/// for a continuation; it is not valid for any other kind of job.
-extern "C" SWIFT_CC(swift)
-AsyncTask *swift_job_takeNullaryContinuation(Job *job) {
-  if (auto *nullary = dyn_cast<NullaryContinuationJob>(job)) {
-    auto *continuation = nullary->getContinuation();
-    swift_cxx_deleteObject(nullary);
-    return continuation;
-  }
-
-  swift_Concurrency_fatalError(0, "job is not a nullary continuation job");
-}
-
 #if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {

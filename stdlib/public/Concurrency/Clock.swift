@@ -48,162 +48,312 @@ public protocol Clock<Duration>: Sendable {
 ///
 /// Executors only know how to schedule work against the clocks they
 /// recognise.  When a `SchedulingExecutor` is asked to schedule against some
-/// other clock, and that clock is an `EnqueueingClock`, the executor hands the
+/// other clock, and that clock is a `SchedulingClock`, the executor hands the
 /// work over to the clock, which is responsible for running it at the right
 /// time.
 ///
-/// Every `SchedulingExecutor` must support `ContinuousClock` and
-/// `SuspendingClock` natively; forwarding to the clock is only for other
-/// clocks.
+/// An executor says whether it schedules against `ContinuousClock` and
+/// `SuspendingClock` itself using `supportsScheduling(on:)`.  If it does not,
+/// those clocks are scheduled by the default executor (or, if that does not
+/// either, by the runtime's global enqueue function), which gives the job to
+/// the executor to run when the time comes.  So forwarding to the clock is
+/// only for other clocks.
 ///
-/// A clock should implement `run` by arranging to run the job on some executor
-/// at the fire time.  It must not do that by asking an executor to schedule
-/// the job against the clock itself, as the executor would simply hand the job
-/// straight back; instead it should either schedule against a clock that
-/// executors do support, as `ContinuousClock` and `SuspendingClock` do (they
-/// use the default executor, so that an executor that is itself forwarding
-/// to them does not cause a loop), or hold the job itself and enqueue it
-/// when the time arrives.
+/// A clock should implement `schedule(_:at:tolerance:)` by arranging to run the
+/// job on some executor at the fire time.  It must not do that by asking an
+/// executor to schedule the job against the clock itself, as the executor would
+/// simply hand the job straight back; instead it should either schedule against
+/// one of the standard clocks (as `ContinuousClock` and `SuspendingClock`
+/// schedule against the default executor), or hold the job itself and enqueue
+/// it when the time arrives.
 ///
 /// The tokens that these methods return are cancelled through
 /// `JobCancellationToken.canceller`.  If a clock keeps the job itself, it
-/// should also conform to `JobCanceller` and name itself as the canceller.
+/// should also conform to `JobCanceller` (and so be a class) and name itself as
+/// the canceller.
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
-public protocol EnqueueingClock<Duration>: Clock<Duration> {
+public protocol SchedulingClock<Duration>: Clock<Duration> {
   /// Run the given job on an unspecified executor at some point after the
   /// fire time.
   ///
   /// Parameters:
   ///
   /// - job:       The job we wish to run.
-  /// - run:       The time at which we would like it to run.
+  /// - at:        The time at which we would like it to run.
   /// - tolerance: The ideal maximum delay we are willing to tolerate.
   ///
   /// Returns a ``JobCancellationToken`` that can be used to cancel the job
   /// before it runs.
-  func run(_ job: consuming ExecutorJob,
-           run: SchedulingExecutorFireTime<Self>,
-           tolerance: Duration?) -> JobCancellationToken
+  func schedule(_ job: consuming ExecutorJob,
+                at: SchedulingExecutorFireTime<Self>,
+                tolerance: Duration?) -> JobCancellationToken
 
-  /// Resume the given continuation at some point after the fire time.
-  ///
-  /// Resuming a continuation schedules the task on whatever executor it is
-  /// bound to, so no executor needs to be named.  The default implementation
-  /// creates a job that resumes the continuation, and passes it to
-  /// `run(_:run:tolerance:)`; a clock that implements this natively must also
-  /// implement `cancel(continuationWithToken:)` on whatever it names as the
-  /// canceller.
-  ///
-  /// Returns a ``JobCancellationToken`` that can be used to take the
-  /// continuation back, using `cancelContinuation()`, before it is resumed.
-  func run(resuming continuation: consuming TimerContinuation,
-           run: SchedulingExecutorFireTime<Self>,
-           tolerance: Duration?) -> JobCancellationToken
-
-  /// Enqueue the given job on the specified executor at some point after the
+  /// Run the given job on the specified executor at some point after the
   /// fire time.
   ///
-  /// The default implementation uses `run` to run a job that does
-  /// `executor.enqueue(job)`.  If a clock knows that the executor it has been
-  /// asked to use is the one it would run jobs on anyway, it can short-circuit
-  /// that and use `run` with the original job.
+  /// The default implementation uses `schedule(_:at:tolerance:)` to schedule a
+  /// job that does `executor.enqueue(job)`.  If a clock knows that the executor
+  /// it has been asked to use is the one it would run jobs on anyway, it can
+  /// short-circuit that and use `schedule(_:at:tolerance:)` with the original
+  /// job.
   ///
-  /// Cancelling the job hands back the trampoline job rather than `job`
-  /// itself; running the trampoline enqueues `job` on the executor, so that
-  /// is equivalent to running `job`, but it must not simply be discarded.
+  /// Cancelling the job gives `job` back, as for any other scheduled job.
+  /// (The default implementation arranges that even though it has to schedule
+  /// a different job on the clock.)
   ///
   /// Returns a ``JobCancellationToken`` that can be used to cancel the job
   /// before it runs.
-  func enqueue(_ job: consuming ExecutorJob,
-               on executor: some Executor,
-               run: SchedulingExecutorFireTime<Self>,
-               tolerance: Duration?) -> JobCancellationToken
+  func schedule(_ job: consuming ExecutorJob,
+                on executor: some Executor,
+                at: SchedulingExecutorFireTime<Self>,
+                tolerance: Duration?) -> JobCancellationToken
 }
 
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
-extension EnqueueingClock {
-  public func enqueue(_ job: consuming ExecutorJob,
-                      on executor: some Executor,
-                      run at: SchedulingExecutorFireTime<Self>,
-                      tolerance: Duration?) -> JobCancellationToken {
-    let trampoline = job.createTrampoline(to: executor)
-    return run(trampoline, run: at, tolerance: tolerance)
+extension SchedulingClock {
+  public func schedule(_ job: consuming ExecutorJob,
+                       on executor: some Executor,
+                       at fireTime: SchedulingExecutorFireTime<Self>,
+                       tolerance: Duration?) -> JobCancellationToken {
+    return _scheduleUsingTrampoline(job, on: executor, at: fireTime,
+                                    tolerance: tolerance, clock: self)
   }
 
-  public func run(resuming continuation: consuming TimerContinuation,
-                  run at: SchedulingExecutorFireTime<Self>,
-                  tolerance: Duration?) -> JobCancellationToken {
-    let raw = unsafe continuation.continuation.context
-    let job = _taskCreateNullaryContinuationJob(
-      priority: Int(Task.currentPriority.rawValue),
-      continuation: raw)
-    return run(ExecutorJob(context: job), run: at, tolerance: tolerance)
-  }
-
-  /// A default `sleep` that resumes the task by scheduling its continuation
-  /// with the clock, so that a clock need only implement `run` to be usable
-  /// with `Task.sleep()`.  Cancelling the task takes the timer back out of the
-  /// clock immediately.
-  public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+  /// A default `sleep` that wakes the task by scheduling the job that resumes
+  /// it with the clock, so that a clock need only implement
+  /// `schedule(_:at:tolerance:)` to be usable with `Task.sleep()`.  Cancelling
+  /// the task takes the timer back out of the clock immediately.
+  public func sleep(
+    until deadline: Instant, tolerance: Duration?
+  ) async throws {
     guard #available(StdlibDeploymentTarget 6.5, *) else {
       fatalError("we shouldn't get here; if we have, availability is broken")
     }
 
     try Task.checkCancellation()
-    try await Task<Never, Never>._sleepScheduling { timer in
-      self.run(resuming: timer, run: .at(deadline), tolerance: tolerance)
+    try await Task<Never, Never>._sleepScheduling { job in
+      self.schedule(job, at: .at(deadline), tolerance: tolerance)
     }
   }
 }
 
-/// The executor that `ContinuousClock` and `SuspendingClock` hand work to.
+/// Shared state between a trampoline job and the thing that can cancel it.
+@available(StdlibDeploymentTarget 6.5, *)
+private final class _TrampolineState: @unchecked Sendable {
+  /// Set (before the trampoline is enqueued) if the job was cancelled, in which
+  /// case the trampoline must not enqueue it.
+  var cancelled = false
+}
+
+/// Cancels a job that has been scheduled on a clock through a trampoline,
+/// handing back the original job instead of the trampoline.
+@available(StdlibDeploymentTarget 6.5, *)
+private final class _TrampolineCanceller: JobCanceller, @unchecked Sendable {
+  let original: UnownedJob
+  let state: _TrampolineState
+
+  /// The token for the trampoline.  It is set when we are created, and taken
+  /// when we are asked to cancel, which happens at most once because that
+  /// consumes our token.
+  var trampolineToken: JobCancellationToken?
+
+  init(original: UnownedJob, state: _TrampolineState,
+       trampolineToken: consuming JobCancellationToken) {
+    self.original = original
+    self.state = state
+    self.trampolineToken = consume trampolineToken
+  }
+
+  func cancel(jobWithToken token: consuming JobCancellationToken)
+    -> ExecutorJob? {
+    guard let trampolineToken = trampolineToken.take(),
+          let trampoline = trampolineToken.cancel() else {
+      return nil
+    }
+
+    // The trampoline is a task, which has to be run to be freed, so tell it
+    // to do nothing and let it run.  We hand back the job it was carrying
+    // instead.
+    state.cancelled = true
+    Task<Never, Never>.defaultExecutor.enqueue(trampoline)
+    return ExecutorJob(original)
+  }
+}
+
+/// Run `job` on `executor` at some point after the fire time, by scheduling a
+/// trampoline job on `clock`, which enqueues `job` on `executor` when it runs.
+@available(StdlibDeploymentTarget 6.5, *)
+internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
+  _ job: consuming ExecutorJob,
+  on executor: some Executor,
+  at fireTime: SchedulingExecutorFireTime<Clk>,
+  tolerance: Clk.Duration?,
+  clock: Clk
+) -> JobCancellationToken {
+  let original = UnownedJob(job)
+  let state = _TrampolineState()
+
+  let flags = taskCreateFlags(
+    priority: TaskPriority(ExecutorJob(original).priority),
+    isChildTask: false,
+    copyTaskLocals: false,
+    inheritContext: false,
+    enqueueJob: false,
+    addPendingGroupTaskUnconditionally: false,
+    isDiscardingTask: false,
+    isSynchronousStart: false
+  )
+  let (trampolineTask, _) = Builtin.createAsyncTask(flags) {
+    if !state.cancelled {
+      executor.enqueue(original)
+    }
+  }
+  let trampoline = ExecutorJob(
+    context: Builtin.convertTaskToJob(trampolineTask))
+
+  let trampolineToken = clock.schedule(trampoline, at: fireTime,
+                                       tolerance: tolerance)
+  let canceller = _TrampolineCanceller(original: original, state: state,
+                                       trampolineToken: trampolineToken)
+  return unsafe JobCancellationToken(canceller: canceller, opaqueData: [0, 0])
+}
+
+/// A canceller for work that was handed to the runtime's global enqueue
+/// functions, which can't take a timer back.
+@available(StdlibDeploymentTarget 6.5, *)
+private final class _NonCancellingCanceller: JobCanceller, @unchecked Sendable {
+  static let shared = _NonCancellingCanceller()
+
+  func cancel(jobWithToken token: consuming JobCancellationToken)
+    -> ExecutorJob? {
+    return nil
+  }
+}
+
+/// Schedule a job against one of the standard library's clocks, with no
+/// particular executor in mind.
 ///
-/// These clocks have to schedule work on some executor, and every
-/// `SchedulingExecutor` is required to support them natively, so this must not
-/// be an executor that forwards unfamiliar clocks back to the clock itself,
-/// or the two would call each other forever.  The default executor is
-/// the one that the runtime requires to be able to schedule against them.
+/// We give it to the default executor if that executor schedules against the
+/// clock itself; if not, we use the runtime's global enqueue function, which
+/// is how an executor written in C (against `ExecutorImpl.h`) schedules, and
+/// which handles both of the clocks but can't cancel.  `fallback` gives us the
+/// arguments for that function, and is only evaluated if we need them.
 @available(StdlibDeploymentTarget 6.5, *)
-private func _executorForBuiltInClocks() -> any SchedulingExecutor {
-  guard let executor = Task<Never, Never>.defaultExecutor.asSchedulingExecutor else {
-    fatalError("the default executor is not a SchedulingExecutor")
+private func _scheduleOnDefaultExecutor<C: Clock>(
+  _ job: consuming ExecutorJob,
+  at fireTime: SchedulingExecutorFireTime<C>,
+  tolerance: C.Duration?,
+  clock: C,
+  systemClock: SystemClockID,
+  fallback: () -> (clockID: Int32, seconds: Int64, nanoseconds: Int64,
+                   toleranceSeconds: Int64, toleranceNanoseconds: Int64)
+) -> JobCancellationToken {
+  if let executor = Task<Never, Never>.defaultExecutor.asSchedulingExecutor,
+     executor.supportsScheduling(on: systemClock) {
+    return executor.schedule(job, at: fireTime, tolerance: tolerance,
+                             clock: clock)
   }
-  return executor
+
+  let args = fallback()
+  _enqueueJobGlobalWithDeadline(
+    args.seconds, args.nanoseconds,
+    args.toleranceSeconds, args.toleranceNanoseconds,
+    args.clockID, UnownedJob(job))
+  return unsafe JobCancellationToken(canceller: _NonCancellingCanceller.shared,
+                                     opaqueData: [0, 0])
+}
+
+/// Run a job on `executor` against one of the standard library's clocks:
+/// directly, if the executor schedules against the clock itself, and otherwise
+/// by way of a trampoline that the default executor schedules.
+@available(StdlibDeploymentTarget 6.5, *)
+private func _scheduleOnExecutor<C: SchedulingClock>(
+  _ job: consuming ExecutorJob,
+  on executor: some Executor,
+  at fireTime: SchedulingExecutorFireTime<C>,
+  tolerance: C.Duration?,
+  clock: C,
+  systemClock: SystemClockID
+) -> JobCancellationToken {
+  if let scheduler = executor.asSchedulingExecutor,
+     scheduler.supportsScheduling(on: systemClock) {
+    return scheduler.schedule(job, at: fireTime, tolerance: tolerance,
+                              clock: clock)
+  }
+  return _scheduleUsingTrampoline(job, on: executor, at: fireTime,
+                                  tolerance: tolerance, clock: clock)
+}
+
+/// The standard library clock that `clock` is, if it is one.
+@available(StdlibDeploymentTarget 6.5, *)
+internal func _systemClockID<C: Clock>(_ clock: C) -> SystemClockID? {
+  if clock is ContinuousClock {
+    return .continuous
+  } else if clock is SuspendingClock {
+    return .suspending
+  }
+  return nil
 }
 
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
-extension ContinuousClock: EnqueueingClock {
-  public func run(_ job: consuming ExecutorJob,
-                  run at: SchedulingExecutorFireTime<ContinuousClock>,
-                  tolerance: Duration?) -> JobCancellationToken {
-    return _executorForBuiltInClocks().enqueue(job, run: at, tolerance: tolerance, clock: self)
+extension ContinuousClock: SchedulingClock {
+  public func schedule(_ job: consuming ExecutorJob,
+                       at fireTime: SchedulingExecutorFireTime<ContinuousClock>,
+                       tolerance: Duration?) -> JobCancellationToken {
+    return _scheduleOnDefaultExecutor(
+      job, at: fireTime, tolerance: tolerance, clock: self,
+      systemClock: .continuous) {
+      let (clockID, seconds, nanoseconds) =
+        timestamp(for: fireTime.asInstant(clock: self))
+      let (toleranceSeconds, toleranceNanoseconds) = tolerance.map {
+        durationComponents(for: $0)
+      } ?? (0, -1)
+      return (clockID: clockID.rawValue, seconds: seconds,
+              nanoseconds: nanoseconds, toleranceSeconds: toleranceSeconds,
+              toleranceNanoseconds: toleranceNanoseconds)
+    }
   }
 
-  public func run(resuming continuation: consuming TimerContinuation,
-                  run at: SchedulingExecutorFireTime<ContinuousClock>,
-                  tolerance: Duration?) -> JobCancellationToken {
-    return _executorForBuiltInClocks().enqueue(resuming: continuation, run: at,
-                            tolerance: tolerance, clock: self)
+  public func schedule(_ job: consuming ExecutorJob,
+                       on executor: some Executor,
+                       at fireTime: SchedulingExecutorFireTime<ContinuousClock>,
+                       tolerance: Duration?) -> JobCancellationToken {
+    return _scheduleOnExecutor(job, on: executor, at: fireTime,
+                               tolerance: tolerance, clock: self,
+                               systemClock: .continuous)
   }
 }
 
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
-extension SuspendingClock: EnqueueingClock {
-  public func run(_ job: consuming ExecutorJob,
-                  run at: SchedulingExecutorFireTime<SuspendingClock>,
-                  tolerance: Duration?) -> JobCancellationToken {
-    return _executorForBuiltInClocks().enqueue(job, run: at, tolerance: tolerance, clock: self)
+extension SuspendingClock: SchedulingClock {
+  public func schedule(_ job: consuming ExecutorJob,
+                       at fireTime: SchedulingExecutorFireTime<SuspendingClock>,
+                       tolerance: Duration?) -> JobCancellationToken {
+    return _scheduleOnDefaultExecutor(
+      job, at: fireTime, tolerance: tolerance, clock: self,
+      systemClock: .suspending) {
+      let (clockID, seconds, nanoseconds) =
+        timestamp(for: fireTime.asInstant(clock: self))
+      let (toleranceSeconds, toleranceNanoseconds) = tolerance.map {
+        durationComponents(for: $0)
+      } ?? (0, -1)
+      return (clockID: clockID.rawValue, seconds: seconds,
+              nanoseconds: nanoseconds, toleranceSeconds: toleranceSeconds,
+              toleranceNanoseconds: toleranceNanoseconds)
+    }
   }
 
-  public func run(resuming continuation: consuming TimerContinuation,
-                  run at: SchedulingExecutorFireTime<SuspendingClock>,
-                  tolerance: Duration?) -> JobCancellationToken {
-    return _executorForBuiltInClocks().enqueue(resuming: continuation, run: at,
-                            tolerance: tolerance, clock: self)
+  public func schedule(_ job: consuming ExecutorJob,
+                       on executor: some Executor,
+                       at fireTime: SchedulingExecutorFireTime<SuspendingClock>,
+                       tolerance: Duration?) -> JobCancellationToken {
+    return _scheduleOnExecutor(job, on: executor, at: fireTime,
+                               tolerance: tolerance, clock: self,
+                               systemClock: .suspending)
   }
 }
 
@@ -211,65 +361,38 @@ extension SuspendingClock: EnqueueingClock {
 
 /// Returns `true` if `clock` is one that an executor should forward to.
 @available(StdlibDeploymentTarget 6.5, *)
-internal func _isEnqueueingClock<C: Clock>(_ clock: C) -> Bool {
-  return clock is any EnqueueingClock
+internal func _isSchedulingClock<C: Clock>(_ clock: C) -> Bool {
+  return clock is any SchedulingClock
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
-private func _open<E: EnqueueingClock, C: Clock>(
-  _ enqueueingClock: E,
+private func _open<E: SchedulingClock, C: Clock>(
+  _ schedulingClock: E,
   _ job: consuming ExecutorJob,
   on executor: some Executor,
-  run: SchedulingExecutorFireTime<C>,
+  at fireTime: SchedulingExecutorFireTime<C>,
   tolerance: C.Duration?
 ) -> JobCancellationToken {
   // `E` is the dynamic type of the clock that `C` was, so these can't fail.
-  return enqueueingClock.enqueue(
+  return schedulingClock.schedule(
     job, on: executor,
-    run: run as! SchedulingExecutorFireTime<E>,
+    at: fireTime as! SchedulingExecutorFireTime<E>,
     tolerance: tolerance as! E.Duration?)
 }
 
-@available(StdlibDeploymentTarget 6.5, *)
-private func _open<E: EnqueueingClock, C: Clock>(
-  _ enqueueingClock: E,
-  resuming continuation: consuming TimerContinuation,
-  run: SchedulingExecutorFireTime<C>,
-  tolerance: C.Duration?
-) -> JobCancellationToken {
-  return enqueueingClock.run(
-    resuming: continuation,
-    run: run as! SchedulingExecutorFireTime<E>,
-    tolerance: tolerance as! E.Duration?)
-}
-
-/// Hand a job to an `EnqueueingClock` to be enqueued on `executor`.  The
+/// Hand a job to a `SchedulingClock` to be run on `executor`.  The
 /// caller must already have checked that `clock` is one.
 @available(StdlibDeploymentTarget 6.5, *)
-internal func _enqueueUsingClock<C: Clock>(
+internal func _scheduleUsingClock<C: Clock>(
   _ job: consuming ExecutorJob,
   on executor: some Executor,
-  run: SchedulingExecutorFireTime<C>,
+  at fireTime: SchedulingExecutorFireTime<C>,
   tolerance: C.Duration?,
   clock: C
 ) -> JobCancellationToken {
-  let enqueueingClock = clock as! any EnqueueingClock
-  return _open(enqueueingClock, job, on: executor,
-               run: run, tolerance: tolerance)
-}
-
-/// Hand a continuation to an `EnqueueingClock` to be resumed.  The caller
-/// must already have checked that `clock` is one.
-@available(StdlibDeploymentTarget 6.5, *)
-internal func _resumeUsingClock<C: Clock>(
-  _ continuation: consuming TimerContinuation,
-  run: SchedulingExecutorFireTime<C>,
-  tolerance: C.Duration?,
-  clock: C
-) -> JobCancellationToken {
-  let enqueueingClock = clock as! any EnqueueingClock
-  return _open(enqueueingClock, resuming: continuation,
-               run: run, tolerance: tolerance)
+  let schedulingClock = clock as! any SchedulingClock
+  return _open(schedulingClock, job, on: executor,
+               at: fireTime, tolerance: tolerance)
 }
 #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 

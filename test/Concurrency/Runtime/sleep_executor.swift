@@ -36,12 +36,16 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
     }
   }
 
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
+  }
+
+  public func schedule<C: Clock>(_ _job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
     // Convert to `Swift.Duration`
-    let duration = run.asDuration(clock: clock) as! Swift.Duration
+    let duration = fireTime.asDuration(clock: clock) as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
@@ -57,7 +61,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
 
-    return JobCancellationToken(canceller: self, jobID: 0, opaqueData: [0, 0])
+    return JobCancellationToken(canceller: self, opaqueData: [0, 0])
   }
 
   // We can't remove jobs from `asyncAfter`, so we never cancel.

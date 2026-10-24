@@ -61,12 +61,12 @@ extension DispatchMainExecutor: MainExecutor {}
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension DispatchMainExecutor: SchedulingExecutor {
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
-    return _dispatchEnqueue(job, run: run, tolerance: tolerance, clock: clock,
-                            executor: self, global: false)
+  public func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
+    return _dispatchEnqueue(job, run: fireTime, tolerance: tolerance,
+                            clock: clock, executor: self, global: false)
   }
 
   public func cancel(jobWithToken token: consuming JobCancellationToken)
@@ -74,18 +74,12 @@ extension DispatchMainExecutor: SchedulingExecutor {
     return _dispatchCancel(token.opaqueData[0])
   }
 
-  public func enqueue<C: Clock>(resuming continuation: consuming TimerContinuation,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
-    return _dispatchEnqueue(resuming: continuation, run: run,
-                            tolerance: tolerance, clock: clock,
-                            executor: self, global: false)
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
   }
 
-  public func cancel(continuationWithToken token: consuming JobCancellationToken)
-    -> TimerContinuation? {
-    return _dispatchCancelContinuation(token.opaqueData[0])
+  public func release(token: borrowing JobCancellationToken) {
+    _dispatchReleaseSource(token.opaqueData[0])
   }
 }
 
@@ -102,12 +96,12 @@ class DispatchGlobalTaskExecutor: TaskExecutor, @unchecked Sendable {
 }
 @available(StdlibDeploymentTarget 6.5, *)
 extension DispatchGlobalTaskExecutor: SchedulingExecutor {
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
-    return _dispatchEnqueue(job, run: run, tolerance: tolerance, clock: clock,
-                            executor: self, global: true)
+  public func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
+    return _dispatchEnqueue(job, run: fireTime, tolerance: tolerance,
+                            clock: clock, executor: self, global: true)
   }
 
   public func cancel(jobWithToken token: consuming JobCancellationToken)
@@ -115,18 +109,12 @@ extension DispatchGlobalTaskExecutor: SchedulingExecutor {
     return _dispatchCancel(token.opaqueData[0])
   }
 
-  public func enqueue<C: Clock>(resuming continuation: consuming TimerContinuation,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
-    return _dispatchEnqueue(resuming: continuation, run: run,
-                            tolerance: tolerance, clock: clock,
-                            executor: self, global: true)
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
   }
 
-  public func cancel(continuationWithToken token: consuming JobCancellationToken)
-    -> TimerContinuation? {
-    return _dispatchCancelContinuation(token.opaqueData[0])
+  public func release(token: borrowing JobCancellationToken) {
+    _dispatchReleaseSource(token.opaqueData[0])
   }
 }
 
@@ -218,11 +206,8 @@ fileprivate func _deadlineArguments<C: Clock>(
 fileprivate func _dispatchToken<E: SchedulingExecutor>(
   executor: E, source: Int
 ) -> JobCancellationToken {
-  return JobCancellationToken(
-    canceller: executor,
-    jobID: UInt64(UInt(bitPattern: source)),
-    opaqueData: [source, 0],
-    cleanUp: { _dispatchReleaseSource($0.opaqueData[0]) })
+  return unsafe JobCancellationToken(canceller: executor,
+                                     opaqueData: [source, 0])
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
@@ -235,8 +220,8 @@ fileprivate func _dispatchEnqueue<C: Clock, E: SchedulingExecutor>(
   global: Bool
 ) -> JobCancellationToken {
   // A clock we don't recognise may know how to schedule the job itself.
-  if !_isDispatchClock(clock) && _isEnqueueingClock(clock) {
-    return _enqueueUsingClock(job, on: executor, run: run,
+  if !_isDispatchClock(clock) && _isSchedulingClock(clock) {
+    return _scheduleUsingClock(job, on: executor, at: run,
                               tolerance: tolerance, clock: clock)
   }
 
@@ -247,41 +232,6 @@ fileprivate func _dispatchEnqueue<C: Clock, E: SchedulingExecutor>(
                                             args.clockID,
                                             UnownedJob(job))
   return _dispatchToken(executor: executor, source: source)
-}
-
-@available(StdlibDeploymentTarget 6.5, *)
-fileprivate func _dispatchEnqueue<C: Clock, E: SchedulingExecutor>(
-  resuming continuation: consuming TimerContinuation,
-  run: SchedulingExecutorFireTime<C>,
-  tolerance: C.Duration?,
-  clock: C,
-  executor: E,
-  global: Bool
-) -> JobCancellationToken {
-  if !_isDispatchClock(clock) && _isEnqueueingClock(clock) {
-    return _resumeUsingClock(continuation, run: run,
-                             tolerance: tolerance, clock: clock)
-  }
-
-  let args = _deadlineArguments(run: run, tolerance: tolerance, clock: clock)
-
-  // We're running in the sleeping task, so its priority is the one that
-  // should select the timer queue.
-  let source = _dispatchEnqueueContinuationWithDeadline(
-    CBool(global),
-    args.seconds, args.nanoseconds,
-    args.tolSec, args.tolNanosec,
-    args.clockID,
-    continuation._takeRawBits(),
-    Int(Task.currentPriority.rawValue))
-  return _dispatchToken(executor: executor, source: source)
-}
-
-/// Take back a continuation scheduled with the above, if it has not fired.
-@available(StdlibDeploymentTarget 6.5, *)
-fileprivate func _dispatchCancelContinuation(_ source: Int) -> TimerContinuation? {
-  let bits = _dispatchCancelContinuationBits(source)
-  return bits == 0 ? nil : TimerContinuation(rawBits: bits)
 }
 
 #endif // !$Embedded && !os(WASI) && !os(Emscripten)

@@ -158,9 +158,11 @@ public:
   };
 
   Job(JobFlags flags, JobInvokeFunction *invoke,
-      const HeapMetadata *metadata = jobHeapMetadataPtr)
+      const HeapMetadata *metadata = jobHeapMetadataPtr,
+      bool captureCurrentVoucher = true)
       : HeapObject(metadata), Flags(flags), RunJob(invoke) {
-    Voucher = voucher_copy();
+    if (captureCurrentVoucher)
+      Voucher = voucher_copy();
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
@@ -245,8 +247,6 @@ public:
 
   SWIFT_CC(swiftasync)
   static void process(Job *job);
-
-  AsyncTask *getContinuation() const { return Continuation; }
 
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::NullaryContinuation;

@@ -16,26 +16,16 @@ import Swift
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A wait queue is a specialised priority queue used to run a timer.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 struct WaitQueue {
-  /// What to do when an entry's deadline arrives.
-  @safe
-  enum Payload {
-    /// Run a job.
-    case job(UnownedJob)
-
-    /// Resume a sleeping task.
-    case continuation(UnsafeContinuation<Void, CancellationError>)
-  }
-
-  /// A job or continuation waiting for its deadline.
+  /// A job waiting for its deadline.
   ///
-  /// We keep the deadline and an ID alongside the payload, rather than in the
+  /// We keep the deadline and an ID alongside the job, rather than in the
   /// job's executor private data, so that a cancelled job can be handed back
   /// exactly as we received it, and so that a stale cancellation can never
   /// match a different entry that happens to reuse the same address.
   struct Entry {
-    var payload: Payload
+    var job: UnownedJob
     var deadline: CooperativeExecutor.Timestamp
     var id: UInt64
   }
@@ -60,36 +50,22 @@ struct WaitQueue {
                         after delay: CooperativeExecutor.Duration,
                         id: UInt64) {
     let deadline = currentTime + delay
-    queue.push(Entry(payload: .job(UnownedJob(job)), deadline: deadline, id: id))
+    queue.push(Entry(job: UnownedJob(job), deadline: deadline, id: id))
   }
 
-  @available(StdlibDeploymentTarget 6.5, *)
-  mutating func enqueue(_ continuation: consuming TimerContinuation,
-                        after delay: CooperativeExecutor.Duration,
-                        id: UInt64) {
-    let deadline = currentTime + delay
-    queue.push(Entry(payload: unsafe .continuation(continuation.continuation),
-                     deadline: deadline, id: id))
-  }
-
-  mutating func forEachReady(
-    job: (consuming ExecutorJob) -> (),
-    continuation: (UnsafeContinuation<Void, CancellationError>) -> ()
-  ) {
+  mutating func forEachReadyJob(body: (consuming ExecutorJob) -> ()) {
     let now = currentTime
     while let entry = queue.pop(when: { $0.deadline < now }) {
-      switch entry.payload {
-      case let .job(unowned):
-        job(ExecutorJob(unowned))
-      case let .continuation(c):
-        unsafe continuation(c)
-      }
+      body(ExecutorJob(entry.job))
     }
   }
 
-  /// Remove the entry with the specified ID, if it is still waiting.
-  mutating func cancel(id: UInt64) -> Payload? {
-    return queue.removeFirst(where: { $0.id == id })?.payload
+  /// Remove the job with the specified ID, if it is still waiting.
+  mutating func cancel(id: UInt64) -> ExecutorJob? {
+    if let entry = queue.removeFirst(where: { $0.id == id }) {
+      return ExecutorJob(entry.job)
+    }
+    return nil
   }
 
   var timeToNextJob: CooperativeExecutor.Duration? {
@@ -109,11 +85,20 @@ struct WaitQueue {
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
 ///
-/// It runs everything on whichever thread calls `run()` or `runUntil(_:)`, and
-/// is not thread-safe: jobs must be enqueued, and timers cancelled, from that
-/// thread.  It is exposed as SPI so that it can be tested.
+/// It runs everything on whichever thread calls `run()` or `runUntil(_:)`.
+///
+/// This executor is intended for single-threaded use (it is the default
+/// executor on platforms without threads), so it deliberately has no locking:
+/// its run queue and wait queues are not safe to touch from more than one
+/// thread.  That means that every operation must be performed from the thread
+/// that is running it.  In particular, jobs must be enqueued from that thread,
+/// and so must cancellation of a timer, even though `JobCanceller` allows
+/// `cancel` to be called from any thread: cancelling a `Task.sleep()` from some
+/// other thread while the executor is running races with the executor, and is
+/// not supported.  Code that needs to cancel from another thread should use an
+/// executor that is built to be used from several.
 @_spi(ExperimentalCustomExecutors)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 public final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -216,9 +201,31 @@ extension CooperativeExecutor: SchedulingExecutor {
     return now
   }
 
-  // The values stored in `JobCancellationToken.opaqueData[0]`
+  // The clock that a job was scheduled on, which we encode in the token
   private static var continuousClockToken: Int { 1 }
   private static var suspendingClockToken: Int { 2 }
+
+  /// Encode a job ID and its clock in a token's opaque data.
+  ///
+  /// A token has two words, which on a 32-bit platform is only enough for 64
+  /// bits in all, so we put the clock in the low bit of the ID and split the
+  /// result into two halves, which works wherever `Int` is at least 32 bits.
+  private static func tokenData(id: UInt64, clockToken: Int)
+    -> InlineArray<2, Int> {
+    let value = (id << 1) | (clockToken == suspendingClockToken ? 1 : 0)
+    return [Int(truncatingIfNeeded: value & 0xffff_ffff),
+            Int(truncatingIfNeeded: value >> 32)]
+  }
+
+  /// The inverse of `tokenData(id:clockToken:)`.
+  private static func decode(_ token: borrowing JobCancellationToken)
+    -> (id: UInt64, clockToken: Int) {
+    let value = UInt64(UInt32(truncatingIfNeeded: token.opaqueData[0]))
+      | (UInt64(UInt32(truncatingIfNeeded: token.opaqueData[1])) << 32)
+    return (id: value >> 1,
+            clockToken: (value & 1) != 0 ? suspendingClockToken
+                                         : continuousClockToken)
+  }
 
   /// Returns `true` if `clock` is one of the clocks that we schedule ourselves.
   private func isKnown<C: Clock>(_ clock: C) -> Bool {
@@ -242,95 +249,44 @@ extension CooperativeExecutor: SchedulingExecutor {
   // Note that, like `enqueue(_:)`, none of this is thread-safe; the
   // cooperative executor is intended to be driven from a single thread, and
   // `cancel` must be called from that thread too.
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
+  public func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
     // A clock we don't recognise may know how to schedule the job itself.
-    if !isKnown(clock) && _isEnqueueingClock(clock) {
-      return _enqueueUsingClock(job, on: self, run: run,
+    if !isKnown(clock) && _isSchedulingClock(clock) {
+      return _scheduleUsingClock(job, on: self, at: fireTime,
                                 tolerance: tolerance, clock: clock)
     }
 
     let id = nextJobID
     nextJobID += 1
 
-    let (delay, clockToken) = delay(run: run, clock: clock)
+    let (delay, clockToken) = delay(run: fireTime, clock: clock)
     if clockToken == Self.continuousClockToken {
       continuousWaitQueue.enqueue(job, after: delay, id: id)
     } else {
       suspendingWaitQueue.enqueue(job, after: delay, id: id)
     }
-    return JobCancellationToken(canceller: self, jobID: id,
-                                opaqueData: [clockToken, 0])
+    return unsafe JobCancellationToken(
+      canceller: self,
+      opaqueData: Self.tokenData(id: id, clockToken: clockToken))
   }
 
-  public func enqueue<C: Clock>(resuming continuation: consuming TimerContinuation,
-                                run: SchedulingExecutorFireTime<C>,
-                                tolerance: C.Duration?,
-                                clock: C) -> JobCancellationToken {
-    if !isKnown(clock) && _isEnqueueingClock(clock) {
-      return _resumeUsingClock(continuation, run: run,
-                               tolerance: tolerance, clock: clock)
-    }
-
-    let id = nextJobID
-    nextJobID += 1
-
-    let (delay, clockToken) = delay(run: run, clock: clock)
-    if clockToken == Self.continuousClockToken {
-      continuousWaitQueue.enqueue(continuation, after: delay, id: id)
-    } else {
-      suspendingWaitQueue.enqueue(continuation, after: delay, id: id)
-    }
-    return JobCancellationToken(canceller: self, jobID: id,
-                                opaqueData: [clockToken, 0])
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
   }
 
-  private func cancel(token: borrowing JobCancellationToken)
-    -> WaitQueue.Payload? {
-    switch token.opaqueData[0] {
-    case Self.continuousClockToken:
-      return continuousWaitQueue.cancel(id: token.jobID)
-    case Self.suspendingClockToken:
-      return suspendingWaitQueue.cancel(id: token.jobID)
-    default:
-      return nil
-    }
-  }
-
-  /// A token is for a job or a continuation depending on which `enqueue` made
-  /// it, but a caller can end up asking for the other kind: for example, an
-  /// executor that wraps this one might return one of our tokens from its own
-  /// job-based `enqueue`, and then be asked to cancel it as a continuation.
-  /// Whichever is asked for, give back something equivalent rather than losing
-  /// the work, by converting between a continuation and the job that wraps it.
   public func cancel(jobWithToken token: consuming JobCancellationToken)
     -> ExecutorJob? {
-    switch cancel(token: token) {
-    case .none:
+    let (id, clockToken) = Self.decode(token)
+    switch clockToken {
+    case Self.continuousClockToken:
+      return continuousWaitQueue.cancel(id: id)
+    case Self.suspendingClockToken:
+      return suspendingWaitQueue.cancel(id: id)
+    default:
       return nil
-    case let .job(job):
-      return ExecutorJob(job)
-    case let .continuation(continuation):
-      let job = _taskCreateNullaryContinuationJob(
-        priority: Int(Task.currentPriority.rawValue),
-        continuation: unsafe continuation.context)
-      return ExecutorJob(context: job)
-    }
-  }
-
-  public func cancel(continuationWithToken token: consuming JobCancellationToken)
-    -> TimerContinuation? {
-    switch cancel(token: token) {
-    case .none:
-      return nil
-    case let .continuation(continuation):
-      return unsafe TimerContinuation(continuation)
-    case let .job(job):
-      // This only works for a job that wraps a continuation
-      let raw = _swiftJobTakeNullaryContinuation(job)
-      return unsafe TimerContinuation(UnsafeContinuation(raw))
     }
   }
 
@@ -338,7 +294,7 @@ extension CooperativeExecutor: SchedulingExecutor {
 #endif
 
 @_spi(ExperimentalCustomExecutors)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
     try runUntil { false }
@@ -349,12 +305,12 @@ extension CooperativeExecutor: RunLoopExecutor {
     while !shouldStop && !condition() {
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Process the timer queues
-      unsafe suspendingWaitQueue.forEachReady(
-        job: { runQueue.push(UnownedJob($0)) },
-        continuation: { unsafe $0.resume() })
-      unsafe continuousWaitQueue.forEachReady(
-        job: { runQueue.push(UnownedJob($0)) },
-        continuation: { unsafe $0.resume() })
+      suspendingWaitQueue.forEachReadyJob {
+        runQueue.push(UnownedJob($0))
+      }
+      continuousWaitQueue.forEachReadyJob {
+        runQueue.push(UnownedJob($0))
+      }
       #endif
 
       // Now run any queued jobs
@@ -399,15 +355,15 @@ extension CooperativeExecutor: RunLoopExecutor {
 }
 
 @_spi(ExperimentalCustomExecutors)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CooperativeExecutor: SerialExecutor {}
 
 @_spi(ExperimentalCustomExecutors)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CooperativeExecutor: TaskExecutor {}
 
 @_spi(ExperimentalCustomExecutors)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CooperativeExecutor: MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

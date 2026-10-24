@@ -30,11 +30,12 @@ extension Task where Success == Never, Failure == Never {
 
       if #available(StdlibDeploymentTarget 6.5, *) {
         #if !$Embedded
-        if let executor = Task.currentSchedulingExecutor {
+        if let executor = Task.currentSchedulingExecutor,
+           executor.supportsScheduling(on: .continuous) {
           // This sleep can't be cancelled, so we have no use for the token.
-          _ = executor.enqueue(ExecutorJob(context: job),
-                               run: .after(.nanoseconds(duration)),
-                               clock: .continuous)
+          _ = executor.schedule(ExecutorJob(context: job),
+                                at: .after(.nanoseconds(duration)),
+                                clock: .continuous)
           return
         }
         #endif

@@ -1207,17 +1207,6 @@ func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
                                    _ toleranceSec: Int64, _ toleranceNSec: Int64,
                                    _ clock: Int32, _ task: UnownedJob)
 
-/// Enqueue a continuation to be resumed at a deadline, without creating a job
-/// to stand in for it.
-@available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("swift_task_enqueueGlobalContinuationWithDeadline")
-@usableFromInline
-func _enqueueContinuationGlobalWithDeadline(
-  _ seconds: Int64, _ nanoseconds: Int64,
-  _ toleranceSec: Int64, _ toleranceNSec: Int64,
-  _ clock: Int32, _ continuation: Builtin.RawUnsafeContinuation,
-  _ priority: Int)
-
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_asyncMainDrainQueue")

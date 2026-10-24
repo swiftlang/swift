@@ -44,13 +44,6 @@ SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobalWithDeadline,
     long long tnsec,
     int clock, Job *job);
 
-SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobalContinuationWithDeadline,
-    long long sec,
-    long long nsec,
-    long long tsec,
-    long long tnsec,
-    int clock, AsyncTask *continuation, size_t priority);
-
 SWIFT_CONCURRENCY_HOOK(void, swift_task_checkIsolated,
     SerialExecutorRef executor);
 

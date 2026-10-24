@@ -128,9 +128,14 @@ static inline void * _Nonnull * _Nonnull swift_job_getPrivateData(SwiftJob * _No
 }
 
 /// Allocate memory associated with a job.
+///
+/// Only a task can have memory allocated for it this way.  For any other kind
+/// of job (for example the job that resumes a sleeping task), this returns
+/// `NULL`, and the caller has to allocate the memory some other way.
 void * _Nullable swift_job_alloc(SwiftJob * _Nonnull job, size_t size);
 
-/// Release memory allocated using `swift_job_alloc()`.
+/// Release memory allocated using `swift_job_alloc()`.  (A job that has no
+/// memory allocated for it is not affected.)
 void swift_job_dealloc(SwiftJob * _Nonnull job, void * _Nonnull ptr);
 
 /// Swift's refcounted objects start with this header
@@ -252,51 +257,6 @@ static inline void swift_job_run(SwiftJob * _Nonnull job,
   _swift_job_run_c(job, executor);
 }
 
-/// An opaque reference to the suspended half of a sleeping task.  Executors
-/// that are asked to schedule one must resume it, exactly once, when its timer
-/// fires, using `swift_timerContinuation_resume()`.
-typedef struct SwiftTimerContinuation SwiftTimerContinuation;
-
-/// Resume the task awaiting a timer's continuation.  This consumes the
-/// continuation, and may be called from any thread.
-static inline void
-swift_timerContinuation_resume(SwiftTimerContinuation * _Nonnull continuation) {
-  extern void _swift_timerContinuation_resume_c(
-    SwiftTimerContinuation * _Nonnull continuation);
-
-  _swift_timerContinuation_resume_c(continuation);
-}
-
-/// Wrap a timer continuation in a job that resumes it when it is run.
-///
-/// An executor that holds continuations natively needs this if it is asked to
-/// cancel one as though it were a job (see `SchedulingExecutor.cancel(jobWithToken:)`).
-/// The job takes ownership of the continuation.
-static inline SwiftJob * _Nonnull
-swift_timerContinuation_createJob(SwiftTimerContinuation * _Nonnull continuation,
-                                  SwiftJobPriority priority) {
-  extern SwiftJob * _Nonnull _swift_timerContinuation_createJob_c(
-    SwiftTimerContinuation * _Nonnull continuation,
-    SwiftJobPriority priority);
-
-  return _swift_timerContinuation_createJob_c(continuation, priority);
-}
-
-/// Take the continuation back out of a job that wraps one, destroying the job.
-///
-/// This is for an executor that holds jobs, and is asked to cancel one as
-/// though it were a continuation.  The job must be one that wraps a timer
-/// continuation, such as the default implementation of
-/// `swift_task_enqueueGlobalContinuationWithDeadlineImpl()` creates; for any
-/// other job this stops the program.
-static inline SwiftTimerContinuation * _Nonnull
-swift_timerContinuation_takeFromJob(SwiftJob * _Nonnull job) {
-  extern SwiftTimerContinuation * _Nonnull _swift_timerContinuation_takeFromJob_c(
-    SwiftJob * _Nonnull job);
-
-  return _swift_timerContinuation_takeFromJob_c(job);
-}
-
 /// A delay in nanoseconds.
 typedef unsigned long long SwiftJobDelay;
 
@@ -337,30 +297,6 @@ SWIFT_CC(swift) void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
                                                               long long tnsec,
                                                               int clock,
                                                               SwiftJob * _Nonnull job);
-
-/// Enqueue a continuation, to be resumed at a specific deadline.
-///
-/// An executor that implements this should arrange to call
-/// `swift_timerContinuation_resume()` on the continuation, exactly once, at or
-/// after the deadline.  `priority` is the priority of the sleeping task, which
-/// an executor may use to choose how to schedule the timer; unlike for a job,
-/// there is no other way to find it.
-///
-/// You do not have to provide this function.  The runtime supplies a default
-/// that wraps the continuation in a job and passes it to
-/// `swift_task_enqueueGlobalWithDeadline()`, which will call any hook that is
-/// installed for that function and then reach
-/// `swift_task_enqueueGlobalWithDeadlineImpl()`; it lives in a separate object
-/// file, so when linking statically a definition of your own takes precedence.
-SWIFT_CC(swift) void
-swift_task_enqueueGlobalContinuationWithDeadlineImpl(
-    long long sec,
-    long long nsec,
-    long long tsec,
-    long long tnsec,
-    int clock,
-    SwiftTimerContinuation * _Nonnull continuation,
-    SwiftJobPriority priority);
 
 /// Enqueue a job on the main executor (which may or may not be the same as
 /// the global executor).

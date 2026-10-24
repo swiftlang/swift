@@ -96,6 +96,40 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
   }
 }
 
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+/// The default executor, which has to be able to schedule work against the
+/// given clock if these functions are going to work.
+///
+/// These functions are the runtime's fallback for scheduling a timer when
+/// there is no scheduling executor to hand it to (`Task.sleep()` uses
+/// them in that case), and they can only work if the default executor is a
+/// `SchedulingExecutor` that says that it schedules against the clock.  We
+/// check that it does, rather than asking it anyway, because an executor that
+/// has said that it doesn't might hand the work to the clock, which would hand
+/// it back to the runtime's global enqueue function, which would get us here
+/// again, for ever.
+///
+/// If the default executor is not like that, an executor that wants to be used
+/// in this way has to provide its own implementation of the `Impl` function, or
+/// install a hook.
+@available(StdlibDeploymentTarget 6.5, *)
+private func defaultSchedulingExecutor(
+  for clock: SystemClockID
+) -> any SchedulingExecutor {
+  guard let executor = Task.defaultExecutor.asSchedulingExecutor,
+        executor.supportsScheduling(on: clock) else {
+    fatalError("""
+      the default executor does not support scheduling work for later on the \
+      \(clock) clock; it must be a SchedulingExecutor that returns true from \
+      supportsScheduling(on:) for it, or provide its own \
+      swift_task_enqueueGlobalWithDelayImpl and \
+      swift_task_enqueueGlobalWithDeadlineImpl
+      """)
+  }
+  return executor
+}
+#endif
+
 #if !$Embedded
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelayImpl")
@@ -104,9 +138,9 @@ internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(StdlibDeploymentTarget 6.5, *) {
-    _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+    _ = defaultSchedulingExecutor(for: .continuous).schedule(
       ExecutorJob(unownedJob),
-      run: .after(.nanoseconds(delay)),
+      at: .after(.nanoseconds(delay)),
       clock: .continuous)
   } else {
     fatalError("this should never happen")
@@ -136,16 +170,16 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   if #available(StdlibDeploymentTarget 6.5, *) {
     switch clock {
       case _ClockID.suspending.rawValue:
-        _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        _ = defaultSchedulingExecutor(for: .suspending).schedule(
           ExecutorJob(unownedJob),
-          run: .at(SuspendingClock.Instant(_value: deadline)),
+          at: .at(SuspendingClock.Instant(_value: deadline)),
           tolerance: leeway,
           clock: .suspending
         )
       case _ClockID.continuous.rawValue:
-        _ = Task.defaultExecutor.asSchedulingExecutor!.enqueue(
+        _ = defaultSchedulingExecutor(for: .continuous).schedule(
           ExecutorJob(unownedJob),
-          run: .at(ContinuousClock.Instant(_value: deadline)),
+          at: .at(ContinuousClock.Instant(_value: deadline)),
           tolerance: leeway,
           clock: .continuous
         )

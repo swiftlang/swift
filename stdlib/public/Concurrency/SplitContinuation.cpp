@@ -57,22 +57,23 @@ namespace {
 /// The storage backing a split continuation. A raw continuation referring to a
 /// split continuation is the address of one of these.
 ///
-/// The layout makes a split continuation resumable by *any* code that can
+/// It is a Job, of a kind of its own.  Resuming a continuation that has a Void
+/// result is just what running such a job does, so a sleeping task can hand its
+/// continuation straight to an executor as the job that wakes it, with no
+/// stand-in job to allocate.  (An executor may also recognise the kind and
+/// resume the continuation itself instead of running the job.)
+///
+/// The layout also makes a split continuation resumable by *any* code that can
 /// resume a regular one, including code compiled before split continuations
-/// existed. `ResumeContext` sits at exactly the offset at which an AsyncTask
-/// keeps its own.
+/// existed.  `ResumeContext` sits at exactly the offset at which an AsyncTask
+/// keeps its own, and a regular continuation is a task, so the job's kind is
+/// enough to tell the two apart.
 ///
 /// AsyncTask isn't standard-layout, so `offsetof` on it warns; we rely on its
 /// layout deliberately and assert it below.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
-struct SplitContinuationStorage {
-  /// Distinguishes this from a task.
-  uintptr_t Marker;
-
-  /// Padding placing `ResumeContext` where a task keeps its own.
-  char TaskPrefixPadding[offsetof(AsyncTask, ResumeContext) - sizeof(uintptr_t)];
-
+struct SplitContinuationStorage : public Job {
   /// Points at the ContinuationAsyncContext that follows in this allocation.
   AsyncContext * __ptrauth_swift_task_resume_context ResumeContext;
 
@@ -80,14 +81,33 @@ struct SplitContinuationStorage {
   /// resume-by-context can make it runnable. Null until then, which is also how
   /// a resume that races ahead of the await is recognised.
   AsyncTask *AwaitingTask;
+
+  /// Whether the continuation's result type is empty (that is, Void), which
+  /// is what it takes to be able to resume it by running it as a job: a job
+  /// has no way to supply a value.
+  bool ResultIsEmpty;
+
+  SplitContinuationStorage(JobPriority priority, bool resultIsEmpty)
+      : Job({JobKind::SplitContinuation, priority}, &process,
+            jobHeapMetadataPtr, /*captureCurrentVoucher=*/false),
+        ResumeContext(nullptr), AwaitingTask(nullptr),
+        ResultIsEmpty(resultIsEmpty) {}
+
+  /// Running the job resumes the continuation normally.
+  SWIFT_CC(swiftasync)
+  static void process(Job *job) {
+    auto *storage = cast<SplitContinuationStorage>(job);
+    assert(storage->ResultIsEmpty &&
+           "a split continuation can only be run as a job if its result is "
+           "empty");
+    swift_continuation_resume(reinterpret_cast<AsyncTask *>(storage));
+  }
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::SplitContinuation;
+  }
 };
 
-/// Written into `SplitContinuationStorage::Marker`, where a task keeps its
-/// metadata pointer. No metadata pointer is all-ones.
-static constexpr uintptr_t SplitContinuationMarker = ~(uintptr_t)0;
-
-static_assert(offsetof(SplitContinuationStorage, Marker) == 0,
-              "the marker must sit where a task keeps its metadata pointer");
 static_assert(offsetof(SplitContinuationStorage, ResumeContext) ==
                   offsetof(AsyncTask, ResumeContext),
               "a split continuation must be loadable as if it were a "
@@ -100,10 +120,11 @@ static size_t splitContextOffset() {
                        alignof(ContinuationAsyncContext));
 }
 
-/// Whether `continuation` is a split continuation rather than a task.
+/// Whether `continuation` is a split continuation rather than a task.  Either
+/// way it is a job, so we can ask it what kind it is.
 static bool isSplitContinuation(const void *continuation) {
-  return *reinterpret_cast<const uintptr_t *>(continuation) ==
-         SplitContinuationMarker;
+  return isa<SplitContinuationStorage>(
+      reinterpret_cast<const Job *>(continuation));
 }
 
 /// The storage a split continuation refers to.
@@ -223,9 +244,17 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   context->Cond = nullptr;
 #endif
 
-  auto *storage = static_cast<SplitContinuationStorage *>(allocation);
-  storage->Marker = SplitContinuationMarker;
-  storage->AwaitingTask = nullptr;
+  // The job takes the priority of the task that creates it, which is also
+  // the task that will await it.  It doesn't capture a voucher, since the
+  // great majority of split continuations are never scheduled as jobs, and the
+  // task that is awaiting the continuation carries its own.
+  //
+  // Note that if the task's priority is later escalated, this job's priority
+  // is not updated.  That affects only an executor that reads the job's
+  // priority after the job has been scheduled, which the Dispatch executor
+  // does not (it chooses its queue when it is given the job).
+  auto *storage = new (allocation) SplitContinuationStorage(
+      swift_task_getCurrent()->getPriority(), resultSize == 0);
 
   // Relaxed is fine: resumption must happen-after this call returns and the
   // continuation is handed to the executor.
@@ -236,7 +265,7 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
 
   concurrency::trace::task_continuation_init(task, context);
 
-  return static_cast<SplitContinuation *>(allocation);
+  return reinterpret_cast<SplitContinuation *>(storage);
 }
 
 
@@ -339,6 +368,8 @@ void swift::swift_continuation_destroySplit(SplitContinuation *continuation) {
   // The await has resolved and taken the result out of the context, and the
   // resume-exactly-once contract guarantees the resume side is finished with the
   // context before the awaiting task runs again, so it is safe to free.
+  static_cast<Job *>(reinterpret_cast<SplitContinuationStorage *>(continuation))
+      ->~Job();
   swift_task_dealloc(continuation);
 }
 

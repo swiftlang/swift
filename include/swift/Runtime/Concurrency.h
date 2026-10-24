@@ -998,13 +998,6 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDeadline(long long sec, long long nsec,
     long long tsec, long long tnsec, int clock, Job *job);
 
-/// Enqueue a continuation to be resumed at a deadline, without a job to stand
-/// in for it.  `priority` is the priority of the sleeping task.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_enqueueGlobalContinuationWithDeadline(
-    long long sec, long long nsec, long long tsec, long long tnsec,
-    int clock, AsyncTask *continuation, size_t priority);
-
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
