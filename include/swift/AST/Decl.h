@@ -7829,6 +7829,12 @@ public:
     return getValueOwnershipForSpecifier(getSpecifier());
   }
 
+  /// Returns the ownership that this parameter has after lowering. An
+  /// unannotated parameter of a closure has the ownership of the corresponding
+  /// parameter of the closure's type, which may be inferred. See
+  /// swift::getLoweredOwnership().
+  LoweredOwnership getLoweredOwnership() const;
+
   static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
     switch (specifier) {
     case ParamSpecifier::InOut:

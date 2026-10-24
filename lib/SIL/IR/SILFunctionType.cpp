@@ -3603,17 +3603,19 @@ static CanSILFunctionType getNativeSILFunctionType(
       return getSILFunctionTypeForConventions(DefaultAllocatorConventions());
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::DistributedThunk: {
-      // If we have a setter, use the special setter convention. This ensures
-      // that we take normal parameters at +1.
-      if (constant) {
-        if (constant->isSetter()) {
-          return getSILFunctionTypeForConventions(DefaultSetterConventions());
-        }
+      // A setter or an init accessor takes its normal parameters at +1, which
+      // must agree with the ownership that the AST assigns to them.
+      auto *accessor = constant ? constant->getAccessorDecl() : nullptr;
+      if (accessor &&
+          getLoweredOwnership(ValueOwnership::Default, accessor,
+                              /*isSelf=*/false) == LoweredOwnership::Owned) {
         if (constant->isInitAccessor()) {
           return getSILFunctionTypeForInitAccessor(
               TC, context, origType, substInterfaceType, extInfoBuilder,
               DefaultSetterConventions(), *constant);
         }
+        ASSERT(constant->isSetter());
+        return getSILFunctionTypeForConventions(DefaultSetterConventions());
       }
 
       if (substInterfaceType->hasCalledAtMostOnceSemantics())
