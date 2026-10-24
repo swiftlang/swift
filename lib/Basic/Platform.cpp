@@ -215,6 +215,25 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
   llvm_unreachable("Unsupported Darwin platform");
 }
 
+static StringRef
+getKernelKitPlatformNameForDarwin(const DarwinPlatformKind platform) {
+  switch (platform) {
+  case DarwinPlatformKind::MacOS:
+    return "kernelkit.macosx";
+  case DarwinPlatformKind::IPhoneOS:
+    return "kernelkit.iphoneos";
+  case DarwinPlatformKind::TvOS:
+    return "kernelkit.appletvos";
+  case DarwinPlatformKind::WatchOS:
+    return "kernelkit.watchos";
+  case DarwinPlatformKind::VisionOS:
+    return "kernelkit.xros";
+  default:
+    // Simulators and firmware have no KernelKit SDK.
+    return getPlatformNameForDarwin(platform);
+  }
+}
+
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::AIX:
@@ -253,6 +272,9 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::WatchOS:
   case llvm::Triple::XROS:
   case llvm::Triple::Firmware:
+    // KernelKit builds use a separate SDK platform, e.g. "kernelkit.macosx".
+    if (triple.getEnvironment() == llvm::Triple::KernelKit)
+      return getKernelKitPlatformNameForDarwin(getDarwinPlatformKind(triple));
     return getPlatformNameForDarwin(getDarwinPlatformKind(triple));
   case llvm::Triple::Linux:
     if (triple.isAndroid())
