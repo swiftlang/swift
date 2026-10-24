@@ -377,6 +377,19 @@ func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
 }
 
+/// Optimizer hint that `lhs <= rhs`. The condition is unchecked.
+/// Requires:
+/// - `T` to be statically known at compile time.
+/// - `T` to be one of stdlib's integer types.
+/// Otherwise it has no effect.
+@export(implementation) @_transparent
+@unsafe
+func _uncheckedUnsafeAssumeLessThanOrEqualTo<T>(_ lhs: T, _ rhs: T) {
+#if $BuiltinAssumeLessThanOrEqualTo
+  Builtin.assumeLessThanOrEqualTo(lhs, rhs)
+#endif
+}
+
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` if the class indicated by `theClass` uses native
