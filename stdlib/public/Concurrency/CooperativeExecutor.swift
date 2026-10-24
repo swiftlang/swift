@@ -299,20 +299,39 @@ extension CooperativeExecutor: SchedulingExecutor {
     }
   }
 
+  /// A token is for a job or a continuation depending on which `enqueue` made
+  /// it, but a caller can end up asking for the other kind: for example, an
+  /// executor that wraps this one might return one of our tokens from its own
+  /// job-based `enqueue`, and then be asked to cancel it as a continuation.
+  /// Whichever is asked for, give back something equivalent rather than losing
+  /// the work, by converting between a continuation and the job that wraps it.
   public func cancel(jobWithToken token: consuming JobCancellationToken)
     -> ExecutorJob? {
-    if case let .job(job) = cancel(token: token) {
+    switch cancel(token: token) {
+    case .none:
+      return nil
+    case let .job(job):
       return ExecutorJob(job)
+    case let .continuation(continuation):
+      let job = _taskCreateNullaryContinuationJob(
+        priority: Int(Task.currentPriority.rawValue),
+        continuation: unsafe continuation.context)
+      return ExecutorJob(context: job)
     }
-    return nil
   }
 
   public func cancel(continuationWithToken token: consuming JobCancellationToken)
     -> TimerContinuation? {
-    if case let .continuation(continuation) = cancel(token: token) {
+    switch cancel(token: token) {
+    case .none:
+      return nil
+    case let .continuation(continuation):
       return unsafe TimerContinuation(continuation)
+    case let .job(job):
+      // This only works for a job that wraps a continuation
+      let raw = _swiftJobTakeNullaryContinuation(job)
+      return unsafe TimerContinuation(UnsafeContinuation(raw))
     }
-    return nil
   }
 
 }

@@ -172,7 +172,7 @@ internal func _dispatchEnqueueMain(_ job: UnownedJob)
 @_silgen_name("swift_dispatchEnqueueGlobal")
 internal func _dispatchEnqueueGlobal(_ job: UnownedJob)
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_dispatchEnqueueWithDeadline")
 internal func _dispatchEnqueueWithDeadline(_ global: CBool,
                                            _ sec: CLongLong,
@@ -185,7 +185,7 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
 /// Like `_dispatchEnqueueWithDeadline`, but resumes a continuation (passed as
 /// the bits of a `TimerContinuation`) instead of running a job.  `priority`
 /// selects the timer queue.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_dispatchEnqueueContinuationWithDeadline")
 internal func _dispatchEnqueueContinuationWithDeadline(
   _ global: CBool,
@@ -201,20 +201,20 @@ internal func _dispatchEnqueueContinuationWithDeadline(
 /// `_dispatchEnqueueContinuationWithDeadline`, returning its bits if it had
 /// not yet been resumed, or 0.  The caller must still call
 /// `_dispatchReleaseSource`.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_dispatchCancelContinuation")
 internal func _dispatchCancelContinuationBits(_ source: Int) -> Int
 
 /// Cancel a job scheduled with `_dispatchEnqueueWithDeadline`, returning it if
 /// it had not yet started.  The caller must still call
 /// `_dispatchReleaseSource`.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_dispatchCancel")
 internal func _dispatchCancel(_ source: Int) -> ExecutorJob?
 
 /// Release the reference to a scheduled job's state that was returned by
 /// `_dispatchEnqueueWithDeadline`.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_dispatchReleaseSource")
 internal func _dispatchReleaseSource(_ source: Int)
 

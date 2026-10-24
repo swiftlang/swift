@@ -90,7 +90,7 @@ public enum SchedulingExecutorFireTime<C: Clock> {
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
 @safe
-public struct TimerContinuation: ~Copyable {
+public struct TimerContinuation: ~Copyable, Sendable {
   internal var continuation: UnsafeContinuation<Void, _Concurrency.CancellationError>
 
   internal init(
@@ -283,7 +283,8 @@ public protocol SchedulingExecutor: Executor, JobCanceller {
   /// - run:       A `SchedulingExecutorFireTime` saying when the job should
   ///              run.  The job will not run before that time.
   /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
+  ///              job is executed.  `nil` means that the executor chooses a
+  ///              default.
   /// - clock:     The clock used to interpret `run`.
   ///
   /// Returns a token that can be used to cancel the job before it runs.
@@ -310,7 +311,7 @@ public protocol SchedulingExecutor: Executor, JobCanceller {
   /// - run:          A `SchedulingExecutorFireTime` saying when to resume it.
   ///                 It will not be resumed before that time.
   /// - tolerance:    The maximum additional delay permissible.  `nil` means
-  ///                 no limit.
+  ///                 that the executor chooses a default.
   /// - clock:        The clock used to interpret `run`.
   ///
   /// Returns a token that can be used to cancel the timer before it fires.

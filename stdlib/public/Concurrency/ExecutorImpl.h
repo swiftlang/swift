@@ -267,6 +267,36 @@ swift_timerContinuation_resume(SwiftTimerContinuation * _Nonnull continuation) {
   _swift_timerContinuation_resume_c(continuation);
 }
 
+/// Wrap a timer continuation in a job that resumes it when it is run.
+///
+/// An executor that holds continuations natively needs this if it is asked to
+/// cancel one as though it were a job (see `SchedulingExecutor.cancel(jobWithToken:)`).
+/// The job takes ownership of the continuation.
+static inline SwiftJob * _Nonnull
+swift_timerContinuation_createJob(SwiftTimerContinuation * _Nonnull continuation,
+                                  SwiftJobPriority priority) {
+  extern SwiftJob * _Nonnull _swift_timerContinuation_createJob_c(
+    SwiftTimerContinuation * _Nonnull continuation,
+    SwiftJobPriority priority);
+
+  return _swift_timerContinuation_createJob_c(continuation, priority);
+}
+
+/// Take the continuation back out of a job that wraps one, destroying the job.
+///
+/// This is for an executor that holds jobs, and is asked to cancel one as
+/// though it were a continuation.  The job must be one that wraps a timer
+/// continuation, such as the default implementation of
+/// `swift_task_enqueueGlobalContinuationWithDeadlineImpl()` creates; for any
+/// other job this stops the program.
+static inline SwiftTimerContinuation * _Nonnull
+swift_timerContinuation_takeFromJob(SwiftJob * _Nonnull job) {
+  extern SwiftTimerContinuation * _Nonnull _swift_timerContinuation_takeFromJob_c(
+    SwiftJob * _Nonnull job);
+
+  return _swift_timerContinuation_takeFromJob_c(job);
+}
+
 /// A delay in nanoseconds.
 typedef unsigned long long SwiftJobDelay;
 
@@ -317,7 +347,9 @@ SWIFT_CC(swift) void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 /// there is no other way to find it.
 ///
 /// You do not have to provide this function.  The runtime supplies a default
-/// that wraps the continuation in a job and calls
+/// that wraps the continuation in a job and passes it to
+/// `swift_task_enqueueGlobalWithDeadline()`, which will call any hook that is
+/// installed for that function and then reach
 /// `swift_task_enqueueGlobalWithDeadlineImpl()`; it lives in a separate object
 /// file, so when linking statically a definition of your own takes precedence.
 SWIFT_CC(swift) void

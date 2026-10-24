@@ -461,6 +461,54 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, clock.pendingCount)
     }
 
+    tests.test("Cancelling a Dispatch continuation timer as a job gives back a job that resumes it") {
+      // A token can end up being cancelled as the other kind of thing from
+      // what it was issued for; the executor must not hand back garbage.
+      let scheduler = Task.defaultExecutor as! any SchedulingExecutor
+
+      try! await withUnsafeThrowingContinuation { (c: UnsafeContinuation<Void, any Error>) in
+        let token = scheduler.enqueue(resuming: TimerContinuation(c),
+                                      run: .after(.seconds(3600)),
+                                      tolerance: nil, clock: ContinuousClock())
+        guard let job = token.cancel() else {
+          expectUnreachable("the executor should have given the timer back")
+          c.resume()
+          return
+        }
+
+        // Running the job resumes the continuation.
+        Task.defaultExecutor.enqueue(job)
+      }
+    }
+
+    tests.test("CooperativeExecutor: cancelling a continuation timer as a job gives back a job that resumes it") {
+      let exec = CooperativeExecutor()
+      let done = Flag()
+
+      _ = Task(executorPreference: exec) {
+        try await withUnsafeThrowingContinuation { (c: UnsafeContinuation<Void, any Error>) in
+          let token = exec.enqueue(resuming: TimerContinuation(c),
+                                   run: .after(.seconds(3600)),
+                                   tolerance: nil, clock: ContinuousClock())
+          guard let job = token.cancel() else {
+            expectUnreachable("the executor should have given the timer back")
+            c.resume()
+            return
+          }
+
+          // The timer is gone, rather than lost, so running the job resumes
+          // the task.
+          exec.enqueue(job)
+        }
+        done.set()
+      }
+
+      let start = ContinuousClock.now
+      try! exec.run()
+      expectTrue(done.value)
+      expectTrue(ContinuousClock.now - start < .seconds(30))
+    }
+
     await runAllTestsAsync()
   }
 }

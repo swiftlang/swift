@@ -47,7 +47,7 @@ internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ serialExecutor: UnownedSerialExecutor,
                                          _ taskExecutor: UnownedTaskExecutor) -> ()
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_job_takeNullaryContinuation")
 internal func _swiftJobTakeNullaryContinuation(_ job: UnownedJob)
   -> Builtin.RawUnsafeContinuation

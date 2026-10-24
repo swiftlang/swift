@@ -57,6 +57,12 @@ namespace swift {
 SWIFT_CC(swift)
 void swift_timerContinuation_resume(AsyncTask *continuation);
 
+/// Destroy a NullaryContinuationJob that has not run, and return the
+/// continuation that it would have resumed; the caller must resume it.  The
+/// job must be a NullaryContinuationJob.  (Defined in Task.cpp.)
+extern "C" SWIFT_CC(swift)
+AsyncTask *swift_job_takeNullaryContinuation(Job *job);
+
 // Set to 1 to enable helpful debug spew to stderr
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0

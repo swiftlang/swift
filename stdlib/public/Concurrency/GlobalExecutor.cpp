@@ -128,6 +128,21 @@ _swift_timerContinuation_resume_c(SwiftTimerContinuation *continuation)
   swift_timerContinuation_resume(reinterpret_cast<AsyncTask *>(continuation));
 }
 
+extern "C" SwiftJob *
+_swift_timerContinuation_createJob_c(SwiftTimerContinuation *continuation,
+                                     SwiftJobPriority priority)
+{
+  return reinterpret_cast<SwiftJob *>(swift_task_createNullaryContinuationJob(
+    priority, reinterpret_cast<AsyncTask *>(continuation)));
+}
+
+extern "C" SwiftTimerContinuation *
+_swift_timerContinuation_takeFromJob_c(SwiftJob *job)
+{
+  return reinterpret_cast<SwiftTimerContinuation *>(
+    swift_job_takeNullaryContinuation(reinterpret_cast<Job *>(job)));
+}
+
 extern "C" SwiftTime swift_time_now(SwiftClockId clock)
 {
   SwiftTime result;

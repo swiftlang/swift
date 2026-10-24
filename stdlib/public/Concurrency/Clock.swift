@@ -52,12 +52,18 @@ public protocol Clock<Duration>: Sendable {
 /// work over to the clock, which is responsible for running it at the right
 /// time.
 ///
+/// Every `SchedulingExecutor` must support `ContinuousClock` and
+/// `SuspendingClock` natively; forwarding to the clock is only for other
+/// clocks.
+///
 /// A clock should implement `run` by arranging to run the job on some executor
-/// at the fire time.  It must not do that by asking the current executor to
-/// schedule the job against the clock itself, as the executor would simply
-/// hand the job straight back; instead it should either schedule against a
-/// clock the executor does know, as `ContinuousClock` and `SuspendingClock`
-/// do, or hold the job itself and enqueue it when the time arrives.
+/// at the fire time.  It must not do that by asking an executor to schedule
+/// the job against the clock itself, as the executor would simply hand the job
+/// straight back; instead it should either schedule against a clock that
+/// executors do support, as `ContinuousClock` and `SuspendingClock` do (they
+/// use the default executor, so that an executor that is itself forwarding
+/// to them does not cause a loop), or hold the job itself and enqueue it
+/// when the time arrives.
 ///
 /// The tokens that these methods return are cancelled through
 /// `JobCancellationToken.canceller`.  If a clock keeps the job itself, it
@@ -152,25 +158,34 @@ extension EnqueueingClock {
   }
 }
 
+/// The executor that `ContinuousClock` and `SuspendingClock` hand work to.
+///
+/// These clocks have to schedule work on some executor, and every
+/// `SchedulingExecutor` is required to support them natively, so this must not
+/// be an executor that forwards unfamiliar clocks back to the clock itself,
+/// or the two would call each other forever.  The default executor is
+/// the one that the runtime requires to be able to schedule against them.
+@available(StdlibDeploymentTarget 6.5, *)
+private func _executorForBuiltInClocks() -> any SchedulingExecutor {
+  guard let executor = Task<Never, Never>.defaultExecutor.asSchedulingExecutor else {
+    fatalError("the default executor is not a SchedulingExecutor")
+  }
+  return executor
+}
+
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
 extension ContinuousClock: EnqueueingClock {
   public func run(_ job: consuming ExecutorJob,
                   run at: SchedulingExecutorFireTime<ContinuousClock>,
                   tolerance: Duration?) -> JobCancellationToken {
-    guard let executor = Task<Never, Never>.currentSchedulingExecutor else {
-      fatalError("no scheduling executor is available to run a job")
-    }
-    return executor.enqueue(job, run: at, tolerance: tolerance, clock: self)
+    return _executorForBuiltInClocks().enqueue(job, run: at, tolerance: tolerance, clock: self)
   }
 
   public func run(resuming continuation: consuming TimerContinuation,
                   run at: SchedulingExecutorFireTime<ContinuousClock>,
                   tolerance: Duration?) -> JobCancellationToken {
-    guard let executor = Task<Never, Never>.currentSchedulingExecutor else {
-      fatalError("no scheduling executor is available to resume a continuation")
-    }
-    return executor.enqueue(resuming: continuation, run: at,
+    return _executorForBuiltInClocks().enqueue(resuming: continuation, run: at,
                             tolerance: tolerance, clock: self)
   }
 }
@@ -181,19 +196,13 @@ extension SuspendingClock: EnqueueingClock {
   public func run(_ job: consuming ExecutorJob,
                   run at: SchedulingExecutorFireTime<SuspendingClock>,
                   tolerance: Duration?) -> JobCancellationToken {
-    guard let executor = Task<Never, Never>.currentSchedulingExecutor else {
-      fatalError("no scheduling executor is available to run a job")
-    }
-    return executor.enqueue(job, run: at, tolerance: tolerance, clock: self)
+    return _executorForBuiltInClocks().enqueue(job, run: at, tolerance: tolerance, clock: self)
   }
 
   public func run(resuming continuation: consuming TimerContinuation,
                   run at: SchedulingExecutorFireTime<SuspendingClock>,
                   tolerance: Duration?) -> JobCancellationToken {
-    guard let executor = Task<Never, Never>.currentSchedulingExecutor else {
-      fatalError("no scheduling executor is available to resume a continuation")
-    }
-    return executor.enqueue(resuming: continuation, run: at,
+    return _executorForBuiltInClocks().enqueue(resuming: continuation, run: at,
                             tolerance: tolerance, clock: self)
   }
 }

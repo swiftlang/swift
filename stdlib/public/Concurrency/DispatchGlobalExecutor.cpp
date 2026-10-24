@@ -228,11 +228,12 @@ struct swift_job_source {
   dispatch_source_t source;
   std::atomic<void *> payload;
   bool isContinuation;
+  SwiftJobPriority priority;
 
   swift_job_source(dispatch_source_t source_, void *payload_,
-                   bool isContinuation_)
+                   bool isContinuation_, SwiftJobPriority priority_)
     : refcount(2), source(source_), payload(payload_),
-      isContinuation(isContinuation_) {}
+      isContinuation(isContinuation_), priority(priority_) {}
 };
 
 
@@ -343,6 +344,9 @@ static inline uint64_t seconds_nanos_to_nanos(long long sec, long long nsec) {
 extern "C" SWIFT_CC(swift)
 void swift_dispatchEnqueueMain(SwiftJob *job);
 
+/// The most slack that we give a timer by default, however far away it is.
+static const uint64_t MaxDefaultLeewayNanos = 60ull * NSEC_PER_SEC;
+
 /// Schedule a job or continuation to run at a deadline.  Returns a token
 /// that can be passed to swift_dispatchCancel*(), or 0 if the payload was
 /// dispatched immediately and cannot be cancelled.
@@ -360,6 +364,12 @@ static uintptr_t enqueueWithDeadline(bool global,
 
   dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
+  long long nowSec, nowNsec;
+  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
+
+  uint64_t now = seconds_nanos_to_nanos(nowSec, nowNsec);
+  uint64_t deadline = seconds_nanos_to_nanos(sec, nsec);
+
   // If the deadline has already passed there is nothing to wait for, and
   // creating, activating and firing a dispatch source would cost several
   // times as much as just running the job or resuming the continuation.  Do
@@ -370,23 +380,15 @@ static uintptr_t enqueueWithDeadline(bool global,
   // is no cheaper than a source for anything beyond about a microsecond, and
   // its coalescing makes sleeps of tens of microseconds take several times
   // longer than a source does.
-  {
-    long long nowSec, nowNsec;
-    swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
-
-    uint64_t now = seconds_nanos_to_nanos(nowSec, nowNsec);
-    uint64_t deadline = seconds_nanos_to_nanos(sec, nsec);
-
-    if (deadline <= now) {
-      if (isContinuation)
-        swift_timerContinuation_resume(
-        static_cast<SwiftTimerContinuation *>(payload));
-      else if (global)
-        swift_dispatchEnqueueGlobal(static_cast<SwiftJob *>(payload));
-      else
-        swift_dispatchEnqueueMain(static_cast<SwiftJob *>(payload));
-      return 0;
-    }
+  if (deadline <= now) {
+    if (isContinuation)
+      swift_timerContinuation_resume(
+          static_cast<SwiftTimerContinuation *>(payload));
+    else if (global)
+      swift_dispatchEnqueueGlobal(static_cast<SwiftJob *>(payload));
+    else
+      swift_dispatchEnqueueMain(static_cast<SwiftJob *>(payload));
+    return 0;
   }
 
   uint64_t leeway;
@@ -395,18 +397,13 @@ static uintptr_t enqueueWithDeadline(bool global,
     // case, which sets the leeway according to the priority (5% for
     // interactive and above, 6.7% for default and above, 10% otherwise).  We
     // need a source so that we can cancel, and we have no way to ask Dispatch
-    // for its idea of the priority, so use 6.7%.
-    long long nowSec, nowNsec;
-    swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
-
-    uint64_t now = seconds_nanos_to_nanos(nowSec, nowNsec);
-    uint64_t deadline = seconds_nanos_to_nanos(sec, nsec);
-
-    uint64_t delta;
-    if (__builtin_sub_overflow(deadline, now, &delta))
-      delta = 0;
+    // for its idea of the priority, so use 6.7%.  Don't let that grow without
+    // limit for very long timers; a minute's slack is plenty.
+    uint64_t delta = deadline - now;
 
     leeway = delta / 15;
+    if (leeway > MaxDefaultLeewayNanos)
+      leeway = MaxDefaultLeewayNanos;
   } else if (tsec < 0 || (tsec == 0 && tnsec < 0)) {
     leeway = 0;
   } else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
@@ -420,7 +417,7 @@ static uintptr_t enqueueWithDeadline(bool global,
 
   struct swift_job_source *jobSource =
     swift_cxx_newObject<struct swift_job_source>(source, payload,
-                                                 isContinuation);
+                                                 isContinuation, priority);
 
   dispatch_set_context(source, jobSource);
   dispatch_set_finalizer_f(source, &_swift_job_source_finalize);
@@ -470,7 +467,10 @@ uintptr_t swift_dispatchEnqueueContinuationWithDeadline(
 /// Take the payload of a timer scheduled by one of the functions above, if
 /// it has not already run (or been taken).  This does not release the
 /// caller's reference; call swift_dispatchReleaseSource() for that.
-static void *cancelPayload(uintptr_t token) {
+///
+/// `isContinuation` and `priority` are set to describe what was scheduled.
+static void *cancelPayload(uintptr_t token, bool *isContinuation,
+                           SwiftJobPriority *priority) {
   if (!token)
     return nullptr;  // The payload was dispatched directly
   auto *jobSource = reinterpret_cast<struct swift_job_source *>(token);
@@ -478,6 +478,8 @@ static void *cancelPayload(uintptr_t token) {
                                               std::memory_order_acq_rel);
 
   if (payload) {
+    *isContinuation = jobSource->isContinuation;
+    *priority = jobSource->priority;
     dispatch_source_cancel(jobSource->source);
     dispatch_release(jobSource->source);
   }
@@ -487,20 +489,39 @@ static void *cancelPayload(uintptr_t token) {
 
 /// Cancel a job scheduled by swift_dispatchEnqueueWithDeadline().
 ///
-/// Returns the job if it had not already been run (or taken), or null.
+/// Returns the job if it had not already been run (or taken), or null.  If the
+/// token was really issued for a continuation, as can happen when something
+/// else's job-based `enqueue` hands us a token from a continuation, we return
+/// a job that resumes it.
 extern "C" SWIFT_CC(swift)
 SwiftJob *swift_dispatchCancel(uintptr_t token) {
-  return static_cast<SwiftJob *>(cancelPayload(token));
+  bool isContinuation = false;
+  SwiftJobPriority priority = 0;
+  void *payload = cancelPayload(token, &isContinuation, &priority);
+
+  if (payload && isContinuation)
+    return swift_timerContinuation_createJob(
+      static_cast<SwiftTimerContinuation *>(payload), priority);
+
+  return static_cast<SwiftJob *>(payload);
 }
 
 /// Cancel a continuation scheduled by
 /// swift_dispatchEnqueueContinuationWithDeadline().
 ///
 /// Returns the continuation if it had not already been resumed (or taken), or
-/// null.
+/// null.  If the token was really issued for a job, we take the continuation
+/// back out of it (which is only possible for a job that wraps one).
 extern "C" SWIFT_CC(swift)
 void *swift_dispatchCancelContinuation(uintptr_t token) {
-  return cancelPayload(token);
+  bool isContinuation = false;
+  SwiftJobPriority priority = 0;
+  void *payload = cancelPayload(token, &isContinuation, &priority);
+
+  if (payload && !isContinuation)
+    return swift_timerContinuation_takeFromJob(static_cast<SwiftJob *>(payload));
+
+  return payload;
 }
 
 /// Release the reference to a scheduled job's state that was returned from
