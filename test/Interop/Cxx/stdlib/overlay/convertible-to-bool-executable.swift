@@ -2,7 +2,6 @@
 
 // REQUIRES: executable_test
 
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // FIXME: addressable parameters pass an address where the lowered apply expects a direct value (rdar://180980178)
 
 import StdlibUnittest
