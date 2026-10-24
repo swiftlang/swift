@@ -1301,11 +1301,13 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#pragma clang diagnostic ignored \"-Wdocumentation\"\n";
   }
 
-  os << "#ifndef SWIFT_PRINTED_CORE\n";
-  os << "#define SWIFT_PRINTED_CORE\n";
-  printSwiftToClangCoreScaffold(interopContext, context,
-                                writer.getTypeMapping(), os);
-  os << "#endif\n";
+  if (M.isStdlibModule() || context.LangOpts.hasFeature(Feature::Embedded)) {
+    os << "#ifndef SWIFT_PRINTED_CORE\n";
+    os << "#define SWIFT_PRINTED_CORE\n";
+    printSwiftToClangCoreScaffold(interopContext, context,
+                                  writer.getTypeMapping(), os);
+    os << "#endif\n";
+  }
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {
