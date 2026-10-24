@@ -5110,6 +5110,66 @@ llvm::StructType *IRGenModule::getTypeMetadataResponseTy() {
   return TypeMetadataResponseTy;
 }
 
+/// Whether the generated C++ header can call the metadata accessor of this
+/// imported type. The header declares a TypeMetadataTrait that calls the
+/// accessor for every C or C++ struct or enum it refers to (see
+/// emitReferencedClangTypeMetadata in PrintAsClang).
+static bool mayCxxCallForeignTypeMetadataAccessor(IRGenModule &IGM,
+                                                  CanType type) {
+  auto &langOpts = IGM.Context.LangOpts;
+  if (!langOpts.EnableCXXInterop || langOpts.hasFeature(Feature::Embedded))
+    return false;
+  // Type metadata for foreign types is not yet supported on Windows. Bug
+  // #76168.
+  if (IGM.Triple.isOSWindows())
+    return false;
+  if (getTypeMetadataAccessStrategy(type) !=
+      MetadataAccessStrategy::ForeignAccessor)
+    return false;
+  auto *clangDecl =
+      dyn_cast_or_null<clang::TypeDecl>(type->getAnyNominal()->getClangDecl());
+  if (!clangDecl)
+    return false;
+  auto clangType =
+      clangDecl->getASTContext().getTypeDeclType(clangDecl).getCanonicalType();
+  return isa<clang::RecordType, clang::EnumType>(clangType.getTypePtr());
+}
+
+/// Foreign type metadata accessors are emitted into every module that uses
+/// them, so they normally have hidden linkonce_odr linkage. C++ code that uses
+/// the generated header can call the accessor from another image, e.g. when
+/// the Swift module is a dynamic library or was prelinked with `ld -r`, so
+/// export the accessors that the header can call. Copies in different modules
+/// still get merged.
+static void
+exposeForeignTypeMetadataAccessorToCxx(IRGenModule &IGM, CanType type,
+                                       llvm::Function *fn,
+                                       ForDefinition_t forDefinition) {
+  if (!mayCxxCallForeignTypeMetadataAccessor(IGM, type))
+    return;
+  bool isELF = IGM.Triple.isOSBinFormatELF();
+  if (forDefinition) {
+    // When merging copies of a symbol, ELF linkers use the most constraining
+    // visibility, so a single hidden copy in a shared object would hide the
+    // accessor. Export every copy there. Other linkers use the least
+    // constraining visibility, so only export the accessors of types that the
+    // public API uses as generic arguments. Foreign type metadata is emitted
+    // lazily, after all public functions noted their uses.
+    if (!isELF &&
+        !IGM.IRGen.isForeignTypeMetadataUsedByCxx(type->getAnyNominal()))
+      return;
+    // Use weak_odr so that the definition can't be dropped or auto-hidden.
+    fn->setLinkage(llvm::GlobalValue::WeakODRLinkage);
+  }
+  // The definition might come from another image.
+  fn->setDSOLocal(false);
+  // The type descriptor refers to the accessor with a relative reference,
+  // which requires protected visibility on ELF (see getIRLinkage).
+  fn->setVisibility(forDefinition && isELF
+                        ? llvm::GlobalValue::ProtectedVisibility
+                        : llvm::GlobalValue::DefaultVisibility);
+}
+
 /// Fetch the type metadata access function for a non-generic type.
 llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
@@ -5121,7 +5181,10 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    if (forDefinition) {
+      updateLinkageForDefinition(*this, entry, entity);
+      exposeForeignTypeMetadataAccessorToCxx(*this, type, entry, forDefinition);
+    }
     return entry;
   }
 
@@ -5131,6 +5194,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
+  exposeForeignTypeMetadataAccessorToCxx(*this, type, entry, forDefinition);
   return entry;
 }
 

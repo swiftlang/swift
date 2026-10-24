@@ -293,6 +293,10 @@ private:
 
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyReemittedTypeContextDescriptors;
 
+  /// Foreign types whose metadata the generated C++ header can request because
+  /// the public API uses them as generic arguments.
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> ForeignTypeMetadataUsedByCxx;
+
   /// The queue of metadata accessors to emit.
   ///
   /// The accessors must be emitted after everything else which might result in
@@ -535,6 +539,15 @@ public:
       if (auto *nominal = t->getAnyNominal())
         noteUseOfTypeMetadata(nominal);
     });
+  }
+
+  void noteUseOfForeignTypeMetadataByCxx(NominalTypeDecl *type) {
+    noteUseOfTypeMetadata(type);
+    ForeignTypeMetadataUsedByCxx.insert(type);
+  }
+
+  bool isForeignTypeMetadataUsedByCxx(NominalTypeDecl *type) const {
+    return ForeignTypeMetadataUsedByCxx.count(type);
   }
 
   void noteUseOfTypeContextDescriptor(NominalTypeDecl *type,
