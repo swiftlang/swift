@@ -748,18 +748,13 @@ bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 /// \param toType         The destination type of the cast.
 /// \param contextKind    The cast context in which this is being typechecked.
 /// \param dc             The context of the cast.
-/// \param isTypeTest     True for `is` and equivalent non-binding patterns.
-///                       An IsExpr or IsPattern \p contextKind need not set
-///                       this; it exists for the constraint solver, which has
-///                       to report a context-free \p contextKind.
 ///
 /// \returns a CheckedCastKind indicating the semantics of the cast. If the
 /// cast is invalid, Unresolved is returned. If the cast represents an implicit
 /// conversion, Coercion is returned.
 CheckedCastKind typeCheckCheckedCast(Type fromType, Type toType,
                                      CheckedCastContextKind contextKind,
-                                     DeclContext *dc,
-                                     bool isTypeTest = false);
+                                     DeclContext *dc);
 
 /// Find the Objective-C class that bridges between a value of the given
 /// dynamic type and the given value type.
