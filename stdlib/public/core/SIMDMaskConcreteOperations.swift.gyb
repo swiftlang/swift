@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,6 +29,14 @@ extension SIMDMask where Storage == ${Vector} {
   @export(implementation) @_transparent
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Vector}(_builtin)
+  }
+
+  // The lanes of this mask as one-bit values.
+  @export(implementation) @_transparent
+  internal func _predicate() -> Builtin.Vec${storageN}xInt1 {
+    Builtin.cmp_slt_${Builtin}(
+      _storage._storage._value, Builtin.zeroInitializer()
+    )
   }
   
   @export(implementation) @_transparent
@@ -179,9 +187,9 @@ extension SIMDMask where Storage == ${Vector} {
   public static func .!=(a: Self, b: Self) -> Self {
     a .^ b
   }
-    
-  /// Replaces elements of this vector with elements of `other` in the lanes
-  /// where `mask` is `true`.
+
+  /// Replaces elements of this vector with elements of another vector in the
+  /// lanes where a mask is true.
   ///
   /// Equivalent to:
   /// ```
@@ -189,13 +197,17 @@ extension SIMDMask where Storage == ${Vector} {
   ///   if mask[i] { self[i] = other[i] }
   /// }
   /// ```
-  @export(implementation)
+  ///
+  /// - Parameters:
+  ///   - other: The vector mask to take replacement elements from.
+  ///   - mask: The vector mask that selects which lanes to replace.
+  @export(implementation) @_transparent
   public mutating func replace(with other: Self, where mask: Self) {
     self = replacing(with: other, where: mask)
   }
-    
+
   /// Returns a copy of this vector, with elements replaced by elements of
-  /// `other` in the lanes where `mask` is `true`.
+  /// another vector in the lanes where a mask is true.
   ///
   /// Equivalent to:
   /// ```
@@ -204,9 +216,58 @@ extension SIMDMask where Storage == ${Vector} {
   ///   result[i] = mask[i] ? other[i] : self[i]
   /// }
   /// ```
-  @export(implementation)
+  ///
+  /// - Parameters:
+  ///   - other: The vector mask to take replacement elements from.
+  ///   - mask: The vector mask that selects which lanes to replace.
+  ///
+  /// - Returns: A copy of this vector, with the selected lanes from `other`.
+  @export(implementation) @_transparent
   public func replacing(with other: Self, where mask: Self) -> Self {
-    (self .& .!mask) .| (other .& mask)
+    Self(Builtin.select_Vec${storageN}xInt1_${Builtin}(
+      mask._predicate(),
+      other._storage._storage._value,
+      _storage._storage._value
+    ))
+  }
+
+  /// Replaces elements of this vector with a Boolean value in the lanes where
+  /// a mask is true.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in indices {
+  ///   if mask[i] { self[i] = other }
+  /// }
+  /// ```
+  ///
+  /// - Parameters:
+  ///   - other: The value to store in the selected lanes.
+  ///   - mask: The vector mask that selects which lanes to replace.
+  @export(implementation) @_transparent
+  public mutating func replace(with other: Bool, where mask: Self) {
+    replace(with: Self(repeating: other), where: mask)
+  }
+
+  /// Returns a copy of this vector, with elements replaced by a Boolean value
+  /// in the lanes where a mask is true.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in indices {
+  ///   result[i] = mask[i] ? other : self[i]
+  /// }
+  /// ```
+  ///
+  /// - Parameters:
+  ///   - other: The value to store in the selected lanes.
+  ///   - mask: The vector mask that selects which lanes to replace.
+  ///
+  /// - Returns: A copy of this vector, with `other` in the selected lanes.
+  @export(implementation) @_transparent
+  public func replacing(with other: Bool, where mask: Self) -> Self {
+    replacing(with: Self(repeating: other), where: mask)
   }
 }
 
