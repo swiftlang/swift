@@ -17,6 +17,7 @@ auto getFuncRef() -> int (&)();
 auto getFuncRvalueRef() -> int (&&)();
 int callFuncRef(int (&)());
 int callFuncRvalueRef(int (&&)());
+int callFuncPtrRvalueRef(int (*&&)());
 
 using ConstIntRefTypealias = const int &;
 

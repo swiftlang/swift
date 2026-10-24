@@ -89,3 +89,9 @@ func passFuncRefs() -> CInt {
 
 // CHECK: sil {{.*}}[clang callFuncRef] @{{.*}} : $@convention(c) (@convention(c) () -> Int32) -> Int32
 // CHECK: sil {{.*}}[clang callFuncRvalueRef] @{{.*}} : $@convention(c) (@convention(c) () -> Int32) -> Int32
+
+func passFuncPtrRvalueRef() -> CInt {
+  return callFuncPtrRvalueRef(consuming: getStaticInt)
+}
+
+// CHECK: sil {{.*}}[clang callFuncPtrRvalueRef] @{{.*}} : $@convention(c) (@in_cxx Optional<@convention(c) () -> Int32>) -> Int32
