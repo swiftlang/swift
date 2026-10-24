@@ -150,7 +150,7 @@ def _configure_llvm(cp, host_target, short_triple):
     build_root = os.path.dirname(cp.build_dir)
     llvm_build_dir = os.path.join(build_root, 'llvm-%s' % short_triple)
     llvm_source_dir = os.path.join(
-        os.path.dirname(cp.source_dir), 'llvm-project', 'llvm')
+        os.path.dirname(cp.source_dir), cp.llvm_source_dirname, 'llvm')
 
     cmake_options, _, _ = cp.host_cmake_options(host_target)
     cmake_options.define('CMAKE_BUILD_TYPE:STRING', args.build_variant)
