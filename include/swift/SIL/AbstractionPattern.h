@@ -1574,6 +1574,15 @@ public:
   /// a substituted error type.
   CanType getEffectiveThrownErrorType() const;
 
+  /// Given that the value being abstracted is a function, return the
+  /// abstraction pattern for its yield type.
+  AbstractionPattern getFunctionYieldType(unsigned index) const;
+
+  /// Given that the value being abstracted is a function type, and that
+  /// this is not an opaque abstraction pattern, return the yield flags
+  /// for one of its yields.
+  YieldTypeFlags getFunctionYieldFlags(unsigned index) const;
+
   /// Given that the value being abstracted is a function type, return
   /// the abstraction pattern for one of its parameter types.
   AbstractionPattern getFunctionParamType(unsigned index) const;
