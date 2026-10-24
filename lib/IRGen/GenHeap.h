@@ -40,7 +40,8 @@ class HeapLayout : public StructLayout {
   NecessaryBindings Bindings;
   unsigned BindingsIndex;
   mutable llvm::Constant *privateMetadata = nullptr;
-  
+  mutable llvm::Function *privateDestructor = nullptr;
+
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
              ArrayRef<SILType> elementTypes,
@@ -94,6 +95,10 @@ public:
                                      const llvm::BitVector &unownedFields,
                                      bool isStackAllocated = false,
                                      bool trapsOnDestroy = false) const;
+
+  /// Returns the destructor in the metadata that getPrivateMetadata() built,
+  /// or null if it hasn't built any or if the destructor traps.
+  llvm::Function *getPrivateDestructor() const { return privateDestructor; }
 
   std::optional<uint64_t>
   computeTypedMallocTypeDescriptor(IRGenModule &IGM) const;

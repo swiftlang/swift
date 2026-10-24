@@ -717,13 +717,18 @@ llvm::Constant *HeapLayout::getPrivateMetadata(
     std::optional<uint64_t> mallocTypeId, const llvm::Twine &name,
     const llvm::BitVector &unownedFields, bool isStackAllocated,
     bool trapsOnDestroy) const {
-  if (!privateMetadata)
+  if (!privateMetadata) {
+    llvm::Function *dtorFn;
+    if (trapsOnDestroy) {
+      dtorFn = IGM.getExactlyOnceClosureDestructor();
+    } else {
+      dtorFn = createDtorFn(IGM, *this, mallocTypeId, name, unownedFields,
+                            isStackAllocated);
+      privateDestructor = dtorFn;
+    }
     privateMetadata = buildPrivateMetadata(
-        IGM, *this,
-        trapsOnDestroy ? IGM.getExactlyOnceClosureDestructor()
-                       : createDtorFn(IGM, *this, mallocTypeId, name,
-                                      unownedFields, isStackAllocated),
-        captureDescriptor, MetadataKind::HeapLocalVariable);
+        IGM, *this, dtorFn, captureDescriptor, MetadataKind::HeapLocalVariable);
+  }
   return privateMetadata;
 }
 
