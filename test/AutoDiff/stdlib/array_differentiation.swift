@@ -7,9 +7,9 @@ import StdlibUnittest
 var ArrayDifferentiationTests = TestSuite("ArrayDifferentiation")
 
 ArrayDifferentiationTests.test("Array.DifferentiableView+") {
-  let zero1: Array<Float>.DifferentiableView = [0, 0, 0]
-  let zero2: Array<Float>.DifferentiableView = .zero
-  let a: Array<Float>.DifferentiableView = [1, 2, 3]
+  let zero1: Array<Float>.ArrayTangentVector = [0, 0, 0]
+  let zero2: Array<Float>.ArrayTangentVector = .zero
+  let a: Array<Float>.ArrayTangentVector = [1, 2, 3]
   
   expectEqual(a + a, [2, 4, 6])
   
@@ -21,9 +21,9 @@ ArrayDifferentiationTests.test("Array.DifferentiableView+") {
 }
 
 ArrayDifferentiationTests.test("Array.DifferentiableView-") {
-  let zero1: Array<Float>.DifferentiableView = [0, 0, 0]
-  let zero2: Array<Float>.DifferentiableView = .zero
-  let a: Array<Float>.DifferentiableView = [1, 2, 3]
+  let zero1: Array<Float>.ArrayTangentVector = [0, 0, 0]
+  let zero2: Array<Float>.ArrayTangentVector = .zero
+  let a: Array<Float>.ArrayTangentVector = [1, 2, 3]
   
   expectEqual(a - a, [0, 0, 0])
   
