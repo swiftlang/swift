@@ -77,14 +77,6 @@ void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
 /// done on behalf of a child task.
 void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 
-/// Given that we've already set the right executor as the active
-/// executor, run the given job.  This does additional bookkeeping
-/// related to the active task. actor and executorIdentity are used for emitting
-/// tracing around the run.
-void runJobInEstablishedExecutorContext(Job *job,
-                                        SerialExecutorRef serialExecutor,
-                                        TaskExecutorRef taskExecutor);
-
 /// Adopt the voucher stored in `task`. This removes the voucher from the task
 /// and adopts it on the current thread.
 void adoptTaskVoucher(AsyncTask *task);
