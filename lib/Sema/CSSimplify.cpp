@@ -9188,15 +9188,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (type->isTypeVariableOrMember())
     return formUnsolved();
 
-  // If we have a function type and are checking for Sendable conformance we
-  // need to delay if we have Sendable dependence.
+  // If we have a function type and are checking for a conformance that
+  // depends on a type, we need to delay until that type is resolved.
   if (auto *fnTy = type->getAs<FunctionType>()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      if (fnTy->hasTypeDependencyFor(TypeDependenceKind::Sendable)) {
+    std::optional<TypeDependenceKind> dependenceKind;
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
+      dependenceKind = TypeDependenceKind::Sendable;
+    else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
+             protocol->isSpecificProtocol(KnownProtocolKind::Deinitable))
+      dependenceKind = TypeDependenceKind::ExecutionSemantics;
+
+    if (dependenceKind) {
+      if (fnTy->hasTypeDependencyFor(*dependenceKind)) {
         fnTy = simplifyType(fnTy)->castTo<FunctionType>();
         type = fnTy;
       }
-      if (fnTy->hasTypeDependencyFor(TypeDependenceKind::Sendable))
+      if (fnTy->hasTypeDependencyFor(*dependenceKind))
         return formUnsolved();
     }
   }
