@@ -251,32 +251,56 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
     try await Self._wait(context: _takeContext())
   }
 
-  /// Suspend until the paired ``Continuation`` is resumed, with a
-  /// cancellation handler and a priority-escalation handler installed for the
-  /// duration of the suspension.
+  /// Suspend until the paired ``Continuation`` is resumed, with a cancellation
+  /// handler and a priority-escalation handler installed for the duration of
+  /// the suspension.
   ///
-  /// If the continuation was already resumed before `wait` is called, this
-  /// call does not suspend at all and returns the value immediately.
+  /// If the continuation was already resumed before `wait` is called, this call
+  /// does not suspend at all and returns the value immediately.
   ///
   /// If the current task is already cancelled, `onCancel` runs before this
   /// function suspends.
   ///
+  /// `onPriorityEscalated` is always called once when `wait` is called, with
+  /// the task's current priority as both arguments, so that an escalation that
+  /// happened before the handler was installed is not missed. It may therefore
+  /// be called with a priority the work already runs at. Compare against the
+  /// priority the work was enqueued with, and only act if it's higher:
+  ///
+  /// ```swift
+  /// let priority = Task.currentPriority
+  /// let job = queue.enqueue(request, priority: priority, resuming: continuation)
+  /// return try await waiter.wait(
+  ///   onCancel: { queue.cancel(job) },
+  ///   onPriorityEscalated: { _, newPriority in
+  ///     guard newPriority > priority else { return }
+  ///     queue.escalate(job, to: newPriority)
+  ///   })
+  /// ```
+  ///
   /// - Parameters:
   ///   - onCancel: Run when the task is cancelled while suspended
   ///     here. It may run concurrently with the resumption, and on any thread.
-  ///   - onEscalate: Run with the new priority when the task's priority is
-  ///     escalated while suspended here.
+  ///   - onPriorityEscalated: Run once when `wait` is called, and then when the
+  ///     task's priority is escalated while suspended here. The first argument
+  ///     is the old priority (before escalation), and the second argument is
+  ///     the new escalated priority. It may run concurrently with the
+  ///     resumption, and on any thread.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
     onCancel handleCancellation: sending () -> Void,
-    onEscalate handleEscalation: sending (TaskPriority) -> Void
+    onPriorityEscalated handlePriorityEscalation:
+      sending (TaskPriority, TaskPriority) -> Void
   ) async throws(Failure) -> sending Success {
     // The escalation handler is wrapped so the runtime can hand it raw
     // priorities.
     try await Self._wait(
       context: _takeContext(),
       onCancel: handleCancellation,
-      onEscalate: { handleEscalation(TaskPriority(rawValue: $0)) })
+      onPriorityEscalated: {
+        handlePriorityEscalation(
+          TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
+      })
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
@@ -306,18 +330,42 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// If the continuation was already resumed before `wait` is called, this
   /// call does not suspend at all and returns the value immediately.
   ///
+  /// `onPriorityEscalated` is always called once when `wait` is called, with
+  /// the task's current priority as both arguments, so that an escalation that
+  /// happened before the handler was installed is not missed. It may therefore
+  /// be called with a priority the work already runs at. Compare against the
+  /// priority the work was enqueued with, and only act if it's higher:
+  ///
+  /// ```swift
+  /// let priority = Task.currentPriority
+  /// let job = queue.enqueue(request, priority: priority, resuming: continuation)
+  /// return try await waiter.wait(
+  ///   onCancel: { queue.cancel(job) },
+  ///   onPriorityEscalated: { _, newPriority in
+  ///     guard newPriority > priority else { return }
+  ///     queue.escalate(job, to: newPriority)
+  ///   })
+  /// ```
+  ///
   /// - Parameters:
-  ///   - onEscalate: Run with the new priority when the task's priority is
-  ///     escalated while suspended here.
+  ///   - onPriorityEscalated: Run once when `wait` is called, and then when the
+  ///     task's priority is escalated while suspended here. The first argument
+  ///     is the old priority (before escalation), and the second argument is
+  ///     the new escalated priority. It may run concurrently with the
+  ///     resumption, and on any thread.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
-    onEscalate handleEscalation: sending (TaskPriority) -> Void
+    onPriorityEscalated handlePriorityEscalation:
+      sending (TaskPriority, TaskPriority) -> Void
   ) async throws(Failure) -> sending Success {
     // The escalation handler is wrapped so the runtime can hand it raw
     // priorities.
     try await Self._wait(
       context: _takeContext(),
-      onEscalate: { handleEscalation(TaskPriority(rawValue: $0)) })
+      onPriorityEscalated: {
+        handlePriorityEscalation(
+          TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
+      })
   }
 
   @export(implementation)
@@ -340,7 +388,8 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
     onCancel handleCancellation: sending () -> Void,
-    onEscalate handleEscalation: sending (UInt8) -> Void
+    onPriorityEscalated handlePriorityEscalation:
+      sending (UInt8, UInt8) -> Void
   ) async throws(Failure) -> sending Success {
     // Install the handlers with the existing per-handler entry points.
     let cancellationRecord = unsafe _taskAddCancellationHandler(
@@ -348,7 +397,7 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
     defer { unsafe _taskRemoveCancellationHandler(record: cancellationRecord) }
 
     let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
-      handler: { _, newPriority in handleEscalation(newPriority) })
+      handler: handlePriorityEscalation)
     defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
 
     return try await _wait(context: context)
@@ -369,10 +418,11 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
-    onEscalate handleEscalation: sending (UInt8) -> Void
+    onPriorityEscalated handlePriorityEscalation:
+      sending (UInt8, UInt8) -> Void
   ) async throws(Failure) -> sending Success {
     let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
-      handler: { _, newPriority in handleEscalation(newPriority) })
+      handler: handlePriorityEscalation)
     defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
 
     return try await _wait(context: context)
@@ -423,17 +473,15 @@ public nonisolated(nonsending) func withContinuation<
   // half (given to whoever performs the work) and the wait half (waited on by
   // `body`). The continuation is destroyed when this scope exits, after the
   // wait has resolved and moved the value out.
+  //
+  // The continuation's storage comes from the task allocator, which is a
+  // stack, so it must be destroyed after everything allocated after it, such
+  // as the buffers for `body`'s result and error.
   let rawContinuation = Builtin.createSplitContinuation(Success.self)
+  defer { Builtin.destroySplitContinuation(rawContinuation) }
   let continuation = Continuation<Success, Failure>(rawContinuation)
   let waiter = ContinuationWaiter<Success, Failure>(context: rawContinuation)
-  do {
-    let result = try await body(consume continuation, consume waiter)
-    Builtin.destroySplitContinuation(rawContinuation)
-    return result
-  } catch {
-    Builtin.destroySplitContinuation(rawContinuation)
-    throw error
-  }
+  return try await body(consume continuation, consume waiter)
   #else
   fatalError("Swift compiler is incompatible with this SDK version")
   #endif
@@ -449,9 +497,21 @@ extension Continuation where Success: ~Copyable {
   /// the resumed task.
   ///
   /// The offered execution context is used only if it belongs to the executors
-  /// the awaiting task resumes on. If the context doesn't match the task is
-  /// enqueued on its expected execution context.
-  /// from a point where that executor could run one of its own jobs.
+  /// the awaiting task resumes on. If the context doesn't match, the task is
+  /// enqueued on its expected execution context instead.
+  ///
+  /// If the offer is taken, the resumed task runs synchronously, nested inside
+  /// this call, just like a job run with
+  /// ``ExecutorJob/runSynchronously(isolatedTo:taskExecutor:)``. This method
+  /// must therefore only be called from the context of the offered executors,
+  /// at a point where they could run one of their own jobs; typically from
+  /// within the executor's implementation, between running jobs.
+  ///
+  /// Don't offer an executor that the calling code merely happens to be
+  /// isolated to, such as `#isolation` in an actor method. Running the resumed
+  /// task from there re-enters the actor outside of a suspension point, which
+  /// breaks the guarantee that actors are only re-entered at suspension
+  /// points, and can cause exclusivity violations.
   ///
   /// This overload names both a serial executor and a task executor, mirroring
   /// ``ExecutorJob/runSynchronously(isolatedTo:taskExecutor:)``. Use
@@ -476,8 +536,9 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it throw the given
   /// error, offering the current execution context to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - error: The error to throw from the continuation.
@@ -497,8 +558,9 @@ extension Continuation where Success: ~Copyable {
   /// throw based on the given `Result`, offering the current execution context
   /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - result: A value to either return or throw from the continuation.
@@ -517,8 +579,9 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it return the given
   /// value, offering the current execution context to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - value: The value to return from the continuation.
@@ -535,8 +598,9 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it throw the given
   /// error, offering the current execution context to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
-  /// execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - error: The error to throw from the continuation.
@@ -554,8 +618,9 @@ extension Continuation where Success: ~Copyable {
   /// throw based on the given `Result`, offering the current execution context
   /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
-  /// execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - result: A value to either return or throw from the continuation.
@@ -572,8 +637,9 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it return the given
   /// value, offering the current execution context to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - value: The value to return from the continuation.
@@ -590,8 +656,9 @@ extension Continuation where Success: ~Copyable {
   /// Resume the task awaiting this continuation by having it throw the given
   /// error, offering the current execution context to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
-  /// context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - error: The error to throw from the continuation.
@@ -609,8 +676,9 @@ extension Continuation where Success: ~Copyable {
   /// throw based on the given `Result`, offering the current execution context
   /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
-  /// context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - result: A value to either return or throw from the continuation.

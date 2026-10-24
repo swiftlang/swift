@@ -2767,8 +2767,17 @@ swift_task_addPriorityEscalationHandlerImpl(
   auto *record = ::new (allocation)
       EscalationNotificationStatusRecord(unsigned_handler, context);
 
+  auto *task = swift_task_getCurrent();
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;
+  });
+
+  // Call the handler once with the task's current priority, so that an
+  // escalation that happened before it was installed is not missed.
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  withStatusRecordLock(task, status, [&](ActiveTaskStatus lockedStatus) {
+    auto priority = lockedStatus.getStoredPriority();
+    record->run(priority, priority);
   });
 
   return record;

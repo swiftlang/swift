@@ -80,6 +80,11 @@ enum class StackAllocationKind : uint8_t {
   /// A BuiltinInst for the TaskCancellationScopePush builtin. The deallocation
   /// is a BuiltinInst for the TaskCancellationScopePop builtin.
   BuiltinTaskCancellationScopePush,
+
+  /// A BuiltinInst for the CreateSplitContinuation builtin, which allocates the
+  /// continuation's storage from the task allocator. The deallocation is a
+  /// BuiltinInst for the DestroySplitContinuation builtin.
+  BuiltinCreateSplitContinuation,
 };
 
 class StackAllocation {

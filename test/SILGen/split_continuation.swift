@@ -4,12 +4,16 @@
 import Swift
 import _Concurrency
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test6createBcyF
+// The continuation is a stack allocation, so it is created and destroyed in
+// the same function.
+// CHECK-LABEL: sil hidden [ossa] @$s4test16createAndDestroyyyF
 // CHECK: [[MT:%.*]] = metatype $@thin Builtin.Int32.Type
 // CHECK: [[CONTINUATION:%.*]] = builtin "createSplitContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
-// CHECK: return [[CONTINUATION]]
-func create() -> Builtin.RawUnsafeContinuation {
-  return Builtin.createSplitContinuation(Builtin.Int32.self)
+// CHECK: [[BINDING:%.*]] = move_value [var_decl] [[CONTINUATION]]
+// CHECK: builtin "destroySplitContinuation"([[BINDING]] : $Builtin.RawUnsafeContinuation) : $()
+func createAndDestroy() {
+  let continuation = Builtin.createSplitContinuation(Builtin.Int32.self)
+  Builtin.destroySplitContinuation(continuation)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test13awaitThrowingyBi32_BcYaKF
@@ -22,10 +26,4 @@ func awaitThrowing(
   _ continuation: Builtin.RawUnsafeContinuation
 ) async throws -> Builtin.Int32 {
   return try await Builtin.awaitSplitThrowingContinuation(continuation)
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4test7destroyyyBcF
-// CHECK: builtin "destroySplitContinuation"({{%.*}} : $Builtin.RawUnsafeContinuation) : $()
-func destroy(_ continuation: Builtin.RawUnsafeContinuation) {
-  Builtin.destroySplitContinuation(continuation)
 }

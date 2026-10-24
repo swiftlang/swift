@@ -5,15 +5,21 @@ import Builtin
 import Swift
 import _Concurrency
 
-// CHECK-LABEL: sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
-sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
-bb0:
+// The continuation is a stack allocation, so it is created and destroyed in
+// the same function.
+// CHECK-LABEL: sil @split_create_resume_destroy : $@convention(thin) (Builtin.Int32) -> () {
+sil @split_create_resume_destroy : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%v : $Builtin.Int32):
   // CHECK: [[MT:%.*]] = metatype $@thin Builtin.Int32.Type
   %mt = metatype $@thin Builtin.Int32.Type
   // CHECK: [[TOK:%.*]] = builtin "createSplitContinuation"<Builtin.Int32>([[MT]] : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
   %tok = builtin "createSplitContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
-  // CHECK: return [[TOK]]
-  return %tok : $Builtin.RawUnsafeContinuation
+  // CHECK: builtin "resumeThrowingContinuationReturning"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, {{%.*}} : $Builtin.Int32) : $()
+  %r = builtin "resumeThrowingContinuationReturning"<Builtin.Int32>(%tok : $Builtin.RawUnsafeContinuation, %v : $Builtin.Int32) : $()
+  // CHECK: builtin "destroySplitContinuation"([[TOK]] : $Builtin.RawUnsafeContinuation) : $()
+  %d = builtin "destroySplitContinuation"(%tok : $Builtin.RawUnsafeContinuation) : $()
+  %t = tuple ()
+  return %t : $()
 }
 
 // CHECK-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
@@ -55,16 +61,4 @@ bb2(%e : $Error):
 
 bb3:
   return undef : $()
-}
-
-// CHECK-LABEL: sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
-sil @split_resume : $@convention(thin) (Builtin.RawUnsafeContinuation, @in Builtin.Int32) -> () {
-bb0(%continuation : $Builtin.RawUnsafeContinuation, %val : $*Builtin.Int32):
-  %v = load %val : $*Builtin.Int32
-  // CHECK: builtin "resumeThrowingContinuationReturning"<Builtin.Int32>({{%.*}} : $Builtin.RawUnsafeContinuation, {{%.*}} : $Builtin.Int32) : $()
-  %r = builtin "resumeThrowingContinuationReturning"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %v : $Builtin.Int32) : $()
-  // CHECK: builtin "destroySplitContinuation"({{%.*}} : $Builtin.RawUnsafeContinuation) : $()
-  %d = builtin "destroySplitContinuation"(%continuation : $Builtin.RawUnsafeContinuation) : $()
-  %t = tuple ()
-  return %t : $()
 }

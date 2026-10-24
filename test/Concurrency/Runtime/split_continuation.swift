@@ -201,6 +201,33 @@ actor Elsewhere {
       // CHECK: UniqueResource(99).deinit
     }
 
+    // MARK: - Resilient failure types.
+
+    tests.test("resilient failure type, resumed") {
+      try! await withContinuation(of: Void.self, throwing: CancellationError.self) {
+        (continuation: consuming Continuation<Void, CancellationError>,
+         waiter: consuming ContinuationWaiter<Void, CancellationError>)
+        async throws(CancellationError) -> Void in
+        continuation.resume()
+        try await waiter.wait()
+      }
+    }
+
+    tests.test("resilient failure type, thrown") {
+      do {
+        try await withContinuation(of: Void.self, throwing: CancellationError.self) {
+          (continuation: consuming Continuation<Void, CancellationError>,
+           waiter: consuming ContinuationWaiter<Void, CancellationError>)
+          async throws(CancellationError) -> Void in
+          continuation.resume(throwing: CancellationError())
+          try await waiter.wait()
+        }
+        expectUnreachable("wait() should have thrown")
+      } catch {
+        // Expected.
+      }
+    }
+
     // MARK: - Resume after await.
 
     tests.test("resume after await, from another task") {
@@ -246,20 +273,23 @@ actor Elsewhere {
 
     // MARK: - Handlers installed on the await.
 
-    tests.test("handlers are not run when nothing happens") {
+    tests.test("only the inline escalation call runs when nothing happens") {
       let cancelled = Box(false)
-      let escalated = Box(false)
+      let escalations = Box<[[TaskPriority]]>([])
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
         (continuation: consuming Continuation<Int, Never>,
          waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 5)
         return await waiter.wait(
           onCancel: { cancelled.value = true },
-          onEscalate: { _ in escalated.value = true })
+          onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
       }
       expectEqual(5, value)
       expectFalse(cancelled.value)
-      expectFalse(escalated.value)
+      // The escalation handler is always called once, with the current
+      // priority, even if the continuation was already resumed.
+      let current = Task.currentPriority
+      expectEqual([[current, current]], escalations.value)
     }
 
     tests.test("cancellation handler runs once while suspended and can resume") {
@@ -276,7 +306,7 @@ actor Elsewhere {
               runs.modify { $0 += 1 }
               holder.resumeFromDetachedTask(returning: -1, executorPreference: executor)
             },
-            onEscalate: { _ in })
+            onPriorityEscalated: { _, _ in })
         }
         return (value, Task.isCancelled)
       }
@@ -303,7 +333,7 @@ actor Elsewhere {
           let holder = ContinuationHolder(continuation)
           return await waiter.wait(
             onCancel: { holder.resumeFromDetachedTask(returning: -2, executorPreference: executor) },
-            onEscalate: { _ in })
+            onPriorityEscalated: { _, _ in })
         }
       }
       task.cancel()
@@ -339,7 +369,7 @@ actor Elsewhere {
           continuation.resume(returning: 1)
           let value = await waiter.wait(
             onCancel: { runs.modify { $0 += 1 } },
-            onEscalate: { _ in })
+            onPriorityEscalated: { _, _ in })
           await withTaskCancellationHandler {
             try? await Task.sleep(for: .seconds(10))
           } onCancel: {}
@@ -462,7 +492,7 @@ actor Elsewhere {
             let holder = ContinuationHolder(continuation)
             return await waiter.wait(
               onCancel: { holder.resumeFromDetachedTask(returning: -10, executorPreference: executor) },
-              onEscalate: { _ in })
+              onPriorityEscalated: { _, _ in })
           }
         }
       }
@@ -483,7 +513,7 @@ actor Elsewhere {
             let holder = ContinuationHolder(continuation)
             return await waiter.wait(
               onCancel: { holder.resumeFromDetachedTask(returning: -11, executorPreference: nil) },
-              onEscalate: { _ in })
+              onPriorityEscalated: { _, _ in })
           }
         }
       }
@@ -502,7 +532,7 @@ actor Elsewhere {
             holder.resumeFromDetachedTask(returning: 42, executorPreference: executor)
             return await waiter.wait(
               onCancel: { expectUnreachable("shielded onCancel must not run") },
-              onEscalate: { _ in })
+              onPriorityEscalated: { _, _ in })
           }
         }
       }
@@ -523,7 +553,7 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, any Error>) in
           continuation.resume(returning: 1)
           _ = try await waiter.wait(
-            onCancel: {}, onEscalate: { _ in })
+            onCancel: {}, onPriorityEscalated: { _, _ in })
           throw TestError()
         }
         expectUnreachable("the body should have thrown")
@@ -573,8 +603,8 @@ actor Elsewhere {
 
     // MARK: - Escalation before the handlers exist.
 
-    tests.test("escalation before the await is not reported to the handler") {
-      let escalations = Box(0)
+    tests.test("escalation before the await is reported by the inline call") {
+      let escalations = Box<[[TaskPriority]]>([])
       let executor = ManualExecutor()
       let task = Task(executorPreference: executor, priority: .background) { () -> Int in
         await withContinuation(of: Int.self, throwing: Never.self) {
@@ -583,13 +613,33 @@ actor Elsewhere {
           continuation.resume(returning: 1)
           return await waiter.wait(
             onCancel: {},
-            onEscalate: { _ in escalations.modify { $0 += 1 } })
+            onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
         }
       }
       task.escalatePriority(to: .medium)
       executor.runNextJob()
       expectEqual(1, await task.value)
-      expectEqual(0, escalations.value)
+      expectEqual(1, escalations.value.count)
+      expectEqual(escalations.value.first?[0], escalations.value.first?[1])
+    }
+
+    tests.test("escalation-only handler is called inline with the current priority") {
+      let escalations = Box<[[TaskPriority]]>([])
+      let executor = ManualExecutor()
+      let task = Task(executorPreference: executor, priority: .background) { () -> Int in
+        await withContinuation(of: Int.self, throwing: Never.self) {
+          (continuation: consuming Continuation<Int, Never>,
+           waiter: consuming ContinuationWaiter<Int, Never>) in
+          continuation.resume(returning: 2)
+          return await waiter.wait(
+            onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
+        }
+      }
+      task.escalatePriority(to: .medium)
+      executor.runNextJob()
+      expectEqual(2, await task.value)
+      expectEqual(1, escalations.value.count)
+      expectEqual(escalations.value.first?[0], escalations.value.first?[1])
     }
 
     // MARK: - Handing the await half to another isolation domain.

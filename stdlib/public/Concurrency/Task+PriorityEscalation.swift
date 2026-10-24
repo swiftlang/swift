@@ -91,8 +91,29 @@ extension UnsafeCurrentTask {
 /// but cannot influence how the escalation influences the task, i.e. the task's
 /// priority will be escalated regardless of actions performed in the handler.
 ///
-/// The handler will only trigger if a priority escalation occurs while the
-/// operation is in progress.
+/// The handler is called once when it is installed, before `operation` runs,
+/// with the task's current priority as both arguments. This ensures that an
+/// escalation that happened before the handler was installed, for example
+/// after the caller last read `Task.currentPriority`, is not missed. After
+/// that, the handler is triggered each time a priority escalation occurs while
+/// the operation is in progress. The handler may therefore be called with a
+/// priority it has already seen. Calls to the handler are never concurrent
+/// with each other. Compare against the priority the work was enqueued with,
+/// and only act if it's higher:
+///
+/// ```swift
+/// let priority = Task.currentPriority
+/// let job = queue.enqueue(request, priority: priority, resuming: continuation)
+/// return try await waiter.wait(
+///   onCancel: { queue.cancel(job) },
+///   onPriorityEscalated: { _, newPriority in
+///     guard newPriority > priority else { return }
+///     queue.escalate(job, to: newPriority)
+///   })
+/// ```
+///
+/// - Note: Runtimes older than Swift 6.5 don't call the handler when it is
+///   installed, only on escalation.
 ///
 /// If multiple task escalation handlers are nested they will all be triggered.
 ///

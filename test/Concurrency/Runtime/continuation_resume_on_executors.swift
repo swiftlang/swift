@@ -925,19 +925,21 @@ struct Main {
           }
           let value = await waiter.wait(
             onCancel: { log.record("cancellation handler") },
-            onEscalate: { _ in log.record("escalation handler") })
+            onPriorityEscalated: { _, _ in log.record("escalation handler") })
           log.record("waiter resumed")
           return value
         }
       }
-      // The awaiting task suspends with its handlers installed.
+      // The awaiting task suspends with its handlers installed, calling the
+      // escalation handler once as it does.
       pool.runNextJob()
+      expectEqual(["escalation handler"], log.recorded)
       // Cancelling runs the cancellation handler without resuming.
       task.cancel()
-      expectEqual(["cancellation handler"], log.recorded)
+      expectEqual(["escalation handler", "cancellation handler"], log.recorded)
       expectEqual(1, pool.pendingJobCount)
       pool.runNextJob()
-      expectEqual(["cancellation handler", "waiter resumed", "resume returned"], log.recorded)
+      expectEqual(["escalation handler", "cancellation handler", "waiter resumed", "resume returned"], log.recorded)
       expectEqual(0, pool.pendingJobCount)
       expectEqual(16, await task.value)
     }
