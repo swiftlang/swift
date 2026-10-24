@@ -66,6 +66,11 @@ public:
   /// content no longer contributes to the cache key.
   bool CASFSInputOverlay = false;
 
+  /// Path prefixes that the dependency scanner substituted into this
+  /// invocation, i.e. the `<prefix>` arguments of `-cache-replay-prefix-map`.
+  /// Paths under these prefixes are not the original paths on disk.
+  std::vector<std::string> ScannerMappedPrefixes;
+
   /// Get the CAS configuration flags.
   void enumerateCASConfigurationFlags(
       llvm::function_ref<void(llvm::StringRef)> Callback) const;
