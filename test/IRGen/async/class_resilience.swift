@@ -34,6 +34,7 @@ open class MyBaseClass<T> {
 }
 
 // CHECK-LABEL: @"$s16class_resilience11MyBaseClassC4waitxyYaFTjTu" = {{(dllexport )?}}{{(protected )?}}global %swift.async_func_pointer
+// CHECK-SAME: section "{{(__TEXT,__const|\.rodata|\.rdata)}}"
 
 // CHECK-LABEL: @"$s16class_resilience11MyBaseClassCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // CHECK-SAME: ptr @"$s16class_resilience11MyBaseClassC4waitxyYaFTu"

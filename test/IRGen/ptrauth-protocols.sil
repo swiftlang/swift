@@ -13,6 +13,8 @@ protocol Q {
   associatedtype Assoc : P
 }
 
+// CHECK: @"$s4test1GVyxGAA1RAAMc.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1GVyxGAA1RAAMc", i32 2, i64 0, i64 50923 }, section "llvm.ptrauth"
+
 // CHECK: @"$s4test1PMp" = hidden constant
 // CHECK-SAME: { i32 -775684095, i32 0 }
 
@@ -41,9 +43,10 @@ bb0(%0 : $@thick A.Type):
 sil_witness_table A : P module test {
   method #P.foo: @A_foo
 }
+// CHECK: @"$s4test1AVAA1PAAMc.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1AVAA1PAAMc", i32 2, i64 ptrtoint (ptr @"$s4test1AVAA1PAAWP" to i64), i64 50923 }, section "llvm.ptrauth"
 // CHECK: @A_foo.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @A_foo, i32 0, i64 ptrtoint (ptr getelementptr inbounds ([2 x ptr], ptr @"$s4test1AVAA1PAAWP", i32 0, i32 1) to i64), i64 53700 }, section "llvm.ptrauth"
 
-// CHECK: @"$s4test1AVAA1PAAWP" = hidden constant [2 x ptr] [ptr @"$s4test1AVAA1PAAMc", ptr @A_foo.ptrauth], align 8
+// CHECK: @"$s4test1AVAA1PAAWP" = hidden constant [2 x ptr] [ptr @"$s4test1AVAA1PAAMc.ptrauth", ptr @A_foo.ptrauth], align 8
 
 sil @B_init : $@convention(witness_method : Q) (@thick B.Type) -> (@out B) {
 bb0(%0 : $*B, %1 : $@thick B.Type):
@@ -55,9 +58,12 @@ sil_witness_table B : Q module test {
   associated_type Assoc: A
   method #Q.init!allocator: @B_init
 }
+//   Associated type and associated conformance witnesses are data pointers.
+// CHECK: @"associated conformance 4test1BVAA1QAA5AssocAaDP_AA1P.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr getelementptr inbounds (i8, ptr @"associated conformance 4test1BVAA1QAA5AssocAaDP_AA1P", i64 1), i32 2, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 1) to i64), i64 31334 }, section "llvm.ptrauth"
+// CHECK: @"symbolic _____ 4test1AV.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr getelementptr inbounds (i8, ptr @"symbolic _____ 4test1AV", i64 1), i32 2, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 2) to i64), i64 35760 }, section "llvm.ptrauth"
 // CHECK: @B_init.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @B_init, i32 0, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 3) to i64), i64 33208 }, section "llvm.ptrauth"
 // CHECK: @"$s4test1BVAA1QAAWP" = hidden global [4 x ptr] [
-// CHECK-SAME: ptr @"$s4test1BVAA1QAAMc",
+// CHECK-SAME: ptr @"$s4test1BVAA1QAAMc.ptrauth",
 // CHECK-SAME: @"{{.*}}.ptrauth",
 // CHECK-SAME: ptr @B_init.ptrauth]
 
@@ -91,3 +97,21 @@ bb0:
   apply %0<B>() : $@convention(thin) <T : Q> () -> ()
   return undef : $()
 }
+
+protocol R {
+  associatedtype Result
+  func get() -> Result
+}
+
+struct G<T> : R {
+  func get() -> T
+}
+
+sil @test_witness_table_accessor : $@convention(thin) <T> (@in_guaranteed G<T>) -> @out T {
+bb0(%0 : $*T, %1 : $*G<T>):
+  %2 = witness_method $G<T>, #R.get : $@convention(witness_method : R) <Self where Self : R> (@in_guaranteed Self) -> @out Self.Result
+  %3 = apply %2<G<T>>(%0, %1) : $@convention(witness_method : R) <Self where Self : R> (@in_guaranteed Self) -> @out Self.Result
+  return %3 : $()
+}
+// CHECK-LABEL: define swiftcc void @test_witness_table_accessor(
+// CHECK:         call ptr @swift_getWitnessTable(ptr @"$s4test1GVyxGAA1RAAMc.ptrauth", ptr
