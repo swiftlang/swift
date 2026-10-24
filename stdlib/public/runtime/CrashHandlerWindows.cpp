@@ -18,13 +18,22 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <psapi.h>
 
 #include "swift/Runtime/Backtrace.h"
 #include "BacktracePrivate.h"
 
 using namespace swift::runtime::backtrace;
 
+#ifndef STATUS_FAIL_FAST_EXCEPTION
+#define STATUS_FAIL_FAST_EXCEPTION ((DWORD)0xC0000602L)
+#endif
+
 namespace {
+
+typedef VOID (WINAPI *RaiseFailFastException_t)(PEXCEPTION_RECORD,
+                                                PCONTEXT,
+                                                DWORD);
 
 SRWLOCK crashLock = SRWLOCK_INIT;
 
@@ -38,6 +47,13 @@ LONG NTAPI reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo);
 LONG callWithAltStack(EXCEPTION_POINTERS *arg,
                       LONG (*fn)(EXCEPTION_POINTERS *));
 LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo);
+VOID WINAPI hookRaiseFailFastException(PEXCEPTION_RECORD pExceptionRecord,
+                                       PCONTEXT pContextRecord,
+                                       DWORD dwFlags);
+void hookFailFastInLoadedModules();
+LONG NTAPI hookFailFastOnException(EXCEPTION_POINTERS *ExceptionInfo);
+
+RaiseFailFastException_t pRealRaiseFailFastException = NULL;
 
 }
 
@@ -57,6 +73,16 @@ _swift_installCrashHandler()
   // Install the exception handler
   AddVectoredExceptionHandler(0, reinstallUnhandledExceptionFilter);
   SetUnhandledExceptionFilter(handleException);
+
+  if (_swift_backtraceSettings.hookFailFast) {
+    pRealRaiseFailFastException
+      = (RaiseFailFastException_t)GetProcAddress(GetModuleHandleW(L"kernelbase.dll"),
+                                                 "RaiseFailFastException");
+    if (pRealRaiseFailFastException) {
+      hookFailFastInLoadedModules();
+      AddVectoredExceptionHandler(0, hookFailFastOnException);
+    }
+  }
 
   return ERROR_SUCCESS;
 }
@@ -197,6 +223,132 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   }
 
   return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// Redirect any import address table entries for RaiseFailFastException()
+// in the specified module to our hook.
+void hookFailFastInModule(HMODULE hModule) {
+  BYTE *base = (BYTE *)hModule;
+  IMAGE_DOS_HEADER *dosHeader = (IMAGE_DOS_HEADER *)base;
+  if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    return;
+
+  IMAGE_NT_HEADERS *ntHeaders = (IMAGE_NT_HEADERS *)(base + dosHeader->e_lfanew);
+  if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
+    return;
+
+  IMAGE_DATA_DIRECTORY *iatDirectory
+    = &ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT];
+  if (!iatDirectory->VirtualAddress || !iatDirectory->Size)
+    return;
+
+  void **iat = (void **)(base + iatDirectory->VirtualAddress);
+  size_t count = iatDirectory->Size / sizeof(void *);
+  for (size_t n = 0; n < count; ++n) {
+    if (iat[n] != (void *)pRealRaiseFailFastException)
+      continue;
+
+    DWORD dwOldProtect;
+    if (VirtualProtect(&iat[n], sizeof(void *), PAGE_READWRITE,
+                       &dwOldProtect)) {
+      InterlockedExchangePointer(&iat[n], (void *)hookRaiseFailFastException);
+      VirtualProtect(&iat[n], sizeof(void *), dwOldProtect, &dwOldProtect);
+    }
+  }
+}
+
+SRWLOCK hookLock = SRWLOCK_INIT;
+HMODULE loadedModules[1024];
+HMODULE hookedModules[1024];
+DWORD hookedModuleCount = 0;
+
+void hookFailFastInLoadedModules() {
+  // If another thread is already doing this, there's no need to wait
+  if (!TryAcquireSRWLockExclusive(&hookLock))
+    return;
+
+  DWORD cbNeeded;
+  if (K32EnumProcessModules(GetCurrentProcess(), loadedModules,
+                            sizeof(loadedModules), &cbNeeded)) {
+    if (cbNeeded > sizeof(loadedModules))
+      cbNeeded = sizeof(loadedModules);
+    DWORD count = cbNeeded / sizeof(HMODULE);
+
+    // Nothing to do if no modules have been loaded since we last did this
+    if (count != hookedModuleCount
+        || memcmp(loadedModules, hookedModules, cbNeeded) != 0) {
+      for (DWORD n = 0; n < count; ++n)
+        hookFailFastInModule(loadedModules[n]);
+
+      memcpy(hookedModules, loadedModules, cbNeeded);
+      hookedModuleCount = count;
+    }
+  }
+
+  ReleaseSRWLockExclusive(&hookLock);
+}
+
+// Modules loaded after _swift_installCrashHandler() (e.g. WinUI's) won't
+// have been hooked yet, so do that before any __except filter gets to see
+// a potentially fatal exception.
+LONG hookFailFastOnException(EXCEPTION_POINTERS *ExceptionInfo) {
+  switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+  case EXCEPTION_ACCESS_VIOLATION:
+  case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+  case EXCEPTION_BREAKPOINT:
+  case EXCEPTION_DATATYPE_MISALIGNMENT:
+  case EXCEPTION_ILLEGAL_INSTRUCTION:
+  case EXCEPTION_IN_PAGE_ERROR:
+  case EXCEPTION_INT_DIVIDE_BY_ZERO:
+  case EXCEPTION_PRIV_INSTRUCTION:
+    hookFailFastInLoadedModules();
+    break;
+  default:
+    break;
+  }
+
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+volatile LONG failFastThread = 0;
+
+// RaiseFailFastException() never returns, so neither does this.
+VOID WINAPI hookRaiseFailFastException(PEXCEPTION_RECORD pExceptionRecord,
+                                       PCONTEXT pContextRecord,
+                                       DWORD dwFlags) {
+  LONG currentThread = (LONG)GetCurrentThreadId();
+  LONG owner = InterlockedCompareExchange(&failFastThread, currentThread, 0);
+
+  // If another thread is generating a backtrace, wait for it to terminate
+  // the process; if this thread is, we failed while doing so.
+  if (owner != 0 && owner != currentThread) {
+    for (;;)
+      Sleep(INFINITE);
+  }
+
+  if (owner == 0) {
+    EXCEPTION_RECORD exceptionRecord;
+    CONTEXT context;
+    EXCEPTION_POINTERS exceptionPointers = { pExceptionRecord, pContextRecord };
+
+    if (!pContextRecord) {
+      RtlCaptureContext(&context);
+      exceptionPointers.ContextRecord = &context;
+    }
+    if (!pExceptionRecord) {
+      memset(&exceptionRecord, 0, sizeof(exceptionRecord));
+      exceptionRecord.ExceptionCode = STATUS_FAIL_FAST_EXCEPTION;
+      exceptionRecord.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
+      exceptionRecord.ExceptionAddress = __builtin_return_address(0);
+      exceptionPointers.ExceptionRecord = &exceptionRecord;
+    }
+
+    AcquireSRWLockExclusive(&crashLock);
+    callWithAltStack(&exceptionPointers, reallyHandleException);
+    ReleaseSRWLockExclusive(&crashLock);
+  }
+
+  pRealRaiseFailFastException(pExceptionRecord, pContextRecord, dwFlags);
 }
 
 void *pcFromContext(PCONTEXT Context) {
