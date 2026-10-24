@@ -25,6 +25,8 @@ struct TypeValuePropertyStruct : MyProto {
 // CHECK-NEXT:        "valueKind": "Array",
 // CHECK-NEXT:        "value": [
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractTypeValue.swift",
+// CHECK-NEXT:            "line": 15,
 // CHECK-NEXT:            "valueKind": "Type",
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "type": "ExtractTypeValue.Warbler<Swift.String>",
@@ -32,6 +34,8 @@ struct TypeValuePropertyStruct : MyProto {
 // CHECK-NEXT:            }
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractTypeValue.swift",
+// CHECK-NEXT:            "line": 15,
 // CHECK-NEXT:            "valueKind": "Type",
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "type": "ExtractTypeValue.Avocet",
@@ -39,6 +43,8 @@ struct TypeValuePropertyStruct : MyProto {
 // CHECK-NEXT:            }
 // CHECK-NEXT:          },
 // CHECK-NEXT:          {
+// CHECK-NEXT:            "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractTypeValue.swift",
+// CHECK-NEXT:            "line": 15,
 // CHECK-NEXT:            "valueKind": "Type",
 // CHECK-NEXT:            "value": {
 // CHECK-NEXT:              "type": "ExtractTypeValue.RainbowLorikeet",
