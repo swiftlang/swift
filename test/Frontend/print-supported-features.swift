@@ -9,6 +9,7 @@
 // CHECK:     { "name": "InferIsolatedConformances", "migratable": true, "categories": ["IsolatedConformances"], "enabled_in": "7" },
 // CHECK:   ],
 // CHECK:   "experimental": [
+// CHECK:     { "name": "GenerateBindingsForThrowingFunctionsInCXX" }
 // CHECK:     { "name": "BuiltinModule" }
 // CHECK:   ]
 // CHECK: }
