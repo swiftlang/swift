@@ -311,6 +311,20 @@ func indirectSendingOptionalClassField<T>(_ t: GenericNonSendableKlass<T>) -> se
   // expected-note @-2 {{'Optional<T>' is a non-Sendable type}}
 }
 
+protocol IsolatedP {
+  func f()
+}
+final class IsolatedS: @MainActor IsolatedP {
+  @MainActor func f() {}
+}
+
+@MainActor func returnSendingExistentialIsolatedConformance() -> sending any IsolatedP {
+  IsolatedS() // expected-warning {{returning a main actor-isolated 'any IsolatedP' value as a 'sending' result risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{isolated conformance to protocol 'IsolatedP' can be introduced here}}
+  // expected-note @-2 {{returning a main actor-isolated 'any IsolatedP' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
+  // expected-note @-3 {{type 'any IsolatedP' does not conform to the 'Sendable' protocol}}
+}
+
 func useBlock<T>(block: () throws -> T) throws -> sending T {
   fatalError()
 }
