@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend %s -emit-sil -cxx-interoperability-mode=default -I %S/Inputs -Xcc -fignore-exceptions -verify
 
+// FIXME: The synthesized conformance of std::vector to CxxVector on android-armv7 is invalid
+// https://github.com/swiftlang/swift/issues/93524
+// XFAIL: OS=linux-androideabi
+
 import StdVector
 import CxxStdlib
 
