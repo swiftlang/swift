@@ -15,14 +15,14 @@
 using namespace swift;
 using namespace swift::refactoring::asyncrefactorings;
 
-bool DeclReferenceFinder::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkAction DeclReferenceFinder::walkToExprPre(Expr *E) {
   if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
     if (DRE->getDecl() == Search) {
       HasFoundReference = true;
-      return false;
+      return Action::Stop();
     }
   }
-  return true;
+  return Action::Continue();
 }
 
 bool DeclReferenceFinder::containsReference(ASTNode Node,
