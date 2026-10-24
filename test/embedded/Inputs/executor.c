@@ -1,7 +1,7 @@
 /* A custom executor to test that we can build an external executor
    and use it with libswift_Concurrency.a. */
 
-#include <swift/ExecutorImpl.h>
+#include <swift/EmbeddedPlatform.h>
 
 #include <assert.h>
 #include <inttypes.h>
@@ -48,9 +48,11 @@ static SwiftJob *job_heap_fixup(SwiftJob *job) {
   SwiftJob *left = job_left(job);
   SwiftJob *right = job_right(job);
 
-  SwiftJobPriority priority = swift_job_getPriority(job);
-  SwiftJobPriority leftPriority = left ? swift_job_getPriority(left) : 0;
-  SwiftJobPriority rightPriority = right ? swift_job_getPriority(right) : 0;
+  SwiftJobPriority priority = swift_job_getPriorityFromFlags(job);
+  SwiftJobPriority leftPriority =
+      left ? swift_job_getPriorityFromFlags(left) : 0;
+  SwiftJobPriority rightPriority =
+      right ? swift_job_getPriorityFromFlags(right) : 0;
 
   SwiftJob *temp;
 
@@ -84,7 +86,7 @@ static void job_heap_push(SwiftJob *job) {
 
   // Otherwise, make the existing top node a child of this one, then fix the
   // heap condition.
-  SwiftJobPriority jobPriority = swift_job_getPriority(job);
+  SwiftJobPriority jobPriority = swift_job_getPriorityFromFlags(job);
 
   job_setLeft(job, jobHeap);
   jobHeap = job_heap_fixup(job);
@@ -134,8 +136,10 @@ static SwiftJob *job_heap_pop(void) {
 
 // .. A list of delayed jobs ...................................................
 
+enum { ContinuousClock, SuspendingClock, ClockCount };
+
 // One for each clock
-static SwiftJob *delayQueues[2] = { NULL, NULL };
+static SwiftJob *delayQueues[ClockCount] = { NULL, NULL };
 
 static SwiftJob *job_next(SwiftJob *job) {
   return (SwiftJob *)(job->schedulerPrivate[0]);
@@ -157,12 +161,10 @@ static void job_setDeadline(SwiftJob *job, uint64_t deadline) {
   job->schedulerPrivate[1] = (void *)(uintptr_t)deadline;
 }
 
-static void job_schedule(SwiftJob *job, SwiftClockId clock, uint64_t deadline) {
-  assert(clock >= 1 && clock <= 2 && "clock out of range");
-
+static void job_schedule(SwiftJob *job, int clock, uint64_t deadline) {
   job_setDeadline(job, deadline);
 
-  SwiftJob **pos = &delayQueues[clock - 1];
+  SwiftJob **pos = &delayQueues[clock];
   SwiftJob *ptr;
   while ((ptr = *pos) && deadline >= job_deadline(ptr)) {
     pos = job_ptrToNext(ptr);
@@ -172,14 +174,18 @@ static void job_schedule(SwiftJob *job, SwiftClockId clock, uint64_t deadline) {
   *pos = job;
 }
 
-static uint64_t job_getTime(SwiftClockId clock) {
-  SwiftTime now = swift_time_now(clock);
-  return now.seconds * 1000000000ull + now.nanoseconds;
+static uint64_t job_getTime(int clock) {
+  __swift_int64_t seconds, nanoseconds;
+  if (clock == ContinuousClock)
+    _swift_clockContinuous_getTime(&seconds, &nanoseconds);
+  else
+    _swift_clockSuspending_getTime(&seconds, &nanoseconds);
+  return seconds * 1000000000ull + nanoseconds;
 }
 
 static void job_runTimers(void) {
-  for (int clock = 0; clock < 2; ++clock) {
-    uint64_t flatNow = job_getTime((SwiftClockId)(clock + 1));
+  for (int clock = 0; clock < ClockCount; ++clock) {
+    uint64_t flatNow = job_getTime(clock);
 
     SwiftJob *job = delayQueues[clock];
     while (job && flatNow >= job_deadline(job)) {
@@ -193,7 +199,7 @@ static void job_runTimers(void) {
 }
 
 static bool job_haveDelayedJobs(void) {
-  for (int clock = 0; clock < 2; ++clock) {
+  for (int clock = 0; clock < ClockCount; ++clock) {
     if (delayQueues[clock])
       return true;
   }
@@ -208,19 +214,19 @@ static void job_sleep(uint64_t ns) {
   debug("executor: sleeping for %"PRIu64" ns\n", ns);
 
   // We don't know how to do this "properly", so spin instead
-  uint64_t flatNow = job_getTime(SwiftContinuousClock);
+  uint64_t flatNow = job_getTime(ContinuousClock);
   uint64_t deadline = flatNow + ns;
 
   while (flatNow < deadline)
-    flatNow = job_getTime(SwiftContinuousClock);
+    flatNow = job_getTime(ContinuousClock);
 }
 
 // Wait until the next timer is about to fire
 static void job_wait(void) {
   uint64_t toSleep = ~(uint64_t)0;
 
-  for (int clock = 0; clock < 2; ++clock) {
-    uint64_t flatNow = job_getTime((SwiftClockId)(clock + 1));
+  for (int clock = 0; clock < ClockCount; ++clock) {
+    uint64_t flatNow = job_getTime(clock);
 
     if (delayQueues[clock]) {
       uint64_t deadline = job_deadline(delayQueues[clock]);
@@ -256,8 +262,7 @@ static SwiftJob *job_getNextJob() {
 // .. Interface functions ......................................................
 
 /// Enqueue a job on the global executor.
-SWIFT_CC(swift) void
-swift_task_enqueueGlobalImpl(SwiftJob *job) {
+void _swift_task_enqueueGlobalImpl(SwiftJob *job) {
   debug("executor: job %p enqueued\n", job);
 
   job_heap_push(job);
@@ -265,26 +270,17 @@ swift_task_enqueueGlobalImpl(SwiftJob *job) {
 
 /// Enqueue a job on the global executor, with a specific delay before it
 /// should execute.
-SWIFT_CC(swift) void
-swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
-                                      SwiftJob *job) {
-  SwiftTime now = swift_time_now(SwiftContinuousClock);
-  uint64_t deadline = now.seconds * 1000000000ull + now.nanoseconds + delay;
+void _swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+                                            SwiftJob *job) {
+  uint64_t deadline = job_getTime(ContinuousClock) + delay;
 
   debug("executor: job %p scheduled with delay %llu ns\n", job, delay);
 
-  job_schedule(job, SwiftContinuousClock, deadline);
+  job_schedule(job, ContinuousClock, deadline);
 }
 
-/// Enqueue a job on the global executor, with a specific deadline before
-/// which it must execute.
-SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                              long long nsec,
-                                              long long tsec,
-                                              long long tnsec,
-                                              int clock,
-                                              SwiftJob *job) {
+static void job_scheduleAt(SwiftJob *job, int clock, __swift_int64_t sec,
+                           __swift_int64_t nsec) {
   uint64_t deadline = sec * 1000000000ull + nsec;
 
   debug("executor: job %p scheduled with deadline %"PRIu64" on clock %d\n",
@@ -293,47 +289,57 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
   job_schedule(job, clock, deadline);
 }
 
+/// Enqueue a job on the global executor, with a specific deadline on the
+/// continuous clock before which it must execute.
+void _swift_task_enqueueGlobalWithContinuousDeadlineImpl(
+    __swift_int64_t sec, __swift_int64_t nsec, __swift_int64_t tsec,
+    __swift_int64_t tnsec, SwiftJob *job) {
+  job_scheduleAt(job, ContinuousClock, sec, nsec);
+}
+
+/// Enqueue a job on the global executor, with a specific deadline on the
+/// suspending clock before which it must execute.
+void _swift_task_enqueueGlobalWithSuspendingDeadlineImpl(
+    __swift_int64_t sec, __swift_int64_t nsec, __swift_int64_t tsec,
+    __swift_int64_t tnsec, SwiftJob *job) {
+  job_scheduleAt(job, SuspendingClock, sec, nsec);
+}
+
 /// Enqueue a job on the main executor (which may or may not be the same as
 /// the global executor).
-SWIFT_CC(swift)
-void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
-  swift_task_enqueueGlobalImpl(job);
+void _swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
+  _swift_task_enqueueGlobalImpl(job);
 }
 
 /// Assert that the specified executor is the current executor.
-SWIFT_CC(swift)
-void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
+void _swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
   swift_executor_invokeSwiftCheckIsolated(executor);
 }
 
 /// Check if the specified executor is the current executor.
-SWIFT_CC(swift)
-int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+int8_t _swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
   return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
 }
 
 /// Get a reference to the main executor.
-SWIFT_CC(swift)
-SwiftExecutorRef swift_task_getMainExecutorImpl() {
+SwiftExecutorRef _swift_task_getMainExecutorImpl(void) {
   return swift_executor_generic();
 }
 
 /// Check if the specified executor is the main executor.
-SWIFT_CC(swift)
-bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+bool _swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
   return swift_executor_isGeneric(executor);
 }
 
 /// Drain the main executor's queue, processing jobs enqueued on it; this
 /// should never return.
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift) void
-swift_task_asyncMainDrainQueueImpl() {
+void _swift_task_asyncMainDrainQueueImpl(void) {
   debug("executor: running\n");
   while (true) {
     SwiftJob *job = job_getNextJob();
     assert(job && "We shouldn't run out of jobs here.");
     debug("executor: job %p running\n", job);
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
 }
 
@@ -341,16 +347,15 @@ swift_task_asyncMainDrainQueueImpl() {
 /// condition function returns `true`.  Support for this function is optional,
 /// but you should assert or provide a dummy implementation if your executor
 /// does not support it.
-SWIFT_CC(swift) void
-swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
-                                                 void *conditionContext) {
+void _swift_task_donateThreadToGlobalExecutorUntilImpl(
+    bool (*condition)(void *), void *conditionContext) {
   debug("executor: running until condition\n");
   while (!condition(conditionContext)) {
     SwiftJob *job = job_getNextJob();
     if (!job)
       return;
     debug("executor: job %p running\n", job);
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
   debug("executor: condition satisfied or no more jobs\n");
 }

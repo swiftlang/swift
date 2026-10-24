@@ -18,6 +18,11 @@
 #include "ExecutorBridge.h"
 #include "swift/Runtime/Casting.h"
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "ExecutorImpl.h"
+#include "swift/EmbeddedPlatform.h"
+#endif
+
 using namespace swift;
 
 #pragma clang diagnostic push
@@ -35,8 +40,7 @@ extern "C" SWIFT_CC(swift) bool _swift_task_isMainExecutorSwift(
     HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *witnessTable);
 
-extern "C" SWIFT_CC(swift) void swift_task_checkIsolatedImpl(
-    SerialExecutorRef executor) {
+static void checkIsolated(SerialExecutorRef executor) {
   HeapObject *identity = executor.getIdentity();
 
   // We might be being called with an actor rather than a "proper"
@@ -63,9 +67,7 @@ int8_t _swift_task_isIsolatingCurrentContextSwift(
   const SerialExecutorWitnessTable *witnessTable
 );
 
-extern "C" SWIFT_CC(swift) int8_t
-swift_task_isIsolatingCurrentContextImpl(
-    SerialExecutorRef executor) {
+static int8_t isIsolatingCurrentContext(SerialExecutorRef executor) {
   HeapObject *identity = executor.getIdentity();
 
   // We might be being called with an actor rather than a "proper"
@@ -79,19 +81,80 @@ swift_task_isIsolatingCurrentContextImpl(
       executor.getSerialExecutorWitnessTable());
 }
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+
+// The executor entrypoints of EmbeddedPlatform.h default to the executor in
+// ExecutorImpl.swift. libswift_ConcurrencyDefaultExecutor.a replaces them when
+// linked after this archive only because no default exists here for the delay
+// and deadline entrypoints, which the hooks reference and only its executor
+// defines.
+
+extern "C" __attribute__((weak))
+void _swift_task_enqueueGlobalImpl(SwiftJob *job) {
+  swift_task_enqueueGlobalImpl(job);
+}
+
+extern "C" __attribute__((weak))
+void _swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
+  swift_task_enqueueMainExecutorImpl(job);
+}
+
+extern "C" __attribute__((weak))
+SwiftExecutorRef _swift_task_getMainExecutorImpl(void) {
+  return swift_task_getMainExecutorImpl();
+}
+
+extern "C" __attribute__((weak))
+bool _swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+  // In the embedded cooperative executor model the main executor is the generic
+  // executor, as in CooperativeGlobalExecutor.cpp. Custom SerialExecutor
+  // witness tables and the _swift_task_isMainExecutorSwift bridge are
+  // unavailable in embedded mode.
+  return swift_executor_isGeneric(executor);
+}
+
+extern "C" __attribute__((weak))
+void _swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
+  checkIsolated(*reinterpret_cast<SerialExecutorRef *>(&executor));
+}
+
+extern "C" __attribute__((weak))
+int8_t _swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+  return isIsolatingCurrentContext(
+      *reinterpret_cast<SerialExecutorRef *>(&executor));
+}
+
+extern "C" __attribute__((weak))
+void _swift_task_asyncMainDrainQueueImpl(void) {
+  swift_task_asyncMainDrainQueueImpl();
+}
+
+extern "C" __attribute__((weak))
+void _swift_task_donateThreadToGlobalExecutorUntilImpl(
+    bool (*condition)(void *), void *conditionContext) {
+  swift_task_donateThreadToGlobalExecutorUntilImpl(condition, conditionContext);
+}
+
+#else
+
+extern "C" SWIFT_CC(swift) void swift_task_checkIsolatedImpl(
+    SerialExecutorRef executor) {
+  checkIsolated(executor);
+}
+
+extern "C" SWIFT_CC(swift) int8_t
+swift_task_isIsolatingCurrentContextImpl(
+    SerialExecutorRef executor) {
+  return isIsolatingCurrentContext(executor);
+}
+
 extern "C" SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(
     SerialExecutorRef executor) {
-#if SWIFT_CONCURRENCY_EMBEDDED
-  // In the embedded cooperative executor model the main executor is the generic
-  // executor (mirrors CooperativeGlobalExecutor.cpp's swift_task_isMainExecutorImpl).
-  // Custom SerialExecutor witness tables and the _swift_task_isMainExecutorSwift
-  // bridge are unavailable in embedded mode.
-  return executor.isGeneric();
-#else
   HeapObject *identity = executor.getIdentity();
   return executor.hasSerialExecutorWitnessTable() &&
          _swift_task_isMainExecutorSwift(
              identity, swift_getObjectType(identity),
              executor.getSerialExecutorWitnessTable());
-#endif
 }
+
+#endif

@@ -21,6 +21,11 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "Error.h"
+#include "swift/EmbeddedPlatform.h"
+#endif
+
 using namespace swift;
 
 // Define all the hooks
@@ -40,9 +45,17 @@ using namespace swift;
 // types from `ExecutorHooks.h`, we need to make an Orig version containing
 // appropriate type casts in each case.
 
+// Embedded Swift executors implement the C entrypoints in EmbeddedPlatform.h.
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_EXECUTOR_IMPL(name) _##name##Impl
+#else
+#define SWIFT_EXECUTOR_IMPL(name) name##Impl
+#endif
+
 SWIFT_CC(swift) static void
 swift_task_enqueueGlobalOrig(Job *job) {
-  swift_task_enqueueGlobalImpl(reinterpret_cast<SwiftJob *>(job));
+  SWIFT_EXECUTOR_IMPL(swift_task_enqueueGlobal)(
+      reinterpret_cast<SwiftJob *>(job));
 }
 
 void
@@ -60,7 +73,7 @@ swift::swift_task_enqueueGlobal(Job *job) {
 
 SWIFT_CC(swift) static void
 swift_task_enqueueGlobalWithDelayOrig(JobDelay delay, Job *job) {
-  swift_task_enqueueGlobalWithDelayImpl(
+  SWIFT_EXECUTOR_IMPL(swift_task_enqueueGlobalWithDelay)(
       static_cast<SwiftJobDelay>(delay), reinterpret_cast<SwiftJob *>(job));
 }
 
@@ -82,8 +95,22 @@ swift_task_enqueueGlobalWithDeadlineOrig(
     long long tsec,
     long long tnsec,
     int clock, Job *job) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  switch (clock) {
+  case swift_clock_id_continuous:
+    _swift_task_enqueueGlobalWithContinuousDeadlineImpl(
+        sec, nsec, tsec, tnsec, reinterpret_cast<SwiftJob *>(job));
+    return;
+  case swift_clock_id_suspending:
+    _swift_task_enqueueGlobalWithSuspendingDeadlineImpl(
+        sec, nsec, tsec, tnsec, reinterpret_cast<SwiftJob *>(job));
+    return;
+  }
+  swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n", clock);
+#else
   swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock,
                                            reinterpret_cast<SwiftJob *>(job));
+#endif
 }
 
 void
@@ -103,7 +130,8 @@ swift::swift_task_enqueueGlobalWithDeadline(
 
 SWIFT_CC(swift) static void
 swift_task_checkIsolatedOrig(SerialExecutorRef executor) {
-  swift_task_checkIsolatedImpl(*reinterpret_cast<SwiftExecutorRef *>(&executor));
+  SWIFT_EXECUTOR_IMPL(swift_task_checkIsolated)(
+      *reinterpret_cast<SwiftExecutorRef *>(&executor));
 }
 
 void
@@ -116,7 +144,7 @@ swift::swift_task_checkIsolated(SerialExecutorRef executor) {
 
 SWIFT_CC(swift) static int8_t
 swift_task_isIsolatingCurrentContextOrig(SerialExecutorRef executor) {
-  return swift_task_isIsolatingCurrentContextImpl(
+  return SWIFT_EXECUTOR_IMPL(swift_task_isIsolatingCurrentContext)(
       *reinterpret_cast<SwiftExecutorRef *>(&executor));
 }
 
@@ -170,7 +198,8 @@ swift::swift_task_isOnExecutor(HeapObject *executor,
 
 SWIFT_CC(swift) static void
 swift_task_enqueueMainExecutorOrig(Job *job) {
-  swift_task_enqueueMainExecutorImpl(reinterpret_cast<SwiftJob *>(job));
+  SWIFT_EXECUTOR_IMPL(swift_task_enqueueMainExecutor)(
+      reinterpret_cast<SwiftJob *>(job));
 }
 
 void
@@ -185,7 +214,7 @@ swift::swift_task_enqueueMainExecutor(Job *job) {
 
 SWIFT_CC(swift) static swift::SerialExecutorRef
 swift_task_getMainExecutorOrig() {
-  auto ref = swift_task_getMainExecutorImpl();
+  auto ref = SWIFT_EXECUTOR_IMPL(swift_task_getMainExecutor)();
   return *reinterpret_cast<SerialExecutorRef *>(&ref);
 }
 
@@ -200,7 +229,7 @@ swift::swift_task_getMainExecutor() {
 
 SWIFT_CC(swift) static bool
 swift_task_isMainExecutorOrig(SerialExecutorRef executor) {
-  return swift_task_isMainExecutorImpl(
+  return SWIFT_EXECUTOR_IMPL(swift_task_isMainExecutor)(
            *reinterpret_cast<SwiftExecutorRef *>(&executor));
 }
 
@@ -216,7 +245,8 @@ swift::swift_task_isMainExecutor(SerialExecutorRef executor) {
 SWIFT_CC(swift) static void
 swift_task_donateThreadToGlobalExecutorUntilOrig(bool (*condition)(void *),
                                                  void *context) {
-  return swift_task_donateThreadToGlobalExecutorUntilImpl(condition, context);
+  return SWIFT_EXECUTOR_IMPL(swift_task_donateThreadToGlobalExecutorUntil)(
+      condition, context);
 }
 
 void swift::

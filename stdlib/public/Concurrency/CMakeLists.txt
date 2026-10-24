@@ -10,7 +10,9 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
+# ExecutorImpl.h includes ExecutorTypes.h from the EmbeddedPlatform headers.
+set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+  -I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims)
 
 set(swift_concurrency_private_link_libraries)
@@ -426,6 +428,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       C_COMPILE_FLAGS
         ${extra_c_compile_flags}
         -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
+        -ffunction-sections -fdata-sections
       INSTALL_IN_COMPONENT stdlib
       )
   endforeach()
@@ -448,6 +451,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
   swift_install_in_component(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift/ExecutorTypes.h"
     DESTINATION "include/swift"
     COMPONENT compiler)
 

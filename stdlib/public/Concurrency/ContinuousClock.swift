@@ -21,7 +21,6 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 public struct ContinuousClock: Sendable {
   /// A continuous point in time used for `ContinuousClock`.
   public struct Instant: Sendable {
@@ -69,8 +68,7 @@ extension Clock where Self == ContinuousClock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
-extension ContinuousClock: Clock {
+extension ContinuousClock {
   /// The current continuous instant.
   public var now: ContinuousClock.Instant {
     ContinuousClock.now
@@ -80,26 +78,38 @@ extension ContinuousClock: Clock {
   public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
+#if $Embedded
+    unsafe _platformContinuousResolution(&seconds, &nanoseconds)
+#else
     unsafe _getClockRes(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.continuous.rawValue)
-    return Duration(_seconds: seconds, nanoseconds: nanoseconds)
+#endif
+    return Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
   /// The current continuous instant.
   public static var now: ContinuousClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
+#if $Embedded
+    unsafe _platformContinuousTime(&seconds, &nanoseconds)
+#else
     unsafe _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.continuous.rawValue)
+#endif
     return Instant(
-      _value: Duration(_seconds: seconds, nanoseconds: nanoseconds)
+      _value: Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
     )
   }
+}
 
+@available(StdlibDeploymentTarget 5.7, *)
+@_unavailableInEmbedded
+extension ContinuousClock: Clock {
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
@@ -134,17 +144,15 @@ extension ContinuousClock: Clock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
   @export(implementation)
   public var systemEpoch: Instant {
-    unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
+    unsafe unsafeBitCast(Swift.Duration.seconds(0), to: Instant.self)
   }
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 
