@@ -177,7 +177,7 @@ extension AddressUseVisitor {
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
            .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer, .PrepareInitialization,
-           .GetEnumTag, .InjectEnumTag:
+           .GetEnumTag, .InjectEnumTag, .AssumeLessThanOrEqualTo:
         return leafAddressUse(of: operand)
       default:
         // TODO: SIL verification should check that this exhaustively

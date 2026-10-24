@@ -921,6 +921,21 @@ BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
 /// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(Dereferenceable, "dereferenceable", "n", Special)
 
+/// Allows the compiler to assume that the first operand is less than or equal
+/// to the second one if T is one of the standard library's integer types, e.g.
+/// `Int` or `UInt8`. Otherwise it has no effect. No code is generated.
+///
+///   builtin "assumeLessThanOrEqualTo"<Int>(%lower : $Int, %upper : $Int) : $()
+///
+/// If the operands are addresses, e.g. in generic code, the builtin reads them.
+/// Once T is known to be an integer type, the optimizer replaces the operands
+/// with their builtin integers, e.g. `$Builtin.Int64` for `Int`. Only these
+/// get lowered by IRGen.
+///
+/// <T> (T, T) -> ()
+BUILTIN_MISC_OPERATION(AssumeLessThanOrEqualTo,
+                       "assumeLessThanOrEqualTo", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //

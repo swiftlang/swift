@@ -30,6 +30,8 @@ extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
         optimizeAssertConfig(context)
       case .AssumeTrue:
         optimizeAssumeTrue(context)
+      case .AssumeLessThanOrEqualTo:
+        optimizeAssumeLessThanOrEqualTo(context)
       case .Sizeof,
            .Strideof,
            .Alignof:
@@ -169,6 +171,40 @@ private extension BuiltinInst {
   func optimizeAssumeTrue(_ context: SimplifyContext) {
     if uses.isEmpty, let literal = operands[0].value as? IntegerLiteralInst, let value = literal.value, value != 0 {
       context.erase(instruction: self)
+    }
+  }
+
+  func optimizeAssumeLessThanOrEqualTo(_ context: SimplifyContext) {
+    let type = substitutionMap.replacementType
+    // A generic type can still become an integer type by specialization.
+    if type.hasArchetype {
+      return
+    }
+    // On 32-bit targets `Int128` and `UInt128` don't consist of a single builtin integer.
+    let fields = type.loweredType(in: parentFunction).getNominalFields(in: parentFunction)
+    let lhs = operands[0].value
+    let rhs = operands[1].value
+    if !type.isStdlibInteger || fields?.count != 1 || lhs == rhs {
+      context.erase(instruction: self)
+      return
+    }
+    if let lhsValue = lhs.integerConstant, let rhsValue = rhs.integerConstant,
+       // Non-negative values compare the same, regardless of whether the type is signed.
+       0 <= lhsValue, lhsValue <= rhsValue
+    {
+      context.erase(instruction: self)
+      return
+    }
+    // IRGen needs the builtin integers. They also enable other optimizations: an address would block
+    // mem2reg, a struct would block replacing a struct phi by an integer phi.
+    let builder = Builder(before: self, context)
+    for operand in operands where operand.value.type.isAddress || !operand.value.type.isBuiltinInteger {
+      var value = operand.value
+      if value.type.isAddress {
+        value = builder.createLoad(fromAddress: value,
+                                   ownership: parentFunction.hasOwnership ? .trivial : .unqualified)
+      }
+      operand.set(to: builder.createStructExtract(struct: value, fieldIndex: 0), context)
     }
   }
   
@@ -351,6 +387,12 @@ private extension BuiltinInst {
 }
 
 private extension Value {
+  /// The value of an integer literal, or of a stdlib integer constant like `struct $Int (%literal)`.
+  var integerConstant: Int? {
+    let literal = (self as? StructInst)?.operands.first?.value ?? self
+    return (literal as? IntegerLiteralInst)?.value
+  }
+
   var isZeroInteger: Bool {
     if let literal = self as? IntegerLiteralInst,
        let value = literal.value

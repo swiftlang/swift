@@ -1,0 +1,93 @@
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -module-name Swift -parse-stdlib -Xllvm -sil-disable-pass=simplify-builtin | %FileCheck %s
+
+import Builtin
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+struct UInt8 {
+  var _value: Builtin.Int8
+}
+
+struct MyInt {
+  var value: Builtin.Int64
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeLessThanOrEqualTo_signed(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp sle i64 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeLessThanOrEqualTo_signed : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeLessThanOrEqualTo_unsigned(i8 %0, i8 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp ule i8 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeLessThanOrEqualTo_unsigned : $@convention(thin) (Builtin.Int8, Builtin.Int8) -> () {
+bb0(%0 : $Builtin.Int8, %1 : $Builtin.Int8):
+  %2 = builtin "assumeLessThanOrEqualTo"<UInt8>(%0 : $Builtin.Int8, %1 : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeLessThanOrEqualTo_struct_operands(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeLessThanOrEqualTo_struct_operands : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int>(%0 : $Int, %1 : $Int) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeLessThanOrEqualTo_addresses(ptr {{.*}}%0, ptr {{.*}}%1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeLessThanOrEqualTo_addresses : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int>(%0 : $*Int, %1 : $*Int) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeLessThanOrEqualTo_generic(ptr {{.*}}%0, ptr {{.*}}%1, ptr %T) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeLessThanOrEqualTo_generic : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeLessThanOrEqualTo_not_an_integer(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeLessThanOrEqualTo_not_an_integer : $@convention(thin) (MyInt, MyInt) -> () {
+bb0(%0 : $MyInt, %1 : $MyInt):
+  %2 = builtin "assumeLessThanOrEqualTo"<MyInt>(%0 : $MyInt, %1 : $MyInt) : $()
+  %3 = tuple ()
+  return %3 : $()
+}

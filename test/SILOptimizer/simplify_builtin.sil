@@ -70,6 +70,140 @@ bb0(%0 : $@thin T.Type):
   return %1 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_builtin_integers :
+// CHECK:         builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $()
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_builtin_integers'
+sil @assumeLessThanOrEqualTo_builtin_integers : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_values :
+// CHECK:         [[L:%.*]] = struct_extract %0 : $Int64, #Int64._value
+// CHECK:         [[R:%.*]] = struct_extract %1 : $Int64, #Int64._value
+// CHECK:         builtin "assumeLessThanOrEqualTo"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64) : $()
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_values'
+sil @assumeLessThanOrEqualTo_values : $@convention(thin) (Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $Int64, %1 : $Int64) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @assumeLessThanOrEqualTo_addresses :
+// CHECK:         [[LI:%.*]] = load [trivial] %0
+// CHECK:         [[L:%.*]] = struct_extract [[LI]] : $Int64, #Int64._value
+// CHECK:         [[RI:%.*]] = load [trivial] %1
+// CHECK:         [[R:%.*]] = struct_extract [[RI]] : $Int64, #Int64._value
+// CHECK:         builtin "assumeLessThanOrEqualTo"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64) : $()
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_addresses'
+sil [ossa] @assumeLessThanOrEqualTo_addresses : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed Int64) -> () {
+bb0(%0 : $*Int64, %1 : $*Int64):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $*Int64, %1 : $*Int64) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_addresses_non_ossa :
+// CHECK:         [[LI:%.*]] = load %0
+// CHECK:         [[L:%.*]] = struct_extract [[LI]] : $Int64, #Int64._value
+// CHECK:         [[RI:%.*]] = load %1
+// CHECK:         [[R:%.*]] = struct_extract [[RI]] : $Int64, #Int64._value
+// CHECK:         builtin "assumeLessThanOrEqualTo"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64) : $()
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_addresses_non_ossa'
+sil @assumeLessThanOrEqualTo_addresses_non_ossa : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed Int64) -> () {
+bb0(%0 : $*Int64, %1 : $*Int64):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $*Int64, %1 : $*Int64) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_generic :
+// CHECK:         builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_generic'
+sil @assumeLessThanOrEqualTo_generic : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_not_an_integer :
+// CHECK-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_not_an_integer'
+sil @assumeLessThanOrEqualTo_not_an_integer : $@convention(thin) (Double, Double) -> () {
+bb0(%0 : $Double, %1 : $Double):
+  %2 = builtin "assumeLessThanOrEqualTo"<Double>(%0 : $Double, %1 : $Double) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_same_operand :
+// CHECK-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_same_operand'
+sil @assumeLessThanOrEqualTo_same_operand : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $Int64, %0 : $Int64) : $()
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_constants :
+// CHECK-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_constants'
+sil @assumeLessThanOrEqualTo_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %3 : $Int64) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_builtin_integer_constants :
+// CHECK-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_builtin_integer_constants'
+sil @assumeLessThanOrEqualTo_builtin_integer_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = builtin "assumeLessThanOrEqualTo"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_negative_constant :
+// CHECK:         builtin "assumeLessThanOrEqualTo"
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_negative_constant'
+sil @assumeLessThanOrEqualTo_negative_constant : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %3 : $Int64) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @assumeLessThanOrEqualTo_false_constants :
+// CHECK:         builtin "assumeLessThanOrEqualTo"
+// CHECK:       } // end sil function 'assumeLessThanOrEqualTo_false_constants'
+sil @assumeLessThanOrEqualTo_false_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 10
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %3 : $Int64) : $()
+  %5 = tuple ()
+  return %5
+}
+
 // CHECK-LABEL: sil @same_metatype_same_operand
 // CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:    return [[R]]

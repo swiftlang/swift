@@ -162,6 +162,35 @@ bb0(%0 : $AB, %1 : $Int):
   return %18 : $()
 }
 
+// CHECK-LABEL: sil hidden @dead_store_across_assume_less_than_or_equal_to
+// CHECK: bb0
+// CHECK-NOT: {{ store}}
+// CHECK: builtin "assumeLessThanOrEqualTo"
+// CHECK: {{ store}}
+sil hidden @dead_store_across_assume_less_than_or_equal_to : $@convention(thin) (@guaranteed AB, Int, Swift.Int, Swift.Int) -> () {
+bb0(%0 : $AB, %1 : $Int, %2 : $Swift.Int, %3 : $Swift.Int):
+  %4 = ref_element_addr %0 : $AB, #AB.value
+  store %1 to %4 : $*Int
+  %6 = builtin "assumeLessThanOrEqualTo"<Swift.Int>(%2 : $Swift.Int, %3 : $Swift.Int) : $()
+  store %1 to %4 : $*Int
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden @store_read_by_assume_less_than_or_equal_to
+// CHECK: bb0
+// CHECK: {{ store}}
+// CHECK: builtin "assumeLessThanOrEqualTo"
+// CHECK: {{ store}}
+sil hidden @store_read_by_assume_less_than_or_equal_to : $@convention(thin) (@inout Swift.Int, Swift.Int, Swift.Int) -> () {
+bb0(%0 : $*Swift.Int, %1 : $Swift.Int, %2 : $Swift.Int):
+  store %1 to %0 : $*Swift.Int
+  %3 = builtin "assumeLessThanOrEqualTo"<Swift.Int>(%0 : $*Swift.Int, %0 : $*Swift.Int) : $()
+  store %2 to %0 : $*Swift.Int
+  %4 = tuple ()
+  return %4 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dead_store_across_borrow_scopes :
 // CHECK-NOT:     store
 // CHECK:         end_borrow

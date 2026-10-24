@@ -177,6 +177,44 @@ bb0(%0 : $AB, %1 : $Int):
   return %6 : $Int
 }
 
+// The assume builtin does not access memory, so it must not block load forwarding.
+// CHECK-LABEL: sil hidden @load_forward_across_assume
+// CHECK-NOT: = load
+// CHECK: return %1
+sil hidden @load_forward_across_assume : $@convention(thin) (@guaranteed AB, Int, Builtin.Int1) -> Int {
+bb0(%0 : $AB, %1 : $Int, %2 : $Builtin.Int1):
+  %3 = ref_element_addr %0 : $AB, #AB.value
+  store %1 to %3 : $*Int
+  %5 = builtin "assume_Int1"(%2 : $Builtin.Int1) : $Builtin.Int1
+  %6 = load %3 : $*Int
+  return %6 : $Int
+}
+
+// The assume builtin does not access memory, so it must not block load forwarding.
+// CHECK-LABEL: sil hidden @load_forward_across_assume_less_than_or_equal_to
+// CHECK-NOT: = load
+// CHECK: return %1
+sil hidden @load_forward_across_assume_less_than_or_equal_to : $@convention(thin) (@guaranteed AB, Int, Swift.Int, Swift.Int) -> Int {
+bb0(%0 : $AB, %1 : $Int, %2 : $Swift.Int, %3 : $Swift.Int):
+  %4 = ref_element_addr %0 : $AB, #AB.value
+  store %1 to %4 : $*Int
+  %6 = builtin "assumeLessThanOrEqualTo"<Swift.Int>(%2 : $Swift.Int, %3 : $Swift.Int) : $()
+  %7 = load %4 : $*Int
+  return %7 : $Int
+}
+
+// The assume builtin only reads memory, so it must not block load forwarding.
+// CHECK-LABEL: sil hidden @load_forward_across_assume_less_than_or_equal_to_of_addresses
+// CHECK-NOT: = load
+// CHECK: return %1
+sil hidden @load_forward_across_assume_less_than_or_equal_to_of_addresses : $@convention(thin) (@inout Swift.Int, Swift.Int) -> Swift.Int {
+bb0(%0 : $*Swift.Int, %1 : $Swift.Int):
+  store %1 to %0 : $*Swift.Int
+  %3 = builtin "assumeLessThanOrEqualTo"<Swift.Int>(%0 : $*Swift.Int, %0 : $*Swift.Int) : $()
+  %4 = load %0 : $*Swift.Int
+  return %4 : $Swift.Int
+}
+
 // CHECK-LABEL: sil hidden @redundant_load_across_fixlifetime_inst
 // CHECK: = load
 // CHECK-NOT: = load

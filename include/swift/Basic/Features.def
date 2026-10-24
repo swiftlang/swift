@@ -298,6 +298,7 @@ LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @
 LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
 LANGUAGE_FEATURE(BuiltinAllocRawTyped, 0, "Builtin.allocRawTyped/deallocRawTyped")
 LANGUAGE_FEATURE(BuiltinTypedAllocationID, 0, "Builtin.typedAllocationID")
+LANGUAGE_FEATURE(BuiltinAssumeLessThanOrEqualTo, 0, "Builtin.assumeLessThanOrEqualTo")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.

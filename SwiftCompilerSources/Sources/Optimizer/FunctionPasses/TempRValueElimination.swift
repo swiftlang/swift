@@ -308,6 +308,10 @@ private struct UseCollector : AddressDefUseWalker {
       users.append(address.instruction)
       return .continueWalk
 
+    case let builtin as BuiltinInst where builtin.id == .AssumeLessThanOrEqualTo:
+      users.append(builtin)
+      return .continueWalk
+
     case is DebugValueInst:
       debugUses.append(address)
       return .continueWalk

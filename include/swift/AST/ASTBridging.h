@@ -3283,6 +3283,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getOptionalType() const;
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isOptional() const;
+  BRIDGED_INLINE bool isStdlibInteger() const;
   BRIDGED_INLINE bool isStructurallyUninhabited() const;
   BRIDGED_INLINE bool isBuiltinType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getAnyPointerElementType() const;

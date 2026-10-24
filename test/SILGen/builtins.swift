@@ -958,6 +958,26 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins23assumeLessThanOrEqualToyyBi64__Bi64_tF
+// CHECK: builtin "assumeLessThanOrEqualTo"<Builtin.Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $()
+// CHECK: return
+// CANONICAL-LABEL: sil hidden @$s8builtins23assumeLessThanOrEqualToyyBi64__Bi64_tF
+// CANONICAL-NOT: builtin "assumeLessThanOrEqualTo"
+// CANONICAL: return
+func assumeLessThanOrEqualTo(_ x: Builtin.Int64, _ y: Builtin.Int64) {
+  Builtin.assumeLessThanOrEqualTo(x, y)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins30assumeLessThanOrEqualToGenericyyx_xtlF
+// CHECK: builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+// CHECK: return
+// CANONICAL-LABEL: sil hidden @$s8builtins30assumeLessThanOrEqualToGenericyyx_xtlF
+// CANONICAL: builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+// CANONICAL: return
+func assumeLessThanOrEqualToGeneric<T>(_ x: T, _ y: T) {
+  Builtin.assumeLessThanOrEqualTo(x, y)
+}
+
 // CHECK: sil hidden [ossa] @$s8builtins15assumeAlignmentyyBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {  
 // CHECK: builtin "assumeAlignment"(%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Builtin.Word) : $Builtin.RawPointer
 // CHECK: return

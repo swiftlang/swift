@@ -984,6 +984,13 @@ static ValueDecl *getDereferenceable(ASTContext &ctx, Identifier id) {
                             _rawPointer);
 }
 
+static ValueDecl *getAssumeLessThanOrEqualTo(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted, _conformsToDefaults(0)),
+                            _parameters(_typeparam(0), _typeparam(0)),
+                            _void);
+}
+
 static ValueDecl *getCopyArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
@@ -3311,6 +3318,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getDereferenceable(Context, Id);
+
+  case BuiltinValueKind::AssumeLessThanOrEqualTo:
+    if (!Types.empty())
+      return nullptr;
+    return getAssumeLessThanOrEqualTo(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
