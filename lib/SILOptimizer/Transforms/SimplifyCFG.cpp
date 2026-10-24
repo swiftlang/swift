@@ -696,6 +696,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
   //   switch_enum %val, case A: bb1, case B: bb2
   // bb1:
   //   use %val   // We know that %val has case A
+  SILBasicBlock *OrigUsedInBB = UsedInBB;
   SILBasicBlock *Pred = UsedInBB->getSinglePredecessorBlock();
   int Limit = 3;
   // A very simple dominator check: just walk up the single predecessor chain.
@@ -708,6 +709,12 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     }
     UsedInBB = Pred;
     Pred = UsedInBB->getSinglePredecessorBlock();
+  }
+
+  // In OSSA, a switch_enum on an owned enum switches on a borrow of it.
+  if (auto *BBI = dyn_cast<BeginBorrowInst>(Val)) {
+    return getEnumCaseRecursive(BBI->getOperand(), OrigUsedInBB,
+                                RecursionDepth + 1, HandledArgs);
   }
 
   // In case of a phi, recursively check the enum cases of all
@@ -787,6 +794,17 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget,
     // user. If this is the case we have a single block switch_enum loop.
     if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
       return true;
+
+    // In OSSA, a switch_enum on an owned enum switches on a borrow of it.
+    if (auto *BBI = dyn_cast<BeginBorrowInst>(User)) {
+      for (Operand *borrowUse : BBI->getUses()) {
+        auto *borrowUser = borrowUse->getUser();
+        if (borrowUser->getParent() == BB &&
+            (isa<SwitchEnumInst>(borrowUser) ||
+             isa<SelectEnumInst>(borrowUser)))
+          return true;
+      }
+    }
 
     // Also allow enum of enum, which usually can be combined to a single
     // instruction. This helps to simplify the creation of an enum from an

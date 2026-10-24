@@ -318,3 +318,47 @@ bb5:
 bb6(%28 : $Bool):
   return %28 : $Bool
 }
+
+// A switch_enum on a borrow of a phi is threaded when the incoming value is a
+// known enum case.
+// CHECK-LABEL: sil [ossa] @test_jump_thread_switch_enum_on_borrowed_phi :
+// CHECK:       bb1:
+// CHECK:         [[E:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
+// CHECK-NEXT:    br bb2([[E]])
+// CHECK:       bb2([[A:%.*]] : @owned $FakeOptional<Klass>):{{ *}}// Preds: bb1
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[A]]
+// CHECK-NEXT:    switch_enum [[B]]
+// CHECK:         switch_enum
+// CHECK-LABEL: } // end sil function 'test_jump_thread_switch_enum_on_borrowed_phi'
+sil [ossa] @test_jump_thread_switch_enum_on_borrowed_phi : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  specify_test "simplify_cfg_try_jump_threading @instruction[3]"
+  %1 = copy_value %0
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %1
+  br bb3(%2)
+
+bb2:
+  %4 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%4)
+
+bb3(%6 : @owned $FakeOptional<Klass>):
+  %7 = begin_borrow %6
+  switch_enum %7, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb5
+
+bb4(%9 : @guaranteed $Klass):
+  end_borrow %7
+  destroy_value %6
+  br bb6
+
+bb5:
+  end_borrow %7
+  destroy_value %6
+  br bb6
+
+bb6:
+  %t = tuple ()
+  return %t
+}
