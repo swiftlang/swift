@@ -36,11 +36,6 @@ internal typealias _CocoaString = AnyObject
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   )
 
-  @objc(_fastCStringContents:)
-  func _fastCStringContents(
-    _ requiresNulTermination: Int8
-  ) -> UnsafePointer<CChar>?
-
   @objc(_fastCharacterContents)
   func _fastCharacterContents() -> UnsafePointer<UInt16>?
 
@@ -464,12 +459,10 @@ internal func _bridgeTaggedASCII(
 }
 #endif
 
+@_silgen_name("swift_stdlib_NSStringASCIIPointer")
 @_effects(readonly)
-private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
-  //TODO(String bridging): Unconditionally asking for nul-terminated contents is
-  // overly conservative and hurts perf with some NSStrings
-  return unsafe str._fastCStringContents(1)?._asUInt8
-}
+private func _NSStringASCIIPointer(_ str: _StringSelectorHolder)
+  -> UnsafePointer<UInt8>?
 
 @_effects(readonly)
 private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
