@@ -185,6 +185,8 @@ NOTE(copy_inout_captured_by_autoclosure,none, "pass a copy of %0", (Identifier))
 
 NOTE(copy_self_captured_by_autoclosure,none, "pass a copy of 'self'", ())
 
+NOTE(copy_inout_captured_by_escaping_closure,none,"capture '%0' explicitly to copy it into the closure", (Identifier))
+
 #undef SELECT_ESCAPING_CLOSURE_KIND
 
 NOTE(value_captured_transitively,none,
