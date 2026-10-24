@@ -103,13 +103,13 @@ extension UnsafeCurrentTask {
 ///
 /// ```swift
 /// let priority = Task.currentPriority
-/// let job = queue.enqueue(request, priority: priority, resuming: continuation)
-/// return try await waiter.wait(
-///   onCancel: { queue.cancel(job) },
-///   onPriorityEscalated: { _, newPriority in
-///     guard newPriority > priority else { return }
-///     queue.escalate(job, to: newPriority)
-///   })
+/// let job = queue.enqueue(request, priority: priority)
+/// return try await withTaskPriorityEscalationHandler {
+///   try await job.value
+/// } onPriorityEscalated: { _, newPriority in
+///   guard newPriority > priority else { return }
+///   queue.escalate(job, to: newPriority)
+/// }
 /// ```
 ///
 /// - Note: Runtimes older than Swift 6.5 don't call the handler when it is

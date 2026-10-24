@@ -105,7 +105,7 @@ final class Box<Value: Sendable>: Sendable {
          waiter: consuming ContinuationWaiter<Int, Never>) in
         let holder = ContinuationHolder(continuation)
         return await waiter.wait(
-          onCancel: { holder.resumeFromDetachedTask(returning: 7, executorPreference: executor) },
+          onCancel: { _ in holder.resumeFromDetachedTask(returning: 7, executorPreference: executor) },
           onPriorityEscalated: { old, new in observedPriorities.value.append([old, new]) })
       }
     }
