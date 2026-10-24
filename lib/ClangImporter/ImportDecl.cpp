@@ -956,13 +956,11 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
     return false;
   }
 
-  if (isa<clang::FunctionTemplateDecl>(decl))
-    return true;
+  // Classify a member function template like the underlying function
+  if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(decl))
+    decl = ftd->getTemplatedDecl();
 
   if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
-    if (fn->getDescribedFunctionTemplate())
-      return true;
-
     switch (fn->getDeclName().getNameKind()) {
     case clang::DeclarationName::CXXOperatorName:
     case clang::DeclarationName::CXXConversionFunctionName:
