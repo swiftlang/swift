@@ -1,0 +1,4 @@
+module PrivateTypedef {
+  header "header.h"
+  requires cplusplus
+}
