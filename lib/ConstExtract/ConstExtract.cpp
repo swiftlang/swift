@@ -493,12 +493,18 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto tapExpr = interpolatedStringExpr->getAppendingExpr();
       auto &Ctx = tapExpr->getVar()->getASTContext();
 
-      std::vector<std::shared_ptr<CompileTimeValue>> segments;
+      std::vector<InterpolatedStringSegment> segments;
       interpolatedStringExpr->forEachSegment(
           Ctx, [&](bool isInterpolation, CallExpr *segment) -> void {
-            auto arg = segment->getArgs()->get(0);
-            auto expr = arg.getExpr();
-            segments.push_back(extractCompileTimeValue(expr, declContext));
+            if (isInterpolation) {
+              auto args = extractFunctionArguments(segment->getArgs(),
+                                                  declContext);
+              segments.push_back({true, nullptr, args});
+            } else {
+              auto arg = segment->getArgs()->get(0);
+              auto value = extractCompileTimeValue(arg.getExpr(), declContext);
+              segments.push_back({false, value, {}});
+            }
           });
 
       return std::make_shared<InterpolatedStringLiteralValue>(segments);
@@ -986,9 +992,29 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "InterpolatedStringLiteral");
     JSON.attributeObject("value", [&]() {
       JSON.attributeArray("segments", [&] {
-        auto segments = interpolatedStringValue->getSegments();
-        for (auto s : segments) {
-          JSON.object([&] { writeValue(JSON, s); });
+        for (auto &seg : interpolatedStringValue->getSegments()) {
+          JSON.object([&] {
+            if (seg.IsInterpolation) {
+              // Backwards-compatible rule: a single unlabeled argument uses the
+              // existing flat format so existing consumers are unaffected.
+              if (seg.Arguments.size() == 1 && seg.Arguments[0].Label.empty()) {
+                writeValue(JSON, seg.Arguments[0].Value);
+              } else {
+                JSON.attributeArray("arguments", [&] {
+                  for (auto &param : seg.Arguments) {
+                    JSON.object([&] {
+                      JSON.attribute("label", param.Label);
+                      JSON.attribute("type",
+                                     toFullyQualifiedTypeNameString(param.Type));
+                      writeValue(JSON, param.Value);
+                    });
+                  }
+                });
+              }
+            } else {
+              writeValue(JSON, seg.Value);
+            }
+          });
         }
       });
     });
