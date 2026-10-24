@@ -16,8 +16,6 @@ from . import product
 from . import wasisysroot
 from ..helpers import wasmswiftsdkhelpers as helpers
 from .wasistdlib import WASIStdlib, WASIThreadsStdlib
-from .cmake_product import CMakeProduct
-from .. import shell
 
 
 class WASISwiftSDK(product.Product):
@@ -40,7 +38,7 @@ class WASISwiftSDK(product.Product):
         return False
 
     def _append_platform_cmake_options(self, cmake_options,
-                                       swift_host_triple, has_pthread,
+                                       swift_host_triple, threading_flags,
                                        sysroot, extra_swift_flags):
         cmake_options.define('CMAKE_SYSTEM_NAME:STRING', 'WASI')
         cmake_options.define('CMAKE_SYSTEM_PROCESSOR:STRING', 'wasm32')
@@ -56,17 +54,14 @@ class WASISwiftSDK(product.Product):
             dest_dir, 'usr', 'lib', 'swift_static')
         clang_resource_dir = os.path.join(swift_resource_dir, 'clang')
 
+        threading_swift_flags, threading_clang_flags = threading_flags
         swift_flags = ['-sdk', sysroot, '-resource-dir',
                        swift_resource_dir] + extra_swift_flags
+        swift_flags.extend(threading_swift_flags)
         c_flags = ['-resource-dir', clang_resource_dir]
         cxx_flags = c_flags + ['-fno-exceptions']
-        if has_pthread:
-            clang_flags = ['-mthread-model', 'posix', '-pthread']
-            c_flags.extend(clang_flags)
-            cxx_flags.extend(clang_flags)
-            swift_flags.extend(['-Xcc', '-matomics', '-Xcc', '-mbulk-memory',
-                               '-Xcc', '-mthread-model', '-Xcc', 'posix',
-                               '-Xcc', '-pthread'])
+        c_flags.extend(threading_clang_flags)
+        cxx_flags.extend(threading_clang_flags)
 
         cmake_options.define('CMAKE_Swift_FLAGS', ' '.join(swift_flags))
         cmake_options.define('CMAKE_C_FLAGS', ' '.join(c_flags))
@@ -92,19 +87,15 @@ class WASISwiftSDK(product.Product):
             self.args, self.toolchain, host_target,
             self.install_toolchain_path(host_target))
 
-        # NOTE: We have two types of target triples:
-        # 1. swift_host_triple: The triple used by the Swift compiler's
-        #    '-target' option
-        # 2. clang_multiarch_triple: The triple used by Clang to find library
-        #    and header paths from the sysroot
-        #    https://github.com/llvm/llvm-project/blob/73ef397fcba35b7b4239c00bf3e0b4e689ca0add/clang/lib/Driver/ToolChains/WebAssembly.cpp#L29-L36
-        for swift_host_triple, clang_multiarch_triple, build_basename, build_sdk, has_pthread in [
-            ('wasm32-unknown-wasip1', 'wasm32-wasip1', 'wasistdlib', True, False),
-            ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
-             'wasithreadsstdlib', True, True),
+        for stdlib_product, has_pthread in [
+            (WASIStdlib, False),
+            (WASIThreadsStdlib, True),
         ]:
+            swift_host_triple = stdlib_product.swift_triple()
+            clang_multiarch_triple = stdlib_product.multiarch_triple()
             stdlib_build_path = os.path.join(
-                build_root, '%s-%s' % (build_basename, host_target))
+                build_root,
+                '%s-%s' % (stdlib_product.product_name(), host_target))
             sysroot = wasisysroot.WASISysroot.sysroot_install_path(
                 build_root, clang_multiarch_triple)
             resource_dir = wasisysroot.WASISysroot.resource_dir_install_path(
@@ -116,13 +107,15 @@ class WASISwiftSDK(product.Product):
                 self.toolchain.cmake, stdlib_build_path,
                 resource_dir, dest_dir)
 
+            threading_flags = stdlib_product.threading_compile_flags()
+
             # Create a closure capturing WASI-specific platform config.
             def append_cmake_opts(cmake_options, extra_swift_flags,
                                   _triple=swift_host_triple,
-                                  _pthread=has_pthread,
+                                  _flags=threading_flags,
                                   _sysroot=sysroot):
                 self._append_platform_cmake_options(
-                    cmake_options, _triple, _pthread,
+                    cmake_options, _triple, _flags,
                     _sysroot, extra_swift_flags)
 
             host_toolchain_path = self.native_toolchain_path(
@@ -145,19 +138,18 @@ class WASISwiftSDK(product.Product):
 
             # Append this triple's Swift SDK to the shared wasm
             # `.artifactbundle`. The bundle is reused across wasi /
-            # emscripten via `--incremental` + `--bundle-name
+            # wasi-threads / emscripten via `--incremental` + `--bundle-name
             # canonical_bundle_name(swift_version)`.
-            if build_sdk:
-                helpers.generate_swift_sdk(
-                    swift_run=swift_run,
-                    source_dir=self.source_dir,
-                    build_dir=self.build_dir,
-                    triple=swift_host_triple,
-                    sysroot=sysroot,
-                    package_path=dest_dir,
-                    bundle_name=helpers.canonical_bundle_name(swift_version),
-                    swift_version=swift_version,
-                )
+            helpers.generate_swift_sdk(
+                swift_run=swift_run,
+                source_dir=self.source_dir,
+                build_dir=self.build_dir,
+                triple=swift_host_triple,
+                sysroot=sysroot,
+                package_path=dest_dir,
+                bundle_name=helpers.canonical_bundle_name(swift_version),
+                swift_version=swift_version,
+            )
 
     def test(self, host_target):
         pass
