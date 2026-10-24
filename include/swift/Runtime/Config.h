@@ -680,13 +680,15 @@ swift_sign_code_address(T value, const void *address, unsigned extra) {
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
 #endif
 
-/// What is the system page size?
+/// Maximum page size used to align statically allocated runtime buffers.
 #if defined(__APPLE__) && defined(__arm64__)
-  // Apple Silicon systems use a 16KB page size
-  #define SWIFT_PAGE_SIZE 16384
+  // Apple Silicon systems use a 16KB page size.
+  #define SWIFT_MAX_PAGE_SIZE 16384
+#elif defined(__linux__) && defined(__aarch64__)
+  // Linux AArch64 supports 4KB, 16KB, and 64KB pages.
+  #define SWIFT_MAX_PAGE_SIZE 65536
 #else
-  // Everything else uses 4KB pages
-  #define SWIFT_PAGE_SIZE 4096
+  #define SWIFT_MAX_PAGE_SIZE 4096
 #endif
 
 #endif
