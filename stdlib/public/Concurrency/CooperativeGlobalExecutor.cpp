@@ -33,6 +33,7 @@
 #include <new>
 
 #include "swift/Basic/PriorityQueue.h"
+#include "swift/EmbeddedPlatform.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Heap.h"
 
@@ -72,8 +73,8 @@ using JobDeadline = long long;
 /// Read the current time on the suspending clock and return it as a
 /// nanosecond count.
 static JobDeadline currentSuspendingNanos() {
-  long long seconds, nanoseconds;
-  swift_get_time(&seconds, &nanoseconds, swift_clock_id_suspending);
+  __swift_int64_t seconds, nanoseconds;
+  _swift_clockSuspending_getTime(&seconds, &nanoseconds);
   return seconds * static_cast<JobDeadline>(NSEC_PER_SEC) + nanoseconds;
 }
 
@@ -227,8 +228,8 @@ static void sleepThisThreadUntil(JobDeadline deadline) {
   // If the deadline is already in the past there's nothing to wait for.
   if (remaining <= 0)
     return;
-  swift_sleep(remaining / static_cast<JobDeadline>(NSEC_PER_SEC),
-              remaining % static_cast<JobDeadline>(NSEC_PER_SEC));
+  _swift_clock_sleep(remaining / static_cast<JobDeadline>(NSEC_PER_SEC),
+                     remaining % static_cast<JobDeadline>(NSEC_PER_SEC));
 }
 
 /// Claim the next job from the cooperative global queue.

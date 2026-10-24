@@ -26,6 +26,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_dependencies(embedded-libraries embedded-multi-threaded-posix-shim)
   add_custom_target(embedded-multi-threaded-darwin-shim)
   add_dependencies(embedded-libraries embedded-multi-threaded-darwin-shim)
+  add_custom_target(embedded-clock-posix-shim)
+  add_dependencies(embedded-libraries embedded-clock-posix-shim)
 
   # The bridging header annotates its C declarations with Clang bounds-safety
   # attributes (EMBEDDED_SWIFT_COUNTED_BY / EMBEDDED_SWIFT_SIZED_BY, i.e.
@@ -125,4 +127,29 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       INSTALL_IN_COMPONENT stdlib
     )
   endif()
+
+  # The clock shim needs `clock_gettime` and `nanosleep`, which bare-metal and
+  # Windows triples lack, and Apple triples need an Apple SDK. Keep this list
+  # separate from `_mt_posix_skip_triple`: plain WASI has clocks but no threads.
+  set(_clock_posix_skip_triple "-none-" "-windows-")
+  if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+    list(APPEND _clock_posix_skip_triple "-apple-")
+  endif()
+
+  add_embedded_swift_target_library(
+    embedded-clock-posix-shim
+    swiftEmbeddedPlatformClockPOSIX
+    PARTIAL_SOURCES_INTENDED
+    INSTALL_BINARY
+    NON_EMPTY_OBJECT_FILE
+
+    EmbeddedPlatformClockPOSIX.c
+
+    C_COMPILE_FLAGS -nostdinc++ -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+    SKIP_MOD_REGEX "-windows-msvc$"
+    SKIP_ARCH_REGEX "avr"
+    SKIP_TRIPLE_REGEX ${_clock_posix_skip_triple}
+    ARCHITECTURE_KEY mod
+    INSTALL_IN_COMPONENT stdlib
+  )
 endif()

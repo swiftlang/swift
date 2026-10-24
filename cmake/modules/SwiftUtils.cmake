@@ -262,6 +262,14 @@ function(is_wasm_sdk sdk result_var_name)
   endif()
 endfunction()
 
+function(swift_wasi_target_triple result_var_name)
+  if(SWIFT_ENABLE_WASI_THREADS)
+    set("${result_var_name}" "wasm32-unknown-wasip1-threads" PARENT_SCOPE)
+  else()
+    set("${result_var_name}" "wasm32-unknown-wasip1" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Append Swift compilation-caching flags (driven by the SWIFT_CACHING_BUILD_*
 # cache variables) to the named list variable. Callers are responsible for
 # deciding whether caching applies to their target (e.g. checking

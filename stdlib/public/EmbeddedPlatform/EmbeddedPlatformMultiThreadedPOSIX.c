@@ -10,12 +10,9 @@
  *
  *===----------------------------------------------------------------------===*
  *
- * A multi-threaded implementation of the Embedded Swift platform mutex hooks
- * on top of `pthread_mutex_t`. The `pthread_mutex_t` is constructed directly
- * in the eight pointer-sized words of caller-owned storage that the platform
- * layer provides — 64 bytes on 64-bit targets, which fits every currently
- * supported `pthread_mutex_t` (40 bytes on glibc LP64, 56 bytes on Darwin
- * LP64).
+ * A multi-threaded implementation of the Embedded Swift platform hooks on top
+ * of POSIX threads. Semaphores are built from a mutex and a condition variable
+ * because Darwin does not implement unnamed POSIX semaphores.
  *
  *===----------------------------------------------------------------------===*/
 
@@ -23,6 +20,7 @@
 #include "swift/EmbeddedPlatform.h"
 
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 
 void _swift_lockStandardOutput(void) {
@@ -32,6 +30,12 @@ void _swift_lockStandardOutput(void) {
 void _swift_unlockStandardOutput(void) {
   funlockfile(stdout);
 }
+
+typedef struct {
+  pthread_mutex_t mutex;
+  pthread_cond_t condition;
+  __swift_size_t count;
+} swift_posix_semaphore_t;
 
 static pthread_t swift_embedded_platform_main_thread;
 static pthread_key_t swift_embedded_platform_tls_keys[SWIFT_TLS_KEY_COUNT];
@@ -53,6 +57,14 @@ _Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WOR
 _Static_assert(_Alignof(pthread_mutex_t) <= _Alignof(void *),
                "pthread_mutex_t requires stronger alignment than the Embedded "
                "Swift Platform recursive mutex storage provides");
+_Static_assert(sizeof(swift_posix_semaphore_t) <= EMBEDDED_SWIFT_SEMAPHORE_NUM_WORDS * sizeof(void *),
+               "swift_posix_semaphore_t does not fit in the Embedded Swift "
+               "Platform semaphore storage");
+_Static_assert(_Alignof(swift_posix_semaphore_t) <= _Alignof(void *),
+               "swift_posix_semaphore_t requires stronger alignment than the "
+               "Embedded Swift Platform semaphore storage provides");
+_Static_assert(sizeof(pthread_t) <= sizeof(__swift_thread_t),
+               "pthread_t does not fit in __swift_thread_t");
 #endif
 
 static void trap_if(int failed) {
@@ -160,4 +172,52 @@ void _swift_tls_set(__swift_tls_key_t key, void *value) {
 
 __swift_ptrdiff_t _swift_thread_isMain(void) {
   return pthread_equal(pthread_self(), swift_embedded_platform_main_thread) != 0;
+}
+
+__swift_ptrdiff_t _swift_thread_create(__swift_thread_t *thread,
+                                       __swift_thread_start_t start,
+                                       void *arg) {
+  pthread_t handle;
+  if (pthread_create(&handle, NULL, start, arg) != 0) {
+    return 0;
+  }
+  *thread = (__swift_thread_t)(uintptr_t)handle;
+  return 1;
+}
+
+void _swift_thread_join(__swift_thread_t thread) {
+  trap_if(pthread_join((pthread_t)(uintptr_t)thread, NULL) != 0);
+}
+
+void _swift_sem_init(void *sem, __swift_size_t value) {
+  swift_posix_semaphore_t *s = (swift_posix_semaphore_t *)sem;
+  trap_if(value > PTRDIFF_MAX);
+  trap_if(pthread_mutex_init(&s->mutex, NULL) != 0);
+  trap_if(pthread_cond_init(&s->condition, NULL) != 0);
+  s->count = value;
+}
+
+void _swift_sem_destroy(void *sem) {
+  swift_posix_semaphore_t *s = (swift_posix_semaphore_t *)sem;
+  trap_if(pthread_cond_destroy(&s->condition) != 0);
+  trap_if(pthread_mutex_destroy(&s->mutex) != 0);
+}
+
+void _swift_sem_wait(void *sem) {
+  swift_posix_semaphore_t *s = (swift_posix_semaphore_t *)sem;
+  trap_if(pthread_mutex_lock(&s->mutex) != 0);
+  while (s->count == 0) {
+    trap_if(pthread_cond_wait(&s->condition, &s->mutex) != 0);
+  }
+  s->count--;
+  trap_if(pthread_mutex_unlock(&s->mutex) != 0);
+}
+
+void _swift_sem_post(void *sem) {
+  swift_posix_semaphore_t *s = (swift_posix_semaphore_t *)sem;
+  trap_if(pthread_mutex_lock(&s->mutex) != 0);
+  trap_if(s->count == PTRDIFF_MAX);
+  s->count++;
+  trap_if(pthread_cond_signal(&s->condition) != 0);
+  trap_if(pthread_mutex_unlock(&s->mutex) != 0);
 }
