@@ -923,3 +923,34 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   return %2
 }
 
+// CHECK-LABEL: sil @assume_true :
+// CHECK-NOT:     builtin "assume_Int1"
+// CHECK:       } // end sil function 'assume_true'
+sil @assume_true : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  %1 = builtin "assume_Int1"(%0) : $Builtin.Int1
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil @assume_false :
+// CHECK:         builtin "assume_Int1"
+// CHECK:       } // end sil function 'assume_false'
+sil @assume_false : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %1 = builtin "assume_Int1"(%0) : $Builtin.Int1
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil @assume_non_constant :
+// CHECK:         builtin "assume_Int1"
+// CHECK:       } // end sil function 'assume_non_constant'
+sil @assume_non_constant : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = builtin "assume_Int1"(%0) : $Builtin.Int1
+  %2 = tuple ()
+  return %2
+}

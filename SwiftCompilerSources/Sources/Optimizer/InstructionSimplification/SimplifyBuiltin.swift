@@ -28,6 +28,8 @@ extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
         optimizeCanBeClass(context)
       case .AssertConf:
         optimizeAssertConfig(context)
+      case .AssumeTrue:
+        optimizeAssumeTrue(context)
       case .Sizeof,
            .Strideof,
            .Alignof:
@@ -161,6 +163,12 @@ private extension BuiltinInst {
       context.erase(instruction: self)
     case .unknown:
       return
+    }
+  }
+
+  func optimizeAssumeTrue(_ context: SimplifyContext) {
+    if uses.isEmpty, let literal = operands[0].value as? IntegerLiteralInst, let value = literal.value, value != 0 {
+      context.erase(instruction: self)
     }
   }
   
