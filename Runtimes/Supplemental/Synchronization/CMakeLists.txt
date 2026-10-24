@@ -51,7 +51,6 @@ include(GNUInstallDirs)
 
 include(AvailabilityMacros)
 include(EmitSwiftInterface)
-include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
@@ -185,14 +184,16 @@ if(WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL i686)
   endif()
 endif()
 
+emit_swift_interface(swiftSynchronization)
 install(TARGETS swiftSynchronization
   EXPORT SwiftSynchronizationTargets
   COMPONENT ${PROJECT_NAME}_runtime
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftSynchronization)
-install_swift_interface(swiftSynchronization)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT ${PROJECT_NAME}_development
+    DESTINATION "${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}")
 
 # Inter-project install info
 export(EXPORT SwiftSynchronizationTargets

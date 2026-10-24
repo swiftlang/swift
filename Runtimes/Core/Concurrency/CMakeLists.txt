@@ -162,14 +162,16 @@ if(NOT BUILD_SHARED_LIBS AND CMAKE_STATIC_LIBRARY_PREFIX_Swift)
     PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX_Swift})
 endif()
 
+emit_swift_interface(swift_Concurrency)
 install(TARGETS swift_Concurrency
   EXPORT SwiftCoreTargets
   COMPONENT SwiftCore_runtime
   ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swift_Concurrency)
-install_swift_interface(swift_Concurrency)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftCore_development
+    DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}")
 
 # Configure plist creation for Darwin platforms.
 generate_plist(swift_Concurrency "${CMAKE_PROJECT_VERSION}" swift_Concurrency)

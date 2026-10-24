@@ -16,12 +16,14 @@ target_link_libraries(swift_Builtin_float PRIVATE
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   swiftCore)
 
+emit_swift_interface(swift_Builtin_float)
 install(TARGETS swift_Builtin_float
   EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swift_Builtin_float)
-install_swift_interface(swift_Builtin_float)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftOverlay_development
+    DESTINATION "${SwiftOverlay_INSTALL_SWIFTMODULEDIR}")
 
 embed_manifest(swift_Builtin_float)
