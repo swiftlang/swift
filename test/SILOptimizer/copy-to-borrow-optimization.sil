@@ -2820,3 +2820,117 @@ bb0(%0 : @guaranteed $C):
   %6 = tuple ()
   return %6
 }
+
+struct ObjAndInt {
+  var obj: Builtin.NativeObject
+  var i: Builtin.Int64
+}
+
+sil @guaranteed_obj_and_int_user : $@convention(thin) (@guaranteed ObjAndInt) -> ()
+
+// A copy of an aggregate, built from a borrow, is removed by extending the borrow scope.
+// CHECK-LABEL: sil [ossa] @copy_of_aggregate_of_borrow :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    [[S:%.*]] = struct $ObjAndInt ([[B]], %1)
+// CHECK-NOT:     copy_value
+// CHECK:         apply {{%.*}}([[S]])
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'copy_of_aggregate_of_borrow'
+sil [ossa] @copy_of_aggregate_of_borrow : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int64) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int64):
+  %2 = begin_borrow %0
+  %3 = struct $ObjAndInt (%2, %1)
+  %4 = copy_value %3
+  end_borrow %2
+  %6 = function_ref @guaranteed_obj_and_int_user : $@convention(thin) (@guaranteed ObjAndInt) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@guaranteed ObjAndInt) -> ()
+  destroy_value %4
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// A `destroy_value [dead_end]` of the borrowed value right before a destroy of the copy doesn't prevent
+// extending the borrow scope. It is moved below the copy's destroy, i.e. after the new `end_borrow`.
+// CHECK-LABEL: sil [ossa] @copy_of_aggregate_of_borrow_dead_end :
+// CHECK-NOT:     copy_value
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'copy_of_aggregate_of_borrow_dead_end'
+sil [ossa] @copy_of_aggregate_of_borrow_dead_end : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int64) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int64):
+  %2 = begin_borrow %0
+  %3 = struct $ObjAndInt (%2, %1)
+  %4 = copy_value %3
+  end_borrow %2
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = function_ref @guaranteed_obj_and_int_user : $@convention(thin) (@guaranteed ObjAndInt) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@guaranteed ObjAndInt) -> ()
+  destroy_value %4
+  destroy_value %0
+  %t = tuple ()
+  return %t
+
+bb2:
+  destroy_value [dead_end] %0
+  destroy_value %4
+  unreachable
+}
+
+// A `destroy_value [dead_end]` of an owned value right before a destroy of its copy doesn't prevent
+// removing the copy. It is moved below the copy's destroy.
+// CHECK-LABEL: sil [ossa] @copy_of_owned_dead_end :
+// CHECK-NOT:     copy_value
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'copy_of_owned_dead_end'
+sil [ossa] @copy_of_owned_dead_end : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = apply %3(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %1
+  destroy_value %0
+  %t = tuple ()
+  return %t
+
+bb2:
+  destroy_value [dead_end] %0
+  destroy_value %1
+  unreachable
+}
+
+// A `destroy_value [dead_end]` within the copy's lifetime is only moved within the block of the copy's
+// destroy. Here it's in other blocks, so the copy is not removed.
+// CHECK-LABEL: sil [ossa] @copy_of_owned_dead_end_other_block :
+// CHECK:         copy_value %0
+// CHECK:       } // end sil function 'copy_of_owned_dead_end_other_block'
+sil [ossa] @copy_of_owned_dead_end_other_block : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = copy_value %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb2:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  %6 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %7 = apply %6(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %1
+  unreachable
+}

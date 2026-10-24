@@ -51,7 +51,7 @@ func extendBorrowScope(of value: Value,
                        toOverlap range: InstructionRange,
                        _ context: FunctionPassContext) -> Bool
 {
-  guard let beginBorrow = BeginBorrowValue(value.lookThroughForwardingInstructions) else {
+  guard let beginBorrow = singleBorrowIntroducer(of: value, context) else {
     return false
   }
   if case .functionArgument = beginBorrow {
@@ -101,6 +101,20 @@ func extendBorrowScope(of value: Value,
     Builder(before: insertionPoint, context).createEndBorrow(of: beginBorrow.value)
   }
   return true
+}
+
+/// Returns the borrow scope which encloses `value`, if there is exactly one. Unlike
+/// `lookThroughForwardingInstructions`, this also looks through aggregates, e.g. a `struct` with a
+/// single non-trivial operand.
+func singleBorrowIntroducer(of value: Value, _ context: some Context) -> BeginBorrowValue? {
+  var result: BeginBorrowValue? = nil
+  for introducer in value.getBorrowIntroducers(context) {
+    if result != nil {
+      return nil
+    }
+    result = introducer
+  }
+  return result
 }
 
 private func getEndBorrows(of beginBorrow: BeginBorrowValue,
