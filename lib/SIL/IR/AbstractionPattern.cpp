@@ -499,12 +499,12 @@ bool AbstractionPattern::matchesTuple(CanType substType) const {
 
 static const clang::FunctionType *
 getClangFunctionType(const clang::Type *clangType) {
+  if (auto refTy = clangType->getAs<clang::ReferenceType>())
+    clangType = refTy->getPointeeType().getTypePtr();
   if (auto ptrTy = clangType->getAs<clang::PointerType>()) {
     clangType = ptrTy->getPointeeType().getTypePtr();
   } else if (auto blockTy = clangType->getAs<clang::BlockPointerType>()) {
     clangType = blockTy->getPointeeType().getTypePtr();
-  } else if (auto refTy = clangType->getAs<clang::ReferenceType>()) {
-    clangType = refTy->getPointeeType().getTypePtr();
   }
   return clangType->castAs<clang::FunctionType>();
 }
