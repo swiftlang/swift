@@ -250,8 +250,12 @@ extension Character {
   /// - "Π" (U+03A0 GREEK CAPITAL LETTER PI)
   @inlinable
   public var isUppercase: Bool {
-    if _fastPath(_isSingleScalar && _firstScalar.properties.isUppercase) {
-      return true
+    if _fastPath(_isSingleScalar) {
+      if _firstScalar.isASCII {
+        return _firstScalar.value >= 0x41 && _firstScalar.value <= 0x5A
+      } else if _firstScalar.properties.isUppercase {
+        return true
+      }
     }
     return _isUppercased && isCased
   }
@@ -266,8 +270,12 @@ extension Character {
   /// - "π" (U+03C0 GREEK SMALL LETTER PI)
   @inlinable
   public var isLowercase: Bool {
-    if _fastPath(_isSingleScalar && _firstScalar.properties.isLowercase) {
-      return true
+    if _fastPath(_isSingleScalar) {
+      if _firstScalar.isASCII {
+        return _firstScalar.value >= 0x61 && _firstScalar.value <= 0x7A
+      } else if _firstScalar.properties.isLowercase {
+        return true
+      }
     }
     return _isLowercased && isCased
   }
