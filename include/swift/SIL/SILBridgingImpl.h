@@ -912,7 +912,7 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->hasLoweredAddresses(); }
 
-SwiftInt BridgedFunction::getStage() const {
+SwiftInt BridgedFunction::getFunctionStage() const {
   return (SwiftInt)getFunction()->getFunctionStage();
 }
 
