@@ -1,0 +1,526 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -debug-reconstruction-block-simplification %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+protocol P {}
+
+enum MyEnum {
+  case none
+  case some(Int64)
+}
+
+class Root {}
+class Base : Root {}
+class Derived : Base {}
+
+// CHECK-LABEL: sil {{.+}} @test_struct_extract_simplification
+// The struct+struct_extract pair is folded away, which leaves the block forwarding
+// its only argument, so the block goes away too.
+// CHECK: debug_value %0 : $Int64, let, name "val"
+// CHECK-NOT: transform {
+sil hidden @test_struct_extract_simplification : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value %0 : $Int64, let, name "val", transform {
+  bb0(%a : $Int64):
+    %1 = struct $MyStruct (%a : $Int64, %a : $Int64)
+    %2 = struct_extract %1 : $MyStruct, #MyStruct.x
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_tuple_extract_simplification
+// CHECK: debug_value %0 : $Int64, let, name "tval"
+// CHECK-NOT: transform {
+sil hidden @test_tuple_extract_simplification : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value %0 : $Int64, let, name "tval", transform {
+  bb0(%a : $Int64):
+    %1 = tuple (%a : $Int64, %a : $Int64)
+    %2 = tuple_extract %1 : $(Int64, Int64), 0
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Passing the same value twice is redundant: both arguments are merged into one
+// and the duplicated operand is dropped.
+// CHECK-LABEL: sil {{.+}} @test_merge_duplicate_operands
+// CHECK: debug_value %0 : $Int64, let, name "dup", type $MyStruct, transform {
+// CHECK:   bb0(%0 : $Int64):
+// CHECK:     %1 = struct $MyStruct (%0 : $Int64, %0 : $Int64)
+// CHECK:     return %1 : $MyStruct
+// CHECK:   }
+sil hidden @test_merge_duplicate_operands : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value (%0 : $Int64, %0 : $Int64), let, name "dup", type $MyStruct, transform {
+  bb0(%a : $Int64, %b : $Int64):
+    %1 = struct $MyStruct (%a : $Int64, %b : $Int64)
+    return %1 : $MyStruct
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// An undef operand cannot describe anything, so its argument becomes undef inside
+// the block and the operand is dropped. The recoverable half of the variable stays.
+// CHECK-LABEL: sil {{.+}} @test_undef_operand
+// CHECK: debug_value %0 : $Int64, let, name "partial", type $MyStruct, transform {
+// CHECK:   bb0(%0 : $Int64):
+// CHECK:     %1 = struct $MyStruct (%0 : $Int64, undef : $Int64)
+// CHECK:     return %1 : $MyStruct
+// CHECK:   }
+sil hidden @test_undef_operand : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value (%0 : $Int64, undef : $Int64), let, name "partial", type $MyStruct, transform {
+  bb0(%a : $Int64, %b : $Int64):
+    %1 = struct $MyStruct (%a : $Int64, %b : $Int64)
+    return %1 : $MyStruct
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Undef propagates through a projection, which leaves the whole variable
+// unrecoverable. With nothing left to reconstruct, the debug value collapses back
+// to the plain `debug_value undef` spelling and loses its block entirely.
+// CHECK-LABEL: sil {{.+}} @test_undef_propagation
+// CHECK: debug_value undef : $Int64, let, name "gone"
+// CHECK-NOT: transform {
+sil hidden @test_undef_propagation : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $MyStruct, let, name "gone", type $Int64, transform {
+  bb0(%a : $MyStruct):
+    %1 = struct_extract %a : $MyStruct, #MyStruct.x
+    return %1 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// An aggregate is only recoverable if all of its fields are.
+// CHECK-LABEL: sil {{.+}} @test_all_undef_aggregate
+// CHECK: debug_value undef : $MyStruct, let, name "s"
+// CHECK-NOT: transform {
+sil hidden @test_all_undef_aggregate : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Int64, let, name "s", type $MyStruct, transform {
+  bb0(%a : $Int64):
+    %1 = struct $MyStruct (%a : $Int64, %a : $Int64)
+    return %1 : $MyStruct
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Loading from an unrecoverable address gives an unrecoverable value. This is the
+// shape left behind when the address operand of an `op_deref` debug value is killed.
+// CHECK-LABEL: sil {{.+}} @test_load_undef
+// CHECK: debug_value undef : $Int64, let, name "loaded"
+// CHECK-NOT: transform {
+sil hidden @test_load_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $*Int64, let, name "loaded", type $Int64, transform {
+  bb0(%a : $*Int64):
+    %1 = load %a : $*Int64
+    return %1 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The simplification makes the second argument unused, which makes its operand
+// droppable even though it is not undef.
+// CHECK-LABEL: sil {{.+}} @test_dead_operand
+// CHECK: debug_value %0 : $Int64, let, name "first"
+// CHECK-NOT: transform {
+sil hidden @test_dead_operand : $@convention(thin) (Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64):
+  debug_value (%0 : $Int64, %1 : $Int64), let, name "first", transform {
+  bb0(%a : $Int64, %b : $Int64):
+    %2 = struct $MyStruct (%a : $Int64, %b : $Int64)
+    %3 = struct_extract %2 : $MyStruct, #MyStruct.x
+    return %3 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Dropping a middle operand shifts the following ones down, so that operand i
+// keeps matching block argument i.
+// CHECK-LABEL: sil {{.+}} @test_erase_middle_operand
+// CHECK: debug_value (%0 : $Int64, %2 : $Int64), let, name "outer", type $MyStruct, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = struct $MyStruct (%0 : $Int64, %1 : $Int64)
+// CHECK:     return %2 : $MyStruct
+// CHECK:   }
+sil hidden @test_erase_middle_operand : $@convention(thin) (Int64, Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64):
+  debug_value (%0 : $Int64, %1 : $Int64, %2 : $Int64), let, name "outer", type $MyStruct, transform {
+  bb0(%a : $Int64, %b : $Int64, %c : $Int64):
+    %3 = struct $MyStruct (%a : $Int64, %c : $Int64)
+    return %3 : $MyStruct
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A block which just forwards its only argument describes nothing the operand does
+// not already describe, so it is detached even when no simplification happened.
+// CHECK-LABEL: sil {{.+}} @test_collapse_forwarding_block
+// CHECK: debug_value %0 : $Int64, let, name "noop"
+// CHECK-NOT: transform {
+sil hidden @test_collapse_forwarding_block : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  debug_value %0 : $Int64, let, name "noop", transform {
+  bb0(%a : $Int64):
+    return %a : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Detaching a forwarding block keeps the op_deref, which then applies to the
+// operand rather than to the block's result. This is the shape
+// `getOrCreateDebugReconstructionBlock` produces for an address-only variable,
+// where the deref cannot be turned into a load.
+// CHECK-LABEL: sil {{.+}} @test_collapse_forwarding_block_deref
+// CHECK: debug_value %0 : $*any P, let, name "indirect", expr op_deref
+// CHECK-NOT: transform {
+sil hidden @test_collapse_forwarding_block_deref : $@convention(thin) (@in any P) -> () {
+bb0(%0 : $*any P):
+  debug_value %0 : $*any P, let, name "indirect", type $any P, expr op_deref, transform {
+  bb0(%a : $*any P):
+    return %a : $*any P
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A block which only loads its argument is the same as an op_deref.
+// CHECK-LABEL: sil {{.+}} @test_collapse_load_block
+// CHECK: debug_value %0 : $*Int64, let, name "loaded_arg", expr op_deref
+// CHECK-NOT: transform {
+sil hidden @test_collapse_load_block : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  debug_value %0 : $*Int64, let, name "loaded_arg", transform {
+  bb0(%a : $*Int64):
+    %1 = load %a : $*Int64
+    return %1 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A load of a projection cannot be simplified.
+// CHECK-LABEL: sil {{.+}} @test_load_of_projection_kept
+// CHECK: debug_value %0 : $*MyStruct, let, name "field", transform {
+// CHECK:   bb0(%0 : $*MyStruct):
+// CHECK-NEXT: %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.x
+// CHECK-NEXT: %2 = load %1 : $*Int64
+// CHECK-NEXT: return %2 : $Int64
+// CHECK-NEXT: }
+sil hidden @test_load_of_projection_kept : $@convention(thin) (@inout MyStruct) -> () {
+bb0(%0 : $*MyStruct):
+  debug_value %0 : $*MyStruct, let, name "field", transform {
+  bb0(%a : $*MyStruct):
+    %1 = struct_element_addr %a : $*MyStruct, #MyStruct.x
+    %2 = load %1 : $*Int64
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Undef propagates through an address projection just like through a value projection.
+// CHECK-LABEL: sil {{.+}} @test_tuple_element_addr_undef
+// CHECK: debug_value undef : $Int64, let, name "elt"
+// CHECK-NOT: transform {
+sil hidden @test_tuple_element_addr_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $*(Int64, Int64), let, name "elt", type $Int64, transform {
+  bb0(%a : $*(Int64, Int64)):
+    %1 = tuple_element_addr %a : $*(Int64, Int64), 0
+    %2 = load %1 : $*Int64
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_index_addr_undef
+// CHECK: debug_value undef : $Int64, let, name "gone_idx"
+// CHECK-NOT: transform {
+sil hidden @test_index_addr_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $*Int64, let, name "gone_idx", type $Int64, transform {
+  bb0(%a : $*Int64):
+    %1 = integer_literal $Builtin.Word, 4
+    %2 = index_addr %a : $*Int64, %1 : $Builtin.Word
+    %3 = load %2 : $*Int64
+    return %3 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Salvaging clones the index literal into the block, so a zero index shows up here and
+// folds to the base. The dead literal is cleaned up with it, which leaves only the load.
+// CHECK-LABEL: sil {{.+}} @test_index_addr_zero
+// CHECK: debug_value %0 : $*Int64, let, name "idx", expr op_deref
+// CHECK-NOT: transform {
+sil hidden @test_index_addr_zero : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  debug_value %0 : $*Int64, let, name "idx", transform {
+  bb0(%a : $*Int64):
+    %1 = integer_literal $Builtin.Word, 0
+    %2 = index_addr %a : $*Int64, %1 : $Builtin.Word
+    %3 = load %2 : $*Int64
+    return %3 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// An `enum` still records which case the variable holds, so it must not be folded away
+// even though its payload became undef.
+// CHECK-LABEL: sil {{.+}} @test_enum_undef_payload_kept
+// CHECK: debug_value (), let, name "e", type $MyEnum, transform {
+// CHECK: %0 = enum $MyEnum, #MyEnum.some!enumelt, undef : $Int64
+sil hidden @test_enum_undef_payload_kept : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Int64, let, name "e", type $MyEnum, transform {
+  bb0(%a : $Int64):
+    %1 = enum $MyEnum, #MyEnum.some!enumelt, %a : $Int64
+    return %1 : $MyEnum
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_inplace_enum_data_addr_undef
+// CHECK: debug_value undef : $Int64, let, name "payload"
+// CHECK-NOT: transform {
+sil hidden @test_inplace_enum_data_addr_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $*MyEnum, let, name "payload", type $Int64, transform {
+  bb0(%a : $*MyEnum):
+    %1 = unchecked_inplace_enum_data_addr %a : $*MyEnum, #MyEnum.some!enumelt
+    %2 = load %1 : $*Int64
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Putting all fields of a struct back together gives the struct.
+// CHECK-LABEL: sil {{.+}} @test_struct_of_extracts
+// CHECK: debug_value %0 : $MyStruct, let, name "rebuilt"
+// CHECK-NOT: transform {
+sil hidden @test_struct_of_extracts : $@convention(thin) (MyStruct) -> () {
+bb0(%0 : $MyStruct):
+  debug_value %0 : $MyStruct, let, name "rebuilt", transform {
+  bb0(%a : $MyStruct):
+    %1 = struct_extract %a : $MyStruct, #MyStruct.x
+    %2 = struct_extract %a : $MyStruct, #MyStruct.y
+    %3 = struct $MyStruct (%1 : $Int64, %2 : $Int64)
+    return %3 : $MyStruct
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_struct_of_swapped_extracts_kept
+// CHECK: debug_value %0 : $MyStruct, let, name "swapped", transform {
+// CHECK:   bb0(%0 : $MyStruct):
+// CHECK-NEXT: %1 = struct_extract %0 : $MyStruct, #MyStruct.x
+// CHECK-NEXT: %2 = struct_extract %0 : $MyStruct, #MyStruct.y
+// CHECK-NEXT: %3 = struct $MyStruct (%2 : $Int64, %1 : $Int64)
+// CHECK-NEXT: return %3 : $MyStruct
+// CHECK-NEXT: }
+sil hidden @test_struct_of_swapped_extracts_kept : $@convention(thin) (MyStruct) -> () {
+bb0(%0 : $MyStruct):
+  debug_value %0 : $MyStruct, let, name "swapped", transform {
+  bb0(%a : $MyStruct):
+    %1 = struct_extract %a : $MyStruct, #MyStruct.x
+    %2 = struct_extract %a : $MyStruct, #MyStruct.y
+    %3 = struct $MyStruct (%2 : $Int64, %1 : $Int64)
+    return %3 : $MyStruct
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// This is the shape a salvaged `destructure_tuple` and `tuple` pair leaves behind.
+// CHECK-LABEL: sil {{.+}} @test_tuple_of_extracts
+// CHECK: debug_value %0 : $(Int64, Int64), let, name "pair"
+// CHECK-NOT: transform {
+sil hidden @test_tuple_of_extracts : $@convention(thin) ((Int64, Int64)) -> () {
+bb0(%0 : $(Int64, Int64)):
+  debug_value %0 : $(Int64, Int64), let, name "pair", transform {
+  bb0(%a : $(Int64, Int64)):
+    %1 = tuple_extract %a : $(Int64, Int64), 0
+    %2 = tuple_extract %a : $(Int64, Int64), 1
+    %3 = tuple (%1 : $Int64, %2 : $Int64)
+    return %3 : $(Int64, Int64)
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_upcast_chain
+// CHECK: debug_value %0 : $Derived, let, name "root", type $Root, transform {
+// CHECK:   bb0(%0 : $Derived):
+// CHECK-NEXT: %1 = upcast %0 : $Derived to $Root
+// CHECK-NEXT: return %1 : $Root
+// CHECK-NEXT: }
+sil hidden @test_upcast_chain : $@convention(thin) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  debug_value %0 : $Derived, let, name "root", type $Root, transform {
+  bb0(%a : $Derived):
+    %1 = upcast %a : $Derived to $Base
+    %2 = upcast %1 : $Base to $Root
+    return %2 : $Root
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Casting back to the original class gives the original reference.
+// CHECK-LABEL: sil {{.+}} @test_ref_cast_of_upcast
+// CHECK: debug_value %0 : $Derived, let, name "back"
+// CHECK-NOT: transform {
+sil hidden @test_ref_cast_of_upcast : $@convention(thin) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  debug_value %0 : $Derived, let, name "back", transform {
+  bb0(%a : $Derived):
+    %1 = upcast %a : $Derived to $Base
+    %2 = unchecked_ref_cast %1 : $Base to $Derived
+    return %2 : $Derived
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_ref_cast_chain
+// CHECK: debug_value %0 : $Derived, let, name "chain"
+// CHECK-NOT: transform {
+sil hidden @test_ref_cast_chain : $@convention(thin) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  debug_value %0 : $Derived, let, name "chain", transform {
+  bb0(%a : $Derived):
+    %1 = unchecked_ref_cast %a : $Derived to $Builtin.NativeObject
+    %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Derived
+    return %2 : $Derived
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_address_pointer_round_trip
+// CHECK: debug_value %0 : $*Int64, let, name "addr", expr op_deref
+// CHECK-NOT: transform {
+sil hidden @test_address_pointer_round_trip : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  debug_value %0 : $*Int64, let, name "addr", transform {
+  bb0(%a : $*Int64):
+    %1 = address_to_pointer %a : $*Int64 to $Builtin.RawPointer
+    %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
+    %3 = load %2 : $*Int64
+    return %3 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_pointer_address_round_trip
+// CHECK: debug_value %0 : $Builtin.RawPointer, let, name "raw"
+// CHECK-NOT: transform {
+sil hidden @test_pointer_address_round_trip : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  debug_value %0 : $Builtin.RawPointer, let, name "raw", transform {
+  bb0(%a : $Builtin.RawPointer):
+    %1 = pointer_to_address %a : $Builtin.RawPointer to [strict] $*Int64
+    %2 = address_to_pointer %1 : $*Int64 to $Builtin.RawPointer
+    return %2 : $Builtin.RawPointer
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_builtin_undef
+// CHECK: debug_value undef : $Builtin.Int64, let, name "wide"
+// CHECK-NOT: transform {
+sil hidden @test_builtin_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Builtin.Int32, let, name "wide", type $Builtin.Int64, transform {
+  bb0(%a : $Builtin.Int32):
+    %1 = builtin "zextOrBitCast_Int32_Int64"(%a : $Builtin.Int32) : $Builtin.Int64
+    return %1 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A sum with an undefined value is undefined.
+// CHECK-LABEL: sil {{.+}} @test_builtin_add_one_undef
+// CHECK: debug_value undef : $Builtin.Int64, let, name "sum"
+// CHECK-NOT: transform {
+sil hidden @test_builtin_add_one_undef : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value (%0 : $Builtin.Int64, undef : $Builtin.Int64), let, name "sum", type $Builtin.Int64, transform {
+  bb0(%a : $Builtin.Int64, %b : $Builtin.Int64):
+    %1 = integer_literal $Builtin.Int1, -1
+    %2 = builtin "sadd_with_overflow_Int64"(%a : $Builtin.Int64, %b : $Builtin.Int64, %1 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+    %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0
+    return %3 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// One undef is not enough to fold `and`.
+// CHECK-LABEL: sil {{.+}} @test_builtin_and_one_undef_kept
+// CHECK: debug_value %0 : $Builtin.Int64, let, name "masked", transform {
+// CHECK:   bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT: %1 = builtin "and_Int64"(%0 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT: return %1 : $Builtin.Int64
+// CHECK-NEXT: }
+sil hidden @test_builtin_and_one_undef_kept : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value (%0 : $Builtin.Int64, undef : $Builtin.Int64), let, name "masked", type $Builtin.Int64, transform {
+  bb0(%a : $Builtin.Int64, %b : $Builtin.Int64):
+    %1 = builtin "and_Int64"(%a : $Builtin.Int64, %b : $Builtin.Int64) : $Builtin.Int64
+    return %1 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The size is known and folded, even with an undef metatype.
+// CHECK-LABEL: sil {{.+}} @test_builtin_sizeof_undef_metatype
+// CHECK: debug_value (), let, name "size", type $Builtin.Word, transform {
+// CHECK:   bb0:
+// CHECK-NEXT: %0 = integer_literal $Builtin.Word, 8
+// CHECK-NEXT: return %0 : $Builtin.Word
+// CHECK-NEXT: }
+sil hidden @test_builtin_sizeof_undef_metatype : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $@thick Int64.Type, let, name "size", type $Builtin.Word, transform {
+  bb0(%a : $@thick Int64.Type):
+    %1 = builtin "sizeof"<Int64>(%a : $@thick Int64.Type) : $Builtin.Word
+    return %1 : $Builtin.Word
+  }
+  %r = tuple ()
+  return %r : $()
+}
