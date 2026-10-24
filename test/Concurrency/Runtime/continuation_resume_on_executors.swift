@@ -924,7 +924,7 @@ struct Main {
             log.record("resume returned")
           }
           let value = await waiter.wait(
-            onCancel: { log.record("cancellation handler") },
+            onCancel: { _ in log.record("cancellation handler") },
             onPriorityEscalated: { _, _ in log.record("escalation handler") })
           log.record("waiter resumed")
           return value

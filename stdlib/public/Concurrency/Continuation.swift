@@ -272,7 +272,7 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// let priority = Task.currentPriority
   /// let job = queue.enqueue(request, priority: priority, resuming: continuation)
   /// return try await waiter.wait(
-  ///   onCancel: { queue.cancel(job) },
+  ///   onCancel: { reason in queue.cancel(job, reason: reason) },
   ///   onPriorityEscalated: { _, newPriority in
   ///     guard newPriority > priority else { return }
   ///     queue.escalate(job, to: newPriority)
@@ -280,8 +280,9 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// ```
   ///
   /// - Parameters:
-  ///   - onCancel: Run when the task is cancelled while suspended
-  ///     here. It may run concurrently with the resumption, and on any thread.
+  ///   - onCancel: Run with the reason the task was cancelled with when it is
+  ///     cancelled while suspended here. It may run concurrently with the
+  ///     resumption, and on any thread.
   ///   - onPriorityEscalated: Run once when `wait` is called, and then when the
   ///     task's priority is escalated while suspended here. The first argument
   ///     is the old priority (before escalation), and the second argument is
@@ -289,15 +290,17 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   ///     resumption, and on any thread.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
-    onCancel handleCancellation: sending () -> Void,
+    onCancel handleCancellation: sending (CancellationError.Reason) -> Void,
     onPriorityEscalated handlePriorityEscalation:
-      sending (TaskPriority, TaskPriority) -> Void
+      @Sendable (TaskPriority, TaskPriority) -> Void
   ) async throws(Failure) -> sending Success {
-    // The escalation handler is wrapped so the runtime can hand it raw
-    // priorities.
+    // The handlers are wrapped so the runtime can hand them a raw reason and
+    // raw priorities.
     try await Self._wait(
       context: _takeContext(),
-      onCancel: handleCancellation,
+      onCancel: {
+        handleCancellation(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
+      },
       onPriorityEscalated: {
         handlePriorityEscalation(
           TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
@@ -314,15 +317,19 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// function suspends.
   ///
   /// - Parameters:
-  ///   - onCancel: Run when the task is cancelled while suspended
-  ///     here. It may run concurrently with the resumption, and on any thread.
+  ///   - onCancel: Run with the reason the task was cancelled with when it is
+  ///     cancelled while suspended here. It may run concurrently with the
+  ///     resumption, and on any thread.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
-    onCancel handleCancellation: sending () -> Void
+    onCancel handleCancellation: sending (CancellationError.Reason) -> Void
   ) async throws(Failure) -> sending Success {
+    // The handler is wrapped so the runtime can hand it a raw reason.
     try await Self._wait(
       context: _takeContext(),
-      onCancel: handleCancellation)
+      onCancel: {
+        handleCancellation(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
+      })
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
@@ -340,12 +347,10 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// ```swift
   /// let priority = Task.currentPriority
   /// let job = queue.enqueue(request, priority: priority, resuming: continuation)
-  /// return try await waiter.wait(
-  ///   onCancel: { queue.cancel(job) },
-  ///   onPriorityEscalated: { _, newPriority in
-  ///     guard newPriority > priority else { return }
-  ///     queue.escalate(job, to: newPriority)
-  ///   })
+  /// return try await waiter.wait(onPriorityEscalated: { _, newPriority in
+  ///   guard newPriority > priority else { return }
+  ///   queue.escalate(job, to: newPriority)
+  /// })
   /// ```
   ///
   /// - Parameters:
@@ -357,7 +362,7 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
     onPriorityEscalated handlePriorityEscalation:
-      sending (TaskPriority, TaskPriority) -> Void
+      @Sendable (TaskPriority, TaskPriority) -> Void
   ) async throws(Failure) -> sending Success {
     // The escalation handler is wrapped so the runtime can hand it raw
     // priorities.
@@ -388,39 +393,47 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
-    onCancel handleCancellation: sending () -> Void,
+    onCancel handleCancellation: sending (UInt8) -> Void,
     onPriorityEscalated handlePriorityEscalation:
-      sending (UInt8, UInt8) -> Void
+      @Sendable (UInt8, UInt8) -> Void
   ) async throws(Failure) -> sending Success {
+    #if $BuiltinCancellationHandlerWithReason
     // Install the handlers with the existing per-handler entry points.
-    let cancellationRecord = unsafe _taskAddCancellationHandler(
+    let cancellationRecord = unsafe Builtin.taskAddCancellationHandlerWithReason(
       handler: handleCancellation)
-    defer { unsafe _taskRemoveCancellationHandler(record: cancellationRecord) }
+    defer { unsafe Builtin.taskRemoveCancellationHandler(record: cancellationRecord) }
 
     let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
       handler: handlePriorityEscalation)
     defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
 
     return try await _wait(context: context)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
-    onCancel handleCancellation: sending () -> Void
+    onCancel handleCancellation: sending (UInt8) -> Void
   ) async throws(Failure) -> sending Success {
-    let cancellationRecord = unsafe _taskAddCancellationHandler(
+    #if $BuiltinCancellationHandlerWithReason
+    let cancellationRecord = unsafe Builtin.taskAddCancellationHandlerWithReason(
       handler: handleCancellation)
-    defer { unsafe _taskRemoveCancellationHandler(record: cancellationRecord) }
+    defer { unsafe Builtin.taskRemoveCancellationHandler(record: cancellationRecord) }
 
     return try await _wait(context: context)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
     onPriorityEscalated handlePriorityEscalation:
-      sending (UInt8, UInt8) -> Void
+      @Sendable (UInt8, UInt8) -> Void
   ) async throws(Failure) -> sending Success {
     let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
       handler: handlePriorityEscalation)

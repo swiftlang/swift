@@ -281,7 +281,7 @@ actor Elsewhere {
          waiter: consuming ContinuationWaiter<Int, Never>) in
         continuation.resume(returning: 5)
         return await waiter.wait(
-          onCancel: { cancelled.value = true },
+          onCancel: { _ in cancelled.value = true },
           onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
       }
       expectEqual(5, value)
@@ -302,7 +302,7 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           return await waiter.wait(
-            onCancel: {
+            onCancel: { _ in
               runs.modify { $0 += 1 }
               holder.resumeFromDetachedTask(returning: -1, executorPreference: executor)
             },
@@ -332,7 +332,7 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           return await waiter.wait(
-            onCancel: { holder.resumeFromDetachedTask(returning: -2, executorPreference: executor) },
+            onCancel: { _ in holder.resumeFromDetachedTask(returning: -2, executorPreference: executor) },
             onPriorityEscalated: { _, _ in })
         }
       }
@@ -349,13 +349,52 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           return await waiter.wait(
-            onCancel: { holder.resumeFromDetachedTask(returning: -20, executorPreference: executor) })
+            onCancel: { _ in holder.resumeFromDetachedTask(returning: -20, executorPreference: executor) })
         }
       }
       executor.runNextJob() // The one job: runs the task to its suspension.
       task.cancel()
       executor.runNextJobs(count: 2) // Runs the cancellation handler's resume.
       expectEqual(-20, await task.value)
+    }
+
+    tests.test("cancellation handler receives the cancellation reason") {
+      let reason = Box<CancellationError.Reason?>(nil)
+      let executor = ManualExecutor()
+      let task = Task(executorPreference: executor) {
+        await withContinuation(of: Int.self, throwing: Never.self) {
+          (continuation: consuming Continuation<Int, Never>,
+           waiter: consuming ContinuationWaiter<Int, Never>) in
+          let holder = ContinuationHolder(continuation)
+          return await waiter.wait(
+            onCancel: {
+              reason.value = $0
+              holder.resumeFromDetachedTask(returning: -21, executorPreference: executor)
+            })
+        }
+      }
+      executor.runNextJob() // The one job: runs the task to its suspension.
+      task.cancel(reason: .deadlineExpired)
+      executor.runNextJobs(count: 2) // Runs the cancellation handler's resume.
+      expectEqual(-21, await task.value)
+      expectEqual(.deadlineExpired, reason.value)
+    }
+
+    tests.test("cancellation handler receives the reason when already cancelled") {
+      let reason = Box<CancellationError.Reason?>(nil)
+      let executor = ManualExecutor()
+      let task = Task(executorPreference: executor) {
+        await withContinuation(of: Int.self, throwing: Never.self) {
+          (continuation: consuming Continuation<Int, Never>,
+           waiter: consuming ContinuationWaiter<Int, Never>) in
+          continuation.resume(returning: 22)
+          return await waiter.wait(onCancel: { reason.value = $0 })
+        }
+      }
+      task.cancel(reason: .deadlineExpired)
+      executor.runNextJob()
+      expectEqual(22, await task.value)
+      expectEqual(.deadlineExpired, reason.value)
     }
 
     tests.test("handlers are uninstalled once the await resolves") {
@@ -368,7 +407,7 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, Never>) in
           continuation.resume(returning: 1)
           let value = await waiter.wait(
-            onCancel: { runs.modify { $0 += 1 } },
+            onCancel: { _ in runs.modify { $0 += 1 } },
             onPriorityEscalated: { _, _ in })
           await withTaskCancellationHandler {
             try? await Task.sleep(for: .seconds(10))
@@ -491,7 +530,7 @@ actor Elsewhere {
              waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
             return await waiter.wait(
-              onCancel: { holder.resumeFromDetachedTask(returning: -10, executorPreference: executor) },
+              onCancel: { _ in holder.resumeFromDetachedTask(returning: -10, executorPreference: executor) },
               onPriorityEscalated: { _, _ in })
           }
         }
@@ -512,7 +551,7 @@ actor Elsewhere {
              waiter: consuming ContinuationWaiter<Int, Never>) in
             let holder = ContinuationHolder(continuation)
             return await waiter.wait(
-              onCancel: { holder.resumeFromDetachedTask(returning: -11, executorPreference: nil) },
+              onCancel: { _ in holder.resumeFromDetachedTask(returning: -11, executorPreference: nil) },
               onPriorityEscalated: { _, _ in })
           }
         }
@@ -531,7 +570,7 @@ actor Elsewhere {
             let holder = ContinuationHolder(continuation)
             holder.resumeFromDetachedTask(returning: 42, executorPreference: executor)
             return await waiter.wait(
-              onCancel: { expectUnreachable("shielded onCancel must not run") },
+              onCancel: { _ in expectUnreachable("shielded onCancel must not run") },
               onPriorityEscalated: { _, _ in })
           }
         }
@@ -553,7 +592,7 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, any Error>) in
           continuation.resume(returning: 1)
           _ = try await waiter.wait(
-            onCancel: {}, onPriorityEscalated: { _, _ in })
+            onCancel: { _ in }, onPriorityEscalated: { _, _ in })
           throw TestError()
         }
         expectUnreachable("the body should have thrown")
@@ -612,7 +651,7 @@ actor Elsewhere {
            waiter: consuming ContinuationWaiter<Int, Never>) in
           continuation.resume(returning: 1)
           return await waiter.wait(
-            onCancel: {},
+            onCancel: { _ in },
             onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
         }
       }
