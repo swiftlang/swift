@@ -107,6 +107,14 @@ NS_ASSUME_NONNULL_BEGIN
 @interface RAdopter : NSObject <R>
 @end
 
+// CHECK-LABEL: class Table
+// CHECK: @available({{.*}}, *)
+// CHECK-NEXT: {{.*}}subscript(index: UInt) -> UnsafeMutablePointer<[4 of CInt]>
+@interface Table : NSObject
+- (int (*)[4])objectAtIndexedSubscript:(NSUInteger)index;
+- (void)setObject:(int (*)[4])object atIndexedSubscript:(NSUInteger)index;
+@end
+
 // Parameters declared as arrays decay to pointers to arrays, however they are
 // qualified.
 @interface Matrix : NSObject
@@ -242,9 +250,10 @@ func testAsync(
 }
 
 @available(anyAppleOS 26, *)
-func testMirroredInit(
+func testMirroredInitAndSubscript(
     tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
-    array: UnsafeMutablePointer<InlineArray<4, Int32>>
+    array: UnsafeMutablePointer<InlineArray<4, Int32>>,
+    table: Table
 ) {
   _ = RAdopter(buf: tuple)
   // expected-modern-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
@@ -252,6 +261,26 @@ func testMirroredInit(
   _ = RAdopter(buf: array)
   // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  _ = table[0]
+
+  table[1] = tuple
+  // expected-modern-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  table[1] = array
+  // expected-legacy-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
+
+  _ = table.objectAtIndexedSubscript(0)
+  // expected-error@-1 {{'objectAtIndexedSubscript' is unavailable: use subscripting}}
+  table.setObject(tuple, atIndexedSubscript: 1)
+  // expected-legacy-c-array-error@-1 {{'setObject(_:atIndexedSubscript:)' is unavailable: use subscripting}}
+  // expected-modern-c-array-error@-2 {{cannot convert value of type 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>' to expected argument type 'UnsafeMutablePointer<[4 of CInt]>' (aka 'UnsafeMutablePointer<InlineArray<4, Int32>>')}}
+  // expected-modern-c-array-note@-3 {{arguments to generic parameter 'Pointee' ('(Int32, Int32, Int32, Int32)' and '[4 of CInt]' (aka 'InlineArray<4, Int32>')) are expected to be equal}}
+  table.setObject(array, atIndexedSubscript: 1)
+  // expected-modern-c-array-error@-1 {{'setObject(_:atIndexedSubscript:)' is unavailable: use subscripting}}
+  // expected-legacy-c-array-error@-2 {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<4, Int32>>' to expected argument type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>' (aka 'UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>')}}
+  // expected-legacy-c-array-note@-3 {{arguments to generic parameter 'Pointee' ('InlineArray<4, Int32>' and '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')) are expected to be equal}}
 }
 
 @available(anyAppleOS 26, *)
@@ -355,8 +384,13 @@ func testCompletionHandler(_ pointer: UnsafeMutablePointer<CArray>, _ svc: Svc) 
 }
 
 @available(anyAppleOS 26, *)
-func testMirroredInit(_ pointer: UnsafeMutablePointer<CArray>) {
+func testMirroredInitAndSubscript(
+    _ pointer: UnsafeMutablePointer<CArray>, _ table: Table
+) {
   _ = RAdopter(buf: pointer)
+
+  _ = table[0]
+  table[1] = pointer
 }
 
 #if MODERN_C_ARRAYS

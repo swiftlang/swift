@@ -8866,8 +8866,16 @@ SwiftDeclConverter::importSubscript(Decl *decl,
               continue;
 
             // Selector must match.
-            if (afd->getObjCSelector() == swiftSel)
-              return afd;
+            if (afd->getObjCSelector() != swiftSel)
+              continue;
+
+            // C array projection (if any) must match.
+            if (auto *attr =
+                    afd->getAttrs().getAttribute<CArrayProjectionAttr>())
+              if (attr->getProjection() != getCArrayProjection())
+                continue;
+
+            return afd;
           }
         }
       }
@@ -8885,8 +8893,9 @@ SwiftDeclConverter::importSubscript(Decl *decl,
         isa<clang::ObjCProtocolDecl>(counterpart->getDeclContext()))
       return nullptr;
 
-    return cast_or_null<FuncDecl>(
-        Impl.importDecl(counterpart, getActiveSwiftVersion()));
+    return cast_or_null<FuncDecl>(Impl.importDecl(
+        counterpart,
+        getActiveSwiftVersion().withCArrayProjection(getCArrayProjection())));
   };
 
   // Determine the selector of the counterpart.
@@ -9085,6 +9094,12 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     access = limitAccessForCArrayProjection(access, setterObjCMethod);
   subscript->setAccess(access);
   subscript->setSetterAccess(access);
+
+  // A modern subscript can only be used where InlineArray is available.
+  // (`importAttributes()` doesn't touch subscripts.)
+  if (getCArrayProjection() == CArrayProjection::Modern &&
+          needsLegacyCArrayProjection(getterObjCMethod))
+    addInlineArrayAvailability(subscript);
 
   // Build the thunks.
   AccessorDecl *getterThunk = synthesizer.buildSubscriptGetterDecl(

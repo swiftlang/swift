@@ -1583,26 +1583,76 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
     }
   }
 
-  // Contrariwise, when a global function is turned into an accessor using
-  // import-as-member, the accessors are imported first and we must recursively
-  // register their property.
-  if (auto *modernAccessor = dyn_cast<AccessorDecl>(modernVD)) {
-    auto *legacyAccessor = cast_or_null<AccessorDecl>(legacyVD);
-    auto *property = dyn_cast<VarDecl>(modernAccessor->getStorage());
-    auto *legacyProperty =
-        legacyAccessor ? dyn_cast<VarDecl>(legacyAccessor->getStorage())
-                       : nullptr;
+  // Contrariwise, when a storage declaration is synthesized from an accessor,
+  // we must recursively register it. There are a couple ways that can happen.
+  auto registerImplicitStorage = [&](AbstractStorageDecl *modernStorage,
+                                     AbstractStorageDecl *legacyStorage) {
+    if (!modernStorage || modernStorage == legacyStorage)
+      return;
 
-    // Guard against registering the property twice (either because there are
-    // two accessors, or by recursing back and forth between "register accessors
-    // for property" and "register property for accessors").
-    if (property && property != legacyProperty &&
-        !property->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
-      registerCArrayProjections(property, legacyProperty,
-                                /*addAlternate=*/false);
-      if (legacyProperty)
-        ImporterImpl.addAlternateDecl(modernAccessor, legacyProperty);
-    }
+    // ClangImporter ignores alternates of alternates, and `modernStorage` is an
+    // alternate of `modernVD`, so we'll need to do the `addAlternateDecl` by
+    // hand.
+    registerCArrayProjections(modernStorage, legacyStorage,
+                              /*addAlternate=*/false);
+
+    if (legacyStorage)
+      ImporterImpl.addAlternateDecl(modernVD, legacyStorage);
+  };
+
+  // Global functions turned into accessors using import-as-member.
+  if (auto *modernAccessor = dyn_cast<AccessorDecl>(modernVD)) {
+    auto *modernStorage = dyn_cast<VarDecl>(modernAccessor->getStorage());
+    auto *legacyAccessor = cast_or_null<AccessorDecl>(legacyVD);
+
+    // Distinguish import-as-member properties (whose accessors are registered
+    // first) from ordinary properties and variables (whose storage is
+    // registered first).
+    //
+    // We need an extra recursion guard here to protect against stored
+    // variables. A stored variable looks like this:
+    //
+    //   MODERN PROJECTIONS                       LEGACY PROJECTIONS
+    //
+    //    ┌──────────────┐                         ┌──────────────┐
+    //    │    VarDecl   │◀──────counterpart──────▶│   VarDecl    │
+    //    │  (computed)  │                         │   (stored)   │
+    //    └┬┬────────────┘                         └──────────────┘
+    //     ││ ┌──────────┐
+    //     │└▶│  getter  │───────counterpart──────▶ nullptr
+    //     │  └──────────┘
+    //     │  ┌──────────┐
+    //     └─▶│  setter  │───────counterpart──────▶ nullptr
+    //        └──────────┘
+    //
+    // We're currently processing one of the modern accessors, which has no
+    // legacy counterpart (stored properties don't have accessors). Since
+    // there's no legacy accessor, we would end up assuming there isn't any
+    // legacy storage either, and so we would try to re-register the modern
+    // VarDecl as a modern-only decl. This would trip the `ASSERT()` in the main
+    // recursion guard above.
+    //
+    // Fortunately, in this scenario we have already registered the modern and
+    // legacy VarDecls, so all we need to do is detect that the modern storage
+    // has already been registered and refuse to recurse.
+    if (modernStorage &&
+        !modernStorage->getAttrs().hasAttribute<CArrayProjectionAttr>())
+      registerImplicitStorage(
+          modernStorage,
+          legacyAccessor ? dyn_cast<VarDecl>(legacyAccessor->getStorage())
+                         : nullptr);
+  }
+
+  // Subscripts synthesized from ObjC object subscript methods.
+  if (isa<FuncDecl>(modernVD)) {
+    auto findSubscript = [&](ValueDecl *func) -> SubscriptDecl * {
+      if (func)
+        for (auto *alternate : ImporterImpl.getAlternateDecls(func))
+          if (auto *subscript = dyn_cast<SubscriptDecl>(alternate))
+            return subscript;
+      return nullptr;
+    };
+    registerImplicitStorage(findSubscript(modernVD), findSubscript(legacyVD));
   }
 
   // If an operator was synthesized from a function, there is one for each
