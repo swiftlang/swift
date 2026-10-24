@@ -1919,8 +1919,30 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
   // reaching indicates that the closure was dropped. Proceed to deallocating
   // the context as uninitialized instead of releasing it in that case.
   if (!isCalledOnce && (consumedFields.empty() || consumedFields.none())) {
-    forwarder.emitNativeStrongRelease(rawContextPtr,
-                                      forwarder.getDefaultAtomicity());
+    if (!contextIsOnStack) {
+      forwarder.emitNativeStrongRelease(rawContextPtr,
+                                        forwarder.getDefaultAtomicity());
+      return;
+    }
+
+    // The caller deallocates a stack-allocated context, so releasing it would
+    // only call its destructor through the runtime. Call the destructor
+    // directly instead, unless it has nothing to destroy. The caller built the
+    // context's metadata, and with it the destructor, before emitting this
+    // forwarder.
+    auto *dtorFn = layout->getPrivateDestructor();
+    assert(dtorFn && "stack-allocated context without a destructor");
+    bool hasFieldsToDestroy = false;
+    for (unsigned i : indices(layout->getElements())) {
+      if (!layout->getElement(i).isTriviallyDestroyable() &&
+          (unownedFields.empty() || !unownedFields.test(i)))
+        hasFieldsToDestroy = true;
+    }
+    if (hasFieldsToDestroy) {
+      auto *call = forwarder.Builder.CreateCall(dtorFn->getFunctionType(),
+                                                dtorFn, {rawContextPtr});
+      call->addParamAttr(0, llvm::Attribute::SwiftSelf);
+    }
     return;
   }
 
