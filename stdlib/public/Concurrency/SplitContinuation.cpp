@@ -60,6 +60,11 @@ namespace {
 /// resume a regular one, including code compiled before split continuations
 /// existed. `ResumeContext` sits at exactly the offset at which an AsyncTask
 /// keeps its own.
+///
+/// AsyncTask isn't standard-layout, so `offsetof` on it warns; we rely on its
+/// layout deliberately and assert it below.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 struct SplitContinuationStorage {
   /// Distinguishes this from a task.
   uintptr_t Marker;
@@ -86,6 +91,7 @@ static_assert(offsetof(SplitContinuationStorage, ResumeContext) ==
                   offsetof(AsyncTask, ResumeContext),
               "a split continuation must be loadable as if it were a "
               "task, so its ResumeContext must sit at the task's offset");
+#pragma clang diagnostic pop
 
 /// The context follows the storage, at the context's alignment.
 static size_t splitContextOffset() {

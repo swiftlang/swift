@@ -1525,6 +1525,7 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(TaskAddCancellationHandlerWithReason, TaskAddCancellationHandler)
       BUILTIN_CASE(TaskPushDeadline, TaskPushDeadline)
       BUILTIN_CASE(TaskCancellationScopePush, TaskCancellationScopePush)
+      BUILTIN_CASE(CreateSplitContinuation, CreateSplitContinuation)
 #undef BUILTIN_CASE
 
       default:
@@ -1639,6 +1640,7 @@ SILInstruction::getStackDeallocation() const {
                    BuiltinTaskAddCancellationHandler)
       BUILTIN_CASE(TaskPopDeadline, BuiltinTaskPushDeadline)
       BUILTIN_CASE(TaskCancellationScopePop, BuiltinTaskCancellationScopePush)
+      BUILTIN_CASE(DestroySplitContinuation, BuiltinCreateSplitContinuation)
 #undef BUILTIN_CASE
 
       default:

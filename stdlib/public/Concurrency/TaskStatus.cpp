@@ -23,6 +23,7 @@
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
+#include <algorithm>
 #include <atomic>
 
 using namespace swift;
@@ -1786,10 +1787,16 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
         "[Override] Escalating %p which has status records from %#x to %#x",
         task, oldPriority, newPriority);
 
+    // Notify with the priority as of taking the lock rather than the one we
+    // escalated to, so that the last notification a record receives always
+    // carries the task's current priority.
+    auto notifiedPriority =
+        std::max(newPriority, newStatus.getStoredPriority());
+
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
     for (auto cur: newStatus.records()) {
-      performEscalationAction(task, cur, oldPriority, newPriority);
+      performEscalationAction(task, cur, oldPriority, notifiedPriority);
     }
     result = newStatus.getStoredPriority();
   });

@@ -97,7 +97,7 @@ final class Box<Value: Sendable>: Sendable {
 @main struct Main {
   static func main() async {
     let executor = ManualExecutor()
-    let observedPriority = Box<TaskPriority?>(nil)
+    let observedPriorities = Box<[[TaskPriority]]>([])
 
     let task = Task(executorPreference: executor, priority: .background) { () -> Int in
       await withContinuation(of: Int.self, throwing: Never.self) {
@@ -106,15 +106,16 @@ final class Box<Value: Sendable>: Sendable {
         let holder = ContinuationHolder(continuation)
         return await waiter.wait(
           onCancel: { holder.resumeFromDetachedTask(returning: 7, executorPreference: executor) },
-          onEscalate: { newPriority in observedPriority.value = newPriority })
+          onPriorityEscalated: { old, new in observedPriorities.value.append([old, new]) })
       }
     }
 
     executor.runNextJob() // The one job: runs the task to its suspension,
-                           // installing the handlers.
+                           // installing the handlers. The escalation handler
+                           // is called once with the current priority.
 
     // Escalation walks the same status-record list cancellation does, and
-    // invokes onEscalate synchronously on the calling thread -- no need to
+    // invokes onPriorityEscalated synchronously on the calling thread -- no need to
     // wait for or race a real background thread.
     task.escalatePriority(to: .medium)
 
@@ -126,12 +127,12 @@ final class Box<Value: Sendable>: Sendable {
 
     let result = await task.value
     precondition(result == 7, "continuation did not resume: \(result)")
-    precondition(observedPriority.value == .medium,
-                 "escalation handler saw \(String(describing: observedPriority.value))")
+    precondition(observedPriorities.value == [[.background, .background], [.background, .medium]],
+                 "escalation handler saw \(observedPriorities.value)")
 
     // The same with only an escalation handler installed.
     let escalationOnlyExecutor = ManualExecutor()
-    let escalationOnlyPriority = Box<TaskPriority?>(nil)
+    let escalationOnlyPriorities = Box<[[TaskPriority]]>([])
     let handOff = ContinuationHolder<Int, Never>()
 
     let escalationOnlyTask = Task(executorPreference: escalationOnlyExecutor, priority: .background) { () -> Int in
@@ -140,7 +141,7 @@ final class Box<Value: Sendable>: Sendable {
          waiter: consuming ContinuationWaiter<Int, Never>) in
         handOff.store(continuation)
         return await waiter.wait(
-          onEscalate: { newPriority in escalationOnlyPriority.value = newPriority })
+          onPriorityEscalated: { old, new in escalationOnlyPriorities.value.append([old, new]) })
       }
     }
 
@@ -152,8 +153,29 @@ final class Box<Value: Sendable>: Sendable {
     let escalationOnlyResult = await escalationOnlyTask.value
     precondition(escalationOnlyResult == 8,
                  "continuation did not resume: \(escalationOnlyResult)")
-    precondition(escalationOnlyPriority.value == .medium,
-                 "escalation handler saw \(String(describing: escalationOnlyPriority.value))")
+    precondition(escalationOnlyPriorities.value == [[.background, .background], [.background, .medium]],
+                 "escalation handler saw \(escalationOnlyPriorities.value)")
+
+    let earlyExecutor = ManualExecutor()
+    let earlyPriorities = Box<[[TaskPriority]]>([])
+
+    let earlyTask = Task(executorPreference: earlyExecutor, priority: .background) { () -> Int in
+      await withContinuation(of: Int.self, throwing: Never.self) {
+        (continuation: consuming Continuation<Int, Never>,
+         waiter: consuming ContinuationWaiter<Int, Never>) in
+        continuation.resume(returning: 9)
+        return await waiter.wait(
+          onPriorityEscalated: { old, new in earlyPriorities.value.append([old, new]) })
+      }
+    }
+
+    earlyTask.escalatePriority(to: .medium)
+    earlyExecutor.runNextJob()
+
+    let earlyResult = await earlyTask.value
+    precondition(earlyResult == 9, "continuation did not resume: \(earlyResult)")
+    precondition(earlyPriorities.value == [[.medium, .medium]],
+                 "escalation handler saw \(earlyPriorities.value)")
     // CHECK: OK
     print("OK")
   }

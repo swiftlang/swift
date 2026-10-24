@@ -12,24 +12,19 @@ import Builtin
 import Swift
 import _Concurrency
 
-// CHECK-LABEL: define{{.*}} swiftcc ptr @split_create()
-// CHECK:   call swiftcc ptr @swift_continuation_createSplit(ptr
+// The continuation is a stack allocation, so it is created and destroyed in
+// the same function.
+// CHECK-LABEL: define{{.*}} swiftcc void @split_create_destroy()
+// CHECK:   [[TOK:%.*]] = call swiftcc ptr @swift_continuation_createSplit(ptr
+// CHECK:   call swiftcc void @swift_continuation_destroySplit(ptr [[TOK]])
 // CHECK: }
 // CHECK: declare extern_weak swiftcc ptr @swift_continuation_createSplit(ptr)
-sil @split_create : $@convention(thin) () -> Builtin.RawUnsafeContinuation {
+// CHECK: declare extern_weak swiftcc void @swift_continuation_destroySplit(ptr)
+sil @split_create_destroy : $@convention(thin) () -> () {
 bb0:
   %mt = metatype $@thin Builtin.Int32.Type
   %tok = builtin "createSplitContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
-  return %tok : $Builtin.RawUnsafeContinuation
-}
-
-// CHECK-LABEL: define{{.*}} swiftcc void @split_destroy(ptr %0)
-// CHECK:   call swiftcc void @swift_continuation_destroySplit(ptr %0)
-// CHECK: }
-// CHECK: declare extern_weak swiftcc void @swift_continuation_destroySplit(ptr)
-sil @split_destroy : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () {
-bb0(%continuation : $Builtin.RawUnsafeContinuation):
-  %d = builtin "destroySplitContinuation"(%continuation : $Builtin.RawUnsafeContinuation) : $()
+  %d = builtin "destroySplitContinuation"(%tok : $Builtin.RawUnsafeContinuation) : $()
   %t = tuple ()
   return %t : $()
 }

@@ -132,7 +132,7 @@ actor IsolatedActor {
            waiter: consuming ContinuationWaiter<Int, Never>) in
           let holder = ContinuationHolder(continuation)
           Task.detached(executorPreference: executor) { holder.take().resume(returning: 19) }
-          return await waiter.wait(onCancel: {}, onEscalate: { _ in })
+          return await waiter.wait(onCancel: {}, onPriorityEscalated: { _, _ in })
         }
       }
       executor.runNextJob()
