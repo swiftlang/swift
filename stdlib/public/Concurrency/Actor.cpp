@@ -125,6 +125,46 @@ SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
 _swift_concurrency_currentTask;
 }
 
+#if defined(_WIN32) && defined(__clang__) && defined(SWIFT_THREAD_LOCAL) &&    \
+    !SWIFT_THREADING_NONE
+// On Windows, `_swift_concurrency_currentTask` lives in this image's implicit
+// (static) TLS block, and thread-local variables can be neither dllexported
+// nor located through the export table. Code accesses the variable like this:
+//
+//   ((char **)Teb->ThreadLocalStoragePointer)[_tls_index]
+//     + SECREL(_swift_concurrency_currentTask)
+//
+// where SECREL is the variable's offset within the `.tls` section. The loader
+// gives every thread a copy of that section, so the offset is the same for
+// every thread and is fixed when the image is linked. It isn't stable across
+// builds, though. It depends on what else the linker places in `.tls`, such as
+// other thread-locals or the CRT's `__tls_guard`.
+//
+// Export that offset as `_swift_concurrency_debug_current_task_tls_offset`
+// so out-of-process inspectors (e.g. swift-inspect) can find the current task
+// of any thread without running code in the target. C++ cannot spell a SECREL
+// relocation in a constant initializer, so emit it with assembly; the linker
+// resolves it exactly as it does the relocations in the accessing code.
+#define SWIFT_CONCURRENCY_TLS_OFFSET_SYMBOL                                    \
+  SWIFT_SYMBOL_PREFIX_STRING "_swift_concurrency_debug_current_task_tls_offset"
+#if !defined(SWIFT_STATIC_STDLIB) && SWIFT_IMAGE_EXPORTS_swift_Concurrency
+#define SWIFT_CONCURRENCY_TLS_OFFSET_EXPORT                                    \
+  "  .section .drectve,\"yni\"\n"                                              \
+  "  .ascii \" /EXPORT:" SWIFT_CONCURRENCY_TLS_OFFSET_SYMBOL ",DATA\"\n"
+#else
+#define SWIFT_CONCURRENCY_TLS_OFFSET_EXPORT ""
+#endif
+__asm__("  .section .rdata,\"dr\"\n"
+        "  .globl " SWIFT_CONCURRENCY_TLS_OFFSET_SYMBOL "\n"
+        "  .p2align 2\n"
+        SWIFT_CONCURRENCY_TLS_OFFSET_SYMBOL ":\n"
+        "  .secrel32 " SWIFT_SYMBOL_PREFIX_STRING
+        "_swift_concurrency_currentTask\n"
+        SWIFT_CONCURRENCY_TLS_OFFSET_EXPORT);
+#undef SWIFT_CONCURRENCY_TLS_OFFSET_EXPORT
+#undef SWIFT_CONCURRENCY_TLS_OFFSET_SYMBOL
+#endif
+
 namespace {
 
 /// A class which encapsulates the information we track about
