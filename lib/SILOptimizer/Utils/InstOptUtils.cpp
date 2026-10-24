@@ -1957,9 +1957,7 @@ static void killDebugUses(SILInstruction *inst) {
     killDebugUses(result);
 }
 
-/// Canonicalizes the operand list of \p debugValue, minimizing the amount of
-/// live operands. Merges duplicates, and kills dead or undef operands.
-static void canonicalizeDebugValue(DebugValueInst *debugValue) {
+void swift::canonicalizeDebugValue(DebugValueInst *debugValue) {
   SILBasicBlock *debugBB = debugValue->getDebugReconstructionBlock();
   if (!debugBB)
     return;
@@ -1981,9 +1979,7 @@ static void canonicalizeDebugValue(DebugValueInst *debugValue) {
       debugValue->killOperand(op.getOperandNumber());
 }
 
-/// Returns the operand of \p debugValue holding \p value, or nullptr if it has
-/// none.
-static const Operand *findDebugValueOperand(DebugValueInst *debugValue,
+const Operand *swift::findDebugValueOperand(DebugValueInst *debugValue,
                                             SILValue value) {
   auto operands = debugValue->getAllOperands();
   const Operand *use = llvm::find_if(
@@ -1991,12 +1987,10 @@ static const Operand *findDebugValueOperand(DebugValueInst *debugValue,
   return use == operands.end() ? nullptr : use;
 }
 
-/// Appends the values of \p newOperands that \p debugValue does not already have
-/// as an operand, updating the reconstruction block.
-/// \p debugValue is replaced with a fresh DebugValueInst if needed.
-static void addOperandsToDebugValue(DebugValueInst *&debugValue,
+void swift::addOperandsToDebugValue(DebugValueInst *&debugValue,
                                     ArrayRef<SILValue> newOperands) {
   SILBasicBlock *debugBB = debugValue->getDebugReconstructionBlock();
+  ASSERT(debugBB && "new operands need a reconstruction block to be used in");
 
   SmallVector<SILValue, DebugValueInst::MaxOperands> updatedOperands;
   for (Operand &op : debugValue->getAllOperands()) {
