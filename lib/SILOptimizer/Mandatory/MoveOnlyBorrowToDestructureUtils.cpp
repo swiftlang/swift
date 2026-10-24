@@ -395,10 +395,15 @@ bool Implementation::gatherUses(SILValue value) {
       // since the control flow is significant, and we can't destructure through
       // the switch dispatch. If the final pattern match ends up destructuring
       // the value, then SILGen emits that as a separate access.
-      if (auto switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
+      //
+      // Likewise treat opening a borrowed existential as a full liveness use of
+      // the existential: its payload is not part of the existential's type
+      // tree, so we can't destructure through it.
+      if (isa<SwitchEnumInst>(nextUse->getUser()) ||
+          (isa<OpenExistentialValueInst>(nextUse->getUser()) &&
+           isa<BeginBorrowInst>(nextUse->get()))) {
         SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
-        TypeTreeLeafTypeRange::get(&switchEnum->getOperandRef(), getRootValue(),
-                                   leafRanges);
+        TypeTreeLeafTypeRange::get(nextUse, getRootValue(), leafRanges);
         if (!leafRanges.size()) {
           LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
           return false;
@@ -416,7 +421,7 @@ bool Implementation::gatherUses(SILValue value) {
         instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
         continue;
       }
-    
+
       // Look through guaranteed forwarding if we have at least one non-trivial
       // value. If we have all non-trivial values, treat this as a liveness use.
       SmallVector<SILValue, 8> forwardedValues;
@@ -1116,13 +1121,15 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
                                  borrow);
       return true;
     });
-  } else if (auto swi = dyn_cast<SwitchEnumInst>(op->getUser())) {
-    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow for switch:\n"
+  } else if (isa<SwitchEnumInst>(op->getUser()) ||
+             isa<OpenExistentialValueInst>(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow for switch or opened "
+                               "existential:\n"
                                "    ";
-               swi->print(llvm::dbgs()));
+               op->getUser()->print(llvm::dbgs()));
     // End the borrow where the original borrow of the subject was ended.
     // TODO: handle if the switch isn't directly on a borrow?
-    auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
+    auto beginBorrow = cast<BeginBorrowInst>(op->get());
     // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     BorrowingOperand(&beginBorrow->getOperandRef())
       .visitScopeEndingUses([&](Operand *endScope) -> bool {
@@ -1141,7 +1148,6 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     SILBuilderWithScope endBuilder(nextInst);
     endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
   }
-  
 }
 
 void Implementation::rewriteUses(InstructionDeleter *deleter) {
