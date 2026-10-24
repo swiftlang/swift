@@ -5510,7 +5510,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
   if (dc->getSelfProtocolDecl())
     return std::nullopt;
 
-  if (explicitNonisolatedIsSpecial(dc)) {
+  if (getDefaultIsolationForContext(dc) == DefaultIsolation::Nonisolated) {
     // Prevent isolation inference from requirements if the conforming type
     // has an explicit `nonisolated` attribute.
     if (auto *NTD = dc->getSelfNominalTypeDecl()) {
