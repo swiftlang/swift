@@ -123,6 +123,195 @@ inline void releaseArgOnlyConstructed(ArgOnlyConstructed *t) {
     delete t;
 }
 
+inline int &liveNonTrivialArgs() {
+  static int count = 0;
+  return count;
+}
+inline int getLiveNonTrivialArgs() { return liveNonTrivialArgs(); }
+
+struct NonTrivialArg {
+  int value;
+
+  NonTrivialArg(int value) : value(value) { ++liveNonTrivialArgs(); }
+  NonTrivialArg(const NonTrivialArg &other) : value(other.value) {
+    ++liveNonTrivialArgs();
+  }
+  ~NonTrivialArg() { --liveNonTrivialArgs(); }
+};
+
+struct RefcountedArg {
+  int refcount = 1;
+  int value = 0;
+
+  SWIFT_RETURNS_RETAINED RefcountedArg(int value) : value(value) {}
+
+  int getRefcount() const { return refcount; }
+
+  virtual ~RefcountedArg() {}
+} SWIFT_SHARED_REFERENCE(retainRefcountedArg, releaseRefcountedArg);
+
+inline void retainRefcountedArg(RefcountedArg *t) { ++t->refcount; }
+inline void releaseRefcountedArg(RefcountedArg *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+struct ReferenceConstructed {
+  int refcount = 1;
+  int seen = 0;
+
+  SWIFT_RETURNS_RETAINED ReferenceConstructed(const int &i) : seen(i) {}
+  SWIFT_RETURNS_RETAINED ReferenceConstructed(int &i, int) : seen(i) {
+    i = 100;
+  }
+  SWIFT_RETURNS_RETAINED ReferenceConstructed(NonTrivialArg arg, long)
+      : seen(arg.value) {}
+  SWIFT_RETURNS_RETAINED ReferenceConstructed(const NonTrivialArg &arg, char)
+      : seen(arg.value) {}
+  SWIFT_RETURNS_RETAINED ReferenceConstructed(RefcountedArg *arg, short)
+      : seen(arg->value) {}
+
+  int getSeen() const { return seen; }
+
+  virtual ~ReferenceConstructed() {}
+} SWIFT_SHARED_REFERENCE(retainReferenceConstructed,
+                         releaseReferenceConstructed);
+
+inline void retainReferenceConstructed(ReferenceConstructed *t) {
+  ++t->refcount;
+}
+inline void releaseReferenceConstructed(ReferenceConstructed *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+struct OverloadedConstructed {
+  int refcount = 1;
+  int which = 0;
+
+  SWIFT_RETURNS_RETAINED OverloadedConstructed(int) : which(1) {}
+  SWIFT_RETURNS_RETAINED OverloadedConstructed(double) : which(2) {}
+
+  int getWhich() const { return which; }
+
+  virtual ~OverloadedConstructed() {}
+} SWIFT_SHARED_REFERENCE(retainOverloadedConstructed,
+                         releaseOverloadedConstructed);
+
+inline void retainOverloadedConstructed(OverloadedConstructed *t) {
+  ++t->refcount;
+}
+inline void releaseOverloadedConstructed(OverloadedConstructed *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+// A static factory method imported as an initializer. Since the type declares
+// one, ClangImporter does not import its C++ constructor as an initializer.
+struct SharedWithFactory {
+  int refcount = 1;
+  int a = 0;
+
+  SharedWithFactory() {}
+
+  static SharedWithFactory *make(int a) SWIFT_RETURNS_RETAINED // expected-note {{'init(value:)' declared here}}
+      __attribute__((swift_name("init(value:)")));
+
+  virtual ~SharedWithFactory() {}
+} SWIFT_SHARED_REFERENCE(retainSharedWithFactory, releaseSharedWithFactory);
+
+inline SharedWithFactory *SharedWithFactory::make(int a) {
+  auto result = new SharedWithFactory();
+  result->a = a;
+  return result;
+}
+
+inline void retainSharedWithFactory(SharedWithFactory *t) { ++t->refcount; }
+inline void releaseSharedWithFactory(SharedWithFactory *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+// A static factory method imported as a no-argument initializer.
+struct SharedWithFactoryOnly {
+  int refcount = 1;
+
+  static SharedWithFactoryOnly *create() SWIFT_RETURNS_RETAINED // expected-note 2 {{'init()' declared here}}
+      __attribute__((swift_name("init()")));
+
+  virtual ~SharedWithFactoryOnly() {}
+
+protected:
+  SharedWithFactoryOnly() {}
+} SWIFT_SHARED_REFERENCE(retainSharedWithFactoryOnly,
+                         releaseSharedWithFactoryOnly);
+
+inline SharedWithFactoryOnly *SharedWithFactoryOnly::create() {
+  return new SharedWithFactoryOnly();
+}
+
+inline void retainSharedWithFactoryOnly(SharedWithFactoryOnly *t) {
+  ++t->refcount;
+}
+inline void releaseSharedWithFactoryOnly(SharedWithFactoryOnly *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+// A type with an initializer imported from a global function rather than from a
+// C++ constructor.
+struct SharedWithFunctionInit {
+  int refcount = 1;
+
+  SWIFT_RETURNS_RETAINED SharedWithFunctionInit() {}
+
+  virtual ~SharedWithFunctionInit() {}
+} SWIFT_SHARED_REFERENCE(retainSharedWithFunctionInit,
+                         releaseSharedWithFunctionInit);
+
+inline void retainSharedWithFunctionInit(SharedWithFunctionInit *t) {
+  ++t->refcount;
+}
+inline void releaseSharedWithFunctionInit(SharedWithFunctionInit *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+SWIFT_RETURNS_RETAINED SharedWithFunctionInit *makeSharedWithFunctionInit(int x) // expected-note {{'init(x:)' declared here}}
+    __attribute__((swift_name("SharedWithFunctionInit.init(x:)")));
+
+inline SharedWithFunctionInit *makeSharedWithFunctionInit(int x) {
+  return new SharedWithFunctionInit();
+}
+
+// A type whose only no-argument initializer is imported from a C function.
+struct SharedWithFunctionDefaultInit {
+  int refcount = 1;
+
+  SWIFT_RETURNS_RETAINED SharedWithFunctionDefaultInit(int a) {}
+
+  virtual ~SharedWithFunctionDefaultInit() {}
+} SWIFT_SHARED_REFERENCE(retainSharedWithFunctionDefaultInit,
+                         releaseSharedWithFunctionDefaultInit);
+
+inline void
+retainSharedWithFunctionDefaultInit(SharedWithFunctionDefaultInit *t) {
+  ++t->refcount;
+}
+inline void
+releaseSharedWithFunctionDefaultInit(SharedWithFunctionDefaultInit *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+SWIFT_RETURNS_RETAINED SharedWithFunctionDefaultInit *
+makeSharedWithFunctionDefaultInit()
+    __attribute__((swift_name("SharedWithFunctionDefaultInit.init()")));
+
+inline SharedWithFunctionDefaultInit *makeSharedWithFunctionDefaultInit() {
+  return new SharedWithFunctionDefaultInit(0);
+}
+
 #if __has_feature(nullability)
 _Pragma("clang assume_nonnull end")
 #endif
