@@ -418,3 +418,33 @@ bb5:
   %t = tuple ()
   return %t
 }
+
+// A switch_enum on a borrow of a copy of an enum instruction is folded.
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_on_borrowed_copy :
+// CHECK:         [[C:%.*]] = copy_value
+// CHECK:         [[B:%.*]] = begin_borrow [[C]]
+// CHECK-NOT:     switch_enum
+// CHECK:         [[P:%.*]] = unchecked_enum_data [[B]]
+// CHECK-NEXT:    br bb1([[P]])
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_on_borrowed_copy'
+sil [ossa] @test_simplify_switch_enum_on_borrowed_copy : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0
+  %2 = copy_value %1
+  %3 = begin_borrow %2
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[3]"
+  switch_enum %3, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%5 : @guaranteed $Klass):
+  end_borrow %3
+  br bb3
+
+bb2:
+  end_borrow %3
+  br bb3
+
+bb3:
+  destroy_value %2
+  %t = tuple ()
+  return %t
+}

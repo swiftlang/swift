@@ -717,6 +717,12 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
                                 RecursionDepth + 1, HandledArgs);
   }
 
+  // A copy has the enum case of its operand.
+  if (auto *CVI = dyn_cast<CopyValueInst>(Val)) {
+    return getEnumCaseRecursive(CVI->getOperand(), OrigUsedInBB,
+                                RecursionDepth + 1, HandledArgs);
+  }
+
   // In case of a phi, recursively check the enum cases of all
   // incoming predecessors.
   if (auto *Arg = dyn_cast<SILArgument>(Val)) {
