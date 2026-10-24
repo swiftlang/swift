@@ -709,6 +709,10 @@ EXPERIMENTAL_FEATURE(Cells, true)
 /// Extend `@specialized` for `@specialized(exported: true, ...)`.
 EXPERIMENTAL_FEATURE(ExtendedSpecializedAttribute, false)
 
+/// The `@Resolvable` macro will synthesize a `DistributedProtocolStub` typealias
+/// linking a distributed-actor protocol to its generated `$`-prefixed stub.
+EXPERIMENTAL_FEATURE(DistributedProtocolStubTypealias, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
