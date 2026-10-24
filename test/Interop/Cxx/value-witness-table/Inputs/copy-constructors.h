@@ -1,13 +1,25 @@
 #ifndef TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_COPY_CONSTRUCTORS_H
 #define TEST_INTEROP_CXX_VALUE_WITNESS_TABLE_INPUTS_COPY_CONSTRUCTORS_H
 
+inline int &getCopyConstructorCount() {
+  static int count = 0;
+  return count;
+}
+
 struct __attribute__((swift_attr("import_unsafe")))
 HasUserProvidedCopyConstructor {
   int numCopies;
   HasUserProvidedCopyConstructor(int numCopies = 0) : numCopies(numCopies) {}
   HasUserProvidedCopyConstructor(const HasUserProvidedCopyConstructor &other)
-      : numCopies(other.numCopies + 1) {}
+      : numCopies(other.numCopies + 1) {
+    ++getCopyConstructorCount();
+  }
 };
+
+inline int readWithArgument(const HasUserProvidedCopyConstructor &value,
+                            const int *argument) {
+  return value.numCopies + *argument;
+}
 
 struct HasNonTrivialImplicitCopyConstructor {
   HasUserProvidedCopyConstructor box;
