@@ -691,7 +691,16 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       os << "#include <objc/objc.h>\n";
 
     writePostImportPrologue(os, *M);
-    emitExternC(os, [&] { os << "\n" << cModuleContents.str(); });
+    auto printCContents = [&] {
+      emitExternC(os, [&] { os << "\n" << cModuleContents.str(); });
+    };
+    if (M->isStdlibModule()) {
+      // The standard library exports C entry points with reserved names.
+      ClangSyntaxPrinter(M->getASTContext(), os)
+          .printIgnoredDiagnosticBlock("reserved-identifier", printCContents);
+    } else {
+      printCContents();
+    }
     writeBlockEpilogue(os);
     moduleContentsScratch.clear();
   }
@@ -752,7 +761,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     auto deps = printModuleContentsAsCxx(
         moduleContents, *M, interopContext,
         frontendOpts.ClangHeaderMinAccess.value_or(AccessLevel::Public),
-        /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules);
+        /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules,
+        /*useClangDeploymentTarget=*/M->isStdlibModule());
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     for (const auto &mod : frontendOpts.clangHeaderExposedImports)
