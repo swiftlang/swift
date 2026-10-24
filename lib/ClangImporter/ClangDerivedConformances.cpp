@@ -1495,6 +1495,15 @@ static void conformToCxxVector(ClangImporter::Implementation &impl,
   if (!Element || !Size || !RawIterator)
     return;
 
+  // Before synthesizing the conformance to CxxVector, check if `RawIterator`
+  // conforms to `UnsafeCxxRandomAccessIterator`.
+  auto cxxRandomAccessIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRandomAccessIteratorProto ||
+      !checkConformance(RawIterator->getUnderlyingType(),
+                        cxxRandomAccessIteratorProto))
+    return;
+
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                Element->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,

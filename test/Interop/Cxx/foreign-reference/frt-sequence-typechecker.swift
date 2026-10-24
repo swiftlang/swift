@@ -3,6 +3,8 @@
 // RUN:   -verify-additional-file %S/Inputs%{fs-sep}frt-sequence.h \
 // RUN:   -target %target-swift-5.8-abi-triple -disable-typo-correction
 
+// FIXME: The synthesized conformance of std::vector to CxxVector on android-armv7 is invalid
+// https://github.com/swiftlang/swift/issues/93524
 // XFAIL: OS=linux-androideabi
 
 import FrtSequence
