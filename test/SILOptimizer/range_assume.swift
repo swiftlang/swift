@@ -195,6 +195,19 @@ public func localRangeSliceCount(_ a: [Int], _ i: Int, _ j: Int) -> Int {
   return a[i..<j].count
 }
 
+public var globalRange = 0..<10
+
+// An assume about bounds that nothing else uses is removed along with their loads.
+// CHECK-SIL-LABEL: sil [noinline] @$s12range_assume16unusedRangeBoundyyF :
+// CHECK-SIL-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SIL-NOT:     begin_access
+// CHECK-SIL-NOT:     load
+// CHECK-SIL:       } // end sil function '$s12range_assume16unusedRangeBoundyyF'
+@inline(never)
+public func unusedRangeBound() {
+  _ = globalRange.endIndex
+}
+
 // Array's range subscript, setter. The probe's body is moved into a specialized
 // function; the assume must be in there.
 // CHECK-SIL-LABEL: sil shared @$sSays10ArraySliceVyxGSnySiGcisSi_{{.*}} :

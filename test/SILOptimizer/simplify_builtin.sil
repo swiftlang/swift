@@ -1,7 +1,8 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY --check-prefix=CHECK-UNSERIALIZED
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS1
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS2
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -serialize-sil -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK-SERIALIZED
 
 
 import Swift
@@ -202,6 +203,243 @@ bb0:
   %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %3 : $Int64) : $()
   %5 = tuple ()
   return %5
+}
+
+sil_global @rangeGlobal : $Range<Int64>
+sil_global @tupleGlobal : $(Int64, Int64)
+
+class Pair<T> {
+  @_hasStorage var lower: T
+  @_hasStorage var upper: T
+}
+
+// CHECK-UNSERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_global_loads :
+// CHECK-UNSERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-UNSERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_global_loads'
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_global_loads :
+// CHECK-SERIALIZED-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_global_loads'
+sil @assumeLessThanOrEqualTo_unused_global_loads : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = begin_access [read] [dynamic] %0 : $*Range<Int64>
+  %2 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  %5 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %6 = struct_element_addr %5 : $*Int64, #Int64._value
+  %7 = load %6 : $*Builtin.Int64
+  end_access %1 : $*Range<Int64>
+  %9 = builtin "assumeLessThanOrEqualTo"<Int64>(%4 : $Builtin.Int64, %7 : $Builtin.Int64) : $()
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_global_struct :
+// CHECK-SERIALIZED-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_global_struct'
+sil @assumeLessThanOrEqualTo_unused_global_struct : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = load %0 : $*Range<Int64>
+  %2 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%2 : $Int64, %3 : $Int64) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_global_tuple :
+// CHECK-SERIALIZED-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_global_tuple'
+sil @assumeLessThanOrEqualTo_unused_global_tuple : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @tupleGlobal : $*(Int64, Int64)
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = load %1 : $*Int64
+  %3 = load %0 : $*(Int64, Int64)
+  %4 = tuple_extract %3 : $(Int64, Int64), 1
+  %5 = builtin "assumeLessThanOrEqualTo"<Int64>(%2 : $Int64, %4 : $Int64) : $()
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_debug_values :
+// CHECK-SERIALIZED-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_debug_values'
+sil @assumeLessThanOrEqualTo_unused_debug_values : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = load %0 : $*Range<Int64>
+  debug_value %1 : $Range<Int64>, let, name "range"
+  %3 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
+  debug_value %3 : $Int64, let, name "lower"
+  %5 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %6 = builtin "assumeLessThanOrEqualTo"<Int64>(%3 : $Int64, %5 : $Int64) : $()
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_generic :
+// CHECK-SERIALIZED-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_generic'
+sil @assumeLessThanOrEqualTo_unused_generic : $@convention(thin) <T> (@guaranteed Pair<T>) -> () {
+bb0(%0 : $Pair<T>):
+  %1 = ref_element_addr %0 : $Pair<T>, #Pair.lower
+  %2 = ref_element_addr %0 : $Pair<T>, #Pair.upper
+  %3 = builtin "assumeLessThanOrEqualTo"<T>(%1 : $*T, %2 : $*T) : $()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_inout_loads :
+// CHECK-SERIALIZED-NOT:     builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_inout_loads'
+sil @assumeLessThanOrEqualTo_unused_inout_loads : $@convention(thin) (@inout Range<Int64>) -> () {
+bb0(%0 : $*Range<Int64>):
+  %1 = begin_access [read] [static] %0 : $*Range<Int64>
+  %2 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %3 = load %2 : $*Int64
+  %4 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %5 = load %4 : $*Int64
+  end_access %1 : $*Range<Int64>
+  %7 = builtin "assumeLessThanOrEqualTo"<Int64>(%3 : $Int64, %5 : $Int64) : $()
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_argument_fields :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_argument_fields'
+sil @assumeLessThanOrEqualTo_argument_fields : $@convention(thin) (Range<Int64>) -> () {
+bb0(%0 : $Range<Int64>):
+  %1 = struct_extract %0 : $Range<Int64>, #Range.lowerBound
+  %2 = struct_extract %0 : $Range<Int64>, #Range.upperBound
+  %3 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %2 : $Int64) : $()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_negative_constant :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_negative_constant'
+sil @assumeLessThanOrEqualTo_unused_negative_constant : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %3 : $Int64) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_unused_false_constants :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_unused_false_constants'
+sil @assumeLessThanOrEqualTo_unused_false_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 10
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $Int64, %3 : $Int64) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_returned_value :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_returned_value'
+sil @assumeLessThanOrEqualTo_returned_value : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = load %0 : $*Range<Int64>
+  %2 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%2 : $Int64, %3 : $Int64) : $()
+  return %2 : $Int64
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_separate_extract :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_separate_extract'
+sil @assumeLessThanOrEqualTo_separate_extract : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = load %0 : $*Range<Int64>
+  %2 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %4 = builtin "assumeLessThanOrEqualTo"<Int64>(%2 : $Int64, %3 : $Int64) : $()
+  %5 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  return %5 : $Int64
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_separate_tuple_element :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_separate_tuple_element'
+sil @assumeLessThanOrEqualTo_separate_tuple_element : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @tupleGlobal : $*(Int64, Int64)
+  %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
+  %2 = load %1 : $*Int64
+  %3 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %4 = load %3 : $*Int64
+  %5 = builtin "assumeLessThanOrEqualTo"<Int64>(%2 : $Int64, %4 : $Int64) : $()
+  %6 = tuple_element_addr %0 : $*(Int64, Int64), 1
+  %7 = load %6 : $*Int64
+  return %7 : $Int64
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_separate_load :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_separate_load'
+sil @assumeLessThanOrEqualTo_separate_load : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = struct_element_addr %0 : $*Range<Int64>, #Range.lowerBound
+  %2 = load %1 : $*Int64
+  %3 = struct_element_addr %0 : $*Range<Int64>, #Range.upperBound
+  %4 = load %3 : $*Int64
+  %5 = builtin "assumeLessThanOrEqualTo"<Int64>(%2 : $Int64, %4 : $Int64) : $()
+  %6 = load %1 : $*Int64
+  return %6 : $Int64
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_addresses_read_elsewhere :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"<Int64>({{%[0-9]+}} : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int64) : $()
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_addresses_read_elsewhere'
+sil @assumeLessThanOrEqualTo_addresses_read_elsewhere : $@convention(thin) () -> Range<Int64> {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = struct_element_addr %0 : $*Range<Int64>, #Range.lowerBound
+  %2 = struct_element_addr %0 : $*Range<Int64>, #Range.upperBound
+  %3 = builtin "assumeLessThanOrEqualTo"<Int64>(%1 : $*Int64, %2 : $*Int64) : $()
+  %4 = load %0 : $*Range<Int64>
+  return %4 : $Range<Int64>
+}
+
+// CHECK-SERIALIZED-LABEL: sil @assumeLessThanOrEqualTo_global_accessed_again :
+// CHECK-SERIALIZED:         builtin "assumeLessThanOrEqualTo"
+// CHECK-SERIALIZED:       } // end sil function 'assumeLessThanOrEqualTo_global_accessed_again'
+sil @assumeLessThanOrEqualTo_global_accessed_again : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_addr @rangeGlobal : $*Range<Int64>
+  %1 = begin_access [read] [dynamic] %0 : $*Range<Int64>
+  %2 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  %5 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %6 = struct_element_addr %5 : $*Int64, #Int64._value
+  %7 = load %6 : $*Builtin.Int64
+  end_access %1 : $*Range<Int64>
+  %9 = builtin "assumeLessThanOrEqualTo"<Int64>(%4 : $Builtin.Int64, %7 : $Builtin.Int64) : $()
+  %10 = begin_access [read] [dynamic] %0 : $*Range<Int64>
+  %11 = struct_element_addr %10 : $*Range<Int64>, #Range.lowerBound
+  %12 = struct_element_addr %11 : $*Int64, #Int64._value
+  %13 = load %12 : $*Builtin.Int64
+  end_access %10 : $*Range<Int64>
+  return %13 : $Builtin.Int64
 }
 
 // CHECK-LABEL: sil @same_metatype_same_operand

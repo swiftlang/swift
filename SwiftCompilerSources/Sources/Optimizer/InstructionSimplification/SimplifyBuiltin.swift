@@ -175,6 +175,11 @@ private extension BuiltinInst {
   }
 
   func optimizeAssumeLessThanOrEqualTo(_ context: SimplifyContext) {
+    // Erase only after serialization: clients that inline a serialized body may use the operands.
+    if context.moduleIsSerialized && carriesNoInformation(context) {
+      context.erase(instruction: self)
+      return
+    }
     let type = substitutionMap.replacementType
     // A generic type can still become an integer type by specialization.
     if type.hasArchetype {
@@ -206,6 +211,39 @@ private extension BuiltinInst {
       }
       operand.set(to: builder.createStructExtract(struct: value, fieldIndex: 0), context)
     }
+  }
+
+  func carriesNoInformation(_ context: SimplifyContext) -> Bool {
+    var values = ValueWorklist(context)
+    defer { values.deinitialize() }
+
+    var onlyConstants = true
+    for operand in definedOperands {
+      var value = operand.value
+      values.pushIfNotVisited(value)
+      while let source = value.projectedOrLoadedFrom {
+        values.pushIfNotVisited(source)
+        value = source
+      }
+      // Inlining can give the caller more uses of an argument value.
+      if value is FunctionArgument && !value.type.isAddress {
+        return false
+      }
+      onlyConstants = onlyConstants && value.integerConstant != nil
+    }
+    // An assume of constants can still say that the code is unreachable.
+    if onlyConstants {
+      return false
+    }
+    while let value = values.pop() {
+      let otherUses = value.uses.ignoreDebugUses.ignore(usersOfType: EndAccessInst.self).ignore(user: self)
+      for use in otherUses {
+        guard let user = use.instruction as? SingleValueInstruction, values.hasBeenPushed(user) else {
+          return false
+        }
+      }
+    }
+    return true
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
@@ -411,6 +449,25 @@ private extension Value {
       return bi.operands[0].value.lookThroughScalarCasts
     default:
       return self
+    }
+  }
+
+  var projectedOrLoadedFrom: Value? {
+    switch self {
+    case let extract as StructExtractInst:
+      return extract.struct
+    case let extract as TupleExtractInst:
+      return extract.tuple
+    case let load as LoadInst:
+      return load.address
+    case let address as StructElementAddrInst:
+      return address.struct
+    case let address as TupleElementAddrInst:
+      return address.tuple
+    case let access as BeginAccessInst:
+      return access.address
+    default:
+      return nil
     }
   }
 }

@@ -972,7 +972,7 @@ func assumeLessThanOrEqualTo(_ x: Builtin.Int64, _ y: Builtin.Int64) {
 // CHECK: builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
 // CHECK: return
 // CANONICAL-LABEL: sil hidden @$s8builtins30assumeLessThanOrEqualToGenericyyx_xtlF
-// CANONICAL: builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+// CANONICAL-NOT: builtin "assumeLessThanOrEqualTo"
 // CANONICAL: return
 func assumeLessThanOrEqualToGeneric<T>(_ x: T, _ y: T) {
   Builtin.assumeLessThanOrEqualTo(x, y)
