@@ -43,6 +43,49 @@
 
 #define MachOTextSegment "__TEXT"
 
+#include <cstddef>
+#include <cstring>
+
+namespace swift {
+
+/// Split a Mach-O section name as written in a \c @section attribute,
+/// "segment,section" with optional spaces and trailing attributes, into its
+/// two NUL-terminated parts. Each part is at most 16 bytes in a Mach-O header,
+/// so longer names cannot match any section and make this return false.
+static inline bool parseMachOSectionName(const char *name, char segment[17],
+                                         char section[17]) {
+  if (!name)
+    return false;
+  const char *comma = strchr(name, ',');
+  if (!comma)
+    return false;
+
+  const char *segmentStart = name;
+  while (*segmentStart == ' ')
+    ++segmentStart;
+  const char *segmentEnd = comma;
+  while (segmentEnd > segmentStart && segmentEnd[-1] == ' ')
+    --segmentEnd;
+
+  const char *sectionStart = comma + 1;
+  while (*sectionStart == ' ')
+    ++sectionStart;
+  size_t sectionLength = strcspn(sectionStart, ", ");
+
+  size_t segmentLength = static_cast<size_t>(segmentEnd - segmentStart);
+  if (segmentLength == 0 || segmentLength > 16 || sectionLength == 0 ||
+      sectionLength > 16)
+    return false;
+
+  memcpy(segment, segmentStart, segmentLength);
+  segment[segmentLength] = '\0';
+  memcpy(section, sectionStart, sectionLength);
+  section[sectionLength] = '\0';
+  return true;
+}
+
+} // namespace swift
+
 #else
 
 #include "swift/shims/Visibility.h"
@@ -51,7 +94,7 @@
 
 namespace swift {
 struct MetadataSections;
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 5;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 6;
 }
 
 struct SectionInfo {

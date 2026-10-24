@@ -453,6 +453,9 @@ public:
   /// runtime.
   void emitAccessibleFunctions();
 
+  /// Emit the SE-0492 custom section index for each IR module.
+  void emitCustomSectionIndex();
+
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
@@ -1325,6 +1328,16 @@ public:
   void emitAccessibleFunction(StringRef sectionName,
                               const AccessibleFunction &func);
 
+  /// Record that a variable definition in this IR module was placed into a
+  /// custom section by the `@section` attribute. Functions are not indexed.
+  void noteCustomSection(StringRef sectionName);
+  /// Emit the SE-0492 custom section index: one `linkonce_odr` entry per
+  /// custom section that holds a variable of this IR module, placed in the
+  /// runtime-owned index section. Emitted for ELF, Wasm and COFF; Mach-O
+  /// carries section bounds in the image header. Not emitted in Embedded
+  /// Swift.
+  void emitCustomSectionIndex();
+
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
 
@@ -1480,6 +1493,10 @@ private:
   /// List of all of the functions, which can be lookup by name
   /// up at runtime.
   SmallVector<AccessibleFunction, 4> AccessibleFunctions;
+
+  /// Names of the custom sections that `@section` placed variables into, in
+  /// definition order. Consumed by emitCustomSectionIndex().
+  SmallVector<std::string, 4> CustomSectionNames;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
