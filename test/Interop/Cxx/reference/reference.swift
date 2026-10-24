@@ -75,6 +75,12 @@ ReferenceTestSuite.test("func-rvalue-reference") {
   expectEqual(61, cxxF())
 }
 
+ReferenceTestSuite.test("func-ptr-rvalue-reference") {
+  expectNotEqual(67, getStaticInt())
+  setStaticInt(67)
+  expectEqual(67, callFuncPtrRvalueRef(consuming: getStaticInt))
+}
+
 ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {
   expectNotEqual(getStaticInt(), 78)
   takeConstRef(78)
