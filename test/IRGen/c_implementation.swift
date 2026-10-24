@@ -2,14 +2,14 @@
 // RUN:   -disable-objc-interop \
 // RUN:   -F %clang-importer-sdk-path/frameworks %s \
 // RUN:   -import-objc-header %S/Inputs/objc_implementation.h -emit-ir \
-// RUN:   -use-clang-function-types \
+// RUN:   -use-clang-function-types -Xcc -fvisibility=default \
 // RUN:   -target %target-future-triple > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   -disable-objc-interop \
 // RUN:   -F %clang-importer-sdk-path/frameworks %s \
 // RUN:   -import-objc-header %S/Inputs/objc_implementation.h -emit-sil \
-// RUN:   -use-clang-function-types \
+// RUN:   -use-clang-function-types -Xcc -fvisibility=default \
 // RUN:   -experimental-print-full-convention \
 // RUN:   -target %target-future-triple | %FileCheck %s --check-prefix=SIL
 
