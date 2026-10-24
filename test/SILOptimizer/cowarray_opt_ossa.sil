@@ -54,6 +54,9 @@ sil [ossa] [_semantics "array.mutate_unknown"] @array_unknown_mutate : $@convent
 // An unknown user
 sil [ossa] @unknown : $@convention(thin) () -> ()
 
+// An unknown user of an array
+sil [ossa] @unknown_array_user : $@convention(thin) (@inout MyArray<MyStruct>) -> ()
+
 ///////////
 // Tests //
 ///////////
@@ -86,6 +89,73 @@ bb1a:
 
 bb2:
   destroy_value %2 : $MyArray<MyStruct>
+  %r = tuple()
+  return %r : $()
+}
+
+// The array escapes before the loop, so make_mutable can only be hoisted
+// because the loop has no unsafe operations. An assume is not one.
+// CHECK-LABEL: sil [ossa] @hoist_with_assume :
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'hoist_with_assume'
+sil [ossa] @hoist_with_assume : $@convention(thin) (@inout MyArray<MyStruct>, Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $Builtin.Int1):
+  %2 = function_ref @unknown_array_user : $@convention(thin) (@inout MyArray<MyStruct>) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@inout MyArray<MyStruct>) -> ()
+  br bb1
+
+bb1:
+  %5 = builtin "assume_Int1"(%1 : $Builtin.Int1) : $Builtin.Int1
+  %6 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = apply %6(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %9 = apply %8(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  %r = tuple()
+  return %r : $()
+}
+
+// An assume in the loop is not an unsafe operation.
+// CHECK-LABEL: sil [ossa] @hoist_with_assume_less_than_or_equal_to :
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: } // end sil function 'hoist_with_assume_less_than_or_equal_to'
+sil [ossa] @hoist_with_assume_less_than_or_equal_to : $@convention(thin) (@inout MyArray<MyStruct>, Int, Int) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $Int, %2 : $Int):
+  %3 = function_ref @unknown_array_user : $@convention(thin) (@inout MyArray<MyStruct>) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@inout MyArray<MyStruct>) -> ()
+  br bb1
+
+bb1:
+  %5 = builtin "assumeLessThanOrEqualTo"<Int>(%1 : $Int, %2 : $Int) : $()
+  %6 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = apply %6(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %9 = apply %8(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
   %r = tuple()
   return %r : $()
 }

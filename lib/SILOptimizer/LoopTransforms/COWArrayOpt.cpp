@@ -761,6 +761,10 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         continue;
       if (isa<CondFailInst>(Inst))
         continue;
+      // An assume does not write memory. Its side effects only keep it in
+      // place.
+      if (isAssume(Inst))
+        continue;
       if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
         continue;
 

@@ -601,3 +601,79 @@ bb0(%0 : $Float, %1 : @closureCapture $Builtin.FPIEEE32, %2 : @closureCapture $B
   %69 = tuple (%62 : $Float, %67 : $Float)        // user: %70
   return %69 : $(Float, Float)                    // id: %70
 }
+
+// An assume, and a condition which is only computed for assumes, don't add to
+// the cost of inlining.
+
+// CHECK-LOG-LABEL: Inline into caller: testCalleeWithoutAssumes
+// CHECK-LOG-NEXT: decision {c=[[COST:[0-9]+]],{{.*}} calleeWithoutAssumes
+
+// CHECK-LOG-LABEL: Inline into caller: testCalleeWithAssumes
+// CHECK-LOG-NEXT: decision {c=[[COST]],{{.*}} calleeWithAssumes
+
+// CHECK-LOG-LABEL: Inline into caller: testCalleeWithAssumeLessThanOrEqualTo
+// CHECK-LOG-NEXT: decision {c=[[COST]],{{.*}} calleeWithAssumeLessThanOrEqualTo
+
+sil @testCalleeWithoutAssumes : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = function_ref @calleeWithoutAssumes : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int32, Int32) -> Int32
+  return %3 : $Int32
+}
+
+sil @testCalleeWithAssumes : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = function_ref @calleeWithAssumes : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int32, Int32) -> Int32
+  return %3 : $Int32
+}
+
+sil @calleeWithoutAssumes : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = struct_extract %0 : $Int32, #Int32._value
+  %3 = struct_extract %1 : $Int32, #Int32._value
+  %4 = integer_literal $Builtin.Int1, -1
+  %5 = builtin "ssub_with_overflow_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %7 : $Builtin.Int1
+  %9 = struct $Int32 (%6 : $Builtin.Int32)
+  return %9 : $Int32
+}
+
+sil @calleeWithAssumes : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = struct_extract %0 : $Int32, #Int32._value
+  %3 = struct_extract %1 : $Int32, #Int32._value
+  %4 = builtin "cmp_sle_Int32"(%2 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  %5 = builtin "assume_Int1"(%4 : $Builtin.Int1) : $Builtin.Int1
+  %6 = builtin "assume_Int1"(%4 : $Builtin.Int1) : $Builtin.Int1
+  %7 = integer_literal $Builtin.Int1, -1
+  %8 = builtin "ssub_with_overflow_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %10 : $Builtin.Int1
+  %12 = struct $Int32 (%9 : $Builtin.Int32)
+  return %12 : $Int32
+}
+
+sil @testCalleeWithAssumeLessThanOrEqualTo : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = function_ref @calleeWithAssumeLessThanOrEqualTo : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int32, Int32) -> Int32
+  return %3 : $Int32
+}
+
+sil @calleeWithAssumeLessThanOrEqualTo : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  %2 = struct_extract %0 : $Int32, #Int32._value
+  %3 = struct_extract %1 : $Int32, #Int32._value
+  %4 = builtin "assumeLessThanOrEqualTo"<Int32>(%0 : $Int32, %1 : $Int32) : $()
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = builtin "ssub_with_overflow_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
+  %8 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %8 : $Builtin.Int1
+  %10 = struct $Int32 (%7 : $Builtin.Int32)
+  return %10 : $Int32
+}
