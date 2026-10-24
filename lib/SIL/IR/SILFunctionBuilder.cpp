@@ -113,6 +113,21 @@ void SILFunctionBuilder::addFunctionAttributes(
             SA->isPublic()));
       }
     }
+
+    // Propagate '@specialized' on the member's type, exported or not, except
+    // to default argument generators, which are emitted into clients.
+    auto *member = constant.getAbstractFunctionDecl();
+    if (member && !constant.isDefaultArgGenerator()) {
+      SmallVector<std::pair<GenericSignature, bool>, 2> typeLevelSigs;
+      SpecializedAttr::getTypeLevelSpecializations(member, typeLevelSigs);
+      for (auto [sig, exported] : typeLevelSigs)
+        F->addSpecializeAttr(SILSpecializeAttr::create(
+            M, sig, /*typeErasedParams=*/{}, exported,
+            SILSpecializeAttr::SpecializationKind::Full,
+            /*target=*/nullptr, Identifier(), member->getModuleContext(),
+            AvailabilityRange::alwaysAvailable(),
+            /*isSpecializedSpelling=*/true));
+    }
   }
 
   llvm::SmallVector<const EffectsAttr *, 8> customEffects;

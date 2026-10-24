@@ -242,9 +242,15 @@ private struct VTableSpecializer {
       }
       notifyNewFunction(specializedMethod)
 
-      context.deserializeAllCallees(of: specializedMethod, mode: .allFunctions)
-      specializedMethod.set(linkage: .public, context)
-      specializedMethod.set(isSerialized: false, context)
+      // `specialize` may return an exported specialization: this module's own
+      // definition, or a declaration of the one another module defines. Keep
+      // its linkage and serialization, so that the definition stays unique
+      // and other modules don't create their own copy.
+      if !specializedMethod.isExportedSpecialization {
+        context.deserializeAllCallees(of: specializedMethod, mode: .allFunctions)
+        specializedMethod.set(linkage: .public, context)
+        specializedMethod.set(isSerialized: false, context)
+      }
 
       return VTable.Entry(kind: entry.kind, isNonOverridden: entry.isNonOverridden,
                           methodDecl: entry.methodDecl, implementation: specializedMethod)
@@ -341,7 +347,15 @@ private func specializeDeinit(forType type: Type,
     return
   }
   notifyNewFunction(specializedDeinit)
+  context.addSpecializedDeinit(ofType: type, specializedDeinit)
 
+  // `specialize` may return an exported specialization: this module's own
+  // definition, or a declaration of the one another module defines. Keep its
+  // linkage and serialization, so that the definition stays unique and other
+  // modules don't create their own copy.
+  if specializedDeinit.isExportedSpecialization {
+    return
+  }
   context.deserializeAllCallees(of: specializedDeinit, mode: .allFunctions)
   // Use `shared` rather than `public` linkage: the specialization is only ever
   // referenced from the value witnesses of types in this module, and importing
@@ -349,8 +363,6 @@ private func specializeDeinit(forType type: Type,
   // and dead-strip the deinit when the metadata that referenced it is stripped.
   specializedDeinit.set(linkage: .shared, context)
   specializedDeinit.set(isSerialized: false, context)
-
-  context.addSpecializedDeinit(ofType: type, specializedDeinit)
 }
 
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.

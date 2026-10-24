@@ -8134,7 +8134,7 @@ ERROR(resilient_associated_type_less_available_requires_default,none,
 //------------------------------------------------------------------------------
 
 ERROR(specialize_attr_nongeneric_trailing_where,none,
-      "trailing 'where' clause in %select{'_specialize'|'specialized'}1 attribute of non-generic function %0", (DeclName, bool))
+      "trailing 'where' clause in %select{'_specialize'|'specialized'}1 attribute of non-generic %select{function|type}2 %0", (DeclName, bool, bool))
 ERROR(specialize_missing_where_clause,none,
       "missing 'where' clause in %select{'_specialize'|'specialized'}0 attribute", (bool))
 ERROR(specialize_empty_where_clause,none,
@@ -8159,6 +8159,13 @@ ERROR(specialized_attr_exported_experimental,none,
 ERROR(specialized_attr_exported_library_evolution,none,
       "'@specialized(exported: true)' is not supported in a module built "
       "with library evolution", ())
+ERROR(specialized_attr_exported_not_public,none,
+      "'@specialized(exported: true)' requires a public declaration", ())
+ERROR(specialized_attr_exported_not_public_type,none,
+      "'@specialized(exported: true)' requires %0 to be public", (Type))
+ERROR(specialized_attr_type_experimental,none,
+      "'@specialized' on a type requires "
+      "'-enable-experimental-feature ExtendedSpecializedAttribute'", ())
 ERROR(specialized_attr_exported_emitted_into_client,none,
       "'@specialized(exported: true)' cannot be combined with "
       "%select{'@export(implementation)'|'@_alwaysEmitIntoClient'|"

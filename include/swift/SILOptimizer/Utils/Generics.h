@@ -505,6 +505,17 @@ ApplySite replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
 /// body is not required for further optimization or inlining (-Onone).
 SILFunction *lookupPrespecializedSymbol(SILModule &M, StringRef FunctionName);
 
+/// Returns the exported specialization of \p origF for \p subs, if its type
+/// is \p specializedType, or null. Callers reuse it instead of creating their
+/// own copy of the specialization.
+/// E.g. with '@specialized(exported: true, where T == Int)' on 'Box<T>',
+/// \p origF 'Box.get()' and \p subs 'T == Int' give the exported 'Box.get()'
+/// for 'Int', if its type is \p specializedType.
+SILFunction *lookupExportedSpecialization(SILOptFunctionBuilder &funcBuilder,
+                                          SILFunction *origF,
+                                          SubstitutionMap subs,
+                                          CanSILFunctionType specializedType);
+
 } // end namespace swift
 
 #endif
