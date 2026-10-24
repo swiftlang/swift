@@ -536,6 +536,9 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
+/// Name existing concrete C++ class template specializations in Swift.
+EXPERIMENTAL_FEATURE(CxxConcreteTemplateTypes, false)
+
 /// Do not import non-field C++ record members until requested from Swift.
 LANGUAGE_FEATURE(ImportCxxMembersLazily, 0, "import C++ members lazily")
 
