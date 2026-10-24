@@ -787,6 +787,8 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
 void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
                                          Constraint *applicableFn,
                                          bool verify) {
+  auto &ctx = cs.getASTContext();
+
   auto argumentList = cs.getArgumentList(applicableFn->getLocator());
   ASSERT(argumentList);
 
@@ -845,7 +847,7 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
           llvm::errs().indent(cs.solverState->getCurrentIndent())
               << "<<< Matching failed with ";
           choice->print(llvm::errs(),
-                        &cs.getASTContext().SourceMgr,
+                        &ctx.SourceMgr,
                         cs.solverState->getCurrentIndent());
           llvm::errs() << "\n";
         }
@@ -897,7 +899,8 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
       // If the result of the applicable fn is a type variable, consider each
       // potential subtype binding on this type variable. If any of them
       // contradict the result type of this overload, we can prune the overload.
-      if (resultTypeVar != nullptr) {
+      if (ctx.TypeCheckerOpts.SolverEnablePromoteSupertypes &&
+          resultTypeVar != nullptr) {
         const auto &node = cs.getConstraintGraph()[resultTypeVar];
         const auto &bindings = node.getPotentialBindings();
         ASSERT(bindings.GenerationNumber == resultGenerationNumber);
@@ -922,7 +925,7 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
           llvm::errs().indent(cs.solverState->getCurrentIndent() + 4)
               << "(disabled choice ";
           choice->print(llvm::errs(),
-                        &cs.getASTContext().SourceMgr,
+                        &ctx.SourceMgr,
                         cs.solverState->getCurrentIndent());
           llvm::errs() << " because ";
           simple_display(llvm::errs(), reason);
