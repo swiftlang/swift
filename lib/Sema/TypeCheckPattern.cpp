@@ -1754,8 +1754,11 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
            "Closures cannot have API names");
     assert(!param->isDefaultArgument() && "Closures cannot have default args");
 
-    if (params[i].isInOut())
-      param->setSpecifier(ParamDecl::Specifier::InOut);
+    auto ownership = params[i].getParameterFlags().getOwnershipSpecifier();
+    if (param->getSpecifier() == ParamDecl::Specifier::Default &&
+        ownership != ParamSpecifier::Default) {
+      param->setSpecifier(ownership);
+    }
 
     param->setInterfaceType(
         params[i].getParameterType()->mapTypeOutOfEnvironment());
