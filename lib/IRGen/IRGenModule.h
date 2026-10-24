@@ -1223,6 +1223,12 @@ public:
                               bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
+  /// Whether the witness table of the concrete \p conformance can be
+  /// referenced as a constant. For a specialized conformance this means that
+  /// a specialized witness table can be emitted statically.
+  bool canReferenceWitnessTableStatically(
+      const ProtocolConformance *conformance);
+
   Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);

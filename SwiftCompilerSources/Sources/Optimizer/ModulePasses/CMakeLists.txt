@@ -13,4 +13,5 @@ swift_compiler_sources(Optimizer
   MandatoryPerformanceOptimizations.swift
   ReadOnlyGlobalVariables.swift
   StackProtection.swift
+  WitnessTableSpecialization.swift
 )
