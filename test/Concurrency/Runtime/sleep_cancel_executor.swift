@@ -75,7 +75,7 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  public func cancel(jobWithToken token: consuming JobCancellationToken)
+  public func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     let id = UInt64(token.opaqueData[0])
     if let job = queue.sync(execute: { pending.removeValue(forKey: id) }) {

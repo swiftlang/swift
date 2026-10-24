@@ -78,7 +78,7 @@ final class ManualClock: SchedulingClock, JobCanceller, @unchecked Sendable {
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  func cancel(jobWithToken token: consuming JobCancellationToken)
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     let id = UInt64(token.opaqueData[0])
     if let entry = queue.sync(execute: { pending.removeValue(forKey: id) }) {
@@ -181,7 +181,7 @@ final class HoldingClock: SchedulingClock, JobCanceller, @unchecked Sendable {
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  func cancel(jobWithToken token: consuming JobCancellationToken)
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     let id = UInt64(token.opaqueData[0])
     if let entry = queue.sync(execute: { pending.removeValue(forKey: id) }) {
@@ -284,7 +284,7 @@ final class RefusingExecutor: TaskExecutor, SchedulingExecutor,
     fatalError("a standard clock should never be scheduled on this executor")
   }
 
-  func cancel(jobWithToken token: consuming JobCancellationToken)
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     return nil
   }
@@ -436,6 +436,9 @@ func waitUntil(_ condition: () -> Bool) async throws {
         return
       }
       expectEqual(0, clock.pendingCount)
+
+      // Cancelling doesn't consume the token, and a second cancel gets nothing.
+      expectTrue(token.cancel() == nil)
 
       // We get the original job back, not the trampoline that the clock was
       // holding, and the trampoline does nothing, so the task runs once, when

@@ -277,7 +277,7 @@ extension CooperativeExecutor: SchedulingExecutor {
     return true
   }
 
-  public func cancel(jobWithToken token: consuming JobCancellationToken)
+  public func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     let (id, clockToken) = Self.decode(token)
     switch clockToken {

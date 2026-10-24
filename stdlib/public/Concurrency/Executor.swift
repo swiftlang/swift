@@ -139,7 +139,10 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// This may be called from any thread, unless the scheduler is documented as
   /// being for use from a single thread only, as the cooperative executor is,
   /// in which case it must be called from that thread.  A token for a job that
-  /// has already run must return `nil` and must never match a different job.
+  /// has already run or been cancelled must return `nil`, and a token must
+  /// never match a different job; in particular, `cancel` can be called more
+  /// than once with the same token, and only the first call may return the
+  /// job.
   ///
   /// ### Implementing `cancel`
   ///
@@ -174,7 +177,7 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// Parameters:
   ///
   /// - jobWithToken: The token returned when the job was scheduled.
-  func cancel(jobWithToken: consuming JobCancellationToken) -> ExecutorJob?
+  func cancel(jobWithToken: borrowing JobCancellationToken) -> ExecutorJob?
 
   /// Called when a token that this canceller issued is destroyed, so that it
   /// can release anything it was keeping for the token (for example, a
@@ -182,12 +185,12 @@ public protocol JobCanceller: AnyObject, Sendable {
   ///
   /// This is called exactly once for each token that was issued, from the
   /// token's `deinit`, on whatever thread that happens to be, and it is called
-  /// whether or not the job was cancelled.  In particular, `cancel` consumes
-  /// the token, so for a token that is cancelled, `release` is called *after*
-  /// `cancel` returns.  An implementation that frees its bookkeeping in
-  /// `cancel` must therefore not touch it again in `release`: free it in one or
-  /// the other (the Dispatch executor frees it only here), or make them cope
-  /// with having both run.
+  /// whether or not the job was cancelled.  `cancel` does not consume the token,
+  /// so `release` can be called after `cancel` has returned (and, if the token
+  /// is cancelled more than once, after all of the calls).  An implementation
+  /// that frees its bookkeeping in `cancel` must therefore not touch it again in
+  /// `release`: free it in one or the other (the Dispatch executor frees it only
+  /// here), or make them cope with having both run.
   ///
   /// It is called for every token, so it should do as little as it can; the
   /// default does nothing.
@@ -244,10 +247,15 @@ public struct JobCancellationToken: ~Copyable, Sendable {
   ///
   /// If the job had not started running, it is removed from the executor and
   /// returned; the caller then owns it and must run or enqueue it.
-  /// Returns `nil` if the job has started, has finished, or cannot be
-  /// cancelled by the executor, in which case it will run (or has run)
-  /// normally.
-  public consuming func cancel() -> ExecutorJob? {
+  /// Returns `nil` if the job has started, has finished, has already been
+  /// cancelled, or cannot be cancelled by the executor, in which case it will
+  /// run (or has run) normally.
+  ///
+  /// This does not consume the token, so that it can be used from a closure
+  /// that only borrows it (such as a cancellation handler), and it is safe to
+  /// call more than once: only the first call can return the job.  The token
+  /// is released when it is destroyed, as always.
+  public borrowing func cancel() -> ExecutorJob? {
     return canceller.cancel(jobWithToken: self)
   }
 }

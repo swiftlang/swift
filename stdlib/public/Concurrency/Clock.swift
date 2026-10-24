@@ -166,7 +166,7 @@ private final class _TrampolineCanceller: JobCanceller, @unchecked Sendable {
     self.trampolineToken = consume trampolineToken
   }
 
-  func cancel(jobWithToken token: consuming JobCancellationToken)
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     guard let trampolineToken = trampolineToken.take(),
           let trampoline = trampolineToken.cancel() else {
@@ -226,7 +226,7 @@ internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
 private final class _NonCancellingCanceller: JobCanceller, @unchecked Sendable {
   static let shared = _NonCancellingCanceller()
 
-  func cancel(jobWithToken token: consuming JobCancellationToken)
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> ExecutorJob? {
     return nil
   }

@@ -74,23 +74,6 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 }
 
 #if !$Embedded
-/// A one-shot holder for a `JobCancellationToken`, so that the (escaping,
-/// `sending`) cancellation handler of a sleep can consume the token.
-@available(StdlibDeploymentTarget 6.5, *)
-fileprivate final class _SleepTokenBox: @unchecked Sendable {
-  var token: JobCancellationToken?
-
-  init(_ token: consuming JobCancellationToken) {
-    self.token = consume token
-  }
-
-  /// Take the token.  Only the cancellation handler calls this, and it
-  /// runs at most once.
-  func take() -> JobCancellationToken? {
-    return token.take()
-  }
-}
-
 /// A flag that is claimed exactly once, by whichever of the timer and the
 /// cancellation handler gets there first.
 @available(StdlibDeploymentTarget 5.7, *)
@@ -221,12 +204,12 @@ extension Task where Success == Never, Failure == Never {
         Void, _Concurrency.CancellationError
       >(continuation._takeContext())
 
-      // The cancellation handler is `sending` and can't consume the token
-      // directly, so hand it over in a box.
-      let box = unsafe _SleepTokenBox(schedule(_jobToResume(sleeper)))
+      // The cancellation handler only borrows the token, which it can do
+      // because `cancel()` doesn't consume it, so no box is needed.
+      let token = unsafe schedule(_jobToResume(sleeper))
 
       try await waiter.wait(onCancel: {
-        guard let token = box.take(), token.cancel() != nil else {
+        guard token.cancel() != nil else {
           // The timer has already fired; it will resume the continuation.
           return
         }

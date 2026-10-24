@@ -63,7 +63,7 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
     return JobCancellationToken(canceller: self, opaqueData: [0, 0])
   }
 
-  public func cancel(jobWithToken: consuming JobCancellationToken)
+  public func cancel(jobWithToken: borrowing JobCancellationToken)
     -> ExecutorJob? {
     return nil
   }
