@@ -31,6 +31,7 @@ namespace irgen {
 class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
   ClassDecl *TheClass;
   mutable llvm::StructType *classLayoutType;
+  mutable std::optional<bool> NonatomicRC;
 
   // The resilient layout of the class, without making any assumptions
   // that violate resilience boundaries. This is used to allocate
@@ -71,6 +72,19 @@ public:
 
   ClassDecl *getClass() const { return TheClass; }
 
+  /// Is this class (or a superclass) marked @_nonatomicReferenceCounting?
+  /// References to such classes are retained and released non-atomically.
+  bool usesNonatomicReferenceCounting() const {
+    if (!NonatomicRC) {
+      bool result = false;
+      if (Refcount == ReferenceCounting::Native)
+        for (auto *c = TheClass; c && !result; c = c->getSuperclassDecl())
+          result = c->getAttrs().hasAttribute<NonatomicReferenceCountingAttr>();
+      NonatomicRC = result;
+    }
+    return *NonatomicRC;
+  }
+
   llvm::Type *getClassLayoutType() const { return classLayoutType; }
 
   /// For a foreign reference type with custom reference counting, returns the
@@ -102,6 +116,8 @@ public:
       return;
     }
 
+    if (usesNonatomicReferenceCounting())
+      atomicity = Atomicity::NonAtomic;
     HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
   }
 
@@ -119,6 +135,8 @@ public:
       return;
     }
 
+    if (usesNonatomicReferenceCounting())
+      atomicity = Atomicity::NonAtomic;
     HeapTypeInfo::emitScalarRetain(IGF, value, atomicity);
   }
 

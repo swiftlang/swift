@@ -138,6 +138,7 @@ import NSErrorTest
 #if canImport(Darwin)
 import NSStringConversion
 #endif
+import NonatomicRC
 import NopDeinit
 import ObjectAllocation
 #if canImport(Darwin)
@@ -361,6 +362,7 @@ register(NSStringConversion.benchmarks)
 #endif
 register(NibbleSort.benchmarks)
 register(NIOChannelPipeline.benchmarks)
+register(NonatomicRC.benchmarks)
 register(NopDeinit.benchmarks)
 register(ObjectAllocation.benchmarks)
 #if canImport(Darwin)

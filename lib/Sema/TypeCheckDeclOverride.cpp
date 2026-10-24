@@ -1828,6 +1828,7 @@ namespace  {
     UNINTERESTING_ATTR(Sensitive)
 
     UNINTERESTING_ATTR(EagerMove)
+    UNINTERESTING_ATTR(NonatomicReferenceCounting)
     UNINTERESTING_ATTR(NoEagerMove)
 
     UNINTERESTING_ATTR(MacroRole)

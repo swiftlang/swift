@@ -965,7 +965,14 @@ DECL_ATTR(_scopeParams, ScopeParams,
   182)
 DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
 
-LAST_DECL_ATTR(ScopeParams)
+// Promises that instances of the class (and its subclasses) are only ever
+// accessed from one thread at a time without synchronization, so references to
+// them can be retained and released without atomic operations.
+SIMPLE_DECL_ATTR(_nonatomicReferenceCounting, NonatomicReferenceCounting,
+  OnClass,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  183)
+LAST_DECL_ATTR(NonatomicReferenceCounting)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

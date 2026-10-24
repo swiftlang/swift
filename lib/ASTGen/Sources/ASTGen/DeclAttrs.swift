@@ -324,6 +324,7 @@ extension ASTGenVisitor {
         .SPIOnly,
         .ShowInInterface,
         .SpecializeExtension,
+        .NonatomicReferenceCounting,
         .StaticExclusiveOnly,
         .Testable,
         .Transparent,

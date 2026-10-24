@@ -137,6 +137,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NaiveRangeReplaceableCollectionConformance
     single-source/NibbleSort
     single-source/NIOChannelPipeline
+    single-source/NonatomicRC
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging

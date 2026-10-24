@@ -5148,6 +5148,7 @@ public:
   TRIVIAL_ATTR_PRINTER(DynamicCallable, dynamic_callable)
   TRIVIAL_ATTR_PRINTER(DynamicMemberLookup, dynamic_member_lookup)
   TRIVIAL_ATTR_PRINTER(EagerMove, eager_move)
+  TRIVIAL_ATTR_PRINTER(NonatomicReferenceCounting, nonatomic_reference_counting)
   TRIVIAL_ATTR_PRINTER(EmitAssemblyVisionRemarks, emit_assembly_vision_remarks)
   TRIVIAL_ATTR_PRINTER(Exported, exported)
   TRIVIAL_ATTR_PRINTER(ExtractConstantsFromMembers,
