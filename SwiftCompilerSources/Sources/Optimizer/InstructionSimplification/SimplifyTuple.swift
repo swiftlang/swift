@@ -63,6 +63,13 @@ extension TupleInst : OnoneSimplifiable, SILCombineSimplifiable {
   }
 }
 
+extension TupleInst : DebugReconstructionBlockSimplifiable {
+  /// See `SingleValueInstruction.simplifyAggregateForDebugReconstructionBlock`.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    simplifyAggregateForDebugReconstructionBlock(context)
+  }
+}
+
 private func tryReplaceDestructConstructPair(destruct: MultipleValueInstruction & UnaryInstruction,
                                              construct: SingleValueInstruction,
                                              _ context: SimplifyContext) {

@@ -139,10 +139,14 @@ struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
   typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
+  typedef BridgedInstruction (* _Nonnull UpdateInstructionFn)(BridgedContext, BridgedInstruction);
 
   static void registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
                                          UpdateLifetimeValuesFn completeLifetimeFn);
   static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
+  static void registerDebugReconstructionSimplification(
+      UpdateFunctionFn simplifyDebugReconstructionBlocksFn,
+      UpdateInstructionFn simplifyDebugReconstructionBlockFn);
 };
 
 struct BridgedLoopTree {
