@@ -156,11 +156,13 @@ def pushd(path, dry_run=None, echo=True):
         _echo_command(dry_run, ["pushd", path])
     if not dry_run:
         os.chdir(path)
-    yield
-    if dry_run or echo:
-        _echo_command(dry_run, ["popd"])
-    if not dry_run:
-        os.chdir(old_dir)
+    try:
+        yield
+    finally:
+        if dry_run or echo:
+            _echo_command(dry_run, ["popd"])
+        if not dry_run:
+            os.chdir(old_dir)
 
 
 def makedirs(path, dry_run=None, echo=True):
