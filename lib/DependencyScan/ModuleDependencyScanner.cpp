@@ -2510,6 +2510,45 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     swiftArgs.push_back(ScanASTContext.LangOpts.ClangTarget->str());
   }
 
+  // Enable C++ interop so the PCM build injects the libstdc++ module map.
+  if (ScanASTContext.LangOpts.EnableCXXInterop)
+    swiftArgs.push_back("-cxx-interoperability-mode=default");
+
+  // <clang-imported-headers-vfs-overlay.yaml> is in-memory only and stripped
+  // above by filterClangSystemVFSOverlay, so a direct-cc1 -emit-pcm job must
+  // reconstruct it by running the Clang driver. Because the job's -Xcc flags
+  // are minimized cc1 arguments (with driver flags like --gcc-toolchain
+  // consumed and unused -internal-isystem paths pruned), forward the scan's
+  // Clang driver flags and search-path options when VFS files were injected.
+  auto *clangImporter =
+      static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
+  const auto &fileMapping = clangImporter->getClangFileMapping();
+  if (!ScanASTContext.CASOpts.EnableCaching &&
+      (!fileMapping.redirectedFiles.empty() ||
+       !fileMapping.overridenFiles.empty())) {
+    for (const auto &arg : ScanASTContext.ClangImporterOpts.ExtraArgs) {
+      swiftArgs.push_back("-direct-clang-cc1-driver-arg");
+      swiftArgs.push_back(arg);
+    }
+    const auto &searchPathOpts = ScanASTContext.SearchPathOpts;
+    auto forwardOption = [&](StringRef option, std::optional<StringRef> value) {
+      if (!value)
+        return;
+      swiftArgs.push_back(option.str());
+      swiftArgs.push_back(value->str());
+    };
+    forwardOption("-sysroot", searchPathOpts.getSysRoot());
+    forwardOption("-windows-sdk-root", searchPathOpts.getWinSDKRoot());
+    forwardOption("-windows-sdk-version", searchPathOpts.getWinSDKVersion());
+    forwardOption("-visualc-tools-root", searchPathOpts.getVCToolsRoot());
+    forwardOption("-visualc-tools-version", searchPathOpts.getVCToolsVersion());
+    const auto &resourceDir = searchPathOpts.RuntimeResourcePath;
+    if (!resourceDir.empty()) {
+      swiftArgs.push_back("-resource-dir");
+      swiftArgs.push_back(resourceDir);
+    }
+  }
+
   // Add args reported by the scanner.
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);

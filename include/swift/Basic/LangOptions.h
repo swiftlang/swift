@@ -1137,6 +1137,10 @@ namespace swift {
     /// Extra arguments which should be passed to the Clang importer.
     std::vector<std::string> ExtraArgs;
 
+    /// Clang driver arguments from the dependency scan for a direct cc1 module
+    /// build, where \c ExtraArgs contains cc1 flags instead of driver flags.
+    std::vector<std::string> DirectCC1DriverArgs;
+
     /// A directory for overriding Clang's resource directory.
     std::string OverrideResourceDir;
 
