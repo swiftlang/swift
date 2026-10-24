@@ -182,7 +182,7 @@ func testStatic(_ sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
   x = StaticFuncs.chameleon()
   x = sf.chameleon2()
 
-  x = sfi.chameleon() // expected-error {{static member 'chameleon' cannot be used on instance of type 'StaticFuncsGeneric<Int>'}}
+  x = sfi.chameleon() // expected-error {{static member 'chameleon' can only be used on the type 'StaticFuncsGeneric<Int>', not on the instance sfi}}
   typealias SFI = StaticFuncsGeneric<Int>
   x = SFI.chameleon()
   _ = x

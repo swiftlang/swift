@@ -45,9 +45,9 @@ do {
   existMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'TypeMemberOnInstanceAndViceVersa'}}
 
   // TypeMemberOnInstanceAndViceVersa
-  instance.static_invariantSelfMethod // expected-error {{static member 'static_invariantSelfMethod' cannot be used on instance of type 'any TypeMemberOnInstanceAndViceVersa'}}
-  instance.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on instance of type 'any TypeMemberOnInstanceAndViceVersa'}}
-  instance[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on instance of type 'any TypeMemberOnInstanceAndViceVersa'}}
+  instance.static_invariantSelfMethod // expected-error {{static member 'static_invariantSelfMethod' can only be used on the type 'any TypeMemberOnInstanceAndViceVersa', not on the instance instance}}
+  instance.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' can only be used on the type 'any TypeMemberOnInstanceAndViceVersa', not on the instance instance}}
+  instance[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' can only be used on the type 'any TypeMemberOnInstanceAndViceVersa', not on the instance instance}}
 }
 
 /// Used to verify the type of an expression. Use like this:
