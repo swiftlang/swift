@@ -151,8 +151,8 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
     dirResults.push_back(retVal);
   unsigned indResIdx = 0, dirResIdx = 0;
   for (auto &resInfo : convs.getResults())
-    results.push_back(resInfo.isFormalDirect() ? dirResults[dirResIdx++]
-                                               : indResults[indResIdx++]);
+    results.push_back(convs.isSILIndirect(resInfo) ? indResults[indResIdx++]
+                                                   : dirResults[dirResIdx++]);
   // Treat semantic result parameters as semantic results.
   // Append them` parameters after formal results.
   for (auto i : range(convs.getNumParameters())) {
@@ -195,9 +195,9 @@ void collectAllActualResultsInTypeOrder(
   auto calleeConvs = fai.getSubstCalleeConv();
   unsigned indResIdx = 0, dirResIdx = 0;
   for (auto &resInfo : calleeConvs.getResults()) {
-    results.push_back(resInfo.isFormalDirect()
-                          ? extractedDirectResults[dirResIdx++]
-                          : fai.getIndirectSILResults()[indResIdx++]);
+    results.push_back(calleeConvs.isSILIndirect(resInfo)
+                          ? fai.getIndirectSILResults()[indResIdx++]
+                          : extractedDirectResults[dirResIdx++]);
   }
 }
 
@@ -233,7 +233,7 @@ void collectMinimalIndicesForFunctionCall(
   for (const auto &resAndIdx : enumerate(calleeConvs.getResults())) {
     const auto &res = resAndIdx.value();
     unsigned idx = resAndIdx.index();
-    if (res.isFormalDirect()) {
+    if (!calleeConvs.isSILIndirect(res)) {
       results.push_back(directResults[dirResIdx]);
       if (auto dirRes = directResults[dirResIdx])
         if (dirRes && activityInfo.isActive(dirRes, parentConfig))
@@ -253,7 +253,7 @@ void collectMinimalIndicesForFunctionCall(
     const auto &param = paramAndIdx.value();
     if (!param.isAutoDiffSemanticResult())
       continue;
-    unsigned idx = paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();
+    unsigned idx = paramAndIdx.index() + calleeConvs.getNumIndirectSILResults();
     results.push_back(ai.getArgument(idx));
     resultIndices.push_back(semanticResultParamResultIndex++);
   }
