@@ -30,13 +30,13 @@ class D3 : Any, A { } // expected-error{{superclass 'A' must appear first in the
 class D4 : P & P1, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{18-21=}}{{12-12=A, }}
 
 // Struct inheriting a class
-struct S : A { } // expected-error{{inheritance from non-protocol type 'A'}}
+struct S : A { } // expected-error{{non-protocol type 'A' cannot be used in a conformance list}}
 
 // Protocol inheriting a class
 protocol Q : A { }
 
 // Extension inheriting a class
-extension C : A { } // expected-error{{inheritance from non-protocol type 'A'}}
+extension C : A { } // expected-error{{non-protocol type 'A' cannot be used in a conformance list}}
 
 // Keywords in inheritance clauses
 struct S2 : struct { } // expected-error{{expected type}}
