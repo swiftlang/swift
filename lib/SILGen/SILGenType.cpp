@@ -26,6 +26,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
@@ -627,7 +628,42 @@ public:
   }
 
   Witness getWitness(ValueDecl *decl) {
-    return Conformance->getWitness(decl);
+    auto witness = Conformance->getWitness(decl);
+    // A conformance from another module that we're emitting here, such as
+    // the conformance of a back-deployed type, has deserialized witnesses,
+    // which lack the witness thunk signature. Recompute it.
+    if (witness && !witness.getWitnessThunkSignature() &&
+        witness.getDecl() != decl &&
+        Conformance->getDeclContext()->getParentModule() !=
+            SGM.M.getSwiftModule())
+      return completeDeserializedWitness(decl, witness);
+    return witness;
+  }
+
+  Witness completeDeserializedWitness(ValueDecl *req, Witness witness) {
+    auto *proto = Conformance->getProtocol();
+    GenericSignature reqSig = proto->getGenericSignature();
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(req)) {
+      if (func->hasGenericParamList())
+        reqSig = func->getGenericSignature();
+    } else if (auto *subscript = dyn_cast<SubscriptDecl>(req)) {
+      if (subscript->hasGenericParamList())
+        reqSig = subscript->getGenericSignature();
+    }
+
+    RequirementEnvironment reqEnv(Conformance->getDeclContext(), reqSig, proto,
+                                  /*covariantSelf*/ nullptr, Conformance);
+    // Deserialized substitutions are expressed in terms of the interface
+    // types of the witness thunk signature, rather than its archetypes.
+    auto subs = witness.getSubstitutions();
+    if (auto thunkSig = reqEnv.getWitnessThunkSignature())
+      subs = subs.subst(
+          thunkSig.getGenericEnvironment()->getForwardingSubstitutionMap());
+    return Witness(witness.getDecl(), subs,
+                   reqEnv.getWitnessThunkSignature(),
+                   reqEnv.getRequirementToWitnessThunkSubs(),
+                   witness.getDerivativeGenericSignature(),
+                   witness.getEnterIsolation());
   }
 
   // Treat placeholders and missing methods as no-ops. These may be encountered

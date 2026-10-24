@@ -181,6 +181,12 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     return mangler.mangleValueWitnessTable(getType());
 
   case Kind::TypeMetadataAccessFunction:
+    // A module's copy of the access function for a back-deployed type has
+    // a distinct name, so that it can reference the defining module's.
+    if (auto nominal = getType()->getAnyNominal())
+      if (nominal->isBackDeployedIntoClient())
+        return mangler.mangleBackDeploymentCopyTypeMetadataAccessFunction(
+            getType());
     return mangler.mangleTypeMetadataAccessFunction(getType());
 
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -1833,6 +1839,42 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
   default:
     return false;
   }
+}
+
+bool LinkEntity::isBackDeployedIntoClient() const {
+  const NominalTypeDecl *nominal = nullptr;
+  switch (getKind()) {
+  case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+    nominal = dyn_cast<NominalTypeDecl>(getDecl());
+    break;
+
+  case Kind::TypeMetadata:
+    nominal = getType()->getAnyNominal();
+    break;
+
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction: {
+    auto *dc = getDeclContextForEmission();
+    nominal = dc->getSelfNominalTypeDecl();
+    if (nominal && dc->getParentModule() != nominal->getParentModule())
+      return false;
+    break;
+  }
+
+  default:
+    return false;
+  }
+
+  return nominal && nominal->isBackDeployedIntoClient();
 }
 
 bool LinkEntity::hasNonUniqueDefinition() const {
