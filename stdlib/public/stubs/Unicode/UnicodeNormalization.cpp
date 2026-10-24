@@ -114,10 +114,8 @@ __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
       rangeCount = -rangeCount;
     }
   
-    auto composed = lower + rangeCount;
-  
     if (x == lower) {
-      return composed;
+      return lower + rangeCount;
     }
   
     if (x > lower) {
