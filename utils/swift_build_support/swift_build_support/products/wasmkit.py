@@ -74,6 +74,7 @@ class WasmKit(product.Product):
 
 def run_swift_build(host_target, product, swiftpm_package_product_name, set_installation_rpath=False):
     swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
+    caching_flags = product.swiftpm_caching_flags()
 
     if not os.path.exists(swift_build) or product.args.build_runtime_with_host_compiler:
         print(
@@ -81,6 +82,7 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
             "don't use these build artifacts for deployment!"
         )
         swift_build = product.toolchain.swift_build
+        caching_flags = []
 
     if host_target.startswith('macos'):
         # Universal binary on macOS
@@ -103,7 +105,7 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
         '--configuration', 'release',
         '-j', str(product.args.build_jobs),
         '--traits', 'default,WasmDebuggingSupport',
-    ] + platform_args
+    ] + platform_args + caching_flags
 
     if product.args.verbose_build:
         build_args.append('--verbose')

@@ -24,7 +24,7 @@ def perform_build(args, swiftbuild_path):
         os.path.join(args.toolchain, 'usr', 'lib', 'swift', 'macosx'),
         "-Xswiftc",
         "-lswiftRemoteMirror"
-    ]
+    ] + args.extra_swiftpm_flags
     if args.verbose:
         swiftbuild_args.append("--verbose")
     print(' '.join(swiftbuild_args))
@@ -39,6 +39,9 @@ def main():
     parser.add_argument("--toolchain", type=str, required=True)
     parser.add_argument("--configuration", type=str, choices=['debug', 'release'],
                         default='release')
+    parser.add_argument("--extra-swiftpm-flag", dest="extra_swiftpm_flags",
+                        action="append", default=[],
+                        help="additional flag to pass to SwiftPM)")
 
     args = parser.parse_args()
 

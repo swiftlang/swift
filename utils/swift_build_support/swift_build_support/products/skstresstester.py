@@ -71,7 +71,7 @@ class SKStressTester(product.Product):
             # or by the package being opened using Xcode. Discard that and
             # reset the dependencies to be local.
             '--update'
-        ]
+        ] + self.swiftpm_caching_helper_args()
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
         helper_cmd.extend(additional_params)

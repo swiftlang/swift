@@ -54,6 +54,8 @@ class SwiftSyntax(product.Product):
         build_cmd = [
             os.path.join(self.install_toolchain_path(target), "bin", "swift"),
             'run',
+            # swift-syntax-dev-utils locates the package using #filePath
+            '--disable-build-cache-prefix-mapping',
         ]
         if self.args.verbose_build:
             build_cmd.append('--vv')
@@ -65,7 +67,7 @@ class SwiftSyntax(product.Product):
             '--build-dir', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
             '--toolchain', self.install_toolchain_path(target)
-        ]
+        ] + self.swiftpm_caching_helper_args()
 
         if self.is_release():
             build_cmd.append('--release')
@@ -95,6 +97,7 @@ class SwiftSyntax(product.Product):
         run_cmd = [
             os.path.join(self.install_toolchain_path(host_target), "bin", "swift"),
             'run',
+            '--disable-build-cache-prefix-mapping',
         ]
         if self.args.verbose_build:
             run_cmd.append('--vv')
