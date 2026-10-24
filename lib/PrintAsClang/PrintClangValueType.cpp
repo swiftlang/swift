@@ -236,6 +236,27 @@ void ClangValueTypePrinter::printValueTypeDecl(
 
   bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
                    interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
+  // A value whose only nontrivial part is one strong reference is copied and
+  // destroyed with direct reference counting calls.
+  std::optional<IRABIDetailsProvider::SingleReference> singleReference;
+  if (!isOpaqueLayout && !isNoncopyable && !typeDecl->isGenericContext())
+    singleReference =
+        interopContext.getIrABIDetails().getSingleReference(typeDecl);
+  assert((!singleReference || typeSizeAlign) &&
+         "a value with a single reference has a fixed layout");
+  StringRef retainFunction, releaseFunction;
+  if (singleReference) {
+    switch (singleReference->kind) {
+    case IRABIDetailsProvider::SingleReference::Kind::Native:
+      retainFunction = "swift_retain";
+      releaseFunction = "swift_release";
+      break;
+    case IRABIDetailsProvider::SingleReference::Kind::Bridge:
+      retainFunction = "swift_bridgeObjectRetain";
+      releaseFunction = "swift_bridgeObjectRelease";
+      break;
+    }
+  }
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
@@ -248,6 +269,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
   auto printVWTable = [&](raw_ostream &os) {
     ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
         Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+  };
+  auto printReferenceCountCall = [&](raw_ostream &os, StringRef function,
+                                     StringRef reference) {
+    os << "    ";
+    ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
+    os << function << '(' << reference << ");\n";
+  };
+  // Loads the reference from the storage of 'object' into 'reference'.
+  auto printLoadReference = [&](raw_ostream &os, StringRef reference,
+                                StringRef object) {
+    os << "    void *" << reference << ";\n";
+    os << "    memcpy(&" << reference << ", " << object
+       << "_getOpaquePointer()";
+    if (singleReference->offset != 0)
+      os << " + " << singleReference->offset;
+    os << ", sizeof(" << reference << "));\n";
   };
   std::string baseName;
   {
@@ -325,8 +362,13 @@ void ClangValueTypePrinter::printValueTypeDecl(
       // A moved-from object with an opaque layout has no allocation.
       if (isOpaqueLayout)
         os << "    if (!_storage.isAllocated()) return;\n";
-      printVWTable(os);
-      os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      if (singleReference) {
+        printLoadReference(os, "reference", "");
+        printReferenceCountCall(os, releaseFunction, "reference");
+      } else {
+        printVWTable(os);
+        os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      }
       os << "  }\n";
     }
 
@@ -389,16 +431,23 @@ void ClangValueTypePrinter::printValueTypeDecl(
         // A copy of a moved-from object is moved from too.
         if (isOpaqueLayout)
           os << "    if (!other._storage.isAllocated()) return;\n";
-        printVWTable(os);
-        if (isOpaqueLayout) {
-          os << "    _storage = ";
-          printer.printSwiftImplQualifier();
-          os << cxx_synthesis::getCxxOpaqueStorageClassName()
-             << "(vwTable->size, vwTable->getAlignment());\n";
+        if (singleReference) {
+          printLoadReference(os, "reference", "other.");
+          printReferenceCountCall(os, retainFunction, "reference");
+          os << "    memcpy(_getOpaquePointer(), other._getOpaquePointer(), "
+                "sizeof(_storage));\n";
+        } else {
+          printVWTable(os);
+          if (isOpaqueLayout) {
+            os << "    _storage = ";
+            printer.printSwiftImplQualifier();
+            os << cxx_synthesis::getCxxOpaqueStorageClassName()
+               << "(vwTable->size, vwTable->getAlignment());\n";
+          }
+          os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+                "const_cast<char "
+                "*>(other._getOpaquePointer()), metadata._0);\n";
         }
-        os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-              "const_cast<char "
-              "*>(other._getOpaquePointer()), metadata._0);\n";
         os << "  }\n";
       }
 
@@ -420,10 +469,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
           os << "      return *this;\n";
           os << "    }\n";
         }
-        printVWTable(os);
-        os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
-              "const_cast<char "
-              "*>(other._getOpaquePointer()), metadata._0);\n";
+        if (singleReference) {
+          // Retain before releasing so self-assignment and aliases stay alive.
+          printLoadReference(os, "newReference", "other.");
+          printReferenceCountCall(os, retainFunction, "newReference");
+          printLoadReference(os, "oldReference", "");
+          // memmove, as 'other' may be this value.
+          os << "    memmove(_getOpaquePointer(), other._getOpaquePointer(), "
+                "sizeof(_storage));\n";
+          printReferenceCountCall(os, releaseFunction, "oldReference");
+        } else {
+          printVWTable(os);
+          os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
+                "const_cast<char "
+                "*>(other._getOpaquePointer()), metadata._0);\n";
+        }
         os << "  return *this;\n";
         os << "  }\n";
       }
@@ -617,6 +677,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
           if (isTrivial) {
+            os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
+               << ");\n";
+          } else if (singleReference) {
             os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
                << ");\n";
           } else {

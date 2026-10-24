@@ -62,5 +62,52 @@ int main() {
 // CHECK-NEXT: breakpoint 4
 // CHECK-NEXT: destroy RefCountedClass
 // CHECK-NEXT: breakpoint 5
+  {
+    auto value = returnNewStructWithRefcountedMember();
+    auto &alias = value;
+    value = alias;
+    printBreak(6);
+    auto copy = identity(value);
+    value = copy;
+    printBreak(7);
+  }
+  printBreak(8);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: breakpoint 6
+// CHECK-NEXT: breakpoint 7
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 8
+  {
+    auto value = returnNewReferenceEnum();
+    auto copy = identity(value);
+    value = copy;
+    printBreak(9);
+  }
+  printBreak(10);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: breakpoint 9
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 10
+  {
+    auto value = returnNewReferenceAfterTrivial(42);
+    auto copy = value;
+    assert(getCount(copy) == 42);
+    auto other = returnNewReferenceAfterTrivial(7);
+    other = value;
+    assert(getCount(other) == 42);
+    auto &alias = other;
+    other = alias;
+    assert(getCount(other) == 42);
+    auto roundTripped = identity(other);
+    assert(getCount(roundTripped) == 42);
+    printBreak(11);
+  }
+  printBreak(12);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 11
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 12
   return 0;
 }
