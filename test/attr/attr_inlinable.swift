@@ -351,6 +351,34 @@ public struct HasUsableFromInlinePrivateSetProperty {
   }
 }
 
+// A setter that is itself '@usableFromInline' is referenceable from inlinable
+public struct HasUsableFromInlineSetProperty {
+  @usableFromInline
+  internal var _a: Int = 0
+
+  public internal(set) var a: Int {
+    get { _a }
+    @usableFromInline set { _a = newValue }
+  }
+
+  @inlinable
+  public mutating func update() {
+    a = 1 // no warning
+  }
+}
+
+// '@_alwaysEmitIntoClient' on the property emits the setter into the client,
+// so the setter must not be diagnosed either.
+public struct HasAlwaysEmitIntoClientSetProperty {
+  @_alwaysEmitIntoClient
+  public internal(set) var b: Int = 0
+
+  @inlinable
+  public mutating func update() {
+    b = 1 // no warning
+  }
+}
+
 @usableFromInline protocol P {
   typealias T = Int
 }
