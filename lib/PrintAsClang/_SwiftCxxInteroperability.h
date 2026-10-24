@@ -164,33 +164,50 @@ SWIFT_INLINE_THUNK void opaqueFree(void *_Nonnull p) noexcept {
 #endif
 }
 
-/// Base class for a container for an opaque Swift value, like resilient struct.
+/// Storage for a Swift value whose size and alignment are known at runtime.
+/// Small values, including common Optional payloads, do not need a heap box.
 class OpaqueStorage {
 public:
   SWIFT_INLINE_THUNK OpaqueStorage() noexcept : storage(nullptr) {}
-  SWIFT_INLINE_THUNK OpaqueStorage(size_t size, size_t alignment) noexcept
-      : storage(reinterpret_cast<char *>(opaqueAlloc(size, alignment))) {}
-  SWIFT_INLINE_THUNK OpaqueStorage(OpaqueStorage &&other) noexcept
-      : storage(other.storage) {
-    other.storage = nullptr;
+  SWIFT_INLINE_THUNK OpaqueStorage(size_t size, size_t alignment) noexcept {
+    allocate(size, alignment);
   }
   OpaqueStorage(const OpaqueStorage &) noexcept = delete;
+  void operator=(const OpaqueStorage &) noexcept = delete;
 
   SWIFT_INLINE_THUNK ~OpaqueStorage() noexcept {
-    if (storage) {
+    if (storage && storage != inlineStorage) {
       opaqueFree(static_cast<char *_Nonnull>(storage));
     }
   }
 
-  SWIFT_INLINE_THUNK void operator=(OpaqueStorage &&other) noexcept {
+  /// Select storage before initializing a Swift value in this container.
+  /// Swift's value witnesses must perform any subsequent copy or relocation.
+  SWIFT_INLINE_THUNK void allocate(size_t size, size_t alignment) noexcept {
+    if (size <= sizeof(inlineStorage) && alignment <= alignof(void *)) {
+      storage = inlineStorage;
+    } else {
+      storage = reinterpret_cast<char *>(opaqueAlloc(size, alignment));
+    }
+  }
+
+  /// The destination must not hold a live Swift value. Relocate inline values
+  /// with their value witness; heap-backed values can transfer their allocation.
+  template <class InitializeWithTake>
+  SWIFT_INLINE_THUNK void moveFrom(
+      OpaqueStorage &other, InitializeWithTake initializeWithTake) noexcept {
     if (this == &other)
       return;
-    if (storage)
+    if (storage && storage != inlineStorage)
       opaqueFree(static_cast<char *_Nonnull>(storage));
-    storage = other.storage;
+    if (other.storage == other.inlineStorage) {
+      storage = inlineStorage;
+      initializeWithTake(inlineStorage, other.inlineStorage);
+    } else {
+      storage = other.storage;
+    }
     other.storage = nullptr;
   }
-  void operator=(const OpaqueStorage &) noexcept = delete;
 
   /// A moved-from container has no allocation and holds no Swift value.
   SWIFT_INLINE_THUNK bool isAllocated() const noexcept {
@@ -210,6 +227,8 @@ public:
 
 private:
   char *_Nullable storage;
+  // Leave room for a two-word payload and a separate Optional discriminator.
+  alignas(void *) char inlineStorage[3 * sizeof(void *)];
 };
 
 /// Base class for a Swift reference counted class value.
