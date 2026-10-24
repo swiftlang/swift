@@ -353,6 +353,12 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // Certain builtins have memory effects that are known to not depend on
   // the current executor.
   if (auto builtin = dyn_cast<BuiltinInst>(inst)) {
+    // An assume only reads its operands which are addresses, as a load does.
+    if (isAssume(builtin)) {
+      return llvm::any_of(builtin->getArguments(), [](SILValue arg) {
+        return arg->getType().isAddress() && isGlobalMemory(arg);
+      });
+    }
     if (auto kind = builtin->getBuiltinKind()) {
       switch (*kind) {
       // The initialization of the default actor header isn't

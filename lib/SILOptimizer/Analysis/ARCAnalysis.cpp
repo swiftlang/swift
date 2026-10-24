@@ -110,8 +110,16 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   }
 
   auto &BI = BInst->getBuiltinInfo();
-  if (!BI.isReadNone())
+  // An assume only reads its operands which are addresses. Its side effects
+  // only keep it in place.
+  if (isAssume(BInst)) {
+    if (llvm::any_of(BInst->getArguments(), [](SILValue arg) {
+          return arg->getType().isAddress();
+        }))
+      return true;
+  } else if (!BI.isReadNone()) {
     return true;
+  }
 
   for (auto &Op : BInst->getAllOperands()) {
     if (!Op.get()->getType().isTrivial(*F)) {

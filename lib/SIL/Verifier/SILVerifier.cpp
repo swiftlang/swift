@@ -842,6 +842,11 @@ struct ImmutableAddressUseVerifier {
             break;
           }
 
+          // assumeLessThanOrEqualTo only reads its operands.
+          if (builtinKind == BuiltinValueKind::AssumeLessThanOrEqualTo) {
+            break;
+          }
+
           // Get enum tag borrows its operand address value.
           if (builtinKind == BuiltinValueKind::GetEnumTag) {
             return false;

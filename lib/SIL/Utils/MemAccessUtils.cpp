@@ -2653,6 +2653,14 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       visitor(&builtin->getAllOperands()[0]);
       return;
 
+    // Reads its operands if they are addresses.
+    case BuiltinValueKind::AssumeLessThanOrEqualTo:
+      for (auto &operand : builtin->getAllOperands()) {
+        if (operand.get()->getType().isAddress())
+          visitor(&operand);
+      }
+      return;
+
     // Arrays: (T.Type, Builtin.RawPointer, Builtin.RawPointer,
     // Builtin.Word)
     case BuiltinValueKind::CopyArray:

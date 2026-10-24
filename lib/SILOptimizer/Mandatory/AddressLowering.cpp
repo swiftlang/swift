@@ -3782,7 +3782,8 @@ protected:
     case BuiltinValueKind::TaskLocalValuePush:
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::AddressOfRawLayout:
-    case BuiltinValueKind::TaskPushDeadline: {
+    case BuiltinValueKind::TaskPushDeadline:
+    case BuiltinValueKind::AssumeLessThanOrEqualTo: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;

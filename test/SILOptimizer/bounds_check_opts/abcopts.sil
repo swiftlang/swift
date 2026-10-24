@@ -436,6 +436,94 @@ bb3:
   return %23 : $Int32
 }
 
+// An assume in the loop doesn't prevent hoisting the bounds checks.
+// HOIST-LABEL: sil @hoist_with_assume
+// HOIST: bb1
+// HOIST: [[CB1:%[0-9]+]] = function_ref @checkbounds
+// HOIST: apply [[CB1]]
+// HOIST: apply [[CB1]]
+// HOIST-NOT: @checkbounds
+// HOIST: builtin "assume_Int1"
+// HOIST-NOT: @checkbounds
+// HOIST: return
+sil @hoist_with_assume : $@convention(thin) (Int32, @inout ArrayInt, Builtin.Int1) -> Int32 {
+bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $Builtin.Int1):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  br bb1(%2 : $Builtin.Int32)
+
+bb1(%4 : $Builtin.Int32):
+  %8 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %26 = builtin "assume_Int1"(%25 : $Builtin.Int1) : $Builtin.Int1
+  %37 = struct $Int32(%4 : $Builtin.Int32)
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %10 = integer_literal $Builtin.Int32, 1
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  %22 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %22 : $Builtin.Int1
+  br bb1(%21 : $Builtin.Int32)
+
+bb3:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
+// An assume in the loop doesn't prevent hoisting the bounds checks.
+// HOIST-LABEL: sil @hoist_with_assume_less_than_or_equal_to
+// HOIST: bb1
+// HOIST: [[CB1:%[0-9]+]] = function_ref @checkbounds
+// HOIST: apply [[CB1]]
+// HOIST: apply [[CB1]]
+// HOIST-NOT: @checkbounds
+// HOIST: builtin "assumeLessThanOrEqualTo"
+// HOIST-NOT: @checkbounds
+// HOIST: return
+sil @hoist_with_assume_less_than_or_equal_to : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  br bb1(%2 : $Builtin.Int32)
+
+bb1(%4 : $Builtin.Int32):
+  %8 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %37 = struct $Int32(%4 : $Builtin.Int32)
+  %26 = builtin "assumeLessThanOrEqualTo"<Int32>(%37 : $Int32, %0 : $Int32) : $()
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %10 = integer_literal $Builtin.Int32, 1
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  %22 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %22 : $Builtin.Int1
+  br bb1(%21 : $Builtin.Int32)
+
+bb3:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
 // HOIST-LABEL: sil @always_false_hoist
 // HOIST: bb4
 // HOIST:   builtin "sadd_with_overflow_Int32"

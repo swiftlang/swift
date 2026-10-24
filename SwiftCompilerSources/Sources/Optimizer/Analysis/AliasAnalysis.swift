@@ -487,6 +487,13 @@ struct AliasAnalysis {
   }
 
   private func getBuiltinEffect(of builtin: BuiltinInst, on memLoc: MemoryLocation) -> SideEffects.Memory {
+    if builtin.isAssume {
+      // An assume only reads its operands which are addresses.
+      if builtin.arguments.contains(where: { $0.type.isAddress && memLoc.mayAlias(with: $0, self) }) {
+        return .init(read: true)
+      }
+      return .noEffects
+    }
     switch builtin.id {
     case .Once, .OnceWithContext:
       if !memLoc.addressWithPath.isEscaping(using: AddressVisibleByBuiltinOnceVisitor(),

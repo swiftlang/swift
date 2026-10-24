@@ -211,6 +211,17 @@ public struct Range<Bound: Comparable> {
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
+
+  /// Specifies that the range's lower bound is not greater than its upper bound.
+  /// This is only an optimization hint and has no effect in runtime.
+  /// Requires:
+  /// - `Bound` to be statically known at compile time.
+  /// - `Bound` to be one of stdlib's integer types.
+  /// Otherwise it has no effect.
+  @export(implementation) @_transparent
+  public func _assumeValid() {
+    unsafe _uncheckedUnsafeAssumeLessThanOrEqualTo(lowerBound, upperBound)
+  }
 }
 
 extension Range: Sequence
@@ -228,10 +239,16 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   public typealias SubSequence = Range<Bound>
 
   @inlinable
-  public var startIndex: Index { return lowerBound }
+  public var startIndex: Index {
+    _assumeValid()
+    return lowerBound
+  }
 
   @inlinable
-  public var endIndex: Index { return upperBound }
+  public var endIndex: Index {
+    _assumeValid()
+    return upperBound
+  }
 
   @inlinable
   @inline(__always)

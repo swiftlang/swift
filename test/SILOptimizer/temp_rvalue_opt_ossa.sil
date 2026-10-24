@@ -1152,6 +1152,22 @@ bb0(%0 : $*Klass):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @eliminate_temp_read_by_assume_less_than_or_equal_to : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+// CHECK-NOT: alloc_stack
+// CHECK: builtin "assumeLessThanOrEqualTo"<T>(%0 : $*T, %1 : $*T) : $()
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'eliminate_temp_read_by_assume_less_than_or_equal_to'
+sil [ossa] @eliminate_temp_read_by_assume_less_than_or_equal_to : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = alloc_stack $T
+  copy_addr %0 to [init] %2 : $*T
+  %3 = builtin "assumeLessThanOrEqualTo"<T>(%2 : $*T, %1 : $*T) : $()
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_yield
 // CHECK:   [[TA:%[0-9]+]] = ref_tail_addr
 // CHECK-NOT: copy_addr

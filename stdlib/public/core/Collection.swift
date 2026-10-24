@@ -1030,6 +1030,7 @@ extension Collection where SubSequence == Slice<Self> {
   /// - Complexity: O(1)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
+    bounds._assumeValid()
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(base: self, bounds: bounds)
   }

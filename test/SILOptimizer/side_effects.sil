@@ -315,6 +315,44 @@ bb0(%0 : $*X, %1 : $*Builtin.NativeObject):
   return %r : $()
 }
 
+// The assume builtin's conservative memory effects only keep it from being moved or
+// removed. It must not show up in the function's side effect summary.
+// CHECK-LABEL: sil @test_assume_builtin
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_assume_builtin : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "cmp_sgt_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  %3 = builtin "assume_Int1"(%2 : $Builtin.Int1) : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// The assume of two values must not show up in the function's side effect summary.
+// CHECK-LABEL: sil @test_assume_less_than_or_equal_to_builtin
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_assume_less_than_or_equal_to_builtin : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int>(%0 : $Int, %1 : $Int) : $()
+  %r = tuple ()
+  return %r : $()
+}
+
+// The assume of two addresses reads them.
+// CHECK-LABEL: sil @test_assume_less_than_or_equal_to_builtin_of_addresses
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_assume_less_than_or_equal_to_builtin_of_addresses : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %2 = builtin "assumeLessThanOrEqualTo"<Int>(%0 : $*Int, %1 : $*Int) : $()
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @test_project_box
 // CHECK-NEXT:  [%0: read c0.v**]
 // CHECK-NEXT:  [global: ]

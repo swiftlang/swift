@@ -628,6 +628,28 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     }
     return;
   }
+  case BuiltinValueKind::AssumeLessThanOrEqualTo: {
+    // The optimizer passes the builtin integers of the integer type's values.
+    auto type = substitutions.getReplacementTypes()[0];
+    auto isBuiltinInteger = [](SILType argType) {
+      return argType.isObject() && argType.is<BuiltinIntegerType>();
+    };
+    if (!type->isStdlibInteger() || !isBuiltinInteger(argTypes[0]) ||
+        !isBuiltinInteger(argTypes[1])) {
+      (void)args.claimAll();
+      return;
+    }
+    llvm::Value *lhs = args.claimNext();
+    llvm::Value *rhs = args.claimNext();
+    bool isSigned = type->isInt() || type->isInt8() || type->isInt16() ||
+                    type->isInt32() || type->isInt64() || type->isInt128();
+    llvm::Value *isLessThanOrEqualTo =
+        isSigned ? IGF.Builder.CreateICmpSLE(lhs, rhs)
+                 : IGF.Builder.CreateICmpULE(lhs, rhs);
+    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume,
+                                    isLessThanOrEqualTo);
+    return;
+  }
   case BuiltinValueKind::AssumeNonNegative: {
     llvm::Value *v = args.claimNext();
     // If the argument is a `load` or `call` we can use a range metadata to

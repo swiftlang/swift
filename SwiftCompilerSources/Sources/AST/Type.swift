@@ -227,6 +227,9 @@ extension TypeProperties {
   /// True if this the nominal type `Swift.Optional`.
   public var isOptional: Bool { rawType.bridged.isOptional() }
 
+  /// True if this is one of the standard library's integer types, e.g. `Int` or `UInt8`.
+  public var isStdlibInteger: Bool { rawType.bridged.isStdlibInteger() }
+
   /// True if no value of this type can exist, e.g. `Never`, a case-less enum, or a tuple which
   /// contains such a type. Note that this doesn't take resilience into account: a case-less enum
   /// from another module can gain cases in a future version of that module.

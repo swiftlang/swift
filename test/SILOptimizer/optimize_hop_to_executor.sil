@@ -18,6 +18,8 @@ sil [ossa] @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isol
 sil [ossa] @asyncThrowingFunction : $@convention(thin) @async () -> @error any Error
 sil [ossa] @syncFunction : $@convention(thin) () -> ()
 
+sil_global @globalInt : $Int
+
 // CHECK-LABEL: sil [ossa] @simpleRedundantActor : $@convention(method) @async (@guaranteed MyActor) -> () {
 // CHECK:       bb0(%0 : @guaranteed $MyActor):
 // CHECK-NEXT:    hop_to_executor %0
@@ -303,6 +305,40 @@ bb0(%0 : @guaranteed $MyActor):
   %b = begin_borrow %0 : $MyActor
   hop_to_executor %0 : $MyActor
   end_borrow %b : $MyActor
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @handleAssume : {{.*}} {
+// CHECK-NOT:     hop_to_executor
+// CHECK-LABEL: } // end sil function 'handleAssume'
+sil [ossa] @handleAssume : $@convention(method) @async (@guaranteed MyActor, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : $Builtin.Int1):
+  hop_to_executor %0 : $MyActor
+  %2 = builtin "assume_Int1"(%1 : $Builtin.Int1) : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @handleAssumeLessThanOrEqualTo : {{.*}} {
+// CHECK-NOT:     hop_to_executor
+// CHECK-LABEL: } // end sil function 'handleAssumeLessThanOrEqualTo'
+sil [ossa] @handleAssumeLessThanOrEqualTo : $@convention(method) @async (@guaranteed MyActor, Int, Int) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : $Int, %2 : $Int):
+  hop_to_executor %0 : $MyActor
+  %3 = builtin "assumeLessThanOrEqualTo"<Int>(%1 : $Int, %2 : $Int) : $()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @handleAssumeLessThanOrEqualToOfGlobal : {{.*}} {
+// CHECK:         hop_to_executor
+// CHECK-LABEL: } // end sil function 'handleAssumeLessThanOrEqualToOfGlobal'
+sil [ossa] @handleAssumeLessThanOrEqualToOfGlobal : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor %0 : $MyActor
+  %1 = global_addr @globalInt : $*Int
+  %2 = builtin "assumeLessThanOrEqualTo"<Int>(%1 : $*Int, %1 : $*Int) : $()
   %r = tuple ()
   return %r : $()
 }

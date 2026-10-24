@@ -141,6 +141,19 @@ static bool cleanFunction(SILFunction &fn) {
           madeChange = true;
           break;
         }
+        case BuiltinValueKind::AssumeLessThanOrEqualTo: {
+          // Without an integer type, e.g. if the type is still generic, IRGen
+          // emits nothing for it. But its operands, e.g. the field addresses of
+          // a generic struct, could still need the struct's metadata.
+          auto type = bi->getSubstitutions().getReplacementTypes()[0];
+          if (type->isStdlibInteger())
+            break;
+          InstructionDeleter deleter;
+          deleter.forceDelete(bi);
+          deleter.cleanupDeadInstructions();
+          madeChange = true;
+          break;
+        }
         default:
           break;
       }
