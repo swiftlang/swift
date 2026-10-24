@@ -722,6 +722,12 @@ func captureRulesAtMostOnce(
   let _ = { [d] in _ = d } // Ok
 }
 
+// `UnsafeMutablePointer.pointee` has addressors but no getter.
+func capturePointer(_ pointer: UnsafeMutablePointer<Int>) {
+  let _ = { @once in _ = pointer.pointee } // Ok
+  let _ = { @callable(once) in pointer.pointee = 1 } // Ok
+}
+
 // MARK: - Storage
 
 // Storage that can drop a value without calling it requires `Deinitable`.
