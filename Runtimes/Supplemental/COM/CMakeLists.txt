@@ -65,6 +65,8 @@ include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 
+set(Swift_MODULE_CACHE_DIR "" CACHE STRING "Module cache to use for Swift files")
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:SHELL:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
@@ -74,7 +76,8 @@ add_compile_options(
   $<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-com-interop>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-com-interop>"
+  "$<$<AND:$<BOOL:${Swift_MODULE_CACHE_DIR}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${Swift_MODULE_CACHE_DIR}>")
 
 find_package(SwiftSwiftDirectRuntime)
 

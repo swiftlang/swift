@@ -12,6 +12,8 @@ include(GNUInstallDirs)
 
 set(SwiftRuntime_SWIFTC_SOURCE_DIR "${PROJECT_SOURCE_DIR}/../../")
 
+set(Swift_MODULE_CACHE_SUBDIR "" CACHE STRING "Module folder inside each build folder to use for Swift files")
+
 foreach(lib ${Swift_ENABLE_RUNTIMES})
   string(TOLOWER ${lib} name)
   set(SwiftRuntime_ENABLE_${name} YES)
@@ -23,6 +25,10 @@ endif()
 
 if(CMAKE_MAKE_PROGRAM)
   set(MAKE_PROGRAM_FLAG "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}")
+endif()
+
+if(Swift_MODULE_CACHE_SUBDIR)
+  set(Swift_MODULE_CACHE_DIR_FLAG "-DSwift_MODULE_CACHE_DIR=<BINARY_DIR>/${Swift_MODULE_CACHE_SUBDIR}")
 endif()
 
 set(COMMON_OPTIONS
@@ -44,7 +50,8 @@ set(COMMON_OPTIONS
   -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=${CMAKE_FIND_PACKAGE_PREFER_CONFIG}
   -DCMAKE_OSX_SYSROOT:PATH=${CMAKE_OSX_SYSROOT}
   ${SwiftCore_DIR_FLAG}
-  ${MAKE_PROGRAM_FLAG})
+  ${MAKE_PROGRAM_FLAG}
+  ${Swift_MODULE_CACHE_DIR_FLAG})
 
 # StringProcessing
 if(SwiftRuntime_ENABLE_stringprocessing)
