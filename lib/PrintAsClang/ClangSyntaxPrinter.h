@@ -222,6 +222,10 @@ public:
   void printPrimaryCxxTypeName(const NominalTypeDecl *type,
                                const ModuleDecl *moduleContext);
 
+  // Print the #include sequence for a header relative to lib/swift, including
+  // the resource-directory lookup used by toolchain Clang installations.
+  void printIncludeForSwiftHeader(StringRef headerPath);
+
   // Print the #include sequence for the specified C++ interop shim header.
   void printIncludeForShimHeader(StringRef headerName);
 

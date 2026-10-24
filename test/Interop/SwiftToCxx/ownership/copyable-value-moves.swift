@@ -1,4 +1,6 @@
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/stdlib.h
+// RUN: %FileCheck %s --check-prefix=STDLIB < %t/stdlib.h
 // RUN: %target-swift-frontend %s -module-name Moves -enable-library-evolution -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/moves.h
 // RUN: %FileCheck %s < %t/moves.h
 // RUN: %check-interop-cxx-header-in-clang(%t/moves.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
@@ -6,8 +8,8 @@
 // With library evolution, the Swift values below are boxed. A move transfers
 // the box, and a moved-from object has no box. Optional is boxed because its
 // layout depends on its generic argument.
-// CHECK-LABEL: class SWIFT_SYMBOL("s:Sq") Optional final {
-// CHECK: Optional(Optional &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// STDLIB-LABEL: class SWIFT_SYMBOL("s:Sq") Optional final {
+// STDLIB: Optional(Optional &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
 
 public enum Choice {
   case value(Value)
