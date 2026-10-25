@@ -2268,11 +2268,11 @@ FUNCTION(OnceClosureDestroyedError, Swift,
          EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_deletedAsyncMethodError();
+// void swift_deletedAsyncMethodError(AsyncContext *context);
 FUNCTION(DeletedAsyncMethodError, _Concurrency, swift_deletedAsyncMethodError, SwiftAsyncCC,
         ConcurrencyAvailability,
         RETURNS(VoidTy),
-        ARGS(),
+        ARGS(SwiftContextPtrTy),
         ATTRS(NoUnwind),
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
