@@ -157,12 +157,13 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
-  // its boxed form so we can obey Swift's capture reference semantics.
+  // its boxed form so we can obey Swift's capture reference semantics. An
+  // unannotated closure parameter is shared if the closure's type says so.
   if (!var->supportsMutation()
       && contextTy->isNoncopyable()
       && !capture.isNoEscape()) {
       auto *param = dyn_cast<ParamDecl>(var);
-      if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
+      if (!param || (param->getLoweredOwnership() != LoweredOwnership::Shared &&
                      !param->isSelfParameter())) {
         return CaptureKind::ImmutableBox;
       }

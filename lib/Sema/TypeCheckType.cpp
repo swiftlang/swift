@@ -4603,9 +4603,8 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
 
 /// Whether a parameter is borrowed or mutated for the call rather than
 /// consumed, so that it has an access scope.
-static bool hasAccessScope(ParamDecl *param, AbstractFunctionDecl *fn) {
-  return getLoweredOwnership(param->getValueOwnership(), fn,
-                             param->isSelfParameter()) != ValueOwnership::Owned;
+static bool hasAccessScope(ParamDecl *param) {
+  return param->getLoweredOwnership() != LoweredOwnership::Owned;
 }
 
 /// The name of the parameter a written scope refers to, if any: `&a` is an
@@ -4789,7 +4788,7 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
       diagnose(repr.getLoc(), diag::scoped_self_no_access);
       return std::nullopt;
     }
-    if (!hasAccessScope(fn->getImplicitSelfDecl(), fn)) {
+    if (!hasAccessScope(fn->getImplicitSelfDecl())) {
       diagnose(repr.getLoc(), diag::scoped_consuming_param);
       diagnose(fn->getLoc(), diag::scoped_consuming_param_here, ctx.Id_self);
       return std::nullopt;
@@ -4812,7 +4811,7 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
     auto *param = *found;
 
     if (repr.isAccess()) {
-      if (!hasAccessScope(param, fn)) {
+      if (!hasAccessScope(param)) {
         diagnose(repr.getLoc(), diag::scoped_consuming_param);
         if (param->getValueOwnership() != ValueOwnership::Default) {
           diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);

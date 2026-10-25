@@ -995,7 +995,8 @@ protected:
 
   // Attribute parsing helper.
   bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind,
-                                 Type paramType, ValueOwnership loweredOwnership,
+                                 Type paramType,
+                                 LoweredOwnership loweredOwnership,
                                  bool isInterfaceFile = false) const {
     if (kind == ParsedLifetimeDependenceKind::Inherit) {
       return true;
@@ -1004,18 +1005,18 @@ protected:
     if (kind == ParsedLifetimeDependenceKind::Borrow) {
       // An owned/consumed BitwiseCopyable value can be effectively borrowed
       // because its lifetime can be indefinitely extended.
-      if (loweredOwnership == ValueOwnership::Owned &&
+      if (loweredOwnership == LoweredOwnership::Owned &&
           isBitwiseCopyable(paramType, ctx)) {
         return true;
       }
       if (isInterfaceFile) {
-        return loweredOwnership == ValueOwnership::Shared ||
-               loweredOwnership == ValueOwnership::InOut;
+        return loweredOwnership == LoweredOwnership::Shared ||
+               loweredOwnership == LoweredOwnership::InOut;
       }
-      return loweredOwnership == ValueOwnership::Shared;
+      return loweredOwnership == LoweredOwnership::Shared;
     }
     assert(kind == ParsedLifetimeDependenceKind::Inout);
-    return loweredOwnership == ValueOwnership::InOut;
+    return loweredOwnership == LoweredOwnership::InOut;
   }
 
   // Inferrence helper.
@@ -1033,8 +1034,8 @@ protected:
       return true;
     }
     assert(kind == LifetimeDependenceKind::Scope);
-    return loweredOwnership == ValueOwnership::Shared ||
-           loweredOwnership == ValueOwnership::InOut;
+    return loweredOwnership == LoweredOwnership::Shared ||
+           loweredOwnership == LoweredOwnership::InOut;
   }
 
 
@@ -1193,8 +1194,8 @@ protected:
       }
 
       if (type->isEscapable()) {
-        if (loweredOwnership == ValueOwnership::Shared ||
-            loweredOwnership == ValueOwnership::InOut) {
+        if (loweredOwnership == LoweredOwnership::Shared ||
+            loweredOwnership == LoweredOwnership::InOut) {
           return LifetimeDependenceKind::Scope;
         }
         diagnose(
@@ -1224,18 +1225,17 @@ protected:
                getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
                getOwnershipSpelling(loweredOwnership));
       switch (loweredOwnership) {
-      case ValueOwnership::Shared:
+      case LoweredOwnership::Shared:
         diagnose(loc,
                  diag::lifetime_dependence_parsed_borrow_with_ownership_fix,
                  "borrow ", descriptor.getString());
         break;
-      case ValueOwnership::InOut:
+      case LoweredOwnership::InOut:
         diagnose(loc,
                  diag::lifetime_dependence_parsed_borrow_with_ownership_fix,
                  "&", descriptor.getString());
         break;
-      case ValueOwnership::Owned:
-      case ValueOwnership::Default:
+      case LoweredOwnership::Owned:
         break;
       }
       return std::nullopt;
@@ -1252,7 +1252,7 @@ protected:
   // @lifetime(copy x) is only valid if 'x' has a ~Escapable type.
   bool checkNonEscapableSource(LifetimeDescriptor descriptor,
                                const ParamInfo &sourceParam,
-                               ValueOwnership ownership) {
+                               LoweredOwnership ownership) {
     // Allow recompiling old interfaces with a newer compiler.
     if (isInterfaceFile())
       return true;
@@ -1270,9 +1270,8 @@ protected:
     auto loc = descriptor.getLoc();
     if (sourceParam.typeInContext->isEscapable()) {
       diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type);
-      diagnose(loc,
-               diag::lifetime_escapable_source_requires_escapable_note,
-               (ownership == ValueOwnership::InOut) ? "&" : "borrow ",
+      diagnose(loc, diag::lifetime_escapable_source_requires_escapable_note,
+               (ownership == LoweredOwnership::InOut) ? "&" : "borrow ",
                descriptor.getString());
       return false;
     }
@@ -1366,7 +1365,7 @@ protected:
   // Get the value ownership of param if it is non-default. Otherwise, compute
   // the lowered value ownership. The supplied Param must be a member of
   // parameters or implicitSelfParamInfo.value().
-  ValueOwnership getLoweredOwnership(Param const &param) const {
+  LoweredOwnership getLoweredOwnership(Param const &param) const {
     auto const isSelfParameter = implicitSelfParamInfo.has_value() &&
                                  &param == &(implicitSelfParamInfo->param);
     return swift::getLoweredOwnership(param.getValueOwnership(), afd,
@@ -1493,7 +1492,7 @@ protected:
     auto loweredOwnership = getLoweredOwnership(paramInfo.param);
     // It is impossible to depend on a consumed Escapable value (unless it is
     // BitwiseCopyable as checked above).
-    if (loweredOwnership == ValueOwnership::Owned) {
+    if (loweredOwnership == LoweredOwnership::Owned) {
       return std::nullopt;
     }
     return LifetimeDependenceKind::Scope;

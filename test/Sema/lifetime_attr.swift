@@ -140,9 +140,9 @@ struct Wrapper : ~Escapable {
     get {
       _ne
     }
-    @_lifetime(self: &self)
+    @_lifetime(self: &self) // expected-error{{invalid use of & dependence with borrowing ownership}}
+                            // expected-note@-1{{use '@_lifetime(borrow self)' instead}}
     nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
-      // expected-error@-1{{cannot infer the lifetime dependence scope on a method with a non-'Escapable' parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
     }
   }
 
@@ -159,6 +159,24 @@ struct Wrapper : ~Escapable {
     _modify {
       yield &self._ne
     }
+  }
+}
+
+// A non-mutating modify accessor borrows `self`.
+struct NonmutatingModifyHolder : ~Copyable {
+  var ne: NE {
+    @_lifetime(borrow self)
+    _read { yield NE() }
+    @_lifetime(borrow self)
+    nonmutating _modify { var ne = NE(); yield &ne }
+  }
+
+  var otherNE: NE {
+    @_lifetime(borrow self)
+    _read { yield NE() }
+    @_lifetime(&self) // expected-error{{invalid use of & dependence with borrowing ownership}}
+                      // expected-note@-1{{use '@_lifetime(borrow self)' instead}}
+    nonmutating _modify { var ne = NE(); yield &ne }
   }
 }
 
