@@ -410,7 +410,7 @@ extension Span where Element: BitwiseCopyable {
   @export(implementation)
   @unsafe
   @_lifetime(copy bytes)
-  public init(_bytes bytes: consuming RawSpan) {
+  public init(_unsafeBytes bytes: consuming RawSpan) {
     let rawBuffer = unsafe UnsafeRawBufferPointer(
       start: bytes._pointer, count: bytes.byteCount
     )
@@ -418,6 +418,14 @@ extension Span where Element: BitwiseCopyable {
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'bytes'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, copying: bytes)
+  }
+
+  @available(*, deprecated, renamed: "init(_unsafeBytes:)")
+  @export(implementation)
+  @unsafe
+  @_lifetime(copy bytes)
+  public init(_bytes bytes: consuming RawSpan) {
+    self = unsafe Self(_unsafeBytes: bytes)
   }
 
   /// View initialized raw memory as a typed span.

@@ -659,11 +659,7 @@ extension RawSpan {
   consuming public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> Span<T> {
-    let rawBuffer = unsafe UnsafeRawBufferPointer(start: _pointer, count: _count)
-    let newSpan = unsafe Span<T>(_unsafeBytes: rawBuffer)
-    // As a trivial value, 'rawBuffer' does not formally depend on the
-    // lifetime of 'self'. Make the dependence explicit.
-    return unsafe _overrideLifetime(newSpan, copying: self)
+    unsafe Span<T>(_unsafeBytes: self)
   }
 }
 
