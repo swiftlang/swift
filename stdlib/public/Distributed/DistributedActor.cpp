@@ -336,6 +336,10 @@ SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError();
 /// If the accessor has a leading isolated `(any Actor)?` parameter pass it the `(isolatedActor, isolatedActorWTable)`.
 /// The accessor decodes the arguments on the caller's executor, then hops to the requested isolation
 /// and executes the target method there without any further executor switch.
+///
+/// Always inlined into the `swiftasync` entry points: the call into the
+/// accessor has to be a tail call, which it only is once this is inlined.
+SWIFT_ALWAYS_INLINE
 static void dispatchToDistributedAccessor(
     AsyncContext *callerContext,
     DefaultActor *actor,
