@@ -1053,6 +1053,7 @@ extension RawSpan {
 
 extension RawSpan {
   @available(*, deprecated)
+  @available(swift, obsoleted: 1)
   @usableFromInline
   var _span: Span<UInt8> {
     @_lifetime(copy self)
