@@ -171,8 +171,8 @@ extension AddressUseVisitor {
       switch builtin.id {
       // Builtins that cannot load a nontrivial value.
       case .TSanInoutAccess, .ResumeThrowingContinuationReturning,
-           .ResumeNonThrowingContinuationReturning, .GenericAdd,
-           .GenericFAdd, .GenericAnd, .GenericAShr, .GenericLShr, .GenericOr,
+           .ResumeNonThrowingContinuationReturning, .GetSplitContinuationAddr,
+           .GenericAdd, .GenericFAdd, .GenericAnd, .GenericAShr, .GenericLShr, .GenericOr,
            .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,

@@ -271,9 +271,21 @@ extension CheckedContinuation {
   /// the resumed task.
   ///
   /// The offered execution context is used only if it belongs to the executors
-  /// the awaiting task resumes on. If the context doesn't match the task is
-  /// enqueued on its expected execution context.
-  /// from a point where that executor could run one of its own jobs.
+  /// the awaiting task resumes on. If the context doesn't match, the task is
+  /// enqueued on its expected execution context instead.
+  ///
+  /// If the offer is taken, the resumed task runs synchronously, nested inside
+  /// this call, just like a job run with
+  /// ``ExecutorJob/runSynchronously(isolatedTo:taskExecutor:)``. This method
+  /// must therefore only be called from the context of the offered executors,
+  /// at a point where they could run one of their own jobs; typically from
+  /// within the executor's implementation, between running jobs.
+  ///
+  /// Don't offer an executor that the calling code merely happens to be
+  /// isolated to, such as `#isolation` in an actor method. Running the resumed
+  /// task from there re-enters the actor outside of a suspension point, which
+  /// breaks the guarantee that actors are only re-entered at suspension
+  /// points, and can cause exclusivity violations.
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
@@ -293,12 +305,13 @@ extension CheckedContinuation {
       returning: value, serialExecutor._executor, taskExecutor._executor)
   }
 
-  /// Resume the task awaiting the continuation by having it throw an error
-  /// from its suspension point, offering the current execution context to run
-  /// the resumed task.
+  /// Resume the task awaiting the continuation by having it throw the given
+  /// error from its suspension point, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - error: The error to throw from the continuation.
@@ -314,13 +327,13 @@ extension CheckedContinuation {
       throwing: error, serialExecutor._executor, taskExecutor._executor)
   }
 
-  /// Resume the task awaiting the continuation by having it either
-  /// return normally or throw an error based on the state of the given
-  /// `Result` value, offering the current execution context to run the
-  /// resumed task.
+  /// Resume the task awaiting the continuation by having it either return or
+  /// throw based on the given `Result`, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - result: A value to either return or throw from the continuation.
@@ -349,8 +362,9 @@ extension CheckedContinuation {
   /// This overload names only a serial executor, asserting no task executor
   /// preference of its own.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - value: The value to return from the continuation.
@@ -364,12 +378,13 @@ extension CheckedContinuation {
       returning: value, serialExecutor._executor, _getUndefinedTaskExecutor())
   }
 
-  /// Resume the task awaiting the continuation by having it throw an error
-  /// from its suspension point, offering the current execution context to run
-  /// the resumed task.
+  /// Resume the task awaiting the continuation by having it throw the given
+  /// error from its suspension point, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
-  /// execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - error: The error to throw from the continuation.
@@ -383,13 +398,13 @@ extension CheckedContinuation {
       throwing: error, serialExecutor._executor, _getUndefinedTaskExecutor())
   }
 
-  /// Resume the task awaiting the continuation by having it either
-  /// return normally or throw an error based on the state of the given
-  /// `Result` value, offering the current execution context to run the
-  /// resumed task.
+  /// Resume the task awaiting the continuation by having it either return or
+  /// throw based on the given `Result`, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:)`` for when the offered
-  /// execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - result: A value to either return or throw from the continuation.
@@ -411,8 +426,9 @@ extension CheckedContinuation {
   /// from its suspension point, offering the current execution context to run
   /// the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when
-  /// the offered execution context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - value: The value to return from the continuation.
@@ -426,12 +442,13 @@ extension CheckedContinuation {
       returning: value, _getGenericSerialExecutor(), taskExecutor._executor)
   }
 
-  /// Resume the task awaiting the continuation by having it throw an error
-  /// from its suspension point, offering the current execution context to run
-  /// the resumed task.
+  /// Resume the task awaiting the continuation by having it throw the given
+  /// error from its suspension point, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
-  /// context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - error: The error to throw from the continuation.
@@ -445,13 +462,13 @@ extension CheckedContinuation {
       throwing: error, _getGenericSerialExecutor(), taskExecutor._executor)
   }
 
-  /// Resume the task awaiting the continuation by having it either
-  /// return normally or throw an error based on the state of the given
-  /// `Result` value, offering the current execution context to run the
-  /// resumed task.
+  /// Resume the task awaiting the continuation by having it either return or
+  /// throw based on the given `Result`, offering the current execution context
+  /// to run the resumed task.
   ///
-  /// See ``resumeSynchronously(returning:on:)`` for when the offered execution
-  /// context is used to run the resumed task.
+  /// This must only be called from the context of the offered executor. See
+  /// ``resumeSynchronously(returning:isolatedTo:taskExecutor:)`` for when the
+  /// offered execution context is used to run the resumed task.
   ///
   /// - Parameters:
   ///   - result: A value to either return or throw from the continuation.
