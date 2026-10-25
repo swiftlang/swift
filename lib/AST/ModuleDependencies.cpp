@@ -905,11 +905,21 @@ void ModuleDependenciesCache::recordClangDependency(
 
   auto depID =
       ModuleDependencyID{dependency.ID.ModuleName, ModuleDependencyKind::Clang};
-  auto priorClangModuleDetails = findKnownDependency(depID).getAsClangModule();
+  const auto &priorClangModuleInfo = findKnownDependency(depID);
+  auto priorClangModuleDetails = priorClangModuleInfo.getAsClangModule();
   DEBUG_ASSERT(priorClangModuleDetails);
   auto priorContextHash = priorClangModuleDetails->contextHash;
   auto newContextHash = dependency.ID.ContextHash;
   if (priorContextHash != newContextHash) {
+    // A new variant of a module reused from a prior serialized scan means one
+    // of its inputs changed in a way incremental validation could not detect,
+    // so the prior scan results cannot be trusted.
+    if (priorClangModuleInfo.isFromPriorScan()) {
+      if (!stalePriorScanClangModule)
+        stalePriorScanClangModule = dependency.ID.ModuleName;
+      return;
+    }
+
     // This situation means that within the same scanning action, Clang
     // Dependency Scanner has produced two different variants of the same
     // module. This is not supposed to happen, but we are currently
@@ -948,10 +958,19 @@ void ModuleDependenciesCache::recordClangDependency(
               isNewlyDiscovered, checkArg);
     };
     diagnoseExtraCommandLineFlags(priorClangModuleDetails,
-                                  newClangModuleDetails, true);
+                                  newClangModuleDetails, false);
     diagnoseExtraCommandLineFlags(newClangModuleDetails,
-                                  priorClangModuleDetails, false);
+                                  priorClangModuleDetails, true);
   }
+}
+
+void ModuleDependenciesCache::reset() {
+  for (auto &entry : ModuleDependenciesMap)
+    entry.second.clear();
+  clangModulesVisibleFromNamedLookup.clear();
+  negativeSwiftDependencyCache.clear();
+  alreadySeenClangModules.clear();
+  stalePriorScanClangModule.reset();
 }
 
 void ModuleDependenciesCache::setVisibleClangModulesFromLookup(
