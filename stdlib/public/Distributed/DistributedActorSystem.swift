@@ -799,15 +799,6 @@ extension DistributedActorSystem {
         errorCode: .invalidParameterCount)
     }
 
-    // Copy the types from the buffer into a Swift Array
-    var argumentTypes: [Any.Type] = []
-    do {
-      argumentTypes.reserveCapacity(Int(decodedNum))
-      for unsafe argumentType in unsafe argumentTypesBuffer {
-        argumentTypes.append(argumentType)
-      }
-    }
-
     // Decode the return type
     func doAllocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeMutableRawPointer? {
       return UnsafeMutableRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
@@ -893,8 +884,8 @@ extension DistributedActorSystem {
         try unsafe await _executeDistributedTargetWithIsolation(
           on: actor,
           isolatedActor: isolatedActor,
-          /*targetNameData:*/targetName,
-          /*targetNameLength:*/UInt(targetName.utf8.count),
+          /*targetNameData:*/targetNameUTF8,
+          /*targetNameLength:*/UInt(targetNameUTF8.count),
           argumentDecoder: &invocationDecoder,
           argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
           resultBuffer: resultBuffer._rawValue,
@@ -905,8 +896,8 @@ extension DistributedActorSystem {
       } else {
         try unsafe await _executeDistributedTarget(
           on: actor,
-          /*targetNameData:*/targetName,
-          /*targetNameLength:*/UInt(targetName.utf8.count),
+          /*targetNameData:*/targetNameUTF8,
+          /*targetNameLength:*/UInt(targetNameUTF8.count),
           argumentDecoder: &invocationDecoder,
           argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
           resultBuffer: resultBuffer._rawValue,
