@@ -1604,52 +1604,30 @@ void ConstraintSystem::print(raw_ostream &out) const {
 CheckedCastKind
 TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,
-                                  DeclContext *dc,
-                                  bool isTypeTest) {
+                                  DeclContext *dc) {
   // If the from/to types are equivalent or convertible, this is a coercion.
   if (fromType->isEqual(toType) ||
       isConvertibleTo(fromType, toType, dc)) {
     return CheckedCastKind::Coercion;
   }
 
-  // Since move-only types currently cannot conform to protocols, nor be a class
-  // type, the subtyping hierarchy looks a bit like this:
-  //
-  //                  ~Copyable
-  //                    /  \
-  //                   /    \
-  //       +--------- Any    noncopyable structs/enums
-  //       |           |
-  //   AnyObject    protocol
-  //       |       existentials
-  //       |            |   \
-  //       +---------+  |    +-- structs/enums
-  //                 |  |
-  //                classes
-  //           (and their subtyping)
-  //
-  //
-  // Thus, right now, a move-only type is only a subtype of itself.
-  // We also want to prevent conversions of a move-only type's metatype.
+  // Everything remaining is some form of dynamic cast.
+  bool noncopyableCastingEnabled =
+      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting);
+  bool involvesMetatype =
+      fromType->is<AnyMetatypeType>() || toType->is<AnyMetatypeType>();
+  bool involvesNoncopyable =
+      fromType->getMetatypeInstanceType()->isNoncopyable() ||
+      toType->getMetatypeInstanceType()->isNoncopyable();
 
-  // Certain `~Copyable` casts are supported under `NoncopyableCasting`
-  bool isSupportedNoncopyableExistentialCast =
-      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
-      fromType->isNoncopyable() && fromType->isExistentialType() &&
-      !toType->isExistentialType() && !toType->is<ArchetypeType>();
-
-  // `is` only borrows the source, so we can handle noncopyables here
-  // But continue to reject Metatypes for now...
-  bool isNoncopyableTypeTest =
-      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
-      (isTypeTest || contextKind == CheckedCastContextKind::IsExpr ||
-       contextKind == CheckedCastContextKind::IsPattern) &&
-      !fromType->is<AnyMetatypeType>() && !toType->is<AnyMetatypeType>();
-
-  if (!isSupportedNoncopyableExistentialCast && !isNoncopyableTypeTest &&
-      (fromType->getMetatypeInstanceType()->isNoncopyable()
-       || toType->getMetatypeInstanceType()->isNoncopyable()))
+  if (involvesNoncopyable && !noncopyableCastingEnabled) {
+    // A noncopyable cast got here without being enabled...
     return CheckedCastKind::Unresolved;
+  }
+  if (involvesMetatype && involvesNoncopyable) {
+    // Noncopyable metatypes and casts between noncopyables and metatypes
+    return CheckedCastKind::Unresolved;
+  }
 
   // Anything bridges to AnyObject
   if (toType->isAnyObject()) {

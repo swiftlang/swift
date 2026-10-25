@@ -116,8 +116,8 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
     // endpoint, which requires a temporary buffer to put the result into.
     //
     // The copy that entails is safe because Sema rejects casting out of a
-    // non-'Copyable' existential at these deployment targets.  See
-    // checkNoncopyableExistentialCastingAvailability().
+    // non-'Copyable' value at these deployment targets.  See
+    // checkNoncopyableCastingAvailability().
     auto targetSILType =
         IGF.IGM.getLoweredType(AbstractionPattern::getOpaque(), targetType);
     auto &targetTI = IGF.getTypeInfo(targetSILType);

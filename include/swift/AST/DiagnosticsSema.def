@@ -7853,8 +7853,8 @@ ERROR(availability_escapable_existential_casting_only_version_newer, none,
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
-ERROR(availability_noncopyable_existential_casting_only_version_newer, none,
-      "runtime support for casting out of a non-'Copyable' existential "
+ERROR(availability_noncopyable_casting_only_version_newer, none,
+      "runtime support for casting out of a non-'Copyable' value "
       "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
