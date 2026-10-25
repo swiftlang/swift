@@ -1468,6 +1468,18 @@ performModuleScanImpl(
 
   // Perform the full module scan starting at the main module.
   auto allModules = scanner.performDependencyScan(mainModuleID);
+
+  // If this scan found that the prior scan's results are stale, re-scan from
+  // scratch: modules reused from the prior scan may depend on the stale entry.
+  if (auto staleModule = cache.getStalePriorScanClangModule()) {
+    if (opts.EmitDependencyScannerCacheRemarks)
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_variant,
+                         *staleModule);
+    cache.reset();
+    cache.recordDependency(mainModuleName, *scanner.getMainModuleDependencyInfo(
+                                               instance->getMainModule()));
+    allModules = scanner.performDependencyScan(mainModuleID);
+  }
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
 

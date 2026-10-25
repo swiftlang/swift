@@ -284,6 +284,9 @@ public:
   /// and inputs).
   bool finalized;
 
+  /// This info was loaded from a prior serialized scan.
+  bool fromPriorScan = false;
+
   /// The library level of this module (API, SPI, IPI, or Other),
   /// computed during dependency scanning.
   LibraryLevel libraryLevel = LibraryLevel::Other;
@@ -931,6 +934,12 @@ public:
   bool isFinalized() const { return storage->finalized; }
   void setIsFinalized(bool isFinalized) { storage->finalized = isFinalized; }
 
+  /// Whether this info was loaded from a prior serialized scan.
+  bool isFromPriorScan() const { return storage->fromPriorScan; }
+  void setIsFromPriorScan(bool isFromPriorScan) {
+    storage->fromPriorScan = isFromPriorScan;
+  }
+
   /// The library level of this module, as determined during scanning.
   LibraryLevel getLibraryLevel() const { return storage->libraryLevel; }
   void setLibraryLevel(LibraryLevel level) { storage->libraryLevel = level; }
@@ -1174,6 +1183,9 @@ private:
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
+  /// Name of a Clang module carried over from a prior serialized scan for
+  /// which this scan discovered a different variant.
+  std::optional<std::string> stalePriorScanClangModule;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -1220,6 +1232,15 @@ public:
   void addSeenClangModule(clang::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
+
+  /// If set, an entry carried over from a prior serialized scan is out of
+  /// date and the scan must be re-done from an empty cache.
+  const std::optional<std::string> &getStalePriorScanClangModule() const {
+    return stalePriorScanClangModule;
+  }
+
+  /// Drop all recorded dependency state.
+  void reset();
 
   /// Query all dependencies
   ModuleDependencyIDCollectionView

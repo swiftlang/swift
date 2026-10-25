@@ -249,6 +249,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 
         moduleDep.setLibraryLevel(currentLibraryLevel);
         moduleDep.setIsFinalized(true);
+        moduleDep.setIsFromPriorScan(true);
       };
 
   auto addSwiftCommonDependencyInfo =
