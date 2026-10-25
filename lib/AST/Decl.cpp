@@ -9375,6 +9375,23 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
                            ParamDecl::Specifier::Default);
 }
 
+LoweredOwnership ParamDecl::getLoweredOwnership() const {
+  auto *dc = getDeclContext();
+  auto ownership = getValueOwnership();
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+    auto params = closure->getParameters()->getArray();
+    auto found = llvm::find(params, this);
+    auto closureType = closure->getType();
+    if (auto *fnType =
+            closureType ? closureType->getAs<AnyFunctionType>() : nullptr;
+        fnType && found != params.end())
+      ownership =
+          fnType->getParams()[found - params.begin()].getValueOwnership();
+  }
+  return swift::getLoweredOwnership(
+      ownership, dyn_cast<AbstractFunctionDecl>(dc), isSelfParameter());
+}
+
 LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
   auto specifier = getSpecifier();
   // Copyable parameters which are consumed have eager-move semantics.
