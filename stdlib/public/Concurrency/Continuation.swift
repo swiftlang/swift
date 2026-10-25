@@ -396,15 +396,16 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
     onPriorityEscalated handlePriorityEscalation:
       @Sendable (UInt8, UInt8) -> Void
   ) async throws(Failure) -> sending Success {
-    #if $BuiltinCancellationHandlerWithReason
-    // Install the handlers with the existing per-handler entry points.
+    #if $BuiltinCancellationHandlerWithReason && $BuiltinConcurrencyStackNesting
     let cancellationRecord = unsafe Builtin.taskAddCancellationHandlerWithReason(
       handler: handleCancellation)
     defer { unsafe Builtin.taskRemoveCancellationHandler(record: cancellationRecord) }
 
-    let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
+    let escalationRecord = unsafe Builtin.taskAddPriorityEscalationHandler(
       handler: handlePriorityEscalation)
-    defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
+    defer {
+      unsafe Builtin.taskRemovePriorityEscalationHandler(record: escalationRecord)
+    }
 
     return try await _wait(context: context)
     #else
@@ -434,11 +435,17 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
     onPriorityEscalated handlePriorityEscalation:
       @Sendable (UInt8, UInt8) -> Void
   ) async throws(Failure) -> sending Success {
-    let escalationRecord = unsafe _taskAddPriorityEscalationHandler(
+    #if $BuiltinConcurrencyStackNesting
+    let escalationRecord = unsafe Builtin.taskAddPriorityEscalationHandler(
       handler: handlePriorityEscalation)
-    defer { unsafe _taskRemovePriorityEscalationHandler(record: escalationRecord) }
+    defer {
+      unsafe Builtin.taskRemovePriorityEscalationHandler(record: escalationRecord)
+    }
 
     return try await _wait(context: context)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   deinit {
