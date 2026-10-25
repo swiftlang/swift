@@ -39,9 +39,10 @@ using namespace swift;
 //     one Continuation type can carry either flavour and a resume works for
 //     both.
 //   * await (swift_continuation_awaitSplit): binds the resume-point to the
-//     *current* task, records the awaiting task on the context, publishes any
-//     handler records together with the suspension, and performs the
-//     Pending->Awaited transition.
+//     *current* task, records the awaiting task on the context, and performs
+//     the Pending->Awaited transition. Cancellation and escalation handlers
+//     are not part of this: ContinuationWaiter installs them beforehand with
+//     the regular per-handler entry points.
 //   * resume: the regular swift_continuation_resume* entry points, and
 //     swift_continuation_resumeOnExecutors, which read the marker word and
 //     route to the split implementation. The resume works *by context* (the
@@ -185,8 +186,8 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   // for the result value. The result storage has to live here rather than in
   // the awaiting frame because a resume can arrive before the await does and
   // needs somewhere to write the value.
-  assert(swift_task_getCurrent() &&
-         "creating a split continuation outside of a task");
+  auto *task = swift_task_getCurrent();
+  assert(task && "creating a split continuation outside of a task");
 
   size_t contextOffset = splitContextOffset();
   size_t resultAlign = resultType->vw_alignment();
@@ -194,10 +195,9 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   size_t resultOffset =
       llvm::alignTo(contextOffset + sizeof(ContinuationAsyncContext),
                     resultAlign);
-  // swift_task_alloc only guarantees the maximum standard alignment, so an
-  // over-aligned result needs slack to align its storage within the allocation.
-  size_t slack =
-      resultAlign > alignof(std::max_align_t) ? resultAlign - 1 : 0;
+  // swift_task_alloc only guarantees MaximumAlignment, so an over-aligned
+  // result needs slack to align its storage within the allocation.
+  size_t slack = resultAlign > MaximumAlignment ? resultAlign - 1 : 0;
 
   void *allocation = swift_task_alloc(resultOffset + slack + resultSize);
   auto *context = reinterpret_cast<ContinuationAsyncContext *>(
@@ -234,7 +234,7 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
 
   storage->ResumeContext = context;
 
-  concurrency::trace::task_continuation_init(nullptr, context);
+  concurrency::trace::task_continuation_init(task, context);
 
   return static_cast<SplitContinuation *>(allocation);
 }
@@ -273,9 +273,11 @@ void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
           oldStatus == ContinuationStatus::Resumed) &&
          "awaiting a corrupt or already-awaited continuation");
 
-  // If the status is already Resumed (resume raced ahead), continue inline.
-  // Nothing was suspended, so the handler records are never published and
-  // neither handler can fire.
+  // If the status is already Resumed (resume raced ahead), continue inline
+  // without suspending. Any handlers were already installed by the caller, so
+  // they may have run regardless: a cancellation handler runs immediately if
+  // the task was already cancelled, and an escalation handler is always called
+  // once when it is installed.
   if (oldStatus == ContinuationStatus::Resumed) {
     return context->ResumeParent(context);
   }
