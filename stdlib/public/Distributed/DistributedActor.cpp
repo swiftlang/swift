@@ -20,6 +20,10 @@
 #include "swift/Basic/Casting.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrency.h"
+#if !SWIFT_DISTRIBUTED_EMBEDDED
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Concurrent.h"
+#endif
 
 using namespace swift;
 
@@ -42,6 +46,151 @@ const void *swift_distributed_getAccessibleRecord(const char *targetNameStart,
   return findDistributedAccessor(targetNameStart, targetNameLength);
 }
 
+#if !SWIFT_DISTRIBUTED_EMBEDDED
+
+// Exported by the core runtime (MetadataLookup.cpp) without a header; the
+// Swift side of this library declares them with @_silgen_name.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned swift_func_getParameterCount(const char *typeNameStart,
+                                      size_t typeNameLength);
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *_Nullable swift_func_getReturnTypeInfo(
+    const char *typeNameStart, size_t typeNameLength,
+    GenericEnvironmentDescriptor *genericEnv,
+    const void *const *genericArguments);
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterTypeInfo(const char *typeNameStart,
+                                size_t typeNameLength,
+                                GenericEnvironmentDescriptor *genericEnv,
+                                const void *const *genericArguments,
+                                Metadata const **types, unsigned typesLength);
+
+namespace {
+
+/// The part of a distributed target's signature that depends on the target
+/// alone. For a generic target the types depend on the call's substitutions,
+/// so `ParameterTypes` and `ReturnType` are null.
+struct DistributedTargetSignature {
+  /// Negative if the mangled name could not be resolved.
+  intptr_t ParameterCount;
+  const Metadata *const *ParameterTypes;
+  const Metadata *ReturnType;
+  const GenericEnvironmentDescriptor *GenericEnvironment;
+};
+
+/// The accessor record's address, hashed here since `llvm::hash_value` is not
+/// available outside the core runtime.
+struct DistributedTargetSignatureKey {
+  const void *Record;
+
+  friend llvm::hash_code hash_value(const DistributedTargetSignatureKey &key) {
+    auto value = reinterpret_cast<uint64_t>(key.Record);
+    return llvm::hash_code(
+        static_cast<size_t>((value * 0x9E3779B97F4A7C15ULL) >> 32));
+  }
+};
+
+struct DistributedTargetSignatureCacheEntry {
+private:
+  const void *Record;
+  DistributedTargetSignature Signature;
+
+public:
+  DistributedTargetSignatureCacheEntry(
+      DistributedTargetSignatureKey key,
+      const DistributedTargetSignature &signature)
+      : Record(key.Record), Signature(signature) {}
+
+  const DistributedTargetSignature &getSignature() const { return Signature; }
+
+  bool matchesKey(DistributedTargetSignatureKey key) const {
+    return Record == key.Record;
+  }
+
+  friend llvm::hash_code
+  hash_value(const DistributedTargetSignatureCacheEntry &entry) {
+    return hash_value(DistributedTargetSignatureKey{entry.Record});
+  }
+};
+
+/// Never invalidated: records, type metadata and generic environments live as
+/// long as the process, and only names that resolved to a record get an entry.
+static Lazy<ConcurrentReadableHashMap<DistributedTargetSignatureCacheEntry>>
+    DistributedTargetSignatures;
+
+static const DistributedTargetSignature UnresolvedDistributedTargetSignature = {
+    -1, nullptr, nullptr, nullptr};
+
+} // end anonymous namespace
+
+/// Resolve the signature of the target behind an accessor record (as found by
+/// `swift_distributed_getAccessibleRecord` for the same name) on first use and
+/// return the cached signature from then on. A negative parameter count means
+/// the name could not be resolved; the caller then reports the error as before.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+DistributedTargetSignature
+swift_distributed_getTargetSignature(const void *accessorRecord,
+                                     const char *targetNameStart,
+                                     size_t targetNameLength) {
+  auto &signatures = DistributedTargetSignatures.get();
+  DistributedTargetSignatureKey key{accessorRecord};
+  {
+    auto snapshot = signatures.snapshot();
+    if (auto *entry = snapshot.find(key))
+      return entry->getSignature();
+  }
+
+  auto *record =
+      reinterpret_cast<const AccessibleFunctionRecord *>(accessorRecord);
+  DistributedTargetSignature signature = {-1, nullptr, nullptr,
+                                          record->GenericEnvironment.get()};
+
+  unsigned parameterCount =
+      swift_func_getParameterCount(targetNameStart, targetNameLength);
+  if (static_cast<int>(parameterCount) < 0)
+    return UnresolvedDistributedTargetSignature;
+  signature.ParameterCount = parameterCount;
+
+  const Metadata **parameterTypes = nullptr;
+  if (!signature.GenericEnvironment) {
+    // At least one slot, so that the accessor never gets a null pointer.
+    parameterTypes = reinterpret_cast<const Metadata **>(
+        malloc(std::max(parameterCount, 1u) * sizeof(const Metadata *)));
+    unsigned decoded = swift_func_getParameterTypeInfo(
+        targetNameStart, targetNameLength, /*genericEnv=*/nullptr,
+        /*genericArguments=*/nullptr, parameterTypes, parameterCount);
+    const Metadata *returnType =
+        decoded == parameterCount
+            ? swift_func_getReturnTypeInfo(targetNameStart, targetNameLength,
+                                           /*genericEnv=*/nullptr,
+                                           /*genericArguments=*/nullptr)
+            : nullptr;
+    if (!returnType) {
+      free(parameterTypes);
+      return UnresolvedDistributedTargetSignature;
+    }
+    signature.ParameterTypes = parameterTypes;
+    signature.ReturnType = returnType;
+  }
+
+  signatures.getOrInsert(
+      key, [&](DistributedTargetSignatureCacheEntry *entry, bool created) {
+        if (created) {
+          ::new (entry) DistributedTargetSignatureCacheEntry{key, signature};
+        } else {
+          // Another thread resolved the same target first; its entry wins.
+          free(parameterTypes);
+          signature = entry->getSignature();
+        }
+        return true;
+      });
+  return signature;
+}
+
+#endif // !SWIFT_DISTRIBUTED_EMBEDDED
 
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swiftDistributed)
@@ -80,14 +229,15 @@ SWIFT_EXPORT_FROM(swiftDistributed)
 TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
 /// Same as `TargetExecutorSignature` but with additional leading
-/// `isolatedActor`/`isolatedActorWTable`.
+/// `isolatedActor`/`isolatedActorWTable`, and with the accessor record found
+/// by `swift_distributed_getAccessibleRecord` in place of the target name.
 ///
 /// Introduced in SwiftStdlib 6.5.
 using TargetExecutorWithIsolationSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
                         /*isolatedActor=*/HeapObject *,
                         /*isolatedActorWTable=*/void **,
-                        /*targetName=*/const char *, /*targetNameSize=*/size_t,
+                        /*accessorRecord=*/const void *,
                         /*argumentDecoder=*/HeapObject *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
@@ -181,7 +331,7 @@ static void swift_distributed_execute_target_with_isolation_resume(
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 SwiftError* swift_distributed_makeDistributedTargetAccessorNotFoundError();
 
-/// Look up the accessor and dispatch to it.
+/// Dispatch to the accessor.
 ///
 /// If the accessor has a leading isolated `(any Actor)?` parameter pass it the `(isolatedActor, isolatedActorWTable)`.
 /// The accessor decodes the arguments on the caller's executor, then hops to the requested isolation
@@ -191,7 +341,7 @@ static void dispatchToDistributedAccessor(
     DefaultActor *actor,
     HeapObject *isolatedActor,
     void **isolatedActorWTable,
-    const char *targetNameStart, size_t targetNameLength,
+    const AccessibleFunctionRecord *accessor,
     HeapObject *argumentDecoder,
     const Metadata *const *argumentTypes,
     void *resultBuffer,
@@ -201,7 +351,6 @@ static void dispatchToDistributedAccessor(
     Metadata *decoderType,
     void **decoderWitnessTable,
     TaskContinuationFunction *resume) {
-  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     SwiftError *error =
         swift_distributed_makeDistributedTargetAccessorNotFoundError();
@@ -270,7 +419,7 @@ void swift_distributed_execute_target(
   dispatchToDistributedAccessor(
       callerContext, actor,
       /*isolatedActor=*/nullptr, /*isolatedActorWTable=*/nullptr,
-      targetNameStart, targetNameLength,
+      findDistributedAccessor(targetNameStart, targetNameLength),
       argumentDecoder, argumentTypes, resultBuffer, substitutions,
       witnessTables, numWitnessTables, decoderType, decoderWitnessTable,
       function_cast<TaskContinuationFunction *>(
@@ -283,7 +432,7 @@ void swift_distributed_execute_target_with_isolation(
     DefaultActor *actor,
     HeapObject *isolatedActor,
     void **isolatedActorWTable,
-    const char *targetNameStart, size_t targetNameLength,
+    const void *accessorRecord,
     HeapObject *argumentDecoder,
     const Metadata *const *argumentTypes,
     void *resultBuffer,
@@ -296,7 +445,7 @@ void swift_distributed_execute_target_with_isolation(
   dispatchToDistributedAccessor(
       callerContext, actor,
       isolatedActor, isolatedActorWTable,
-      targetNameStart, targetNameLength,
+      reinterpret_cast<const AccessibleFunctionRecord *>(accessorRecord),
       argumentDecoder, argumentTypes, resultBuffer, substitutions,
       witnessTables, numWitnessTables, decoderType, decoderWitnessTable,
       function_cast<TaskContinuationFunction *>(

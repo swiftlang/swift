@@ -27,6 +27,7 @@ set(swift_distributed_link_libraries
 
 add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   DistributedActor.cpp
+  ThreadingError.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
   DistributedAssertions.swift
@@ -48,6 +49,7 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
 
+  INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY swiftThreading
   LINK_LIBRARIES ${swift_distributed_link_libraries}
 
   C_COMPILE_FLAGS
