@@ -4005,6 +4005,18 @@ public:
 };
 }
 
+/// Returns the access level a witness must have to be visible throughout
+/// \p requiredAccessScope, for use in diagnostics.
+static AccessLevel
+getRequiredWitnessAccessForDiagnostics(AccessScope requiredAccessScope) {
+  // The witness is a member of the conforming type, which is nested inside
+  // the required scope, so a 'private' witness is never visible throughout
+  // that scope. This matters when the scope is a type, e.g. when the
+  // conforming type is a private type nested inside another type.
+  return std::max(requiredAccessScope.requiredAccessForDiagnostics(),
+                  AccessLevel::FilePrivate);
+}
+
 /// Helper function for diagnostics when a witness needs to be seated at a
 /// required access level.
 static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
@@ -4813,7 +4825,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           NormalProtocolConformance *conformance) {
         auto requiredAccessScope = check.getRequiredAccessScope();
         AccessLevel requiredAccess =
-          requiredAccessScope.requiredAccessForDiagnostics();
+          getRequiredWitnessAccessForDiagnostics(requiredAccessScope);
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -5864,8 +5876,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
         ctx.addDelayedConformanceDiag(conformance, false,
             [dc, requiredAccessScope, typeDecl](
               NormalProtocolConformance *conformance) {
-          AccessLevel requiredAccess =
-              requiredAccessScope.first.requiredAccessForDiagnostics();
+          AccessLevel requiredAccess = getRequiredWitnessAccessForDiagnostics(
+              requiredAccessScope.first);
           auto proto = conformance->getProtocol();
           auto protoAccessScope = proto->getFormalAccessScope(dc);
           bool protoForcesAccess =
