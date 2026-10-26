@@ -1810,9 +1810,8 @@ Type TypeResolution::applyUnboundGenericArguments(
         auto genericSig = decl->getGenericSignature();
         auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
         for (auto gp : parentSig.getGenericParams()) {
-          ASSERT(genericSig->isConcreteType(gp));
-          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-              genericSig->getConcreteType(gp);
+          if (auto sub = genericSig->getConcreteType(gp))
+            subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] = sub;
         }
       }
 
