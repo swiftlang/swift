@@ -3178,21 +3178,8 @@ namespace {
           }
         }
 
-        if (auto ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
-          // Indirect fields are created as computed property accessible the
-          // fields on the anonymous field from which they are injected.
-          synthesizer.makeIndirectFieldAccessors(ind, members, result, member);
-        } else if (decl->isUnion() && !isBitField) {
-          // Union fields should only be available indirectly via a computed
-          // property. Since the union is made of all of the fields at once,
-          // this is a trivial accessor that casts self to the correct
-          // field type.
-          synthesizer.makeUnionFieldAccessors(result, member);
-
-          // Union accessors are always unsafe.
-          member->addAttribute(new (Impl.SwiftContext)
-                                   UnsafeAttr(/*Implicit=*/true));
-
+        if (!isa<clang::IndirectFieldDecl>(nd) && decl->isUnion() &&
+                !isBitField) {
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
           auto valueCtor = Impl.forEachCArrayProjection(
@@ -4045,6 +4032,17 @@ namespace {
       // the VarDecl?
       if (result->isUnavailable())
         return nullptr;
+
+      // An indirect field is a computed property that accesses the field on
+      // the anonymous member from which it is injected. Find and import the
+      // property containing the anonymous struct with the real field, then
+      // install accessors that call through to it.
+      auto *underlyingStorageDecl = dyn_cast_or_null<VarDecl>(
+          Impl.importDecl(decl->chain().front(), getVersion()));
+      if (!underlyingStorageDecl)
+        return nullptr;
+      synthesizer.makeIndirectFieldAccessors(cast<NominalTypeDecl>(dc),
+                                             result, underlyingStorageDecl);
 
       return result;
     }
@@ -5506,6 +5504,17 @@ namespace {
       result->setInterfaceType(type);
       ClangImporter::Implementation::recordImplicitUnwrapForDecl(
           result, importedType.isImplicitlyUnwrapped());
+
+      // Union fields should only be available indirectly via a computed
+      // property. Since the union is made of all of the fields at once, this
+      // is a trivial accessor that casts self to the correct field type.
+      if (decl->getParent()->isUnion() && !decl->isBitField()) {
+        synthesizer.makeUnionFieldAccessors(cast<NominalTypeDecl>(dc), result);
+
+        // Union accessors are always unsafe.
+        result->addAttribute(new (Impl.SwiftContext)
+                                 UnsafeAttr(/*Implicit=*/true));
+      }
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())

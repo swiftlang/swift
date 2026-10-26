@@ -232,28 +232,36 @@ public:
   /// Build the indirect field getter and setter.
   ///
   /// \code
-  /// struct SomeImportedIndirectField {
+  /// struct SomeImportedIndirectField {    // passed as `importedStructDecl`
   ///   struct __Unnamed_struct___Anonymous_field_1 {
-  ///     var myField : Int
+  ///     var myField : Int                 // located by name matching
   ///   }
-  ///   var __Anonymous_field_1 : __Unnamed_struct___Anonymous_field_1
-  ///   var myField : Int {
-  ///     get {
+  ///   var __Anonymous_field_1 :           // passed as `anonymousStorageDecl`
+  ///           __Unnamed_struct___Anonymous_field_1
+  ///   var myField : Int {                 // passed as `importedFieldDecl`
+  ///     get {                             // created, added, and returned
   ///       __Anonymous_field_1.myField
   ///     }
-  ///     set(newValue) {
+  ///     set(newValue) {                   // created, added, and returned
   ///       __Anonymous_field_1.myField = newValue
   ///     }
   ///   }
   /// }
   /// \endcode
   ///
+  /// \param importedStructDecl The type that \p importedFieldDecl is a member
+  ///        of.
+  /// \param importedFieldDecl The property created from the
+  ///        \c clang::IndirectFieldDecl ; the one that clients will directly
+  ///        use and that this function will install accessors on.
+  /// \param anonymousStorageDecl The property that contains the anonymous
+  ///        instance that the accessors should forward to.
+  ///
   /// \returns a pair of getter and setter function decls.
   std::pair<AccessorDecl *, AccessorDecl *>
-  makeIndirectFieldAccessors(const clang::IndirectFieldDecl *indirectField,
-                             ArrayRef<VarDecl *> members,
-                             NominalTypeDecl *importedStructDecl,
-                             VarDecl *importedFieldDecl);
+  makeIndirectFieldAccessors(NominalTypeDecl *importedStructDecl,
+                             VarDecl *importedFieldDecl,
+                             VarDecl *anonymousStorageDecl);
 
   std::pair<AccessorDecl *, AccessorDecl *>
   makeLegacyCArrayAccessors(DeclContext *dc,

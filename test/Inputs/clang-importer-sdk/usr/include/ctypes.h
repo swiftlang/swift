@@ -365,6 +365,17 @@ struct StructWithPlainAndArrayFields {
   int small[4];
 };
 
+struct StructWithAnonymousUnionArray {
+  int plain;
+  union {
+    char name[8];
+    struct {
+      int zeroes;
+      int offset;
+    } longName;
+  };
+};
+
 struct StructWithSmallAndHugeArrayFields {
   int small[4];
   int huge[5000];

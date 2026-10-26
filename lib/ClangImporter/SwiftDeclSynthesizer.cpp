@@ -1312,7 +1312,11 @@ static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
   for (auto decl :
        anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
     if (auto *VD = dyn_cast<VarDecl>(decl)) {
-      return VD;
+      auto *matchingDecl =
+          importer::getDeclForCArrayProjectionMatching(VD, importedFieldDecl);
+      ASSERT(matchingDecl && "synthesizing IndirectFieldDecl accessor body "
+                             "for nonexistent C array projection");
+      return matchingDecl;
     }
   }
 
@@ -1387,8 +1391,9 @@ synthesizeIndirectFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 
 std::pair<AccessorDecl *, AccessorDecl *>
 SwiftDeclSynthesizer::makeIndirectFieldAccessors(
-    const clang::IndirectFieldDecl *indirectField, ArrayRef<VarDecl *> members,
-    NominalTypeDecl *importedStructDecl, VarDecl *importedFieldDecl) {
+    NominalTypeDecl *importedStructDecl,
+    VarDecl *importedFieldDecl,
+    VarDecl *anonymousStorageDecl) {
   auto &C = ImporterImpl.SwiftContext;
 
   auto getterDecl =
@@ -1402,23 +1407,10 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
   ClangImporter::Implementation::makeComputed(importedFieldDecl, getterDecl,
                                               setterDecl);
 
-  auto containingField = indirectField->chain().front();
-  VarDecl *anonymousFieldDecl = nullptr;
-
-  // Reverse scan of the members because indirect field are generated just
-  // after the corresponding anonymous type, so a reverse scan allows
-  // switching from O(n) to O(1) here.
-  for (auto decl : reverse(members)) {
-    if (decl->getClangDecl() == containingField) {
-      anonymousFieldDecl = cast<VarDecl>(decl);
-      break;
-    }
-  }
-  assert(anonymousFieldDecl && "anonymous field not generated");
   getterDecl->setBodySynthesizer(synthesizeIndirectFieldGetterBody,
-                                 anonymousFieldDecl);
+                                 anonymousStorageDecl);
   setterDecl->setBodySynthesizer(synthesizeIndirectFieldSetterBody,
-                                 anonymousFieldDecl);
+                                 anonymousStorageDecl);
 
   return {getterDecl, setterDecl};
 }

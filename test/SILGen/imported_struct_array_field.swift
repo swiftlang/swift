@@ -17,3 +17,27 @@ func useImportedArrayTypedefInit() -> StructWithArrayTypedefField {
   return StructWithArrayTypedefField(small: (0, 0, 0, 0))
 }
 #endif
+
+// Test compatibility with anonymous unions (and indirect fields into them).
+
+// LEGACY-LABEL: sil hidden [ossa] @$s{{.*}}readAnonymousUnionElement
+// MODERN-LABEL: sil hidden [ossa] @$s{{.*}}readAnonymousUnionElement
+// LEGACY-LABEL: sil hidden [ossa] @$s{{.*}}writeAnonymousUnionElement
+// MODERN-LABEL: sil hidden [ossa] @$s{{.*}}writeAnonymousUnionElement
+#if hasFeature(ModernImportedCArrays)
+func readAnonymousUnionElement(_ s: StructWithAnonymousUnionArray) -> CChar {
+  s.name[0]
+}
+
+func writeAnonymousUnionElement(_ s: inout StructWithAnonymousUnionArray) {
+  s.name[1] = 3
+}
+#else
+func readAnonymousUnionElement(_ s: StructWithAnonymousUnionArray) -> CChar {
+  s.name.0
+}
+
+func writeAnonymousUnionElement(_ s: inout StructWithAnonymousUnionArray) {
+  s.name.1 = 3
+}
+#endif
