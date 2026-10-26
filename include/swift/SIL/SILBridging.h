@@ -1356,7 +1356,6 @@ struct BridgedWitnessTable {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedWitnessTableEntry getEntry(SwiftInt index) const;
   BRIDGED_INLINE bool isDeclaration() const;
   BRIDGED_INLINE bool isSpecialized() const;
-  BRIDGED_INLINE bool hasConditionalConformances() const;
 };
 
 struct OptionalBridgedWitnessTable {

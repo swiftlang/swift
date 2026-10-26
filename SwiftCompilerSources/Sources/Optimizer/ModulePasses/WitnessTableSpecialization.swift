@@ -28,7 +28,11 @@ import SIL
 ///   }
 /// ```
 /// IRGen emits a static witness table, which is directly referenced, and which contains the
-/// specialized witness methods.
+/// specialized witness methods - if possible. Otherwise the witness table is still instantiated
+/// at runtime. The specialized witness table is still kept in SIL, so that it can be used by
+/// optimizations in the future, e.g. for devirtualization.
+/// Witness methods which cannot be specialized, e.g. generic method requirements, keep the original
+/// generic witness.
 ///
 /// Embedded Swift creates specialized witness tables in the mandatory pipeline.
 ///
@@ -40,7 +44,7 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
   }
 
   // Collect the conformances first, because specialization creates new functions.
-  var conformances: [Conformance] = []
+  var conformances: [(Conformance, Location)] = []
   var visited = Set<Conformance>()
 
   for function in moduleContext.functions where function.isDefinition && !function.isGeneric {
@@ -53,13 +57,14 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
       {
         let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
         if baseConf.isSpecialized && visited.insert(conformance.canonical).inserted {
-          conformances.append(conformance)
+          conformances.append((conformance, initExistential.location))
         }
       }
     }
   }
 
-  for conformance in conformances {
-    _ = specializeWitnessTableForStaticEmission(for: conformance, moduleContext)
+  var history = SpecializationHistory()
+  for (conformance, location) in conformances {
+    specializeWitnessTable(for: conformance, errorLocation: location, history: &history, moduleContext)
   }
 }

@@ -114,10 +114,6 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   // True, if this is a specialized witness table.
   public var isSpecialized: Bool { bridged.isSpecialized() }
 
-  /// True, if the witness table stores conditional conformances in its private area, which is
-  /// filled when the witness table is instantiated at runtime.
-  public var hasConditionalConformances: Bool { bridged.hasConditionalConformances() }
-
   public var description: String {
     return String(taking: bridged.getDebugDescription())
   }

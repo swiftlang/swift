@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -O -wmo -module-name test -emit-ir %s -o %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck %s --check-prefix=DESC < %t.ll
+// RUN: %FileCheck %s --check-prefix=NOSTATIC < %t.ll
 
 // In optimized non-embedded Swift, an existential which is created from a specialized
 // generic type references a statically emitted specialized witness table instead of
@@ -45,6 +46,12 @@ extension Cond: P where T: P {
 // CHECK-DAG: @"$s4test3BoxVySbGAA1PAAWP" = linkonce_odr hidden
 
 // CHECK-DAG: @"$s4test4CondVyAA3BoxVySdGGAA1PAAWP" = linkonce_odr hidden {{.*}}@"$s4test4CondVyxGAA1PA2aERzlMc"
+
+// An associated conformance which is the conformance itself.
+// CHECK-DAG: @"$s4test4LoopVySiGAA7SelfRefAAWP" = linkonce_odr hidden {{.*}}@"$s4test4LoopVyxGAA7SelfRefAAMc"{{.*}}@"$s4test4LoopVySiGAA7SelfRefAAWP"
+
+// The generic witness of a conditional conformance needs a runtime-instantiated witness table.
+// NOSTATIC-NOT: @"$s4test4CondVyAA3BoxVySiGGAA16HasGenericMethodAAWP" =
 
 // A witness which cannot be specialized is the generic witness in the static table.
 // CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW"
@@ -94,4 +101,92 @@ public func makeGBox() -> any HasGenericMethod {
 // CHECK:       }
 public func makeCond() -> any P {
   return Cond(t: Box(t: 1.0))
+}
+
+public protocol SelfRef {
+  associatedtype S: SelfRef
+  func next() -> S
+}
+
+public struct Loop<T>: SelfRef {
+  var t: T
+  public func next() -> Loop<T> { self }
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test8makeLoopAA7SelfRef_pyF"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test4LoopVySiGAA7SelfRefAAWP"
+// CHECK:       }
+public func makeLoop() -> any SelfRef {
+  return Loop(t: 1)
+}
+
+extension Cond: HasGenericMethod where T: P {
+  public func g<U>(_ u: U) -> Int { t.foo() + MemoryLayout<U>.size }
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test15makeCondGenericAA03HasD6Method_pyF"
+// CHECK-NOT:     @"$s4test4CondVyAA3BoxVySiGGAA16HasGenericMethodAAWP"
+// CHECK:       }
+public func makeCondGeneric() -> any HasGenericMethod {
+  return Cond(t: Box(t: 1))
+}
+
+// A cycle of witness tables, where one table cannot be emitted statically: the generic witness
+// of the conditional conformance `B<Int>: Cycle` needs a runtime-instantiated witness table.
+// Therefore `A<Int>: Cycle`, which references it, cannot be emitted statically either.
+public protocol K {}
+extension Int: K {}
+
+public protocol Cycle {
+  associatedtype S: Cycle
+  func next() -> S
+  func g<U>(_ u: U) -> Int
+}
+
+public struct A<T: K>: Cycle {
+  var t: T
+  public func next() -> B<T> { B(t: t) }
+  public func g<U>(_ u: U) -> Int { 1 }
+}
+
+public struct B<T> {
+  var t: T
+}
+
+extension B: Cycle where T: K {
+  public func next() -> A<T> { A(t: t) }
+  public func g<U>(_ u: U) -> Int { 2 }
+}
+
+// NOSTATIC-NOT: @"$s4test1AVySiGAA5CycleAAWP" =
+// NOSTATIC-NOT: @"$s4test1BVySiGAA5CycleAAWP" =
+
+// CHECK-LABEL: define {{.*}} @"$s4test5makeAAA5Cycle_pyF"
+// CHECK-NOT:     @"$s4test1AVySiGAA5CycleAAWP"
+// CHECK:       }
+public func makeA() -> any Cycle {
+  return A(t: 1)
+}
+
+// A final class.
+public final class FinalBox<T>: Named {
+  var t: T
+  init(t: T) { self.t = t }
+}
+
+public protocol Named {
+  func name() -> String
+}
+
+extension Named {
+  public func name() -> String { "\(type(of: self))" }
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test12makeFinalBoxAA5Named_pyF"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test8FinalBoxCySiGAA5NamedAAWP"
+// CHECK:       }
+public func makeFinalBox() -> any Named {
+  return FinalBox(t: 1)
 }

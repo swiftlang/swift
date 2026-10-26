@@ -101,6 +101,76 @@ func makeBaseCopies() -> any Copies { let b: Base<Int> = Sub(); return b }
 @inline(never)
 func makeBaseNamed() -> any Named { let b: Base<Int> = Sub(); return b }
 
+// For a struct, the default implementation is specialized for the concrete self type.
+struct SBox<T>: Named {
+  var t: T
+}
+
+@inline(never)
+func makeSBoxNamed() -> any Named { SBox(t: 1) }
+
+// The associated conformance is the conformance itself.
+protocol SelfRef {
+  associatedtype S: SelfRef
+  func next() -> S
+  func describe() -> String
+}
+
+struct Loop<T>: SelfRef {
+  var t: T
+  func next() -> Loop<T> { Loop(t: t) }
+  func describe() -> String { "Loop<\(T.self)>(\(t))" }
+}
+
+@inline(never)
+func makeLoop() -> any SelfRef { Loop(t: 4) }
+
+@inline(never)
+func callNext<L: SelfRef>(_ l: L) -> String { l.next().next().describe() }
+
+// A final class gets a specialized default implementation.
+final class FinalBox<T>: Named {
+  var t: T
+  init(t: T) { self.t = t }
+}
+
+@inline(never)
+func makeFinalBoxNamed() -> any Named { FinalBox(t: 1) }
+
+// A cycle of witness tables, where one table cannot be emitted statically.
+protocol K {}
+extension Int: K {}
+
+protocol Cycle {
+  associatedtype S: Cycle
+  func next() -> S
+  func g<U>(_ u: U) -> String
+}
+
+struct A<T: K>: Cycle {
+  var t: T
+  func next() -> B<T> { B(t: t) }
+  func g<U>(_ u: U) -> String { "A<\(T.self)>.g<\(U.self)>" }
+}
+
+struct B<T> {
+  var t: T
+}
+
+extension B: Cycle where T: K {
+  func next() -> A<T> { A(t: t) }
+  func g<U>(_ u: U) -> String { "B<\(T.self)>.g<\(U.self)>" }
+}
+
+@inline(never)
+func makeA() -> any Cycle { A(t: 1) }
+
+@inline(never)
+func makeB() -> any Cycle { B(t: 1) }
+
+@inline(never)
+func walk<X: Cycle>(_ x: X) -> String { x.g(1) + " " + x.next().g("") + " " + x.next().next().g(1.0) }
+
 // The getter returns an associated type indirectly. A direct call of the witness
 // thunk is specialized with a direct result, which must not be confused with the
 // specialized witness in the witness table.
@@ -152,6 +222,16 @@ print(makeCondGeneric().g(true))
 print(type(of: makeBaseCopies().copy()))
 // CHECK: Sub
 print(makeBaseNamed().name())
+// CHECK: SBox<Int>
+print(makeSBoxNamed().name())
+// CHECK: Loop<Int>(4)
+print(callNext(makeLoop()))
+// CHECK: FinalBox<Int>
+print(makeFinalBoxNamed().name())
+// CHECK: A<Int>.g<Int> B<Int>.g<String> A<Int>.g<Double>
+print(walk(makeA()))
+// CHECK: B<Int>.g<Int> A<Int>.g<String> B<Int>.g<Double>
+print(walk(makeB()))
 // CHECK: Wrapper<Bool>
 print(callFoo(makeWrapper()))
 // CHECK: Box<Bool>(true)

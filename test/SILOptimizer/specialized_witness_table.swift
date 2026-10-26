@@ -6,8 +6,8 @@
 // RUN: %target-swift-frontend -Onone -wmo -module-name test -I %t -emit-sil %s | %FileCheck %s --check-prefix=ONONE
 
 // In optimized non-embedded Swift, an existential which is created from a specialized
-// generic type gets a statically emitted specialized witness table with specialized
-// witness methods.
+// generic type gets a specialized witness table with specialized witness methods.
+// IRGen emits it statically if possible (see test/IRGen/specialized_witness_table.swift).
 
 // ONONE-NOT: [specialized]
 
@@ -68,7 +68,11 @@ public func makeCond() -> any P {
   return Cond(t: Box(t: 1.0))
 }
 
-// A conformance to a resilient protocol has no fixed witness table layout.
+// A conformance to a resilient protocol has no fixed witness table layout. IRGen cannot emit the
+// specialized witness table statically, but it's still available for optimizations.
+// CHECK-LABEL: sil_witness_table shared [specialized] RBox<Int>: specialize <Int> (<T> RBox<T>: ResilientP module test) {
+// CHECK-NEXT:    method #ResilientP.foo: {{.*}} : @$s4test4RBoxVyxG9Resilient0C1PAaeFP3fooSiyFTWSi_TG5
+// CHECK-NEXT:  }
 public struct RBox<T>: ResilientP {
   var t: T
   public func foo() -> Int { 2 }
@@ -116,6 +120,30 @@ public func makeNamed() -> any Named {
   return Base<Int>()
 }
 
+// For a final class, the default implementation is specialized for the concrete self type.
+public final class FinalBase<T>: Named {
+  public init() {}
+}
+
+// CHECK-LABEL: sil_witness_table shared [specialized] FinalBase<Int>: specialize <Int> (<T> FinalBase<T>: Named module test) {
+// CHECK-NEXT:    method #Named.name: {{.*}} : @$s4test9FinalBaseCyxGAA5NamedA2aEP4nameSSyFTW{{.*}}_TG5
+// CHECK-NEXT:  }
+public func makeFinalBase() -> any Named {
+  return FinalBase<Int>()
+}
+
+// For a struct, the default implementation is specialized for the concrete self type.
+public struct SBox<T>: Named {
+  var t: T
+}
+
+// CHECK-LABEL: sil_witness_table shared [specialized] SBox<Int>: specialize <Int> (<T> SBox<T>: Named module test) {
+// CHECK-NEXT:    method #Named.name: {{.*}} : @$s4test4SBoxVyxGAA5NamedA2aEP4nameSSyFTW{{.*}}_TG5
+// CHECK-NEXT:  }
+public func makeSBox() -> any Named {
+  return SBox(t: 1)
+}
+
 // A generic method requirement cannot be fully specialized and is kept as the generic witness.
 public protocol HasGenericMethod {
   func g<U>(_ u: U) -> Int
@@ -133,10 +161,12 @@ public func makeGBox() -> any HasGenericMethod {
   return GBox(t: 1)
 }
 
-// Negative cases: no specialized witness tables for the following.
-
 // A generic witness of a conditional conformance would need the conditional conformances,
-// which are only stored in a runtime-instantiated witness table.
+// which are only stored in a runtime-instantiated witness table. IRGen cannot emit the specialized
+// witness table statically.
+// CHECK-LABEL: sil_witness_table shared [specialized] Cond<Box<Int>>: specialize <Box<Int>> (<T where T : P> Cond<T>: HasGenericMethod module test) {
+// CHECK-NEXT:    method #HasGenericMethod.g: {{.*}} : @$s4test4CondVyxGAA16HasGenericMethodA2A1PRzlAaEP1gySiqd__lFTW{{([[:space:]].*)?$}}
+// CHECK-NEXT:  }
 extension Cond: HasGenericMethod where T: P {
   public func g<U>(_ u: U) -> Int { t.foo() + MemoryLayout<U>.size }
 }
@@ -145,5 +175,33 @@ public func makeCondGeneric() -> any HasGenericMethod {
   return Cond(t: Box(t: 1))
 }
 
-// NEG-NOT: [specialized] RBox
-// NEG-NOT: [specialized] Cond<Box<Int>>: specialize <Box<Int>> (<T where T : P> Cond<T>: HasGenericMethod
+// The witness table of a non-generic conformance is not specialized, even if it has a default
+// method, because IRGen emits the original witness table.
+public protocol D {
+  func d() -> Int
+}
+
+extension D {
+  public func d() -> Int { 3 }
+}
+
+public struct Plain: D {}
+
+public protocol HasD {
+  associatedtype X: D
+  func x() -> X
+}
+
+public struct HBox<T>: HasD {
+  var t: T
+  public func x() -> Plain { Plain() }
+}
+
+// CHECK-LABEL: sil_witness_table shared [specialized] HBox<Int>: specialize <Int> (<T> HBox<T>: HasD module test) {
+// CHECK:         associated_conformance (X: D): Plain: D module test
+// CHECK:       }
+public func makeHBox() -> any HasD {
+  return HBox(t: 1)
+}
+
+// NEG-NOT: [specialized] Plain: D
