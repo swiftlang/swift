@@ -739,11 +739,6 @@ void importer::getNormalInvocationArguments(
     if (clangSupportsPragmaAttributeWithSwiftAttr())
       invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS=1");
 
-    if (triple.isXROS()) {
-      // FIXME: This is a gnarly hack until some macros get adjusted in the SDK.
-      llvm::append_values(invocationArgStrs, "-DOS_OBJECT_HAVE_OBJC_SUPPORT=1");
-    }
-
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
     auto V = version::getCurrentCompilerVersion();
