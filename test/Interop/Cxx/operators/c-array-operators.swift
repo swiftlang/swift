@@ -9,7 +9,10 @@
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -cxx-interoperability-mode=default -verify-additional-prefix legacy-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -cxx-interoperability-mode=default -o /dev/null
 
+// RUN: %target-swift-ide-test -print-module -module-to-print=CArrays -source-filename=x -I %t/include -cxx-interoperability-mode=default --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s %if VENDOR=apple %{ --check-prefixes CHECK,APPLE %}
+
 // REQUIRES: swift_feature_ModernImportedCArrays
+// REQUIRES: swift_feature_ModernImportedCArraysOnly
 
 //--- include/module.modulemap
 module CArrays {
@@ -86,3 +89,13 @@ func test(
   _ = ops == pointer
   _ = ops + pointer
 }
+
+// CHECK-LABEL: struct SubIndex
+// CHECK: func __operatorSubscriptConst
+// APPLE-NEXT: @available({{.*}}, *)
+// CHECK-NEXT: subscript(array: UnsafeMutablePointer<[4 of CInt]>!) -> CInt
+
+// CHECK-LABEL: struct SubResult
+// CHECK: func __operatorSubscript
+// APPLE-NEXT: @available({{.*}}, *)
+// CHECK-NEXT: subscript(index: CInt) -> UnsafeMutablePointer<[4 of CInt]>!

@@ -1394,6 +1394,11 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
+  /// Add an \c @available attribute with the minimum version to be able to
+  /// use \c InlineArray . Use this only for declarations that \em don't pass
+  /// through \c importAttributes() , or for which it doesn't do this.
+  void addInlineArrayAvailability(Decl *decl);
+
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 

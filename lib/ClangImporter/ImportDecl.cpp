@@ -1704,20 +1704,6 @@ namespace {
       return limitAccessForCArrayProjection(declAccess, decl);
     }
 
-    /// Add an \c @available attribute with the minimum version to be able to
-    /// use \c InlineArray . Use this only for declarations that \em don't pass
-    /// through \c ClangImporter::Implementation::importAttributes() .
-    void addInlineArrayAvailability(Decl *decl) {
-      auto platform = targetPlatform(Impl.SwiftContext.LangOpts);
-      auto availability = Impl.SwiftContext.getInlineArrayAvailability();
-      if (!platform || !availability.hasMinimumVersion())
-        return;
-
-      decl->addAttribute(AvailableAttr::createPlatformVersioned(
-          Impl.SwiftContext, *platform, "", "",
-          availability.getRawMinimumVersion(), {}, {}));
-    }
-
   public:
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
                                 ImportNameVersion vers)
@@ -3209,7 +3195,7 @@ namespace {
           });
 
           if (valueCtor->getAttrs().hasAttribute<CArrayProjectionAttr>())
-            addInlineArrayAvailability(valueCtor);
+            Impl.addInlineArrayAvailability(valueCtor);
         }
         // TODO: we have a problem lazily looking up members of an unnamed
         // record, so we add them here. To fix this `translateContext` needs to
@@ -3338,7 +3324,7 @@ namespace {
         });
 
         if (valueCtor->getAttrs().hasAttribute<CArrayProjectionAttr>())
-          addInlineArrayAvailability(valueCtor);
+          Impl.addInlineArrayAvailability(valueCtor);
       }
 
       if (isa<StructDecl>(result)) {
@@ -9099,7 +9085,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // (`importAttributes()` doesn't touch subscripts.)
   if (getCArrayProjection() == CArrayProjection::Modern &&
           needsLegacyCArrayProjection(getterObjCMethod))
-    addInlineArrayAvailability(subscript);
+    Impl.addInlineArrayAvailability(subscript);
 
   // Build the thunks.
   AccessorDecl *getterThunk = synthesizer.buildSubscriptGetterDecl(
@@ -10494,6 +10480,17 @@ static void filterUsableVersionedAttrs(
 
     applicableVersionedAttrSet.insert(versionedAttr);
   }
+}
+
+void ClangImporter::Implementation::addInlineArrayAvailability(Decl *decl) {
+  auto platform = targetPlatform(SwiftContext.LangOpts);
+  auto availability = SwiftContext.getInlineArrayAvailability();
+  if (!platform || !availability.hasMinimumVersion())
+    return;
+
+  decl->addAttribute(AvailableAttr::createPlatformVersioned(
+      SwiftContext, *platform, "", "", availability.getRawMinimumVersion(), {},
+      {}));
 }
 
 /// Import Clang attributes as Swift attributes.

@@ -1045,19 +1045,21 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
       if (!subscript)
         return nullptr;
 
-      // Import attributes from the Clang operator[] decl(s) onto the
-      // synthesized accessor thunks (importAttributes is a no-op on
-      // SubscriptDecl itself).
+      Struct->addMember(subscript);
+      result.push_back(subscript);
+      return subscript;
+    };
+
+    /// Import attributes from the Clang operator[] decl(s) onto the
+    /// synthesized accessor thunks (importAttributes is a no-op on
+    /// SubscriptDecl itself).
+    auto importSubscriptAttributes = [&](SubscriptDecl *subscript) {
       if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
           getterAccessor && CXXGetter)
         importAttributes(CXXGetter.method, getterAccessor);
       if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
           setterAccessor && CXXSetter)
         importAttributes(CXXSetter.method, setterAccessor);
-
-      Struct->addMember(subscript);
-      result.push_back(subscript);
-      return subscript;
     };
 
     auto *subscript = addSubscript(getter, setter);
@@ -1066,6 +1068,7 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
 
     // If the underlying functions use C arrays, they have a legacy projection
     // as well, and so does a subscript built from them.
+    SubscriptDecl *legacySubscript = nullptr;
     if ((getter && getter->getAttrs().hasAttribute<CArrayProjectionAttr>()) ||
         (setter && setter->getAttrs().hasAttribute<CArrayProjectionAttr>())) {
       FuncDecl *legacyGetter =
@@ -1074,7 +1077,6 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
                    importer::getDeclForCounterpartCArrayProjection(setter);
       bool hasLegacy = (!getter || legacyGetter) && (!setter || legacySetter);
 
-      SubscriptDecl *legacySubscript = nullptr;
       if (hasLegacy) {
         for (auto *fn : {legacyGetter, legacySetter}) {
           if (fn)
@@ -1084,7 +1086,13 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
       }
       synth.registerCArrayProjections(subscript, legacySubscript,
                                       /*addAlternate=*/false);
+
+      addInlineArrayAvailability(subscript);
     }
+
+    importSubscriptAttributes(subscript);
+    if (legacySubscript)
+      importSubscriptAttributes(legacySubscript);
   }
 
   return result;
