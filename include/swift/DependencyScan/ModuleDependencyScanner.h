@@ -188,6 +188,9 @@ private:
       const llvm::DenseSet<clang::dependencies::ModuleID>
           &alreadySeenModules);
 
+  llvm::StringMap<std::string>
+  findClangModuleMapFiles(ArrayRef<StringRef> moduleNames);
+
   /// Query dependency information for header dependencies
   /// of a binary Swift module.
   ///
@@ -318,6 +321,11 @@ public:
 
   /// How many filesystem lookups were performed by the scanner
   unsigned getNumLookups() { return NumLookups; }
+
+  /// Resolve the clang module map path for each module in \p moduleNames.
+  /// Names that are not found are omitted.
+  llvm::StringMap<std::string>
+  findClangModuleMapFiles(ArrayRef<StringRef> moduleNames);
 
   /// CAS Dependency Tracker.
   std::optional<SwiftDependencyTracker>
@@ -527,7 +535,6 @@ private:
   /// Count of lookups the scanner performed on the filesystem rather than
   /// answering from the dependency cache: one per module name looked up and
   /// one per header scan. Reported as the NumDepScanFilesystemLookups
-  /// frontend statistic.
   std::atomic<unsigned> NumLookups = 0;
 
   /// Whether each worker uses a single Clang compiler instance for all of
