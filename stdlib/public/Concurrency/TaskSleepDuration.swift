@@ -208,7 +208,7 @@ extension Task where Success == Never, Failure == Never {
       // because `cancel()` doesn't consume it, so no box is needed.
       let token = unsafe schedule(_jobToResume(sleeper))
 
-      try await waiter.wait(onCancel: {
+      try await waiter.wait(onCancel: { _ in
         guard token.cancel() != nil else {
           // The timer has already fired; it will resume the continuation.
           return
@@ -288,7 +288,7 @@ extension Task where Success == Never, Failure == Never {
         }
       }
 
-      try await waiter.wait(onCancel: {
+      try await waiter.wait(onCancel: { _ in
         if claim.claim() {
           unsafe sleeper.resume(throwing: _Concurrency.CancellationError())
         }
