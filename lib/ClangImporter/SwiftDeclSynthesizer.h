@@ -57,12 +57,6 @@ enum class ValueConstructorFlags {
 };
 using ValueConstructorOptions = OptionSet<ValueConstructorFlags>;
 
-inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
-  auto *classDecl = dc->getSelfClassDecl();
-  return (classDecl && !classDecl->isFinal()) ? AccessLevel::Open
-                                              : AccessLevel::Public;
-}
-
 enum class ReferenceReturnTypeBehaviorForBaseMethodSynthesis {
   KeepReference,
   RemoveReference,

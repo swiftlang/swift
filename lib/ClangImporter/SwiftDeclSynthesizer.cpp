@@ -1961,8 +1961,6 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, elementTy, dc, getter->getClangNode());
 
-  thunk->setAccess(getOverridableAccessLevel(dc));
-
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
     thunk->addAttribute(objcAttr->clone(C));
   thunk->setIsObjC(getter->isObjC());
@@ -2004,8 +2002,6 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       valueIndicesPL, TupleType::getEmpty(C), dc,
       setter->getClangNode());
-
-  thunk->setAccess(getOverridableAccessLevel(dc));
 
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
     thunk->addAttribute(objcAttr->clone(C));
