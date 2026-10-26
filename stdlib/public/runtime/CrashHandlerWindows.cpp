@@ -263,9 +263,7 @@ HMODULE hookedModules[1024];
 DWORD hookedModuleCount = 0;
 
 void hookFailFastInLoadedModules() {
-  // If another thread is already doing this, there's no need to wait
-  if (!TryAcquireSRWLockExclusive(&hookLock))
-    return;
+  AcquireSRWLockExclusive(&hookLock)
 
   DWORD cbNeeded;
   if (K32EnumProcessModules(GetCurrentProcess(), loadedModules,
