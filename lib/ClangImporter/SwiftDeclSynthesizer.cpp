@@ -1018,6 +1018,12 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
 
+  if (needsCArrayProjections) {
+    if (unlabeledInit)
+      ImporterImpl.addInlineArrayAvailability(unlabeledInit);
+    ImporterImpl.addInlineArrayAvailability(initRawValue);
+  }
+
   ClangImporter::Implementation::addSynthesizedTypealias(
       structDecl, ctx.Id_RawValue, visibleRawValueType);
   ImporterImpl.RawTypes[structDecl] = visibleRawValueType;

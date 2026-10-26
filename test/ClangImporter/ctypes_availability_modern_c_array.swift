@@ -114,3 +114,30 @@ func testBigArray2dWithAvailability(
 ) {
   useBigArray2d(maxSize, maxSizePlusOne)
 }
+
+// The initializers of a `swift_newtype` around a C array are synthesized, but
+// still have to be as available as InlineArray.
+
+func testNewtypesWithoutAvailability(
+    // expected-note@-1 4 {{add '@available' attribute to enclosing global function}}
+    _ small: InlineArray<4, Int32>,
+    // expected-error@-1 {{'InlineArray' is only available in}}
+    _ huge: InlineArray<9000, Int32>
+    // expected-error@-1 {{'InlineArray' is only available in}}
+) {
+  _ = SmallArrayNewtype(rawValue: small)
+  // expected-error@-1 {{'init(rawValue:)' is only available in}}
+  // expected-note@-2 {{add 'if #available' version check}}
+
+  _ = HugeArrayNewtype(rawValue: huge)
+  // expected-error@-1 {{'init(rawValue:)' is only available in}}
+  // expected-note@-2 {{add 'if #available' version check}}
+}
+
+@available(anyAppleOS 26, *)
+func testNewtypesWithAvailability(
+    _ small: InlineArray<4, Int32>, _ huge: InlineArray<9000, Int32>
+) {
+  _ = SmallArrayNewtype(rawValue: small)
+  _ = HugeArrayNewtype(rawValue: huge)
+}
