@@ -39,39 +39,53 @@ struct WaitQueue {
   /// class so that the queue's `didPlace` hook can update it while the queue
   /// is being modified.
   final class Slots {
-    /// The index in the heap of the entry in each slot, or -1 if it is free.
-    var heapIndex: [Int] = []
-    var generation: [UInt32] = []
-    var free: [Int] = []
+    struct Slot {
+      /// For a slot in use, the index in the heap of its entry (never
+      /// negative).  For a free slot, the next free slot, as `-2 - next`
+      /// (so the end of the list, -1, is -1), which is always negative.
+      var index: Int
+      var generation: UInt32
+    }
+
+    var slots: [Slot] = []
+
+    /// The first free slot, or -1.
+    var firstFree = -1
 
     func allocate() -> Int {
-      if let slot = free.popLast() {
+      if firstFree >= 0 {
+        let slot = firstFree
+        firstFree = -2 - slots[slot].index
+        slots[slot].index = 0   // The queue sets this when it places the entry
         return slot
       }
-      heapIndex.append(-1)
-      generation.append(0)
-      return heapIndex.count - 1
+      slots.append(Slot(index: 0, generation: 0))
+      return slots.count - 1
     }
 
     func release(_ slot: Int) {
-      heapIndex[slot] = -1
-      generation[slot] = (generation[slot] + 1) & 0x7fff_ffff
-      free.append(slot)
+      slots[slot].index = -2 - firstFree
+      slots[slot].generation = (slots[slot].generation + 1) & 0x7fff_ffff
+      firstFree = slot
+    }
+
+    func setHeapIndex(_ index: Int, of slot: Int) {
+      slots[slot].index = index
     }
 
     func id(of slot: Int) -> UInt64 {
-      return (UInt64(generation[slot]) << 32) | UInt64(slot)
+      return (UInt64(slots[slot].generation) << 32) | UInt64(slot)
     }
 
     /// The heap index for a job ID, or nil if it is no longer waiting.
     func heapIndex(forID id: UInt64) -> (slot: Int, index: Int)? {
       let slot = Int(truncatingIfNeeded: id & 0xffff_ffff)
-      if slot >= heapIndex.count
-           || generation[slot] != UInt32(truncatingIfNeeded: id >> 32)
-           || heapIndex[slot] < 0 {
+      if slot >= slots.count
+           || slots[slot].generation != UInt32(truncatingIfNeeded: id >> 32)
+           || slots[slot].index < 0 {
         return nil
       }
-      return (slot: slot, index: heapIndex[slot])
+      return (slot: slot, index: slots[slot].index)
     }
   }
 
@@ -83,7 +97,7 @@ struct WaitQueue {
     let slots = self.slots
     queue = PriorityQueue(
       compare: { $0.deadline < $1.deadline },
-      didPlace: { slots.heapIndex[$0.slot] = $1 })
+      didPlace: { slots.setHeapIndex($1, of: $0.slot) })
     self.clock = clock
   }
 
