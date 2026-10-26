@@ -214,14 +214,6 @@ bool BridgedPassContext::hasClassFixedMetadataLayout(BridgedDeclObj classDecl) c
   return igm->getClassMetadataStrategy(classDecl.getAs<swift::ClassDecl>()) == swift::irgen::ClassMetadataStrategy::Fixed;
 }
 
-bool BridgedPassContext::canReferenceWitnessTableStatically(BridgedConformance conformance) const {
-  SILPassManager *pm = invocation->getPassManager();
-  auto *igm = pm->getIRGenModule();
-  if (!igm)
-    return false;
-  return igm->canReferenceWitnessTableStatically(conformance.unbridged().getConcrete());
-}
-
 bool BridgedPassContext::fitsInOpaqueExistentialPayload(BridgedType type) const {
   SILPassManager *pm = invocation->getPassManager();
   auto *igm = pm->getIRGenModule();

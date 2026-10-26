@@ -292,14 +292,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         case .BuildOrdinaryTaskExecutorRef,
              .BuildOrdinarySerialExecutorRef,
              .BuildComplexEqualitySerialExecutorRef:
-          // In non-embedded Swift, specialized witness tables are emitted statically. They are
-          // only created by the WitnessTableSpecialization pass, which checks that this is possible.
-          if context.options.enableEmbeddedSwift {
-            let conformance = bi.substitutionMap.conformances[0]
-            if specializeWitnessTable(for: conformance, errorLocation: bi.location,
-                                      history: &specializationHistory, moduleContext) {
-              worklist.addWitnessMethods(of: conformance, moduleContext)
-            }
+          let conformance = bi.substitutionMap.conformances[0]
+          if specializeWitnessTable(for: conformance, errorLocation: bi.location,
+                                    history: &specializationHistory, moduleContext) {
+            worklist.addWitnessMethods(of: conformance, moduleContext)
           }
 
         default:

@@ -263,15 +263,6 @@ extension Function {
   }
 }
 
-extension Conformance {
-  /// True if IRGen can reference the witness table of this concrete conformance as a constant.
-  /// For a specialized conformance this means that IRGen can emit a static specialized witness
-  /// table.
-  func canReferenceWitnessTableStatically(_ context: ModulePassContext) -> Bool {
-    context.bridgedPassContext.canReferenceWitnessTableStatically(self.bridged)
-  }
-}
-
 extension ClassDecl {
   /// True if the class has a fixed metadata layout. This means that IRGen generates the
   /// full class metadata at compile time.

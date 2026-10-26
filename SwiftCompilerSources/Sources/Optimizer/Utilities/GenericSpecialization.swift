@@ -61,7 +61,7 @@ struct SpecializationHistory {
 
   /// Returns false if the witness table of the specialized `conformance` must not be specialized,
   /// because it is part of an infinitely growing chain of specializations. In this case an error
-  /// is emitted.
+  /// is emitted in Embedded Swift.
   mutating func insertWitnessTable(for conformance: Conformance,
                                    errorLocation: Location, _ context: ModulePassContext) -> Bool {
     let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
@@ -72,9 +72,12 @@ struct SpecializationHistory {
     case .refused:
       return false
     case .limitReached(let rootConformance):
-      context.diagnosticEngine.diagnose(.embedded_infinite_conformance_specialization,
-                                        rootConformance.type, rootConformance.protocol.name,
-                                        at: errorLocation)
+      // In regular Swift, a specialized witness table is only an optimization.
+      if context.options.enableEmbeddedSwift {
+        context.diagnosticEngine.diagnose(.embedded_infinite_conformance_specialization,
+                                          rootConformance.type, rootConformance.protocol.name,
+                                          at: errorLocation)
+      }
       return false
     }
   }
@@ -356,6 +359,14 @@ private func specializeDeinit(forType type: Type,
 /// Specializes a witness table of `conformance` for the concrete type of the conformance.
 /// Returns false if the witness table must not be specialized because it is part of an infinitely
 /// growing chain of specializations (see `SpecializationHistory`).
+///
+/// In Embedded Swift, specialized witness tables are required, because there is no runtime which
+/// can instantiate witness tables. In regular Swift, a specialized witness table is an optimization.
+/// IRGen emits it as a static table if possible (see `IRGenModule::canEmitStaticSpecializedWitnessTable`).
+/// Otherwise the witness table is instantiated at runtime, like without specialization. The
+/// specialized witness table is still kept in SIL, so that it can be used by optimizations in the
+/// future, e.g. for devirtualization. Currently, only Embedded Swift looks up witness methods in
+/// specialized witness tables.
 @discardableResult
 func specializeWitnessTable(for conformance: Conformance,
                             errorLocation: Location,
@@ -390,9 +401,18 @@ private func specializeWitnessTable(for conformance: Conformance,
     return true
   }
 
+  let isEmbedded = context.options.enableEmbeddedSwift
   let baseConf = conformance.isInherited ? conformance.inheritedConformance: conformance
   if !baseConf.isSpecialized {
     specializeDefaultMethods(for: conformance, visited: &visited, errorLocation, &history, context)
+    return true
+  }
+
+  // In regular Swift, conformances are also referenced in generic contexts and with types which
+  // contain archetypes, e.g. of opaque return types. Only fully concrete types can be specialized.
+  if !isEmbedded &&
+     (conformance.type.hasArchetype || conformance.type.hasTypeParameter || conformance.type.hasDynamicSelf)
+  {
     return true
   }
 
@@ -406,190 +426,24 @@ private func specializeWitnessTable(for conformance: Conformance,
     return false
   }
 
-  guard let witnessTable = context.lookupWitnessTable(for: baseConf.genericConformance) else {
-    fatalError("no witness table found")
-  }
-  assert(witnessTable.isDefinition, "No witness table available")
-  let newEntries = specializedEntries(
-    of: witnessTable, for: conformance, with: baseConf.specializedSubstitutions,
-    specializeMethod: { origMethod, substitutions in
-      let methodSubs = substitutions.getMethodSubstitutions(for: origMethod,
-                         // Generic self types need to be handled specially (see `getMethodSubstitutions`)
-                         selfType: origMethod.hasGenericSelf(context) ? conformance.type.canonical : nil)
-      return specializeWitness(origMethod, for: methodSubs, isMandatory: true, context)
-    },
-    specializeBaseConformance: { baseProtocolConf in
-      specializeWitnessTable(for: baseProtocolConf, visited: &visited, errorLocation, &history, context)
-      return true
-    },
-    specializeAssociatedConformance: { assocConf in
-      // The associated conformance is abstract if the associated type is an opaque result
-      // type. Keep the abstract conformance in the entry - IRGen looks through the opaque
-      // type - but make sure the underlying type's witness table exists.
-      specializeNestedConformance(assocConf, visited: &visited, errorLocation, &history, context)
-      return true
-    })!
-
-  context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
-                                        linkage: .shared, serialized: false)
-  return true
-}
-
-/// Specializes the witness table of `conformance` for the concrete type of the conformance in
-/// non-embedded Swift.
-///
-/// In contrast to Embedded Swift, a specialized witness table is an optimization and not required.
-/// IRGen emits it as a static table, which is referenced directly, instead of instantiating the
-/// witness table at runtime. Therefore, a specialized witness table is only created if IRGen can
-/// emit it statically and if all base protocol and associated conformances - recursively - have
-/// a witness table which can be referenced as a constant. Otherwise no witness table is created at
-/// all and false is returned.
-///
-/// Witness methods which cannot be specialized, e.g. generic method requirements, keep the original
-/// generic witness. Such a witness gets the generic parameters of the conformance from the metadata
-/// of the self type. However, if the generic conformance has conditional conformances, a generic
-/// witness would need them from the private area of a runtime-instantiated witness table. In this
-/// case no witness table is created if a witness cannot be specialized.
-func specializeWitnessTableForStaticEmission(for conformance: Conformance,
-                                             _ context: ModulePassContext) -> Bool
-{
-  var specializer = StaticWitnessTableSpecializer(context)
-  guard specializer.specialize(conformance) else {
-    // Specialized witness methods which have been created so far are removed by dead function
-    // elimination.
-    return false
-  }
-  for (conformance, entries) in specializer.newTables {
-    context.createSpecializedWitnessTable(entries: entries, conformance: conformance,
-                                          linkage: .shared, serialized: false)
-  }
-  return true
-}
-
-private struct StaticWitnessTableSpecializer {
-  let context: ModulePassContext
-
-  /// The conformances for which a witness table is (or will be) available.
-  private var handled = Set<Conformance>()
-
-  private(set) var newTables: [(Conformance, [WitnessTable.Entry])] = []
-
-  init(_ context: ModulePassContext) {
-    self.context = context
-  }
-
-  /// Returns false if the witness table of `conformance` cannot be referenced statically.
-  mutating func specialize(_ conformance: Conformance) -> Bool {
-    // Marker and ObjC protocols don't have witness tables.
-    if conformance.protocol.isMarkerProtocol || conformance.protocol.isObjC {
-      return true
+  guard let witnessTable = context.lookupWitnessTable(for: baseConf.genericConformance),
+        witnessTable.isDefinition
+  else {
+    // In regular Swift, the witness table of a conformance in another module may not be available.
+    if isEmbedded {
+      fatalError("no witness table available")
     }
-    // An abstract conformance, e.g. of an opaque result type, cannot be referenced statically.
-    guard conformance.isConcrete else {
-      return false
-    }
-    // Conformances which only differ in type sugar share a witness table.
-    let conformance = conformance.canonical
-
-    if handled.contains(conformance) {
-      return true
-    }
-    if let existingTable = context.lookupWitnessTable(for: conformance), existingTable.isSpecialized {
-      handled.insert(conformance)
-      return true
-    }
-
-    guard conformance.canReferenceWitnessTableStatically(context) else {
-      return false
-    }
-
-    let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
-    if !baseConf.isSpecialized {
-      // A non-generic conformance doesn't need a specialized witness table.
-      handled.insert(conformance)
-      return true
-    }
-
-    // Only fully concrete types can be specialized.
-    if conformance.type.hasArchetype || conformance.type.hasTypeParameter || conformance.type.hasDynamicSelf {
-      return false
-    }
-
-    guard let witnessTable = context.lookupWitnessTable(for: baseConf.genericConformance),
-          witnessTable.isDefinition
-    else {
-      return false
-    }
-
-    // Inserting the conformance before specializing the entries avoids infinite recursion if an
-    // associated conformance is the conformance itself. If specialization fails, no witness table
-    // is created at all.
-    handled.insert(conformance)
-
-    let context = self.context
-    guard let newEntries = specializedEntries(
-            of: witnessTable, for: conformance, with: baseConf.specializedSubstitutions,
-            specializeMethod: { origMethod, substitutions in
-              // The dynamic self type of a non-final class can be a sub-class. Therefore the witness
-              // cannot be specialized for the class type of the conformance.
-              if origMethod.hasGenericSelf(context) {
-                return nil
-              }
-              let methodSubs = substitutions.getMethodSubstitutions(for: origMethod)
-              // Only create full specializations, e.g. not for a generic method requirement.
-              if methodSubs.replacementTypes.contains(where: { $0.hasTypeParameter || $0.hasArchetype }) {
-                return nil
-              }
-              return specializeWitness(origMethod, for: methodSubs, isMandatory: false, context)
-            },
-            specializeBaseConformance: { specialize($0) },
-            specializeAssociatedConformance: { specialize($0) })
-    else {
-      return false
-    }
-
-    // An unspecialized generic witness would need the conditional conformances, which are only
-    // stored in the private area of a runtime-instantiated witness table.
-    if witnessTable.hasConditionalConformances,
-       newEntries.contains(where: {
-         if case .method(_, let witness) = $0, let witness, witness.isGeneric { true } else { false }
-       })
-    {
-      return false
-    }
-
-    newTables.append((conformance, newEntries))
     return true
   }
-}
+  let substitutions = baseConf.specializedSubstitutions
 
-/// Creates the entries of the specialized witness table of `conformance` from `witnessTable`, which
-/// is the witness table of the generic conformance. `substitutions` are the substitutions of the
-/// specialized conformance.
-///
-/// `specializeMethod` returns the specialized witness of a method, or nil if the original witness
-/// is kept. `specializeBaseConformance` and `specializeAssociatedConformance` are called for the
-/// concrete base protocol and associated conformances. If one of them returns false, nil is returned
-/// and the remaining entries are not specialized anymore.
-private func specializedEntries(
-  of witnessTable: WitnessTable,
-  for conformance: Conformance,
-  with substitutions: SubstitutionMap,
-  specializeMethod: (Function, SubstitutionMap) -> Function?,
-  specializeBaseConformance: (Conformance) -> Bool,
-  specializeAssociatedConformance: (Conformance) -> Bool
-) -> [WitnessTable.Entry]? {
-  var failed = false
   let newEntries = witnessTable.entries.map { origEntry in
-    if failed {
-      return origEntry
-    }
     switch origEntry {
     case .invalid:
       return WitnessTable.Entry.invalid
     case .method(let requirement, let witness):
       guard let origMethod = witness,
-            let specializedMethod = specializeMethod(origMethod, substitutions)
+            let specializedMethod = specializeWitness(origMethod, of: conformance, with: substitutions, context)
       else {
         return origEntry
       }
@@ -597,9 +451,7 @@ private func specializedEntries(
     case .baseProtocol(let requirement, _):
       let selfTy = requirement.selfInterfaceType
       let baseConf = conformance.getAssociatedConformance(ofAssociatedType: selfTy, to: requirement)
-      if !specializeBaseConformance(baseConf) {
-        failed = true
-      }
+      specializeWitnessTable(for: baseConf, visited: &visited, errorLocation, &history, context)
       return .baseProtocol(requirement: requirement, witness: baseConf)
     case .associatedType(let requirement, let witness):
       let substType = witness.subst(with: substitutions)
@@ -609,18 +461,41 @@ private func specializedEntries(
       //       let concreteAssociateConf = assocConf.subst(with: substitutions)
       let concreteAssociateConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType,
                                                                        to: assocConf.protocol)
-      if !specializeAssociatedConformance(concreteAssociateConf) {
-        failed = true
-      }
-      return .associatedConformance(requirement: requirement, witness: concreteAssociateConf)
+      // The associated conformance is abstract if the associated type is an opaque result
+      // type. Keep the abstract conformance in the entry - IRGen looks through the opaque
+      // type - but make sure the underlying type's witness table exists.
+      specializeNestedConformance(concreteAssociateConf, visited: &visited, errorLocation, &history, context)
+      return .associatedConformance(requirement: requirement,
+                                    witness: concreteAssociateConf)
     }
   }
-  return failed ? nil : newEntries
+  context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
+                                        linkage: .shared, serialized: false)
+  return true
+}
+
+/// Specializes the witness `method` of the generic conformance of the specialized `conformance`.
+/// `substitutions` are the substitutions of the specialized conformance.
+private func specializeWitness(_ method: Function, of conformance: Conformance,
+                               with substitutions: SubstitutionMap, _ context: ModulePassContext) -> Function?
+{
+  var selfType: CanonicalType? = nil
+  if method.hasGenericSelf(context) {
+    // In regular Swift, the dynamic self type of a non-final class can be a sub-class. Therefore
+    // the witness cannot be specialized for the class type of the conformance.
+    if !context.options.enableEmbeddedSwift && conformance.type.isClass {
+      return nil
+    }
+    // Generic self types need to be handled specially (see `getMethodSubstitutions`)
+    selfType = conformance.type.canonical
+  }
+  let methodSubs = substitutions.getMethodSubstitutions(for: method, selfType: selfType)
+  return specializeWitness(method, for: methodSubs, context)
 }
 
 /// Specializes the witness `method` with `methodSubs`.
 /// Returns nil if the method cannot be specialized.
-private func specializeWitness(_ method: Function, for methodSubs: SubstitutionMap, isMandatory: Bool,
+private func specializeWitness(_ method: Function, for methodSubs: SubstitutionMap,
                                _ context: ModulePassContext) -> Function?
 {
   guard !methodSubs.conformances.contains(where: {!$0.isValid}),
@@ -631,7 +506,8 @@ private func specializeWitness(_ method: Function, for methodSubs: SubstitutionM
         // Keep the abstraction of the parameters and results so that the specialized witness has
         // the same ABI as the original witness.
         let specializedMethod = context.specialize(function: method, for: methodSubs,
-                                                   convertIndirectToDirect: false, isMandatory: isMandatory)
+                                                   convertIndirectToDirect: false,
+                                                   isMandatory: context.options.enableEmbeddedSwift)
   else {
     return nil
   }
@@ -648,6 +524,11 @@ private func specializeDefaultMethods(for conformance: Conformance,
                                       _ history: inout SpecializationHistory,
                                       _ context: ModulePassContext)
 {
+  // In regular Swift, IRGen emits the original witness table of a non-generic conformance.
+  // A specialized witness table would have the same symbol.
+  guard context.options.enableEmbeddedSwift else {
+    return
+  }
   // Avoid infinite recursion, which may happen if an associated conformance is the conformance itself.
   guard conformance.isConcrete,
         visited.insert(conformance).inserted,
@@ -675,8 +556,7 @@ private func specializeDefaultMethods(for conformance: Conformance,
       let methodSubs = SubstitutionMap(genericSignature: origMethod.genericSignature,
                                        replacementTypes: [conformance.type])
 
-      guard let specializedMethod = specializeWitness(origMethod, for: methodSubs, isMandatory: true, context)
-      else {
+      guard let specializedMethod = specializeWitness(origMethod, for: methodSubs, context) else {
         return origEntry
       }
       specialized = true
