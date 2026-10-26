@@ -163,7 +163,7 @@ GenericSignature DeclContext::getGenericSignatureOfContext() const {
     if (auto decl = dc->getAsDecl())
       if (auto GC = decl->getAsGenericContext())
         return GC->getGenericSignature();
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return nullptr;
 }
@@ -174,7 +174,7 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
     if (auto decl = dc->getAsDecl())
       if (auto GC = decl->getAsGenericContext())
         return GC->getGenericEnvironment();
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return nullptr;
 }
