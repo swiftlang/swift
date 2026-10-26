@@ -636,6 +636,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
+  BRIDGED_INLINE bool isOptimizedForSize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
   BRIDGED_INLINE bool wasDeserializedCanonical() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;

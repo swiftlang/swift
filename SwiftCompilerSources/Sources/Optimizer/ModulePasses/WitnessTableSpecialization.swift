@@ -31,6 +31,9 @@ import SIL
 /// specialized witness methods - if possible. Otherwise the witness table is still instantiated
 /// at runtime. The specialized witness table is still kept in SIL, so that it can be used by
 /// optimizations in the future, e.g. for devirtualization.
+///
+/// All witness methods of a specialized witness table are specialized, even if they are never
+/// called. Therefore the pass doesn't run on functions which are optimized for code size.
 /// Witness methods which cannot be specialized, e.g. generic method requirements, keep the original
 /// generic witness.
 ///
@@ -47,7 +50,9 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
   var conformances: [(Conformance, Location)] = []
   var visited = Set<Conformance>()
 
-  for function in moduleContext.functions where function.isDefinition && !function.isGeneric {
+  for function in moduleContext.functions
+    where function.isDefinition && !function.isGeneric && !function.isOptimizedForSize
+  {
     for inst in function.instructions {
       guard let initExistential = inst as? InitExistentialInstruction else {
         continue
