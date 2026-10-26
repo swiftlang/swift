@@ -2522,8 +2522,12 @@ static bool performCompileStepsPostSILGen(
     FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs,
     ArrayRef<PrimarySpecificPaths> auxPSPs) {
 
-  FrontendStatsTracer tracer(SM->getASTContext().Stats,
-                             "SIL-and-LLVM-processing");
+  auto *Stats = Instance.getASTContext().Stats;
+  SWIFT_DEFER {
+    if (Stats)
+      Stats->flushTracesAndProfiles();
+  };
+  FrontendStatsTracer tracer(Stats, "SIL-and-LLVM-processing");
 
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
@@ -2542,7 +2546,6 @@ static bool performCompileStepsPostSILGen(
   if (Instance.isCancellationRequested())
     return true;
 
-  auto *Stats = Instance.getASTContext().Stats;
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -2691,23 +2694,19 @@ static bool performCompileStepsPostSILGen(
   if (Instance.isCancellationRequested())
     return true;
 
-  // TODO: at this point we need to flush any the _tracing and profiling_
-  // in the UnifiedStatsReporter, because the those subsystems of the USR
-  // retain _pointers into_ the SILModule, and the SILModule's lifecycle is
-  // not presently such that it will outlive the USR (indeed, as it's
-  // destroyed on a separate thread, this fact isn't even _deterministic_
-  // after this point). If future plans require the USR tracing or
-  // profiling entities after this point, more rearranging will be required.
-  if (Stats)
-    Stats->flushTracesAndProfiles();
-
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
     return performDumpTypeInfo(IRGenOpts, *SM);
 
 #if SWIFT_BUILD_IMMEDIATE_MODE
-  if (Action == FrontendOptions::ActionType::Immediate)
+  if (Action == FrontendOptions::ActionType::Immediate) {
+    // processCommandLineAndRunImmediately may free SM without providing
+    // another chance to retain it by other means for tracing, flush now.
+    if (Stats)
+      Stats->flushTracesAndProfiles();
+
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
+  }
 #else
   if (Action == FrontendOptions::ActionType::Immediate) {
     Instance.getASTContext().Diags.diagnose(
