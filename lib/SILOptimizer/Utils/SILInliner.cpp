@@ -569,6 +569,11 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       unsigned idx = p.index();
       if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
         auto paramInfo = calleeConv.getParamInfoForSILArg(idx);
+        // An @in_cxx argument is destroyed by the caller after the call.
+        if (paramInfo.getConvention() == ParameterConvention::Indirect_In_CXX) {
+          inCxxArgs[idx] = true;
+        }
+
         if (callArg->getType().isAddress()) {
           // If lexical lifetimes are enabled, any alloc_stacks in the caller
           // that are passed to the callee being inlined (except mutating
@@ -609,9 +614,6 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             }
           }
         }
-
-        if (paramInfo.getConvention() == ParameterConvention::Indirect_In_CXX)
-          inCxxArgs[idx] = true;
       }
     }
   }
