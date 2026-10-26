@@ -278,4 +278,15 @@ func unappliedConsumingMethodsOnUnresolvedBase() {
   let finishRef = NDBox(42).finish
   let _: @callable(once) () -> Void = finishRef
   // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> ()' to function type '@callable(once) () -> Void'}}
+
+  func generic<T>(_: T) {} // expected-note {{required by local function 'generic' where 'T' = '@once () -> ()'}}
+  func genericNC<T: ~Copyable>(_: consuming T) {} // expected-note {{required by local function 'genericNC' where 'T' = '@once () -> ()'}}
+
+  generic(NDBox(42).finish)
+  // expected-error@-1 {{type '@once () -> ()' cannot conform to 'Copyable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  genericNC(NDBox(42).finish)
+  // expected-error@-1 {{type '@once () -> ()' cannot conform to 'Deinitable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }

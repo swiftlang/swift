@@ -1,0 +1,4 @@
+module Profiled {
+  header "header.h"
+  requires cplusplus
+}
