@@ -255,10 +255,6 @@ REMARK(remark_scanner_invalidate_cas_error, none,
 REMARK(remark_scanner_invalidate_missing_cas, none,
        "Incremental module scan: Dependency info for module '%0' invalidated due to missing CAS input '%1'.", (StringRef, StringRef))
 
-REMARK(remark_scanner_invalidate_variant, none,
-       "Incremental module scan: Dependency info for module '%0' invalidated due to a new variant"
-       " discovered by this scan, re-scanning all modules.", (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
