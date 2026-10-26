@@ -126,11 +126,9 @@ func testClosures() {
 
   generic(fn)
   // expected-error@-1 {{type '@callable(once) () -> ()' cannot conform to 'Copyable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
   generic { @callable(once) in }
   // expected-error@-1 {{type '@callable(once) () -> ()' cannot conform to 'Copyable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
   func genericNC<T: ~Copyable>(_: consuming T) {}
 
@@ -352,7 +350,6 @@ func testExactlyOnceClosures() {
 
   generic(fn)
   // expected-error@-1 {{type '@once () -> ()' cannot conform to 'Copyable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
 // MARK: - Conversions
@@ -633,15 +630,12 @@ func genericArgumentInferred(
 
   genericNC(exactlyOnce)
   // expected-error@-1 {{type '@once () -> Void' cannot conform to 'Deinitable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
   genericNC { @once in }
   // expected-error@-1 {{type '@once () -> ()' cannot conform to 'Deinitable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
   genericNC(atMostOnce) // Ok
 
   _ = NCBox(value: exactlyOnce)
   // expected-error@-1 {{type '@once () -> Void' cannot conform to 'Deinitable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
   // FIXME: [deinitable] Optional's payload must be Deinitable.
   let _: _? = exactlyOnce
@@ -649,8 +643,7 @@ func genericArgumentInferred(
 
   let _ = Optional.some(exactlyOnce)
   // expected-error@-1 {{type '@once () -> Void' cannot conform to 'Deinitable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-note@-3 {{required by generic enum 'Optional' where 'Wrapped' = '@once () -> Void'}}
+  // expected-note@-2 {{required by generic enum 'Optional' where 'Wrapped' = '@once () -> Void'}}
 
   let _: any ~Copyable = exactlyOnce
   // expected-error@-1 {{value of type '@once () -> Void' does not conform to specified type 'Deinitable'}}
@@ -659,7 +652,6 @@ func genericArgumentInferred(
   _ = { (f: @escaping @once () -> Void) in
     genericNC(f)
     // expected-error@-1 {{type '@once () -> Void' cannot conform to 'Deinitable'}}
-    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
     return 0
   }
 }
@@ -681,7 +673,6 @@ func partiallyAppliedWithTypeDependence() {
   generic(ConditionallyCopyableBox(42).finish) // Ok
   generic(ConditionallyCopyableBox(NC()).finish)
   // expected-error@-1 {{type '@callable(once) () -> ()' cannot conform to 'Copyable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
   genericNC(ConditionallyCopyableBox(NC()).finish) // Ok
 }
 
@@ -854,7 +845,6 @@ struct NCWrapper<T: ~Copyable>: ~Copyable {
 struct WrappedStorage: ~Copyable {
   @NCWrapper var wrapped: @once () -> Void
   // expected-error@-1 {{type '@once () -> Void' cannot conform to 'Deinitable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
 // MARK: - Conventions
