@@ -445,6 +445,24 @@ bb0(%0 : $Derived):
   return %r : $()
 }
 
+// CHECK-LABEL: sil {{.+}} @test_noescape_of_thin_to_thick
+// CHECK: debug_value %0 : $@convention(thin) () -> Int64, let, name "fn", type $@noescape @callee_guaranteed () -> Int64, transform {
+// CHECK:   bb0(%0 : $@convention(thin) () -> Int64):
+// CHECK-NEXT: %1 = thin_to_thick_function %0 : $@convention(thin) () -> Int64 to $@noescape @callee_guaranteed () -> Int64
+// CHECK-NEXT: return %1 : $@noescape @callee_guaranteed () -> Int64
+// CHECK-NEXT: }
+sil hidden @test_noescape_of_thin_to_thick : $@convention(thin) (@convention(thin) () -> Int64) -> () {
+bb0(%0 : $@convention(thin) () -> Int64):
+  debug_value %0 : $@convention(thin) () -> Int64, let, name "fn", type $@noescape @callee_guaranteed () -> Int64, transform {
+  bb0(%a : $@convention(thin) () -> Int64):
+    %1 = thin_to_thick_function %a : $@convention(thin) () -> Int64 to $@callee_guaranteed () -> Int64
+    %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Int64 to $@noescape @callee_guaranteed () -> Int64
+    return %2 : $@noescape @callee_guaranteed () -> Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil {{.+}} @test_address_pointer_round_trip
 // CHECK: debug_value %0 : $*Int64, let, name "addr", expr op_deref
 // CHECK-NOT: transform {
