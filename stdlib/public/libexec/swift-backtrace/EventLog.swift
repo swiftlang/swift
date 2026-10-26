@@ -5,12 +5,12 @@ import WinSDK
 
 /// Returns as many whole lines of `log` as fit in an event message.
 private func truncated(_ log: String, to maxLen: Int) -> String {
-  if log.utf16.count <= len {
+  if log.utf16.count <= maxLen {
     return log
   }
 
   let truncationNote =
-  "\r\n...\r\n(truncated; the full crash log is attached as event data)"
+    "\r\n...\r\n(truncated; the full crash log is attached as event data)"
 
   let limit = log.utf16.index(
     log.startIndex, offsetBy: maxLen - truncationNote.utf16.count)
