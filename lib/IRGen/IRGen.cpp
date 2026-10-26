@@ -1581,6 +1581,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // If we've been provided a SILModule, use it. Otherwise request the lowered
   // SIL for the file or module.
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
+  SWIFT_DEFER {
+    if (SILMod && Ctx.Stats)
+      Ctx.Stats->retainUntilFlushed(std::move(SILMod));
+  };
   if (!SILMod) {
     auto loweringDesc = ASTLoweringDescriptor{desc.Ctx, desc.Conv, desc.SILOpts,
                                               nullptr, std::nullopt};
@@ -1689,14 +1693,16 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Bail out if there are any errors.
   if (Ctx.hadError()) return GeneratedModule::null();
 
-  // Free the memory occupied by the SILModule.
-  // Execute this task in parallel to the embedding of bitcode.
-  auto SILModuleRelease = [&SILMod]() {
-    SILMod.reset(nullptr);
-  };
-  auto Thread = std::thread(SILModuleRelease);
+  // Free the memory occupied by the SILModule, unless the stats
+  // reporter needs it. Execute this task in parallel to embedding the bitcode.
+  std::thread Thread;
+  if (!Ctx.Stats)
+    Thread = std::thread([&SILMod]() { SILMod.reset(nullptr); });
   // Wait for the thread to terminate.
-  SWIFT_DEFER { Thread.join(); };
+  SWIFT_DEFER {
+    if (Thread.joinable())
+      Thread.join();
+  };
 
   embedBitcode(IGM.getModule(), Opts);
 
@@ -1816,6 +1822,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   auto outputFilenames = desc.parallelOutputFilenames;
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   auto *M = desc.getParentModule();
+  SWIFT_DEFER {
+    auto *Stats = M->getASTContext().Stats;
+    if (SILMod && Stats)
+      Stats->retainUntilFlushed(std::move(SILMod));
+  };
 
   IRGenerator irgen(Opts, *SILMod, desc.CAS);
 
@@ -2065,17 +2076,17 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, Opts.NumThreads - 1);
   codeGenThreads.startThreads();
 
-  // Free the memory occupied by the SILModule.
-  // Execute this task in parallel to the LLVM compilation.
-  auto SILModuleRelease = [&SILMod]() {
-    SILMod.reset(nullptr);
-  };
-  auto releaseModuleThread = std::thread(SILModuleRelease);
+  // Free the memory occupied by the SILModule, unless the stats reporter
+  // needs it. Execute this task in parallel to the LLVM compilation.
+  std::thread releaseModuleThread;
+  if (!Ctx.Stats)
+    releaseModuleThread = std::thread([&SILMod]() { SILMod.reset(nullptr); });
 
   codeGenThreads.runMainThread();
 
   // Wait for all threads.
-  releaseModuleThread.join();
+  if (releaseModuleThread.joinable())
+    releaseModuleThread.join();
   codeGenThreads.join();
 }
 
