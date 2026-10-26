@@ -1,4 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all --enable-experimental-cxx-interop -inline --I %S/Inputs %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all --enable-experimental-cxx-interop -enable-lexical-lifetimes=false -inline --I %S/Inputs %s | %FileCheck %s --check-prefix=NOLEXICAL
+
+sil_stage canonical
 
 import Swift
 import Closure
@@ -23,6 +26,14 @@ bb0(%0 : $*NonTrivial, %1 : $Int, %2 : $*NonTrivial):
 // CHECK: %[[V9:.*]] = tuple ()
 // CHECK: return %[[V9]] : $()
 
+// rdar://190216710
+// NOLEXICAL-LABEL: sil [ossa] @caller0 :
+// NOLEXICAL: %[[V2:.*]] = alloc_stack $NonTrivial
+// NOLEXICAL: %[[V3:.*]] = alloc_stack $NonTrivial
+// NOLEXICAL: destroy_addr %[[V3]] : $*NonTrivial
+// NOLEXICAL: destroy_addr %[[V2]] : $*NonTrivial
+// NOLEXICAL-LABEL: } // end sil function 'caller0'
+
 sil [ossa] @caller0 : $@convention(thin) (@in_guaranteed NonTrivial, Int) -> () {
 bb0(%0 : $*NonTrivial, %1 : $Int):
   %2 = alloc_stack $NonTrivial
@@ -35,4 +46,30 @@ bb0(%0 : $*NonTrivial, %1 : $Int):
   dealloc_stack %2 : $*NonTrivial
   %8 = tuple ()
   return %8 : $()
+}
+
+sil [ossa] @f1 : $@convention(c) (@in_cxx NonTrivial) -> () {
+[global: ]
+bb0(%0 : $*NonTrivial):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// rdar://190216710
+// CHECK-LABEL: sil [ossa] @caller1 : $@convention(thin) (@in_guaranteed NonTrivial) -> () {
+// CHECK: %[[V1:.*]] = alloc_stack $NonTrivial
+// CHECK: copy_addr %0 to [init] %[[V1]] : $*NonTrivial
+// CHECK: destroy_addr %[[V1]] : $*NonTrivial
+// CHECK: dealloc_stack %[[V1]] : $*NonTrivial
+// CHECK-LABEL: } // end sil function 'caller1'
+
+sil [ossa] @caller1 : $@convention(thin) (@in_guaranteed NonTrivial) -> () {
+bb0(%0 : $*NonTrivial):
+  %1 = alloc_stack $NonTrivial
+  copy_addr %0 to [init] %1: $*NonTrivial
+  %3 = function_ref @f1 : $@convention(c) (@in_cxx NonTrivial) -> ()
+  %4 = apply %3(%1) : $@convention(c) (@in_cxx NonTrivial) -> ()
+  dealloc_stack %1 : $*NonTrivial
+  %6 = tuple ()
+  return %6 : $()
 }
