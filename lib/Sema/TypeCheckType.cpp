@@ -1544,9 +1544,13 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
     if (inStage(TypeResolutionStage::Structural))
       return type;
 
+    // If we have a nested non-generic type, check the outer requirements. We
+    // can skip this for generic types since we'll check the requirements when
+    // applying the args.
     GenericTypeDecl *decl;
     Type parentTy;
-    if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer())) {
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer());
+        aliasTy && aliasTy->getDirectGenericArgs().empty()) {
       decl = aliasTy->getDecl();
       parentTy = aliasTy->getParent();
     } else if (auto *nominalTy = type->getAs<NominalType>();
