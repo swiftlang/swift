@@ -326,7 +326,7 @@ DeclContext *DeclContext::getParentForLookup() const {
   if (isa<NominalTypeDecl>(this)) {
     // If we are inside a nominal type that is inside a protocol,
     // skip the protocol.
-    if (isa<ProtocolDecl>(getParent()))
+    if (getParent()->getSelfProtocolDecl())
       return getModuleScopeContext();
   }
   return getParent();
