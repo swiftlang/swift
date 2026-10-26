@@ -353,6 +353,10 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
             if (auto *ugAliasDecl =
                     dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
               if (ugAliasDecl == aliasDecl) {
+                // For an unbound type we have a "passthrough" alias and so
+                // can return the interface type of the typealias directly
+                // since any generic parameters it has will match the underlying
+                // type exactly.
                 if (getStage() == TypeResolutionStage::Structural &&
                     aliasDecl->getUnderlyingTypeRepr() != nullptr) {
                   return adjustAliasType(aliasDecl->getStructuralType());
@@ -366,13 +370,14 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
           }
           if (auto *aliasType =
                   dyn_cast<TypeAliasType>(extendedType.getPointer())) {
-            if (aliasType->getDecl() == aliasDecl) {
-              if (getStage() == TypeResolutionStage::Structural &&
-                  aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-                return adjustAliasType(aliasDecl->getStructuralType());
-              }
-              return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
-            }
+            // For a bound typealias type, we need to return the extended type
+            // directly. We can't return the interface type of the typealias
+            // itself since the generic signature of the extension does *not*
+            // contain any of the typealiases generic parameters, only those of
+            // the underlying nominal.
+            if (aliasType->getDecl() == aliasDecl)
+              return adjustAliasType(aliasType);
+
             extendedType = aliasType->getParent();
             continue;
           }
