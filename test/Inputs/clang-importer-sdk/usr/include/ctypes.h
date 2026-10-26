@@ -324,6 +324,11 @@ struct StructWithBitfields {
   unsigned : 11;
 };
 
+struct StructWithBitfieldAndArray {
+  unsigned flags : 4;
+  int values[4];
+};
+
 union EmptyCUnion {};
 
 typedef struct ModRM {

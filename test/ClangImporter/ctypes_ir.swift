@@ -62,6 +62,18 @@ func testBigArrays2d(_ maxSize: UnsafeMutablePointer<IntTuple4096>?, _ maxSizePl
 }
 #endif
 
+// Make sure C array inits with AST-synthesized bodies pass DI. (The sibling
+// bitfield forces AST synthesis.)
+#if MODERN_C_ARRAYS
+@available(anyAppleOS 26, *)
+func testBitfieldAndArrayInit() -> StructWithBitfieldAndArray {
+  return StructWithBitfieldAndArray(flags: 1, values: [1, 2, 3, 4])
+}
+#else
+func testBitfieldAndArrayInit() -> StructWithBitfieldAndArray {
+  return StructWithBitfieldAndArray(flags: 1, values: (1, 2, 3, 4))
+}
+#endif
 
 // Make sure fields with a swift_name attribute only produce one stored
 // property, not two. (rdar://86069786)

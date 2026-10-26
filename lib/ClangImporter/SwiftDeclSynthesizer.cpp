@@ -675,6 +675,19 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
       if (isa_and_nonnull<clang::IndirectFieldDecl>(var->getClangDecl()))
         continue;
 
+      // Peephole through a computed C array projection to its stored
+      // counterpart if it has one. Avoids needing ugly DI hacks.
+      bool reinterpretToTarget = false;
+      if (!var->hasStorage()) {
+        if (auto *counterpart = dyn_cast_or_null<VarDecl>(
+                importer::getDeclForCounterpartCArrayProjection(var))) {
+          if (counterpart->hasStorage()) {
+            var = counterpart;
+            reinterpretToTarget = true;
+          }
+        }
+      }
+
       if (var->hasStorage() == (pass != 0)) {
         ++paramPos;
         continue;
@@ -693,7 +706,10 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
       lhs->setType(LValueType::get(var->getTypeInContext()));
 
       // Construct right-hand side.
-      auto rhs = createParamRefExpr(constructor, paramPos);
+      Expr *rhs = createParamRefExpr(constructor, paramPos);
+      if (reinterpretToTarget)
+        rhs = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+            ctx, rhs->getType(), var->getTypeInContext(), rhs);
 
       // Add assignment.
       auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
