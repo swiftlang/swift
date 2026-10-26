@@ -38,6 +38,24 @@ bb0(%0 : $Int64):
   return %r : $()
 }
 
+// The load becomes dead once its user is folded away. Removing it leaves the
+// address operand unused, so it is dropped and the block goes away too.
+// CHECK-LABEL: sil {{.+}} @test_dead_load
+// CHECK: debug_value %1 : $Int64, let, name "dead_load"
+// CHECK-NOT: transform {
+sil hidden @test_dead_load : $@convention(thin) (@inout Int64, Int64) -> () {
+bb0(%0 : $*Int64, %1 : $Int64):
+  debug_value (%0 : $*Int64, %1 : $Int64), let, name "dead_load", transform {
+  bb0(%a : $*Int64, %b : $Int64):
+    %2 = load %a : $*Int64
+    %3 = struct $MyStruct (%2 : $Int64, %b : $Int64)
+    %4 = struct_extract %3 : $MyStruct, #MyStruct.y
+    return %4 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil {{.+}} @test_tuple_extract_simplification
 // CHECK: debug_value %0 : $Int64, let, name "tval"
 // CHECK-NOT: transform {

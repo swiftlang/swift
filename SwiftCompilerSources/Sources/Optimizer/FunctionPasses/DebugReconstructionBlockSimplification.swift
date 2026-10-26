@@ -111,7 +111,9 @@ func simplifyDebugReconstructionBlock(of debugValue: DebugValueInst, _ context: 
   }
 
   // Cleanup dead instructions and operands.
-  for instruction in debugBB.instructions.reversed() where instruction.isTriviallyDead {
+  // A reconstruction block has no side effects, so any unused instruction is dead.
+  for instruction in debugBB.instructions.reversed()
+    where !(instruction is ReturnInst) && instruction.results.allSatisfy({ $0.uses.isEmpty }) {
     context.erase(instruction: instruction)
   }
   return debugValue.eraseDeadOperands(context)
