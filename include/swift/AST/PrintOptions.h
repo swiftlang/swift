@@ -504,6 +504,10 @@ public:
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
+  /// Suppress 'consuming' on parameters whose function type implies it, as one
+  /// with at-most-once semantics does.
+  bool SuppressImpliedConsumingParams = false;
+
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
 
@@ -779,6 +783,7 @@ public:
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
     result.PrintHomogeneousTuplesCompactly = true;
+    result.SuppressImpliedConsumingParams = true;
     return result;
   }
 
