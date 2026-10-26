@@ -1101,7 +1101,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setWasDeserializedCanonical();
 
   // Seed the stage from what the container recorded for this function, not from
-  // the container kind. 
+  // the container kind. Seed it before the body is built, so construction-time
+  // checks see the stage the body was verified at.
   auto recordedStage = SILStage(serializedStage);
   if (recordedStage > fn->getFunctionStage())
     fn->setFunctionStage(recordedStage);
