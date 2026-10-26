@@ -771,8 +771,14 @@ bool DiagnosticEmitter::emitGlobalOrClassFieldLoadedAndConsumed(
     return true;
   }
 
-  // is it a global?
-  if (isa<GlobalAddrInst>(operand)) {
+  // is it a global? A lazily initialized global (or a static property) is
+  // reached through its addressor rather than a global_addr.
+  bool isGlobal = isa<GlobalAddrInst>(operand);
+  if (auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand))
+    if (auto *apply = dyn_cast<ApplyInst>(ptrToAddr->getOperand()))
+      if (auto *callee = apply->getReferencedFunctionOrNull())
+        isGlobal = callee->isGlobalInit();
+  if (isGlobal) {
     diagnose(markedValue->getModule().getASTContext(),
              markedValue,
              diag::sil_movechecking_notconsumable_but_assignable_was_consumed,
