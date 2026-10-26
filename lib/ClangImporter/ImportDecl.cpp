@@ -3222,8 +3222,12 @@ namespace {
         // record, so we add them here. To fix this `translateContext` needs to
         // somehow translate unnamed contexts so that `SwiftLookupTable::lookup`
         // can find members in unnamed contexts.
-        if (!decl->hasNameForLinkage())
+        if (!decl->hasNameForLinkage()) {
           result->addMemberToLookupTable(member);
+          if (auto *legacyMember =
+                  importer::getDeclForCounterpartCArrayProjection(member))
+            result->addMemberToLookupTable(legacyMember);
+        }
       }
 
       const clang::CXXRecordDecl *cxxRecordDecl =

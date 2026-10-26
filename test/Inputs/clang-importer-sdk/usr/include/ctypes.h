@@ -301,6 +301,18 @@ struct UnnamedUnion {
   } u;
 };
 
+// The types of these fields are unnamed records, so their members aren't
+// reachable by name lookup in the clang module.
+struct StructWithUnnamedRecordArrays {
+  union {
+    char bytes[8];
+    int words[2];
+  } u;
+  struct {
+    int pair[2];
+  } s;
+};
+
 //===---
 // Bitfields
 //===---

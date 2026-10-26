@@ -97,3 +97,20 @@ func useAnonymousUnionArrays(_ s: StructWithAnonymousArrays) {
   s.words = (0, 0)
 #endif
 }
+
+func useUnnamedRecordArrays(_ s: StructWithUnnamedRecordArrays) {
+  var s = s
+#if MODERN_C_ARRAYS
+  let _: CChar = s.u.bytes[0]
+  let _: CInt = s.u.words[1]
+  let _: CInt = s.s.pair[1]
+  s.u.bytes = [0, 0, 0, 0, 0, 0, 0, 0]
+  s.s.pair = [0, 0]
+#else
+  let _: CChar = s.u.bytes.0
+  let _: CInt = s.u.words.1
+  let _: CInt = s.s.pair.1
+  s.u.bytes = (0, 0, 0, 0, 0, 0, 0, 0)
+  s.s.pair = (0, 0)
+#endif
+}
