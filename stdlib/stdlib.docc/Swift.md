@@ -32,7 +32,7 @@ print(interestingNumbers["primes"]!)
 // Prints "[17, 13, 11, 7, 5, 3, 2]"
 ```
 
-> Note: Experiment with Swift standard library types and learn high-level concepts
+> Tip: Experiment with Swift standard library types and learn high-level concepts
 using visualizations and practical examples. Learn how the Swift standard library
 uses protocols and generics to express powerful constraints. Download the playground
 below to get started.
