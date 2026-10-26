@@ -1164,6 +1164,10 @@ static Operand *getProjectedDefOperand(SILValue value) {
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
 
+  case ValueKind::UncheckedOwnershipInst:
+  case ValueKind::UncheckedOwnershipConversionInst:
+    return &cast<SingleValueInstruction>(value)->getAllOperands()[0];
+
   case ValueKind::MultipleValueInstructionResult: {
     SILInstruction *destructure =
         cast<MultipleValueInstructionResult>(value)->getParent();
@@ -4469,6 +4473,19 @@ protected:
     markRewritten(inst, replacement);
   }
 
+  void visitUncheckedOwnershipInst(UncheckedOwnershipInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+    markRewritten(inst,
+                  pass.valueStorageMap.getStorage(use->get()).storageAddress);
+  }
+
+  void visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+    markRewritten(inst,
+                  pass.valueStorageMap.getStorage(use->get()).storageAddress);
+  }
+
   void visitMoveValueInst(MoveValueInst *mvi);
 
   void visitMoveOnlyWrapperToCopyableValueInst(
@@ -4836,8 +4853,6 @@ protected:
   UNIMPLEMENTED_OPAQUE_OPERAND(SelectEnumAddr)
   UNIMPLEMENTED_OPAQUE_OPERAND(StoreUnowned)
   UNIMPLEMENTED_OPAQUE_OPERAND(StoreWeak)
-  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnership)
-  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnershipConversion)
   UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedRefCast)
   UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedAutoreleaseValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedReleaseValue)
@@ -5784,6 +5799,8 @@ protected:
   REWRITTEN_BY_USE(TupleExtract)
   REWRITTEN_BY_USE(TuplePackExtract)
   REWRITTEN_BY_USE(UncheckedEnumData)
+  REWRITTEN_BY_USE(UncheckedOwnership)
+  REWRITTEN_BY_USE(UncheckedOwnershipConversion)
 
   // Can define an opaque result, but has no rewrite yet. This lists known
   // gaps only: a new instruction needs a rewrite, or a NO_OPAQUE_RESULT or
@@ -5804,8 +5821,6 @@ protected:
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnmanagedValue)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnownedValue)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyWeakValue)
-  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnership)
-  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnershipConversion)
   UNIMPLEMENTED_OPAQUE_RESULT(UncheckedRefCast)
   UNIMPLEMENTED_OPAQUE_RESULT(UncheckedTrivialBitCast)
 
