@@ -1148,6 +1148,10 @@ bool BridgedFunction::shouldOptimize() const {
   return getFunction()->shouldOptimize();
 }
 
+bool BridgedFunction::isOptimizedForSize() const {
+  return getFunction()->optimizeForSize();
+}
+
 bool BridgedFunction::isReferencedInModule() const {
   return getFunction()->getRefCount() != 0;
 }

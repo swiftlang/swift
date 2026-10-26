@@ -4,11 +4,14 @@
 // RUN: %FileCheck %s < %t/test.sil
 // RUN: %FileCheck %s --check-prefix=NEG < %t/test.sil
 // RUN: %target-swift-frontend -Onone -wmo -module-name test -I %t -emit-sil %s | %FileCheck %s --check-prefix=ONONE
+// RUN: %target-swift-frontend -Osize -wmo -module-name test -I %t -emit-sil %s | %FileCheck %s --check-prefix=ONONE
 
 // In optimized non-embedded Swift, an existential which is created from a specialized
 // generic type gets a specialized witness table with specialized witness methods.
 // IRGen emits it statically if possible (see test/IRGen/specialized_witness_table.swift).
 
+// Specialized witness tables are not created without optimization and when optimizing for size,
+// because all witness methods are specialized, even if they are never called.
 // ONONE-NOT: [specialized]
 
 import Resilient
