@@ -4352,6 +4352,21 @@ protected:
     pass.deleter.forceDelete(mbi);
   }
 
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *dbi) {
+    SILValue borrowAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    markRewritten(dbi,
+                  builder.createDereferenceBorrowAddr(dbi->getLoc(), borrowAddr));
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *dabi) {
+    SILValue borrowAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    dabi->replaceAllUsesWith(
+        builder.createDereferenceBorrowAddr(dabi->getLoc(), borrowAddr));
+    pass.deleter.forceDelete(dabi);
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *mdi) {
     if (use->getOperandNumber() == MarkDependenceInst::Base) {
       SILValue baseAddr = addrMat.materializeAddress(use->get());
@@ -4840,8 +4855,6 @@ protected:
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginCOWMutation)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginDeallocRef)
   UNIMPLEMENTED_OPAQUE_OPERAND(BorrowedFrom)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceAddrBorrow)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceBorrow)
   UNIMPLEMENTED_OPAQUE_OPERAND(DropDeinit)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndCOWMutation)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndInitLetRef)
@@ -5530,6 +5543,12 @@ protected:
     pass.valueStorageMap.setStorageAddress(dbi, addr);
   }
 
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *mabi) {
+    SILValue destAddr = addrMat.materializeAddress(mabi);
+    builder.createInitBorrowAddr(mabi->getLoc(), destAddr, mabi->getOperand());
+    storage.markRewritten();
+  }
+
   // Rewrite the apply for an indirect result.
   void visitDestructureTupleInst(DestructureTupleInst *destructure) {
     SILValue srcVal = destructure->getOperand();
@@ -5814,7 +5833,6 @@ protected:
   UNIMPLEMENTED_OPAQUE_RESULT(EndInitLetRef)
   UNIMPLEMENTED_OPAQUE_RESULT(LoadUnowned)
   UNIMPLEMENTED_OPAQUE_RESULT(LoadWeak)
-  UNIMPLEMENTED_OPAQUE_RESULT(MakeAddrBorrow)
   UNIMPLEMENTED_OPAQUE_RESULT(RawPointerToRef)
   UNIMPLEMENTED_OPAQUE_RESULT(SelectEnum)
   UNIMPLEMENTED_OPAQUE_RESULT(SelectEnumAddr)
