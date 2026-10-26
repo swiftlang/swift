@@ -6799,6 +6799,11 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
       "access to %kind0 from outside the distributed actor %1 must be asynchronous",
       (const ValueDecl *, DeclName))
 
+ERROR(distributed_witness_typed_throws_requirement,none,
+      "%kind0 cannot satisfy requirement %1 which throws %2; a distributed "
+      "method can throw any error",
+      (const ValueDecl *, const ValueDecl *, Type))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))

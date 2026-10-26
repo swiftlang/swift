@@ -3823,6 +3823,30 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       if (!isThrowsDecl(requirement))
         missingOptions |= MissingFlags::RequirementThrows;
 
+      // A remote call can fail with any error, which the distributed thunk
+      // throws, so the requirement must throw 'any Error' rather than a
+      // typed error, like 'throws(Never)'. A thrown error type which depends
+      // on the conformance, like 'throws(Self.Failure)', is left to the
+      // matching of the witness
+      if (isDistributedDecl(witness) && isThrowsDecl(requirement)) {
+        // The declared thrown type, which is null for an untyped 'throws'.
+        // Unlike the effective thrown type, it is 'Never' for 'throws(Never)'
+        AbstractFunctionDecl *reqFunc =
+            dyn_cast<AbstractFunctionDecl>(requirement);
+        if (!reqFunc)
+          if (auto *storage = dyn_cast<AbstractStorageDecl>(requirement))
+            reqFunc = storage->getEffectfulGetAccessor();
+        Type thrownTy = reqFunc ? reqFunc->getThrownInterfaceType() : Type();
+        ASTContext &ctx = DC->getASTContext();
+        if (thrownTy && !thrownTy->hasTypeParameter() &&
+            !thrownTy->isEqual(ctx.getErrorExistentialType())) {
+          ctx.Diags.diagnose(witness,
+                             diag::distributed_witness_typed_throws_requirement,
+                             witness, requirement, thrownTy);
+          return std::nullopt;
+        }
+      }
+
       // If the witness is distributed, it is able to witness a requirement
       // only if the requirement is `async throws`.
       if (!isDistributedDecl(witness) && !missingOptions)
