@@ -171,6 +171,13 @@ func makeB() -> any Cycle { B(t: 1) }
 @inline(never)
 func walk<X: Cycle>(_ x: X) -> String { x.g(1) + " " + x.next().g("") + " " + x.next().next().g(1.0) }
 
+// Base protocol and associated conformances of a specialized conformance from another module.
+@inline(never)
+func makeLibWrapper() -> any LibQ { LibWrapper(t: 8) }
+
+@inline(never)
+func callLibQ<Q: LibQ>(_ q: Q) -> String { q.describe() + " " + q.make().describe() }
+
 // The getter returns an associated type indirectly. A direct call of the witness
 // thunk is specialized with a direct result, which must not be confused with the
 // specialized witness in the witness table.
@@ -232,6 +239,8 @@ print(makeFinalBoxNamed().name())
 print(walk(makeA()))
 // CHECK: B<Int>.g<Int> A<Int>.g<String> B<Int>.g<Double>
 print(walk(makeB()))
+// CHECK: LibWrapper<Int>(8) LibBox<Int>(8)
+print(callLibQ(makeLibWrapper()))
 // CHECK: Wrapper<Bool>
 print(callFoo(makeWrapper()))
 // CHECK: Box<Bool>(true)

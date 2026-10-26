@@ -426,10 +426,16 @@ private func specializeWitnessTable(for conformance: Conformance,
     return false
   }
 
-  guard let witnessTable = context.lookupWitnessTable(for: baseConf.genericConformance),
+  // In Embedded Swift, the witness tables of conformances in other modules are deserialized when
+  // the conformance is used (see `SILModule::linkWitnessTable`). In regular Swift this is not the
+  // case.
+  let genericConf = baseConf.genericConformance
+  guard let witnessTable = isEmbedded ? context.lookupWitnessTable(for: genericConf)
+                                      : context.loadWitnessTable(for: genericConf),
         witnessTable.isDefinition
   else {
-    // In regular Swift, the witness table of a conformance in another module may not be available.
+    // In regular Swift, the witness table of a conformance in another module is not available if
+    // it's not serialized.
     if isEmbedded {
       fatalError("no witness table available")
     }

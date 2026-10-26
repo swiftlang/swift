@@ -1716,6 +1716,8 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedWitnessTable loadWitnessTable(BridgedConformance conformance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedConformance substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const;
   BRIDGED_INLINE bool calleesAreStaticallyKnowable(BridgedDeclRef method) const;
 

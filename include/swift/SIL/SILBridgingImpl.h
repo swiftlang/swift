@@ -3822,6 +3822,17 @@ OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformanc
   return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
 }
 
+OptionalBridgedWitnessTable BridgedContext::loadWitnessTable(BridgedConformance conformance) const {
+  swift::ProtocolConformanceRef ref = conformance.unbridged();
+  if (!ref.isConcrete()) {
+    return {nullptr};
+  }
+  swift::SILModule *mod = context->getModule();
+  // Only `LinkAll` deserializes witness tables which don't need to be deserialized.
+  mod->linkWitnessTable(ref.getConcrete(), swift::SILModule::LinkingMode::LinkAll);
+  return {mod->lookUpWitnessTable(ref.getConcrete())};
+}
+
 BridgedConformance BridgedContext::substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const {
   swift::SILModule *mod = context->getModule();
   return {swift::substOpaqueTypesWithUnderlyingTypes(conformance.unbridged(),
