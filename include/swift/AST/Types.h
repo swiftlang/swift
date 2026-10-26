@@ -2494,6 +2494,21 @@ public:
     return typealias;
   }
 
+  /// Checks whether the given type is a valid parent for a typealias. This
+  /// excludes existentials and unbound generic parents, e.g:
+  ///
+  /// ```
+  /// struct S<T> {
+  ///   typealias X = Int
+  /// }
+  /// let i: S.X
+  /// ```
+  ///
+  /// We allow resolving `S.X` since the underlying type does not depend on any
+  /// outer generic parameter. However we cannot property represent this as a
+  /// TypeAliasType, so we instead need to use the desugared type.
+  static bool isValidParent(Type ty);
+
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
