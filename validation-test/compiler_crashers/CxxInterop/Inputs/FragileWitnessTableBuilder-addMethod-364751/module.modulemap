@@ -1,0 +1,4 @@
+module ConformsTo {
+  header "header.h"
+  requires cplusplus
+}
