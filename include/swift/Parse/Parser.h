@@ -122,6 +122,7 @@ class Parser {
   bool IsInputIncomplete = false;
   bool EnableParameterizedNonisolated = true; // HACK: for closures
   std::vector<Token> SplitTokens;
+  std::optional<DiagnosticQueue> SuppressedDiagQueue;
 
 public:
   SourceManager &SourceMgr;
