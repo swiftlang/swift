@@ -570,7 +570,7 @@ public:
         auto *var = PBD->getSingleVar();
         if (var && var->hasStorage()) {
           if (auto *init = var->getParentExecutableInitializer()) {
-            if (auto *V = getReferencedNonCopyableValue(init))
+            if (auto *V = getReferencedConsumableValue(init))
               recordConsumingUse(V);
           }
         }
@@ -739,19 +739,19 @@ public:
     ConsumedValues.insert(V);
   }
 
-  ValueDecl *getReferencedNonCopyableValue(Expr *E) {
+  ValueDecl *getReferencedConsumableValue(Expr *E) {
     if (!E)
       return nullptr;
 
     E = E->getSemanticsProvidingExpr();
     if (auto *L = dyn_cast<LoadExpr>(E))
-      return getReferencedNonCopyableValue(L->getSubExpr());
+      return getReferencedConsumableValue(L->getSubExpr());
 
     if (auto *erasure = dyn_cast<ErasureExpr>(E))
-      return getReferencedNonCopyableValue(erasure->getSubExpr());
+      return getReferencedConsumableValue(erasure->getSubExpr());
 
     if (auto *FCE = dyn_cast<FunctionConversionExpr>(E))
-      return getReferencedNonCopyableValue(FCE->getSubExpr());
+      return getReferencedConsumableValue(FCE->getSubExpr());
 
     auto *DRE = dyn_cast<DeclRefExpr>(E);
     if (!DRE)
@@ -762,7 +762,16 @@ public:
       return nullptr;
 
     auto type = DRE->getType()->getWithoutSpecifierType();
-    return type->isNoncopyable() ? ref.getDecl() : nullptr;
+    if (!type->isNoncopyable())
+      return nullptr;
+
+    ValueDecl *V = ref.getDecl();
+    if (auto *param = dyn_cast<ParamDecl>(V)) {
+      if (param->getLoweredOwnership() == LoweredOwnership::Shared)
+        return nullptr;
+    }
+
+    return V;
   }
 
   /// Check whether the given expression represents a consuming use of some
@@ -774,13 +783,13 @@ public:
   void recordConsumedValues(Expr *E) {
     // `consume x`
     if (auto *consume = dyn_cast<ConsumeExpr>(E)) {
-      if (auto *V = getReferencedNonCopyableValue(consume->getSubExpr()))
+      if (auto *V = getReferencedConsumableValue(consume->getSubExpr()))
         recordConsumingUse(V);
     }
 
     // assignments - `... = x`
     if (auto *assignment = dyn_cast<AssignExpr>(E)) {
-      if (auto *V = getReferencedNonCopyableValue(assignment->getSrc()))
+      if (auto *V = getReferencedConsumableValue(assignment->getSrc()))
         recordConsumingUse(V);
     }
 
@@ -795,8 +804,8 @@ public:
                                 : AccessorKind::Get;
 
         auto *accessor = property->getAccessor(accessorKind);
-        if (accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
-          if (auto *base = getReferencedNonCopyableValue(memberRef->getBase()))
+        if (accessor && accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
+          if (auto *base = getReferencedConsumableValue(memberRef->getBase()))
             recordConsumingUse(base);
         }
       }
@@ -804,7 +813,7 @@ public:
 
     // Casts are consuming operations.
     if (auto *cast = dyn_cast<ExplicitCastExpr>(E)) {
-      if (auto *V = getReferencedNonCopyableValue(cast->getSubExpr()))
+      if (auto *V = getReferencedConsumableValue(cast->getSubExpr()))
         recordConsumingUse(V);
     }
 
@@ -836,7 +845,7 @@ public:
                    ParamSpecifier::Borrowing)))
           continue;
 
-        if (auto *V = getReferencedNonCopyableValue(arguments->getExpr(i)))
+        if (auto *V = getReferencedConsumableValue(arguments->getExpr(i)))
           recordConsumingUse(V);
       }
     }
@@ -963,7 +972,7 @@ public:
     if (HasCalledAtMostOnceSemantics && isa<ReturnStmt>(S)) {
       auto *returnStmt = cast<ReturnStmt>(S);
       if (returnStmt->hasResult()) {
-        if (auto *V = getReferencedNonCopyableValue(returnStmt->getResult()))
+        if (auto *V = getReferencedConsumableValue(returnStmt->getResult()))
           recordConsumingUse(V);
       }
     }
