@@ -394,13 +394,13 @@ func testStructWithArrayTypedefField(
   // expected-modern-c-array-error@-1 {{cannot convert value of type '(Int32, Int32, Int32, Int32)' to expected argument type 'SmallArrayTypedef' (aka 'InlineArray<4, Int32>')}}
 
   _ = StructWithArrayTypedefField(small: smallArray)
-  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<4, Int32>' to expected argument type 'SmallArrayTypedef' (aka '(Int32, Int32, Int32, Int32)')}}
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'InlineArray<4, Int32>' to expected argument type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')}}
 
   let _: (Int32, Int32, Int32, Int32) = s.small
   // expected-modern-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}
 
   let _: InlineArray<4, Int32> = s.small
-  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
 }
 
 @available(anyAppleOS 26, *)
@@ -539,7 +539,7 @@ func testHugeTypedefGlobalArray() {
 @available(anyAppleOS 26, *)
 func testSmallTypedefGlobalArray() {
   let _: InlineArray<4, Int32> = smallTypedefGlobalArray
-  // expected-legacy-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
+  // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
 
   let _: (Int32, Int32, Int32, Int32) = smallTypedefGlobalArray
   // expected-modern-c-array-error@-1 {{cannot convert value of type 'SmallArrayTypedef' (aka 'InlineArray<4, Int32>') to specified type '(Int32, Int32, Int32, Int32)'}}

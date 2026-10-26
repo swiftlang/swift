@@ -1019,6 +1019,16 @@ namespace {
         return underlyingResult;
       }
 
+      // If the typedef is for a C array and the compiler is in legacy mode, use
+      // the underlying type so that when we import declarations which use the
+      // typedef, their projections get distinguishable types. (We could have
+      // special-cased Modern instead, but if only one mode can get diagnostics
+      // with the typealias name, it should be the one we want people to use.)
+      if (Impl.VisibleCArrayProjection == CArrayProjection::Legacy &&
+              importer::hasLegacyCArrayType(type->desugar())) {
+        return underlyingResult;
+      }
+
 #ifndef NDEBUG
       switch (underlyingResult.Hint) {
       case ImportHint::Block:
@@ -1032,20 +1042,13 @@ namespace {
           break;
         LLVM_FALLTHROUGH;
       default:
-        // This is basically `assert(AbstractType == mappedType ||
-        // computeLegacyCArrayType(AbstractType) == mappedType)` but with extra
-        // steps.
         if (!underlyingResult.AbstractType->isEqual(mappedType)) {
-          auto legacy = computeLegacyCArrayType(
-              {underlyingResult.AbstractType, false});
-          if (!legacy || !legacy.getType()->isEqual(mappedType)) {
-            underlyingResult.AbstractType->dump(llvm::errs());
-            mappedType->dump(llvm::errs());
-            assert(underlyingResult.AbstractType->isEqual(mappedType) &&
-                   "typedef without special typedef kind was mapped "
-                   "differently from its underlying type?");
-          }
+          underlyingResult.AbstractType->dump(llvm::errs());
+          mappedType->dump(llvm::errs());
         }
+        assert(underlyingResult.AbstractType->isEqual(mappedType) &&
+               "typedef without special typedef kind was mapped "
+               "differently from its underlying type?");
       }
 #endif
 
