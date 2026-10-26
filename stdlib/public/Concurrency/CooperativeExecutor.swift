@@ -20,21 +20,70 @@ import Swift
 struct WaitQueue {
   /// A job waiting for its deadline.
   ///
-  /// We keep the deadline and an ID alongside the job, rather than in the
+  /// We keep the deadline and a slot alongside the job, rather than in the
   /// job's executor private data, so that a cancelled job can be handed back
   /// exactly as we received it, and so that a stale cancellation can never
   /// match a different entry that happens to reuse the same address.
   struct Entry {
     var job: UnownedJob
     var deadline: CooperativeExecutor.Timestamp
-    var id: UInt64
+    var slot: Int
+  }
+
+  /// Where each waiting job is in the heap, so that cancelling one doesn't
+  /// have to look for it.
+  ///
+  /// A job's ID (the one in its token) is the number of its slot and the
+  /// generation of that slot, so a token for a job that has already run or
+  /// been cancelled can't match another job that reuses the slot.  This is a
+  /// class so that the queue's `didPlace` hook can update it while the queue
+  /// is being modified.
+  final class Slots {
+    /// The index in the heap of the entry in each slot, or -1 if it is free.
+    var heapIndex: [Int] = []
+    var generation: [UInt32] = []
+    var free: [Int] = []
+
+    func allocate() -> Int {
+      if let slot = free.popLast() {
+        return slot
+      }
+      heapIndex.append(-1)
+      generation.append(0)
+      return heapIndex.count - 1
+    }
+
+    func release(_ slot: Int) {
+      heapIndex[slot] = -1
+      generation[slot] = (generation[slot] + 1) & 0x7fff_ffff
+      free.append(slot)
+    }
+
+    func id(of slot: Int) -> UInt64 {
+      return (UInt64(generation[slot]) << 32) | UInt64(slot)
+    }
+
+    /// The heap index for a job ID, or nil if it is no longer waiting.
+    func heapIndex(forID id: UInt64) -> (slot: Int, index: Int)? {
+      let slot = Int(truncatingIfNeeded: id & 0xffff_ffff)
+      if slot >= heapIndex.count
+           || generation[slot] != UInt32(truncatingIfNeeded: id >> 32)
+           || heapIndex[slot] < 0 {
+        return nil
+      }
+      return (slot: slot, index: heapIndex[slot])
+    }
   }
 
   var queue: PriorityQueue<Entry>
+  let slots = Slots()
   var clock: _ClockID
 
   init(clock: _ClockID) {
-    queue = PriorityQueue(compare: { $0.deadline < $1.deadline })
+    let slots = self.slots
+    queue = PriorityQueue(
+      compare: { $0.deadline < $1.deadline },
+      didPlace: { slots.heapIndex[$0.slot] = $1 })
     self.clock = clock
   }
 
@@ -46,26 +95,31 @@ struct WaitQueue {
     return now
   }
 
+  /// Returns the ID of the waiting job.
   mutating func enqueue(_ job: consuming ExecutorJob,
-                        after delay: CooperativeExecutor.Duration,
-                        id: UInt64) {
+                        after delay: CooperativeExecutor.Duration) -> UInt64 {
     let deadline = currentTime + delay
-    queue.push(Entry(job: UnownedJob(job), deadline: deadline, id: id))
+    let slot = slots.allocate()
+    queue.push(Entry(job: UnownedJob(job), deadline: deadline, slot: slot))
+    return slots.id(of: slot)
   }
 
   mutating func forEachReadyJob(body: (consuming ExecutorJob) -> ()) {
     let now = currentTime
     while let entry = queue.pop(when: { $0.deadline < now }) {
+      slots.release(entry.slot)
       body(ExecutorJob(entry.job))
     }
   }
 
   /// Remove the job with the specified ID, if it is still waiting.
   mutating func cancel(id: UInt64) -> ExecutorJob? {
-    if let entry = queue.removeFirst(where: { $0.id == id }) {
-      return ExecutorJob(entry.job)
+    guard let (slot, index) = slots.heapIndex(forID: id) else {
+      return nil
     }
-    return nil
+    let entry = queue.remove(at: index)
+    slots.release(slot)
+    return ExecutorJob(entry.job)
   }
 
   var timeToNextJob: CooperativeExecutor.Duration? {
@@ -104,10 +158,6 @@ public final class CooperativeExecutor: Executor, @unchecked Sendable {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var suspendingWaitQueue = WaitQueue(clock: .suspending)
   var continuousWaitQueue = WaitQueue(clock: .continuous)
-
-  /// The ID to give to the next scheduled job; used to identify jobs for
-  /// cancellation.  IDs are never reused.
-  var nextJobID: UInt64 = 1
   #endif
   var shouldStop: Bool = false
 
@@ -259,14 +309,12 @@ extension CooperativeExecutor: SchedulingExecutor {
                                 tolerance: tolerance, clock: clock)
     }
 
-    let id = nextJobID
-    nextJobID += 1
-
     let (delay, clockToken) = delay(run: fireTime, clock: clock)
+    let id: UInt64
     if clockToken == Self.continuousClockToken {
-      continuousWaitQueue.enqueue(job, after: delay, id: id)
+      id = continuousWaitQueue.enqueue(job, after: delay)
     } else {
-      suspendingWaitQueue.enqueue(job, after: delay, id: id)
+      id = suspendingWaitQueue.enqueue(job, after: delay)
     }
     return unsafe JobCancellationToken(
       canceller: self,

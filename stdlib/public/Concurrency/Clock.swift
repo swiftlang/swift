@@ -121,6 +121,19 @@ extension SchedulingClock {
                                     tolerance: tolerance, clock: self)
   }
 
+  /// Resume a continuation at some point after the fire time.
+  ///
+  /// See `SchedulingExecutor.schedule(_:at:tolerance:clock:)`.
+  public func schedule<E: Error>(
+    _ continuation: consuming Continuation<Void, E>,
+    at fireTime: SchedulingExecutorFireTime<Self>,
+    tolerance: Duration?
+  ) -> ScheduledContinuation<E> {
+    return ScheduledContinuation(continuation) { job in
+      self.schedule(job, at: fireTime, tolerance: tolerance)
+    }
+  }
+
   /// A default `sleep` that wakes the task by scheduling the job that resumes
   /// it with the clock, so that a clock need only implement
   /// `schedule(_:at:tolerance:)` to be usable with `Task.sleep()`.  Cancelling
@@ -133,8 +146,8 @@ extension SchedulingClock {
     }
 
     try Task.checkCancellation()
-    try await Task<Never, Never>._sleepScheduling { job in
-      self.schedule(job, at: .at(deadline), tolerance: tolerance)
+    try await Task<Never, Never>._sleepScheduling { continuation in
+      self.schedule(continuation, at: .at(deadline), tolerance: tolerance)
     }
   }
 }

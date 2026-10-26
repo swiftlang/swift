@@ -97,9 +97,10 @@ struct SplitContinuationStorage : public Job {
   SWIFT_CC(swiftasync)
   static void process(Job *job) {
     auto *storage = cast<SplitContinuationStorage>(job);
-    assert(storage->ResultIsEmpty &&
-           "a split continuation can only be run as a job if its result is "
-           "empty");
+    if (!storage->ResultIsEmpty)
+      swift_Concurrency_fatalError(
+          0, "a split continuation can only be run as a job if its result is "
+             "empty");
     swift_continuation_resume(reinterpret_cast<AsyncTask *>(storage));
   }
 

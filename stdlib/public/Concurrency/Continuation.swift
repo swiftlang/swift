@@ -818,6 +818,12 @@ extension UnsafeContinuation {
 /// The job that resumes the task awaiting a split continuation, which is the
 /// continuation itself.
 ///
+/// This is deliberately not available to clients.  The job is part of the
+/// continuation's storage, so the continuation must not be resumed any other
+/// way while the job might run, nor the job used once the continuation has been
+/// resumed.  `SchedulingExecutor.schedule(_:at:clock:)` for a `Continuation`
+/// is the safe interface to it.
+///
 /// A split continuation begins with a job header, so the raw continuation
 /// is also a job.  Running the job resumes the continuation normally, so it can
 /// be handed to an executor to schedule the resumption, with no other object
@@ -832,55 +838,4 @@ internal func _jobToResume<Failure: Error>(
   precondition(job.kind != .task,
                "only a split continuation can be converted to a job")
   return job
-}
-
-@_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.5, *)
-extension Continuation where Success == Void {
-  /// Convert the continuation into an `UnsafeContinuation`, which can be copied
-  /// and passed around freely, at the cost of the checks that `Continuation`
-  /// provides.
-  ///
-  /// This is for when you need both to be able to give the continuation to an
-  /// executor as a job (see `UnsafeContinuation.asJob()`), and to be able to
-  /// resume it yourself, for example with an error if you take the job back.
-  public consuming func asUnsafeContinuation()
-    -> UnsafeContinuation<Void, Failure> {
-    return unsafe UnsafeContinuation<Void, Failure>(_takeContext())
-  }
-
-  /// Convert the continuation into a job that resumes it when it is run.
-  ///
-  /// See `UnsafeContinuation.asJob()`.  This consumes the continuation, so if
-  /// you also want to be able to resume it yourself, convert it to an
-  /// `UnsafeContinuation` first.
-  public consuming func asJob() -> ExecutorJob {
-    return unsafe _jobToResume(asUnsafeContinuation())
-  }
-}
-
-@_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.5, *)
-extension UnsafeContinuation where T == Void {
-  /// The job that resumes the continuation when it is run.
-  ///
-  /// This lets you give the responsibility for resuming the continuation to an
-  /// executor, for example by scheduling the job with a `SchedulingExecutor`.
-  /// Running the job resumes the awaiting task normally.
-  ///
-  /// As always, the continuation must be resumed exactly once.  If you resume
-  /// it yourself (for example with an error, having taken the job back from a
-  /// scheduler), the job must never be run; if the job is run, you must not
-  /// resume the continuation.  The job is part of the continuation's own
-  /// storage, which is freed once the continuation has been resumed and
-  /// awaited, so there is nothing to destroy for a job that you take back and
-  /// discard, but the job must not be used after the continuation has been
-  /// resumed.
-  ///
-  /// This is only available for a continuation that is a `Continuation`
-  /// converted by `asUnsafeContinuation()` (or the equivalent); it is not
-  /// available for the continuation of `withUnsafeContinuation`.
-  public func asJob() -> ExecutorJob {
-    return unsafe _jobToResume(self)
-  }
 }

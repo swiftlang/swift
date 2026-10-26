@@ -416,8 +416,96 @@ extension SchedulingExecutor {
     return schedule(job, at: fireTime, tolerance: nil, clock: clock)
   }
 
+  /// Schedule a continuation to be resumed at a specified time.
+  ///
+  /// The continuation is consumed, and the returned ``ScheduledContinuation``
+  /// is the only thing that can resume it other than the timer, so exactly one
+  /// of them does.  Executors don't need to do anything special to support
+  /// this; the continuation is scheduled as a job.
+  ///
+  /// Parameters:
+  ///
+  /// - continuation: The continuation to resume.
+  /// - at:           The time at which to resume it.
+  /// - tolerance:    The ideal maximum delay we are willing to tolerate.
+  /// - clock:        The clock that `at` is measured against.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func schedule<C: Clock, E: Error>(
+    _ continuation: consuming Continuation<Void, E>,
+    at fireTime: SchedulingExecutorFireTime<C>,
+    tolerance: C.Duration?,
+    clock: C
+  ) -> ScheduledContinuation<E> {
+    return ScheduledContinuation(continuation) { job in
+      self.schedule(job, at: fireTime, tolerance: tolerance, clock: clock)
+    }
+  }
+
+  /// Schedule a continuation to be resumed at a specified time, with no
+  /// tolerance.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func schedule<C: Clock, E: Error>(
+    _ continuation: consuming Continuation<Void, E>,
+    at fireTime: SchedulingExecutorFireTime<C>,
+    clock: C
+  ) -> ScheduledContinuation<E> {
+    return schedule(continuation, at: fireTime, tolerance: nil, clock: clock)
+  }
+
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+/// A continuation that has been scheduled to be resumed at some point in the
+/// future.
+///
+/// Either the scheduled time arrives and the continuation is resumed normally,
+/// or `cancel(throwing:)` takes it back before then and resumes it with an
+/// error.  Dropping this without cancelling is fine; the continuation will be
+/// resumed when its time comes.
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+@safe
+public struct ScheduledContinuation<Failure: Error>: ~Copyable, Sendable {
+  private let token: JobCancellationToken
+  private let continuation: UnsafeContinuation<Void, Failure>
+
+  /// Give `continuation` to `schedule` as a job.
+  internal init(
+    _ continuation: consuming Continuation<Void, Failure>,
+    schedule: (consuming ExecutorJob) -> JobCancellationToken
+  ) {
+    let raw = unsafe UnsafeContinuation<Void, Failure>(
+      continuation._takeContext())
+    unsafe self.continuation = raw
+    self.token = unsafe schedule(_jobToResume(raw))
+  }
+
+  /// Cancel the timer, if it hasn't fired.
+  ///
+  /// If this stops the continuation being resumed by the timer, it resumes the
+  /// continuation by throwing `error` and returns `true`.  If it returns
+  /// `false`, the timer has fired, or is firing, and has resumed the
+  /// continuation (or will) normally.
+  ///
+  /// This may be called more than once, from any thread, and returns `true` at
+  /// most once.  As it is called from task cancellation handlers, it is subject
+  /// to the restrictions on `JobCanceller.cancel(jobWithToken:)`.
+  @discardableResult
+  public borrowing func cancel(throwing error: Failure) -> Bool {
+    // We got the job back, so it will never run; resume the continuation
+    // ourselves.  There is nothing to destroy: the job is part of the
+    // continuation's own storage.
+    guard token.cancel() != nil else {
+      return false
+    }
+    unsafe continuation.resume(throwing: error)
+    return true
+  }
+}
+
+#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 /// A service that executes jobs.
 ///

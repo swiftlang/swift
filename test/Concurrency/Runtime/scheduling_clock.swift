@@ -482,13 +482,13 @@ func waitUntil(_ condition: () -> Bool) async throws {
         clock.advance(by: .seconds(5))
       }
 
-      // A split continuation is a job, so it can be scheduled like any other.
+      // A continuation can be scheduled directly.
       try! await withContinuation(
         of: Void.self, throwing: CancellationError.self
       ) { (continuation: consuming Continuation<Void, CancellationError>,
          waiter: consuming ContinuationWaiter<Void, CancellationError>)
         async throws(CancellationError) -> Void in
-        _ = scheduler.schedule(continuation.asJob(),
+        _ = scheduler.schedule(continuation,
                                at: .after(.seconds(5)),
                                tolerance: nil, clock: clock)
         try await waiter.wait()
@@ -498,7 +498,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, clock.pendingCount)
     }
 
-    tests.test("A continuation scheduled via an unknown clock can be taken back") {
+    tests.test("A continuation scheduled via an unknown clock can be cancelled") {
       let clock = ManualClock()
       let scheduler = Task.defaultExecutor as! any SchedulingExecutor
 
@@ -507,20 +507,24 @@ func waitUntil(_ condition: () -> Bool) async throws {
       ) { (continuation: consuming Continuation<Void, CancellationError>,
          waiter: consuming ContinuationWaiter<Void, CancellationError>)
         async throws(CancellationError) -> Void in
-        let token = scheduler.schedule(continuation.asJob(),
-                                       at: .after(.seconds(3600)),
-                                       tolerance: nil, clock: clock)
+        let scheduled = scheduler.schedule(continuation,
+                                           at: .after(.seconds(3600)),
+                                           tolerance: nil, clock: clock)
         expectEqual(1, clock.pendingCount)
 
-        // We get the job back, and the clock no longer holds it.
-        guard let job = token.cancel() else {
-          fatalError("the clock should have given the job back")
-        }
+        // The clock no longer holds the job, and the continuation is resumed
+        // with our error, once.
+        expectTrue(scheduled.cancel(throwing: CancellationError()))
+        expectFalse(scheduled.cancel(throwing: CancellationError()))
         expectEqual(0, clock.pendingCount)
 
-        // Running it resumes the task.
-        Task.defaultExecutor.enqueue(job)
-        try await waiter.wait()
+        var threw = false
+        do {
+          try await waiter.wait()
+        } catch {
+          threw = true
+        }
+        expectTrue(threw)
       }
     }
 
@@ -602,7 +606,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
         ) { (continuation: consuming Continuation<Void, CancellationError>,
          waiter: consuming ContinuationWaiter<Void, CancellationError>)
         async throws(CancellationError) -> Void in
-          _ = exec.schedule(continuation.asJob(),
+          _ = exec.schedule(continuation,
                             at: .after(.seconds(5)),
                             tolerance: nil, clock: clock)
           try await waiter.wait()
@@ -623,7 +627,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, clock.pendingCount)
     }
 
-    tests.test("CooperativeExecutor: a continuation timer can be taken back and run") {
+    tests.test("CooperativeExecutor: a continuation timer can be cancelled") {
       let exec = CooperativeExecutor()
       let done = Flag()
 
@@ -633,17 +637,20 @@ func waitUntil(_ condition: () -> Bool) async throws {
         ) { (continuation: consuming Continuation<Void, CancellationError>,
          waiter: consuming ContinuationWaiter<Void, CancellationError>)
         async throws(CancellationError) -> Void in
-          let token = exec.schedule(continuation.asJob(),
-                                    at: .after(.seconds(3600)),
-                                    tolerance: nil, clock: ContinuousClock())
-          guard let job = token.cancel() else {
-            fatalError("the executor should have given the job back")
-          }
+          let scheduled = exec.schedule(continuation,
+                                        at: .after(.seconds(3600)),
+                                        tolerance: nil, clock: ContinuousClock())
+          expectTrue(scheduled.cancel(throwing: CancellationError()))
 
-          // The timer is gone, rather than lost, so running the job resumes
-          // the task.
-          exec.enqueue(job)
-          try await waiter.wait()
+          // The timer is gone rather than lost, so the task is resumed with
+          // the error.
+          var threw = false
+          do {
+            try await waiter.wait()
+          } catch {
+            threw = true
+          }
+          expectTrue(threw)
         }
         done.set()
       }
@@ -652,6 +659,72 @@ func waitUntil(_ condition: () -> Bool) async throws {
       try! exec.run()
       expectTrue(done.value)
       expectTrue(ContinuousClock.now - start < .seconds(30))
+    }
+
+    tests.test("CooperativeExecutor: cancelling many timers in any order keeps the rest intact") {
+      let exec = CooperativeExecutor()
+      let cancelled = Counter()
+      let finished = Counter()
+
+      _ = Task(executorPreference: exec) {
+        var tasks: [Task<Void, Never>] = []
+        for i in 0..<300 {
+          tasks.append(Task(executorPreference: exec) {
+            do {
+              try await Task.sleep(for: .seconds(3600) + .milliseconds(i))
+              fatalError("a cancelled sleep should not complete")
+            } catch {
+              cancelled.increment()
+            }
+          })
+        }
+
+        // Timers that are not cancelled must still fire, in order, however the
+        // heap has been shuffled by the cancellations.
+        let survivors = Counter()
+        for i in 0..<5 {
+          tasks.append(Task(executorPreference: exec) {
+            try! await Task.sleep(for: .milliseconds(20 * (i + 1)))
+            survivors.increment()
+            finished.increment()
+          })
+        }
+
+        for _ in 0..<4 { await Task.yield() }
+
+        // Cancel the long sleeps in a scrambled order, then reuse the slots
+        // they were in.
+        var order = Array(0..<300)
+        var seed: UInt64 = 12345
+        for i in stride(from: order.count - 1, to: 0, by: -1) {
+          seed = seed &* 6364136223846793005 &+ 1442695040888963407
+          order.swapAt(i, Int(seed >> 33) % (i + 1))
+        }
+        for i in order.prefix(150) { tasks[i].cancel() }
+        for _ in 0..<2 { await Task.yield() }
+
+        var more: [Task<Void, Never>] = []
+        for i in 0..<100 {
+          more.append(Task(executorPreference: exec) {
+            do {
+              try await Task.sleep(for: .seconds(3600) + .milliseconds(i))
+            } catch {
+              cancelled.increment()
+            }
+          })
+        }
+        for _ in 0..<2 { await Task.yield() }
+        for i in order.suffix(150) { tasks[i].cancel() }
+        for t in more { t.cancel() }
+
+        for t in tasks { await t.value }
+        for t in more { await t.value }
+        expectEqual(5, survivors.value)
+      }
+
+      try! exec.run()
+      expectEqual(400, cancelled.value)
+      expectEqual(5, finished.value)
     }
 
     tests.test("SchedulingExecutorFireTime is Equatable and Hashable") {

@@ -25,6 +25,11 @@ struct PriorityQueue<T> {
   /// result in a min-queue.
   var compare: (borrowing T, borrowing T) -> Bool
 
+  /// If set, called whenever an item is put at a position in the storage, with
+  /// the item and its index, so that an owner can keep track of where each
+  /// item is and remove it with `remove(at:)` without searching.
+  var didPlace: ((borrowing T, Int) -> Void)?
+
   /// Initialise the queue.
   ///
   /// The queue is set up such that if the comparison function in use
@@ -36,15 +41,17 @@ struct PriorityQueue<T> {
   /// - compare: A closure that takes two arguments of type T, and
   ///            returns true if some condition holds.
   ///
-  init(compare: @escaping (borrowing T, borrowing T) -> Bool) {
+  init(compare: @escaping (borrowing T, borrowing T) -> Bool,
+       didPlace: ((borrowing T, Int) -> Void)? = nil) {
     self.compare = compare
+    self.didPlace = didPlace
   }
 
   /// Take the queue.
   ///
   /// This returns a copy of the queue, and empties the original.
   mutating func take() -> PriorityQueue<T> {
-    var q = PriorityQueue(compare: self.compare)
+    var q = PriorityQueue(compare: self.compare, didPlace: self.didPlace)
     swap(&self, &q)
     return q
   }
@@ -57,6 +64,7 @@ struct PriorityQueue<T> {
   ///
   mutating func push(_ value: T) {
     storage.append(value)
+    didPlace?(storage[storage.count - 1], storage.count - 1)
     upHeap(ndx: storage.count - 1)
   }
 
@@ -94,7 +102,7 @@ struct PriorityQueue<T> {
     if !condition(storage[0]) {
       return nil
     }
-    storage.swapAt(0, storage.count - 1)
+    swapItems(0, storage.count - 1)
     let result = storage.removeLast()
     if !storage.isEmpty {
       downHeap(ndx: 0)
@@ -115,12 +123,24 @@ struct PriorityQueue<T> {
     if storage.isEmpty {
       return nil
     }
-    storage.swapAt(0, storage.count - 1)
+    swapItems(0, storage.count - 1)
     let result = storage.removeLast()
     if !storage.isEmpty {
       downHeap(ndx: 0)
     }
     return result
+  }
+
+  /// Exchange two items in the storage, telling `didPlace` where they went.
+  private mutating func swapItems(_ i: Int, _ j: Int) {
+    if i == j {
+      return
+    }
+    storage.swapAt(i, j)
+    if let didPlace {
+      didPlace(storage[i], i)
+      didPlace(storage[j], j)
+    }
   }
 
   /// Remove the item at the given storage index from the queue.
@@ -131,8 +151,8 @@ struct PriorityQueue<T> {
   ///
   /// Returns: The removed item.
   ///
-  private mutating func remove(at ndx: Int) -> T {
-    storage.swapAt(ndx, storage.count - 1)
+  mutating func remove(at ndx: Int) -> T {
+    swapItems(ndx, storage.count - 1)
     let result = storage.removeLast()
     if ndx < storage.count {
       // The item that took its place may need to move in either direction.
@@ -180,7 +200,7 @@ struct PriorityQueue<T> {
         break
       }
 
-      storage.swapAt(theNdx, parentNdx)
+      swapItems(theNdx, parentNdx)
       theNdx = parentNdx
     }
   }
@@ -223,7 +243,7 @@ struct PriorityQueue<T> {
         break
       }
 
-      storage.swapAt(theNdx, largestNdx)
+      swapItems(theNdx, largestNdx)
       theNdx = largestNdx
     }
   }

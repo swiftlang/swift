@@ -168,8 +168,8 @@ extension Task where Success == Never, Failure == Never {
       return
     }
 
-    try await _sleepScheduling { job in
-      executor.schedule(job,
+    try await _sleepScheduling { continuation in
+      executor.schedule(continuation,
                         at: fireTime,
                         tolerance: tolerance,
                         clock: clock)
@@ -179,45 +179,28 @@ extension Task where Success == Never, Failure == Never {
   /// Suspend the current task until a timer fires, or until the task is
   /// cancelled.
   ///
-  /// The continuation that the sleeping task is waiting on is a job, which
-  /// resumes the task when it is run.  `schedule` is handed that job, and must
-  /// arrange for it to run when the timer fires, returning the token that
-  /// cancels the timer.  If the task is cancelled, we use that token to ask for
-  /// the job back.  If we get it, the timer can never fire, so we resume the
-  /// continuation ourselves; if we don't, the timer has already fired (or is
-  /// firing) and will resume it normally.  Either way the continuation is
-  /// resumed exactly once, and a cancelled sleep doesn't leave its timer
-  /// behind.
+  /// `schedule` is handed the continuation that the sleeping task is waiting
+  /// on, and must arrange for it to be resumed when the timer fires.  If the
+  /// task is cancelled, we use the result to take the continuation back and
+  /// resume it with an error, so a cancelled sleep doesn't leave its timer
+  /// behind.  Either way the continuation is resumed exactly once.
   @available(StdlibDeploymentTarget 6.5, *)
   @diagnose(UselessAvailabilityCheck, as: ignored)
   internal static func _sleepScheduling(
-    _ schedule: (consuming ExecutorJob) -> JobCancellationToken
+    _ schedule: (consuming Continuation<Void, _Concurrency.CancellationError>)
+      -> ScheduledContinuation<_Concurrency.CancellationError>
   ) async throws {
     try await withContinuation(
       of: Void.self, throwing: _Concurrency.CancellationError.self
     ) { (continuation: consuming Continuation<Void, _Concurrency.CancellationError>,
          waiter: consuming ContinuationWaiter<Void, _Concurrency.CancellationError>)
         async throws(_Concurrency.CancellationError) -> Void in
-      // We need to be able to resume the continuation with an error, as well as
-      // to give it to the executor as a job, so work with the raw form.
-      let sleeper = unsafe UnsafeContinuation<
-        Void, _Concurrency.CancellationError
-      >(continuation._takeContext())
-
-      // The cancellation handler only borrows the token, which it can do
-      // because `cancel()` doesn't consume it, so no box is needed.
-      let token = unsafe schedule(_jobToResume(sleeper))
+      // The cancellation handler only borrows this, which it can do because
+      // `cancel(throwing:)` doesn't consume it, so no box is needed.
+      let scheduled = schedule(continuation)
 
       try await waiter.wait(onCancel: { _ in
-        guard token.cancel() != nil else {
-          // The timer has already fired; it will resume the continuation.
-          return
-        }
-
-        // We got the job back, so it will never run; resume the continuation
-        // ourselves.  There is nothing to destroy: the job is part of the
-        // continuation's own storage.
-        unsafe sleeper.resume(throwing: _Concurrency.CancellationError())
+        scheduled.cancel(throwing: _Concurrency.CancellationError())
       })
     }
   }
