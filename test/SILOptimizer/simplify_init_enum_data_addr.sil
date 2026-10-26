@@ -148,3 +148,24 @@ bb2:
   destroy_value [dead_end] %1 : $AnyObject
   unreachable
 }
+
+// An end_borrow between the store and the inject_enum_addr doesn't prevent the fold.
+// CHECK-LABEL: sil [ossa] @end_borrow_between_store_and_inject
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK:         [[C:%.*]] = copy_value [[B]]
+// CHECK-NEXT:    [[E:%.*]] = enum $E, #E.B!enumelt, [[C]] : $AnyObject
+// CHECK-NEXT:    store [[E]] to [init] %0 : $*E
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'end_borrow_between_store_and_inject'
+sil [ossa] @end_borrow_between_store_and_inject : $@convention(thin) (@guaranteed AnyObject) -> @out E {
+bb0(%0 : $*E, %1 : @guaranteed $AnyObject):
+  %2 = init_enum_data_addr %0 : $*E, #E.B!enumelt
+  %3 = begin_borrow %1 : $AnyObject
+  %4 = copy_value %3 : $AnyObject
+  store %4 to [init] %2 : $*AnyObject
+  end_borrow %3 : $AnyObject
+  inject_enum_addr %0 : $*E, #E.B!enumelt
+  %8 = tuple ()
+  return %8 : $()
+}

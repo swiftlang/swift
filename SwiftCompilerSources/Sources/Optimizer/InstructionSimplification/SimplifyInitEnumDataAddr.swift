@@ -27,7 +27,9 @@ extension InitEnumDataAddrInst : OnoneSimplifiable, SILCombineSimplifiable {
     //   %1 = enum  $E, #someCaseWithPayload, %payload
     //   store %1 to %enum_addr
     // ```
-    // This store and inject instructions must appear in consecutive order.
+    // This store and inject instructions must appear in consecutive order, except for
+    // `end_borrow`s in between, which don't access memory. E.g. the borrow scope of the
+    // payload's source can end there after inlining.
     // But usually this is the case, because it's generated this way by SILGen.
     // The init can be anywhere before the store, even in another block and with
     // memory writes in between: it only projects the payload address and doesn't
@@ -35,7 +37,7 @@ extension InitEnumDataAddrInst : OnoneSimplifiable, SILCombineSimplifiable {
     //
     if let store = self.uses.singleUse?.instruction as? StoreInst,
        store.destination == self,
-       let inject = store.next as? InjectEnumAddrInst,
+       let inject = instructionAfterEndBorrows(store) as? InjectEnumAddrInst,
        inject.enum == self.enum,
        inject.enum.type.isLoadable(in: parentFunction) {
 
@@ -52,3 +54,10 @@ extension InitEnumDataAddrInst : OnoneSimplifiable, SILCombineSimplifiable {
   }
 }
 
+private func instructionAfterEndBorrows(_ inst: Instruction) -> Instruction? {
+  var next = inst.next
+  while let endBorrow = next as? EndBorrowInst {
+    next = endBorrow.next
+  }
+  return next
+}
