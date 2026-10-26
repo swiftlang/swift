@@ -50,8 +50,10 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   if (known != substitutions.end() && known->second)
     return known->second;
 
-  // Not known.
-  return Type();
+  ABORT([&](auto &out) {
+    out << "Failed to substitute type:\n";
+    type->dump(out);
+  });
 }
 
 Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
