@@ -1603,7 +1603,8 @@ public:
     // cross-actor call becomes an implicit 'await'). The closure's own
     // effects are contained here. CSApply validates that the wrapped call
     // returns 'Void' and does not throw, and replaces the closure for a
-    // synchronous actor-isolated callee
+    // '@oneway' distributed callee and, in Embedded Swift, for a synchronous
+    // actor-isolated callee
     if (auto *NE = dyn_cast<SendExpr>(expr)) {
       Expr *operand = NE->getSubExpr();
       SourceLoc loc = NE->getSendLoc();

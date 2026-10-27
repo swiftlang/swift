@@ -182,6 +182,10 @@ extension DistributedResolvableMacro {
 
     var isGenericOverActorSystem = false
     var specificActorSystemRequirement: TypeSyntax?
+    // Every conformance requirement on the actor system, e.g. both of
+    // 'where ActorSystem: DistributedActorSystem<any Codable>,
+    //        ActorSystem: _DistributedOnewayActorSystem<any Codable>'
+    var actorSystemConformanceRequirements: [TypeSyntax] = []
 
     let attributes = proto.attributes.filter {
       guard let attr = $0.as(AttributeSyntax.self) else {
@@ -199,6 +203,7 @@ extension DistributedResolvableMacro {
       case .conformanceRequirement(let conformanceReq)
            where conformanceReq.leftType.isActorSystem:
         specificActorSystemRequirement = conformanceReq.rightType.trimmed
+        actorSystemConformanceRequirements.append(conformanceReq.rightType.trimmed)
         isGenericOverActorSystem = true
 
       case .sameTypeRequirement(let sameTypeReq):
@@ -265,8 +270,10 @@ extension DistributedResolvableMacro {
         }
       }
 
-      if isGenericOverActorSystem, let specificActorSystemRequirement {
-        typeParamConstraints = ["ActorSystem: \(specificActorSystemRequirement)"] + typeParamConstraints
+      if isGenericOverActorSystem {
+        typeParamConstraints = actorSystemConformanceRequirements.map {
+          "ActorSystem: \($0)"
+        } + typeParamConstraints
       }
       
       if !typeParamConstraints.isEmpty {

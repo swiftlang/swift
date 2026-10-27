@@ -97,6 +97,9 @@ FEATURE(EmbeddedDistributedSwift,                       (6, 5))
 FEATURE(DistributedAccessorIsolation,                   (6, 5))
 FEATURE(DynamicCastTest,                                (6, 5))
 FEATURE(OnceClosureDestroyedError,                      (6, 5))
+// The synchronous thunk of a '@oneway' distributed function calls
+// '_DistributedOnewayActorSystem.remoteCallOneway'
+FEATURE(DistributedOnewayFunction,                      (6, 5))
 FEATURE(SynchronousOperationTask,                       (6, 5))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)

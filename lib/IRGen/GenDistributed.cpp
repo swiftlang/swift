@@ -108,6 +108,23 @@ getAccessorLinking(ThunkOrRequirement accessorFor) {
   return LinkEntity::forDistributedTargetAccessor(requirement);
 }
 
+/// The requirement thunk through which the accessor of the distributed thunk
+/// \p requirement of a protocol requirement calls the witness. That is the
+/// requirement thunk itself, except for a '@oneway' requirement,
+/// whose synchronous thunk only runs a call on a local actor without waiting
+/// for it: its accessor, which is 'async', calls the await thunk, which waits
+/// for the call, like the accessor of a '@oneway' function of a
+/// distributed actor dispatches to its async recipient thunk
+static SILDeclRef
+getRequirementAccessorDispatchRef(AbstractFunctionDecl *requirement) {
+  if (auto *thunk = dyn_cast<FuncDecl>(requirement))
+    if (thunk->isDistributedThunk() && thunk->isOneway())
+      if (auto *original = getDistributedThunkOriginalDecl(thunk))
+        if (auto *awaitThunk = original->getDistributedAwaitThunk())
+          return SILDeclRef(awaitThunk).getDistributedThunkDeclRef();
+  return SILDeclRef(requirement).getDistributedThunkDeclRef();
+}
+
 struct ArgumentDecoderInfo {
   /// The instance of the decoder this information belongs to.
   llvm::Value *Decoder;
@@ -236,7 +253,7 @@ public:
       auto *requirement = cast<AbstractFunctionDecl *>(target);
       Type = IGF.IGM.getSILTypes().getConstantFunctionType(
           IGF.IGM.getMaximalTypeExpansionContext(),
-          SILDeclRef(requirement).getDistributedThunkDeclRef());
+          getRequirementAccessorDispatchRef(requirement));
     }
   }
 
@@ -496,6 +513,27 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   if (Context.LangOpts.hasFeature(Feature::Embedded))
     return;
 
+  // A distributed oneway witness adapter is never looked up by name at
+  // runtime
+  if (auto *thunk = target.dyn_cast<SILFunction *>())
+    if (auto *adapter = thunk->getDeclRef().getDistributedThunk())
+      if (adapter->isDistributedOnewayWitnessAdapter())
+        return;
+
+  // Neither is the await thunk of a '@oneway' function or
+  // requirement: its remote calls use the identifier of the synchronous
+  // thunk, so the receiving side runs the function through the accessor and
+  // the accessible function record of that thunk
+  if (auto *thunk = target.dyn_cast<SILFunction *>()) {
+    if (auto *awaitThunk = thunk->getDeclRef().getDistributedThunk())
+      if (awaitThunk->isDistributedAwaitThunk())
+        return;
+  } else if (auto *requirement = dyn_cast<FuncDecl>(
+                 cast<AbstractFunctionDecl *>(target))) {
+    if (requirement->isDistributedAwaitThunk())
+      return;
+  }
+
   LinkEntity accessorRef = getAccessorLinking(target);
 
   // Pick the SIL function to dispatch through. Default = the linked thunk;
@@ -504,6 +542,13 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   // accessor speaks `$P` end-to-end and no IR-level existential boxing /
   // result-buffer juggling is needed. The linking identity (the symbol
   // emitted into the accessor record) stays the regular thunk's name.
+  //
+  // A `oneway` function always has such a recipient thunk: its distributed
+  // thunk is synchronous and only runs the call on the actor without waiting
+  // for it, the recipient thunk is `async` and awaits the call. A protocol
+  // requirement has no recipient thunk, its accessor calls the await thunk
+  // of the requirement through the witness table instead, see
+  // `getRequirementAccessorDispatchRef`
   SILFunction *dispatchTo = nullptr;
   if (auto *thunk = target.dyn_cast<SILFunction *>()) {
     if (auto *afd = thunk->getDeclRef().getAbstractFunctionDecl()) {
@@ -521,7 +566,7 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
     auto *requirement = cast<AbstractFunctionDecl *>(target);
     targetTy = getSILTypes().getConstantFunctionType(
         getMaximalTypeExpansionContext(),
-        SILDeclRef(requirement).getDistributedThunkDeclRef());
+        getRequirementAccessorDispatchRef(requirement));
   }
   bool targetHasIsolatedActorParameter = false;
   if (auto isolated = targetTy->maybeGetIsolatedParameter()) {
@@ -1209,13 +1254,15 @@ void DistributedAccessor::emit() {
                              /*isOutlined=*/false);
     }
 
-    // Both accessor and distributed method are always `async throws`
-    // so we need to load error value (if any) from the slot.
+    // The accessor is always `async throws`, and so is the distributed
+    // method, except for the synchronous distributed thunk of a `oneway`
+    // function, which is still `throws`. Load the error value (if any) from
+    // the slot
     {
       assert(targetTy->hasErrorResult());
 
-      Address calleeErrorSlot =
-          emission->getCalleeErrorSlot(getErrorType(), /*isCalleeAsync=*/true);
+      Address calleeErrorSlot = emission->getCalleeErrorSlot(
+          getErrorType(), /*isCalleeAsync=*/targetTy->isAsync());
       targetError = IGF.Builder.CreateLoad(calleeErrorSlot);
     }
 
@@ -1238,6 +1285,16 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
     auto fpKind = classifyFunctionPointerKind(callee);
     auto signature = IGM.getSignature(Type, fpKind);
 
+    // The synchronous distributed thunk of a `oneway` function is called
+    // directly, outside of Embedded Swift the accessor dispatches to its
+    // async recipient thunk instead (see `emitDistributedTargetAccessor`)
+    if (!Type->isAsync()) {
+      return FunctionPointer::forDirect(
+          FunctionPointer::Kind(Type),
+          IGM.getAddrOfSILFunction(callee, NotForDefinition),
+          /*secondaryValue=*/nullptr, signature);
+    }
+
     auto *fnPtr = llvm::ConstantExpr::getBitCast(
         IGM.getAddrOfAsyncFunctionPointer(callee), IGM.PtrTy);
 
@@ -1248,7 +1305,7 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
 
   auto *requirementDecl = cast<AbstractFunctionDecl *>(Target);
   auto *protocol = requirementDecl->getDeclContext()->getSelfProtocolDecl();
-  SILDeclRef requirementRef = SILDeclRef(requirementDecl).getDistributedThunkDeclRef();
+  SILDeclRef requirementRef = getRequirementAccessorDispatchRef(requirementDecl);
 
   if (!IGM.isResilient(protocol, ResilienceExpansion::Maximal)) {
     auto *witness = getWitnessMetadata(actorSelf);

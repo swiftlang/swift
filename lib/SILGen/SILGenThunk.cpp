@@ -123,6 +123,28 @@ void SILGenModule::emitDistributedThunkForDecl(
   auto thunk = SILDeclRef(thunkDecl).getDistributedThunkDeclRef();
   emitFunctionDefinition(thunk,
                          getFunction(thunk, ForDefinition));
+
+  // A '@oneway' function also has the await thunk, which calls that are
+  // not a 'send' call
+  if (auto *awaitThunkDecl = afd->getDistributedAwaitThunk()) {
+    if (awaitThunkDecl->hasBody() && !awaitThunkDecl->isBodySkipped()) {
+      auto awaitThunk =
+          SILDeclRef(awaitThunkDecl).getDistributedThunkDeclRef();
+      emitFunctionDefinition(awaitThunk,
+                             getFunction(awaitThunk, ForDefinition));
+    }
+  }
+}
+
+void SILGenModule::emitDistributedWitnessAdapter(FuncDecl *adapter) {
+  assert(adapter->isDistributedOnewayWitnessAdapter());
+  if (!adapter->hasBody() || adapter->isBodySkipped())
+    return;
+
+  auto thunk = SILDeclRef(adapter).getDistributedThunkDeclRef();
+  if (hasFunction(thunk))
+    return;
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
 void SILGenModule::emitDistributedResolvableProxyAdapterThunkForDecl(

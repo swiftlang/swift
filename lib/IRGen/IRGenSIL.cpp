@@ -2874,13 +2874,22 @@ void IRGenSILFunction::emitSILFunction() {
     emitCoroFunctionPointer(IGM, CurFn, LinkEntity::forSILFunction(CurSILFn));
   }
 
-  if (CurSILFn->isRuntimeAccessible())
+  // A distributed oneway witness adapter is only called through a witness
+  // table, it is never looked up by name at runtime, so it has no accessor or
+  // accessible function record: the receiving side runs the function that it
+  // adapts through that function's own record
+  bool isWitnessAdapter = false;
+  if (auto *adapter = CurSILFn->getDeclRef().getDistributedThunk())
+    isWitnessAdapter = adapter->isDistributedOnewayWitnessAdapter();
+
+  if (CurSILFn->isRuntimeAccessible() && !isWitnessAdapter)
     IGM.addAccessibleFunction(
         AccessibleFunction::forSILFunction(IGM, CurSILFn));
 
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
-  if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
+  if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk &&
+      !isWitnessAdapter) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
   }
 

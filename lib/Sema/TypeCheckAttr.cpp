@@ -2870,14 +2870,6 @@ void AttributeChecker::visitOnewayAttr(OnewayAttr *attr) {
   if (!FD || isa<AccessorDecl>(FD))
     return;
 
-  // A 'send' of a distributed function would have to make a remote call
-  // without waiting for its reply, which distributed actor systems do not
-  // support yet
-  if (FD->isDistributed()) {
-    diagnoseAndRemoveAttr(attr, diag::oneway_distributed_not_supported, FD);
-    return;
-  }
-
   // A '@oneway' function is called with 'send', which never observes a reply,
   // so it must return 'Void', and which has no caller to receive an error, so
   // it must not throw. A 'throws(Never)' function does not throw
@@ -2911,6 +2903,8 @@ void AttributeChecker::visitOnewayAttr(OnewayAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_objc, attr, FD);
     return;
   }
+
+  TypeChecker::checkDistributedOnewayAvailability(FD);
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {

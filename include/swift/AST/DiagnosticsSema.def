@@ -6851,9 +6851,17 @@ ERROR(override_oneway_mismatch,none,
       "'@oneway' %kind0 cannot override %kind2, which is not '@oneway'}1",
       (const ValueDecl *, bool, const ValueDecl *))
 
-ERROR(oneway_distributed_not_supported,none,
-      "'@oneway' is not supported on %kind0 yet",
+ERROR(oneway_distributed_only_version_newer,none,
+      "'@oneway' %kind0 is only available in %1 %2 or newer",
+      (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+ERROR(oneway_distributed_requires_oneway_actor_system,none,
+      "'@oneway' %kind0 requires its actor system to conform to "
+      "'_DistributedOnewayActorSystem'",
       (const ValueDecl *))
+NOTE(oneway_distributed_actor_system_not_oneway,none,
+      "actor system %0 of %kind1 does not conform to "
+      "'_DistributedOnewayActorSystem'",
+      (Type, const ValueDecl *))
 
 ERROR(send_requires_call,none,
       "'send' can only be applied to a function call", ())
@@ -6892,8 +6900,14 @@ ERROR(send_requires_newer_concurrency_library,none,
 ERROR(send_only_version_newer,none,
       "'send' is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
-ERROR(send_distributed_not_supported,none,
-      "'send' of %kind0 is not supported yet",
+ERROR(send_distributed_requires_oneway,none,
+      "'send' of %kind0 requires it to be '@oneway'",
+      (const ValueDecl *))
+NOTE(send_distributed_add_oneway,none,
+      "mark %kind0 '@oneway' to call it with 'send'",
+      (const ValueDecl *))
+NOTE(send_distributed_use_try_await,none,
+      "use 'try await' to call %kind0 and wait for its reply",
       (const ValueDecl *))
 GROUPED_WARNING(await_on_oneway_function,AwaitedOnewayCall,none,
       "'@oneway' %select{function|%kind1}0 is not intended to be awaited on, "

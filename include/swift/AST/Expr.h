@@ -2240,8 +2240,10 @@ public:
 /// Pre-checking wraps the call in an implicit '{ try await <call> }' operation
 /// closure of type '() async throws -> Void', which SILGen runs in a new
 /// discarding task. CSApply replaces the closure with a synchronous
-/// expression for a synchronous callee which is isolated to an actor, which
-/// enqueues the call
+/// expression for a '@oneway' distributed callee (see
+/// 'FuncDecl::hasSynchronousDistributedThunk()'), which calls its
+/// synchronous distributed thunk, and for a synchronous callee which is
+/// isolated to an actor, which enqueues the call
 class SendExpr final : public Expr {
   Expr *SubExpr;
   SourceLoc SendLoc;

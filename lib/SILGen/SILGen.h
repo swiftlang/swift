@@ -376,6 +376,10 @@ public:
   /// with it.
   void emitDistributedThunkForDecl(AbstractFunctionDecl * afd);
 
+  /// Emits a distributed oneway witness adapter thunk, unless it was already
+  /// emitted (see \c FuncDecl::isDistributedOnewayWitnessAdapter())
+  void emitDistributedWitnessAdapter(FuncDecl *adapter);
+
   /// Emits the distributed 'resolvable proxy adapter' thunk for the decl
   /// if there is one associated with it.
   void emitDistributedResolvableProxyAdapterThunkForDecl(

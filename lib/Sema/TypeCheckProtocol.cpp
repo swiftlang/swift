@@ -818,7 +818,8 @@ static bool isOnewayRelaxedWitness(ValueDecl *req, ValueDecl *witness) {
   auto *reqFunc = dyn_cast<FuncDecl>(req);
   auto *witnessFunc = dyn_cast<FuncDecl>(witness);
   return reqFunc && witnessFunc && reqFunc->isOneway() &&
-         !witnessFunc->isOneway();
+         (!witnessFunc->isOneway() ||
+          witnessFunc->isDistributedOnewayWitnessAdapter());
 }
 
 RequirementMatch swift::matchWitness(
@@ -1798,6 +1799,31 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
       auto func = dyn_cast<AbstractFunctionDecl>(req);
       if (func && func->isDistributedThunk()) {
         if (auto candidate = dyn_cast<AbstractFunctionDecl>(witness)) {
+          // A non-'@oneway' function witnesses the synchronous thunk of a
+          // '@oneway' requirement through its 'oneway witness adapter'
+          auto *reqThunk = dyn_cast<FuncDecl>(func);
+          auto *candidateFunc = dyn_cast<FuncDecl>(candidate);
+
+          // The await thunk of a '@oneway' requirement is witnessed
+          // by the await thunk of a '@oneway' function, and by the
+          // regular thunk of any other function
+          if (reqThunk && reqThunk->isDistributedAwaitThunk()) {
+            if (candidateFunc && candidateFunc->isOneway()) {
+              if (auto thunk = candidateFunc->getDistributedAwaitThunk())
+                return thunk;
+              return witness;
+            }
+            if (auto thunk = candidate->getDistributedThunk())
+              return thunk;
+            return witness;
+          }
+
+          if (reqThunk && reqThunk->isOneway() && candidateFunc &&
+              !candidateFunc->isOneway()) {
+            if (auto adapter = candidate->getDistributedOnewayWitnessAdapter())
+              return adapter;
+          }
+
           if (auto thunk = candidate->getDistributedThunk())
             return thunk;
         }

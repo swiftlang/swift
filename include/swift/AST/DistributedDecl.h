@@ -229,6 +229,10 @@ bool distributedThunkShouldBeNonisolatedNonsending(FuncDecl *func);
 /// `distributed var`. Returns null if the original cannot be found.
 AbstractFunctionDecl *getDistributedThunkOriginalDecl(FuncDecl *thunk);
 
+/// Whether \p decl is the '_executeDistributedTarget' receive dispatcher that
+/// the compiler synthesizes for a distributed actor in Embedded Swift
+bool isSynthesizedEmbeddedDistributedDispatcher(const Decl *decl);
+
 /// Retrieve the declaration of DistributedActorSystem.make().
 ///
 /// \param thunk the function from which we'll be invoking things on the

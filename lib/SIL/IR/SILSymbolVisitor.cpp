@@ -541,9 +541,18 @@ public:
     {
       // Distributed functions emit a number of thunks that we need to replicate here.
 
-      // Record the 'distributed_thunk'
+      // Record the 'distributed_thunk'. The thunk of a '@oneway'
+      // function is synchronous, so it has no async function pointer
       if (AFD->getDistributedThunk()) {
         auto thunk = SILDeclRef(AFD).getDistributedThunkDeclRef();
+        addFunction(thunk);
+        if (thunk.hasAsync())
+          addAsyncFunctionPointer(thunk);
+      }
+
+      // Record the await 'distributed_thunk' of a '@oneway' function
+      if (auto awaitThunk = AFD->getDistributedAwaitThunk()) {
+        auto thunk = SILDeclRef(awaitThunk).getDistributedThunkDeclRef();
         addFunction(thunk);
         addAsyncFunctionPointer(thunk);
       }

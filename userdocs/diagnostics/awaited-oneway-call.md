@@ -10,7 +10,7 @@ If a method is explicitly annotated using `@oneway` it is inherently designed to
 Calling a function with `send` enqueues the call on the function's actor, and executes the target method without waiting for it to complete.
 A method annotated with `@oneway` explicitly signals that it was designed with this in mind, and calling it with `await` may not result in optimal behavior.
 
-The warning in this group is emitted when a `@oneway` function is called with `await` from outside of its isolation domain. The call is made as an ordinary call, which works, but does not express the intent of the function. The `await` waits for the function to run, like for any other awaited call.
+The warning in this group is emitted when a `@oneway` function is called with `await` from outside of its isolation domain. The call is made as an ordinary call, which works, but does not express the intent of the function. What `await` waits for depends on the function: a `@oneway` function that is not `distributed` is awaited like any other, while the call of a `@oneway` `distributed` function does not wait for the function to run, whether the actor is local or remote, only for the call to be handed over to the actor or the actor system.
 
 For example:
 

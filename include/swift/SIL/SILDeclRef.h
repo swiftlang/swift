@@ -464,6 +464,11 @@ struct SILDeclRef {
   /// Returns a SILDeclRef pointing to the corresponding 'distributed_thunk' of the current loc.
   SILDeclRef getDistributedThunkDeclRef() const;
 
+  /// Like \c getDistributedThunkDeclRef() but for a call from the module being
+  /// compiled: a call of a '@oneway' function that is not a 'send' calls its
+  /// await thunk (see \c AbstractFunctionDecl::getDistributedAwaitThunk())
+  SILDeclRef getDistributedThunkDeclRefForClient(bool isSend) const;
+
   /// Returns the distributed known-to-be-local entry point corresponding to
   /// the same decl.
   SILDeclRef asDistributedKnownToBeLocal(bool isLocal = true) const {

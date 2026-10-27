@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import _Concurrency
-import Distributed
+@_spi(OnewaySend) import Distributed
 
 // ==== ----------------------------------------------------------------------
 // MARK: The serialization requirement
@@ -267,6 +267,11 @@ public final class EmbeddedFakeRoundtripActorSystem: DistributedActorSystem, @un
     // This specific pattern is necessary so that the transparent executeDistributedTarget
     // gets inlined here and works on a concrete Act then, otherwise it would not work in Embedded.
     active[actor.id] = { [self] target, decoder, handler in
+      // Only calls with a oneway flag print, so that the tests which match the
+      // output line by line don't see the extra line
+      if target.isOnewayRemoteCall || target.isOnewayTarget {
+        print("[swift] executeDistributedTarget: oneway: \(target.isOnewayRemoteCall) target: \(target.isOnewayTarget)")
+      }
       try await self.executeDistributedTarget(
           on: actor, target: target, invocationDecoder: &decoder, handler: handler)
     }
@@ -307,7 +312,15 @@ public final class EmbeddedFakeRoundtripActorSystem: DistributedActorSystem, @un
     // serializes its return value into this response buffer
     let resultBuffer = ResultBuffer()
     let handler = ResultHandler(buffer: resultBuffer)
-    try await dispatch(target, &decoder, handler)
+    // 'RemoteCallTarget' is non-escapable, so send its identifier bytes and the
+    // oneway flags, and re-create the target on the receiving side
+    let identifierBytes = target.identifier.withUnsafeBytes { unsafe [UInt8]($0) }
+    let isOneway = target.isOnewayRemoteCall
+    let isOnewayTarget = target.isOnewayTarget
+    var receivedTarget = RemoteCallTarget(identifierBytes.span.bytes)
+    receivedTarget.isOnewayRemoteCall = isOneway
+    receivedTarget.isOnewayTarget = isOnewayTarget
+    try await dispatch(receivedTarget, &decoder, handler)
 
     // Take the serialized response back across the wire and decode it into `Res`
     let responseWire = resultBuffer.returnBytes
@@ -344,6 +357,54 @@ public final class EmbeddedFakeRoundtripActorSystem: DistributedActorSystem, @un
     // response - there is nothing to read back
     let resultBuffer = ResultBuffer()
     let handler = ResultHandler(buffer: resultBuffer)
-    try await dispatch(target, &decoder, handler)
+    // 'RemoteCallTarget' is non-escapable, so send its identifier bytes and the
+    // oneway flags, and re-create the target on the receiving side
+    let identifierBytes = target.identifier.withUnsafeBytes { unsafe [UInt8]($0) }
+    let isOneway = target.isOnewayRemoteCall
+    let isOnewayTarget = target.isOnewayTarget
+    var receivedTarget = RemoteCallTarget(identifierBytes.span.bytes)
+    receivedTarget.isOnewayRemoteCall = isOneway
+    receivedTarget.isOnewayTarget = isOnewayTarget
+    try await dispatch(receivedTarget, &decoder, handler)
+  }
+}
+
+@_spi(OnewaySend)
+extension EmbeddedFakeRoundtripActorSystem: _DistributedOnewayActorSystem {
+  // The synchronous send of a '@oneway' call: hand a copy of the serialized
+  // arguments to the callee and return without waiting for the call
+  public func remoteCallOneway<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder
+  ) throws
+      where Act: DistributedActor, Act.ActorSystem == EmbeddedFakeRoundtripActorSystem {
+    print("[swift] remoteCallOneway reached, oneway: \(target.isOnewayRemoteCall), onewayTarget: \(target.isOnewayTarget)")
+    guard let dispatch = active[actor.id] else {
+      fatalError("no local actor hosted for the target id")
+    }
+
+    // ==================== NETWORK: request -> callee =====================
+    let requestBuffer = CallBuffer()
+    requestBuffer.argBytes = invocation.buffer.argBytes
+    // 'RemoteCallTarget' is non-escapable, so send its identifier bytes and
+    // re-create the target on the receiving side
+    let identifierBytes = target.identifier.withUnsafeBytes { unsafe [UInt8]($0) }
+    // Whether the caller waits for a reply is a property of the call, which
+    // the message carries to the recipient
+    let isOneway = target.isOnewayRemoteCall
+    let isOnewayTarget = target.isOnewayTarget
+
+    // Runs right away up to the first suspension, so the calls reach the
+    // callee in the order they were sent. Nobody waits for the call, and a
+    // '@oneway' call has nobody to report a failure to
+    Task.immediate {
+      var receivedTarget = RemoteCallTarget(identifierBytes.span.bytes)
+      receivedTarget.isOnewayRemoteCall = isOneway
+      receivedTarget.isOnewayTarget = isOnewayTarget
+      var decoder = InvocationDecoder(buffer: requestBuffer)
+      let handler = ResultHandler(buffer: ResultBuffer())
+      try? await dispatch(receivedTarget, &decoder, handler)
+    }
   }
 }

@@ -64,6 +64,11 @@ void diagnoseDistributedFunctionInNonDistributedActorProtocol(
 /// Emit a FixIt suggesting to add Codable to the nominal type.
 void addCodableFixIt(const NominalTypeDecl *nominal, InFlightDiagnostic &diag);
 
+/// The actor system of the distributed actor (or 'DistributedActor'
+/// constrained protocol) which \p func is a member of, in the generic
+/// environment of \p func, or a null type if there is none
+Type getDistributedActorSystemTypeOfMember(AbstractFunctionDecl *func);
+
 /// Create the `_executeDistributedTarget(target:invocationDecoder:resultHandler:)`
 /// instance method for the given distributed actor.
 ///

@@ -1589,11 +1589,20 @@ getSILDeclRefChecked(ModuleFile *MF, ArrayRef<uint64_t> ListOfValues,
   auto *decl = cast<ValueDecl>(declOrErr.get());
   auto kind = (SILDeclRef::Kind)ListOfValues[NextIdx+1];
   // Distributed thunks are serialized as the decl they were synthesized for.
+  // Bit 1 of the foreign field selects the await thunk of a '@oneway'
+  // function rather than its distributed thunk
+  bool isDistributedAwaitThunk = (ListOfValues[NextIdx+2] & 2) != 0;
   if (kind == SILDeclRef::Kind::DistributedThunk)
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
-      if (auto *thunk = afd->getDistributedThunk())
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      FuncDecl *thunk = nullptr;
+      if (isDistributedAwaitThunk)
+        thunk = afd->getDistributedAwaitThunk();
+      if (!thunk)
+        thunk = afd->getDistributedThunk();
+      if (thunk)
         decl = thunk;
-  SILDeclRef DRef(decl, kind, /*isForeign=*/ListOfValues[NextIdx+2] > 0);
+    }
+  SILDeclRef DRef(decl, kind, /*isForeign=*/(ListOfValues[NextIdx+2] & 1) != 0);
   NextIdx += 3;
   return DRef;
 }

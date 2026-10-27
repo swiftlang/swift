@@ -7600,8 +7600,9 @@ RValue RValueEmitter::visitSendExpr(SendExpr *E, SGFContext C) {
 
   // A 'send' call to a synchronous function has already been lowered by the
   // type checker to a synchronous call of '_enqueueOneway' /
-  // '_enqueueOnewayIsolatedAny'. There is no operation closure here, just emit
-  // the call
+  // '_enqueueOnewayIsolatedAny' or, for a '@oneway' distributed function, to a
+  // direct call of its synchronous distributed thunk. There is no operation
+  // closure here, just emit the call
   if (!isAnyClosureExpr(E->getSubExpr())) {
     SGF.emitIgnoredExpr(E->getSubExpr());
     return SGF.emitEmptyTupleRValue(E, C);
@@ -7658,6 +7659,60 @@ RValue RValueEmitter::visitSendExpr(SendExpr *E, SGFContext C) {
     return true;
   };
 
+  // Like 'deriveDefaultActorExecutor', but for a distributed-actor 'actorMV':
+  // the local-vs-remote instance kind is only known at runtime, so emit a
+  // diamond that checks 'isRemote' and sets the initial serial executor to
+  // '.none' on the remote path (no local executor to enqueue on - the
+  // distributed thunk performs the 'remoteCall' itself) or
+  // '.some(<default executor>)' on the local path (matching the
+  // non-distributed actor-instance case above, so the task enqueues directly
+  // on the local actor). This deliberately never materializes a remote proxy's
+  // executor. NOTE: exact submission-order FIFO for a local distributed target
+  // additionally depends on the distributed thunk being
+  // 'nonisolated(nonsending)'; today's '@concurrent' thunk hops to the generic
+  // executor on entry (before its own 'isRemote' check), which can reorder a
+  // burst of 'send' sends. Enqueuing on the local executor here is correct
+  // and forward-compatible with that separately-tracked thunk change. Only
+  // default actors are handled this way, same as 'deriveDefaultActorExecutor'.
+  // Returns whether an executor was derived
+  auto deriveDistributedActorExecutor = [&](ManagedValue actorMV,
+                                            Type actorTy) -> bool {
+    auto *cd = actorTy ? actorTy->getClassDecl() : nullptr;
+    if (!cd || !cd->isDefaultActor(SGF.SGM.SwiftModule,
+                                   SGF.F.getResilienceExpansion()))
+      return false;
+
+    auto *isRemoteBB = SGF.createBasicBlock();
+    auto *isLocalBB = SGF.createBasicBlock();
+    auto *contBB = SGF.createBasicBlock();
+
+    SGF.emitDistributedIfRemoteBranch(loc, actorMV.getValue(), actorTy,
+                                      /*if remote=*/isRemoteBB,
+                                      /*if local=*/isLocalBB);
+
+    SGF.B.emitBlock(isRemoteBB);
+    SILValue noneExec =
+        SGF.B.createManagedOptionalNone(loc, executorOptTy).forward(SGF);
+    SGF.B.createBranch(loc, contBB, noneExec);
+
+    SGF.B.emitBlock(isLocalBB);
+    SILValue someExec;
+    {
+      // Pop the borrow's cleanup before branching to 'contBB': a cleanup
+      // pushed on one arm of a diamond must not survive past the merge,
+      // since the merge block is not dominated by this arm alone
+      FullExpr borrowScope(SGF.Cleanups, CleanupLocation(loc));
+      someExec = buildSomeDefaultActorExecutor(actorMV, actorTy);
+    }
+    SGF.B.createBranch(loc, contBB, someExec);
+
+    SGF.B.emitBlock(contBB);
+    SILValue merged =
+        contBB->createPhiArgument(executorOptTy, OwnershipKind::None);
+    initialSerialExecutor = ManagedValue::forObjectRValueWithoutOwnership(merged);
+    return true;
+  };
+
   // FIFO: when we can statically tell the target's serial executor, pass it
   // as the task's initial serial executor above, so that successive 'send'
   // calls enqueue on it in program order. Dig the underlying call out of the
@@ -7691,8 +7746,10 @@ RValue RValueEmitter::visitSendExpr(SendExpr *E, SGFContext C) {
         // side effects, usually the capture variable the receiver was
         // evaluated into at the call site. A 'nonisolated' method of an
         // actor does not run on the actor, so it has no initial serial
-        // executor. Neither does a distributed actor, which may be remote,
-        // the task hops to it when it starts
+        // executor. For a distributed actor, the local-vs-remote instance
+        // kind is only known at runtime, so the initial serial executor is
+        // derived via a runtime 'isRemote' check (see
+        // 'deriveDistributedActorExecutor' above)
         bool isIsolatedToSelf = calleeIsolation &&
                                 calleeIsolation->isActorInstanceIsolated() &&
                                 calleeIsolation->isActorInstanceForSelfParameter();
@@ -7704,9 +7761,11 @@ RValue RValueEmitter::visitSendExpr(SendExpr *E, SGFContext C) {
           if (selfSemantic && isa<DeclRefExpr>(selfSemantic)) {
             Type selfTy = selfExpr->getType();
             if (auto *nominal = selfTy ? selfTy->getAnyNominal() : nullptr) {
-              if (nominal->isActor() && !nominal->isDistributedActor()) {
+              if (nominal->isActor()) {
                 ManagedValue actorMV = SGF.emitRValueAsSingleValue(selfExpr);
-                done = deriveDefaultActorExecutor(actorMV, selfTy);
+                done = nominal->isDistributedActor()
+                           ? deriveDistributedActorExecutor(actorMV, selfTy)
+                           : deriveDefaultActorExecutor(actorMV, selfTy);
               }
             }
           }

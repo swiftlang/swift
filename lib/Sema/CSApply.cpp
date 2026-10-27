@@ -3955,8 +3955,23 @@ namespace {
       ctx.Diags.diagnose(expr->getSendLoc(), diag::send_requires_call);
     }
 
+    /// Whether \p base is the 'self' of a distributed thunk, which is known
+    /// to be local
+    static bool isSelfOfDistributedThunk(Expr *base) {
+      if (!base)
+        return false;
+      auto *ref = dyn_cast<DeclRefExpr>(base->getSemanticsProvidingExpr());
+      auto *param = ref ? dyn_cast<ParamDecl>(ref->getDecl()) : nullptr;
+      if (!param || !param->isSelfParameter())
+        return false;
+      auto *func = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
+      return func && func->isDistributedThunk();
+    }
+
     /// Whether the callee of \p apply can throw, according to its function
-    /// type. A 'throws(Never)' function does not throw
+    /// type. The error of a call of a 'distributed' function, which is thrown
+    /// by its distributed thunk, is not part of that type, and neither does a
+    /// 'throws(Never)' function throw
     bool canCalleeOfSendThrow(ApplyExpr *apply) {
       Expr *fn = apply->getFn();
       Type fnTy = cs.hasType(fn) ? cs.getType(fn) : fn->getType();
@@ -3995,7 +4010,8 @@ namespace {
       }
 
       // Pre-checking only marks a call which is the operand itself, mark one
-      // in an optional chain as well ('send a?.f()')
+      // in an optional chain as well ('send a?.f()'), see
+      // 'diagnoseSendOfNonOnewayDistributedFunction'
       if (!expr->isImplicit())
         call->setIsOnewaySendOperand();
 
@@ -4006,24 +4022,6 @@ namespace {
         ctx.Diags.diagnose(expr->getSendLoc(),
                            diag::send_requires_actor_isolated_callee);
         return expr;
-      }
-
-      // A 'send' of a distributed function would have to make a remote call
-      // without waiting for its reply, which distributed actor systems do not
-      // support yet
-      if (!expr->isImplicit()) {
-        ValueDecl *callee =
-            call->getCalledValue(/*skipFunctionConversions=*/true);
-        if (!callee)
-          if (auto *selfApply = dyn_cast<SelfApplyExpr>(call->getFn()))
-            callee =
-                selfApply->getCalledValue(/*skipFunctionConversions=*/true);
-        if (auto *calleeFunc = dyn_cast_or_null<AbstractFunctionDecl>(callee);
-            calleeFunc && calleeFunc->isDistributed()) {
-          ctx.Diags.diagnose(expr->getSendLoc(),
-                             diag::send_distributed_not_supported, calleeFunc);
-          return expr;
-        }
       }
 
       // The caller does not wait for a 'send' call, so it cannot get the
@@ -4098,7 +4096,9 @@ namespace {
       // do not support. A synchronous target enqueued by the
       // '_enqueueOneway*' helpers has the same minimum, so that 'send' has a
       // single availability. Embedded Swift has no OS availability, the
-      // runtime ships with the binary
+      // runtime ships with the binary. The 'send' in the distributed thunk of
+      // a '@oneway' function is covered by the function's own availability,
+      // and so is the direct call of a synchronous distributed thunk
       auto checkRuntimeAvailability = [&] {
         if (ctx.LangOpts.hasFeature(Feature::Embedded) || expr->isImplicit())
           return;
@@ -4160,6 +4160,14 @@ namespace {
       var->setInterfaceType(valueTy->mapTypeOutOfEnvironment());
       if (isSending)
         var->setIsSendingCapture();
+
+      // A copy of a distributed actor which is known to be local, like the
+      // 'self' of a distributed thunk, is known to be local as well, so a
+      // distributed function called on it is called directly
+      if (auto *ref = dyn_cast<DeclRefExpr>(value->getSemanticsProvidingExpr()))
+        if (auto *refVar = dyn_cast<VarDecl>(ref->getDecl()))
+          if (refVar->isKnownToBeLocal())
+            var->addAttribute(new (ctx) KnownToBeLocalAttr(/*implicit=*/true));
 
       auto *pattern = NamedPattern::createImplicit(ctx, var, valueTy);
       auto *pbd = PatternBindingDecl::createImplicit(
@@ -4523,6 +4531,15 @@ namespace {
     /// Lower the operation closure '{ <call> }' of a 'send' call to a synchronous expression,
     /// so that the call site has no async code and can be in a synchronous context:
     ///
+    /// - A '@oneway' 'distributed' function, synchronous or 'async', becomes
+    ///   a direct call of its synchronous distributed thunk (see
+    ///   'FuncDecl::hasSynchronousDistributedThunk()'), which throws. The
+    ///   thunk runs a call on a local actor without waiting for it, and uses
+    ///   'remoteCallOneway' of the '_DistributedOnewayActorSystem' for a
+    ///   remote one
+    ///
+    ///     try send a.f(x)  =>  try a.f(x)   // via the distributed thunk
+    ///
     /// A synchronous function (see 'isSynchronouslyEnqueuedSendCallee'),
     /// '@oneway' or not, is enqueued as a task whose operation is synchronous
     /// where the runtime supports it, see '_enqueueOnewayUnchecked':
@@ -4565,13 +4582,41 @@ namespace {
           break;
       }
 
-      // TODO: Lower a call on an existential plain actor ('any Tellable') too.
-      // Its enqueued closure would have to be isolated to the opened
-      // existential, which the closure's captures do not support yet, so such
-      // a call keeps the task-based lowering, and so does a call in an
-      // optional chain
-      if (isa<OptionalEvaluationExpr>(body) || isa<OpenExistentialExpr>(body))
-        return nullptr;
+      // An optional chain around the call ('send a?.f()') skips the call if
+      // the chain fails, the lowered call of a distributed func stays wrapped
+      // in it
+      auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(body);
+      InjectIntoOptionalExpr *injectIntoOptional = nullptr;
+      if (optionalEval) {
+        body = optionalEval->getSubExpr();
+        injectIntoOptional = dyn_cast<InjectIntoOptionalExpr>(body);
+        if (injectIntoOptional)
+          body = injectIntoOptional->getSubExpr();
+      }
+
+      // A call on an existential receiver is wrapped in the opening of the
+      // existential; the lowered call of a distributed func is wrapped in it
+      // the same way
+      auto *openExistential = dyn_cast<OpenExistentialExpr>(body);
+      if (openExistential)
+        body = openExistential->getSubExpr();
+      auto wrapInOpenExistential = [&](Expr *lowered) -> Expr * {
+        if (openExistential) {
+          openExistential->setSubExpr(lowered);
+          openExistential->setType(lowered->getType());
+          cs.cacheType(openExistential);
+          lowered = openExistential;
+        }
+        if (optionalEval) {
+          if (injectIntoOptional) {
+            injectIntoOptional->setSubExpr(lowered);
+            lowered = injectIntoOptional;
+          }
+          optionalEval->setSubExpr(lowered);
+          lowered = optionalEval;
+        }
+        return lowered;
+      };
 
       auto *apply = dyn_cast<ApplyExpr>(body);
       if (!apply || isa<SelfApplyExpr>(apply))
@@ -4583,7 +4628,8 @@ namespace {
       if (!calleeVD && selfApply)
         calleeVD = selfApply->getCalledValue(/*skipFunctionConversions=*/true);
       auto *callee = dyn_cast_or_null<FuncDecl>(calleeVD);
-      if (!callee || !isSynchronouslyEnqueuedSendCallee(callee))
+      if (!callee || (!callee->hasSynchronousDistributedThunk() &&
+                      !isSynchronouslyEnqueuedSendCallee(callee)))
         return nullptr;
 
       DeclContext *outerDC = closure->getParent();
@@ -4594,12 +4640,53 @@ namespace {
 
       // Whether the receiver is the actor the calling function is already
       // isolated to, e.g. 'send self.f(x)' in one of the actor's methods, or
-      // 'send d.f(x)' in a function with an 'isolated d' parameter.
+      // 'send d.f(x)' in a function with an 'isolated d' parameter. Such a
+      // distributed actor is known to be local, just like for the actor
+      // isolation checker, which calls a distributed function on it directly
+      // rather than through its distributed thunk.
       //
       // The isolation of closures is only known after this rewrite, so only a
-      // call directly in a function body is recognized
-      bool isCallerActor = getSendCallerIsolation(apply, base, outerDC) ==
-                           SendCallerIsolation::CallerActorInstance;
+      // call directly in a function body is recognized. A 'send' of a
+      // '@oneway' distributed function in a closure, even one isolated to the
+      // actor, conservatively calls its synchronous distributed thunk, and
+      // therefore needs a 'try'
+      bool isCallerActor =
+          !openExistential && !optionalEval &&
+          getSendCallerIsolation(apply, base, outerDC) ==
+              SendCallerIsolation::CallerActorInstance;
+
+      // A 'distributed' function: call the synchronous distributed thunk
+      // directly. The actor isolation checker keeps the call synchronous and
+      // marks it as throwing, the thunk is used even for an actor which is
+      // known to be local but not isolated to the caller, so that the call is
+      // always run on the actor rather than inline. A 'send' on the caller's
+      // own actor is a local send of the function itself, like for a plain
+      // actor, see below
+      if (callee->hasSynchronousDistributedThunk() && !isCallerActor) {
+        if (!selfApply)
+          return nullptr;
+        // The local branch of the thunk itself sends the call to the function
+        // on its known-to-be-local 'self', which must not call the thunk again
+        if (isSelfOfDistributedThunk(selfApply->getBase()))
+          return nullptr;
+        apply->setShouldApplyDistributedThunk(true);
+        apply->setImplicitlyThrows(true);
+        Expr *lowered = wrapInOpenExistential(apply);
+        TypeChecker::contextualizeExpr(lowered, outerDC);
+        return lowered;
+      }
+      // An 'async' '@oneway' distributed function on the caller's own actor
+      // keeps the task-based lowering, like any other 'async' callee
+      if (!isSynchronouslyEnqueuedSendCallee(callee))
+        return nullptr;
+
+      // TODO: Lower a call on an existential plain actor ('any Tellable') too.
+      // Its enqueued closure would have to be isolated to the opened
+      // existential, which the closure's captures do not support yet, so such
+      // a call keeps the task-based lowering, and so does a call in an
+      // optional chain
+      if (openExistential || optionalEval)
+        return nullptr;
 
       auto isolation = getActorIsolation(callee);
       bool isActorInstance = isolation.isActorInstanceIsolated() &&

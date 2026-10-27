@@ -1721,6 +1721,17 @@ public:
     Expr *calleeFn = nullptr;
     auto fnRef = AbstractFunction::getAppliedFn(E, &calleeFn);
 
+    // A 'send' call of an 'async' '@oneway' distributed function calls its
+    // synchronous distributed thunk, which is not 'async'. Any other call of
+    // it calls its 'async' await thunk
+    if (fnType->isAsync() && E->shouldApplyDistributedThunk() &&
+        E->isOnewaySendOperand()) {
+      auto *calleeFunc = dyn_cast_or_null<FuncDecl>(
+          E->getCalledValue(/*skipFunctionConversions=*/true));
+      if (calleeFunc && calleeFunc->hasSynchronousDistributedThunk())
+        fnType = fnType->withExtInfo(fnType->getExtInfo().withAsync(false));
+    }
+
     auto *args = E->getArgs();
     return classifyApply(
         E, fnRef, calleeFn, fnType, args,
