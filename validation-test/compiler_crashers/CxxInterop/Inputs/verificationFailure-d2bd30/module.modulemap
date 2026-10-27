@@ -1,0 +1,4 @@
+module FnPtr {
+  header "header.h"
+  requires cplusplus
+}
