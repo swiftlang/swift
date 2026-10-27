@@ -31,7 +31,8 @@
 ///       }
 ///     }
 ///
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.0)
 @frozen
 @_staticExclusiveOnly
 public struct Mutex<Value: ~Copyable>: ~Copyable {
@@ -44,7 +45,6 @@ public struct Mutex<Value: ~Copyable>: ~Copyable {
   /// Initializes a value of this mutex with the given initial state.
   ///
   /// - Parameter initialValue: The initial value to give to the mutex.
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public init(_ initialValue: consuming sending Value) {
@@ -52,10 +52,8 @@ public struct Mutex<Value: ~Copyable>: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
 extension Mutex: @unchecked Sendable where Value: ~Copyable {}
 
-@available(SwiftStdlib 6.0, *)
 extension Mutex where Value: ~Copyable {
   /// Calls the given closure after acquiring the lock and then releases
   /// ownership.
@@ -81,7 +79,6 @@ extension Mutex where Value: ~Copyable {
   ///   acquired the lock.
   ///
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public borrowing func withLock<Result: ~Copyable, E: Error>(
@@ -127,7 +124,6 @@ extension Mutex where Value: ~Copyable {
   ///   behavior of similar functions in other languages (such as C's
   ///   `mtx_trylock()`) is platform-dependent and may differ from Swift's
   ///   behavior.
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public borrowing func withLockIfAvailable<Result: ~Copyable, E: Error>(
@@ -145,23 +141,19 @@ extension Mutex where Value: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
 extension Mutex where Value == Void {
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public borrowing func _unsafeLock() {
     handle._lock()
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public borrowing func _unsafeTryLock() -> Bool {
     handle._tryLock()
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public borrowing func _unsafeUnlock() {
@@ -169,9 +161,7 @@ extension Mutex where Value == Void {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
 extension _MutexHandle {
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   @unsafe
@@ -179,7 +169,6 @@ extension _MutexHandle {
     _lock()
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   @unsafe
@@ -187,7 +176,6 @@ extension _MutexHandle {
     _tryLock()
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   @unsafe
