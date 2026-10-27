@@ -1011,14 +1011,13 @@ static bool isCatchAllPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Any:
     return true;
-  case PatternKind::Tuple:
-    return llvm::all_of(cast<TuplePattern>(pattern)->getElements(),
-                        [&](const TuplePatternElt element) {
-                          return isCatchAllPattern(element.getPattern());
-                        });
-  case PatternKind::OptionalSome:
-    return isCatchAllPattern(
-        cast<OptionalSomePattern>(pattern)->getSubPattern());
+  case PatternKind::Tuple: {
+    auto elements = cast<TuplePattern>(pattern)->getElements();
+    return !elements.empty() &&
+           llvm::all_of(elements, [&](const TuplePatternElt element) {
+             return isCatchAllPattern(element.getPattern());
+           });
+  }
   case PatternKind::Paren:
     return isCatchAllPattern(cast<ParenPattern>(pattern)->getSubPattern());
   default:

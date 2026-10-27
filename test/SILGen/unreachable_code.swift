@@ -110,6 +110,17 @@ func testUnreachableCase5(a : Tree) {
   }
 }
 
+func testOptionalSomeIsNotCatchAll(a : Tree?) {
+  switch a {
+  case _?:
+    break
+  case nil:
+    break
+  default: // expected-warning {{default will never be executed}}
+    return
+  }
+}
+
 // https://github.com/apple/swift/issues/48333
 func testOptionalEvaluationBreak(a : Tree) {
   class C { func foo() {} }

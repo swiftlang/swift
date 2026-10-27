@@ -101,6 +101,17 @@ func testParensWildcardWithDefault(e1: ReasonableEnum) -> Bool {
   }
 }
 
+func testOptionalSomeIsNotCatchAll(e1: ReasonableEnum?) -> Bool {
+  switch e1 {
+  case _?:
+    return true
+  case nil:
+    return true
+  default: // expected-warning {{default will never be executed}}
+    return false
+  }
+}
+
 func testGuardedWildcardWithDefault(enum e: ReasonableEnum) -> Bool {
   switch e {
     case .zero, .one:
