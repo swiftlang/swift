@@ -3296,6 +3296,10 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
+    // Expand member macros so the members they add are checked below.
+    (void)evaluateOrDefault(Ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{ED}, {});
+
     for (Decl *member : ED->getMembers())
       visit(member);
 
@@ -4200,6 +4204,10 @@ public:
     checkGenericParams(ED);
 
     TypeChecker::checkDeclAttributes(ED);
+
+    // Expand member macros so the members they add are checked below.
+    (void)evaluateOrDefault(Ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{ED}, {});
 
     // If this is an @_objcImplementation of a class, set up some aspects of the
     // class.
