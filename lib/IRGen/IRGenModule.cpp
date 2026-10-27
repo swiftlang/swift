@@ -2718,6 +2718,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 
+bool IRGenModule::isBorrowRuntimeAvailable() {
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(ctx.getBorrowingAvailability());
+}
+
 bool IRGenModule::isTypedAllocationAvailable() {
   auto &langOpts = Context.LangOpts;
   return langOpts.hasFeature(Feature::Embedded) &&

@@ -23,6 +23,7 @@
 #include "FixedTypeInfo.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
+#include "GenBorrow.h"
 #include "GenMeta.h"
 #include "GenPack.h"
 #include "GenPointerAuth.h"
@@ -3855,6 +3856,19 @@ namespace {
       if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ti))
         return IGF.IGM.emitFixedTypeLayout(t, *fixedTI);
       return nullptr;
+    }
+
+    llvm::Value *visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                                        DynamicMetadataRequest request) {
+      // If the runtime might not support borrow metadata, derive the layout
+      // from the referent's layout instead.
+      if (shouldComputeBorrowLayoutInline(
+              IGF, IGF.IGM.getLoweredType(type))) {
+        auto referentLayout = visit(type->getReferentType()->getCanonicalType(),
+                                    request);
+        return emitInlineBorrowTypeLayout(IGF, referentLayout);
+      }
+      return visitType(type, request);
     }
 
     /// Fallback default implementation.
