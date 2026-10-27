@@ -625,8 +625,10 @@ enum class TypeDependenceKind : uint8_t {
   Sendable,
   /// The execution semantics of the function, e.g. exactly or at-most once.
   ExecutionSemantics,
+  /// Whether the function is Transferable.
+  Transferable,
 
-  Last = ExecutionSemantics
+  Last = Transferable
 };
 
 enum : unsigned {

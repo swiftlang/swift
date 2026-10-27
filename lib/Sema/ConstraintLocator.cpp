@@ -111,6 +111,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ThrownErrorType:
   case ConstraintLocator::FunctionSendability:
   case ConstraintLocator::FunctionExecutionSemantics:
+  case ConstraintLocator::FunctionTransferability:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
   case ConstraintLocator::ExistentialMemberAccessConversion:
@@ -532,6 +533,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::FunctionExecutionSemantics: {
     out << "function execution semantics";
+    break;
+  }
+  case ConstraintLocator::FunctionTransferability: {
+    out << "function transferability";
     break;
   }
   case ConstraintLocator::FallbackType: {

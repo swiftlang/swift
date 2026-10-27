@@ -3168,6 +3168,13 @@ public:
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
+  /// Match the @nontransferable bit between two functions.
+  SolutionKind matchFunctionTransferability(FunctionType *func1,
+                                            FunctionType *func2,
+                                            ConstraintKind kind,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,

@@ -1789,6 +1789,9 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       extInfo = extInfo.withExecutionSemantics(
           getUnappliedConsumingMethodExecutionSemantics(ty));
       break;
+    case TypeDependenceKind::Transferable:
+      extInfo = extInfo.withNonTransferable(!ty->isTransferable());
+      break;
     }
     return Type();
   }
@@ -3711,7 +3714,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::GlobalActorType:
     case ConstraintLocator::ContextualType:
     case ConstraintLocator::FunctionSendability:
-    case ConstraintLocator::FunctionExecutionSemantics: {
+    case ConstraintLocator::FunctionExecutionSemantics:
+    case ConstraintLocator::FunctionTransferability: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
