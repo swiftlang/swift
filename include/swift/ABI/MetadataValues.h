@@ -1838,6 +1838,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
   const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
 
+  /// The task to resume in a NullaryContinuationJob.
+  const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
+
   /// Result type metadata stored in a future task or task group.
   const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
