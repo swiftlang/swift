@@ -80,5 +80,6 @@ private func tryReplaceDestructConstructPair(destruct: MultipleValueInstruction 
 
   if everyResultUsedOnce {
     context.erase(instruction: construct)
+    context.erase(instruction: destruct)
   }
 }
