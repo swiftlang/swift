@@ -3,6 +3,7 @@
 // RUN: %FileCheck %s --check-prefix=NEGATIVE < %t.ll
 // RUN: %FileCheck %s --check-prefix=ACCESSORS < %t.ll
 // RUN: %target-swift-frontend -emit-silgen -parse-as-library -module-name M -enable-library-evolution %s | %FileCheck %s --check-prefix=SILGEN
+// RUN: %target-swift-frontend -emit-silgen -target %target-cpu-apple-macosx14.0 -parse-as-library -module-name M -enable-library-evolution %s | %FileCheck %s --check-prefix=WITNESS
 
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=arm64 || CPU=x86_64
@@ -110,3 +111,19 @@ func callHidden(_ p: Point, _ n: Point.Nested) -> Int {
 // CHECK: call swiftcc void @"$s1M7needsEqyyxmSQRzlF"(ptr getelementptr inbounds ({{.*}}, ptr @"$s1M5PointVMf", i32 0, i32 2), ptr getelementptr inbounds ({{.*}}, ptr @"$s1M5PointVMf", i32 0, i32 2), ptr [[WTABLE]])
 public func needsEq<T: Equatable>(_: T.Type) {}
 public func usePointEq() { needsEq(Point.self) }
+
+// The serialized witness thunks of a back-deployed type call the back
+// deployment thunks of the witnesses even when the deployment target is at
+// least the version the type is back-deployed before. Clients that emit their
+// own copy of the conformance run where the original witnesses might not
+// exist, and the optimizer devirtualizes calls in the serialized fallbacks to
+// these thunks.
+@backDeployed(before: macOS 12)
+@frozen public struct Old: Hashable {
+  public var y: Int
+}
+
+// WITNESS-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s1M3OldVSHAASH9hashValueSivgTW :
+// WITNESS: function_ref @$s1M3OldV9hashValueSivgTwb :
+// WITNESS-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s1M3OldVSHAASH4hash4intoys6HasherVz_tFTW :
+// WITNESS: function_ref @$s1M3OldV4hash4intoys6HasherVz_tFTwb :
