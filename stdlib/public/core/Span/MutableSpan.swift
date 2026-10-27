@@ -16,6 +16,7 @@ import Swift
 
 /// `MutableSpan<Element>` represents a contiguous region of memory which
 /// contains initialized instances of `Element`.
+@backDeployed(before: SwiftStdlib 6.2)
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
