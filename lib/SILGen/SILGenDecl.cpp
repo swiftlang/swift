@@ -1503,6 +1503,13 @@ static Expr *findConsumableStorageReference(Expr *e) {
 bool IsPatternInitialization::tryInitializeFromStorageReference(
     SILGenFunction &SGF, Expr *initializer, SILLocation loc) {
   if (!subInitialization.get()) {
+    // A statically-satisfied test that binds nothing always matches. Borrow
+    // the subject (it may have side effects) and succeed without a test.
+    if (isWildcardIsPattern(pattern)) {
+      FormalEvaluationScope borrowScope(SGF);
+      return (bool)emitTypeTestOperand(SGF, initializer);
+    }
+
     // `if case is T = box` or `if case _ as T = box` bind nothing
     // so they just need to borrow the source within a borrow scope
     // that is closed in the continuation block.
@@ -1886,8 +1893,9 @@ struct InitializationForPattern
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
     // A statically-satisfied test that binds nothing matches any value, so it
-    // needs no test and no storage -- it behaves exactly like `_`.
-    if (isWildcardIsPattern(P))
+    // needs no test and no storage.  Copyable subjects behave exactly like `_`;
+    // noncopyable subjects get borrowed later on.
+    if (isWildcardIsPattern(P) && !P->getType()->isNoncopyable())
       return InitializationPtr(new BlackHoleInitialization());
 
     InitializationPtr subInit;
