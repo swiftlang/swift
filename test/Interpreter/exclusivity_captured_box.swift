@@ -7,16 +7,26 @@
 // RUN: %target-run %t/a.out_O
 // REQUIRES: executable_test
 
-// MandatoryAllocBoxToStack only promotes a box, making its accesses static,
-// where static enforcement is equivalent to dynamic enforcement. These
-// conflicts only happen on some paths, so they must be caught at run time at
-// every optimization level. rdar://179406916
+// Conflicts on variables captured by box (by local functions and closures) that
+// static checking can't decide, so they must trap at run time at every
+// optimization level. Either the conflict only happens on some paths, or static
+// checking can't see it: the variable reaches a call through two captures, or
+// through a closure that escapes. MandatoryAllocBoxToStack doesn't promote these
+// boxes, so their accesses stay dynamic. The compile-time side is in
+// SILOptimizer/exclusivity_static_diagnostics_box.swift. rdar://179406916
+//
+// Functions are @inline(never): after inlining, LegacyDeadObjectElimination can
+// delete a dead variable together with its conflicting dynamic accesses.
 
 import StdlibUnittest
 
 var tests = TestSuite("ExclusivityCapturedBox")
 
 let yes = CommandLine.arguments.count > 0
+
+// -----------------------------------------------------------------------------
+// Conflicts on some paths. Each function is run once without the conflict and
+// once with it.
 
 // The callee calls the escaping closure only on some paths.
 @inline(never)
@@ -44,11 +54,7 @@ tests.test("EscapingClosureCalledDuringAccess") {
   escapingClosureMayBeCalledDuringAccess(yes)
 }
 
-// A local function that captures the variable by box modifies it only on some
-// paths.
-//
-// The local functions are not inlined: after inlining, LegacyDeadObjectElimination
-// deletes the dead variable together with its conflicting dynamic accesses.
+// A local function modifies the variable only on some paths.
 @inline(never)
 func localFunctionMayModifyDuringAccess(_ flag: Bool) {
   var x = 0
@@ -75,50 +81,8 @@ tests.test("LocalFunctionModifiesDuringAccess") {
   localFunctionMayModifyDuringAccess(yes)
 }
 
-// An escaped closure is called during an access.
-var saved: (() -> ())?
-
-@inline(never)
-func callSaved(_ x: inout Int) {
-  saved!()
-}
-
-@inline(never)
-func escapedClosureCalledDuringAccess() {
-  var count = 0
-  saved = { count += 1 }
-  callSaved(&count)
-  _blackHole(count)
-}
-
-tests.test("EscapedClosureCalledDuringAccess") {
-  expectCrashLater(withMessage: "Simultaneous accesses")
-  escapedClosureCalledDuringAccess()
-}
-
-// Local functions that only access their captured box, called directly
-// (rdar://157458037). No conflict.
-@inline(never)
-func localFunctionsWithoutConflict() -> Int {
-  var a1 = 1
-  var a2 = 2
-
-  func innerFunction() {
-    a1 += 1
-    a2 += 2
-  }
-
-  innerFunction()
-  innerFunction()
-  return a1 + a2
-}
-
-tests.test("LocalFunctionsWithoutConflict") {
-  expectEqual(9, localFunctionsWithoutConflict())
-}
-
-// A local function reads on every path and modifies on only some, while a
-// read access is in progress.
+// A local function reads on every path and modifies on only some, while a read
+// access is in progress.
 @inline(never)
 func readAndPerform(_ p: UnsafePointer<Int>, _ body: () -> ()) {
   body()
@@ -147,35 +111,6 @@ tests.test("LocalFunctionDoesNotModifyAfterReadDuringAccess") {
 tests.test("LocalFunctionModifiesAfterReadDuringAccess") {
   expectCrashLater(withMessage: "Simultaneous accesses")
   localFunctionReadsAlwaysModifiesSometimesDuringAccess(yes)
-}
-
-// A local function modifies on every path, but also calls a local function that
-// modifies on only some paths. The conflict is always caught at run time.
-@inline(never)
-func localFunctionForwardsToMayModifyDuringAccess(_ flag: Bool) {
-  var x = 0
-  @inline(never)
-  func mayModify() {
-    if flag {
-      x += 1
-    }
-  }
-  @inline(never)
-  func modify() {
-    x += 1
-    mayModify()
-  }
-  @inline(never)
-  func outer(_ v: inout Int) {
-    modify()
-  }
-  outer(&x)
-  _blackHole(x)
-}
-
-tests.test("LocalFunctionForwardsToMayModifyDuringAccess") {
-  expectCrashLater(withMessage: "Simultaneous accesses")
-  localFunctionForwardsToMayModifyDuringAccess(!yes)
 }
 
 // A local function modifies after a call that may throw.
@@ -219,9 +154,88 @@ tests.test("LocalFunctionModifiesAfterNoThrowDuringAccess") {
   try! localFunctionThrowsBeforeModifyDuringAccess(!yes)
 }
 
-// A local function and an escaping closure that captures the variable are used
-// by the same call. Static enforcement can't check accesses through the two
-// against each other, so the conflict is caught at run time.
+// -----------------------------------------------------------------------------
+// Conflicts on every path that static checking can't see.
+
+// A local function modifies the variable on every path, and also calls a local
+// function that only modifies it on some paths, so the box isn't promoted.
+// `modify` conflicts whether or not `mayModify` does.
+@inline(never)
+func localFunctionForwardsToMayModifyDuringAccess(_ flag: Bool) {
+  var x = 0
+  @inline(never)
+  func mayModify() {
+    if flag {
+      x += 1
+    }
+  }
+  @inline(never)
+  func modify() {
+    x += 1
+    mayModify()
+  }
+  @inline(never)
+  func outer(_ v: inout Int) {
+    modify()
+  }
+  outer(&x)
+  _blackHole(x)
+}
+
+tests.test("LocalFunctionForwardsToMayModifyModifiesDuringAccess") {
+  expectCrashLater(withMessage: "Simultaneous accesses")
+  localFunctionForwardsToMayModifyDuringAccess(yes)
+}
+
+tests.test("LocalFunctionForwardsToMayModifyDoesNotModifyDuringAccess") {
+  expectCrashLater(withMessage: "Simultaneous accesses")
+  localFunctionForwardsToMayModifyDuringAccess(!yes)
+}
+
+// An escaped closure is called during an access.
+var saved: (() -> ())?
+
+@inline(never)
+func callSaved(_ x: inout Int) {
+  saved!()
+}
+
+@inline(never)
+func escapedClosureCalledDuringAccess() {
+  var count = 0
+  saved = { count += 1 }
+  callSaved(&count)
+  _blackHole(count)
+}
+
+tests.test("EscapedClosureCalledDuringAccess") {
+  expectCrashLater(withMessage: "Simultaneous accesses")
+  escapedClosureCalledDuringAccess()
+}
+
+// An escaping closure that captures the variable by box is converted to a
+// non-escaping argument, passed along with an access to the variable.
+@inline(never)
+func readAndCall(_ x: UnsafePointer<Int>, closure: () -> ()) {
+  closure()
+}
+
+@inline(never)
+func noescapeArgumentCapturesBox() {
+  var x = 3
+  let c = { x = 42 }
+  readAndCall(&x, closure: c)
+  _blackHole(x)
+}
+
+tests.test("NoescapeArgumentCapturesBox") {
+  expectCrashLater(withMessage: "Simultaneous accesses")
+  noescapeArgumentCapturesBox()
+}
+
+// A local function and an escaping closure that both capture the variable are
+// used by the same call. Static checking can't check accesses through two
+// arguments of a call against each other.
 @inline(never)
 func modifyAndCallClosure(_ x: inout Int, _ body: () -> ()) {
   body()
@@ -241,6 +255,30 @@ func localFunctionAndClosureCaptureVariable() {
 tests.test("LocalFunctionAndClosureCaptureVariable") {
   expectCrashLater(withMessage: "Simultaneous accesses")
   localFunctionAndClosureCaptureVariable()
+}
+
+// -----------------------------------------------------------------------------
+// No conflict.
+
+// Local functions that only access their captured variables, called directly
+// (rdar://157458037).
+@inline(never)
+func localFunctionsWithoutConflict() -> Int {
+  var a1 = 1
+  var a2 = 2
+
+  func innerFunction() {
+    a1 += 1
+    a2 += 2
+  }
+
+  innerFunction()
+  innerFunction()
+  return a1 + a2
+}
+
+tests.test("LocalFunctionsWithoutConflict") {
+  expectEqual(9, localFunctionsWithoutConflict())
 }
 
 // The variable is captured twice by arguments of the same call, but the

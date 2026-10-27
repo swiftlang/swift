@@ -172,7 +172,7 @@ func modifyAndPerform(_ x: UnsafeMutablePointer<Int>, closure: () -> ()) {
 
 // The closure is converted to a non-escaping closure, which
 // MandatoryAllocBoxToStack doesn't promote, so the conflict is caught at run
-// time.
+// time (Interpreter/exclusivity_captured_box.swift).
 func noescapeArgumentCapturesBox() {
   var x = 3
   let c = { x = 42 }
@@ -360,4 +360,19 @@ func localFunctionPassedTwice() {
     x += 1
   }
   callBoth(increment, increment)
+}
+
+// Local functions that only access their captured variables, called directly
+// (rdar://157458037). No conflict, and the boxes are promoted.
+
+func localFunctionsWithoutConflict() -> Int {
+  var a1 = 1
+  var a2 = 2
+  func innerFunction() {
+    a1 += 1
+    a2 += 2
+  }
+  innerFunction()
+  innerFunction()
+  return a1 + a2
 }
