@@ -1,9 +1,14 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=tuple | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 // RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=tuple | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s --check-prefix=CHECK-SILCOMBINE
 
 
 import Swift
 import Builtin
+
+struct NC : ~Copyable {
+  var x: Int
+}
 
 // CHECK-LABEL: sil [ossa] @forward_owned :
 // CHECK-NOT:     tuple
@@ -53,6 +58,21 @@ bb0(%0 : @owned $(String, Int)):
   debug_value %4 : $String, let, name "t"
   %2 = tuple (%4 : $String, %5 : $Int)
   return %2 : $(String, Int)
+}
+
+// The fold must also erase the `destructure_tuple`. SILCombine never removes a dead destructure of
+// an owned move-only value, so it would consume `%0` a second time.
+// CHECK-SILCOMBINE-LABEL: sil [ossa] @forward_owned_noncopyable_with_debug_use :
+// CHECK-SILCOMBINE-NOT:     destructure_tuple
+// CHECK-SILCOMBINE:         debug_value %0, let, name "x"
+// CHECK-SILCOMBINE:         return %0
+// CHECK-SILCOMBINE:       } // end sil function 'forward_owned_noncopyable_with_debug_use'
+sil [ossa] @forward_owned_noncopyable_with_debug_use : $@convention(thin) (@owned (NC, Int)) -> @owned (NC, Int) {
+bb0(%0 : @owned $(NC, Int)):
+  (%1, %2) = destructure_tuple %0
+  debug_value %1, let, name "x"
+  %3 = tuple (%1, %2)
+  return %3
 }
 
 // CHECK-LABEL: sil [ossa] @dont_forward_label_change :
