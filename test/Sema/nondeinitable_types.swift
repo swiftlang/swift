@@ -284,9 +284,7 @@ func unappliedConsumingMethodsOnUnresolvedBase() {
 
   generic(NDBox(42).finish)
   // expected-error@-1 {{type '@once () -> ()' cannot conform to 'Copyable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
   genericNC(NDBox(42).finish)
   // expected-error@-1 {{type '@once () -> ()' cannot conform to 'Deinitable'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
