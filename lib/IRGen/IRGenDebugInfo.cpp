@@ -2157,12 +2157,13 @@ private:
     case TypeKind::BuiltinJob: {
       unsigned PtrSize =
           CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
+      bool CodeView = Opts.isDebugInfoCodeView();
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes || CodeView) {
         Flags |= llvm::DINode::FlagArtificial;
         llvm::DICompositeType *PTy = DBuilder.createStructType(
             Scope, MangledName, File, 0, PtrSize, 0, Flags, nullptr, nullptr,
-            llvm::dwarf::DW_LANG_Swift, nullptr, {}, nullptr,
-            NumExtraInhabitants);
+            llvm::dwarf::DW_LANG_Swift, nullptr,
+            CodeView ? MangledName : StringRef(), nullptr, NumExtraInhabitants);
         return PTy;
       }
       llvm::DIDerivedType *PTy = DBuilder.createPointerType(
@@ -2626,6 +2627,13 @@ private:
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
+    // CodeView lowers a basic type to an unnamed simple type such as T_UINT8,
+    // and NativePDB only treats records with a Swift mangled unique name as
+    // Swift types. Emit the builtin as an opaque struct named by its mangling.
+    if (Opts.isDebugInfoCodeView())
+      return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
+                                AlignInBits, Flags, MangledName, {}, nullptr,
+                                nullptr, NumExtraInhabitants);
     return DBuilder.createBasicType(MangledName, SizeInBits, Encoding,
                                     llvm::DINode::FlagZero,
                                     NumExtraInhabitants);
@@ -3140,6 +3148,13 @@ private:
         StringRef Name;
         if (auto *AliasDecl = AliasTy->getDecl())
           Name = AliasDecl->getName().str();
+        if (!Name.empty() && Opts.isDebugInfoCodeView())
+          if (auto *DesugaredCTy = dyn_cast<llvm::DICompositeType>(Desugared))
+            if (!DesugaredCTy->getIdentifier().empty())
+              return createOpaqueStruct(
+                  updateScope(Scope, DbgTy), Name, MainFile, 0,
+                  Desugared->getSizeInBits(), Desugared->getAlignInBits(),
+                  Desugared->getFlags(), DesugaredCTy->getIdentifier());
         if (!Name.empty())
           return DBuilder.createTypedef(Desugared, Name, MainFile, 0,
                                         updateScope(Scope, DbgTy));
