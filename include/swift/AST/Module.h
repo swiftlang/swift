@@ -35,6 +35,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1179,9 +1180,13 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
   struct ImportCollector {
-    SmallPtrSet<const ModuleDecl *, 4> imports;
-    llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
-        qualifiedImports;
+    using ImportSet = llvm::SmallSetVector<const ModuleDecl *, 4>;
+    using QualifiedImportMap =
+        llvm::SmallMapVector<const ModuleDecl *,
+                             llvm::SmallSetVector<Decl *, 4>, 4>;
+
+    ImportSet imports;
+    QualifiedImportMap qualifiedImports;
     AccessLevel minimumDocVisibility = AccessLevel::Private;
     llvm::function_ref<bool(const ModuleDecl *)> importFilter = nullptr;
 

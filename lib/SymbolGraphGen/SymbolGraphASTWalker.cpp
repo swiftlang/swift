@@ -104,8 +104,8 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
 
 SymbolGraphASTWalker::SymbolGraphASTWalker(
     ModuleDecl &M,
-    const SmallPtrSet<const ModuleDecl *, 4> ExportedImportedModules,
-    const llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+    const ModuleDecl::ImportCollector::ImportSet ExportedImportedModules,
+    const ModuleDecl::ImportCollector::QualifiedImportMap
         QualifiedExportedImports,
     const SymbolGraphOptions &Options)
     : Options(Options), M(M), ExportedImportedModules(ExportedImportedModules),
@@ -471,7 +471,7 @@ bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D, bool coun
 
 bool SymbolGraphASTWalker::isQualifiedExportedImport(const Decl *D) const {
   return llvm::any_of(QualifiedExportedImports, [&D](const auto &QI) {
-    return QI.getSecond().contains(D);
+    return QI.second.contains(D);
   });
 }
 
