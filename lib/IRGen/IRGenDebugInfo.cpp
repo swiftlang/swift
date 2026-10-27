@@ -353,10 +353,14 @@ public:
       return Cached;
     }
 
-    // If the source buffer is a macro, extract its full text.
+    // If the source buffer is a macro, extract its full text. Only do so on a
+    // DIFile cache miss, as the text is ignored on a hit and every distinct
+    // location could otherwise allocate another copy of the buffer.
     std::optional<StringRef> Source;
     bool ForceGeneratedSourceToDisk = Opts.DWARFVersion < 5;
-    if (!ForceGeneratedSourceToDisk) {
+    SmallString<128> Filename(
+        SM.getDisplayNameForLoc(SL, ForceGeneratedSourceToDisk));
+    if (!ForceGeneratedSourceToDisk && !getCachedFile(Filename)) {
       auto BufferID = SM.findBufferContainingLoc(SL);
       if (auto generatedInfo = SM.getGeneratedSourceInfo(BufferID)) {
         // We only care about macro expansion buffers,
@@ -392,8 +396,7 @@ public:
           }
       }
     }
-    Cached.File = getOrCreateFile(
-        SM.getDisplayNameForLoc(SL, ForceGeneratedSourceToDisk), Source);
+    Cached.File = getOrCreateFile(Filename, Source);
     std::tie(Cached.Line, Cached.Column) =
         SM.getPresumedLineAndColumnForLoc(SL);
     // When WinDbg finds two locations with the same line but different
@@ -601,18 +604,32 @@ private:
 
 #endif
 
-  llvm::DIFile *getOrCreateFile(StringRef Filename,
-                                std::optional<StringRef> Source) {
+  /// Return \p Filename, or the compiler-generated file name if it is empty.
+  static StringRef getFilenameOrCompilerGenerated(StringRef Filename) {
     if (Filename.empty())
-      Filename = SILLocation::getCompilerGeneratedLoc()->filename;
+      return SILLocation::getCompilerGeneratedLoc()->filename;
+    return Filename;
+  }
 
-    // Look in the cache first.
-    auto CachedFile = DIFileCache.find(Filename);
+  /// Return the cached DIFile for \p Filename, or null if there is none.
+  llvm::DIFile *getCachedFile(StringRef Filename) const {
+    auto CachedFile =
+        DIFileCache.find(getFilenameOrCompilerGenerated(Filename));
     if (CachedFile != DIFileCache.end()) {
       // Verify that the information still exists.
       if (llvm::Metadata *V = CachedFile->second)
         return cast<llvm::DIFile>(V);
     }
+    return nullptr;
+  }
+
+  llvm::DIFile *getOrCreateFile(StringRef Filename,
+                                std::optional<StringRef> Source) {
+    Filename = getFilenameOrCompilerGenerated(Filename);
+
+    // Look in the cache first.
+    if (llvm::DIFile *CachedFile = getCachedFile(Filename))
+      return CachedFile;
 
     // Detect the main file.
     StringRef MainFileName = MainFile->getFilename();
