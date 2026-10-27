@@ -24,7 +24,7 @@ enum SwiftEnum { case A, B }
 @objc enum CEnum: Int { case A, B }
 #endif
 
-@_cdecl("enum") // expected-error {{@_cdecl may only be used on 'func' declarations}}
+@_cdecl("enum") // expected-error {{'@_cdecl' may only be used on 'func' declarations}}
 enum UnderscoreCDeclEnum: CInt { case A, B }
 
 @_cdecl("swiftStruct")
@@ -56,7 +56,7 @@ func hasNested() {
 }
 
 // TODO: Handle error conventions in SILGen for toplevel functions.
-@_cdecl("throwing") // expected-error{{raising errors from @_cdecl functions is not supported}}
+@_cdecl("throwing") // expected-error{{raising errors from '@_cdecl' functions is not supported}}
 func throwing() throws { }
 
 // TODO: cdecl name collisions

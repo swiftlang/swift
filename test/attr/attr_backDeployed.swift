@@ -422,17 +422,17 @@ public func transparentFunc() {}
 
 // MARK: - Attribute parsing
 
-@backDeployed(before: macos 12.0, iOS 15.0) // expected-warning {{unknown platform 'macos' for attribute '@backDeployed'; did you mean 'macOS'?}} {{23-28=macOS}}
+@backDeployed(before: macos 12.0, iOS 15.0) // expected-warning {{unknown platform 'macos' for '@backDeployed' attribute; did you mean 'macOS'?}} {{23-28=macOS}}
 public func incorrectPlatformCaseFunc() {}
 
-@backDeployed(before: mscos 12.0, iOS 15.0) // expected-warning {{unknown platform 'mscos' for attribute '@backDeployed'; did you mean 'macOS'?}} {{23-28=macOS}}
+@backDeployed(before: mscos 12.0, iOS 15.0) // expected-warning {{unknown platform 'mscos' for '@backDeployed' attribute; did you mean 'macOS'?}} {{23-28=macOS}}
 public func incorrectPlatformSimilarFunc() {}
 
-@backDeployed(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
+@backDeployed(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for '@backDeployed' attribute}}
 public func unknownOSFunc1() {}
 
 @backDeployed(before: macOS 12.0)
-@backDeployed(before: unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
+@backDeployed(before: unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for '@backDeployed' attribute}}
 public func unknownOSFunc2() {}
 
 @backDeployed(before: @) // expected-error {{expected platform in '@backDeployed' attribute}}
@@ -475,14 +475,14 @@ public func macroVersioned() {}
 public func missingMacroVersion() {}
 
 // Fall back to the default diagnostic when the macro is unknown.
-@backDeployed(before: _unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
+@backDeployed(before: _unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for '@backDeployed' attribute}}
 // expected-error@-1 {{expected version number in '@backDeployed' attribute}}
 public func unknownMacroMissingVersion() {}
 
-@backDeployed(before: _unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
+@backDeployed(before: _unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for '@backDeployed' attribute}}
 public func unknownMacroVersioned() {}
 
-@backDeployed(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
+@backDeployed(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for '@backDeployed' attribute}}
 public func knownAndUnknownMacroVersioned() {}
 
 @backDeployed(before: _emptyMacro)

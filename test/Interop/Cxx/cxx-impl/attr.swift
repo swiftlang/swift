@@ -41,27 +41,27 @@ func plainCallOperatorName(x: Int32) -> Int32 { return x }
 // structs, and classes are supported.
 
 class Foo {
-  // expected-error@+2{{@cxx can only be applied to global functions or functions in extensions of C++ namespaces, structs, and classes}}
+  // expected-error@+2{{'@cxx' can only be applied to global functions or functions in extensions of C++ namespaces, structs, and classes}}
   // expected-error@+1{{'@cxx' must be combined with '@implementation'}}
   @cxx
   func foo(x: Int32) -> Int32 { return x }
 
-  // expected-error@+2{{@cxx can only be applied to global functions or functions in extensions of C++ namespaces, structs, and classes}}
+  // expected-error@+2{{'@cxx' can only be applied to global functions or functions in extensions of C++ namespaces, structs, and classes}}
   // expected-error@+1{{'@cxx' must be combined with '@implementation'}}
   @cxx
   static func bar(x: Int32) -> Int32 { return x }
 }
 
-// expected-error@+1{{@cxx may only be used on 'func' declarations}}
+// expected-error@+1{{'@cxx' may only be used on 'func' declarations}}
 @cxx
 var notAFunction: Int32 = 0
 
-// expected-error@+1{{@cxx may only be used on 'func' declarations}}
+// expected-error@+1{{'@cxx' may only be used on 'func' declarations}}
 @cxx
 enum NotAFunctionEnum { case a }
 
 var accessorHost: Int32 {
-  // expected-error@+1{{@cxx may only be used on 'func' declarations}}
+  // expected-error@+1{{'@cxx' may only be used on 'func' declarations}}
   @cxx
   get { return 0 }
 }

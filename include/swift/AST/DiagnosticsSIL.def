@@ -1418,9 +1418,16 @@ NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRe
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
-ERROR(noncopyable_cast_pattern_binding_unimplemented, none,
-      "binding the payload of a non-'Copyable' value with a cast pattern is not "
-      "implemented; use 'case is' to test the type without binding", ())
+ERROR(noncopyable_cast_pattern_binding_while_borrowed, none,
+      "cannot bind the payload of a non-'Copyable' value with a cast pattern "
+      "while the value is borrowed", ())
+NOTE(noncopyable_cast_pattern_binding_use_switch_consume, none,
+      "use 'switch consume' to bind the payload by consuming the value", ())
+NOTE(noncopyable_cast_pattern_binding_in_guard, none,
+      "a 'where' clause is evaluated before the value is consumed; test the "
+      "condition in the case body instead", ())
+NOTE(noncopyable_cast_pattern_binding_refutable_subpattern, none,
+      "match the bound value in the case body instead", ())
 
 
 /// Borrow and mutate accessors

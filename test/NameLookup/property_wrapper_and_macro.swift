@@ -80,7 +80,7 @@ func bar() {
 @SomeAttr var x = 0 // expected-error {{could not be found for macro}}
 
 _ = { @SomeAttr<Int> in }
-// expected-error@-1 {{attribute @SomeAttr<Int> is not supported on a closure}}
+// expected-error@-1 {{'@SomeAttr<Int>' is not supported on a closure}}
 // expected-warning@-2 {{cannot specialize a non-generic external macro 'SomeAttr()'}}
 
 //--- other.swift

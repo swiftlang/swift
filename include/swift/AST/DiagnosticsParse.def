@@ -485,7 +485,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (DeclAttribute))
+      "unexpected %kind0 in operator declaration", (DeclAttribute))
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -1520,10 +1520,10 @@ ERROR(multiple_access_level_modifiers,none,
 NOTE(previous_access_level_modifier,none,
      "previous modifier specified here", ())
 ERROR(mutually_exclusive_decl_attrs,none,
-      "%0 contradicts previous %select{attribute|modifier}2 %1",
-      (DeclAttribute, DeclAttribute, bool))
+      "%kind0 contradicts previous %kind1",
+      (DeclAttribute, DeclAttribute))
 ERROR(mutually_exclusive_type_attrs,none,
-      "%0 contradicts previous %1",
+      "%kind0 contradicts previous %kind1",
       (const TypeAttribute *, const TypeAttribute *))
 ERROR(mutually_exclusive_attr_names,none,
       "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
@@ -1622,7 +1622,7 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
-      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+      "%0 is unsupported on target '%1'", (DeclAttribute, StringRef))
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
@@ -1640,9 +1640,9 @@ ERROR(attr_availability_multiple_kinds ,none,
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
-       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+       "unknown platform '%0' for '%1' attribute", (StringRef, StringRef))
 WARNING(attr_availability_suggest_platform,none,
-       "unknown platform '%0' for attribute '%1'; did you mean '%2'?",
+       "unknown platform '%0' for '%1' attribute; did you mean '%2'?",
        (StringRef, StringRef, StringRef))
 ERROR(attr_availability_expected_platform,none,
       "expected platform in '%0' attribute", (StringRef))
