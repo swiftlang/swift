@@ -22,6 +22,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -1473,6 +1474,24 @@ public:
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
+      // The storage of a Swift subclass of a C++ foreign reference type is
+      // allocated with a size that is fixed at compile time, so the size of
+      // each of its stored properties must be known at compile time.
+      if (!theClass->hasClangNode() &&
+          theClass->getForeignReferenceSuperclassOrSelf()) {
+        auto expansion =
+            TypeExpansionContext::maximal(theClass, SGM.M.isWholeModule());
+        for (auto field : theClass->getStoredProperties()) {
+          auto fieldTy = field->getInterfaceType()->getCanonicalType();
+          if (fieldTy->hasError())
+            continue;
+          if (!SGM.Types.getTypeLowering(fieldTy, expansion).isFixedABI())
+            field->diagnose(
+                diag::foreign_reference_subclass_field_not_fixed_size, field,
+                field->getInterfaceType());
+        }
+      }
+
       if (!theClass->hasClangNode()) {
         SILGenVTable genVTable(SGM, theClass);
         genVTable.emitVTable();
