@@ -6861,10 +6861,10 @@ ERROR(actor_isolation_multiple_attr_2,none,
       "%kind0 has multiple actor-isolation attributes (%1 and %2)",
       (const Decl *, DeclAttribute, DeclAttribute))
 ERROR(actor_isolation_multiple_attr_3,none,
-      "%0 %1 has multiple actor-isolation attributes (%2, %3, and %4)",
+      "%kind0 has multiple actor-isolation attributes (%1, %2, and %3)",
       (const Decl *, DeclAttribute, DeclAttribute, DeclAttribute))
 ERROR(actor_isolation_multiple_attr_4,none,
-      "%0 %1 has multiple actor-isolation attributes (%2, %3, %4, and %5)",
+      "%kind0 has multiple actor-isolation attributes (%1, %2, %3, and %4)",
       (const Decl *, DeclAttribute, DeclAttribute, DeclAttribute,
        DeclAttribute))
 ERROR(actor_isolation_override_mismatch,none,
