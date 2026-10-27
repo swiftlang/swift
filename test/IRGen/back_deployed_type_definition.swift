@@ -47,6 +47,25 @@ extension Box: Equatable where T: Equatable {}
     @_transparent
     get { x * 3 }
   }
+
+  // Back-deployed, because clients can reference it.
+  @usableFromInline
+  internal func usable() -> Int { x }
+
+  // Internal to this module, so not part of the interface that is
+  // back-deployed: there are no thunks, and callers use it directly.
+  internal func hidden() -> Int { x }
+  internal var hiddenProperty: Int { x }
+
+  @frozen public struct Nested {
+    public var y: Int
+
+    internal func hiddenNested() -> Int { y }
+  }
+}
+
+func callHidden(_ p: Point, _ n: Point.Nested) -> Int {
+  p.hidden() + p.hiddenProperty + n.hiddenNested()
 }
 
 // Members are back-deployed with the type unless they are only available
@@ -59,6 +78,15 @@ extension Box: Equatable where T: Equatable {}
 // SILGEN-NOT: $s1M5PointV10historicalSiyFTw
 // SILGEN-NOT: $s1M5PointV7doubledSivgTw
 // SILGEN-NOT: $s1M5PointV7tripledSivgTw
+// SILGEN-DAG: sil non_abi [serialized] {{.*}}@$s1M5PointV6usableSiyFTwb :
+// SILGEN-DAG: sil non_abi [serialized] {{.*}}@$s1M5PointV6usableSiyFTwB :
+// SILGEN-NOT: $s1M5PointV6hiddenSiyFTw
+// SILGEN-NOT: $s1M5PointV14hiddenPropertySivgTw
+// SILGEN-NOT: $s1M5PointV6NestedV06hiddenB0SiyFTw
+// SILGEN-LABEL: sil hidden {{.*}}@$s1M10callHiddenySiAA5PointV_AD6NestedVtF :
+// SILGEN: function_ref @$s1M5PointV6hiddenSiyF :
+// SILGEN: function_ref @$s1M5PointV14hiddenPropertySivg :
+// SILGEN: function_ref @$s1M5PointV6NestedV06hiddenB0SiyF :
 
 // The type context descriptors are unique: flags are the kind (struct) plus
 // the unique bit (0x40), and the generic bit (0x80) for Box.

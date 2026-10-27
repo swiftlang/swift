@@ -708,6 +708,14 @@ Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
   // Members of a back-deployed struct or enum are back-deployed along with
   // it, unless they have storage or are always emitted into clients anyway.
   if (isa<AbstractFunctionDecl>(this) || isa<AbstractStorageDecl>(this)) {
+    // Clients can't reference members that aren't part of the type's
+    // interface, so they never need a back-deployed copy.
+    if (!cast<ValueDecl>(this)
+             ->getFormalAccessScope(/*useDC=*/nullptr,
+                                    /*treatUsableFromInlineAsPublic=*/true)
+             .isPublic())
+      return std::nullopt;
+
     if (auto *var = dyn_cast<VarDecl>(this))
       if (var->hasStorageOrWrapsStorage())
         return std::nullopt;
