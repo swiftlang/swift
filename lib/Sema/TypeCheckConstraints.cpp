@@ -1601,6 +1601,23 @@ void ConstraintSystem::print(raw_ostream &out) const {
 }
 
 /// Determine the semantics of a checked cast operation.
+
+static bool isConcreteNoncopyable(Type type) {
+  type = type->getWithoutSpecifierType();
+  return type->isNoncopyable() && !type->getOptionalObjectType() &&
+         !type->isAnyExistentialType() && !type->hasArchetype() &&
+         !type->hasTypeParameter() && !type->hasOpenedExistential() &&
+         !type->hasError();
+}
+
+bool TypeChecker::isStaticallyImpossibleNoncopyableCast(Type fromType,
+                                                        Type toType) {
+  // A concrete non-`Copyable` value can't become a `Copyable` one, and a
+  // `Copyable` value (or container) can't hold a concrete non-`Copyable` one.
+  return (isConcreteNoncopyable(fromType) && toType->isCopyable()) ||
+         (fromType->isCopyable() && isConcreteNoncopyable(toType));
+}
+
 CheckedCastKind
 TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,
@@ -1628,6 +1645,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     // Noncopyable metatypes and casts between noncopyables and metatypes
     return CheckedCastKind::Unresolved;
   }
+
+  // A cast the runtime would always answer "no" is reported as such, so the
+  // caller warns that it always fails.
+  if (involvesNoncopyable &&
+      isStaticallyImpossibleNoncopyableCast(fromType, toType))
+    return CheckedCastKind::Unresolved;
 
   // Anything bridges to AnyObject
   if (toType->isAnyObject()) {

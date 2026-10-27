@@ -742,6 +742,13 @@ void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
 /// \returns true if an error occurred, false otherwise.
 bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
+/// True if a dynamic cast between \p fromType and \p toType can never succeed
+/// because one side is a fully concrete non-`Copyable` type and the other can
+/// only hold `Copyable` values. Casts whose answer depends on a dynamic type --
+/// an existential, a generic parameter, or an Optional the runtime unwraps --
+/// are not decided here.
+bool isStaticallyImpossibleNoncopyableCast(Type fromType, Type toType);
+
 /// Determine the semantics of a checked cast operation.
 ///
 /// \param fromType       The source type of the cast.
