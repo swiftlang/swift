@@ -448,3 +448,35 @@ bb3:
   %t = tuple ()
   return %t
 }
+
+// A switch_enum on a borrow of the payload of a copy of an enum instruction is
+// folded to the case of the payload.
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_on_payload_of_copy :
+// CHECK:         [[B:%.*]] = begin_borrow
+// CHECK-NOT:     switch_enum
+// CHECK:         [[P:%.*]] = unchecked_enum_data [[B]]
+// CHECK-NEXT:    br bb1([[P]])
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_on_payload_of_copy'
+sil [ossa] @test_simplify_switch_enum_on_payload_of_copy : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0
+  %2 = enum $FakeOptional<FakeOptional<Klass>>, #FakeOptional.some!enumelt, %1
+  %3 = copy_value %2
+  %4 = unchecked_enum_data %3, #FakeOptional.some!enumelt
+  %5 = begin_borrow %4
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[5]"
+  switch_enum %5, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%7 : @guaranteed $Klass):
+  end_borrow %5
+  br bb3
+
+bb2:
+  end_borrow %5
+  br bb3
+
+bb3:
+  destroy_value %4
+  %t = tuple ()
+  return %t
+}
