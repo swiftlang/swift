@@ -34,6 +34,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -745,26 +746,42 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   emitDiagnostic(diag::type_cannot_conform,
                  nonConformingType, protocolType);
 
-  bool emittedSpecializedNote = false;
+  bool emitCanNeverConformNote = true;
   if (auto protoType = protocolType->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
-    if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      if (nonConformingType->is<FunctionType>()) {
-        emitDiagnostic(diag::nonsendable_function_type);
-        emittedSpecializedNote = true;
-      } else if (nonConformingType->is<TupleType>()) {
-        emitDiagnostic(diag::nonsendable_tuple_type);
-        emittedSpecializedNote = true;
+
+    auto emitSpecializedNote = [&](Diag<> note) {
+      emitDiagnostic(note);
+      emitCanNeverConformNote = false;
+    };
+
+    if (nonConformingType->is<FunctionType>()) {
+      if (auto known = protoDecl->getKnownProtocolKind()) {
+        switch (*known) {
+        case KnownProtocolKind::Sendable:
+          emitSpecializedNote(diag::nonsendable_function_type);
+          break;
+
+        case KnownProtocolKind::Escapable:
+          emitSpecializedNote(diag::nonescapable_function_type);
+          break;
+
+        case KnownProtocolKind::Copyable:
+        case KnownProtocolKind::Deinitable:
+          emitCanNeverConformNote = false;
+          break;
+
+        default:
+          break;
+        }
       }
-    } else if (protoDecl->isSpecificProtocol(KnownProtocolKind::Escapable)) {
-      if (nonConformingType->is<AnyFunctionType>()) {
-        emitDiagnostic(diag::nonescapable_function_type);
-        emittedSpecializedNote = true;
-      }
+    } else if (nonConformingType->is<TupleType>() &&
+               protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      emitSpecializedNote(diag::nonsendable_tuple_type);
     }
   }
 
-  if (!emittedSpecializedNote)
+  if (emitCanNeverConformNote)
     emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
