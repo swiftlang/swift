@@ -180,7 +180,8 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     if (!componentName.isSimpleName()) {
       diags.diagnose(componentNameLoc,
                      diag::expr_unsupported_objc_key_path_compound_name);
-      continue;
+      isInvalid = true;
+      break;
     }
 
     // If we are resolving into a dictionary, any component is
