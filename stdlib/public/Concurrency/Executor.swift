@@ -125,24 +125,32 @@ extension SchedulingExecutorFireTime: Hashable where C.Duration: Hashable {
 public protocol JobCanceller: AnyObject, Sendable {
   /// Cancel a scheduled job.
   ///
-  /// If the job identified by the token has not yet started, remove it from
-  /// the scheduler and return it, handing ownership to the caller.  The
-  /// scheduler must first undo anything it attached to the job so that the
-  /// caller may run or enqueue it.
+  /// Every job must be run exactly once, so cancelling a job means running it
+  /// early: if the job identified by the token has not yet started, take it
+  /// off the timer, enqueue it to run now, where it would have run had the
+  /// timer fired, and return `true`.  If the job's `isResumption` is `true`,
+  /// run it here instead of enqueuing it (see below).  The job, not the
+  /// scheduler, deals with having been cancelled; the job that resumes a
+  /// scheduled continuation, for instance, has been told before it runs that
+  /// it is to resume by throwing.
   ///
-  /// Return `nil` only if the job has already started running or has
-  /// finished; callers take that to mean the job will run (or has run)
-  /// normally.  A scheduler that is unable to remove pending jobs may always
-  /// return `nil`, but then cancelling a `Task.sleep()` will not wake the task
-  /// until its timer fires, and the timer stays queued until then.
+  /// Return `false` if the job has already started running or has finished,
+  /// or if you can't run it early; it will then run (or has run) when its
+  /// timer fires.  `false` is always a safe answer, so a scheduler that is
+  /// unable to cancel jobs may always return it, but then cancelling a
+  /// `Task.sleep()` will not wake the task until its timer fires.  Nor need
+  /// cancelling be synchronous: a scheduler may hand the request to whatever
+  /// owns its timers (another thread, say) and return `false`, so long as the
+  /// job still runs exactly once, whether early or when its timer fires.
+  /// Callers use the result only to learn whether the job will run promptly.
   ///
   /// This may be called from any thread, unless the scheduler is documented as
   /// being for use from a single thread only, as the cooperative executor is,
   /// in which case it must be called from that thread.  A token for a job that
-  /// has already run or been cancelled must return `nil`, and a token must
-  /// never match a different job; in particular, `cancel` can be called more
-  /// than once with the same token, and only the first call may return the
-  /// job.
+  /// has already run or been cancelled must do nothing and return `false`,
+  /// and a token must never match a different job; in particular, `cancel` can
+  /// be called more than once with the same token, and only the first call
+  /// may return `true`.
   ///
   /// ### Implementing `cancel`
   ///
@@ -153,22 +161,33 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// cancellation handler when it is resumed) until `cancel` returns, so:
   ///
   /// * `cancel` must return promptly, and must not call back into the task.
+  /// * It must *enqueue* the job, not run it, unless the job's `isResumption`
+  ///   is `true`.  An arbitrary job may do anything, including running a task,
+  ///   which needs the status record lock.  A resumption job only enqueues the
+  ///   task that it resumes, so it is safe to run here, and should be: the job's
+  ///   priority was fixed when it was created, and if the task has been
+  ///   escalated since, a job that was enqueued could wait behind work of lower
+  ///   priority than the task's, where running it enqueues the task at the
+  ///   task's own priority.  (The same goes for a resumption job whose timer
+  ///   fires: run it then, rather than enqueuing it.)
   /// * It must not wait for a lock that another thread can hold while it
-  ///   enqueues, resumes or runs a job.  If a thread holds your lock and runs
-  ///   the resumed task inline (as an event loop that runs jobs under a lock
-  ///   will), that task needs the status record lock, which `cancel` holds,
-  ///   which is waiting for your lock: a deadlock.
+  ///   runs a job.  If a thread holds your lock and runs the resumed task
+  ///   inline (as an event loop that runs jobs under a lock will), that task
+  ///   needs the status record lock, which `cancel` holds, which is waiting for
+  ///   your lock: a deadlock.  For the same reason, the executor that a
+  ///   resumption job enqueues its task on must not run the task inline.
   ///
   /// The simplest way to meet this is never to call out while holding your own
-  /// lock: do the bookkeeping under it, and drop it before you enqueue, resume
-  /// or run anything, so that no one can wait for the status record lock with
-  /// your lock held.  Then `cancel` can take the lock, briefly.  If you cannot
+  /// lock: do the bookkeeping under it, and drop it before you enqueue or run
+  /// anything, so that no one can wait for the status record lock with your
+  /// lock held.  Then `cancel` can take the lock, briefly.  If you cannot
   /// arrange that, use a claim that doesn't need the lock: an atomic exchange
-  /// that decides whether `cancel` or the timer owns the job (as the Dispatch
-  /// executor does) lets `cancel` return the job, or `nil`, without waiting for
-  /// anything.  And as a last resort, `cancel` may try to take the lock and,
-  /// if it can't, return `nil`: that always means "the job will run normally",
-  /// and costs only promptness.
+  /// that decides whether `cancel` or the timer gets the job (as the Dispatch
+  /// executor does) lets `cancel` enqueue the job, or return `false`, without
+  /// waiting for anything.  And as a last resort, `cancel` may try to take
+  /// the lock and, if it can't, return `false`, or pass the request on to be
+  /// dealt with later: either way the job still runs, and only promptness is
+  /// lost.
   ///
   /// An implementation can rely on the tokens that it issued itself, and must
   /// not trust any other, since the data in a token is not checked (see
@@ -177,7 +196,10 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// Parameters:
   ///
   /// - jobWithToken: The token returned when the job was scheduled.
-  func cancel(jobWithToken: borrowing JobCancellationToken) -> ExecutorJob?
+  ///
+  /// Returns `true` if the job had not started, and has been run, or enqueued
+  /// to run now.
+  func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool
 
   /// Called when a token that this canceller issued is destroyed, so that it
   /// can release anything it was keeping for the token (for example, a
@@ -206,7 +228,7 @@ extension JobCanceller {
 /// Represents a job that has been scheduled for future execution.
 ///
 /// Executors create these in `SchedulingExecutor.schedule(...)`.  Calling
-/// `cancel()` asks the scheduler to give the job back if it has not yet
+/// `cancel()` asks the scheduler to run the job now, if it has not yet
 /// started running.
 ///
 /// Dropping the token without cancelling does not affect the job; the
@@ -245,17 +267,18 @@ public struct JobCancellationToken: ~Copyable, Sendable {
 
   /// Cancel the scheduled job.
   ///
-  /// If the job had not started running, it is removed from the executor and
-  /// returned; the caller then owns it and must run or enqueue it.
-  /// Returns `nil` if the job has started, has finished, has already been
-  /// cancelled, or cannot be cancelled by the executor, in which case it will
-  /// run (or has run) normally.
+  /// If the job had not started running, the executor takes it off the timer
+  /// and runs it (or enqueues it to run) now, and this returns `true`.  Returns `false` if
+  /// the job has started, has finished, has already been cancelled, or cannot
+  /// be run early by the executor, in which case it will run (or has run) when
+  /// its timer fires.  Either way, the job runs exactly once.
   ///
   /// This does not consume the token, so that it can be used from a closure
   /// that only borrows it (such as a cancellation handler), and it is safe to
-  /// call more than once: only the first call can return the job.  The token
+  /// call more than once: only the first call can return `true`.  The token
   /// is released when it is destroyed, as always.
-  public borrowing func cancel() -> ExecutorJob? {
+  @discardableResult
+  public borrowing func cancel() -> Bool {
     return canceller.cancel(jobWithToken: self)
   }
 }
@@ -418,9 +441,10 @@ extension SchedulingExecutor {
 
   /// Schedule a continuation to be resumed at a specified time.
   ///
-  /// The continuation is consumed, and the returned ``ScheduledContinuation``
-  /// is the only thing that can resume it other than the timer, so exactly one
-  /// of them does.  Executors don't need to do anything special to support
+  /// The continuation is consumed, and is resumed when the timer fires.  If
+  /// its error type is `CancellationError`, pass the returned
+  /// ``ScheduledContinuation`` to `ContinuationWaiter.wait(for:)`, which
+  /// cancels the timer if the task is cancelled while waiting.  Executors don't need to do anything special to support
   /// this; the continuation is scheduled as a job.
   ///
   /// Parameters:
@@ -460,10 +484,11 @@ extension SchedulingExecutor {
 /// A continuation that has been scheduled to be resumed at some point in the
 /// future.
 ///
-/// Either the scheduled time arrives and the continuation is resumed normally,
-/// or `cancel(throwing:)` takes it back before then and resumes it with an
-/// error.  Dropping this without cancelling is fine; the continuation will be
-/// resumed when its time comes.
+/// It is resumed when the scheduled time arrives, unless it is cancelled before
+/// then, which happens if this is passed to `ContinuationWaiter.wait(for:)`
+/// and the task is cancelled while waiting.  Dropping this instead is fine
+/// (and is what to do for a continuation whose error type isn't
+/// `CancellationError`); the continuation will be resumed when its time comes.
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.5, *)
 @safe
@@ -482,26 +507,75 @@ public struct ScheduledContinuation<Failure: Error>: ~Copyable, Sendable {
     self.token = unsafe schedule(_jobToResume(raw))
   }
 
-  /// Cancel the timer, if it hasn't fired.
+  /// Whether this is the continuation that `context` refers to.
+  internal func _isContinuation(_ context: Builtin.RawUnsafeContinuation)
+    -> Bool {
+    return unsafe unsafeBitCast(continuation.context, to: UInt.self)
+      == unsafeBitCast(context, to: UInt.self)
+  }
+
+  /// Arrange for the continuation to be resumed by throwing `error`, if the
+  /// timer hasn't fired, and ask for the timer to fire now.
   ///
-  /// If this stops the continuation being resumed by the timer, it resumes the
-  /// continuation by throwing `error` and returns `true`.  If it returns
-  /// `false`, the timer has fired, or is firing, and has resumed the
-  /// continuation (or will) normally.
-  ///
-  /// This may be called more than once, from any thread, and returns `true` at
-  /// most once.  As it is called from task cancellation handlers, it is subject
-  /// to the restrictions on `JobCanceller.cancel(jobWithToken:)`.
-  @discardableResult
-  public borrowing func cancel(throwing error: Failure) -> Bool {
-    // We got the job back, so it will never run; resume the continuation
-    // ourselves.  There is nothing to destroy: the job is part of the
-    // continuation's own storage.
-    guard token.cancel() != nil else {
-      return false
+  /// This must only be called while the task that is waiting for the
+  /// continuation can't have been resumed, which is to say from the
+  /// cancellation handler of `ContinuationWaiter.wait(for:)`: the
+  /// continuation's storage, where we record the error, is freed once it has.
+  internal borrowing func _cancel(throwing error: Failure) {
+    // The job that resumes the continuation is part of its storage, so the
+    // executor still has it, and will run it; tell it to throw first.
+    guard unsafe _continuationCancelScheduled(continuation.context, error) else {
+      return
     }
-    unsafe continuation.resume(throwing: error)
-    return true
+    // Get the executor to run it now, rather than when the timer fires.  If it
+    // can't, it will throw then instead.
+    token.cancel()
+  }
+}
+
+/// Arrange for a split continuation that has been scheduled as a job to be
+/// resumed by throwing `error` when the job runs, if the job hasn't run yet.
+/// Takes ownership of `error`.
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_continuation_cancelScheduled")
+internal func _continuationCancelScheduled(
+  _ continuation: Builtin.RawUnsafeContinuation,
+  _ error: __owned any Error
+) -> Bool
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+extension ContinuationWaiter
+  where Success == Void, Failure == CancellationError {
+  /// Suspend until the paired continuation, which has been scheduled, is
+  /// resumed, or until the current task is cancelled.
+  ///
+  /// If the task is cancelled while we wait (or already has been), and the
+  /// timer hasn't fired, the continuation is made to throw a
+  /// `CancellationError` with the reason the task was cancelled with, and
+  /// the executor is asked to fire the timer now.  If it can't, the error is
+  /// thrown when the timer would have fired.  If the timer has already fired,
+  /// this returns normally.
+  ///
+  /// - Parameters:
+  ///   - scheduled: The scheduled continuation, which must be the one that
+  ///     pairs with this waiter.
+  public nonisolated(nonsending) consuming func wait(
+    for scheduled: consuming ScheduledContinuation<CancellationError>
+  ) async throws(CancellationError) {
+    let context = _takeContext()
+    precondition(scheduled._isContinuation(context),
+                 "waiting for a scheduled continuation that isn't ours")
+    let scheduled = scheduled
+    // A cancellation handler runs either before we suspend or while the task
+    // can't get past the status record lock, so the continuation's storage is
+    // there for `_cancel` to use.
+    try await Self._wait(
+      context: context,
+      onCancel: {
+        scheduled._cancel(throwing: CancellationError(
+          reason: CancellationError.Reason(_rawValue: $0) ?? .unspecified))
+      })
   }
 }
 

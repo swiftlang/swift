@@ -116,6 +116,13 @@ _swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
       *reinterpret_cast<SerialExecutorRef *>(&executor)));
 }
 
+extern "C" SWIFT_CC(swift) bool swift_job_isResumption(Job *job);
+
+extern "C" bool _swift_job_isResumption_c(SwiftJob *job)
+{
+  return swift_job_isResumption(reinterpret_cast<Job *>(job));
+}
+
 extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
 {
   swift_job_run(reinterpret_cast<Job *>(job),

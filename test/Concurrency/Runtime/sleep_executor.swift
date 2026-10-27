@@ -65,9 +65,8 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
   }
 
   // We can't remove jobs from `asyncAfter`, so we never cancel.
-  public func cancel(jobWithToken: borrowing JobCancellationToken)
-    -> ExecutorJob? {
-    return nil
+  public func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool {
+    return false
   }
 }
 

@@ -129,12 +129,13 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// We hand the continuation's resume half to the current scheduling
   /// executor, which resumes it when the timer fires, and keep the token that
-  /// lets us cancel the timer.  If the task is cancelled, we ask the executor
-  /// for the continuation back.  If we get it, the timer can never fire, so we
-  /// resume the continuation ourselves; if we don't, the timer has already
-  /// fired (or is firing) and will resume it normally.  Either way the
-  /// continuation is resumed exactly once, and a cancelled sleep doesn't leave
-  /// its timer behind in the executor.
+  /// lets us cancel the timer.  If the task is cancelled before the timer
+  /// fires, we tell the continuation to throw when it is resumed, and ask the
+  /// executor to fire the timer now; if the timer has already fired (or is
+  /// firing), it resumes the continuation normally.  Either way the timer is
+  /// what resumes the continuation, so it is resumed exactly once, and a
+  /// cancelled sleep doesn't leave its timer behind in an executor that can
+  /// fire it early.
   @available(StdlibDeploymentTarget 6.5, *)
   @diagnose(UselessAvailabilityCheck, as: ignored)
   internal static func _sleep<C: Clock>(
@@ -181,9 +182,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// `schedule` is handed the continuation that the sleeping task is waiting
   /// on, and must arrange for it to be resumed when the timer fires.  If the
-  /// task is cancelled, we use the result to take the continuation back and
-  /// resume it with an error, so a cancelled sleep doesn't leave its timer
-  /// behind.  Either way the continuation is resumed exactly once.
+  /// task is cancelled, we use the result to make the continuation throw, and
+  /// to fire the timer early.
   @available(StdlibDeploymentTarget 6.5, *)
   @diagnose(UselessAvailabilityCheck, as: ignored)
   internal static func _sleepScheduling(
@@ -195,13 +195,7 @@ extension Task where Success == Never, Failure == Never {
     ) { (continuation: consuming Continuation<Void, _Concurrency.CancellationError>,
          waiter: consuming ContinuationWaiter<Void, _Concurrency.CancellationError>)
         async throws(_Concurrency.CancellationError) -> Void in
-      // The cancellation handler only borrows this, which it can do because
-      // `cancel(throwing:)` doesn't consume it, so no box is needed.
-      let scheduled = schedule(continuation)
-
-      try await waiter.wait(onCancel: { _ in
-        scheduled.cancel(throwing: _Concurrency.CancellationError())
-      })
+      try await waiter.wait(for: schedule(continuation))
     }
   }
 
@@ -245,7 +239,7 @@ extension Task where Success == Never, Failure == Never {
     }
 
     #if !$Embedded
-    // The timer can only resume a continuation, and can't be taken back, so
+    // The timer can only resume a continuation, and can't be cancelled, so
     // we can't hand it the continuation that the sleeping task is waiting on:
     // if the task were cancelled, the timer would later resume it a second
     // time.  Instead, a helper task waits for the timer, and whichever of the

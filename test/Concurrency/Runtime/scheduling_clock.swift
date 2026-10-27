@@ -78,13 +78,14 @@ final class ManualClock: SchedulingClock, JobCanceller, @unchecked Sendable {
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
+  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
     let id = UInt64(token.opaqueData[0])
+    // Run the job now, where it would have run when the clock got there.
     if let entry = queue.sync(execute: { pending.removeValue(forKey: id) }) {
-      return ExecutorJob(entry.job)
+      (entry.destination ?? target).enqueue(ExecutorJob(entry.job))
+      return true
     }
-    return nil
+    return false
   }
 
   /// Move the clock forward, running everything that has become due.
@@ -181,13 +182,14 @@ final class HoldingClock: SchedulingClock, JobCanceller, @unchecked Sendable {
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
+  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
     let id = UInt64(token.opaqueData[0])
+    // Run the job now, where it would have run when the clock got there.
     if let entry = queue.sync(execute: { pending.removeValue(forKey: id) }) {
-      return ExecutorJob(entry.job)
+      (entry.destination ?? target).enqueue(ExecutorJob(entry.job))
+      return true
     }
-    return nil
+    return false
   }
 
   /// Move the clock forward, running everything that has become due.
@@ -284,9 +286,8 @@ final class RefusingExecutor: TaskExecutor, SchedulingExecutor,
     fatalError("a standard clock should never be scheduled on this executor")
   }
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
-    return nil
+  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
+    return false
   }
 }
 
@@ -295,6 +296,13 @@ final class Counter: @unchecked Sendable {
   private var _value = 0
   var value: Int { queue.sync { _value } }
   func increment() { queue.sync { _value += 1 } }
+}
+
+final class Log: @unchecked Sendable {
+  private let queue = DispatchQueue(label: "Log")
+  private var _entries: [String] = []
+  var entries: [String] { queue.sync { _entries } }
+  func append(_ entry: String) { queue.sync { _entries.append(entry) } }
 }
 
 final class Flag: @unchecked Sendable {
@@ -341,7 +349,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, clock.pendingCount)
     }
 
-    tests.test("Cancelling a sleep on a SchedulingClock takes the timer back") {
+    tests.test("Cancelling a sleep on a SchedulingClock fires the timer early") {
       let clock = ManualClock()
       let count = 50
 
@@ -419,7 +427,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, clock.pendingCount)
     }
 
-    tests.test("Cancelling a job scheduled via an unknown clock gives back the original job") {
+    tests.test("Cancelling a job scheduled via an unknown clock runs the original job now") {
       let clock = ManualClock()
       let proxy = SchedulingProxy(clock: clock)
       let runs = Counter()
@@ -431,25 +439,20 @@ func waitUntil(_ condition: () -> Bool) async throws {
 
       try! await waitUntil { clock.pendingCount == 1 }
       let token = proxy.takeToken()!
-      guard let job = token.cancel() else {
-        expectUnreachable("the clock should have given the job back")
-        return
-      }
+      expectTrue(token.cancel())
       expectEqual(0, clock.pendingCount)
 
-      // Cancelling doesn't consume the token, and a second cancel gets nothing.
-      expectTrue(token.cancel() == nil)
+      // Cancelling doesn't consume the token, and a second cancel does nothing.
+      expectFalse(token.cancel())
 
-      // We get the original job back, not the trampoline that the clock was
-      // holding, and the trampoline does nothing, so the task runs once, when
-      // we run the job.
-      Task.defaultExecutor.enqueue(job)
+      // The clock runs the trampoline that it was holding early, which runs
+      // the original job, once.
       expectEqual(7, await task.value)
       try! await Task.sleep(for: .milliseconds(50))
       expectEqual(1, runs.value)
     }
 
-    tests.test("A built-in clock schedules a job on an executor directly, and cancelling gives it back") {
+    tests.test("A built-in clock schedules a job on an executor directly, and cancelling runs it now") {
       let scheduler = Task.defaultExecutor as! any SchedulingExecutor
       let proxy = SchedulingProxy(clock: ContinuousClock(), scheduler: scheduler,
                                   askClock: true)
@@ -463,12 +466,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
       try! await Task.sleep(for: .milliseconds(50))
       expectEqual(0, runs.value)
 
-      guard let job = proxy.takeToken()!.cancel() else {
-        expectUnreachable("the executor should have given the job back")
-        return
-      }
-
-      Task.defaultExecutor.enqueue(job)
+      expectTrue(proxy.takeToken()!.cancel())
       expectEqual(9, await task.value)
       expectEqual(1, runs.value)
     }
@@ -502,29 +500,62 @@ func waitUntil(_ condition: () -> Bool) async throws {
       let clock = ManualClock()
       let scheduler = Task.defaultExecutor as! any SchedulingExecutor
 
-      try! await withContinuation(
-        of: Void.self, throwing: CancellationError.self
-      ) { (continuation: consuming Continuation<Void, CancellationError>,
-         waiter: consuming ContinuationWaiter<Void, CancellationError>)
-        async throws(CancellationError) -> Void in
-        let scheduled = scheduler.schedule(continuation,
-                                           at: .after(.seconds(3600)),
-                                           tolerance: nil, clock: clock)
-        expectEqual(1, clock.pendingCount)
+      let task = Task { () async throws -> Void in
+        try await withContinuation(
+          of: Void.self, throwing: CancellationError.self
+        ) { (continuation: consuming Continuation<Void, CancellationError>,
+           waiter: consuming ContinuationWaiter<Void, CancellationError>)
+          async throws(CancellationError) -> Void in
+          let scheduled = scheduler.schedule(continuation,
+                                             at: .after(.seconds(3600)),
+                                             tolerance: nil, clock: clock)
+          expectEqual(1, clock.pendingCount)
 
-        // The clock no longer holds the job, and the continuation is resumed
-        // with our error, once.
-        expectTrue(scheduled.cancel(throwing: CancellationError()))
-        expectFalse(scheduled.cancel(throwing: CancellationError()))
-        expectEqual(0, clock.pendingCount)
-
-        var threw = false
-        do {
-          try await waiter.wait()
-        } catch {
-          threw = true
+          // The task is already cancelled, so the timer is cancelled as soon
+          // as we wait.
+          withUnsafeCurrentTask { $0!.cancel() }
+          try await waiter.wait(for: scheduled)
         }
-        expectTrue(threw)
+      }
+
+      // The continuation is resumed with a cancellation error, and the clock
+      // no longer holds the job.
+      switch await task.result {
+      case .success:
+        expectUnreachable("the continuation should have thrown")
+      case .failure(let error):
+        expectTrue(error is CancellationError)
+      }
+      expectEqual(0, clock.pendingCount)
+    }
+
+    tests.test("Cancelling a scheduled continuation after its timer fires does nothing") {
+      let clock = ManualClock()
+      let scheduler = Task.defaultExecutor as! any SchedulingExecutor
+
+      let task = Task { () async throws -> Void in
+        try await withContinuation(
+          of: Void.self, throwing: CancellationError.self
+        ) { (continuation: consuming Continuation<Void, CancellationError>,
+           waiter: consuming ContinuationWaiter<Void, CancellationError>)
+          async throws(CancellationError) -> Void in
+          let scheduled = scheduler.schedule(continuation,
+                                             at: .after(.seconds(5)),
+                                             tolerance: nil, clock: clock)
+          // Fire the timer, and give its job time to run, before we wait, so
+          // that the continuation has been resumed when we are cancelled.
+          clock.advance(by: .seconds(5))
+          try? await Task.sleep(for: .milliseconds(50))
+          withUnsafeCurrentTask { $0!.cancel() }
+          try await waiter.wait(for: scheduled)
+        }
+      }
+
+      switch await task.result {
+      case .success:
+        break
+      case .failure:
+        expectUnreachable("the timer had already fired")
       }
     }
 
@@ -572,6 +603,43 @@ func waitUntil(_ condition: () -> Bool) async throws {
       case .failure(let error):
         expectTrue(error is CancellationError)
       }
+    }
+
+    tests.test("CooperativeExecutor: a cancelled sleep in an escalated task runs ahead of lower-priority work") {
+      let exec = CooperativeExecutor()
+      let started = Flag()
+      let log = Log()
+
+      let sleeper = Task(executorPreference: exec, priority: .low) { () -> Void in
+        started.set()
+        try? await Task.sleep(for: .seconds(3600))
+        log.append("sleeper")
+      }
+
+      _ = Task(executorPreference: exec, priority: .low) {
+        while !started.value {
+          await Task.yield()
+        }
+        // Give the sleeper time to start waiting.
+        for _ in 0..<3 {
+          await Task.yield()
+        }
+
+        // The job that wakes the sleeper still has its original, low,
+        // priority.  Cancelling must wake the sleeper at its escalated priority,
+        // rather than leaving the job to wait behind the filler.
+        sleeper.escalatePriority(to: .high)
+        for i in 0..<10 {
+          _ = Task(executorPreference: exec, priority: .low) {
+            log.append("filler \(i)")
+          }
+        }
+        sleeper.cancel()
+      }
+
+      try! exec.run()
+      expectEqual(11, log.entries.count)
+      expectEqual("sleeper", log.entries.first)
     }
 
     tests.test("CooperativeExecutor: jobs for an unknown clock go to the clock") {
@@ -640,13 +708,13 @@ func waitUntil(_ condition: () -> Bool) async throws {
           let scheduled = exec.schedule(continuation,
                                         at: .after(.seconds(3600)),
                                         tolerance: nil, clock: ContinuousClock())
-          expectTrue(scheduled.cancel(throwing: CancellationError()))
 
-          // The timer is gone rather than lost, so the task is resumed with
-          // the error.
+          // Cancelling fires the timer now, rather than in an hour, and the
+          // task is resumed with the error.
+          withUnsafeCurrentTask { $0!.cancel() }
           var threw = false
           do {
-            try await waiter.wait()
+            try await waiter.wait(for: scheduled)
           } catch {
             threw = true
           }
@@ -767,13 +835,8 @@ func waitUntil(_ condition: () -> Bool) async throws {
       try! await Task.sleep(for: .milliseconds(50))
       expectEqual(0, runs.value)
 
-      guard let job = proxy.takeToken()!.cancel() else {
-        expectUnreachable("the job should have been handed back")
-        return
-      }
-
-      // We get the original job back, not the trampoline.
-      Task.defaultExecutor.enqueue(job)
+      // Cancelling runs the trampoline now, which runs the original job.
+      expectTrue(proxy.takeToken()!.cancel())
       expectEqual(11, await task.value)
       try! await Task.sleep(for: .milliseconds(50))
       expectEqual(1, runs.value)

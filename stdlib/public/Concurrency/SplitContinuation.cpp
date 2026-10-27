@@ -20,6 +20,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Error.h"
 #include "swift/Threading/ConditionVariable.h"
 #include "llvm/Support/MathExtras.h"
 #include <atomic>
@@ -60,8 +61,13 @@ namespace {
 /// It is a Job, of a kind of its own.  Resuming a continuation that has a Void
 /// result is just what running such a job does, so a sleeping task can hand its
 /// continuation straight to an executor as the job that wakes it, with no
-/// stand-in job to allocate.  (An executor may also recognise the kind and
-/// resume the continuation itself instead of running the job.)
+/// stand-in job to allocate.  Executors must run the job, rather than resuming
+/// the continuation themselves, since the job may have been cancelled, in which
+/// case running it resumes the continuation by throwing.  All that running it
+/// does is resume the continuation, which enqueues the awaiting task, so it is
+/// a "resumption" job (see swift_job_isResumption), which a scheduler should
+/// run as soon as it is due or cancelled rather than enqueue: its priority is
+/// fixed here, and the task may have been escalated since.
 ///
 /// The layout also makes a split continuation resumable by *any* code that can
 /// resume a regular one, including code compiled before split continuations
@@ -87,13 +93,24 @@ struct SplitContinuationStorage : public Job {
   /// has no way to supply a value.
   bool ResultIsEmpty;
 
+  /// Decides, for a continuation that has been scheduled as a job, whether
+  /// running the job resumes it normally or by throwing: null until one or the
+  /// other happens, then either `Fired` (the job ran first) or the error that
+  /// `swift_continuation_cancelScheduled` claimed it with, at +1.
+  std::atomic<SwiftError *> Outcome;
+
+  /// The value of `Outcome` once the job has run without being cancelled.
+  static SwiftError *fired() { return reinterpret_cast<SwiftError *>(1); }
+
   SplitContinuationStorage(JobPriority priority, bool resultIsEmpty)
       : Job({JobKind::SplitContinuation, priority}, &process,
             jobHeapMetadataPtr, /*captureCurrentVoucher=*/false),
         ResumeContext(nullptr), AwaitingTask(nullptr),
-        ResultIsEmpty(resultIsEmpty) {}
+        ResultIsEmpty(resultIsEmpty), Outcome(nullptr) {}
 
-  /// Running the job resumes the continuation normally.
+  /// Running the job resumes the continuation: normally, unless it was
+  /// cancelled first, in which case by throwing the error it was cancelled
+  /// with.
   SWIFT_CC(swiftasync)
   static void process(Job *job) {
     auto *storage = cast<SplitContinuationStorage>(job);
@@ -101,7 +118,13 @@ struct SplitContinuationStorage : public Job {
       swift_Concurrency_fatalError(
           0, "a split continuation can only be run as a job if its result is "
              "empty");
-    swift_continuation_resume(reinterpret_cast<AsyncTask *>(storage));
+    auto *continuation = reinterpret_cast<AsyncTask *>(storage);
+    SwiftError *error = storage->Outcome.exchange(fired(),
+                                                  std::memory_order_acquire);
+    if (error)
+      swift_continuation_throwingResumeWithError(continuation, error);
+    else
+      swift_continuation_resume(continuation);
   }
 
   static bool classof(const Job *job) {
@@ -251,9 +274,9 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   // task that is awaiting the continuation carries its own.
   //
   // Note that if the task's priority is later escalated, this job's priority
-  // is not updated.  That affects only an executor that reads the job's
-  // priority after the job has been scheduled, which the Dispatch executor
-  // does not (it chooses its queue when it is given the job).
+  // is not updated.  That is why schedulers should run it when it is due or
+  // cancelled, rather than enqueue it: running it enqueues the task, at the
+  // task's own priority.
   auto *storage = new (allocation) SplitContinuationStorage(
       swift_task_getCurrent()->getPriority(), resultSize == 0);
 
@@ -374,3 +397,18 @@ void swift::swift_continuation_destroySplit(SplitContinuation *continuation) {
   swift_task_dealloc(continuation);
 }
 
+SWIFT_CC(swift)
+bool swift::swift_continuation_cancelScheduled(SplitContinuation *continuation,
+                                               SwiftError *error) {
+  auto *storage = reinterpret_cast<SplitContinuationStorage *>(continuation);
+  SwiftError *expected = nullptr;
+  // Release, so that the job sees the error that it is to throw.
+  if (storage->Outcome.compare_exchange_strong(expected, error,
+                                               std::memory_order_release,
+                                               std::memory_order_relaxed))
+    return true;
+
+  // The job has already run, or another cancellation got there first.
+  swift_errorRelease(error);
+  return false;
+}

@@ -1186,6 +1186,19 @@ void swift_continuation_awaitSplit(SplitContinuation *continuation);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_destroySplit(SplitContinuation *continuation);
 
+/// Arrange for a split continuation that has been scheduled as a job to be
+/// resumed by throwing `error`, which is passed at +1, when the job runs.
+///
+/// Returns true if this happened first.  Returns false, and releases `error`,
+/// if the job has already run (in which case the continuation was resumed
+/// normally) or the continuation was already cancelled.
+///
+/// This must only be called while the continuation's storage is alive, that is,
+/// before the task that awaits it has been resumed and moved on.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_continuation_cancelScheduled(SplitContinuation *continuation,
+                                        /* +1 */ SwiftError *error);
+
 /// Resume a continuation, offering the current thread to run the resumed task
 /// instead of enqueuing it.
 ///

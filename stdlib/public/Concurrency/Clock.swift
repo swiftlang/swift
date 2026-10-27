@@ -98,9 +98,10 @@ public protocol SchedulingClock<Duration>: Clock<Duration> {
   /// short-circuit that and use `schedule(_:at:tolerance:)` with the original
   /// job.
   ///
-  /// Cancelling the job gives `job` back, as for any other scheduled job.
-  /// (The default implementation arranges that even though it has to schedule
-  /// a different job on the clock.)
+  /// Cancelling the job runs it on `executor` now, if it hasn't run, as for
+  /// any other scheduled job.  (The default implementation gets that for
+  /// nothing: running the job it schedules on the clock early enqueues `job`
+  /// on `executor` early.)
   ///
   /// Returns a ``JobCancellationToken`` that can be used to cancel the job
   /// before it runs.
@@ -137,7 +138,7 @@ extension SchedulingClock {
   /// A default `sleep` that wakes the task by scheduling the job that resumes
   /// it with the clock, so that a clock need only implement
   /// `schedule(_:at:tolerance:)` to be usable with `Task.sleep()`.  Cancelling
-  /// the task takes the timer back out of the clock immediately.
+  /// the task fires the timer early, if the clock can, which then throws.
   public func sleep(
     until deadline: Instant, tolerance: Duration?
   ) async throws {
@@ -152,51 +153,11 @@ extension SchedulingClock {
   }
 }
 
-/// Shared state between a trampoline job and the thing that can cancel it.
-@available(StdlibDeploymentTarget 6.5, *)
-private final class _TrampolineState: @unchecked Sendable {
-  /// Set (before the trampoline is enqueued) if the job was cancelled, in which
-  /// case the trampoline must not enqueue it.
-  var cancelled = false
-}
-
-/// Cancels a job that has been scheduled on a clock through a trampoline,
-/// handing back the original job instead of the trampoline.
-@available(StdlibDeploymentTarget 6.5, *)
-private final class _TrampolineCanceller: JobCanceller, @unchecked Sendable {
-  let original: UnownedJob
-  let state: _TrampolineState
-
-  /// The token for the trampoline.  It is set when we are created, and taken
-  /// when we are asked to cancel, which happens at most once because that
-  /// consumes our token.
-  var trampolineToken: JobCancellationToken?
-
-  init(original: UnownedJob, state: _TrampolineState,
-       trampolineToken: consuming JobCancellationToken) {
-    self.original = original
-    self.state = state
-    self.trampolineToken = consume trampolineToken
-  }
-
-  func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
-    guard let trampolineToken = trampolineToken.take(),
-          let trampoline = trampolineToken.cancel() else {
-      return nil
-    }
-
-    // The trampoline is a task, which has to be run to be freed, so tell it
-    // to do nothing and let it run.  We hand back the job it was carrying
-    // instead.
-    state.cancelled = true
-    Task<Never, Never>.defaultExecutor.enqueue(trampoline)
-    return ExecutorJob(original)
-  }
-}
-
 /// Run `job` on `executor` at some point after the fire time, by scheduling a
 /// trampoline job on `clock`, which enqueues `job` on `executor` when it runs.
+///
+/// Cancelling the trampoline runs it early, which is just what cancelling `job`
+/// should do, so the clock's token for it serves as the token for `job`.
 @available(StdlibDeploymentTarget 6.5, *)
 internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
   _ job: consuming ExecutorJob,
@@ -206,7 +167,6 @@ internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
   clock: Clk
 ) -> JobCancellationToken {
   let original = UnownedJob(job)
-  let state = _TrampolineState()
 
   let flags = taskCreateFlags(
     priority: TaskPriority(ExecutorJob(original).priority),
@@ -219,29 +179,22 @@ internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
     isSynchronousStart: false
   )
   let (trampolineTask, _) = Builtin.createAsyncTask(flags) {
-    if !state.cancelled {
-      executor.enqueue(original)
-    }
+    executor.enqueue(original)
   }
   let trampoline = ExecutorJob(
     context: Builtin.convertTaskToJob(trampolineTask))
 
-  let trampolineToken = clock.schedule(trampoline, at: fireTime,
-                                       tolerance: tolerance)
-  let canceller = _TrampolineCanceller(original: original, state: state,
-                                       trampolineToken: trampolineToken)
-  return unsafe JobCancellationToken(canceller: canceller, opaqueData: [0, 0])
+  return clock.schedule(trampoline, at: fireTime, tolerance: tolerance)
 }
 
 /// A canceller for work that was handed to the runtime's global enqueue
-/// functions, which can't take a timer back.
+/// functions, which can't cancel a timer.
 @available(StdlibDeploymentTarget 6.5, *)
 private final class _NonCancellingCanceller: JobCanceller, @unchecked Sendable {
   static let shared = _NonCancellingCanceller()
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
-    return nil
+  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
+    return false
   }
 }
 

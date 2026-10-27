@@ -97,6 +97,10 @@ internal func _jobSetPriority(_ job: Builtin.Job, _ priority: UInt8)
 @_silgen_name("swift_job_getKind")
 internal func _jobGetKind(_ job: Builtin.Job) -> UInt8
 
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_job_isResumption")
+internal func _jobIsResumption(_ job: Builtin.Job) -> Bool
+
 /// Returns the job's flags; works for any job, not only tasks
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
@@ -182,12 +186,12 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
                                            _ clock: CInt,
                                            _ job: UnownedJob) -> Int
 
-/// Cancel a job scheduled with `_dispatchEnqueueWithDeadline`, returning it if
-/// it had not yet started.  The caller must still call
-/// `_dispatchReleaseSource`.
+/// Cancel a job scheduled with `_dispatchEnqueueWithDeadline`, by enqueuing it
+/// now, and return `true`, if it had not yet started.  The caller must still
+/// call `_dispatchReleaseSource`.
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_dispatchCancel")
-internal func _dispatchCancel(_ source: Int) -> ExecutorJob?
+internal func _dispatchCancel(_ source: Int) -> Bool
 
 /// Release the reference to a scheduled job's state that was returned by
 /// `_dispatchEnqueueWithDeadline`.

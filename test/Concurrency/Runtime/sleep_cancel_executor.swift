@@ -24,13 +24,28 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
   private let queue = DispatchQueue(label: "CancellableExecutor")
   private var pending: [UInt64: UnownedJob] = [:]
   private var nextID: UInt64 = 1
+  private var _scheduledResumptions = 0
+  private var _enqueuedResumptions = 0
 
   /// The number of delayed jobs that haven't yet run or been cancelled.
   var pendingCount: Int {
     return queue.sync { pending.count }
   }
 
+  /// How many of the jobs given to `schedule` were resumptions.
+  var scheduledResumptions: Int {
+    return queue.sync { _scheduledResumptions }
+  }
+
+  /// How many of the jobs given to `enqueue` were resumptions.
+  var enqueuedResumptions: Int {
+    return queue.sync { _enqueuedResumptions }
+  }
+
   public func enqueue(_ _job: consuming ExecutorJob) {
+    if _job.isResumption {
+      queue.sync { _enqueuedResumptions += 1 }
+    }
     let job = UnownedJob(_job)
     DispatchQueue.global().async {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
@@ -56,8 +71,12 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
       + .seconds(Int(seconds))
       + .nanoseconds(Int(nanoseconds))
 
+    let isResumption = _job.isResumption
     let job = UnownedJob(_job)
     let id: UInt64 = queue.sync {
+      if isResumption {
+        _scheduledResumptions += 1
+      }
       let id = nextID
       nextID += 1
       pending[id] = job
@@ -76,12 +95,20 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
+    -> Bool {
     let id = UInt64(token.opaqueData[0])
-    if let job = queue.sync(execute: { pending.removeValue(forKey: id) }) {
-      return ExecutorJob(job)
+    // Run the job now, if the timer hasn't taken it: here, if all it does is
+    // resume a task, and otherwise by enqueuing it.
+    guard let job = queue.sync(execute: { pending.removeValue(forKey: id) })
+    else {
+      return false
     }
-    return nil
+    if job.isResumption {
+      job.runSynchronously(on: asUnownedTaskExecutor())
+    } else {
+      enqueue(ExecutorJob(job))
+    }
+    return true
   }
 }
 
@@ -140,6 +167,41 @@ func waitUntil(_ condition: () -> Bool) async throws {
       }
 
       // The timers must be gone now, rather than at their deadline.
+      expectEqual(0, executor.pendingCount)
+    }
+
+    tests.test("The job that wakes a sleeping task is a resumption") {
+      let executor = CancellableExecutor()
+
+      let task = Task(executorPreference: executor) {
+        try await Task.sleep(for: .milliseconds(10))
+      }
+      try! await task.value
+
+      // The task's own jobs aren't resumptions; the sleep's timer job is, and
+      // so are no others.
+      expectEqual(1, executor.scheduledResumptions)
+      expectEqual(0, executor.enqueuedResumptions)
+    }
+
+    tests.test("A cancelled sleep reports the reason the task was cancelled") {
+      let executor = CancellableExecutor()
+
+      let task = Task(executorPreference: executor) {
+        try await Task.sleep(for: .seconds(3600))
+      }
+
+      try! await waitUntil { executor.pendingCount == 1 }
+      task.cancel(reason: .deadlineExpired)
+
+      do {
+        try await task.value
+        expectUnreachable("sleep should have been cancelled")
+      } catch let error as CancellationError {
+        expectEqual(.deadlineExpired, error.reason)
+      } catch {
+        expectUnreachable("unexpected error \(error)")
+      }
       expectEqual(0, executor.pendingCount)
     }
 

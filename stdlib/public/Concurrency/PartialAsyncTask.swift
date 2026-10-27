@@ -98,6 +98,26 @@ public struct UnownedJob: Sendable {
     return JobPriority(rawValue: raw)
   }
 
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  /// Whether running this job does nothing but make a task runnable.
+  ///
+  /// Such a job resumes a continuation (the job that wakes a sleeping task is
+  /// one), which enqueues the task that is waiting for it, at the task's own
+  /// current priority.  It never blocks, and doesn't run the task itself, so
+  /// it may be run on any thread, including from within
+  /// `JobCanceller.cancel(jobWithToken:)`.  A scheduler should run such a job
+  /// the moment it is due or cancelled, rather than enqueuing it, since the
+  /// job's own priority is fixed when it is created and may be out of date by
+  /// then: if the task has been escalated, a job that was enqueued could wait
+  /// behind work of lower priority than the task's.
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 6.5, *)
+  public var isResumption: Bool {
+    return _jobIsResumption(context)
+  }
+  #endif
+
+
   @available(StdlibDeploymentTarget 5.9, *)
   internal var _context: Builtin.Job {
     context
@@ -371,6 +391,25 @@ public struct ExecutorJob: Sendable, ~Copyable {
   public var kind: Kind {
     return Kind(rawValue: _jobGetKind(self.context))!
   }
+
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  /// Whether running this job does nothing but make a task runnable.
+  ///
+  /// Such a job resumes a continuation (the job that wakes a sleeping task is
+  /// one), which enqueues the task that is waiting for it, at the task's own
+  /// current priority.  It never blocks, and doesn't run the task itself, so
+  /// it may be run on any thread, including from within
+  /// `JobCanceller.cancel(jobWithToken:)`.  A scheduler should run such a job
+  /// the moment it is due or cancelled, rather than enqueuing it, since the
+  /// job's own priority is fixed when it is created and may be out of date by
+  /// then: if the task has been escalated, a job that was enqueued could wait
+  /// behind work of lower priority than the task's.
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 6.5, *)
+  public var isResumption: Bool {
+    return _jobIsResumption(self.context)
+  }
+  #endif
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
   //       we can still offer a description to be called explicitly though.

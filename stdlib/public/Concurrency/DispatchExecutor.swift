@@ -70,7 +70,7 @@ extension DispatchMainExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
+    -> Bool {
     return _dispatchCancel(token.opaqueData[0])
   }
 
@@ -105,7 +105,7 @@ extension DispatchGlobalTaskExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
+    -> Bool {
     return _dispatchCancel(token.opaqueData[0])
   }
 

@@ -68,6 +68,20 @@ uint8_t swift_job_getKind(Job *job) {
   return (uint8_t)(job->Flags.getKind());
 }
 
+/// Whether running `job` does nothing but make a task runnable, at that task's
+/// own priority, so that a scheduler can run it the moment it is due or
+/// cancelled (even from `cancel`) rather than enqueuing it.
+extern "C" SWIFT_CC(swift)
+bool swift_job_isResumption(Job *job) {
+  switch (job->Flags.getKind()) {
+  case JobKind::NullaryContinuation:
+  case JobKind::SplitContinuation:
+    return true;
+  default:
+    return false;
+  }
+}
+
 extern "C" SWIFT_CC(swift)
 void *swift_job_getExecutorPrivateData(Job *job) {
   return &job->SchedulerPrivate[0];

@@ -71,6 +71,13 @@ final class ManualExecutor: TaskExecutor, Sendable {
   func runNextJobs(count: Int) {
     for _ in 0..<count { runNextJob() }
   }
+
+  // Waits for a job to be enqueued from elsewhere.
+  func waitForJob() async {
+    while jobs.withLock({ $0.isEmpty }) {
+      try? await Task.sleep(for: .milliseconds(1))
+    }
+  }
 }
 
 final class Box<Value: Sendable>: Sendable {
@@ -417,6 +424,9 @@ actor Elsewhere {
       }
       executor.runNextJob() // The one job: runs the task into the long sleep.
       task.cancel()
+      // Cancelling fires the sleep's timer early, on the executor that holds
+      // it, which then resumes the task here.
+      await executor.waitForJob()
       executor.runNextJob() // The one job: the cancelled sleep resuming.
       expectEqual(1, await task.value)
       expectEqual(0, runs.value)

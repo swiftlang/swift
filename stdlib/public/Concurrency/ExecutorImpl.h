@@ -127,6 +127,17 @@ static inline void * _Nonnull * _Nonnull swift_job_getPrivateData(SwiftJob * _No
   return &job->schedulerPrivate[0];
 }
 
+/// Whether running a job does nothing but make a task runnable, at that task's
+/// own current priority.  Such a job never blocks, and may be run on any
+/// thread, including from within a cancellation; a scheduler should run it as
+/// soon as it is due or cancelled, rather than enqueuing it, since the job's
+/// own priority may be out of date.
+static inline bool swift_job_isResumption(SwiftJob * _Nonnull job) {
+  extern bool _swift_job_isResumption_c(SwiftJob * _Nonnull job);
+
+  return _swift_job_isResumption_c(job);
+}
+
 /// Allocate memory associated with a job.
 ///
 /// Only a task can have memory allocated for it this way.  For any other kind

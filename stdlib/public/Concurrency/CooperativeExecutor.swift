@@ -21,8 +21,8 @@ struct WaitQueue {
   /// A job waiting for its deadline.
   ///
   /// We keep the deadline and a slot alongside the job, rather than in the
-  /// job's executor private data, so that a cancelled job can be handed back
-  /// exactly as we received it, and so that a stale cancellation can never
+  /// job's executor private data, so that a cancelled job can be moved to the
+  /// run queue exactly as we received it, and so that a stale cancellation can never
   /// match a different entry that happens to reuse the same address.
   struct Entry {
     var job: UnownedJob
@@ -340,15 +340,35 @@ extension CooperativeExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> ExecutorJob? {
+    -> Bool {
     let (id, clockToken) = Self.decode(token)
+    let job: ExecutorJob?
     switch clockToken {
     case Self.continuousClockToken:
-      return continuousWaitQueue.cancel(id: id)
+      job = continuousWaitQueue.cancel(id: id)
     case Self.suspendingClockToken:
-      return suspendingWaitQueue.cancel(id: id)
+      job = suspendingWaitQueue.cancel(id: id)
     default:
-      return nil
+      job = nil
+    }
+    // Run the job now, rather than when its timer fires.
+    switch consume job {
+    case .some(let job):
+      runOrEnqueue(job)
+      return true
+    case .none:
+      return false
+    }
+  }
+
+  /// Run a job that has become due, or been cancelled: at once, if all it does
+  /// is resume a task (so that the task is enqueued at its own priority, which
+  /// may be higher than the job's), and otherwise by enqueuing it.
+  func runOrEnqueue(_ job: consuming ExecutorJob) {
+    if job.isResumption {
+      unsafe job.runSynchronously(on: self.asUnownedSerialExecutor())
+    } else {
+      enqueue(job)
     }
   }
 
@@ -368,10 +388,10 @@ extension CooperativeExecutor: RunLoopExecutor {
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Process the timer queues
       suspendingWaitQueue.forEachReadyJob {
-        runQueue.push(UnownedJob($0))
+        runOrEnqueue($0)
       }
       continuousWaitQueue.forEachReadyJob {
-        runQueue.push(UnownedJob($0))
+        runOrEnqueue($0)
       }
       #endif
 
