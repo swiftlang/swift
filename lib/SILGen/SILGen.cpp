@@ -1582,7 +1582,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // for the call into \p AFD itself.
   emitDistributedResolvableProxyAdapterThunkForDecl(AFD);
 
-  if (AFD->isBackDeployed()) {
+  // A member of a back-deployed type that has no body, such as the implicit
+  // members of a derived conformance when the module is built from its
+  // textual interface, has nothing to use as a fallback.
+  if (AFD->isBackDeployed() &&
+      (AFD->hasBody() || AFD->getAttrs().hasAttribute<BackDeployedAttr>() ||
+       (isa<AccessorDecl>(AFD) &&
+        cast<AccessorDecl>(AFD)->getStorage()
+            ->getAttrs().hasAttribute<BackDeployedAttr>()))) {
     // Emit the fallback function that will be used when the original function
     // is unavailable at runtime.
     auto fallback = SILDeclRef(AFD).asBackDeploymentKind(
