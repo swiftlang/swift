@@ -33,6 +33,7 @@
 #include "llvm/CAS/CASConfiguration.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -63,6 +64,16 @@ enum class ModuleDependencyKind : int8_t {
   SwiftSource,
   LastKind = SwiftSource + 1
 };
+
+inline ModuleDependencyKind &operator++(ModuleDependencyKind &e) {
+  if (e == ModuleDependencyKind::LastKind) {
+    llvm_unreachable(
+        "Attempting to increment last enum value on ModuleDependencyKind");
+  }
+  e = ModuleDependencyKind(
+      static_cast<std::underlying_type<ModuleDependencyKind>::type>(e) + 1);
+  return e;
+}
 
 /// This is used to idenfity a specific macro plugin dependency.
 struct MacroPluginDependency {
@@ -1146,6 +1157,14 @@ public:
   /// Whether \p Directory was reported via \c addInvalidatedPath.
   bool isDirectoryInvalidated(StringRef Directory);
 
+  /// Create the file system through which Clang scanning workers read their
+  /// inputs, without the shared cache in front of it.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> makeClangScanningFileSystem();
+
+  /// The status of the file at the absolute \p Path as the Clang scanner
+  /// observed it when it read the file, if its shared cache holds one.
+  std::optional<llvm::vfs::Status> getClangScannerCachedStatus(StringRef Path);
+
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
@@ -1155,6 +1174,27 @@ private:
 };
 
 // MARK: ModuleDependenciesCache
+/// The size and modification time of a module input file, as observed by a
+/// dependency scan.
+struct ScannerInputFileStatus {
+  uint64_t size;
+  /// Nanoseconds since epoch.
+  uint64_t modificationTime;
+
+  static ScannerInputFileStatus fromStatus(const llvm::vfs::Status &status) {
+    return {status.getSize(),
+            static_cast<uint64_t>(
+                status.getLastModificationTime().time_since_epoch().count())};
+  }
+
+  bool operator==(const ScannerInputFileStatus &other) const {
+    return size == other.size && modificationTime == other.modificationTime;
+  }
+  bool operator!=(const ScannerInputFileStatus &other) const {
+    return !(*this == other);
+  }
+};
+
 /// This "local" dependencies cache persists only for the duration of a given
 /// scanning action, and maintains a store of references to all dependencies
 /// found within the current scanning action.
@@ -1177,6 +1217,9 @@ private:
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
+  /// The status of each input file of the recorded modules, keyed by path,
+  /// as observed by the scan that recorded them.
+  llvm::StringMap<ScannerInputFileStatus> inputFileStatuses;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -1222,6 +1265,13 @@ public:
   }
   void addSeenClangModule(clang::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
+  }
+
+  const llvm::StringMap<ScannerInputFileStatus> &getInputFileStatuses() const {
+    return inputFileStatuses;
+  }
+  void setInputFileStatuses(llvm::StringMap<ScannerInputFileStatus> statuses) {
+    inputFileStatuses = std::move(statuses);
   }
 
   /// Query all dependencies

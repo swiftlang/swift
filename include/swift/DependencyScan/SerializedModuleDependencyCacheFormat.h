@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 10;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 9;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 10;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -78,6 +78,10 @@ using ColumnNumberField = BCFixed<32>;
 
 /// Access level of an import
 using AccessLevelField = BCFixed<8>;
+
+/// Input file status fields
+using FileSizeField = BCVBR<16>;
+using FileModTimeField = BCVBR<16>;
 
 /// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArrayField = llvm::BCArray<IdentifierIDField>;
@@ -125,7 +129,8 @@ enum {
   SWIFT_BINARY_MODULE_DETAILS_NODE,
   CLANG_MODULE_DETAILS_NODE,
   IDENTIFIER_NODE,
-  IDENTIFIER_ARRAY_NODE
+  IDENTIFIER_ARRAY_NODE,
+  INPUT_FILE_STATUS_NODE
 };
 
 // Always the first record in the file.
@@ -160,6 +165,16 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 // the below record layouts contain multiple arrays.
 using IdentifierArrayLayout =
     BCRecordLayout<IDENTIFIER_ARRAY_NODE, IdentifierIDArrayField>;
+
+// After the identifier array records, we have zero or more records capturing
+// the size and modification time of each module input file, as observed by
+// the scan, so that the next scan can tell whether the file has changed.
+using InputFileStatusLayout =
+    BCRecordLayout<INPUT_FILE_STATUS_NODE, // ID
+                   FileIDField,            // path
+                   FileSizeField,          // size
+                   FileModTimeField        // modificationTime
+                   >;
 
 // A record for a given link library node containing information
 // required for the build system client to capture a requirement

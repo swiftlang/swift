@@ -75,17 +75,31 @@ performModulePrescan(SwiftDependencyScanningService &service,
 
 
 namespace incremental {
+/// Record in \p cache the size and modification time of the input files of
+/// every module in \p cache, so that the next scan can validate them.
+///
+/// Inputs that Clang read take the status \p getClangScannerStatus reports
+/// for them, falling back to \p clangFS; the rest are read through \p fs.
+void recordInputFileStatuses(
+    ModuleDependenciesCache &cache, llvm::vfs::FileSystem &fs,
+    llvm::vfs::FileSystem &clangFS,
+    llvm::function_ref<std::optional<llvm::vfs::Status>(StringRef)>
+        getClangScannerStatus);
+
 /// For the given module dependency graph captured in the 'cache',
 /// validate whether each dependency node is up-to-date w.r.t. serialization
 /// time-stamp. i.e. if any of the input files of a module dependency are newer
-/// than the serialized dependency graph, it is considered invalidated and must
-/// be re-scanned.
+/// than the serialized dependency graph, or differ in size or modification
+/// time from when they were scanned, it is considered invalidated and must
+/// be re-scanned. Modules no longer reachable from the root are dropped too,
+/// since they were not validated. Inputs that Clang read are checked through
+/// \p clangFS, the rest through \p fs.
 void validateInterModuleDependenciesCache(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags,
+    llvm::vfs::FileSystem &clangFS, DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
     bool emitRemarks = false);
 
@@ -99,20 +113,21 @@ void outOfDateModuleScan(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags,
+    llvm::vfs::FileSystem &clangFS, DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
     bool emitRemarks, ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan);
 
 /// Validate whether all inputs of a given module dependency
-/// are older than the cache serialization time and none of its directory
+/// are older than the cache serialization time and unchanged in size and
+/// modification time since they were scanned, and none of its directory
 /// dependencies have been invalidated.
 bool verifyModuleDependencyUpToDate(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags,
+    llvm::vfs::FileSystem &clangFS, DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
     bool emitRemarks);
 } // end namespace incremental
