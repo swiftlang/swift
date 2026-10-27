@@ -199,7 +199,9 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 }
 
 /// Recognize jobs in the delayed-jobs queue that are ready to execute
-/// and move them to the primary queue.
+/// and move them to the primary queue, or, for a job that only resumes a
+/// task, run it, so that the task is enqueued at its own priority (which may
+/// have been escalated since the job was created).
 static void recognizeReadyDelayedJobs() {
   // Process all the delayed jobs.
   auto nextDelayedJob = DelayedJobQueue;
@@ -215,7 +217,10 @@ static void recognizeReadyDelayedJobs() {
     JobDeadlineStorage<>::destroy(nextDelayedJob);
 
     auto next = JobQueueTraits::getNext(nextDelayedJob);
-    JobQueue.enqueue(nextDelayedJob);
+    if (swift_job_isResumption(nextDelayedJob))
+      swift_job_run(nextDelayedJob, swift_executor_generic());
+    else
+      JobQueue.enqueue(nextDelayedJob);
     nextDelayedJob = next;
   }
   DelayedJobQueue = nextDelayedJob;

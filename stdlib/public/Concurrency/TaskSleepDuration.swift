@@ -265,9 +265,10 @@ extension Task where Success == Never, Failure == Never {
         }
       }
 
-      try await waiter.wait(onCancel: { _ in
+      try await waiter.wait(onCancel: { reason in
         if claim.claim() {
-          unsafe sleeper.resume(throwing: _Concurrency.CancellationError())
+          unsafe sleeper.resume(
+            throwing: _Concurrency.CancellationError(reason: reason))
         }
       })
     }
