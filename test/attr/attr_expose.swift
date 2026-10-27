@@ -63,7 +63,7 @@ func exposeToCxxCxx() {}
 @_expose(wasm) var errorOnGlobalComputedVar: Int { 0 } // expected-error {{'@_expose' with 'wasm' can only be applied to global functions and to global or static stored variables}}
 
 func wasmNested() {
-  @_expose(wasm) // expected-error {{attribute '_expose' can only be used in a non-local scope}}
+  @_expose(wasm) // expected-error {{'@_expose' can only be used in a non-local scope}}
   func errorOnInnerExpose() {}
 }
 

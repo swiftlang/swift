@@ -167,20 +167,20 @@ extension Polymorphic {
 // reference-counted parameters and receiver, so the operation would call
 // itself.
 
-// expected-error@+2{{@cxx function implementing the retain operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@+2{{'@cxx' function implementing the retain operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 @cxx @implementation
 func retainNode(_ n: Node) { }
 
-// expected-error@+2{{@cxx function implementing the release operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@+2{{'@cxx' function implementing the release operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 @cxx @implementation
 func releaseNode(_ n: Node) { }
 
 extension Counted {
-  // expected-error@+2{{@cxx instance method implementing the retain operation of foreign reference type 'Counted' will cause infinite recursion}}
+  // expected-error@+2{{'@cxx' instance method implementing the retain operation of foreign reference type 'Counted' will cause infinite recursion}}
   @cxx @implementation
   func retainMethod() { }
 
-  // expected-error@+2{{@cxx instance method implementing the release operation of foreign reference type 'Counted' will cause infinite recursion}}
+  // expected-error@+2{{'@cxx' instance method implementing the release operation of foreign reference type 'Counted' will cause infinite recursion}}
   @cxx @implementation
   func releaseMethod() { }
 
