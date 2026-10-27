@@ -4711,6 +4711,17 @@ protected:
       storage.markRewritten();
       break;
     }
+    case BuiltinValueKind::TaskRunInline: {
+      addrMat.materializeAddress(bi);
+      SmallVector<SILValue, 2> newArgs = {storage.storageAddress};
+      llvm::append_range(newArgs, bi->getArguments());
+      auto &astCtx = pass.getModule()->getASTContext();
+      builder.createBuiltin(bi->getLoc(), bi->getName(),
+                            SILType::getEmptyTupleType(astCtx),
+                            bi->getSubstitutions(), newArgs);
+      storage.markRewritten();
+      break;
+    }
 #define BUILTIN(Id, Name, Attrs)
 #define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
     case BuiltinValueKind::Id:
