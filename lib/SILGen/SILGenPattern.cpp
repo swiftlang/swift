@@ -1373,6 +1373,10 @@ PatternMatchEmission::unbindAndEndBorrows(const ClauseRow &row,
     case PatternKind::Expr: // Ignore expression patterns, which we should have
                             // bound in an earlier pass.
       break;
+    case PatternKind::Is: // A wildcard `is` binds nothing; see
+                          // isWildcardIsPattern().
+      ASSERT(isWildcardIsPattern(cast<IsPattern>(pattern)));
+      break;
     case PatternKind::Named: {
       NamedPattern *named = cast<NamedPattern>(pattern);
       SGF.VarLocs.erase(named->getDecl());
@@ -2020,10 +2024,24 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
   // Sema categorizes statically-true casts as "coercions"
   bool isCoercion = firstPattern->getCastKind() == CheckedCastKind::Coercion;
   if (isCoercion) {
-    // Result is statically known...
-    if (!canDeferBinding) {
-      // ... but the binding is needed early; our caller knows how to emit this
-      return false;
+    // Result is statically known, so there is nothing to test. A coercion
+    // that binds nothing is a wildcard and never gets here, so we know
+    // we're binding a payload out of a non-`Copyable` subject.
+    //
+    // The only case we can handle here is an identity cast.  Anything
+    // else would require a borrowed existential view of the subject, which we
+    // can't do today.  Those fall through to be diagnosed below.
+    if (!canDeferBinding && sourceType == targetType) {
+      SmallVector<SpecializedRow, 4> specializedRows;
+      for (auto &row : rows) {
+        specializedRows.push_back({});
+        specializedRows.back().RowIndex = row.RowIndex;
+        specializedRows.back().Patterns.push_back(
+            cast<IsPattern>(row.Pattern)->getSubPattern());
+      }
+      handleCase(src, specializedRows, failure);
+      assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+      return true;
     }
   } else if (!canUseTypeTestForIsa(SGF, sourceType, targetType,
                                    firstPattern->getCastKind())) {
@@ -2041,16 +2059,29 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
       subjectIsCopyable)
     return false;
 
-  // A noncopyable subject can't fall back to the ordinary lowering.
-  // It hands the pattern machinery a cast value whose consumption
-  // kind bindBorrow() asserts on.  Diagnose.
   bool unimplementedBinding = wantsPayload && !canDeferBinding;
   if (unimplementedBinding) {
+    // For a noncopyable subject, we're stuck.  We don't have runtime machinery
+    // to borrow a payload or an existential view of a value, so all we can do
+    // for now is diagnose with as much detail as possible.
+    bool isBorrowingSwitch = !ownership || *ownership <= ValueOwnership::Shared;
     for (auto &row : rows) {
       auto *is = cast<IsPattern>(row.Pattern);
-      if (!patternNeedsNoPayload(is->getSubPattern()))
+      if (patternNeedsNoPayload(is->getSubPattern()))
+        continue;
+      SGF.SGM.diagnose(is->getLoc(),
+                       diag::noncopyable_cast_pattern_binding_while_borrowed);
+      if (isBorrowingSwitch)
+        SGF.SGM.diagnose(
+            is->getLoc(),
+            diag::noncopyable_cast_pattern_binding_use_switch_consume);
+      else if (row.HasGuard)
         SGF.SGM.diagnose(is->getLoc(),
-                         diag::noncopyable_cast_pattern_binding_unimplemented);
+                         diag::noncopyable_cast_pattern_binding_in_guard);
+      else
+        SGF.SGM.diagnose(
+            is->getLoc(),
+            diag::noncopyable_cast_pattern_binding_refutable_subpattern);
     }
   }
 
@@ -2104,7 +2135,13 @@ bool PatternMatchEmission::tryEmitNoncopyableIsDispatch(
   // Set up the success block.  If we diagnosed above, this is unreachable
   endSubjectBorrow();
   if (unimplementedBinding) {
-    SGF.B.createUnreachable(loc);
+    // A coercion has no failure edge of its own; continue with the later
+    // cases so they are still emitted, rather than reporting them as never
+    // executed on top of the error.
+    if (isCoercion)
+      failure(loc);
+    else
+      SGF.B.createUnreachable(loc);
     return true;
   }
 
