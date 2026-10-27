@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// A safe mutable reference allowing in-place mutation to an exclusive value.
-@available(StdlibDeploymentTarget 6.4, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: StdlibDeploymentTarget 6.4)
 @frozen
 @safe
 public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
@@ -21,7 +22,6 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   /// Initializes an instance of `MutableRef` with the given mutable value. This
   /// creates a mutable reference to that value preventing writes to the
   /// original value while this mutable reference is still active.
-  @available(StdlibDeploymentTarget 6.4, *)
   @export(implementation)
   @_lifetime(&value)
   @_transparent
@@ -37,7 +37,6 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   ///                      instance of type `Value`.
   /// - Parameter owner: The owning instance that this `MutableRef` instance's
   ///                    lifetime is based on.
-  @available(StdlibDeploymentTarget 6.4, *)
   @unsafe
   @export(implementation)
   @_lifetime(&owner)
@@ -50,14 +49,11 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
   }
 }
 
-@available(StdlibDeploymentTarget 6.4, *)
 extension MutableRef: @unchecked Sendable where Value: Sendable & ~Copyable {}
 
-@available(StdlibDeploymentTarget 6.4, *)
 extension MutableRef where Value: ~Copyable {
   /// Dereferences the mutable reference allowing for in-place reads and writes
   /// to the underlying value.
-  @available(StdlibDeploymentTarget 6.4, *)
   @export(implementation)
   @_transparent
   public var value: Value {

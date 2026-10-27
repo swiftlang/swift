@@ -47,7 +47,8 @@
 /// For use cases outside of these narrow domains, we generally recommmend
 /// the use of ``UniqueArray`` rather than `RigidArray`. (For copyable elements,
 /// the standard `Array` is an even more convenient choice.)
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.4)
 @frozen
 @safe
 @usableFromInline
@@ -72,12 +73,9 @@ internal struct _RigidArray<Element: ~Copyable>: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal var _storage: UnsafeMutableBufferPointer<Element> {
@@ -90,7 +88,6 @@ extension _RigidArray where Element: ~Copyable {
   /// The maximum number of elements this rigid array can hold.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal var capacity: Int {
@@ -101,7 +98,6 @@ extension _RigidArray where Element: ~Copyable {
   /// exceeding its storage capacity.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal var freeCapacity: Int {
@@ -113,7 +109,6 @@ extension _RigidArray where Element: ~Copyable {
   /// and it cannot accommodate any additional elements.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal var isFull: Bool {
@@ -121,7 +116,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal var _items: UnsafeMutableBufferPointer<Element> {
@@ -134,12 +128,10 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// A span over the elements of this array, providing direct read-only access.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal var span: Span<Element> {
@@ -157,7 +149,6 @@ extension _RigidArray where Element: ~Copyable {
   /// mutating access.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal var mutableSpan: MutableSpan<Element> {
@@ -187,7 +178,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Arbitrarily edit the storage underlying this array by invoking a
   /// user-supplied closure with a mutable `OutputSpan` view over it.
@@ -206,7 +196,6 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: This method returns the result of its function argument.
   /// - Complexity: Adds O(1) overhead to the complexity of the function
   ///    argument.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Element>) throws(E) -> R
@@ -230,7 +219,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal func _contiguousSubrange(following index: inout Int) -> Range<Int> {
@@ -247,7 +235,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Grow or shrink the capacity of a rigid array instance without discarding
   /// its contents.
@@ -260,7 +247,6 @@ extension _RigidArray where Element: ~Copyable {
   ///    greater than or equal to the current count.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func setCapacity(_ newCapacity: Int) {
     let newCapacity = Swift.max(newCapacity, count)
@@ -286,7 +272,6 @@ extension _RigidArray where Element: ~Copyable {
   /// Otherwise the array is left as is.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func reserveCapacity(_ n: Int) {
     guard capacity < n else { return }
@@ -294,13 +279,11 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray {
   /// Copy the contents of this array into a newly allocated rigid array
   /// instance with just enough capacity to hold all its elements.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal func clone() -> Self {
     clone(capacity: self.count)
@@ -313,7 +296,6 @@ extension _RigidArray {
   ///    `capacity` must be greater than or equal to `count`.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal func clone(capacity: Int) -> Self {
     _precondition(capacity >= count, "RigidArray capacity overflow")
@@ -325,7 +307,6 @@ extension _RigidArray {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal mutating func _closeGap(

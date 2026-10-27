@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Inserts a new element into the array at the specified position.
   ///
@@ -30,7 +29,6 @@ extension UniqueArray where Element: ~Copyable {
   ///   `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(_ item: consuming Element, at index: Int) {
     _precondition(index >= 0 && index <= count)
@@ -40,7 +38,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Inserts a given number of new items into this array at the specified
   /// position, using a callback to directly initialize array storage by
@@ -74,7 +71,6 @@ extension UniqueArray where Element: ~Copyable {
   ///       supplied count, and it must fully populate it before returning.
   ///
   /// - Complexity: O(`self.count` + `count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert<E: Error>(
     addingCount newItemCount: Int,
@@ -89,7 +85,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Moves the elements of a fully initialized buffer into this array,
   /// starting at the specified position, and leaving the buffer
@@ -105,7 +100,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    - index: The index at which to move `items`.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(
     moving items: UnsafeMutableBufferPointer<Element>,
@@ -133,7 +127,6 @@ extension UniqueArray where Element: ~Copyable {
   ///       `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(
     moving items: inout OutputSpan<Element>,
@@ -144,7 +137,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: Copyable {
   /// Copies the elements of a fully initialized buffer pointer into this
   /// array at the specified position.
@@ -167,7 +159,6 @@ extension UniqueArray where Element: Copyable {
   ///       a valid index of the array.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(
     copying newElements: UnsafeBufferPointer<Element>, at index: Int
@@ -198,7 +189,6 @@ extension UniqueArray where Element: Copyable {
   ///       a valid index of the array.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(
     copying newElements: UnsafeMutableBufferPointer<Element>,
@@ -226,7 +216,6 @@ extension UniqueArray where Element: Copyable {
   ///        a valid index of the array.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(
     copying newElements: Span<Element>, at index: Int
@@ -256,7 +245,6 @@ extension UniqueArray where Element: Copyable {
   ///        a valid index of the array.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func insert(
     copying newElements: some Collection<Element>, at index: Int

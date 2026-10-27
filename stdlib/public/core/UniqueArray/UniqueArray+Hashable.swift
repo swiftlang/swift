@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray: Hashable where Element: Hashable & ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public func hash(into hasher: inout Hasher) {
     _storage.hash(into: &hasher)

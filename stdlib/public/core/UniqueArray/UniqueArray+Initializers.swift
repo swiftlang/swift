@@ -10,31 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Initializes a new unique array with no elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init() {
     _storage = .init(capacity: 0)
   }
   
   /// Initializes a new unique array with the specified capacity and no elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init(capacity: Int) {
     _storage = .init(capacity: capacity)
   }
 
   /// Initializes a new unique array with the specified capacity and no elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init(minimumCapacity: Int) {
     self.init(capacity: minimumCapacity)
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Creates a new array with the specified capacity, directly initializing
   /// its storage using an output span.
@@ -46,7 +41,6 @@ extension UniqueArray where Element: ~Copyable {
   ///       is allowed to add fewer than `capacity` items. The array is
   ///       initialized with however many items the callback adds to the
   ///       output span before it returns (or before it throws an error).
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init<E: Error>(
     capacity: Int,
@@ -57,7 +51,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: Copyable {
   /// Creates a new array containing the specified number of a single,
   /// repeated value.
@@ -68,27 +61,23 @@ extension UniqueArray where Element: Copyable {
   ///     `repeating` parameter. `count` must be zero or greater.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init(repeating repeatedValue: Element, count: Int) {
     self.init(consuming: _RigidArray(repeating: repeatedValue, count: count))
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Creates a new unique array taking over the storage of the specified
   /// rigid array instance, consuming it in the process.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal init(consuming storage: consuming _RigidArray<Element>) {
     self._storage = storage
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: Copyable {
   /// Creates a new array with the specified initial capacity, holding a copy
   /// of the contents of a given sequence.
@@ -97,7 +86,6 @@ extension UniqueArray where Element: Copyable {
   ///   - capacity: The storage capacity of the new array, or nil to allocate
   ///      just enough capacity to store the contents.
   ///   - contents: The sequence whose contents to copy into the new array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init(
     capacity: Int? = nil,
@@ -115,7 +103,6 @@ extension UniqueArray where Element: Copyable {
   ///      just enough capacity to store the contents of the span.
   ///   - span: The span whose contents to copy into the new array.
   ///      The span must not contain more than `capacity` elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public init(
     capacity: Int? = nil,
