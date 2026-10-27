@@ -131,8 +131,20 @@ extension AsyncIteratorProtocol {
   /// is required to maintain backward compatibility with existing async
   /// iterators.
   @available(SwiftStdlib 6.0, *)
-  @inlinable
+  @export(implementation)
+  @abi(mutating func next_exported() async throws(Failure) -> Element?)
   public mutating func next() async throws(Failure) -> Element? {
     return try await next(isolation: nil)
   }
+
+#if !$Embedded
+  // ABI-only entry point for the default implementation of `next()`, which is
+  // used by clients built before the implementation was emitted into clients.
+  @available(SwiftStdlib 6.1, *)
+  @usableFromInline
+  @abi(mutating func next() async throws(Failure) -> Element?)
+  internal mutating func __abi_next() async throws(Failure) -> Element? {
+    return try await next(isolation: nil)
+  }
+#endif // !$Embedded
 }
