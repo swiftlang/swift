@@ -214,19 +214,19 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @export(implementation)
   @_lifetime(&mutableBytes)
   public init(mutating mutableBytes: inout MutableRawSpan) {
-    _precondition(
-      unsafe ((Int(bitPattern: mutableBytes._pointer) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let byteCount = mutableBytes.byteCount
-    let stride = MemoryLayout<Element>.stride
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    self = unsafe _overrideLifetime(
-      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
-      mutating: &mutableBytes
-    )
+    let pointer = unsafe mutableBytes._pointer
+    let span: MutableSpan<Element>
+    if MemoryLayout<Element>.stride == 1 {
+      span = unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    } else {
+      let buffer = unsafe UnsafeMutableRawBufferPointer(
+        start: pointer, count: mutableBytes.byteCount
+      )
+      span = unsafe _overrideLifetime(
+        MutableSpan(_unsafeBytes: buffer), copying: ()
+      )
+    }
+    self = unsafe _overrideLifetime(span, mutating: &mutableBytes)
   }
 
   /// Convert a raw span to a typed span.
@@ -240,19 +240,19 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @export(implementation)
   @_lifetime(copy mutableBytes)
   public init(mutableBytes: consuming MutableRawSpan) {
-    _precondition(
-      unsafe ((Int(bitPattern: mutableBytes._pointer) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let byteCount = mutableBytes.byteCount
-    let stride = MemoryLayout<Element>.stride
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    self = unsafe _overrideLifetime(
-      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
-      copying: mutableBytes
-    )
+    let pointer = unsafe mutableBytes._pointer
+    let span: MutableSpan<Element>
+    if MemoryLayout<Element>.stride == 1 {
+      span = unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    } else {
+      let buffer = unsafe UnsafeMutableRawBufferPointer(
+        start: pointer, count: mutableBytes.byteCount
+      )
+      span = unsafe _overrideLifetime(
+        MutableSpan(_unsafeBytes: buffer), copying: ()
+      )
+    }
+    self = unsafe _overrideLifetime(span, copying: mutableBytes)
   }
 }
 

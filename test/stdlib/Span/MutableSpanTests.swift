@@ -942,6 +942,39 @@ suite.test("init(mutableBytes:) traps on byteCount not multiple of stride")
   _ = MutableSpan<Int>(mutableBytes: raw)
 }
 
+suite.test("init(mutating:) with 1-byte elements")
+.require(.minimumStdlib(.stdlib_6_4)).code {
+  let buf = UnsafeMutableRawBufferPointer.allocate(byteCount: 8, alignment: 8)
+  defer { unsafe buf.deallocate() }
+  _ = unsafe buf.initializeMemory(as: UInt8.self, fromContentsOf: 0..<8)
+  var raw = unsafe MutableRawSpan(_unsafeBytes: buf[1..<6])
+
+  var signed = MutableSpan<Int8>(mutating: &raw)
+  expectEqual(signed.count, 5)
+  expectEqual(signed[4], 5)
+  signed[0] = -1
+  expectEqual(unsafe buf[1], 0xff)
+
+  var empty = MutableRawSpan()
+  expectEqual(MutableSpan<Int8>(mutating: &empty).count, 0)
+}
+
+suite.test("init(mutableBytes:) with 1-byte elements")
+.require(.minimumStdlib(.stdlib_6_4)).code {
+  let buf = UnsafeMutableRawBufferPointer.allocate(byteCount: 8, alignment: 8)
+  defer { unsafe buf.deallocate() }
+  _ = unsafe buf.initializeMemory(as: UInt8.self, fromContentsOf: 0..<8)
+  let raw = unsafe MutableRawSpan(_unsafeBytes: buf[1..<6])
+
+  var signed = MutableSpan<Int8>(mutableBytes: raw)
+  expectEqual(signed.count, 5)
+  expectEqual(signed[4], 5)
+  signed[0] = -1
+  expectEqual(unsafe buf[1], 0xff)
+
+  expectEqual(MutableSpan<Int8>(mutableBytes: MutableRawSpan()).count, 0)
+}
+
 suite.test("safe bytes property")
 .require(.stdlib_6_4).code {
   let capacity = 4
