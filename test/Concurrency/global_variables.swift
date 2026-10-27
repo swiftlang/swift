@@ -106,6 +106,71 @@ public actor GlobalActorComputed: GlobalActor {
   }
 }
 
+// A Sendable conformance that is unavailable on some platforms still makes
+// the type Sendable in contexts that are also unavailable on those platforms.
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+@available(visionOS, unavailable)
+struct TestUnavailableOnApplePlatforms {
+  static let immutableStatic = TestUnavailableOnApplePlatforms()
+}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+@available(visionOS, unavailable)
+extension TestUnavailableOnApplePlatforms: Sendable {}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+@available(visionOS, unavailable)
+let immutableUnavailableOnApplePlatformsGlobal = TestUnavailableOnApplePlatforms()
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+@available(visionOS, unavailable)
+enum UnavailableOnApplePlatformsEnumSpace {
+  static let enumStaticLet = TestUnavailableOnApplePlatforms()
+}
+
+@available(macOS, unavailable)
+@available(iOS, unavailable)
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+@available(visionOS, unavailable)
+struct TestInferredSendableUnavailableOnApplePlatforms {
+  var stored: TestUnavailableOnApplePlatforms
+  static let immutableStatic = TestInferredSendableUnavailableOnApplePlatforms(
+    stored: TestUnavailableOnApplePlatforms())
+}
+
+@available(*, unavailable)
+let immutableUniversallyUnavailableGlobal = TestUnavailableOnApplePlatforms()
+
+struct TestExplicitlyNonsendable { // expected-note 2{{consider making struct 'TestExplicitlyNonsendable' conform to the 'Sendable' protocol}}
+}
+
+@available(*, unavailable)
+extension TestExplicitlyNonsendable: Sendable {}
+
+let immutableExplicitlyNonsendableGlobal = TestExplicitlyNonsendable()
+// expected-error@-1 {{let 'immutableExplicitlyNonsendableGlobal' is not concurrency-safe because non-'Sendable' type 'TestExplicitlyNonsendable' may have shared mutable state}}
+// expected-note@-2 {{add '@MainActor' to make let 'immutableExplicitlyNonsendableGlobal' part of global actor 'MainActor'}}
+// expected-note@-3 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+
+@available(macOS, unavailable)
+let immutableExplicitlyNonsendableUnavailableOnMacOSGlobal = TestExplicitlyNonsendable()
+// expected-error@-1 {{let 'immutableExplicitlyNonsendableUnavailableOnMacOSGlobal' is not concurrency-safe because non-'Sendable' type 'TestExplicitlyNonsendable' may have shared mutable state}}
+// expected-note@-2 {{add '@MainActor' to make let 'immutableExplicitlyNonsendableUnavailableOnMacOSGlobal' part of global actor 'MainActor'}}
+// expected-note@-3 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+
 @TestGlobalActor
 func f() {
   print(TestStatics.immutableExplicitSendable)

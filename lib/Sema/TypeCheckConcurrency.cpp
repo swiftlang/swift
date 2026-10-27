@@ -1080,6 +1080,24 @@ static bool diagnoseSingleNonSendableType(
   });
 }
 
+/// Returns true if \p conformance cannot be used from the context of the
+/// Sendable check because it, or one of the conformances it depends on, is
+/// unavailable there. A conformance that is unavailable in a domain may still
+/// be used from a context that is also unavailable in that domain.
+static bool isUnavailableConformance(ProtocolConformanceRef conformance,
+                                     SendableCheckContext fromContext,
+                                     SourceLoc loc) {
+  if (!conformance.hasUnavailableConformance())
+    return false;
+
+  auto availability = AvailabilityContext::forLocation(loc, fromContext.fromDC);
+  return availability.enumerateUnsatisfiedRestrictionsForConformance(
+      conformance, [](const Decl *decl, const ProtocolDecl *proto,
+                      AvailabilityRestriction restriction) {
+        return restriction.isUnavailable();
+      });
+}
+
 bool swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext,
     Type inDerivedConformance, SourceLoc loc,
@@ -1112,7 +1130,8 @@ bool swift::diagnoseNonSendableTypes(
   // FIXME: More detail for unavailable conformances.
   auto conformance =
       lookupConformance(type->getCanonicalType(), proto, /*allowMissing=*/true);
-  if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
+  if (conformance.isInvalid() ||
+      isUnavailableConformance(conformance, fromContext, loc)) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
   }
@@ -7478,7 +7497,7 @@ void swift::checkGlobalIsolation(VarDecl *var) {
     auto type = var->getInterfaceType();
     diagnosed = diagnoseIfAnyNonSendableTypes(
         type, SendableCheckContext(var->getDeclContext()),
-        /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
+        /*inDerivedConformance=*/Type(), /*typeLoc=*/var->getLoc(),
         /*diagnoseLoc=*/var->getLoc(), diag::shared_immutable_state_decl,
         diagVar);
   } else {
