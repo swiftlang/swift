@@ -1193,6 +1193,196 @@ bb0(%0 : $Int):
   return %r : $()
 }
 
+sil @exactlyOnceThunk : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+sil @atMostOnceThunk : $@convention(thin) (Int, @owned @noescape @callable(once) @callee_owned (Int) -> Int) -> @out Int
+sil @plainThunk : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @out Int
+sil @borrowingThunk : $@convention(thin) (Int, @guaranteed Builtin.NativeObject) -> @out Int
+
+struct NoncopyableCapture : ~Copyable {
+  var object: Builtin.NativeObject
+}
+
+sil @noncopyableAddressThunk : $@convention(thin) (Int, @in NoncopyableCapture) -> @out Int
+
+// The new apply would consume the closure while the convert_function still
+// consumes it for the destroy_value.
+//
+// CHECK-LABEL: sil [ossa] @test_convert_function_with_other_uses :
+// CHECK:         [[PA:%.*]] = partial_apply [called_once]
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[PA]]
+// CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape [[CONVERTED]]
+// CHECK:         destroy_value [dead_end] [[NOESCAPE]]
+// CHECK:         apply [[NOESCAPE]]
+// CHECK:       } // end sil function 'test_convert_function_with_other_uses'
+sil [ossa] @test_convert_function_with_other_uses : $@convention(thin) (@owned @noescape @once @callee_owned (Int) -> Int, Int, Builtin.Int1) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $Int, %3 : $Builtin.Int1):
+  %4 = function_ref @exactlyOnceThunk : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %5 = partial_apply [called_once] %4(%1) : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %6 = convert_function %5 : $@once @callee_owned (Int) -> @out Int to $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = convert_escape_to_noescape %6 : $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> to $@noescape @once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  cond_br %3, bb1, bb2
+
+bb1:
+  destroy_value [dead_end] %7 : $@noescape @once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  unreachable
+
+bb2:
+  %10 = apply %7(%0, %2) : $@noescape @once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_at_most_once_convert_function_with_other_uses :
+// CHECK:         [[PA:%.*]] = partial_apply [called_at_most_once]
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[PA]]
+// CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape [[CONVERTED]]
+// CHECK:         destroy_value [dead_end] [[NOESCAPE]]
+// CHECK:         apply [[NOESCAPE]]
+// CHECK:       } // end sil function 'test_at_most_once_convert_function_with_other_uses'
+sil [ossa] @test_at_most_once_convert_function_with_other_uses : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (Int) -> Int, Int, Builtin.Int1) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $@noescape @callable(once) @callee_owned (Int) -> Int, %2 : $Int, %3 : $Builtin.Int1):
+  %4 = function_ref @atMostOnceThunk : $@convention(thin) (Int, @owned @noescape @callable(once) @callee_owned (Int) -> Int) -> @out Int
+  %5 = partial_apply [called_at_most_once] %4(%1) : $@convention(thin) (Int, @owned @noescape @callable(once) @callee_owned (Int) -> Int) -> @out Int
+  %6 = convert_function %5 : $@callable(once) @callee_owned (Int) -> @out Int to $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = convert_escape_to_noescape %6 : $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> to $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  cond_br %3, bb1, bb2
+
+bb1:
+  destroy_value [dead_end] %7 : $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  unreachable
+
+bb2:
+  %10 = apply %7(%0, %2) : $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// The new apply would borrow the on-stack closure after the convert_function
+// consumes it, and the closure consumes an exactly-once value, which combining
+// the new apply with the partial_apply would have to copy.
+//
+// CHECK-LABEL: sil [ossa] @test_on_stack_convert_function_with_other_uses :
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[PA]]
+// CHECK:         [[DEPENDENT:%.*]] = mark_dependence [nonescaping] [[CONVERTED]]
+// CHECK:         apply [[DEPENDENT]]
+// CHECK:         destroy_value [[DEPENDENT]]
+// CHECK:       } // end sil function 'test_on_stack_convert_function_with_other_uses'
+sil [ossa] @test_on_stack_convert_function_with_other_uses : $@convention(thin) (@owned @noescape @once @callee_owned (Int) -> Int, Int, @guaranteed Builtin.NativeObject) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $Int, %3 : @guaranteed $Builtin.NativeObject):
+  %4 = function_ref @exactlyOnceThunk : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %5 = partial_apply [callee_guaranteed] [on_stack] [called_once] %4(%1) : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %6 = convert_function %5 : $@noescape @once @callee_guaranteed (Int) -> @out Int to $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = mark_dependence [nonescaping] %6 : $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> on %3 : $Builtin.NativeObject
+  %8 = apply %7(%0, %2) : $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  destroy_value %7 : $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// The on-stack closure owns a noncopyable address, which combining the new
+// apply with the partial_apply would have to copy.
+//
+// CHECK-LABEL: sil [ossa] @test_on_stack_noncopyable_address_capture :
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[PA]]
+// CHECK:         [[DEPENDENT:%.*]] = mark_dependence [nonescaping] [[CONVERTED]]
+// CHECK:         apply [[DEPENDENT]]
+// CHECK:         destroy_value [[DEPENDENT]]
+// CHECK:       } // end sil function 'test_on_stack_noncopyable_address_capture'
+sil [ossa] @test_on_stack_noncopyable_address_capture : $@convention(thin) (@in NoncopyableCapture, Int, @guaranteed Builtin.NativeObject) -> @out Int {
+bb0(%0 : $*Int, %1 : $*NoncopyableCapture, %2 : $Int, %3 : @guaranteed $Builtin.NativeObject):
+  %4 = function_ref @noncopyableAddressThunk : $@convention(thin) (Int, @in NoncopyableCapture) -> @out Int
+  %5 = partial_apply [callee_guaranteed] [on_stack] [called_once] %4(%1) : $@convention(thin) (Int, @in NoncopyableCapture) -> @out Int
+  %6 = convert_function %5 : $@noescape @once @callee_guaranteed (Int) -> @out Int to $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = mark_dependence [nonescaping] %6 : $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> on %3 : $Builtin.NativeObject
+  %8 = apply %7(%0, %2) : $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  destroy_value %7 : $@noescape @once @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// The convert_function makes the closure noncopyable, so the conversions
+// after it still consume the closure, which the new apply would also consume.
+//
+// CHECK-LABEL: sil [ossa] @test_owned_callee_converted_to_noncopyable :
+// CHECK:         [[PA:%.*]] = partial_apply %{{[0-9]+}}(%1)
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[PA]]
+// CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape [[CONVERTED]]
+// CHECK:         destroy_value [dead_end] [[NOESCAPE]]
+// CHECK:         apply [[NOESCAPE]]
+// CHECK:       } // end sil function 'test_owned_callee_converted_to_noncopyable'
+sil [ossa] @test_owned_callee_converted_to_noncopyable : $@convention(thin) (@owned Builtin.NativeObject, Int, Builtin.Int1) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $Builtin.NativeObject, %2 : $Int, %3 : $Builtin.Int1):
+  %4 = function_ref @plainThunk : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @out Int
+  %5 = partial_apply %4(%1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @out Int
+  %6 = convert_function %5 : $@callee_owned (Int) -> @out Int to $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = convert_escape_to_noescape %6 : $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> to $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  cond_br %3, bb1, bb2
+
+bb1:
+  destroy_value [dead_end] %7 : $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  unreachable
+
+bb2:
+  %10 = apply %7(%0, %2) : $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// Combining the new apply with the partial_apply removes the borrow of the
+// closure, so the apply calls the closure's function directly.
+//
+// CHECK-LABEL: sil [ossa] @test_guaranteed_callee_with_copyable_capture :
+// CHECK:         [[FN:%.*]] = function_ref @borrowingThunk
+// CHECK:         apply [[FN]](%0, %2, %1)
+// CHECK:       } // end sil function 'test_guaranteed_callee_with_copyable_capture'
+sil [ossa] @test_guaranteed_callee_with_copyable_capture : $@convention(thin) (@guaranteed Builtin.NativeObject, Int, @guaranteed Builtin.NativeObject) -> @out Int {
+bb0(%0 : $*Int, %1 : @guaranteed $Builtin.NativeObject, %2 : $Int, %3 : @guaranteed $Builtin.NativeObject):
+  %4 = function_ref @borrowingThunk : $@convention(thin) (Int, @guaranteed Builtin.NativeObject) -> @out Int
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4(%1) : $@convention(thin) (Int, @guaranteed Builtin.NativeObject) -> @out Int
+  %6 = convert_function %5 : $@noescape @callee_guaranteed (Int) -> @out Int to $@noescape @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = mark_dependence [nonescaping] %6 : $@noescape @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> on %3 : $Builtin.NativeObject
+  %8 = apply %7(%0, %2) : $@noescape @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  destroy_value %7 : $@noescape @callee_guaranteed @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// When the apply is the only user of each conversion, the conversions are
+// deleted along with the old apply, so the partial_apply is applied directly.
+//
+// CHECK-LABEL: sil [ossa] @test_convert_function_only_used_by_apply :
+// CHECK:         [[PA:%.*]] = partial_apply [called_once]
+// CHECK:         apply [[PA]](%0, %2) : $@once @callee_owned (Int) -> @out Int
+// CHECK:       } // end sil function 'test_convert_function_only_used_by_apply'
+sil [ossa] @test_convert_function_only_used_by_apply : $@convention(thin) (@owned @noescape @once @callee_owned (Int) -> Int, Int) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $Int):
+  %3 = function_ref @exactlyOnceThunk : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %4 = partial_apply [called_once] %3(%1) : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %5 = convert_function %4 : $@once @callee_owned (Int) -> @out Int to $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %6 = convert_escape_to_noescape %5 : $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> to $@noescape @once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  debug_value %6 : $@noescape @once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>, let, name "body"
+  %8 = apply %6(%0, %2) : $@noescape @once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_only_used_by_apply :
+// CHECK:         [[PA:%.*]] = partial_apply [called_once]
+// CHECK-NEXT:    apply [[PA]](%0, %2) : $@once @callee_owned (Int) -> @out Int
+// CHECK:       } // end sil function 'test_mark_dependence_only_used_by_apply'
+sil [ossa] @test_mark_dependence_only_used_by_apply : $@convention(thin) (@owned @noescape @once @callee_owned (Int) -> Int, Int, @guaranteed Builtin.NativeObject) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $Int, %3 : @guaranteed $Builtin.NativeObject):
+  %4 = function_ref @exactlyOnceThunk : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %5 = partial_apply [called_once] %4(%1) : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> Int) -> @out Int
+  %6 = convert_function %5 : $@once @callee_owned (Int) -> @out Int to $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %7 = mark_dependence [nonescaping] %6 : $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> on %3 : $Builtin.NativeObject
+  %8 = apply %7(%0, %2) : $@once @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_dead_closure_with_mark_dependence :
 // CHECK-NOT:     partial_apply
 // CHECK-LABEL: } // end sil function 'test_dead_closure_with_mark_dependence'
