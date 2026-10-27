@@ -16,7 +16,9 @@
 #include "swift/Sema/CSBindings.h"
 #include "TypeChecker.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -2307,15 +2309,26 @@ void BindingSet::promoteBindings() {
   if (!considerSupertypes && !considerSubtypes)
     return;
 
+  auto conformsToAll = [&](const PotentialBinding &binding) {
+    return llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
+      // The function type could be not yet fully resolved to determine
+      // whether it conforms to the given protocol or not.
+      if (auto *fnType = binding.BindingType->getAs<FunctionType>()) {
+        if (fnType->hasTypeDependencyFor(proto))
+          return false;
+      }
+
+      return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
+    });
+  };
+
   for (const auto binding : Bindings) {
     switch (binding.Kind) {
     case AllowedBindingKind::Supertypes:
       if (considerSupertypes) {
         // FIXME: Also check if Optional<T> conforms to all protocols
         // and satisfies the subtype binding
-        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
-          return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
-        })) {
+        if (conformsToAll(binding)) {
           if (beConservativeWithSuperclassBindings &&
               !isSupertypeEligibleForPromotionWhenHacksAreOn(binding.BindingType)) {
             LLVM_DEBUG(llvm::dbgs() << "Binding not eligible for promotion "
@@ -2333,9 +2346,7 @@ void BindingSet::promoteBindings() {
       if (considerSubtypes) {
         // FIXME: If T = Optional<U>, check if U conforms to all protocols
         // and satisfies the supertype binding
-        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
-          return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
-        })) {
+        if (conformsToAll(binding)) {
           ++subtypeCount;
           promotedSubtype = binding;
         }

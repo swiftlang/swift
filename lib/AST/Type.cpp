@@ -4584,6 +4584,25 @@ Type AnyFunctionType::getThrownError() const {
   }
 }
 
+bool AnyFunctionType::hasTypeDependencyFor(ProtocolDecl *P) const {
+  if (!hasTypeDependencies())
+    return false;
+
+  auto known = P->getKnownProtocolKind();
+  if (!known)
+    return false;
+
+  switch (*known) {
+  case KnownProtocolKind::Sendable:
+    return hasTypeDependencyFor(TypeDependenceKind::Sendable);
+  case KnownProtocolKind::Copyable:
+  case KnownProtocolKind::Deinitable:
+    return hasTypeDependencyFor(TypeDependenceKind::ExecutionSemantics);
+  default:
+    return false;
+  }
+}
+
 Type AnyFunctionType::getTypeDependencyFor(TypeDependenceKind kind) const {
   switch (getKind()) {
   case TypeKind::Function:

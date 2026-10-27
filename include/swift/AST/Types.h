@@ -3817,6 +3817,8 @@ public:
     return hasTypeDependencies() && getTypeDependencyFor(kind);
   }
 
+  bool hasTypeDependencyFor(ProtocolDecl *P) const;
+
   bool hasLifetimeDependencies() const {
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
