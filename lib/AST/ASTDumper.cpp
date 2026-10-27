@@ -3291,7 +3291,7 @@ void SourceFile::dump(llvm::raw_ostream &OS,
                       ASTDumpMemberLoading memberLoading) const {
   DefaultWriter writer(OS, /*indent*/ 0);
   PrintDecl(writer, memberLoading).visitSourceFile(*this);
-  llvm::errs() << '\n';
+  OS << '\n';
 }
 
 void SourceFile::dumpJSON(llvm::raw_ostream &OS,
