@@ -3692,6 +3692,15 @@ public:
               .fixItInsert(CD->getAttributeInsertionLoc(/*forModifier=*/true),
                            "final ");
         }
+
+        // The layout of a Swift subclass of a C++ foreign reference type is
+        // fixed at compile time, and it has no Swift class metadata that could
+        // describe its generic arguments (yet), so it cannot be generic.
+        if (!isInvalidSuperclass && CD->getForeignReferenceSuperclassOrSelf() &&
+            CD->isGenericContext()) {
+          CD->diagnose(diag::foreign_reference_subclass_cannot_be_generic, CD,
+                       /*inGenericContext=*/!CD->getGenericParams());
+        }
       }
     }
 
