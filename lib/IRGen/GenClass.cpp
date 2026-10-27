@@ -209,12 +209,21 @@ namespace {
     /// Adds a layout of a tail-allocated element.
     void addTailElement(const ElementLayout &Elt) {
       Elements.push_back(Elt);
+      auto &eltTI = cast<FixedTypeInfo>(Elt.getType());
       if (!addField(Elements.back(), LayoutStrategy::Universal)) {
         // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+        assert(eltTI.getFixedStride() == Size(1) &&
                "empty elements should have stride 1");
         StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
         CurSize += Size(1);
+        return;
+      }
+      // Add trailing padding for the last element.
+      Size padding = eltTI.getFixedStride() - eltTI.getFixedSize();
+      if (!padding.isZero()) {
+        StructFields.push_back(
+            llvm::ArrayType::get(IGM.Int8Ty, padding.getValue()));
+        CurSize += padding;
       }
     }
 
