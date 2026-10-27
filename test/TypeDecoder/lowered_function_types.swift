@@ -23,7 +23,15 @@ do {
 // DEMANGLE: $sSi22lowered_function_types5ClassCACypS2iACypIegygxnldor_D
 // DEMANGLE: $ss5Error_pIegzo_D
 // DEMANGLE: $sSiSiIegco_D
+// DEMANGLE: $sSpyyXlGyXls5NeverOIOxyrzr_D
+// DEMANGLE: $sSpyyXlGyXls5NeverOIOoxyrzr_D
+// DEMANGLE: $syXlIeOxr_D
+// DEMANGLE: $syXlIeOoxr_D
 
 // CHECK: @callee_guaranteed (Int, @guaranteed Class, @owned Class, @in_guaranteed Any, @inout Int) -> (Int, @owned Class, @out Any)
 // CHECK: @callee_guaranteed () -> @error Error
 // CHECK: @callee_guaranteed (@in Int) -> @owned Int
+// CHECK: @noescape @once @callee_owned (UnsafeMutablePointer<AnyObject>) -> (@out AnyObject, @error_indirect Never)
+// CHECK: @noescape @callable(once) @callee_owned (UnsafeMutablePointer<AnyObject>) -> (@out AnyObject, @error_indirect Never)
+// CHECK: {{^}}@once @callee_owned () -> @out AnyObject
+// CHECK: {{^}}@callable(once) @callee_owned () -> @out AnyObject
