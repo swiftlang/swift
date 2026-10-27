@@ -28,6 +28,7 @@
 #include "swift/Strings.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SandboxingFileSystem.h"
 using namespace swift;
 
 ModuleDependencyInfoStorageBase::~ModuleDependencyInfoStorageBase() {}
@@ -667,7 +668,9 @@ swift::dependencies::registerBackDeployLibraries(
 static std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()>
 makeClangScanningVFSFactory(
     const ASTContext &ctx, std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> makeBaseFS,
     llvm::function_ref<StringRef(StringRef)> allocateString) {
+  assert(makeBaseFS);
   // Snapshot the ClangImporter file system into an owning recipe rather than
   // capturing the ASTContext: the callback outlives the per-query
   // CompilerInstance this came from. The overriden files' contents are
@@ -676,17 +679,19 @@ makeClangScanningVFSFactory(
   auto recipe = ClangImporter::computeClangImporterVFSRecipe(
       ctx, importer->getClangFileMapping(), allocateString);
 
-  return [recipe = std::move(recipe), cas = std::move(cas)]()
-             -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
-    // Build a *separate* file system on every call: the Clang scanner calls
-    // setCurrentWorkingDirectory on the file system it is handed, and several
-    // workers do so concurrently (rdar://184810704).
-    auto fs = ClangImporter::computeClangImporterFileSystem(
-        recipe, llvm::vfs::createPhysicalFileSystem());
-    if (cas)
-      return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
-    return fs;
-  };
+  return
+      [recipe = std::move(recipe), cas = std::move(cas),
+       makeBaseFS = std::move(
+           makeBaseFS)]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+        // Build a *separate* file system on every call: the Clang scanner calls
+        // setCurrentWorkingDirectory on the file system it is handed, and
+        // several workers do so concurrently (rdar://184810704).
+        auto fs =
+            ClangImporter::computeClangImporterFileSystem(recipe, makeBaseFS());
+        if (cas)
+          return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
+        return fs;
+      };
 }
 
 bool SwiftDependencyScanningService::setupDependencyScanningService(
@@ -706,12 +711,17 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
     // The service is reused as-is. Its base file system is not rebuilt, which
     // is usually fine since it should be the same for the same platform, but a
     // conflicting CAS configuration cannot be honored.
-    if (invocation.requiresCAS() &&
-        (!CASConfig || *CASConfig != invocation.getCASOptions().Config)) {
+    auto reportConflictingOptions = [&]() -> bool {
       Instance.getDiags().diagnose(SourceLoc(),
                                   diag::error_cas_conflict_options);
       return true;
+    };
+    if (invocation.requiresCAS() &&
+        (!CASConfig || *CASConfig != invocation.getCASOptions().Config)) {
+      return reportConflictingOptions();
     }
+    if (this->CASFSEscapePaths != invocation.getCASOptions().CASFSEscapePaths)
+      return reportConflictingOptions();
     return false;
   }
 
@@ -744,10 +754,38 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
         CASOpts, cas, Instance.getSharedCacheInstance()};
   }
 
+  std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> makeBaseFS =
+      [] { return llvm::vfs::createPhysicalFileSystem(); };
+  const CASOptions &CASOpts = invocation.getCASOptions();
+  if (!CASOpts.CASFSEscapePaths.empty()) {
+    // Escape paths are expected to be the same across all invocations.
+    this->CASFSEscapePaths = CASOpts.CASFSEscapePaths;
+    SmallVector<StringRef, 4> EscapePaths(CASFSEscapePaths.begin(),
+                                          CASFSEscapePaths.end());
+    auto SandboxFS = llvm::vfs::createSandboxingFileSystem(
+        llvm::vfs::createPhysicalFileSystem(), EscapePaths);
+    if (!SandboxFS) {
+      Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                                   toString(SandboxFS.takeError()));
+      return true;
+    }
+    // Rebuild the sandboxing file system from scratch on every query rather
+    // than sharing the instance validated above: it wraps a physical file
+    // system, and several scanning workers set its working directory
+    // concurrently, which races on that shared state.
+    makeBaseFS = [EscapePaths = this->CASFSEscapePaths]()
+        -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+      SmallVector<StringRef, 4> Paths(EscapePaths.begin(), EscapePaths.end());
+      // Using \c cantFail because we verified creation is successful earlier.
+      return llvm::cantFail(llvm::vfs::createSandboxingFileSystem(
+          llvm::vfs::createPhysicalFileSystem(), Paths));
+    };
+  }
+
   // The base VFS is derived from the ClangImporter of this invocation, which is
   // usually fine since it should be the same for the same platform.
   opts.MakeVFS = makeClangScanningVFSFactory(
-      Instance.getASTContext(), std::move(cas),
+      Instance.getASTContext(), std::move(cas), std::move(makeBaseFS),
       [this](StringRef str) { return save(str); });
 
   ClangScanningService.emplace(std::move(opts));

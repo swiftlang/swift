@@ -881,6 +881,10 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
 
   Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
 
+  if (auto *A = Args.getLastArg(OPT_scanner_cas_fs))
+    Opts.DepscanCASFileSystemRootID = A->getValue();
+  Opts.CASFSEscapePaths = Args.getAllArgValues(OPT_cas_fs_escape);
+
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_filelist))

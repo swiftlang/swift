@@ -59,6 +59,11 @@ llvm::cl::opt<unsigned> Threads("scan-threads",
                                 llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
                                             llvm::cl::cat(Category));
+llvm::cl::list<std::string>
+    OutputFiles("o",
+                llvm::cl::desc("<path> (one per '--'-separated argument group; "
+                               "defaults to stdout)"),
+                llvm::cl::cat(Category));
 llvm::cl::list<std::string> InvalidatedPaths("invalidated-path",
                                              llvm::cl::desc("<path>"),
                                              llvm::cl::cat(Category));
@@ -420,13 +425,51 @@ int main(int argc, char *argv[]) {
     return printError(err_msg);
   SWIFT_DEFER { swiftscan_cas_dispose(cas); };
 
+  bool IsScanAction =
+      Action == scan_dependency || Action == get_chained_bridging_header;
+
+  // For scan actions, split the positional swift-frontend command into
+  // multiple groups separated by a literal "--". This allows a single
+  // swift-scan-test invocation to run several scans sequentially against the
+  // same scanner (and thus the same long-lived scanning service), to test
+  // behavior that depends on state the service retains across scans.
+  std::vector<std::vector<std::string>> CommandGroups;
+  if (IsScanAction) {
+    CommandGroups.emplace_back();
+    for (const auto &Cmd : SwiftCommands) {
+      if (Cmd == "--")
+        CommandGroups.emplace_back();
+      else
+        CommandGroups.back().push_back(Cmd);
+    }
+  } else {
+    CommandGroups.push_back(SwiftCommands);
+  }
+
+  if (!OutputFiles.empty()) {
+    if (CommandGroups.size() == 1) {
+      llvm::errs() << "-o is only supported with multiple '--'-separated "
+                      "argument groups; redirect stdout otherwise\n";
+      return EXIT_FAILURE;
+    }
+    if (OutputFiles.size() != CommandGroups.size()) {
+      llvm::errs() << "-o must be specified once per '--'-separated "
+                      "argument group ("
+                   << CommandGroups.size() << " expected, got "
+                   << OutputFiles.size() << ")\n";
+      return EXIT_FAILURE;
+    }
+  }
+
   // Convert commands.
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver(Alloc);
-  auto Args = createArgs(SwiftCommands, Saver, Action);
+  std::vector<std::vector<const char *>> ArgGroups;
+  for (const auto &Group : CommandGroups)
+    ArgGroups.push_back(createArgs(Group, Saver, Action));
 
   swiftscan_scanner_t scanner = nullptr;
-  if (Action == scan_dependency || Action == get_chained_bridging_header)
+  if (IsScanAction)
     scanner = swiftscan_scanner_create();
   SWIFT_DEFER {
     if (scanner)
@@ -447,6 +490,31 @@ int main(int argc, char *argv[]) {
   }
 
   std::atomic<int> Ret = 0;
+
+  if (IsScanAction && CommandGroups.size() > 1) {
+    // Run each argument group sequentially against the same scanner, so
+    // later scans observe any state the scanner/service retained from the
+    // earlier ones.
+    for (unsigned i = 0, e = ArgGroups.size(); i != e; ++i) {
+      std::optional<llvm::raw_fd_ostream> FileOS;
+      llvm::raw_ostream *os = &llvm::outs();
+      if (!OutputFiles.empty()) {
+        std::error_code EC;
+        FileOS.emplace(OutputFiles[i], EC, llvm::sys::fs::OF_None);
+        if (EC) {
+          llvm::errs() << "failed to open '" << OutputFiles[i]
+                       << "': " << EC.message() << "\n";
+          return EXIT_FAILURE;
+        }
+        os = &*FileOS;
+      }
+      Ret += action_scan_dependency(scanner, ArgGroups[i], WorkingDirectory,
+                                    Action == get_chained_bridging_header, *os);
+    }
+    return Ret;
+  }
+
+  auto &Args = ArgGroups.front();
   llvm::raw_null_ostream nullOS;
   std::vector<llvm::raw_null_ostream> nullStreams(Threads - 1);
   // Get the output stream for the thread. Only the first thread writes the
