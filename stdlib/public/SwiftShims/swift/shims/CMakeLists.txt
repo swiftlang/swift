@@ -109,8 +109,10 @@ if (NOT CLANG_VERSION_MAJOR)
 endif()
 
 # Symlink in the Clang headers from either the provided clang...
+set(clang_headers_location_is_external FALSE)
 if(NOT SWIFT_INCLUDE_TOOLS AND
    (SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG))
+  set(clang_headers_location_is_external TRUE)
   if(SWIFT_COMPILER_IS_MSVC_LIKE)
     execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
       OUTPUT_VARIABLE clang_headers_location
@@ -182,6 +184,44 @@ if(NOT SWIFT_BUILT_STANDALONE)
     add_dependencies(${target} ${clang_resource_headers})
   endforeach()
 endif()
+
+# Put swift/EmbeddedPlatform.h in the Clang resource directory
+# so that clang and swiftc find it without any -I flags
+set(embedded_platform_header
+  "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift/EmbeddedPlatform.h")
+set(embedded_platform_header_outputs)
+
+# Don't modify the resource directory of an external clang
+if(NOT clang_headers_location_is_external)
+  list(APPEND embedded_platform_header_outputs
+    "${clang_headers_location}/include/swift/EmbeddedPlatform.h")
+endif()
+
+# Without symlinks, lib/swift[_static]/clang are one-time copies of the Clang
+# resource directory, so also copy the header into them directly.
+if(NOT SWIFT_USE_SYMLINKS)
+  list(APPEND embedded_platform_header_outputs
+    "${SWIFTLIB_DIR}/clang/include/swift/EmbeddedPlatform.h"
+    "${SWIFTSTATICLIB_DIR}/clang/include/swift/EmbeddedPlatform.h")
+endif()
+
+foreach(output ${embedded_platform_header_outputs})
+  add_custom_command(
+    OUTPUT "${output}"
+    DEPENDS "${embedded_platform_header}"
+    COMMAND
+      "${CMAKE_COMMAND}" "-E" "copy_if_different"
+      "${embedded_platform_header}"
+      "${output}"
+    COMMENT "Copying EmbeddedPlatform.h to ${output}")
+endforeach()
+
+add_custom_target(copy_embedded_platform_header
+  DEPENDS ${embedded_platform_header_outputs})
+add_dependencies(copy_embedded_platform_header
+  symlink_clang_headers
+  symlink_clang_headers_static)
+add_dependencies(copy_shim_headers copy_embedded_platform_header)
 
 if(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   foreach(bootstrapping "0" "1")
@@ -267,6 +307,14 @@ swift_install_in_component(DIRECTORY "${clang_headers_source}"
   COMPONENT clang-builtin-headers
   ${clang_headers_filter})
 
+swift_install_in_component(FILES "${embedded_platform_header}"
+  DESTINATION "lib/swift/clang/include/swift"
+  COMPONENT clang-builtin-headers)
+
+swift_install_in_component(FILES "${embedded_platform_header}"
+  DESTINATION "lib/swift_static/clang/include/swift"
+  COMPONENT clang-builtin-headers)
+
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
   # This will still link against the Swift-forked clang headers if the Swift
   # toolchain was built with SWIFT_INCLUDE_TOOLS.
@@ -288,6 +336,16 @@ swift_install_symlink_component(clang-resource-dir-symlink
   TARGET ${SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET}
   DESTINATION "lib/swift_static")
 
+# The symlink points into Clang's installed resource directory, so install the
+# header there. Skip this if the symlink points somewhere else (e.g., at an
+# external clang's resource directory).
+if(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET STREQUAL
+   "../clang/${CLANG_VERSION_MAJOR}")
+  swift_install_in_component(FILES "${embedded_platform_header}"
+    DESTINATION "lib/clang/${CLANG_VERSION_MAJOR}/include/swift"
+    COMPONENT clang-resource-dir-symlink)
+endif()
+
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
 # should be used in conjunction with clang-resource-dir-symlink.
@@ -297,3 +355,7 @@ swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD}/cl
                            DESTINATION "lib"
                            COMPONENT clang-builtin-headers-in-clang-resource-dir
                            REGEX "\.(h|modulemap)$")
+
+swift_install_in_component(FILES "${embedded_platform_header}"
+  DESTINATION "lib/clang/${CLANG_VERSION_MAJOR}/include/swift"
+  COMPONENT clang-builtin-headers-in-clang-resource-dir)
