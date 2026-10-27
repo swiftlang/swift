@@ -4663,6 +4663,8 @@ bool AnyFunctionType::hasTypeDependencyFor(ProtocolDecl *P) const {
   case KnownProtocolKind::Copyable:
   case KnownProtocolKind::Deinitable:
     return hasTypeDependencyFor(TypeDependenceKind::ExecutionSemantics);
+  case KnownProtocolKind::Transferable:
+    return hasTypeDependencyFor(TypeDependenceKind::Transferable);
   default:
     return false;
   }

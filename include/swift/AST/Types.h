@@ -3995,6 +3995,8 @@ public:
   /// Returns true if values of this function type cannot cross an isolation
   /// boundary without also being consumed.
   bool isNonTransferable() const {
+    ASSERT(!hasTypeDependencyFor(TypeDependenceKind::Transferable) &&
+           "Query Transferable dependence first");
     return hasExtInfo() && getExtInfo().isNonTransferable();
   }
 

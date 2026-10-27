@@ -3023,6 +3023,52 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionTransferability(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *constraint = Constraint::create(*this, kind, func1, func2,
+                                            getConstraintLocator(locator));
+      addUnsolvedConstraint(constraint);
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
+  auto typeDependencies = getBoundTypeDependencies(
+      *this, func1, func2, TypeDependenceKind::Transferable);
+  if (!typeDependencies)
+    return formUnsolved();
+  auto [dep1, dep2] = *typeDependencies;
+
+  auto func1NonTransferable =
+      dep1 ? !dep1->isTransferable() : func1->isNonTransferable();
+  auto func2NonTransferable =
+      dep2 ? !dep2->isTransferable() : func2->isNonTransferable();
+
+  // A Transferable function can be a subtype of a non-Transferable function.
+  if (func1NonTransferable != func2NonTransferable &&
+      (func1NonTransferable || kind < ConstraintKind::Subtype)) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    // The fix requires both sides to be resolved.
+    if (dep1)
+      func1 = simplifyType(func1)->castTo<FunctionType>();
+    if (dep2)
+      func2 = simplifyType(func2)->castTo<FunctionType>();
+
+    auto *fix = DropNonTransferableAttribute::create(
+        *this, func1, func2, getConstraintLocator(locator));
+    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+      return SolutionKind::Error;
+  }
+
+  return SolutionKind::Solved;
+}
+
 static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void) locator.getLocatorParts(path);
@@ -3281,8 +3327,8 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // If the locator is for a @Sendable or execution semantics match, that's all
-  // we want to do.
+  // If the locator is for a @Sendable, execution semantics or Transferable
+  // match, that's all we want to do.
   if (auto last = locator.last()) {
     if (last->is<LocatorPathElt::FunctionSendability>())
       return matchFunctionSendability(func1, func2, kind, flags, locator);
@@ -3290,6 +3336,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last->is<LocatorPathElt::FunctionExecutionSemantics>())
       return matchFunctionExecutionSemantics(func1, func2, kind, flags,
                                              locator);
+
+    if (last->is<LocatorPathElt::FunctionTransferability>())
+      return matchFunctionTransferability(func1, func2, kind, flags, locator);
   }
 
   // Match the 'throws' effect.
@@ -3351,16 +3400,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return SolutionKind::Error;
   }
 
-  if (func1->isNonTransferable() != func2->isNonTransferable() &&
-      (func1->isNonTransferable() || kind < ConstraintKind::Subtype)) {
-    if (!shouldAttemptFixes())
-      return SolutionKind::Error;
-
-    auto *fix = DropNonTransferableAttribute::create(
-        *this, func1, func2, getConstraintLocator(locator));
-    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
-      return SolutionKind::Error;
-  }
+  auto transferableResult = matchFunctionTransferability(
+      func1, func2, kind, TMF_GenerateConstraints,
+      locator.withPathElement(ConstraintLocator::FunctionTransferability));
+  if (transferableResult == SolutionKind::Error)
+    return transferableResult;
 
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
   if (func1->hasSendingResult() != func2->hasSendingResult() &&
@@ -9135,6 +9179,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
              protocol->isSpecificProtocol(KnownProtocolKind::Deinitable))
       dependenceKind = TypeDependenceKind::ExecutionSemantics;
+    else if (protocol->isSpecificProtocol(KnownProtocolKind::Transferable))
+      dependenceKind = TypeDependenceKind::Transferable;
 
     if (dependenceKind) {
       if (fnTy->hasTypeDependencyFor(*dependenceKind)) {
@@ -12691,8 +12737,15 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     // contextual type. Sendable-dependent types are not an issue here because
     // they are used for partial applications and ~Transferable base type is
     // non-Sendable.
-    if (contextualFnType->isNonTransferable() &&
-        !closure->getAttrs().hasAttribute<SendableAttr>()) {
+    if (auto transferableTy = contextualFnType->getTypeDependencyFor(
+            TypeDependenceKind::Transferable)) {
+      // Inferred Sendable can't yield to a type that's not resolved yet, so
+      // such closures stay Transferable.
+      if (!closureExtInfo.isSendable() && !closureExtInfo.isNonTransferable())
+        closureExtInfo = closureExtInfo.withTypeDependency(
+            TypeDependenceKind::Transferable, transferableTy);
+    } else if (contextualFnType->isNonTransferable() &&
+               !closure->getAttrs().hasAttribute<SendableAttr>()) {
       closureExtInfo = closureExtInfo.withSendable(false).withNonTransferable();
     }
   }

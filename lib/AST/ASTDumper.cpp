@@ -6878,6 +6878,10 @@ namespace {
           printRec(dependentType.getPointer(),
                    Label::always("execution_semantics_dep"));
           break;
+        case TypeDependenceKind::Transferable:
+          printRec(dependentType.getPointer(),
+                   Label::always("transferable_dep"));
+          break;
         }
       }
 

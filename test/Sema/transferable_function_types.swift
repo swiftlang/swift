@@ -18,6 +18,8 @@ func takesEscapingNontransferable(_: @escaping @nontransferable () -> Void) {}
 
 func requiresTransferable<T>(_: T.Type) {}
 // expected-note@-1 {{required by global function 'requiresTransferable' where 'T' = '@nontransferable () -> Void'}}
+func requiresTransferableValue<T>(_: T) {}
+// expected-note@-1 {{required by global function 'requiresTransferableValue' where 'T' = '@nontransferable () -> ()'}}
 
 // Contextual type
 do {
@@ -287,4 +289,104 @@ func testAsyncLetAndTaskCaptures(nt: NonTransferable, ntc: NonTransferableClass)
   async let x: Void = nt.use()
   // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
   _ = await x
+}
+
+
+// An unapplied reference to an instance member captures its base, so it's
+// @nontransferable when the base is ~Transferable.
+
+protocol HasUse: ~Transferable {
+  func use()
+}
+
+extension NonTransferable: HasUse {
+  static func staticUse() {}
+}
+
+extension NonTransferableClass: HasUse {}
+
+func testUnappliedMemberReferences(nt: NonTransferable, ntc: NonTransferableClass) {
+  let _: @nontransferable () -> Void = nt.use // Ok
+  let _: @nontransferable () -> Void = ntc.use // Ok
+  let _: () -> Void = nt.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = ntc.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  let ref = nt.use
+  let _: @nontransferable () -> Void = ref // Ok
+  let _: () -> Void = ref
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  takesNontransferable(nt.use) // Ok
+  takesTransferable(nt.use)
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  // A fully unapplied reference captures nothing itself, but the function it
+  // returns captures the base.
+  let _: (NonTransferable) -> @nontransferable () -> Void = NonTransferable.use // Ok
+  let _: (NonTransferable) -> () -> Void = NonTransferable.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  // A static member captures the metatype, which is Transferable.
+  let _: () -> Void = NonTransferable.staticUse // Ok
+}
+
+func testUnappliedGenericMemberReferences<T: HasUse & ~Transferable, U: HasUse>(t: T, u: U) {
+  let _: @nontransferable () -> Void = t.use // Ok
+  let _: () -> Void = t.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = u.use // Ok
+}
+
+struct ConditionallyTransferable<T: ~Transferable>: ~Transferable {
+  var t: T
+  func use() {}
+}
+
+extension ConditionallyTransferable: Transferable where T: Transferable {}
+
+// Whether the base is Transferable may only be known once its generic
+// arguments are bound.
+func testUnappliedConditionalMemberReferences(nt: NonTransferable) {
+  let _: () -> Void = ConditionallyTransferable(t: 42).use // Ok
+  let _: @nontransferable () -> Void = ConditionallyTransferable(t: 42).use // Ok
+  let _: @nontransferable () -> Void = ConditionallyTransferable(t: nt).use // Ok
+  let _: () -> Void = ConditionallyTransferable(t: nt).use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  requiresTransferableValue(ConditionallyTransferable(t: 42).use) // Ok
+  requiresTransferableValue(ConditionallyTransferable(t: nt).use)
+  // expected-error@-1 {{type '@nontransferable () -> ()' cannot conform to 'Transferable'}}
+}
+
+func testUnappliedMemberReferenceJoins(nt: NonTransferable, cond: Bool) {
+  let joined = cond ? nt.use : ConditionallyTransferable(t: 42).use
+  let _: @nontransferable () -> Void = joined // Ok
+  let _: () -> Void = joined
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+}
+
+func testUnappliedExistentialMemberReferences(nt: any HasUse & ~Transferable,
+                                              t: any HasUse) {
+  let _: @nontransferable () -> Void = nt.use // Ok
+  let _: () -> Void = nt.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = t.use // Ok
+}
+
+extension NonTransferable {
+  func testUnappliedImplicitSelfReferences() {
+    let _: @nontransferable () -> Void = use // Ok
+    let _: () -> Void = use
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  }
+}
+
+extension NonTransferableClass {
+  func testUnappliedImplicitSelfReferences() {
+    let _: @nontransferable () -> Void = use // Ok
+    let _: () -> Void = use
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  }
 }

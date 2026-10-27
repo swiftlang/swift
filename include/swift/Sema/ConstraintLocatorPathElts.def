@@ -287,6 +287,9 @@ SIMPLE_LOCATOR_PATH_ELT(FunctionSendability)
 /// The execution semantics dependence of a function type.
 SIMPLE_LOCATOR_PATH_ELT(FunctionExecutionSemantics)
 
+/// The Transferable dependence of a function type.
+SIMPLE_LOCATOR_PATH_ELT(FunctionTransferability)
+
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 

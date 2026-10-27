@@ -537,7 +537,10 @@ checkExtInfoConversion(ConformanceCache &cache,
   if (lhsInfo.isAsync() && !rhsInfo.isAsync())
     return ConflictFlag::FunctionAsync;
 
-  if (lhsInfo.isNonTransferable() && !rhsInfo.isNonTransferable())
+  // The destination might become non-Transferable once its dependence is
+  // resolved.
+  if (lhsInfo.isNonTransferable() && !rhsInfo.isNonTransferable() &&
+      !rhsInfo.getTypeDependencyFor(TypeDependenceKind::Transferable))
     return ConflictFlag::FunctionNonTransferable;
 
   auto lhsThrows = lhsFunc->getEffectiveThrownErrorType();
@@ -1171,6 +1174,8 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
       return info.isSendable();
     case TypeDependenceKind::ExecutionSemantics:
       return !info.hasCalledAtMostOnceSemantics();
+    case TypeDependenceKind::Transferable:
+      return !info.isNonTransferable();
     }
     llvm_unreachable("unhandled kind");
   };
@@ -1184,6 +1189,9 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
     case TypeDependenceKind::ExecutionSemantics:
       result = result.withExecutionSemantics(std::nullopt);
       break;
+    case TypeDependenceKind::Transferable:
+      result = result.withNonTransferable(false);
+      break;
     }
     result = result.withTypeDependency(kind, type);
   };
@@ -1196,6 +1204,9 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
       break;
     case TypeDependenceKind::ExecutionSemantics:
       result = result.withExecutionSemantics(from.getExecutionSemantics());
+      break;
+    case TypeDependenceKind::Transferable:
+      result = result.withNonTransferable(from.isNonTransferable());
       break;
     }
     result = result.withTypeDependency(kind, Type());
@@ -1223,6 +1234,12 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
           getExecutionSemanticsSuppressing(inverses));
       break;
     }
+    case TypeDependenceKind::Transferable:
+      result = result.withNonTransferable(
+          op == Operation::Join
+              ? lhsInfo.isNonTransferable() || rhsInfo.isNonTransferable()
+              : lhsInfo.isNonTransferable() && rhsInfo.isNonTransferable());
+      break;
     }
   };
 
@@ -1265,7 +1282,7 @@ static std::optional<AnyFunctionType::ExtInfo>
 extInfoJoinMeetImpl(Operation op,
                     AnyFunctionType::ExtInfo lhsInfo,
                     AnyFunctionType::ExtInfo rhsInfo) {
-  bool noEscape, throwing, async, nontransferable;
+  bool noEscape, throwing, async;
   Type thrownError;
 
   // Concurrency is too hard to reason about here.
@@ -1275,7 +1292,6 @@ extInfoJoinMeetImpl(Operation op,
   if (op == Operation::Join) {
     noEscape = lhsInfo.isNoEscape() || rhsInfo.isNoEscape();
     async = lhsInfo.isAsync() || rhsInfo.isAsync();
-    nontransferable = lhsInfo.isNonTransferable() || rhsInfo.isNonTransferable();
 
     throwing = lhsInfo.isThrowing() || rhsInfo.isThrowing();
     if (throwing) {
@@ -1291,7 +1307,6 @@ extInfoJoinMeetImpl(Operation op,
   } else {
     noEscape = lhsInfo.isNoEscape() && rhsInfo.isNoEscape();
     async = lhsInfo.isAsync() && rhsInfo.isAsync();
-    nontransferable = lhsInfo.isNonTransferable() && rhsInfo.isNonTransferable();
 
     throwing = lhsInfo.isThrowing() && rhsInfo.isThrowing();
     if (throwing) {
@@ -1319,8 +1334,7 @@ extInfoJoinMeetImpl(Operation op,
   auto result = lhsInfo.intoBuilder()
                     .withNoEscape(noEscape)
                     .withThrows(throwing, thrownError)
-                    .withAsync(async)
-                    .withNonTransferable(nontransferable);
+                    .withAsync(async);
 
   auto combined = joinMeetTypeDependencies(op, lhsInfo, rhsInfo, result);
   if (!combined)
