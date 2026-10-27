@@ -1254,8 +1254,20 @@ protected:
           if (child->getText() == "@convention(thin)") {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::Thin);
-          } else if (child->getText() == "@callee_guaranteed") {
-            calleeConvention = ImplParameterConvention::Direct_Guaranteed;
+          } else {
+            auto convention =
+                llvm::StringSwitch<std::optional<ImplParameterConvention>>(
+                    child->getText())
+                    .Case("@callee_unowned",
+                          ImplParameterConvention::Direct_Unowned)
+                    .Case("@callee_guaranteed",
+                          ImplParameterConvention::Direct_Guaranteed)
+                    .Case("@callee_owned",
+                          ImplParameterConvention::Direct_Owned)
+                    .Default(std::nullopt);
+            if (!convention)
+              return MAKE_NODE_TYPE_ERROR0(child, "unknown callee convention");
+            calleeConvention = *convention;
           }
         } else if (child->getKind() == NodeKind::ImplFunctionConvention) {
           if (child->getNumChildren() == 0)
