@@ -193,35 +193,11 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
   SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
   
   for (auto &component : expr->getComponents()) {
-    auto componentNameLoc = component.getLoc();
-    
-    // ObjC keypaths only support named segments.
-    // TODO: Perhaps we can map subscript components to dictionary keys.
-    switch (auto kind = component.getKind()) {
-    case KeyPathExpr::Component::Kind::Invalid:
-    case KeyPathExpr::Component::Kind::Identity:
-    case KeyPathExpr::Component::Kind::CodeCompletion:
-      continue;
+    ASSERT(component.getKind() ==
+               KeyPathExpr::Component::Kind::UnresolvedMember &&
+           "#keyPath is parsed as a sequence of names");
 
-    case KeyPathExpr::Component::Kind::UnresolvedMember:
-    case KeyPathExpr::Component::Kind::UnresolvedApply:
-      break;
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-    case KeyPathExpr::Component::Kind::OptionalChain:
-    case KeyPathExpr::Component::Kind::OptionalForce:
-    case KeyPathExpr::Component::Kind::TupleElement:
-      diags.diagnose(componentNameLoc,
-                     diag::expr_unsupported_objc_key_path_component,
-                     (unsigned)kind);
-      continue;
-    case KeyPathExpr::Component::Kind::OptionalWrap:
-    case KeyPathExpr::Component::Kind::Member:
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::Apply:
-    case KeyPathExpr::Component::Kind::DictionaryKey:
-      llvm_unreachable("already resolved!");
-    }
-    
+    auto componentNameLoc = component.getLoc();
     auto componentName = component.getUnresolvedDeclName();
     if (!componentName.isSimpleName()) {
       diags.diagnose(componentNameLoc,

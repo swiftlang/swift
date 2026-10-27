@@ -138,6 +138,28 @@ func testParseErrors() {
   let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{an Objective-C key path cannot reference a declaration with a compound name}} expected-error{{cannot find 'propSet' in scope}}
   let _: String = #keyPath(A.propString; // expected-error{{expected ')' to complete '#keyPath' expression}}
     // expected-note@-1{{to match this opening '('}}
+  // FIXME: Recovery should skip to the matching ')' instead of applying the
+  // rest of the path to the String and leaving a stray ')'.
+  let _ = #keyPath(A.propB?.propA)
+  // expected-error@-1:27 {{expected ')' to complete '#keyPath' expression}}
+  // expected-note@-2:19 {{to match this opening '('}}
+  // expected-error@-3:27 {{cannot use optional chaining on non-optional value of type 'String'}}
+  // expected-error@-4:29 {{value of type 'String' has no member 'propA'}}
+  // expected-error@-5:34 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-6:34 {{expected expression}}
+  let _ = #keyPath(A.propB!.propA)
+  // expected-error@-1:27 {{expected ')' to complete '#keyPath' expression}}
+  // expected-note@-2:19 {{to match this opening '('}}
+  // expected-error@-3:27 {{cannot force unwrap value of non-optional type 'String'}}
+  // expected-error@-4:29 {{value of type 'String' has no member 'propA'}}
+  // expected-error@-5:34 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-6:34 {{expected expression}}
+  let _ = #keyPath(A.propArray[0].propA)
+  // expected-error@-1:31 {{expected ')' to complete '#keyPath' expression}}
+  // expected-note@-2:19 {{to match this opening '('}}
+  // expected-error@-3:35 {{value of type 'Character' has no member 'propA'}}
+  // expected-error@-4:40 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-5:40 {{expected expression}}
 }
 
 func testTypoCorrection() {
