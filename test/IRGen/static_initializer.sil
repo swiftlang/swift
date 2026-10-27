@@ -27,6 +27,11 @@ struct StructWithPadding {
   var y : Int64
 }
 
+struct StructWithTailPadding {
+  var x : Int64
+  var y : Int8
+}
+
 // CHECK: %Ts5Int32V = type <{ i32 }>
 // CHECK: %T18static_initializer2S2V = type <{ %Ts5Int32V, %Ts5Int32V, %T18static_initializer1SV }>
 // CHECK: %T18static_initializer1SV = type <{ %Ts5Int32V }>
@@ -39,6 +44,7 @@ struct StructWithPadding {
 // CHECK-SYSV-x86_64: %T18static_initializer16TestArrayStorageC_tailelems1 = type <{ %swift.refcounted, %Ts5Int32V, [12 x i8], %Ts7Float80V }>
 // CHECK-WIN-x86_64: %T18static_initializer16TestArrayStorageC_tailelems1 = type <{ %swift.refcounted, %Ts5Int32V, [1 x i8] }>
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems3 = type <{ %swift.refcounted, %Ts5Int32V, [1 x i8], [1 x i8] }>
+// CHECK: %T18static_initializer16TestArrayStorageC_tailelems5 = type <{ %swift.refcounted, %Ts5Int32V, [4 x i8], %T18static_initializer21StructWithTailPaddingV, [7 x i8], %T18static_initializer21StructWithTailPaddingV, [7 x i8] }>
 
 sil_global @$s2ch1xSiv : $Int32 = {
   %1 = integer_literal $Builtin.Int32, 2
@@ -156,6 +162,21 @@ sil_global @static_zeroinitialized_struct : $StructWithPadding = {
   %initval = builtin "zeroInitializer"() : $StructWithPadding
 }
 // CHECK: @static_zeroinitialized_struct = {{(dllexport )?}}{{(protected )?}}global %T18static_initializer17StructWithPaddingV zeroinitializer, align 8
+
+// Each tail element must occupy its full stride, including the trailing
+// padding of the last element. Otherwise copying count * stride bytes out of
+// the object reads past its end.
+sil_global @static_array_with_tail_padding : $TestArrayStorage = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = integer_literal $Builtin.Int8, 1
+  %5 = struct $Int8 (%4 : $Builtin.Int8)
+  %6 = struct $StructWithTailPadding (%3 : $Int64, %5 : $Int8)
+  %initval = object $TestArrayStorage (%1 : $Int32, [tail_elems] %6 : $StructWithTailPadding, %6 : $StructWithTailPadding)
+}
+// CHECK: @static_array_with_tail_padding = {{(dllexport )?}}{{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems5c { [1 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems5 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [4 x i8] undef, %T18static_initializer21StructWithTailPaddingV <{ %Ts5Int64V <{ i64 10 }>, %Ts4Int8V <{ i8 1 }> }>, [7 x i8] undef, %T18static_initializer21StructWithTailPaddingV <{ %Ts5Int64V <{ i64 10 }>, %Ts4Int8V <{ i8 1 }> }>, [7 x i8] undef }> }, align 8
 
 struct MyString {
   var buffer: Builtin.BridgeObject
