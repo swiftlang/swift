@@ -1154,6 +1154,10 @@ public:
   ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc,
                                                  bool allowIndices);
 
+  /// Parse the arguments of the `@_scopeParams` decl and type attributes.
+  ParserStatus parseScopeParamsAttrArgs(SourceRange &parens,
+                                        ScopeParamListRepr *&result);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,

@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/ADT/bit.h"
 #include "llvm/Support/MathExtras.h"
 #include <cstdint>
@@ -31,6 +32,7 @@
 
 namespace swift {
 
+class ASTContext;
 class NominalTypeDecl;
 class Type;
 
@@ -53,54 +55,57 @@ public:
 /// A scope as written, e.g. `&a`, `self`, or `immortal`, before resolution.
 class ScopeRepr {
 public:
-  /// Does this scope refer to something by name, `self`, or
-  /// `immortal`?
-  enum class Subject : uint8_t { Name, Self, Immortal };
+  enum class Kind : uint8_t {
+    /// A scope by name, e.g. `a`.
+    ScopeName,
+    /// The access of a value, e.g. `&a`.
+    AccessedValue,
+    /// `self`
+    Self,
+    /// `&self`
+    AccessedSelf,
+    /// `immortal`
+    Immortal,
+  };
 
 private:
-  /// The name (null unless the subject is `Name`), whether this is an access
-  /// (`&`), and the subject.
-  llvm::PointerIntPair<llvm::PointerIntPair<Identifier, 1, bool>, 2, Subject>
-      Storage;
+  /// The name (null unless the kind is `ScopeName` or `AccessedValue`) and the
+  /// kind.
+  llvm::PointerIntPair<Identifier, 3, Kind> Storage;
   SourceLoc Loc;
 
-  ScopeRepr(Subject subject, Identifier name, bool isAccess, SourceLoc loc)
-      : Storage({name, isAccess}, subject), Loc(loc) {}
+  ScopeRepr(Kind kind, Identifier name, SourceLoc loc)
+      : Storage(name, kind), Loc(loc) {}
 
 public:
   /// Create a scope that refers to a name, e.g. `a`
   static ScopeRepr forScopeName(Located<ScopeName> name) {
-    return {Subject::Name, name.Item.getIdentifier(), /*isAccess=*/false,
-            name.Loc};
+    return {Kind::ScopeName, name.Item.getIdentifier(), name.Loc};
   }
 
   /// Create a scope that describes the access of a value, e.g. `&a`
   static ScopeRepr forAccessedValue(Located<Identifier> name) {
-    return {Subject::Name, name.Item, /*isAccess=*/true, name.Loc};
+    return {Kind::AccessedValue, name.Item, name.Loc};
   }
 
   static ScopeRepr forSelf(SourceLoc selfLoc, bool isAccess) {
-    return {Subject::Self, Identifier(), isAccess, selfLoc};
+    return {isAccess ? Kind::AccessedSelf : Kind::Self, Identifier(), selfLoc};
   }
 
   static ScopeRepr forImmortal(SourceLoc immortalLoc) {
-    return {Subject::Immortal, Identifier(), /*isAccess=*/false, immortalLoc};
+    return {Kind::Immortal, Identifier(), immortalLoc};
   }
 
-  Subject getSubject() const { return Storage.getInt(); }
-
-  /// Whether this is `&a`, the scope of an access to the value `a`, rather than
-  /// a scope itself.
-  bool isAccess() const { return Storage.getPointer().getInt(); }
+  Kind getKind() const { return Storage.getInt(); }
 
   ScopeName getScopeName() const {
-    ASSERT(getSubject() == Subject::Name && !isAccess());
-    return ScopeName(Storage.getPointer().getPointer());
+    ASSERT(getKind() == Kind::ScopeName);
+    return ScopeName(Storage.getPointer());
   }
 
   Identifier getAccessedValue() const {
-    ASSERT(getSubject() == Subject::Name && isAccess());
-    return Storage.getPointer().getPointer();
+    ASSERT(getKind() == Kind::AccessedValue);
+    return Storage.getPointer();
   }
 
   SourceLoc getLoc() const { return Loc; }
@@ -132,6 +137,25 @@ public:
   }
 
   ScopeRepr getScope() const { return Scope; }
+};
+
+/// The scope parameters declared by a `@_scopeParams` attribute as written, e.g.
+/// `a` and `b` in `@_scopeParams(a, b)`.
+class ScopeParamListRepr final
+    : private llvm::TrailingObjects<ScopeParamListRepr, Located<ScopeName>> {
+  friend TrailingObjects;
+
+  unsigned NumParams;
+
+  explicit ScopeParamListRepr(ArrayRef<Located<ScopeName>> params);
+
+public:
+  static ScopeParamListRepr *create(const ASTContext &ctx,
+                                    ArrayRef<Located<ScopeName>> params);
+
+  ArrayRef<Located<ScopeName>> getParams() const {
+    return getTrailingObjects(NumParams);
+  }
 };
 
 /// The number of function types between a position in a type and an enclosing

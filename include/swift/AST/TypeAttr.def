@@ -73,6 +73,8 @@ SIMPLE_TYPE_ATTR(concurrent, Concurrent)
 SIMPLE_TYPE_ATTR(once, Once)
 TYPE_ATTR(callable, Callable)
 TYPE_ATTR(_scoped, Scoped)
+TYPE_ATTR(_scopeParams, ScopeParams)
+TYPE_ATTR(_accessScope, AccessScope)
 SIMPLE_TYPE_ATTR(yield_once, YieldOnce)
 SIMPLE_TYPE_ATTR(yield_once_2, YieldOnce2)
 
