@@ -358,8 +358,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     llvm::PrefixMapper *Mapper)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
-      workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
-      clangScanningTool(*globalScanningService.ClangScanningService), CAS(CAS),
+      workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()), CAS(CAS),
       ActionCache(ActionCache), diagnosticReporter(DiagnosticReporter) {
   assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
          "Need to be the same CAS instance");
@@ -445,6 +444,33 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getSearchPathOptions().ModuleLoadMode,
       *scanningASTDelegate, swiftModuleClangCC1CommandLineArgs,
       workerCompilerInvocation->getSearchPathOptions().ExplicitSwiftModuleInputs);
+
+  // The VFS that is specific to the invocation. It will be overlayed over the
+  // global scan service VFS.
+  auto LocalClangScanVFS =
+      [&]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+    CASOptions &CASOpts = workerCompilerInvocation->getCASOptions();
+    if (!CAS || CASOpts.DepscanCASFileSystemRootID.empty())
+      return nullptr;
+
+    auto reportError = [&](llvm::Error &&E)
+        -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+      workerDiagnosticEngine->diagnose(SourceLoc(),
+                                       diag::clang_dependency_scan_error,
+                                       llvm::toString(std::move(E)));
+      return nullptr;
+    };
+    auto ID = CAS->parseID(CASOpts.DepscanCASFileSystemRootID);
+    if (!ID)
+      return reportError(ID.takeError());
+    auto CASFS = llvm::cas::createCASFileSystem(CAS, *ID);
+    if (!CASFS)
+      return reportError(CASFS.takeError());
+    return std::move(*CASFS);
+  }();
+
+  clangScanningTool = std::make_unique<clang::tooling::DependencyScanningTool>(
+      *globalScanningService.ClangScanningService, LocalClangScanVFS);
 }
 
 SwiftModuleScannerQueryResult
@@ -460,7 +486,7 @@ bool ModuleDependencyScanningWorker::checkClangCompilerInstanceSetup(
   ClangScanDiagnosticCapture diagCapture(*workerDiagnosticEngine,
                                          clangScanningModuleCommandLineArgs);
   auto controller =
-      clangScanningTool.createActionController(lookupModuleCallback);
+      clangScanningTool->createActionController(lookupModuleCallback);
 
   // No query runs, so the consumer receives nothing. It keeps a reference to
   // the set of already-seen modules, so the set must outlive it.
@@ -473,7 +499,7 @@ bool ModuleDependencyScanningWorker::checkClangCompilerInstanceSetup(
     return std::nullopt;
   };
 
-  bool success = clangScanningTool.getByNameDependencies(
+  bool success = clangScanningTool->getByNameDependencies(
       clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs,
       diagCapture.getConsumer(), *controller, noModuleNames, depConsumer);
   diagCapture.finishScan(success);
@@ -491,7 +517,7 @@ bool ModuleDependencyScanningWorker::drainClangModuleQueries(
                                          clangScanningModuleCommandLineArgs);
 
   auto controller =
-      clangScanningTool.createActionController(lookupModuleCallback);
+      clangScanningTool->createActionController(lookupModuleCallback);
 
   AggregatingDependencyConsumer depConsumer(
       alreadySeenModules, discoveredDependencyInfos, visibleModules,
@@ -502,7 +528,7 @@ bool ModuleDependencyScanningWorker::drainClangModuleQueries(
   // The by-name API is a drain: it pulls names from the callback
   // getNextModuleName until the names are exhausted, reusing one Clang
   // compiler instance for all of them.
-  bool success = clangScanningTool.getByNameDependencies(
+  bool success = clangScanningTool->getByNameDependencies(
       clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs,
       diagCapture.getConsumer(), *controller, getNextModuleName, depConsumer);
 
@@ -522,7 +548,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   ClangScanDiagnosticCapture diagCapture(*workerDiagnosticEngine,
                                          clangScanningModuleCommandLineArgs);
   auto controller =
-      clangScanningTool.createActionController(lookupModuleOutput);
+      clangScanningTool->createActionController(lookupModuleOutput);
 
   clang::dependencies::FullDependencyConsumer depConsumer(alreadySeenModules);
 
@@ -537,7 +563,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     return moduleName.str().str();
   };
 
-  bool success = clangScanningTool.getByNameDependencies(
+  bool success = clangScanningTool->getByNameDependencies(
       clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs,
       diagCapture.getConsumer(), *controller, getNextName, depConsumer);
   diagCapture.finishQuery(moduleName.str(), success);
@@ -565,11 +591,12 @@ ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
   clang::TextDiagnosticPrinter diagConsumer(errorOS, diagOpts);
 
   // Scan the specified textual header file and collect its dependencies
-  auto clangModuleDependencies = clangScanningTool.getTranslationUnitDependencies(
-      inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs,
-                                       headerPath),
-      clangScanningWorkingDirectoryPath, diagConsumer, alreadySeenModules,
-      lookupModuleOutput, sourceBuffer);
+  auto clangModuleDependencies =
+      clangScanningTool->getTranslationUnitDependencies(
+          inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs,
+                                           headerPath),
+          clangScanningWorkingDirectoryPath, diagConsumer, alreadySeenModules,
+          lookupModuleOutput, sourceBuffer);
 
   // - If a generated header is provided, scan the generated header.
   // - Textual module dependencies require us to process their bridging header.

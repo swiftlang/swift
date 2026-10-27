@@ -241,7 +241,7 @@ private:
   // An AST delegate for interface scanning.
   std::unique_ptr<InterfaceSubContextDelegateImpl> scanningASTDelegate;
   // The Clang scanner tool used by this worker.
-  clang::tooling::DependencyScanningTool clangScanningTool;
+  std::unique_ptr<clang::tooling::DependencyScanningTool> clangScanningTool;
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
 
