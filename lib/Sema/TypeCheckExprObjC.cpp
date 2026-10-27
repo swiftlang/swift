@@ -45,8 +45,6 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     Beginning,
     ResolvingType,
     ResolvingProperty,
-    ResolvingArray,
-    ResolvingSet,
     ResolvingDictionary,
   } state = Beginning;
   
@@ -58,8 +56,6 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
       return false;
 
     case ResolvingProperty:
-    case ResolvingArray:
-    case ResolvingSet:
     case ResolvingDictionary:
       return true;
     }
@@ -90,18 +86,9 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     // We're updating to a property. Determine whether we're looking
     // into a bridged Swift collection of some sort.
     if (auto boundGeneric = newType->getAs<NominalType>()) {
-      // Array<T>
-      if (boundGeneric->isArray()) {
+      if (boundGeneric->isArray() || boundGeneric->isSet()) {
         // Further lookups into the element type.
-        state = ResolvingArray;
-        currentType = boundGeneric->getGenericArgs()[0];
-        return;
-      }
-
-      // Set<T>
-      if (boundGeneric->isSet()) {
-        // Further lookups into the element type.
-        state = ResolvingSet;
+        state = ResolvingProperty;
         currentType = boundGeneric->getGenericArgs()[0];
         return;
       }
@@ -122,18 +109,9 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
         SmallString<32> scratch;
         StringRef objcClassName = classDecl->getObjCRuntimeName(scratch);
 
-        // NSArray
-        if (objcClassName == "NSArray") {
+        if (objcClassName == "NSArray" || objcClassName == "NSSet") {
           // The element type is unknown, so use AnyObject.
-          state = ResolvingArray;
-          currentType = anyObjectType;
-          return;
-        }
-
-        // NSSet
-        if (objcClassName == "NSSet") {
-          // The element type is unknown, so use AnyObject.
-          state = ResolvingSet;
+          state = ResolvingProperty;
           currentType = anyObjectType;
           return;
         }
