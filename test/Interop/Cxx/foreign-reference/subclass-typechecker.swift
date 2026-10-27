@@ -171,3 +171,8 @@ final class FailableConvenienceInit: SharedConstructed {
     self.init(x: 2)
   }
 }
+
+final class SubWithDeinit: SubclassableShared {
+  var s = ""
+  deinit {} // expected-error {{deinitializer cannot be declared in class 'SubWithDeinit' because it subclasses a C++ foreign reference type}}
+}
