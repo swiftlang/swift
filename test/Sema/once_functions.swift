@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature OnceFunctions
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature OnceFunctions -solver-enable-promote-supertypes
 
 // REQUIRES: swift_feature_OnceFunctions
 
