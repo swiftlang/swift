@@ -257,6 +257,49 @@ tests.test("LocalFunctionAndClosureCaptureVariable") {
   localFunctionAndClosureCaptureVariable()
 }
 
+// The same with a non-escaping closure, which captures the variable by address
+// and is passed to the same call as the local function's box. Its access must
+// be dynamic too.
+@inline(never)
+func localFunctionAndNonEscapingClosureCaptureVariable() {
+  var x = 0
+  @inline(never)
+  func outer(_ c: () -> ()) {
+    modifyAndCallClosure(&x) { c() }
+  }
+  outer { x += 1 }
+  _blackHole(x)
+}
+
+tests.test("LocalFunctionAndNonEscapingClosureCaptureVariable") {
+  expectCrashLater(withMessage: "Simultaneous accesses")
+  localFunctionAndNonEscapingClosureCaptureVariable()
+}
+
+// The local function passes an access through its box, and the non-escaping
+// closure, to another call.
+@inline(never)
+func bump(_ v: inout Int, _ body: () -> ()) {
+  body()
+  v += 1
+}
+
+@inline(never)
+func boxPassedWithNonEscapingClosure() {
+  var x = 0
+  @inline(never)
+  func modify(_ body: () -> ()) {
+    bump(&x, body)
+  }
+  modify { x += 1 }
+  _blackHole(x)
+}
+
+tests.test("BoxPassedWithNonEscapingClosure") {
+  expectCrashLater(withMessage: "Simultaneous accesses")
+  boxPassedWithNonEscapingClosure()
+}
+
 // -----------------------------------------------------------------------------
 // No conflict.
 
