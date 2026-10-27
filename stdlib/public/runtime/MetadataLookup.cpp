@@ -2413,8 +2413,8 @@ public:
       llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
       std::optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
       ImplFunctionTypeFlags flags) {
-    // We can't realize the metadata for a SILFunctionType.
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a SIL function type");
   }
 
   TypeLookupErrorOr<BuiltType>
@@ -2481,7 +2481,8 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createSILPackType(llvm::ArrayRef<BuiltType> elements, bool isElementAddress) const {
-    return TYPE_LOOKUP_ERROR_FMT("Lowered SILPackType cannot be demangled");
+    return TypeLookupError::unsupported(
+        "Lowered SILPackType cannot be demangled");
   }
 
   size_t beginPackExpansion(BuiltType countType) {
@@ -2585,7 +2586,8 @@ public:
 
   TypeLookupErrorOr<BuiltType> createSILBoxType(BuiltType base) const {
     // FIXME: Implement.
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a SIL box type");
   }
 
   struct BuiltSILBoxField {
@@ -2616,7 +2618,8 @@ public:
       llvm::ArrayRef<BuiltRequirement> Requirements,
       llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Implement.
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a SIL box type");
   }
 
   bool isExistential(BuiltType) {
@@ -2630,29 +2633,34 @@ public:
 
   TypeLookupErrorOr<BuiltType> createOptionalType(BuiltType base) {
     // Mangled types for building metadata don't contain sugared types
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a sugared Optional type");
   }
 
   TypeLookupErrorOr<BuiltType> createArrayType(BuiltType base) {
     // Mangled types for building metadata don't contain sugared types
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a sugared Array type");
   }
 
   TypeLookupErrorOr<BuiltType> createInlineArrayType(BuiltType count,
                                                      BuiltType element) {
     // Mangled types for building metadata don't contain sugared types
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a sugared InlineArray type");
   }
 
   TypeLookupErrorOr<BuiltType> createDictionaryType(BuiltType key,
                                                     BuiltType value) {
     // Mangled types for building metadata don't contain sugared types
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a sugared Dictionary type");
   }
 
   TypeLookupErrorOr<BuiltType> createParenType(BuiltType base) {
     // Mangled types for building metadata don't contain sugared types
-    return BuiltType();
+    return TypeLookupError::unsupported(
+        "Cannot build metadata for a sugared Paren type");
   }
 
   TypeLookupErrorOr<BuiltType> createIntegerType(intptr_t value) {
@@ -2798,10 +2806,11 @@ swift_getTypeByMangledNameImpl(MetadataRequest request, StringRef typeName,
 /// unconditionally (compiler-emitted metadata accessors, keypath
 /// instantiation), where a failure is always a real error. It should be false
 /// for probing callers that treat a null result as an expected outcome.
+/// Failures due to constructs the runtime doesn't support are never logged.
 static const Metadata *_Nullable handleTypeByMangledNameResult(
     TypeLookupErrorOr<TypeInfo> result, const char *typeNameStart,
     size_t typeNameLength, bool logFailures) {
-  if (logFailures && result.isError() &&
+  if (logFailures && result.isError() && !result.getError()->isUnsupported() &&
       runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
     TypeLookupError *error = result.getError();
     char *errorString = error->copyErrorString();
