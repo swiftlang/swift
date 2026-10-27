@@ -333,6 +333,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
   __ptrauth(                                                                   \
       ptrauth_key_process_dependent_data, 1,                                   \
       SpecialPointerAuthDiscriminators::NullaryContinuationJobContinuation)
+#define __ptrauth_swift_task_executor_preference_identity                      \
+  __ptrauth(ptrauth_key_process_dependent_data, 1,                             \
+            SpecialPointerAuthDiscriminators::TaskExecutorPreferenceIdentity)
+#define __ptrauth_swift_task_executor_preference_implementation                \
+  __ptrauth(ptrauth_key_process_dependent_data, 1,                             \
+            SpecialPointerAuthDiscriminators::TaskExecutorPreferenceImplementation)
 #define __ptrauth_swift_task_result_type_metadata                              \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::TaskResultTypeMetadata)
@@ -424,6 +430,8 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_task_resume_context
 #define __ptrauth_swift_task_next_waiting_task
 #define __ptrauth_swift_nullary_continuation_job_continuation
+#define __ptrauth_swift_task_executor_preference_identity
+#define __ptrauth_swift_task_executor_preference_implementation
 #define __ptrauth_swift_task_result_type_metadata
 #define __ptrauth_swift_async_context_parent
 #define __ptrauth_swift_async_context_resume

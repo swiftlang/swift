@@ -1841,6 +1841,11 @@ namespace SpecialPointerAuthDiscriminators {
   /// The task to resume in a NullaryContinuationJob.
   const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
 
+  /// The executor identity and witness table stored in a task executor
+  /// preference status record.
+  const uint16_t TaskExecutorPreferenceIdentity = 0xc69e; // = 50846
+  const uint16_t TaskExecutorPreferenceImplementation = 0x3dac; // = 15788
+
   /// Result type metadata stored in a future task or task group.
   const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
