@@ -2948,11 +2948,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     if (!forDefinition)
       gvar->setComdat(nullptr);
 
-    // Mark as llvm.used if @used, set section if @section
-    if (var->markedAsUsed())
-      addUsedGlobal(gvar);
-    else if (var->shouldBePreservedForDebugger() && forDefinition) 
-      addUsedGlobal(gvar);
+    // Set section if @section.
     if (!var->section().empty())
       gvar->setSection(var->section());
   }
@@ -2960,6 +2956,12 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     if (const ExposeAttr *expose = var->getWasmExposeAttr())
       gvar->addAttribute("wasm-export-name",
                          expose->Name.empty() ? gvar->getName() : expose->Name);
+    // llvm.used only allows definitions, so only add declarations
+    // when we're actually emitting the definition.
+    if (var->markedAsUsed())
+      addUsedGlobal(gvar);
+    else if (var->shouldBePreservedForDebugger())
+      addUsedGlobal(gvar);
     if (initVal) {
       gvar->setInitializer(initVal);
       if (var->isLet() &&
@@ -3817,10 +3819,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
 
-  // Mark as llvm.used if @used, set section if @section
-  if (f->markedAsUsed())
-    addUsedGlobal(fn);
+  // If the function is `@used`, we'll add it to `llvm.used` in
+  // `emitSILFunction` whenever we decide to emit the definition.
 
+  // Set section if @section.
   if (!f->section().empty())
     fn->setSection(f->section());
 
