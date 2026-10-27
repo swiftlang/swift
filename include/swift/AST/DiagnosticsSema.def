@@ -3068,16 +3068,16 @@ ERROR(access_level_conflict_with_exported,none,
       "'%0' is incompatible with %1; it can only be applied to public imports",
       (DeclAttribute, DeclAttribute))
 NOTE(module_imported_here,none,
-     "module %0 imported as '%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' here",
+     "module %0 imported as '%select{private|fileprivate|internal|package|%error|%error}1' here",
      (const ModuleDecl*, AccessLevel))
 NOTE(decl_import_via_here,none,
      "%kind0 imported as "
-     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
+     "'%select{private|fileprivate|internal|package|%error|%error}1' "
      "from %select{%2 here|bridging header}3",
      (const Decl *, AccessLevel, const ModuleDecl*, bool))
 NOTE(decl_import_via_local,none,
      "%kind0 is imported by this file as "
-     "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
+     "'%select{private|fileprivate|internal|package|%error|%error}1' "
      "from %select{%2|bridging header}3",
      (const Decl *, AccessLevel, const ModuleDecl*, bool))
 
