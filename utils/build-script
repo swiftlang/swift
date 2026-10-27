@@ -323,6 +323,9 @@ def default_stdlib_deployment_targets(args):
     # (it takes a long time).
     if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
             host_target == StdlibDeploymentTarget.OSX.arm64:
+        if args.build_osx:
+            targets.remove(host_target)
+            targets.extend(StdlibDeploymentTarget.OSX.targets)
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
         if args.build_ios and args.build_ios_device:
