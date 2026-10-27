@@ -801,6 +801,11 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
     }
   }
 
+  // The lowering below consumes its operand. Computing a closure's captures
+  // assumes that this only happens for a cast that involves a COM existential
+  // or a value whose representation depends on abstraction (see
+  // FindCapturedVars::isBorrowingIsCheck()).
+
   // Handle collection downcasts separately.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||

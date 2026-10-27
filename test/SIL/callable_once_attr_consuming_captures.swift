@@ -3,6 +3,14 @@
 // RUN: -enable-experimental-feature OnceFunctions \
 // RUN: -verify
 
+// RUN: %if swift_feature_NoncopyableCasting %{ %target-swift-frontend %s -enable-experimental-feature NoncopyableCasting \
+// RUN:     -emit-sil -verify \
+// RUN:     -verify-additional-prefix casting- \
+// RUN:     -target %target-future-triple \
+// RUN:     -enable-experimental-feature OnceFunctions \
+// RUN:     -D NONCOPYABLE_CASTING \
+// RUN: %}
+
 // REQUIRES: swift_feature_OnceFunctions
 
 struct Resource: ~Copyable {
@@ -357,3 +365,67 @@ struct InitAccessorConsumingValue: ~Copyable {
   }
   init() { r = Resource() }
 }
+
+#if NONCOPYABLE_CASTING
+protocol Shape: ~Copyable {}
+struct Circle: Shape, ~Copyable {}
+struct Square: Shape, ~Copyable {}
+
+func andAtMostOnce(
+  _ lhs: Bool, _ rhs: @autoclosure @callable(once) () -> Bool
+) -> Bool {
+  lhs ? rhs() : false
+}
+
+// An `is` check only borrows its operand, so the autoclosure doesn't consume
+// the capture.
+func testIsCheckDoesNotConsumeCapture(_ shape: consuming any Shape & ~Copyable) {
+  _ = andAtMostOnce(shape is Circle, shape is Square)
+  _ = consume shape
+}
+
+func testIsCheckOfBorrowedCapture(_ shape: borrowing any Shape & ~Copyable) {
+  _ = andAtMostOnce(shape is Circle, shape is Square)
+}
+
+// A function type argument doesn't affect the representation of the struct, so
+// an `is` check of the struct still only borrows it.
+struct NCBox<T>: ~Copyable {
+  var t: T
+}
+
+func testIsCheckOfBorrowedBoxOfFunction(_ b: borrowing NCBox<() -> Void>) {
+  _ = andAtMostOnce(true, b is Int)
+  // expected-casting-warning@-1 {{cast from 'NCBox<() -> Void>' to unrelated type 'Int' always fails}}
+}
+
+func testIsCheckOfBoxOfFunctionDoesNotConsumeCapture(
+  _ b: consuming NCBox<() -> Void>
+) {
+  _ = andAtMostOnce(true, b is Int)
+  // expected-casting-warning@-1 {{cast from 'NCBox<() -> Void>' to unrelated type 'Int' always fails}}
+  _ = consume b
+}
+
+// An `is` check of a function consumes it, so the autoclosure does too.
+func testIsCheckOfFunctionConsumesCapture(_ body: @callable(once) () -> Void) {
+  _ = andAtMostOnce(true, body is Int)
+  // expected-casting-warning@-1 {{cast from '@callable(once) () -> Void' to unrelated type 'Int' always fails}}
+}
+
+func testUseAfterIsCheckOfFunction(_ body: @callable(once) () -> Void) {
+  // expected-casting-error@-1 {{'body' consumed more than once}}
+  _ = andAtMostOnce(true, body is Int) // expected-casting-note {{consumed here}}
+  // expected-casting-warning@-1 {{cast from '@callable(once) () -> Void' to unrelated type 'Int' always fails}}
+  body() // expected-casting-note {{consumed again here}}
+}
+
+// FIXME: An `is` check of an optional should only borrow its operand too, but
+// it's lowered to an `as?` that consumes the payload (rdar://191036883).
+func testIsCheckOfOptionalDoesNotConsumeCapture(
+  _ shape: consuming (any Shape & ~Copyable)?
+  // expected-casting-error@-1 {{missing reinitialization of closure capture 'shape' after consume}}
+) {
+  _ = andAtMostOnce(true, shape is Circle) // expected-casting-note {{consumed here}}
+}
+#endif
