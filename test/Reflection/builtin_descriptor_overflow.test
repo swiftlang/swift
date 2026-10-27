@@ -1,0 +1,40 @@
+// Tests type lowering with builtin type descriptors whose sizes are
+// inconsistent or overflow 32-bit record layout.
+
+// RUN: %empty-directory(%t)
+// RUN: %target-clang -dynamiclib %S/Inputs/BuiltinDescriptorOverflow.s -o %t/libBuiltinDescriptorOverflow.dylib
+// RUN: %target-swift-reflection-dump %t/libBuiltinDescriptorOverflow.dylib -dump-type-lowering < %s | %FileCheck %s
+
+// REQUIRES: OS=macosx
+
+Bi8__Bi8_t
+// CHECK:      (tuple
+// CHECK-NEXT:   (builtin Builtin.Int8)
+// CHECK-NEXT:   (builtin Builtin.Int8))
+// CHECK-NEXT: (tuple size=2 alignment=1 stride=2 num_extra_inhabitants=0 bitwise_takable=1
+
+Bi32_
+// CHECK:      (builtin Builtin.Int32)
+// CHECK-NEXT: Invalid lowering
+
+Bi64_
+// CHECK:      (builtin Builtin.Int64)
+// CHECK-NEXT: (builtin size=2147483648 alignment=1 stride=2147483648 num_extra_inhabitants=0 bitwise_takable=1)
+
+Bi64__Bi64_t
+// CHECK:      (tuple
+// CHECK-NEXT:   (builtin Builtin.Int64)
+// CHECK-NEXT:   (builtin Builtin.Int64))
+// CHECK-NEXT: Invalid lowering
+
+Bi8__Bi128_t
+// CHECK:      (tuple
+// CHECK-NEXT:   (builtin Builtin.Int8)
+// CHECK-NEXT:   (builtin Builtin.Int128))
+// CHECK-NEXT: Invalid lowering
+
+Bi128__Bi8_t
+// CHECK:      (tuple
+// CHECK-NEXT:   (builtin Builtin.Int128)
+// CHECK-NEXT:   (builtin Builtin.Int8))
+// CHECK-NEXT: Invalid lowering
