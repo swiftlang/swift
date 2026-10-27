@@ -959,7 +959,13 @@ DECL_ATTR(callable, Callable,
   181)
 DECL_ATTR_FEATURE_REQUIREMENT(Callable, OnceFunctions)
 
-LAST_DECL_ATTR(Callable)
+DECL_ATTR(_scopeParams, ScopeParams,
+  OnFunc | OnConstructor | OnStruct | OnEnum,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | NotSerialized | ForbiddenInABIAttr,
+  182)
+DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
+
+LAST_DECL_ATTR(ScopeParams)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

@@ -597,6 +597,7 @@ private:
                                        TypeResolutionOptions options,
                                        TypeAttrSet *attrs);
   Type resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr, Type ty);
+  void diagnoseScopeParams(TypeAttrSet *attrs);
   std::optional<ScopeRef> resolveScope(AbstractFunctionDecl *fn,
                                        ScopeDepth depth, ScopeRepr repr);
   SmallVector<AnyFunctionType::Param, 8>
@@ -3649,6 +3650,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::Isolated,
       TypeAttrKind::Once,
       TypeAttrKind::Callable,
+      TypeAttrKind::ScopeParams,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -3915,6 +3917,17 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     } else if (!ty->hasError()) {
       ty = resolveScopedType(scoped, repr, ty);
     }
+  }
+
+  if (auto accessScope = claim<AccessScopeTypeAttr>(attrs)) {
+    if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+      diagnose(accessScope->getAttrLoc(), diag::requires_experimental_feature,
+               "@_accessScope", false, Feature::ScopeRestrictions.getName());
+    } else {
+      // TODO: Support binding the access scopes of parameters.
+      diagnose(accessScope->getAttrLoc(), diag::access_scope_unsupported);
+    }
+    accessScope->setInvalid();
   }
 
   // Handle a type attribute that can only be used in inheritance clauses.
@@ -4610,12 +4623,18 @@ static bool hasAccessScope(ParamDecl *param) {
 /// The name of the parameter a written scope refers to, if any: `&a` is an
 /// access to `a`, and the scope name `a` is the scope of the parameter `a`.
 static std::optional<Identifier> getReferencedParamName(ScopeRepr repr) {
-  if (repr.getSubject() != ScopeRepr::Subject::Name)
-    return std::nullopt;
-  if (repr.isAccess())
+  switch (repr.getKind()) {
+  case ScopeRepr::Kind::AccessedValue:
     return repr.getAccessedValue();
-  // FIXME: Prefer explicitly named scopes here.
-  return repr.getScopeName().getIdentifier();
+  case ScopeRepr::Kind::ScopeName:
+    // FIXME: Prefer explicitly named scopes here.
+    return repr.getScopeName().getIdentifier();
+  case ScopeRepr::Kind::Self:
+  case ScopeRepr::Kind::AccessedSelf:
+  case ScopeRepr::Kind::Immortal:
+    return std::nullopt;
+  }
+  llvm_unreachable("unhandled kind");
 }
 
 /// (For now) diagnoses a `@_scoped` within a function type that names one of
@@ -4746,8 +4765,7 @@ Type TypeResolver::resolveScopedType(ScopedTypeAttr *attr, TypeRepr *repr,
 
   auto written = restrictions.front().getScope();
   // A static method's `self` is an escapable metatype.
-  if (written.getSubject() == ScopeRepr::Subject::Self && !written.isAccess() &&
-      !fn->isStatic()) {
+  if (written.getKind() == ScopeRepr::Kind::Self && !fn->isStatic()) {
     auto *selfNominal = fn->getDeclContext()->getSelfNominalTypeDecl();
     if (selfNominal &&
         selfNominal->canBeEscapable() != TypeDecl::CanBeInvertible::Always)
@@ -4771,17 +4789,32 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
                                                    ScopeRepr repr) {
   auto &ctx = getASTContext();
 
-  switch (repr.getSubject()) {
-  case ScopeRepr::Subject::Immortal:
-    return ScopeRef::forImmortal();
-
-  case ScopeRepr::Subject::Self: {
-    if (!fn->hasImplicitSelfDecl()) {
-      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
+  auto *params = fn->getParameters();
+  auto findParam = [&](Identifier name) -> std::optional<unsigned> {
+    auto found = llvm::find_if(*params, [&](ParamDecl *param) {
+      return param->getParameterName() == name;
+    });
+    if (found == params->end()) {
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, name);
       return std::nullopt;
     }
-    if (!repr.isAccess()) {
+    return found - params->begin();
+  };
+
+  switch (repr.getKind()) {
+  case ScopeRepr::Kind::Immortal:
+    return ScopeRef::forImmortal();
+
+  case ScopeRepr::Kind::Self:
+    if (fn->hasImplicitSelfDecl())
       diagnose(repr.getLoc(), diag::scoped_escapable_param, ctx.Id_self);
+    else
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
+    return std::nullopt;
+
+  case ScopeRepr::Kind::AccessedSelf:
+    if (!fn->hasImplicitSelfDecl()) {
+      diagnose(repr.getLoc(), diag::scoped_unknown_param, ctx.Id_self);
       return std::nullopt;
     }
     if (fn->isStatic() || isa<ConstructorDecl>(fn)) {
@@ -4795,40 +4828,37 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
     }
     // `self` is the parameter of the outer function type of a method.
     return ScopeRef::forParam(depth.deeper(), /*index=*/0);
-  }
 
-  case ScopeRepr::Subject::Name: {
-    // FIXME: Doing params like this is a hack... better to introduce scopes explicitly.
-    auto name = *getReferencedParamName(repr);
-    auto *params = fn->getParameters();
-    auto found = llvm::find_if(*params, [&](ParamDecl *param) {
-      return param->getParameterName() == name;
-    });
-    if (found == params->end()) {
-      diagnose(repr.getLoc(), diag::scoped_unknown_param, name);
+  case ScopeRepr::Kind::AccessedValue: {
+    auto name = repr.getAccessedValue();
+    auto index = findParam(name);
+    if (!index)
+      return std::nullopt;
+    auto *param = params->get(*index);
+    if (!hasAccessScope(param)) {
+      diagnose(repr.getLoc(), diag::scoped_consuming_param);
+      if (param->getValueOwnership() != ValueOwnership::Default) {
+        diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);
+      } else {
+        ASSERT(isa<ConstructorDecl>(fn) &&
+               "only initializers consume parameters by default");
+        diagnose(param->getLoc(), diag::scoped_init_param_consuming_by_default);
+      }
       return std::nullopt;
     }
-    auto *param = *found;
+    return ScopeRef::forParam(depth, *index);
+  }
 
-    if (repr.isAccess()) {
-      if (!hasAccessScope(param)) {
-        diagnose(repr.getLoc(), diag::scoped_consuming_param);
-        if (param->getValueOwnership() != ValueOwnership::Default) {
-          diagnose(param->getLoc(), diag::scoped_consuming_param_here, name);
-        } else {
-          ASSERT(isa<ConstructorDecl>(fn) &&
-                 "only initializers consume parameters by default");
-          diagnose(param->getLoc(),
-                   diag::scoped_init_param_consuming_by_default);
-        }
-        return std::nullopt;
-      }
-      return ScopeRef::forParam(depth, found - params->begin());
-    }
+  case ScopeRepr::Kind::ScopeName: {
+    // FIXME: Doing params like this is a hack... better to introduce scopes explicitly.
+    auto name = repr.getScopeName().getIdentifier();
+    auto index = findParam(name);
+    if (!index)
+      return std::nullopt;
 
     // Does this make sense when values can have multiple scopes?
     // TODO: Support forward references?
-    auto paramTy = param->getInterfaceType();
+    auto paramTy = params->get(*index)->getInterfaceType();
     if (paramTy->hasError())
       return std::nullopt;
     if (fn->mapTypeIntoEnvironment(paramTy)->isEscapable()) {
@@ -4851,7 +4881,21 @@ std::optional<ScopeRef> TypeResolver::resolveScope(AbstractFunctionDecl *fn,
     return paramScopes.front().shifted(depth);
   }
   }
-  llvm_unreachable("unhandled subject");
+  llvm_unreachable("unhandled kind");
+}
+
+void TypeResolver::diagnoseScopeParams(TypeAttrSet *attrs) {
+  auto *attr = claim<ScopeParamsTypeAttr>(attrs);
+  if (!attr)
+    return;
+  if (!getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+    diagnose(attr->getAttrLoc(), diag::requires_experimental_feature,
+             "@_scopeParams", false, Feature::ScopeRestrictions.getName());
+  } else {
+    // TODO: Support explicit scope parameters.
+    diagnose(attr->getAttrLoc(), diag::scope_params_unsupported);
+  }
+  attr->setInvalid();
 }
 
 /// Fills in the scope arguments that \p ty leaves unspecified with fresh scope
@@ -4970,6 +5014,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // param names.
   if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions))
     diagnoseScopeNamingOwnParam(ctx, repr);
+
+  diagnoseScopeParams(attrs);
 
   auto isolatedAttr = claim<IsolatedTypeAttr>(attrs);
 
@@ -5473,6 +5519,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   options.setContext(std::nullopt);
 
   bool hasError = false;
+
+  diagnoseScopeParams(attrs);
 
   auto coroutineKind = SILCoroutineKind::None;
   if (auto coroAttr = attrs ? claim<TAR_SILCoroutine>(*attrs) : nullptr) {

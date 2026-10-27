@@ -36,6 +36,20 @@ void ScopeRef::dump() const {
   llvm::errs() << "\n";
 }
 
+ScopeParamListRepr::ScopeParamListRepr(ArrayRef<Located<ScopeName>> params)
+    : NumParams(params.size()) {
+  llvm::uninitialized_copy(params, getTrailingObjects());
+}
+
+ScopeParamListRepr *
+ScopeParamListRepr::create(const ASTContext &ctx,
+                           ArrayRef<Located<ScopeName>> params) {
+  ASSERT(!params.empty());
+  void *mem = ctx.Allocate(totalSizeToAlloc<Located<ScopeName>>(params.size()),
+                           alignof(ScopeParamListRepr));
+  return new (mem) ScopeParamListRepr(params);
+}
+
 unsigned swift::getNumScopeParams(const NominalTypeDecl *decl) {
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions))
     return 0;

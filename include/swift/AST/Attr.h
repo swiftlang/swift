@@ -3953,6 +3953,35 @@ public:
   }
 };
 
+/// The `@_scopeParams` attribute, which declares the explicit scope parameters
+/// of a function or type, e.g. `@_scopeParams(a, b)`.
+class ScopeParamsAttr : public DeclAttribute {
+  ScopeParamListRepr *Params;
+
+public:
+  ScopeParamsAttr(SourceLoc atLoc, SourceRange range,
+                  ScopeParamListRepr *params, bool implicit = false)
+      : DeclAttribute(DeclAttrKind::ScopeParams, atLoc, range, implicit),
+        Params(params) {}
+
+  ScopeParamListRepr *getParamList() const { return Params; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::ScopeParams;
+  }
+
+  ScopeParamsAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ScopeParamsAttr(AtLoc, Range, Params, isImplicit());
+  }
+
+  bool isEquivalent(const ScopeParamsAttr *other, Decl *attachedTo) const {
+    return llvm::equal(Params->getParams(), other->Params->getParams(),
+                       [](Located<ScopeName> lhs, Located<ScopeName> rhs) {
+                         return lhs.Item == rhs.Item;
+                       });
+  }
+};
+
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };
 
@@ -4669,6 +4698,39 @@ public:
   ArrayRef<ScopeRestrictionRepr> getRestrictions() const {
     return getTrailingObjects(Bits.ScopedTypeAttr.NumRestrictions);
   }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The `@_accessScope` attribute, which binds the access of a parameter to a
+/// scope, e.g. `borrowing @_accessScope(s) [Int]`.
+class AccessScopeTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::AccessScope> {
+  ScopeRepr Scope;
+
+public:
+  AccessScopeTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                      ScopeRepr scope)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), Scope(scope) {}
+
+  ScopeRepr getScope() const { return Scope; }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The `@_scopeParams` attribute on a function type, which declares its
+/// explicit scope parameters, e.g.
+/// `@_scopeParams(a) (@_scoped(a) Ref) -> @_scoped(a) Ref`.
+class ScopeParamsTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::ScopeParams> {
+  ScopeParamListRepr *Params;
+
+public:
+  ScopeParamsTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                      ScopeParamListRepr *params)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), Params(params) {}
+
+  ScopeParamListRepr *getParamList() const { return Params; }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

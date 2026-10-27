@@ -1391,6 +1391,11 @@ BridgedTargetAttr BridgedTargetAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cValue);
 
+SWIFT_NAME("BridgedScopeParamsAttr.createParsed(_:atLoc:range:params:)")
+BridgedScopeParamsAttr BridgedScopeParamsAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedArrayRef cParams);
+
 SWIFT_NAME("BridgedSetterAccessAttr.createParsed(_:range:accessLevel:)")
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
@@ -2717,7 +2722,7 @@ BridgedCallableTypeAttr BridgedCallableTypeAttr_createParsed(
     swift::SourceLoc nameLoc, swift::SourceRange parensRange);
 
 class BridgedScopeRepr {
-  enum class Kind { ScopeName, AccessedValue, Self, SelfAccess, Immortal } kind;
+  enum class Kind { ScopeName, AccessedValue, Self, AccessedSelf, Immortal } kind;
   swift::Identifier name;
   swift::SourceLoc loc;
 
@@ -2739,7 +2744,8 @@ public:
 
   SWIFT_NAME("forSelf(loc:isAccess:)")
   static BridgedScopeRepr forSelf(swift::SourceLoc loc, bool isAccess) {
-    return {isAccess ? Kind::SelfAccess : Kind::Self, swift::Identifier(), loc};
+    return {isAccess ? Kind::AccessedSelf : Kind::Self, swift::Identifier(),
+            loc};
   }
 
   SWIFT_NAME("forImmortal(loc:)")
@@ -2778,6 +2784,20 @@ BridgedScopedTypeAttr BridgedScopedTypeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceLoc nameLoc, swift::SourceRange parensRange,
     BridgedArrayRef cRestrictions);
+
+SWIFT_NAME("BridgedAccessScopeTypeAttr.createParsed(_:atLoc:nameLoc:"
+           "parensRange:scope:)")
+BridgedAccessScopeTypeAttr BridgedAccessScopeTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedScopeRepr scope);
+
+SWIFT_NAME("BridgedScopeParamsTypeAttr.createParsed(_:atLoc:nameLoc:"
+           "parensRange:params:)")
+BridgedScopeParamsTypeAttr BridgedScopeParamsTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedArrayRef cParams);
 
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs

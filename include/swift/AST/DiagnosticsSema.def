@@ -9179,6 +9179,10 @@ ERROR(scoped_elided_result, none,
       "its scope written with '@_scoped'", ())
 ERROR(scoped_param_scope_unsupported, none,
       "the scope of %0 is not supported", (Identifier))
+ERROR(scope_params_unsupported, none,
+      "explicit scope parameters are not supported", ())
+ERROR(access_scope_unsupported, none,
+      "binding the access scope of a parameter is not supported", ())
 
 ERROR(scoped_unknown_param, none,
       "cannot find parameter %0 for scope restriction", (Identifier))
