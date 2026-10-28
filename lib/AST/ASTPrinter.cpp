@@ -1272,7 +1272,7 @@ private:
   bool shouldPrint(const Decl *D, bool Notify = false);
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
-  void printAccessors(const AbstractStorageDecl *ASD);
+  void printAccessors(const AbstractStorageDecl *ASD, bool printedInitializer);
   void printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD);
   void printMembersOfDecl(Decl *NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true,
@@ -2788,7 +2788,8 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
-void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
+void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
+                              bool printedInitializer) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
   if (isa<SubscriptDecl>(ASD) && !Options.PrintSubscriptAccessors)
@@ -2806,22 +2807,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // *and* the accessor block not starting with willSet/didSet, print an
   // attribute as a disambiguation marker.
   auto printDisambiguationMarkerIfNeeded = [&]() {
-    auto *VD = dyn_cast<VarDecl>(ASD);
-    if (!VD)
-      return;
-    auto *PBD = VD->getParentPatternBinding();
-    if (!PBD)
-      return;
-    auto i = PBD->getPatternEntryIndexForVarDecl(VD);
-
-    bool needsDisambiguationAttr = false;
-    if (Options.PrintExprs) {
-      needsDisambiguationAttr |= bool(PBD->getInit(i));
-    } else if (Options.VarInitializers) {
-      needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
-                                      VD->isInitExposedToClients());
-    }
-    if (needsDisambiguationAttr)
+    if (printedInitializer)
       Printer << " @_accessorBlock";
   };
 
@@ -3053,6 +3039,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       break;
     }
   }
+
+  // Don't print an empty accessor block after an initializer, e.g. for a
+  // non-public observed property in a '@frozen' type whose accessors are all
+  // filtered out. Such a block carries no information.
+  if (accessorsToPrint.empty() && printedInitializer)
+    return;
 
   Printer << " {";
 
@@ -4085,10 +4077,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       printPatternType(pattern);
     }
 
+    bool printedInitializer = false;
     if (Options.PrintExprs) {
       if (auto initExpr = decl->getInit(idx)) {
         Printer << " = ";
         visit(initExpr);
+        printedInitializer = true;
       }
     } else if (Options.VarInitializers) {
       auto *vd = decl->getAnchoringVarDecl(idx);
@@ -4096,6 +4090,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
           vd->isInitExposedToClients()) {
         SmallString<128> scratch;
         Printer << " = " << decl->getInitStringRepresentation(idx, scratch);
+        printedInitializer = true;
       }
     }
 
@@ -4103,7 +4098,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     // print the accessors here. It is an error to add accessors to a
     // pattern binding with multiple entries.
     if (auto var = decl->getSingleVar()) {
-      printAccessors(var);
+      printAccessors(var, printedInitializer);
     }
   }
 }
@@ -4514,7 +4509,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     printTypeLoc(tyLoc, getNonRecursiveOptions(decl));
   }
 
-  printAccessors(decl);
+  printAccessors(decl, /*printedInitializer=*/false);
 }
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
@@ -5120,7 +5115,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   }
 
   printDeclGenericRequirements(decl);
-  printAccessors(decl);
+  printAccessors(decl, /*printedInitializer=*/false);
 }
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
