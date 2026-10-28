@@ -1481,12 +1481,8 @@ static DisjunctionInfo computeDisjunctionInfo(
   forEachDisjunctionChoice(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
-        GenericSignature genericSig;
-        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-          genericSig = GF->getGenericSignature();
-        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-          genericSig = SD->getGenericSignature();
-        }
+        auto genericSig = decl->getInnermostDeclContext()
+                              ->getGenericSignatureOfContext();
 
         auto matchings =
             matchArguments(choice->getOverloadChoice(), overloadType);
