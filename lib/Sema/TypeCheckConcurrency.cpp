@@ -18,6 +18,7 @@
 #include "../AST/AbstractConformance.h"
 #include "MiscDiagnostics.h"
 #include "NonisolatedNonsendingByDefaultMigration.h"
+#include "TypeCheckDeclInterface.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
@@ -46,6 +47,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -2407,6 +2409,106 @@ static ClosureExpr *getWithoutActuallyEscapingOrDeinitingBody(Expr *expr) {
   return nullptr;
 }
 
+/// A ~Transferable value always shares the isolation of its context, so it can
+/// never be sent.
+static void diagnoseSendingNonTransferable(Type type, const DeclContext *dc,
+                                           SourceLoc loc) {
+  if (type->hasTypeParameter())
+    type = dc->mapTypeIntoEnvironment(type);
+  if (!type->hasError() && !type->isTransferable())
+    dc->getASTContext().Diags.diagnose(loc, diag::sending_non_transferable_type,
+                                       type);
+}
+
+void TypeChecker::checkSendingTransferabilityInType(Type type,
+                                                    const DeclContext *dc,
+                                                    SourceLoc loc) {
+  if (!type || type->hasError() || loc.isInvalid())
+    return;
+
+  class Walker : public TypeWalker {
+    const DeclContext *dc;
+    SourceLoc loc;
+
+  public:
+    Walker(const DeclContext *dc, SourceLoc loc) : dc(dc), loc(loc) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Not `getAs`: a type alias is checked where it's declared.
+      auto *fnTy = dyn_cast<AnyFunctionType>(ty.getPointer());
+      if (!fnTy)
+        return Action::Continue;
+
+      for (auto &param : fnTy->getParams()) {
+        if (param.getParameterFlags().isSending())
+          diagnoseSendingNonTransferable(param.getPlainType(), dc, loc);
+      }
+      if (fnTy->hasExtInfo() && fnTy->hasSendingResult())
+        diagnoseSendingNonTransferable(fnTy->getResult(), dc, loc);
+      return Action::Continue;
+    }
+  };
+
+  type.walk(Walker(dc, loc));
+}
+
+namespace {
+class SendingTransferabilityChecker
+    : public DeclInterfaceTypeChecker<SendingTransferabilityChecker> {
+public:
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    for (TypeLoc inherited : ED->getInherited().getEntries())
+      checkType(inherited.getType(), inherited.getTypeRepr(), ED);
+
+    if (ED->getTrailingWhereClause()) {
+      WhereClauseOwner(ED).forAllRequirementTypes(
+          [&](Type type, TypeRepr *typeRepr) { checkType(type, typeRepr, ED); });
+    }
+  }
+
+  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
+    // Inferred types come from written ones, which are checked where they're
+    // written.
+    if (!typeRepr)
+      return;
+    TypeChecker::checkSendingTransferabilityInType(
+        type, const_cast<Decl *>(context)->getInnermostDeclContext(),
+        typeRepr->getLoc());
+  }
+
+  void checkAdditional(Decl *D) {
+    auto checkParams = [&](ParameterList *params, const DeclContext *dc) {
+      for (auto *param : *params) {
+        // Synthesized parameters, e.g. of distributed thunks, take their
+        // types from parameters that are checked themselves.
+        auto *repr = param->getTypeRepr();
+        if (param->isSending() && repr)
+          diagnoseSendingNonTransferable(param->getInterfaceType(), dc,
+                                         repr->getLoc());
+      }
+    };
+
+    if (auto *fn = dyn_cast<AbstractFunctionDecl>(D)) {
+      checkParams(fn->getParameters(), fn);
+      if (auto *func = dyn_cast<FuncDecl>(fn);
+          func && func->hasSendingResult() && func->getResultTypeRepr())
+        diagnoseSendingNonTransferable(func->getResultInterfaceType(), func,
+                                       func->getResultTypeRepr()->getLoc());
+    } else if (auto *subscript = dyn_cast<SubscriptDecl>(D)) {
+      checkParams(subscript->getIndices(), subscript);
+      if (auto *elementRepr = subscript->getElementTypeRepr();
+          elementRepr && isa<SendingTypeRepr>(elementRepr))
+        diagnoseSendingNonTransferable(subscript->getElementInterfaceType(),
+                                       subscript, elementRepr->getLoc());
+    }
+  }
+};
+} // end anonymous namespace
+
+void TypeChecker::checkSendingTransferabilityInDecl(Decl *D) {
+  SendingTransferabilityChecker().visit(D);
+}
+
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -3330,12 +3432,16 @@ namespace {
         if (!T->isImplicit()) {
           checkIsolatedConformancesInType(T->getType(), T->getTypeRepr(),
                                           expr->getLoc());
+          TypeChecker::checkSendingTransferabilityInType(
+              T->getType(), getDeclContext(), expr->getLoc());
         }
       }
 
       if (auto *cast = dyn_cast<ExplicitCastExpr>(expr)) {
         checkIsolatedConformancesInType(
             cast->getCastType(), cast->getCastTypeRepr(), expr->getLoc());
+        TypeChecker::checkSendingTransferabilityInType(
+            cast->getCastType(), getDeclContext(), expr->getLoc());
       }
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
@@ -3382,6 +3488,27 @@ namespace {
             checkIsolatedConformancesInType(param->getInterfaceType(),
                                             param->getTypeRepr(),
                                             expr->getLoc());
+
+            // The type of a `sending` parameter may only be known now, e.g.
+            // `{ (x: sending _) in }`.
+            if (auto *repr = param->getTypeRepr()) {
+              if (param->isSending())
+                diagnoseSendingNonTransferable(param->getInterfaceType(),
+                                               explicitClosure, repr->getLoc());
+              TypeChecker::checkSendingTransferabilityInType(
+                  param->getInterfaceType(), explicitClosure, repr->getLoc());
+            }
+          }
+
+          if (explicitClosure->hasExplicitResultType()) {
+            auto *resultRepr = explicitClosure->getExplicitResultTypeRepr();
+            if (isa<SendingTypeRepr>(resultRepr))
+              diagnoseSendingNonTransferable(explicitClosure->getResultType(),
+                                             explicitClosure,
+                                             resultRepr->getLoc());
+            TypeChecker::checkSendingTransferabilityInType(
+                explicitClosure->getResultType(), explicitClosure,
+                resultRepr->getLoc());
           }
 
           if (auto *thrownTypeRepr =

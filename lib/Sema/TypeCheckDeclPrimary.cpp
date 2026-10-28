@@ -4610,6 +4610,7 @@ public:
   void checkDeclCommon(Decl *D) {
     checkAccessControl(D);
     TypeChecker::checkIsolatedConfromancesInDecl(D);
+    TypeChecker::checkSendingTransferabilityInDecl(D);
   }
 };
 } // end anonymous namespace

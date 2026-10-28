@@ -390,3 +390,101 @@ extension NonTransferableClass {
     // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
   }
 }
+
+func sendingParams(
+  _: sending NonTransferable,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _: sending NonTransferableClass,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferableClass'}}
+  _: sending @nontransferable () -> Void,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type '@nontransferable () -> Void'}}
+  _: sending (Int, NonTransferable),
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type '(Int, NonTransferable)'}}
+  _: sending ConditionallyTransferable<NonTransferable>,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'ConditionallyTransferable<NonTransferable>'}}
+  _: sending ConditionallyTransferable<Int>, // Ok
+  _: sending () -> Void // Ok
+) {}
+
+func sendingResult() -> sending NonTransferable { fatalError() }
+// expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+
+func sendingGenericParams<T: ~Transferable, U>(
+  _: sending T,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'T'}}
+  _: sending U, // Ok
+  _: sending ConditionallyTransferable<T>
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'ConditionallyTransferable<T>'}}
+) {}
+
+func sendingNested(
+  _: (sending NonTransferable) -> Void,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _: () -> sending NonTransferable,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _: (sending Int) -> sending Int // Ok
+) {}
+
+struct SendingSubscripts {
+  subscript(_: sending NonTransferable) -> Int { 0 }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  subscript(_: Int) -> sending NonTransferable { fatalError() }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+}
+
+protocol SendsSelf: ~Transferable {
+  func send(_: sending Self)
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'Self'}}
+}
+
+extension ConditionallyTransferable {
+  func send(_: sending Self) {} // Ok
+}
+
+extension ConditionallyTransferable where T: ~Transferable {
+  func sendNonTransferable(_: sending Self) {}
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'ConditionallyTransferable<T>'}}
+}
+
+struct SendsItself: ~Transferable {
+  func send(_: sending SendsItself) {}
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'SendsItself'}}
+}
+
+typealias SendingNonTransferable = (sending NonTransferable) -> Void
+// expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+
+func usesSendingAlias(_ fn: SendingNonTransferable) {
+  let inferred = fn
+  _ = inferred
+}
+
+struct StoresSendingFunction {
+  var fn: (sending NonTransferable) -> Void
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+}
+
+func takesSendingNonTransferable<T: ~Transferable>(_: borrowing T, _: (sending T) -> Void) {}
+// expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'T'}}
+
+func sendingInExpressions(nt: NonTransferable, any: Any) {
+  let _: (sending NonTransferable) -> Void = { _ in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+
+  _ = { (_: sending NonTransferable) in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = { () -> sending NonTransferable in fatalError() }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = { (_: (sending NonTransferable) -> Void) in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = { (_: sending ConditionallyTransferable<Int>) in } // Ok
+
+  takesSendingNonTransferable(nt) { (_: sending _) in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  takesSendingNonTransferable(nt) { _ in }
+
+  _ = Optional<(sending NonTransferable) -> Void>.self
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = any as? (sending NonTransferable) -> Void
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+}
