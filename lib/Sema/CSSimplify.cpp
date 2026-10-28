@@ -7368,106 +7368,6 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
   });
 }
 
-/// Try implicit CGFloat conversion only if this is not:
-///     - an explicit call to a CGFloat initializer;
-///     - an explicit coercion;
-///     - a runtime type check (via `is` expression);
-///     - a checked or conditional cast;
-bool ConstraintSystem::isCGFloatDoubleConversionSupported(
-    ConstraintLocatorBuilder locator) {
-  if (getASTContext().TypeCheckerOpts.SolverEnablePromoteSupertypes) {
-    auto isCGFloatInit = [&]() {
-      auto *expr = locator.trySimplifyToExpr();
-
-      if (auto *call = dyn_cast_or_null<CallExpr>(expr)) {
-        if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-          return getInstanceType(typeExpr)->isCGFloat();
-        }
-      }
-      return false;
-    };
-
-    auto anchor = locator.getAnchor();
-
-    auto isCoercionOrCast = [&]() {
-      // E.g. contextual conversion from coercion/cast
-      // to some other type.
-      if (!locator.endsWith<LocatorPathElt::CoercionOperand>())
-        return false;
-
-      return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
-             isExpr<ConditionalCheckedCastExpr>(anchor) ||
-             isExpr<ForcedCheckedCastExpr>(anchor);
-    };
-
-    return !isCGFloatInit() && !isCoercionOrCast();
-  } else {
-    // Look through all value-to-optional promotions to allow
-    // conversions like Double -> CGFloat?? and vice versa.
-    // T -> Optional<T>
-    if (locator.endsWith<LocatorPathElt::OptionalInjection>() ||
-        locator.endsWith<LocatorPathElt::GenericArgument>()) {
-      SmallVector<LocatorPathElt, 4> path;
-      auto anchor = locator.getLocatorParts(path);
-
-      // Drop all of the applied `value-to-optional` and
-      // `optional-to-optional` conversions.
-      path.erase(llvm::remove_if(
-                     path,
-                     [](const LocatorPathElt &elt) {
-                       return elt.is<LocatorPathElt::OptionalInjection>() ||
-                              elt.is<LocatorPathElt::GenericArgument>();
-                     }),
-                 path.end());
-
-      locator = getConstraintLocator(anchor, path);
-    }
-
-    // Support implicit Double<->CGFloat conversions only for
-    // something which could be directly represented in the AST
-    // e.g. argument-to-parameter, contextual conversions etc.
-    if (!locator.trySimplifyToExpr()) {
-      return false;
-    }
-
-    SmallVector<LocatorPathElt, 4> path;
-    auto anchor = locator.getLocatorParts(path);
-
-    // Try implicit CGFloat conversion only if:
-    // - This is not:
-    //     - an explicit call to a CGFloat initializer;
-    //     - an explicit coercion;
-    //     - a runtime type check (via `is` expression);
-    //     - a checked or conditional cast;
-    // - This is a first type such conversion is attempted for
-    //   for a given path (AST element).
-
-    auto isCGFloatInit = [&](ASTNode locator) {
-      if (auto *call = getAsExpr<CallExpr>(locator)) {
-        if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-          return getInstanceType(typeExpr)->isCGFloat();
-        }
-      }
-      return false;
-    };
-
-    auto isCoercionOrCast = [](ASTNode anchor,
-                               ArrayRef<LocatorPathElt> path) {
-      // E.g. contextual conversion from coercion/cast
-      // to some other type.
-      if (!(path.empty() ||
-            path.back().is<LocatorPathElt::CoercionOperand>()))
-        return false;
-
-      return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
-             isExpr<ConditionalCheckedCastExpr>(anchor) ||
-             isExpr<ForcedCheckedCastExpr>(anchor);
-    };
-
-    return !isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path);
-  }
-}
-
 ConstraintSystem::ImpliedResultConversionKind
 ConstraintSystem::getImpliedResultConversionKind(ConstraintLocator *locator) {
   if (locator->isLastElement<LocatorPathElt::ClosureResult>())
@@ -8083,7 +7983,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloat() || nominal2->isCGFloat()) &&
            (nominal1->isDouble() || nominal2->isDouble()))) {
-        if (isCGFloatDoubleConversionSupported(locator)) {
+        auto anchor = locator.getAnchor();
+
+        auto isCoercionOrCast = [&]() {
+          // E.g. contextual conversion from coercion/cast
+          // to some other type.
+          if (!locator.endsWith<LocatorPathElt::CoercionOperand>())
+            return false;
+
+          return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
+                 isExpr<ConditionalCheckedCastExpr>(anchor) ||
+                 isExpr<ForcedCheckedCastExpr>(anchor);
+        };
+
+        if (!isCoercionOrCast()) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
@@ -15563,13 +15476,26 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     ArrayRef<LocatorPathElt> path(originalPath);
     simplifyLocator(anchor, path, range);
 
-    if (!path.empty() &&
+    auto isCGFloatInit = [&]() {
+      if (auto *call = getAsExpr<CallExpr>(anchor)) {
+        if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
+          return getInstanceType(typeExpr)->isCGFloat();
+        }
+      }
+      return false;
+    };
+
+    // The proposal says we should not allow conversions in CGFloat argument
+    // position at all, but it slipped through because the locator was not
+    // simplified. Allow the old behavior by severely penalizing conversions
+    // in this position.
+    if (isCGFloatInit()) {
+      impact += 100;
+    } else if (!path.empty() &&
         (path.back().is<LocatorPathElt::GenericArgument>() ||
          path.back().is<LocatorPathElt::OptionalPayload>())) {
       impact += 11;
-    }
-
-    if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
+    } else if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
       if (path.empty() || llvm::all_of(path, [](const LocatorPathElt &elt) {
             return elt.is<LocatorPathElt::OptionalInjection>();
           })) {
