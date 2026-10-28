@@ -8,9 +8,6 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// The move checker rejects the copy of a borrowed noncopyable `self` captured
-// by a closure.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Synchronization
 import Dispatch
