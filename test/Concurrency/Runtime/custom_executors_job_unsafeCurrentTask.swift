@@ -7,6 +7,7 @@
 
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
+// REQUIRES: stdlib_6_5_runtime
 // REQUIRES: synchronization
 
 // SE-0469: UnsafeCurrentTask access from ExecutorJob and UnownedJob
@@ -54,12 +55,9 @@ actor Custom {
   }
 }
 
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
-    guard #available(SwiftStdlib 6.5, *) else {
-      fatalError("Requires the SwiftStdlib 6.5 runtime")
-    }
-
     for executor in [ExecutorJobExecutor() as any SerialExecutor, UnownedJobExecutor()] {
       let actor = Custom(executor: executor)
 
