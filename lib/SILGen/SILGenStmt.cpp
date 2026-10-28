@@ -852,15 +852,12 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
   }
 
   SILValue result = resultMV->getValue();
-  SILType selfType = F.getSelfArgument()->getType();
 
   if (F.getConventions().hasGuaranteedResult()) {
     // If we are returning the result of borrow accessor, strip the
     // unnecessary copy_value + mark_unresolved_non_copyable_value
     // instructions.
-    if (selfType.isMoveOnly()) {
-      result = lookThroughMoveOnlyCheckerPattern(result);
-    }
+    result = lookThroughMoveOnlyCheckerPattern(result);
     // If the SIL convention is @guaranteed and the generated result is an
     // address, emit a load_borrow.
     if (result->getType().isAddress()) {

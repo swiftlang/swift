@@ -993,7 +993,15 @@ void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
       applySite.getSubstCalleeType()->hasIndirectFormalYields() ||
       applySite.getSubstCalleeType()->hasIndirectErrorResult()) {
     pass.indirectApplies.insert(applySite);
+    return;
   }
+
+  // A borrow accessor's @guaranteed_address result is lowered to returning an
+  // address, so the apply must be rewritten even if all of its arguments are
+  // direct (e.g. when `self` is loadable). The result is only an address under
+  // the lowered conventions.
+  if (getLoweredCallConv(applySite).hasGuaranteedAddressResult())
+    pass.indirectApplies.insert(applySite);
 }
 
 /// If `value` is address-only, add it to the `valueStorageMap`.
