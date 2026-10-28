@@ -10,7 +10,7 @@ class ObjCClass: NSObject { }
 @c(objcClassReturn) func objcClassReturn() -> ObjCClass { fatalError() }
 // expected-error @-1 {{global function cannot be marked '@c' because its result type cannot be represented in C}}
 // expected-note @-2 {{classes cannot be represented in C}}
-// expected-note @-3 {{use '@objc' to expose this function to Objective-C}}
+// expected-note @-3 {{use '@objc' to expose this function to Objective-C}} {{1-20=@objc(objcClassReturn)}}
 
 @c(objcClassParams) func objcClassParams(a: ObjCClass, b: ObjCClass) { }
 // expected-error @-1 {{global function cannot be marked '@c' because the type of the parameter 1 cannot be represented in C}}
