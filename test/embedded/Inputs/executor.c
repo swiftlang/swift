@@ -2,7 +2,6 @@
    and use it with libswift_Concurrency.a. */
 
 #include <swift/EmbeddedPlatform.h>
-#include <swift/ExecutorImpl.h>
 
 #include <assert.h>
 #include <stdio.h>
