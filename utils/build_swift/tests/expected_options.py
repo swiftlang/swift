@@ -196,7 +196,7 @@ EXPECTED_DEFAULTS = {
     'caching_plugin_option': [],
     'caching_prefix_map': False,
     'caching_remote_service_path': None,
-    'enable_swiftpm_caching': False,
+    'enable_swiftpm_caching': True,
     'swiftpm_build_cache_path': None,
     'dry_run': False,
     'dsymutil_jobs': defaults.DSYMUTIL_JOBS,

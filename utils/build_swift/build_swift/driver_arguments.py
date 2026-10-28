@@ -520,7 +520,9 @@ def create_argument_parser():
            help='the path to the remote caching service socket. Implies '
                 '--caching-prefix-map. Uses libToolchainCASPlugin.dylib '
                 'from Xcode if --caching-plugin-path is not provided.')
+    # FIXME: Temporarily enabled by default.
     option('--enable-swiftpm-caching', toggle_true,
+           default=True,
            help='enable SwiftPM compilation caching for SwiftPM-based '
                 'products')
     option('--swiftpm-build-cache-path', store_path,
