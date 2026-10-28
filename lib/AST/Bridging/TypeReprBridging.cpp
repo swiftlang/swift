@@ -189,6 +189,13 @@ BridgedSendingTypeRepr BridgedSendingTypeRepr_createParsed(
       SendingTypeRepr(base.unbridged(), specifierLoc);
 }
 
+BridgedYieldTypeRepr BridgedYieldTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr base, SourceLoc yieldLoc,
+    BridgedParamSpecifier cSpecifier) {
+  return new (cContext.unbridged())
+      YieldTypeRepr(base.unbridged(), yieldLoc, unbridge(cSpecifier));
+}
+
 BridgedNonisolatedNonsendingTypeRepr BridgedNonisolatedNonsendingTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base, SourceLoc specifierLoc) {
   return new (cContext.unbridged())
