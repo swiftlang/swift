@@ -80,6 +80,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     bitwiseTakable = IsNotBitwiseTakable;
   }
 
+  bool spareBitsFit = true;
+
   // Handle a raw layout specification on a struct.
   RawLayoutAttr *rawLayout = nullptr;
   if (decl) {
@@ -224,7 +226,15 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       MinimumAlign = builder.getAlignment();
       MinimumSize = builder.getSize();
       headerSize = builder.getHeaderSize();
-      SpareBits = builder.getSpareBits();
+      // A spare bit mask is an APInt, whose width in bits must fit in 32 bits.
+      // Skip building a mask that would not fit. A heap object (a box or
+      // closure context) is referenced by pointer, so it never uses its spare
+      // bits. A value type (structs, tuples) whose mask does not fit is
+      // rejected below.
+      spareBitsFit =
+          builder.getSpareBitsSize() <= std::numeric_limits<uint32_t>::max();
+      if (spareBitsFit)
+        SpareBits = builder.getSpareBits();
       IsFixedLayout = builder.isFixedLayout();
       IsLoadable = builder.isLoadable();
       IsKnownBitwiseTakable = bitwiseTakable & builder.isBitwiseTakable();
@@ -249,6 +259,17 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
   }
 
+  // Fall back to a non-fixed layout for a type that cannot be represented, so
+  // we never build a fixed-size type info for it.
+  auto fallBackToNonFixedLayout = [&] {
+    IsFixedLayout = false;
+    IsLoadable = false;
+    IsKnownAlwaysFixedSize = IsNotFixedSize;
+    MinimumSize = Size(0);
+    SpareBits.clear();
+    Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
+  };
+
   // A fixed-layout type's storage size is recorded in a 32-bit field, so a
   // type whose size does not fit in 32 bits cannot be represented. Reject it
   // and fall back to a non-fixed layout so we never build a fixed-size type
@@ -261,12 +282,15 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     else
       IGM.Context.Diags.diagnose(SourceLoc(),
                                  diag::fixed_type_too_large_unnamed);
-    IsFixedLayout = false;
-    IsLoadable = false;
-    IsKnownAlwaysFixedSize = IsNotFixedSize;
-    MinimumSize = Size(0);
-    SpareBits.clear();
-    Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
+    fallBackToNonFixedLayout();
+  }
+
+  // A value type's spare bit mask must fit as well (see above).
+  bool isHeapObject = requiresHeapHeader(layoutKind);
+  if (IsFixedLayout && !spareBitsFit && !isHeapObject) {
+    IGM.Context.Diags.diagnose(SourceLoc(), diag::spare_bits_type_too_large,
+                               type.has_value(), type ? *type : CanType());
+    fallBackToNonFixedLayout();
   }
 }
 
@@ -587,6 +611,14 @@ void StructLayoutBuilder::setAsBodyOfStruct(llvm::StructType *type) const {
           || IGM.DataLayout.getStructLayout(type)->getSizeInBytes()
             == CurSize.getValue())
          && "LLVM size of fixed struct type does not match StructLayout size");
+}
+
+/// Return the size in bits of the mask that getSpareBits would build.
+uint64_t StructLayoutBuilder::getSpareBitsSize() const {
+  uint64_t size = 0;
+  for (const auto &v : CurSpareBits)
+    size += v.size();
+  return size;
 }
 
 /// Return the spare bit mask of the structure built so far.
