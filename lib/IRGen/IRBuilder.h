@@ -488,7 +488,7 @@ public:
 
   bool insertingAtEndOfBlock() const {
     assert(hasValidIP() && "Must have insertion point to ask about it");
-    return InsertPt == BB->end();
+    return InsertPt == GetInsertBlock()->end();
   }
 };
 
