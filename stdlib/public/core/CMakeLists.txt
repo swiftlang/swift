@@ -368,6 +368,9 @@ set(compile_flags_for_final_build)
 if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
   list(APPEND compile_flags_for_final_build "-DCOW_CHECKS_ENABLED")
 endif()
+# Only the final build uses opaque values; the bootstrapping and embedded
+# builds of the standard library don't.
+list(APPEND compile_flags_for_final_build "-Xfrontend" "-enable-sil-opaque-values")
 
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
