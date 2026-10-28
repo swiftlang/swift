@@ -187,19 +187,6 @@ SWIFT_CC(swift) void
   swift_task_donateThreadToGlobalExecutorUntilImpl(bool (* _Nonnull condition)(void * _Nullable),
                                                    void * _Nullable conditionContext);
 
-// -- Main executor functions that Embedded Swift executors must implement ----
-// EmbeddedPlatform.h declares the other functions such an executor implements.
-
-/// Enqueue a job on the main executor, which may be the global executor.
-void _swift_concurrency_enqueueMainExecutor(SwiftJob * _Nonnull job);
-
-/// Get a reference to the main executor.
-SwiftExecutorRef _swift_concurrency_getMainExecutor(void);
-
-/// Check if the specified executor is the main executor. This function must
-/// not call `swift_executor_isMain`, which calls it.
-bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor);
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

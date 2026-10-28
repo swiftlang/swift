@@ -73,3 +73,9 @@ func donateThreadToGlobalExecutorUntil(
     swift_job_runSynchronously(job, swift_executor_generic())
   }
 }
+
+// The platform header declares the main-executor functions.
+let mainExecutorFunctions = (
+  _swift_concurrency_enqueueMainExecutor,
+  _swift_concurrency_getMainExecutor,
+  _swift_concurrency_isMainExecutor)

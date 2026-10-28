@@ -76,6 +76,12 @@ typedef __swift_ptrdiff_t __swift_tls_key_t;
  */
 typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 
+/**
+ * The function a thread created by `_swift_thread_create` runs.
+ */
+typedef void * EMBEDDED_SWIFT_NULLABLE (*__swift_thread_start_t)(
+    void * EMBEDDED_SWIFT_NULLABLE);
+
 #if defined(__has_feature) && (__has_feature(bounds_attributes) || __has_feature(bounds_safety_attributes))
 #define EMBEDDED_SWIFT_COUNTED_BY(N) __attribute__((__counted_by__(N)))
 #define EMBEDDED_SWIFT_SIZED_BY(N) __attribute__((__sized_by__(N)))
@@ -126,7 +132,7 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 2
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 3
 
 #if defined(__cplusplus)
 extern "C" {
@@ -146,7 +152,7 @@ extern "C" {
 #ifndef EMBEDDED_SWIFT_MUTEX_NUM_WORDS
 #if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
 // On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
-// is 40 bytes, which doesn't fit in 8 four-byte words.
+// is 44 bytes, which doesn't fit in 8 four-byte words.
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
 #else
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
@@ -166,10 +172,30 @@ extern "C" {
 #ifndef EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS
 #if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
 // On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
-// is 40 bytes, which doesn't fit in 8 four-byte words.
+// is 44 bytes, which doesn't fit in 8 four-byte words.
 #define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)12
 #else
 #define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
+#endif
+
+/**
+ * The number of pointer-size words that will be used to store a counting
+ * semaphore, i.e., one backed by the `_swift_sem_*` functions.
+ *
+ * It can be defined externally (via `-D` on the command line for Clang,
+ * `-Xcc -D` for Swift) to a different value, but that value must be
+ * consistent throughout the build to prevent ABI mismatches.
+ */
+#ifndef EMBEDDED_SWIFT_SEMAPHORE_NUM_WORDS
+#if __SIZEOF_POINTER__ == 4
+// A `pthread_mutex_t`, a `pthread_cond_t` and a count take 76 bytes on wasm32
+// and on 32-bit Apple targets.
+#define EMBEDDED_SWIFT_SEMAPHORE_NUM_WORDS (__swift_ptrdiff_t)19
+#else
+// A `pthread_mutex_t`, a `pthread_cond_t` and a count take 120 bytes on
+// 64-bit Apple targets.
+#define EMBEDDED_SWIFT_SEMAPHORE_NUM_WORDS (__swift_ptrdiff_t)15
 #endif
 #endif
 
@@ -581,6 +607,34 @@ void _swift_mutexRecursive_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
 void _swift_mutexRecursive_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
 /**
+ * Initializes a counting semaphore.
+ *
+ * - Parameters:
+ *   - sem: Opaque caller-owned semaphore storage initialized by this function
+ *     and later passed to the other `_swift_sem_*` functions. The contents are
+ *     private to the platform implementation. The storage is at least
+ *     EMBEDDED_SWIFT_SEMAPHORE_NUM_WORDS pointer-sized words and has pointer
+ *     alignment.
+ *   - value: The initial count. The count must never exceed the largest
+ *     `__swift_ptrdiff_t` value.
+ *
+ * The `_swift_sem_*` functions are required only by code that waits for
+ * another thread.
+ */
+void _swift_sem_init(void * EMBEDDED_SWIFT_NONNULL sem, __swift_size_t value);
+
+/**
+ * Blocks until the semaphore's count is nonzero, then decrements it.
+ */
+void _swift_sem_wait(void * EMBEDDED_SWIFT_NONNULL sem);
+
+/**
+ * Increments the semaphore's count, waking one execution context blocked in
+ * `_swift_sem_wait` if there is one.
+ */
+void _swift_sem_post(void * EMBEDDED_SWIFT_NONNULL sem);
+
+/**
  * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
  * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL. This function
  * is called at most once for each key that needs a destructor.
@@ -611,6 +665,33 @@ void _swift_tls_set(__swift_tls_key_t key,
                     void * EMBEDDED_SWIFT_NULLABLE value);
 
 /**
+ * Creates a thread that runs `start(arg)`, discards its result, and releases
+ * its resources when `start` returns.
+ *
+ * - Returns: Nonzero if the thread was created, zero otherwise.
+ *
+ * This function is required only by code that creates threads.
+ *
+ * This function can be implemented as a call to `pthread_create` followed by
+ * `pthread_detach`.
+ */
+__swift_ptrdiff_t _swift_thread_create(
+    __swift_thread_start_t EMBEDDED_SWIFT_NONNULL start,
+    void * EMBEDDED_SWIFT_NULLABLE arg);
+
+/**
+ * Returns the number of threads that can run at the same time, from 1 to the
+ * largest `__swift_ptrdiff_t` value.
+ *
+ * This function is required only by code that creates threads, such as the
+ * thread-pool executor. It can be implemented as a call to
+ * `sysconf(_SC_NPROCESSORS_ONLN)`. A platform that cannot query its processor
+ * count, such as WASI, can read the count from the program's environment
+ * instead.
+ */
+__swift_size_t _swift_thread_getHardwareConcurrency(void);
+
+/**
  * Returns nonzero when the current execution context is the platform's main
  * execution context.
  */
@@ -633,11 +714,11 @@ void _swift_exit(int code) EMBEDDED_SWIFT_NORETURN;
  * Enqueues a job on the global executor.
  *
  * The `_swift_concurrency_*` functions are the executor that runs the jobs of
- * Swift Concurrency. `swift/ExecutorImpl.h` declares the three that concern
- * the main executor: `_swift_concurrency_enqueueMainExecutor`,
- * `_swift_concurrency_getMainExecutor` and `_swift_concurrency_isMainExecutor`.
+ * Swift Concurrency. A platform can define them in C, or in Swift with `@c`.
  * `libswift_ConcurrencyDefaultExecutor.a` defines all of them with a
- * single-threaded executor. When the program is linked with dead stripping,
+ * single-threaded executor, and on `wasm32-unknown-wasip1-threads`
+ * `libswift_ConcurrencyThreadPoolExecutor.a` defines them with a pool of
+ * threads. When the program is linked with dead stripping,
  * each of them is required only by code that reaches it.
  *
  * On WebAssembly, `libswift_Concurrency.a` also defines them, as weak
@@ -647,6 +728,25 @@ void _swift_exit(int code) EMBEDDED_SWIFT_NORETURN;
  * before `libswift_Concurrency.a` on the link line.
  */
 void _swift_concurrency_enqueueGlobal(SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Enqueues a job on the main executor, which may be the global executor.
+ */
+void _swift_concurrency_enqueueMainExecutor(
+    SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Returns a reference to the main executor.
+ */
+SwiftExecutorRef _swift_concurrency_getMainExecutor(void);
+
+/**
+ * Returns whether the given executor is the main executor.
+ *
+ * This function must not call `swift_executor_isMain` from
+ * `swift/ExecutorImpl.h`, which calls it.
+ */
+bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor);
 
 /**
  * Runs the jobs enqueued on the main executor.

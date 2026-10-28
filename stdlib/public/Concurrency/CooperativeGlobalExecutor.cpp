@@ -12,43 +12,18 @@
 ///
 /// The implementation of the cooperative global executor.
 ///
-/// It defines the executor entrypoints declared in EmbeddedPlatform.h and
-/// ExecutorImpl.h.
+/// It defines the executor entrypoints declared in EmbeddedPlatform.h.
 ///
 ///===------------------------------------------------------------------===///
 
 #include "swift/shims/Visibility.h"
 
-#include "swift/Basic/PriorityQueue.h"
+#include "SwiftJobPriorityQueue.h"
 #include "swift/EmbeddedPlatform.h"
-
-#include "ExecutorImpl.h"
 
 using namespace swift;
 
-namespace {
-
-struct JobQueueTraits {
-  static SwiftJob *&storage(SwiftJob *cur) {
-    return reinterpret_cast<SwiftJob*&>(cur->schedulerPrivate[0]);
-  }
-
-  static SwiftJob *getNext(SwiftJob *job) {
-    return storage(job);
-  }
-  static void setNext(SwiftJob *job, SwiftJob *next) {
-    storage(job) = next;
-  }
-  enum { prioritiesCount = SwiftJobPriorityBucketCount };
-  static int getPriorityIndex(SwiftJob *job) {
-    return swift_priority_getBucketIndex(swift_job_getPriorityFromFlags(job));
-  }
-};
-using JobPriorityQueue = PriorityQueue<SwiftJob*, JobQueueTraits>;
-
-} // end anonymous namespace
-
-static JobPriorityQueue JobQueue;
+static SwiftJobPriorityQueue JobQueue;
 
 /// Insert a job into the cooperative global queue.
 void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
