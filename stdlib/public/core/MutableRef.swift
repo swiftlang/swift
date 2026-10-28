@@ -12,7 +12,7 @@
 
 /// A safe mutable reference allowing in-place mutation to an exclusive value.
 @available(SwiftStdlib 5.0, *)
-@backDeployed(before: StdlibDeploymentTarget 6.4)
+@backDeployed(before: SwiftStdlib 6.4)
 @frozen
 @safe
 public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
