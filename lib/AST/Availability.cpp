@@ -546,8 +546,13 @@ domainRequiresABICompatibleUnavailableDecls(AvailabilityDomain domain,
 /// Computes the `DeclRuntimeAvailability` value for `decl` in isolation.
 static DeclRuntimeAvailability
 computeDeclRuntimeAvailability(const Decl *decl) {
-  // Don't trust unavailability on declarations from Clang modules.
-  if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
+  // Don't trust unavailability on declarations from Clang modules, unless the
+  // unavailability is in a custom availability domain.
+  bool isClangDecl =
+      isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext());
+  if (isClangDecl && !decl->hasAnyMatchingActiveAvailableAttr([](auto attr) {
+        return attr.getDomain().isCustom();
+      }))
     return DeclRuntimeAvailability::PotentiallyAvailable;
 
   auto &ctx = decl->getASTContext();
@@ -572,6 +577,10 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   // First, collect the unavailable domains from the restrictions.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
   getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
+
+  if (isClangDecl)
+    llvm::erase_if(unavailableDomains,
+                   [](auto domain) { return !domain.isCustom(); });
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains. The attributes
