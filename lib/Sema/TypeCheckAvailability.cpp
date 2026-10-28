@@ -2036,6 +2036,11 @@ checkNoncopyableCastingAvailability(Type srcType, Type targetType,
   if (!srcType->getCanonicalType()->isNoncopyable())
     return false;
 
+  // A cast that can never succeed never copies anything, and is already
+  // diagnosed as always failing.
+  if (TypeChecker::isStaticallyImpossibleNoncopyableCast(srcType, targetType))
+    return false;
+
   // If the target is a concrete (non-existential) `Copyable`,
   // then older runtimes work: It will only try to copy if the
   // cast is successful, which can only happen if the type is `Copyable`.
