@@ -648,6 +648,21 @@ static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   return false;
 }
 
+/// Whether the witness table of \p conformance is a specialized witness table
+/// in non-embedded Swift, i.e. a witness table which is specialized for the
+/// concrete type arguments of a generic conformance. Other than the witness
+/// table of the generic conformance, such a table has no unique definition.
+/// Embedded Swift has its own rules for the linkage of witness tables.
+static bool
+isSpecializedWitnessTableConformance(const ProtocolConformance *conformance) {
+  if (conformance->getDeclContext()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded))
+    return false;
+  if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
+    conformance = inherited->getInheritedConformance();
+  return isa<SpecializedProtocolConformance>(conformance);
+}
+
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
@@ -908,6 +923,12 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
                          forDefinition);
 
   case Kind::ProtocolWitnessTable:
+    // A specialized witness table is emitted in every module which needs it.
+    if (isSpecializedWitnessTableConformance(getProtocolConformance()))
+      return SILLinkage::Shared;
+    return getLinkageForProtocolConformance(getRootProtocolConformance(),
+                                            forDefinition);
+
   case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptorRecord:
     return getLinkageForProtocolConformance(getRootProtocolConformance(),
@@ -1878,6 +1899,9 @@ bool LinkEntity::hasNonUniqueDefinition() const {
   // definitions (so they get linkonce_odr linkage) unless the underlying
   // conformance was explicitly marked @export(interface).
   if (getKind() == Kind::ProtocolWitnessTable) {
+    if (isSpecializedWitnessTableConformance(getProtocolConformance()))
+      return true;
+
     if (auto context = getDeclContextForEmission()) {
       if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
               Feature::Embedded)) {

@@ -636,6 +636,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
+  BRIDGED_INLINE bool isOptimizedForSize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
   BRIDGED_INLINE bool wasDeserializedCanonical() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
@@ -1715,6 +1716,8 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedWitnessTable loadWitnessTable(BridgedConformance conformance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedConformance substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const;
   BRIDGED_INLINE bool calleesAreStaticallyKnowable(BridgedDeclRef method) const;

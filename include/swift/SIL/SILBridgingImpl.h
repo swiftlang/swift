@@ -1148,6 +1148,10 @@ bool BridgedFunction::shouldOptimize() const {
   return getFunction()->shouldOptimize();
 }
 
+bool BridgedFunction::isOptimizedForSize() const {
+  return getFunction()->optimizeForSize();
+}
+
 bool BridgedFunction::isReferencedInModule() const {
   return getFunction()->getRefCount() != 0;
 }
@@ -3820,6 +3824,17 @@ OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformanc
     return {nullptr};
   }
   return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
+}
+
+OptionalBridgedWitnessTable BridgedContext::loadWitnessTable(BridgedConformance conformance) const {
+  swift::ProtocolConformanceRef ref = conformance.unbridged();
+  if (!ref.isConcrete()) {
+    return {nullptr};
+  }
+  swift::SILModule *mod = context->getModule();
+  // Only `LinkAll` deserializes witness tables which don't need to be deserialized.
+  mod->linkWitnessTable(ref.getConcrete(), swift::SILModule::LinkingMode::LinkAll);
+  return {mod->lookUpWitnessTable(ref.getConcrete())};
 }
 
 BridgedConformance BridgedContext::substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const {
