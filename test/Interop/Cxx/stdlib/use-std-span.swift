@@ -708,6 +708,82 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
   }
 }
 
+StdSpanTestSuite.test("Init span from empty buffer") {
+  let ubp = UnsafeBufferPointer<Int32>(start: nil, count: 0)
+  let cs = ConstSpanOfInt(ubp)
+  expectEqual(cs.size(), 0)
+  expectTrue(cs.empty())
+
+  let umbp = UnsafeMutableBufferPointer<Int32>(start: nil, count: 0)
+  let cs2 = ConstSpanOfInt(umbp)
+  expectEqual(cs2.size(), 0)
+  expectTrue(cs2.empty())
+
+  let s = SpanOfInt(umbp)
+  expectEqual(s.size(), 0)
+  expectTrue(s.empty())
+
+  var arr: [Int32] = [1, 2, 3]
+  arr.withUnsafeMutableBufferPointer { umbp in
+    let emptySlice = UnsafeMutableBufferPointer(rebasing: umbp[1..<1])
+    expectNotNil(emptySlice.baseAddress)
+
+    let cs3 = ConstSpanOfInt(UnsafeBufferPointer(emptySlice))
+    expectEqual(cs3.size(), 0)
+    expectTrue(cs3.empty())
+    expectEqual(cs3.__dataUnsafe(), UnsafePointer(emptySlice.baseAddress))
+
+    let cs4 = ConstSpanOfInt(emptySlice)
+    expectEqual(cs4.size(), 0)
+    expectTrue(cs4.empty())
+    expectEqual(cs4.__dataUnsafe(), UnsafePointer(emptySlice.baseAddress))
+
+    let s2 = SpanOfInt(emptySlice)
+    expectEqual(s2.size(), 0)
+    expectTrue(s2.empty())
+    expectEqual(s2.__dataUnsafe(), emptySlice.baseAddress)
+  }
+}
+
+StdSpanTestSuite.test("Convert empty Swift span with nil base address")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  do {
+    let ubp = UnsafeBufferPointer<Int32>(start: nil, count: 0)
+    let s = Span(_unsafeElements: ubp)
+    let cxxSpan = ConstSpanOfInt(s)
+    expectEqual(cxxSpan.size(), 0)
+    expectTrue(cxxSpan.empty())
+  }
+  do {
+    let umbp = UnsafeMutableBufferPointer<Int32>(start: nil, count: 0)
+    let s = MutableSpan(_unsafeElements: umbp)
+    let cxxSpan = SpanOfInt(s)
+    expectEqual(cxxSpan.size(), 0)
+    expectTrue(cxxSpan.empty())
+  }
+  do {
+    var arr: [Int32] = [1, 2, 3]
+    arr.withUnsafeMutableBufferPointer { umbp in
+      let emptySlice = UnsafeMutableBufferPointer(rebasing: umbp[1..<1])
+      expectNotNil(emptySlice.baseAddress)
+
+      let s = Span(_unsafeElements: emptySlice)
+      let cxxSpan = ConstSpanOfInt(s)
+      expectEqual(cxxSpan.size(), 0)
+      expectTrue(cxxSpan.empty())
+      expectEqual(cxxSpan.__dataUnsafe(), UnsafePointer(emptySlice.baseAddress))
+
+      let ms = MutableSpan(_unsafeElements: emptySlice)
+      let cxxMutSpan = SpanOfInt(ms)
+      expectEqual(cxxMutSpan.size(), 0)
+      expectTrue(cxxMutSpan.empty())
+      expectEqual(cxxMutSpan.__dataUnsafe(), emptySlice.baseAddress)
+    }
+  }
+}
+
 StdSpanTestSuite.test("CxxSpan conforms to CxxIterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
