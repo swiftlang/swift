@@ -51,6 +51,14 @@ struct Sis {
 
 struct Ken {};
 
+// NOTE: BadInit<Ken>'s default member initializer is invalid, but is only
+// instantiated when its default constructor is defined.
+template <typename K>
+struct BadInit {       // expected-swift-note {{requested here}}
+  int iAm = K::enough; // expected-swift-error {{no member named 'enough'}}
+};
+using BadInitKen = BadInit<Ken>;
+
 struct __attribute__((swift_attr("import_reference")))
        __attribute__((swift_attr("retain:immortal")))
        __attribute__((swift_attr("release:immortal"))) FRT {};
@@ -196,6 +204,9 @@ void ok(void) {
   auto f = usgs.field;
   f = usgs.returns();
   usgs.takes(f);
+
+  // Instantiates BadInit<Ken> but not its default member initializer.
+  (void)sizeof(BadInitKen);
 }
 
 //--- err.cpp
@@ -242,6 +253,9 @@ func ok() {
   let _: UnsafePointer<DerivedGoodStruct>
   let _: UnsafePointer<UsingGoodStruct>
   let _: UnsafePointer<UsesGoodStruct>
+
+  // Importing BadInitKen should not define its default constructor.
+  let _: UnsafePointer<BadInitKen>
 
   let gs = GoodStruct()
   // TODO: calling overloadsDiffNumArgs(_:_) should work since we should never
@@ -314,4 +328,9 @@ func err() {
   ugs.badArg(uinc)           // expected-swift-error {{has no member}}
 
   let _ = ugs.getBad()  // expected-swift-error {{is unavailable}}
+
+  // Defining BadInit<Ken>'s default constructor instantiates the bad default
+  // member initializer while resolving its exception spec, at no source location.
+  let _ = BadInitKen()
+  // expected-swift-note@<unknown> {{in evaluation of exception specification for 'BadInit<Ken>::BadInit' needed here}}
 }
