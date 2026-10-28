@@ -2205,6 +2205,9 @@ namespace {
 
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
+      if (!var->isAvailableDuringLowering())
+        return;
+
       if (requiresObjCPropertyDescriptor(IGM, var)) {
         if (var->isStatic()) {
           ClassProperties.push_back(var);
@@ -2257,8 +2260,11 @@ namespace {
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.
-      // Get-only properties are (readonly).
-      if (!prop->isSettable(propDC))
+      // Get-only properties are (readonly). So are properties with a setter
+      // that is unavailable during lowering.
+      auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+      if (!prop->isSettable(propDC) ||
+          (setter && !setter->isAvailableDuringLowering()))
         outs << ",R";
       // Weak and Unowned properties are (weak).
       else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
