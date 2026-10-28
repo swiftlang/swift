@@ -106,6 +106,22 @@ extension SomeActor {
   @GA1 nonisolated func conflict1() { } // expected-error {{instance method 'conflict1()' has multiple actor-isolation attributes ('@GA1' and 'nonisolated')}}
 }
 
+@GA1 @concurrent nonisolated func conflict2() async { }
+// expected-error@-1:35 {{global function 'conflict2()' has multiple actor-isolation attributes ('@GA1', 'nonisolated', and '@concurrent')}} {{6-18=}} {{18-30=}} {{none}}
+
+@GA1 class ConflictingDeinit {
+  @GA1 nonisolated isolated deinit { }
+  // expected-error@-1:29 {{deinitializer 'deinit' has multiple actor-isolation attributes ('@GA1', 'isolated', and 'nonisolated')}} {{8-20=}} {{20-29=}} {{none}}
+}
+
+@GA1 class ConflictingDeinitConcurrent {
+  // FIXME: '@concurrent' is inapplicable to deinit, but is only invalidated after '@GA1' is checked when written first.
+  // TODO: Can the _4 case be reached without this cascade?
+  @concurrent @GA1 nonisolated isolated deinit { }
+  // expected-error@-1:3 {{'@concurrent' attribute cannot be applied to this declaration}} {{3-15=}} {{none}}
+  // expected-error@-2:41 {{deinitializer 'deinit' has multiple actor-isolation attributes ('@GA1', 'isolated', 'nonisolated', and '@concurrent')}} {{20-32=}} {{32-41=}} {{3-15=}} {{none}}
+}
+
 
 // -----------------------------------------------------------------------
 // Access
