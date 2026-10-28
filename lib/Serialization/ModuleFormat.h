@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1041; // SIL specialize attribute spelling
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1042; // User module sub-build version
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -950,6 +950,7 @@ namespace control_block {
     BCVBR<17>, // User module format minor version
     BCVBR<17>, // User module format sub-minor version
     BCVBR<17>, // User module format build version
+    BCVBR<17>, // User module format sub-build version
     BCBlob // misc. version information
   >;
 

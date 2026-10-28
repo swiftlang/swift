@@ -124,6 +124,10 @@ GROUPED_WARNING(unknown_warning_group, UnknownWarningGroup, none,
                 "unknown warning group: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
+WARNING(warning_user_module_version_fifth_component_ignored,none,
+      "fifth component of version '%0' is ignored: must be an integer in "
+      "[0, %1]",
+      (StringRef, unsigned))
 ERROR(error_invalid_arg_combination,none,
       "unsupported argument combination: '%0' and '%1'", (StringRef, StringRef))
 WARNING(warning_invalid_locale_code,none,

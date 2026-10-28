@@ -1066,12 +1066,17 @@ void Serializer::writeHeader() {
     if (auto build = Options.UserModuleVersion.getBuild()) {
       userModuleBuild = *build;
     }
+    auto userModuleSubbuild = 0;
+    if (auto subbuild = Options.UserModuleVersion.getSubbuild()) {
+      userModuleSubbuild = *subbuild;
+    }
     Metadata.emit(ScratchRecord,
                   SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
                   shortVersionStringLength,
                   compatibilityVersionStringLength,
                   userModuleMajor, userModuleMinor,
                   userModuleSubminor, userModuleBuild,
+                  userModuleSubbuild,
                   versionString.str());
 
     if (!Options.SDKName.empty())

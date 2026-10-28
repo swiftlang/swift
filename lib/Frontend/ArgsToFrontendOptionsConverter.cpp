@@ -140,17 +140,6 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BadFileDescriptorRetryCount = limit;
   }
 
-  if (auto A = Args.getLastArg(OPT_user_module_version)) {
-    StringRef raw(A->getValue());
-    while(raw.count('.') > 3) {
-      raw = raw.rsplit('.').first;
-    }
-    if (Opts.UserModuleVersion.tryParse(raw)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    }
-  }
-
   for (auto A : Args.getAllArgValues(options::OPT_allowable_client)) {
     Opts.AllowableClients.insert(StringRef(A).str());
   }
@@ -330,6 +319,26 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (HaveNewInputsAndOutputs &&
       computeMainAndSupplementaryOutputFilenames())
     return true;
+
+  if (auto A = Args.getLastArg(OPT_user_module_version)) {
+    StringRef raw(A->getValue());
+    if (auto version = VersionParser::parseUserModuleVersion(raw)) {
+      Opts.UserModuleVersion = *version;
+
+      // The driver passes -user-module-version to every frontend job, so only
+      // warn in the job that emits the module to avoid repeating diagnostics.
+      bool emitsModule = Opts.InputsAndOutputs.hasModuleOutputPath() &&
+                         !Opts.InputsAndOutputs.hasPrimaryInputs();
+      if (emitsModule && raw.count('.') >= 4 && !version->getSubbuild())
+        Diags.diagnose(
+            SourceLoc(),
+            diag::warning_user_module_version_fifth_component_ignored, raw,
+            /*limit*/ 1023);
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
 
   Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
   if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {

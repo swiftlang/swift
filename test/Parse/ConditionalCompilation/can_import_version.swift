@@ -63,6 +63,18 @@ func canImportVersioned() {
   let buildLarger = 1
 #endif
   
+#if canImport(Foo, _version: 113.330.1.2.2)
+  let subbuildSmaller = 1 // expected-warning {{initialization of immutable value 'subbuildSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: 113.330.1.2.3)
+  let subbuildEqual = 1 // expected-warning {{initialization of immutable value 'subbuildEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: 113.330.1.2.4)
+  let subbuildLarger = 1
+#endif
+
 #if canImport(Foo, _version: 113.330.1.2.0)
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
@@ -133,6 +145,18 @@ func canImportVersionedString() {
   
 #if canImport(Foo, _version: "113.330.1.3")
   let buildLarger = 1
+#endif
+
+#if canImport(Foo, _version: "113.330.1.2.2")
+  let subbuildSmaller = 1 // expected-warning {{initialization of immutable value 'subbuildSmaller' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "113.330.1.2.3")
+  let subbuildEqual = 1 // expected-warning {{initialization of immutable value 'subbuildEqual' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "113.330.1.2.4")
+  let subbuildLarger = 1
 #endif
 
 #if canImport(Foo, _version: "113.330.1.2.0")
