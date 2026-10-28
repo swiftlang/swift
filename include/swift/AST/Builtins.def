@@ -1047,6 +1047,15 @@ BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
 /// memory that was allocated by startAsyncLetWithLocalBuffer.
 BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
 
+/// initializeForeignReferenceSubclassVTables<T>(T) -> ()
+///
+/// Points the C++ v-table pointers of `self`, a Swift class that subclasses a
+/// C++ foreign reference type, at the v-tables of that Swift class. Emitted
+/// right after `super.init(...)` returns: the C++ base constructor leaves them
+/// pointing at the v-tables of the base class.
+BUILTIN_MISC_OPERATION(InitializeForeignReferenceSubclassVTables,
+                       "initializeForeignReferenceSubclassVTables", "", Special)
+
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
 /// Marks the end of an async-let's lifetime.

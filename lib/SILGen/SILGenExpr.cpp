@@ -29,6 +29,7 @@
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -5631,14 +5632,63 @@ computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
                                              RebindSelfInConstructorExpr *E) {
   // Get newSelf, forward the cleanup for newSelf and clean everything else
   // up.
-  FormalEvaluationScope Scope(SGF);
-  ManagedValue newSelfWithCleanup =
-      SGF.emitRValueAsSingleValue(E->getSubExpr());
+  ManagedValue newSelfWithCleanup;
+  ManagedValue borrowedSelf;
+  {
+    FormalEvaluationScope Scope(SGF);
+    newSelfWithCleanup = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+    // The C++ constructor of a C++ foreign reference type only borrows 'self',
+    // so the original 'self' is still owned here.
+    if (SGF.isInitDelegationBorrowingSelf()) {
+      assert(SGF.SuperInitDelegationSelf && "super.init did not take self");
+      borrowedSelf = SGF.SuperInitDelegationSelf;
+    }
+  }
+
+  // The original 'self' was not backed by a ref count: the C++ constructor
+  // initialized it, and 'new self' carries the reference that it established.
+  // End the lifetime of the original 'self' without releasing it, since the box
+  // takes 'new self'. Do it once the arguments, which may borrow from it, are
+  // done.
+  if (borrowedSelf)
+    SGF.B.createEndLifetime(E, borrowedSelf);
 
   SGF.InitDelegationSelf = ManagedValue();
   SGF.SuperInitDelegationSelf = ManagedValue();
   SGF.InitDelegationLoc.reset();
   return newSelfWithCleanup;
+}
+
+bool SILGenFunction::isInitDelegationBorrowingSelf() const {
+  if (SelfInitDelegationState == NormalSelf || !InitDelegationLoc)
+    return false;
+  auto rebind = InitDelegationLoc->getAsASTNode<RebindSelfInConstructorExpr>();
+  if (!rebind)
+    return false;
+  // A `self.init` delegation calls the allocating entry point instead.
+  bool isChaining;
+  auto otherCtor = rebind->getCalledConstructor(isChaining)->getDecl();
+  return isChaining && SILDeclRef(otherCtor, SILDeclRef::Kind::Initializer)
+                           .asForeign(requiresForeignEntryPoint(otherCtor))
+                           .isForeignReferenceInitializer();
+}
+
+/// Emit the builtin that points the C++ v-table pointers of \p self, a Swift
+/// subclass of a C++ foreign reference type, at the v-tables of its class.
+static void emitInitializeForeignReferenceSubclassVTables(SILGenFunction &SGF,
+                                                          SILLocation loc,
+                                                          ManagedValue self) {
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(getBuiltinName(
+      BuiltinValueKind::InitializeForeignReferenceSubclassVTables));
+  auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
+  auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                   {self.getType().getASTType()},
+                                   ArrayRef<ProtocolConformanceRef>{});
+  SGF.B.createBuiltin(loc, builtinName,
+                      SGF.getLoweredType(ctx.TheEmptyTupleType), subs,
+                      {self.getValue()});
 }
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
@@ -5648,7 +5698,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfIfaceTy = ctorDecl->getDeclContext()->getSelfInterfaceType();
   auto selfTy = ctorDecl->mapTypeIntoEnvironment(selfIfaceTy);
 
-  bool isChaining; // Ignored
+  bool isChaining;
   auto *otherCtor = E->getCalledConstructor(isChaining)->getDecl();
   assert(otherCtor);
 
@@ -5725,6 +5775,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     // type (or a derived class thereof). Only Objective-C classes can
     // violate this assumption.
     newSelf = SGF.B.createUncheckedRefCast(E, newSelf, destTy);
+  }
+
+  // The C++ base constructor of a Swift subclass of a C++ foreign reference
+  // type leaves the v-table pointers of 'self' pointing at the v-tables of the
+  // base class. Point them at the v-tables of this class.
+  if (isChaining) {
+    auto classDecl = ctorDecl->getDeclContext()->getSelfClassDecl();
+    if (classDecl && !classDecl->isForeignReferenceType() &&
+        classDecl->getForeignReferenceSuperclassOrSelf())
+      emitInitializeForeignReferenceSubclassVTables(SGF, E, newSelf);
   }
 
   // Forward or assign into the box depending on whether we actually consumed

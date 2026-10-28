@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeSubclassing -I %S%{fs-sep}Inputs %s -target %target-swift-5.8-abi-triple
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeSubclassing -I %S%{fs-sep}Inputs %s -target %target-swift-5.8-abi-triple -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inherit-frt-subclassing.h
 
 // REQUIRES: swift_feature_ForeignReferenceTypeSubclassing
 
@@ -125,6 +125,33 @@ final class NoChainableBaseInit: ArgOnlyConstructed { // expected-error {{class 
   let x: Int64 = 42
 }
 
+// A static factory method imported as an initializer allocates a new object, so
+// it cannot construct the base subobject of a subclass.
+final class ChainsToFactory: SharedWithFactory {
+  let x: Int64
+  init(x: Int64) {
+    self.x = x
+    super.init(value: 1) // expected-error {{cannot call 'init(value:)' with 'super.init' because it is not a constructor of 'SharedWithFactory'}}
+  }
+}
+
+final class ChainsToNoArgumentFactory: SharedWithFactoryOnly {
+  init() {
+    super.init() // expected-error {{cannot call 'init()' with 'super.init' because it is not a constructor of 'SharedWithFactoryOnly'}}
+  }
+}
+
+final class OmitsSuperInitToFactory: SharedWithFactoryOnly {
+  let x: Int64
+  init(x: Int64) { // expected-error {{cannot implicitly call 'init()' with 'super.init' because it is not a constructor of 'SharedWithFactoryOnly'}}
+    self.x = x
+  }
+}
+
+final class NoDefaultInitFromFactory: SharedWithFactoryOnly { // expected-error {{class 'NoDefaultInitFromFactory' has no initializers}}
+  let x: Int64 = 42
+}
+
 func constructThem() {
   _ = DefaultInitialized()
   _ = OmitsSuperInit(x: 0)
@@ -134,6 +161,7 @@ func constructThem() {
   _ = OmitsSuperInit() // expected-error {{missing argument for parameter 'x' in call}}
   _ = DefaultInitialized(1) // expected-error {{argument passed to call that takes no arguments}}
   _ = WithConvenienceInit() // expected-error {{missing argument for parameter 'a' in call}}
+  _ = ChainsToFactory(value: 1) // expected-error {{incorrect argument label in call (have 'value:', expected 'x:')}}
 }
 
 enum InitError: Error { case bad }
@@ -170,4 +198,24 @@ final class FailableConvenienceInit: SharedConstructed {
     if !orThrow { throw InitError.bad }
     self.init(x: 2)
   }
+}
+
+// Only an initializer imported from a C++ constructor can construct the C++
+// base subobject.
+final class CallsFunctionInit: SharedWithFunctionInit {
+  init() { super.init(x: 1) } // expected-error {{cannot call 'init(x:)' with 'super.init' because it is not a constructor of 'SharedWithFunctionInit'}}
+}
+
+extension SharedConstructed {
+  convenience init(twice x: Int32) { self.init(x * 2) } // expected-note {{'init(twice:)' declared here}}
+}
+
+final class CallsConvenienceInit: SharedConstructed {
+  init() { super.init(twice: 1) } // expected-error {{cannot call 'init(twice:)' with 'super.init' because it is not a constructor of 'SharedConstructed'}}
+}
+
+// A subclass doesn't get a default initializer chaining to a no-argument
+// initializer that is not a C++ constructor.
+final class NoDefaultInitFromFunction: SharedWithFunctionDefaultInit { // expected-error {{class 'NoDefaultInitFromFunction' has no initializers}}
+  let x: Int64 = 42
 }
