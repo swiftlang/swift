@@ -22,6 +22,28 @@ import StdlibUnittest
 var suite = TestSuite("StringUTF8StorageProperty")
 defer { runAllTests() }
 
+@available(SwiftStdlib 6.2, *)
+func byteCount(_ span: UTF8Span?) -> Int? {
+  span?.count
+}
+
+@available(SwiftStdlib 6.2, *)
+func byteCount(_ span: Span<UInt8>?) -> Int? {
+  span?.count
+}
+
+@available(SwiftStdlib 6.2, *)
+@inline(never)
+func utf8Count(of string: String?) -> Int? {
+  byteCount(string?.utf8Span)
+}
+
+@available(SwiftStdlib 6.2, *)
+@inline(never)
+func utf8Count(ofInout string: inout String?) -> Int? {
+  byteCount(string?.utf8Span)
+}
+
 suite.test("Span from Small String")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
@@ -133,4 +155,36 @@ suite.test("Span from Substring.utf8Span")
   for (i,j) in zip(span1.indices, span2.indices) {
     expectEqual(span1[i], span2[j])
   }
+}
+
+suite.test("UTF8Span through an optional chain")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let small: String? = "abc"
+  let large: String? = String(repeating: "x", count: 100)
+  expectEqual(utf8Count(of: small), 3)
+  expectEqual(utf8Count(of: large), 100)
+  expectNil(utf8Count(of: nil))
+
+  var local = small
+  local = large
+  expectEqual(byteCount(local?.utf8Span), 100)
+  local = small
+  expectEqual(utf8Count(ofInout: &local), 3)
+  local = nil
+  expectNil(utf8Count(ofInout: &local))
+}
+
+suite.test("Span through an optional chain of UTF8Span")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  func count(of string: String?) -> Int? {
+    byteCount(string?.utf8Span.span)
+  }
+
+  expectEqual(count(of: "abc"), 3)
+  expectEqual(count(of: String(repeating: "x", count: 100)), 100)
+  expectNil(count(of: nil))
 }
