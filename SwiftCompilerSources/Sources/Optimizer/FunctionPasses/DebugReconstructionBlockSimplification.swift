@@ -102,11 +102,23 @@ func simplifyDebugReconstructionBlock(of debugValue: DebugValueInst, _ context: 
     if instruction.isDeleted {
       continue
     }
+    // Run the Swift-side simplifications that are approved for reconstruction blocks.
     if let simplifiable = instruction as? DebugReconstructionBlockSimplifiable {
       if useSubpasses, !context.continueWithNextSubpassRun(for: instruction) {
         return debugValue
       }
       simplifiable.simplifyForDebugReconstructionBlock(simplifyCtxt)
+    }
+    // Then run the C++ simplifications.
+    if !instruction.isDeleted, let svi = instruction as? SingleValueInstruction,
+       let simplified = simplifyCtxt.simplify(instruction: svi), simplified != svi,
+       // Skip if it would break self-containedness, although simplification should never return
+       // a value outside of the block.
+       simplified is Undef || simplified.parentBlock == debugBB {
+      if useSubpasses, !context.continueWithNextSubpassRun(for: instruction) {
+        return debugValue
+      }
+      svi.replace(with: simplified, simplifyCtxt)
     }
   }
 

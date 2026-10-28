@@ -187,50 +187,10 @@ extension SingleValueInstruction {
 }
 
 extension StructInst : DebugReconstructionBlockSimplifiable {
+  /// Just folds an all-undef struct to undef.
   func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
-    simplifyAggregateForDebugReconstructionBlock(context)
-  }
-}
-
-/// The common debug reconstruction block simplification of `struct` and `tuple` instructions.
-extension SingleValueInstruction {
-  /// Folds an all-undef aggregate to undef, and an aggregate of all fields of another
-  /// aggregate to that aggregate:
-  /// ```
-  ///   %1 = struct_extract %0 : $S, #S.x
-  ///   %2 = struct_extract %0 : $S, #S.y
-  ///   %3 = struct $S (%1, %2)   ->   %0
-  /// ```
-  func simplifyAggregateForDebugReconstructionBlock(_ context: SimplifyContext) {
     if !operands.isEmpty && operands.allSatisfy({ $0.value is Undef }) {
       replaceWithUndef(context)
-    } else if let aggregate = getExtractedAggregate() {
-      replace(with: aggregate, context)
     }
-  }
-
-  /// Returns the aggregate whose fields are, in order, the operands of this `struct` or `tuple`.
-  /// This is otherwise missing from the Swift side simplifications.
-  private func getExtractedAggregate() -> Value? {
-    var aggregate: Value?
-    for (index, operand) in operands.enumerated() {
-      let extracted: Value
-      switch operand.value {
-      case let extract as StructExtractInst where extract.fieldIndex == index:
-        extracted = extract.struct
-      case let extract as TupleExtractInst where extract.fieldIndex == index:
-        extracted = extract.tuple
-      default:
-        return nil
-      }
-      if let aggregate, aggregate != extracted {
-        return nil
-      }
-      aggregate = extracted
-    }
-    guard let aggregate, aggregate.type == type else {
-      return nil
-    }
-    return aggregate
   }
 }

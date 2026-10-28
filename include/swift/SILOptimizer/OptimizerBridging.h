@@ -222,6 +222,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedValue simplifyInstruction(BridgedInstruction inst) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
                                                                  BridgedSubstitutionMap substitutions,
                                                                  bool convertIndirectToDirect,

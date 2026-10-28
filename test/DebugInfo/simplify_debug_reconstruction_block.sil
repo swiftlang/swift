@@ -560,3 +560,68 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+// The following are folded by the C++ instruction simplifications.
+
+// CHECK-LABEL: sil {{.+}} @test_upcast_of_ref_cast
+// CHECK: debug_value %0 : $Base, let, name "base"
+// CHECK-NOT: transform {
+sil hidden @test_upcast_of_ref_cast : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  debug_value %0 : $Base, let, name "base", transform {
+  bb0(%a : $Base):
+    %1 = unchecked_ref_cast %a : $Base to $Derived
+    %2 = upcast %1 : $Derived to $Base
+    return %2 : $Base
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_enum_of_enum_data
+// CHECK: debug_value %0 : $MyEnum, let, name "e"
+// CHECK-NOT: transform {
+sil hidden @test_enum_of_enum_data : $@convention(thin) (MyEnum) -> () {
+bb0(%0 : $MyEnum):
+  debug_value %0 : $MyEnum, let, name "e", transform {
+  bb0(%a : $MyEnum):
+    %1 = unchecked_enum_data %a : $MyEnum, #MyEnum.some!enumelt
+    %2 = enum $MyEnum, #MyEnum.some!enumelt, %1 : $Int64
+    return %2 : $MyEnum
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_trunc_of_zext
+// CHECK: debug_value %0 : $Builtin.Int32, let, name "narrow"
+// CHECK-NOT: transform {
+sil hidden @test_trunc_of_zext : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  debug_value %0 : $Builtin.Int32, let, name "narrow", transform {
+  bb0(%a : $Builtin.Int32):
+    %1 = builtin "zextOrBitCast_Int32_Int64"(%a : $Builtin.Int32) : $Builtin.Int64
+    %2 = builtin "truncOrBitCast_Int64_Int32"(%1 : $Builtin.Int64) : $Builtin.Int32
+    return %2 : $Builtin.Int32
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A metatype is untouched.
+// CHECK-LABEL: sil {{.+}} @test_metatype_not_replaced_by_argument
+// CHECK: debug_value (), let, name "meta", transform {
+// CHECK:   bb0:
+// CHECK-NEXT: %0 = metatype $@thick Int64.Type
+// CHECK-NEXT: return %0 : $@thick Int64.Type
+// CHECK-NEXT: }
+sil hidden @test_metatype_not_replaced_by_argument : $@convention(thin) (@thick Int64.Type) -> () {
+bb0(%0 : $@thick Int64.Type):
+  debug_value (), let, name "meta", transform {
+  bb0:
+    %1 = metatype $@thick Int64.Type
+    return %1 : $@thick Int64.Type
+  }
+  %r = tuple ()
+  return %r : $()
+}

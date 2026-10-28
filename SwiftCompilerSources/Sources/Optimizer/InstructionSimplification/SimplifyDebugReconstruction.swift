@@ -12,7 +12,8 @@
 
 import SIL
 
-/// Instructions whose only reconstruction block simplification is folding an `undef` operand.
+/// Instructions whose only reconstruction block simplification, besides the C++ simplifications
+/// which apply to every instruction, is folding an `undef` operand.
 ///
 /// These are all salvageable into a debug reconstruction block (see `salvageDebugInfo`), but
 /// have nothing to simplify in a regular block.
@@ -37,19 +38,7 @@ extension RefElementAddrInst : UndefFoldingSimplifiable {}
 extension RefTailAddrInst : UndefFoldingSimplifiable {}
 extension VectorBaseAddrInst : UndefFoldingSimplifiable {}
 extension UncheckedInPlaceEnumDataAddrInst : UndefFoldingSimplifiable {}
-
-extension AddressToPointerInst : DebugReconstructionBlockSimplifiable {
-  /// Folds undef, and removes a `pointer_to_address`-`address_to_pointer` pair, which gives back
-  /// the pointer.
-  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
-    if foldUndefOperands(context) {
-      return
-    }
-    if let ptr2Addr = address as? PointerToAddressInst {
-      replace(with: ptr2Addr.pointer, context)
-    }
-  }
-}
+extension AddressToPointerInst : UndefFoldingSimplifiable {}
 
 extension UpcastInst : DebugReconstructionBlockSimplifiable {
   /// Folds undef, and combines a chain of upcasts:

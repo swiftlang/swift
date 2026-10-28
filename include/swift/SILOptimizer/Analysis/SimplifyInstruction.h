@@ -61,6 +61,10 @@ SILBasicBlock::iterator simplifyAndReplaceAllSimplifiedUsesAndErase(
 /// In case when a simplification is not possible, a null SILValue is returned.
 SILValue simplifyOverflowBuiltinInstruction(BuiltinInst *BI);
 
+/// Try to simplify \p I to an existing value, without modifying the IR.
+/// Returns a null SILValue if no simplification is possible.
+SILValue simplifyInstruction(SILInstruction *I);
+
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_ANALYSIS_SIMPLIFYINSTRUCTION_H
