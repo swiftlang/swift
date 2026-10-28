@@ -1645,11 +1645,12 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   // @export(interface) conformances, which have a unique strong definition
   // in the owning module.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    // The module that declares an exported conformance specialization emits
-    // its witness table.
+    // The module that owns an exported conformance specialization emits its
+    // witness table.
     if (SpecializedAttr::isExportedConformanceSpecialization(
             wt->getConformance()))
-      return wt->getConformance()->getDeclContext()->getParentModule() !=
+      return SpecializedAttr::getExportedTypeSpecializationOwner(
+                 wt->getConformance()->getType()->getCanonicalType()) !=
              SIL.getSwiftModule();
     if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
       switch (normal->getEffectiveCodeGenerationModel()) {

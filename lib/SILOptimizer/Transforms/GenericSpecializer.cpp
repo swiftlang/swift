@@ -41,6 +41,11 @@ static void transferSpecializeAttributeTargets(SILModule &M,
   auto *vd = cast<AbstractFunctionDecl>(d);
   for (auto *A : vd->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
     auto *SA = cast<AbstractSpecializeAttr>(A);
+    // Embedded Swift only creates and calls the exported bodies of
+    // '@specialized', not '@_specialize'.
+    if (M.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+        !SA->isPublic())
+      continue;
     // Filter _spi.
     auto spiGroups = SA->getSPIGroups();
     auto hasSPIGroup = !spiGroups.empty();
@@ -65,9 +70,14 @@ static void transferSpecializeAttributeTargets(SILModule &M,
       auto *attr = SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(vd), SA->getTypeErasedParams(),
           SA->isExported(), kind, nullptr,
-          spiGroupIdent, vd->getModuleContext(), availability);
+          spiGroupIdent, vd->getModuleContext(), availability,
+          /*isSpecializedSpelling=*/SA->isPublic());
 
       auto target = SILDeclRef(targetFunctionDecl);
+      // Comes from a '@specialized' declaration without a body.
+      if (SA->isPublic() && SA->isExported())
+        M.addExportedSpecializationOfImportedFunction(
+            target, attr->getSpecializedSignature(), /*createdHere=*/false);
       std::string targetName = target.mangle();
       if (SILFunction *targetSILFunction = M.lookUpFunction(targetName)) {
         targetSILFunction->addSpecializeAttr(attr);
