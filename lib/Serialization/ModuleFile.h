@@ -305,6 +305,8 @@ private:
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
   MutableArrayRef<Serialized<Decl *>> HiddenTypeLayoutInfoDecls;
+  MutableArrayRef<Serialized<HiddenTypeLayoutInfoDecl *>>
+      AbstractMemberTypeLayouts;
   llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
   std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedHiddenTypeLayouts;
 
