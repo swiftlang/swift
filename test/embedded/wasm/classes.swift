@@ -6,7 +6,9 @@
 // RUN:   -o %t/check.o
 // RUN: %clang -target wasm32-unknown-none-wasm %t/check.o %t/rt.c -nostdlib \
 // RUN:   -I %swift_src_root/stdlib/public/EmbeddedPlatform -o %t/check.wasm
-// RUN: %target-run %t/check.wasm
+// This module imports no shared memory, so it cannot run under the WASI-threads
+// host that %target-run selects on wasip1-threads.
+// RUN: %target-run-no-wasi-threads %t/check.wasm
 // REQUIRES: executable_test
 // REQUIRES: CPU=wasm32
 // REQUIRES: embedded_stdlib_cross_compiling
