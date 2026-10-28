@@ -10032,6 +10032,9 @@ ERROR(non_transferable_capture_in_transferable_closure,none,
       "value %0",
       (ValueDecl *))
 
+ERROR(sending_non_transferable_type,none,
+      "'sending' cannot be applied to non-'Transferable' type %0", (Type))
+
 //===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//
