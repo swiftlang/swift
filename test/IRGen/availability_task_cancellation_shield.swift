@@ -6,14 +6,14 @@
 
 @available(SwiftStdlib 6.4, *)
 func shielded() {
-  // CHECK: call swiftcc i1 @swift_task_cancellationShieldPush()
-  // CHECK: call swiftcc {} @swift_task_cancellationShieldPop()
+  // CHECK-DAG: call swiftcc i1 @swift_task_cancellationShieldPush()
+  // CHECK-DAG: call swiftcc {} @swift_task_cancellationShieldPop()
   withTaskCancellationShield {
     print("shielded")
   }
 }
 
-// CHECK-before: declare extern_weak swiftcc i1 @swift_task_cancellationShieldPush()
-// CHECK-before: declare extern_weak swiftcc {} @swift_task_cancellationShieldPop()
-// CHECK-after: declare swiftcc i1 @swift_task_cancellationShieldPush()
-// CHECK-after: declare swiftcc {} @swift_task_cancellationShieldPop()
+// CHECK-before-DAG: declare extern_weak swiftcc i1 @swift_task_cancellationShieldPush()
+// CHECK-before-DAG: declare extern_weak swiftcc {} @swift_task_cancellationShieldPop()
+// CHECK-after-DAG: declare swiftcc i1 @swift_task_cancellationShieldPush()
+// CHECK-after-DAG: declare swiftcc {} @swift_task_cancellationShieldPop()
