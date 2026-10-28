@@ -1,0 +1,159 @@
+## A hand-crafted ELF object holding a DWARF v5 compile unit with nested
+## inlined subroutines, some with discontiguous ranges, in which a call site
+## that contains an address sorts before call sites that don't, and a call
+## site contains another one that starts later -- see DwarfReaderLookups.swift.
+##
+## Layout (DW_AT_abstract_origin values are DIE offsets):
+##   DIE @ 0x11: "calleeX", @ 0x1a: "calleeY", @ 0x23: "calleeZ",
+##   DIE @ 0x2c: "calleeW"       (all DW_TAG_subprogram)
+##   DIE: DW_TAG_subprogram "outer", [0x1000, 0x1100)
+##     X: inlined "calleeX" [0x1000, 0x1100), line 1
+##       Y: inlined "calleeY" [0x1010, 0x1020), line 2
+##       Z: inlined "calleeZ" [0x1060, 0x1070) and [0x1080, 0x1090), line 3
+##         W: inlined "calleeW" [0x1084, 0x1088), line 4
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_rnglists_base
+              Form:      DW_FORM_sec_offset
+        - Code:     0x02
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+        - Code:     0x03
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x04
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+        - Code:     0x05
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_ranges
+              Form:      DW_FORM_rnglistx
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+        - Code:     0x06
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x0c            # DW_AT_rnglists_base
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "calleeX"
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "calleeY"
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "calleeZ"
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "calleeW"
+        - AbbrCode: 0x03
+          Values:
+            - CStr: "outer"
+            - Value: 0x1000
+            - Value: 0x100
+        - AbbrCode: 0x04              # X
+          Values:
+            - Value: 0x11
+            - Value: 0x1000
+            - Value: 0x100
+            - Value: 0x01
+            - Value: 0x01
+            - Value: 0x01
+        - AbbrCode: 0x06              # Y
+          Values:
+            - Value: 0x1a
+            - Value: 0x1010
+            - Value: 0x10
+            - Value: 0x01
+            - Value: 0x02
+            - Value: 0x01
+        - AbbrCode: 0x05              # Z
+          Values:
+            - Value: 0x23
+            - Value: 0x00            # rangelist 0
+            - Value: 0x01
+            - Value: 0x03
+            - Value: 0x01
+        - AbbrCode: 0x06              # W
+          Values:
+            - Value: 0x2c
+            - Value: 0x1084
+            - Value: 0x04
+            - Value: 0x01
+            - Value: 0x04
+            - Value: 0x01
+        - AbbrCode: 0x00              # end of Z's children
+        - AbbrCode: 0x00              # end of X's children
+        - AbbrCode: 0x00              # end of "outer"'s children
+        - AbbrCode: 0x00              # end of compile unit's children
+  debug_rnglists:
+    - Lists:
+        - Entries:
+            - Operator: DW_RLE_start_end
+              Values:   [ 0x1060, 0x1070 ]
+            - Operator: DW_RLE_start_end
+              Values:   [ 0x1080, 0x1090 ]
+            - Operator: DW_RLE_end_of_list

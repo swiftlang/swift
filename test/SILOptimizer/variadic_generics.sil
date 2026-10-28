@@ -353,6 +353,80 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %res
 }
 
+// MARK: Dynamic indexing of single-element packs
+//
+// rdar://190731025: Eliminating pack types from a loop over a single-element
+// pack would expose lifetime verifier errors, so we do not for now, even though
+// such packs are homogeneous.
+
+// CHECK-LABEL: sil [ossa] @single_element_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+// CHECK:         open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*@pack_element
+// CHECK-LABEL: } // end sil function 'single_element_dpi'
+sil [ossa] @single_element_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %1 of $Pack{Int32}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32}>, shape $each T, id 17
+  %addr = pointer_to_address %0 to $*@pack_element(17) each T
+
+  %res = tuple ()
+  return %res
+}
+
+// A constant index into a single-element pack is still eliminated.
+// CHECK-LABEL: sil [ossa] @single_element_constant_dpi : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK-NOT:     open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int32
+// CHECK-LABEL: } // end sil function 'single_element_constant_dpi'
+sil [ossa] @single_element_constant_dpi : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %zero = integer_literal $Builtin.Word, 0
+  %dpi0 = dynamic_pack_index %zero of $Pack{Int32}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32}>, shape $each T, id 18
+  %addr = pointer_to_address %0 to $*@pack_element(18) each T
+
+  %res = tuple ()
+  return %res
+}
+
+sil [ossa] @get_out : $@convention(thin) <T> () -> @out T
+
+// The Optional payload is only initialized because the loop runs exactly once,
+// which does not satisfy the verifier if the unchecked_addr_cast is eliminated,
+// so it must not be, for now (rdar://190731025).
+//
+// CHECK-LABEL: sil [ossa] @single_element_optional_loop : $@convention(thin) () -> Optional<Bool> {
+// CHECK:         open_pack_element
+// CHECK:         unchecked_addr_cast {{%[0-9]+}} : $*Bool to $*@pack_element
+// CHECK-LABEL: } // end sil function 'single_element_optional_loop'
+sil [ossa] @single_element_optional_loop : $@convention(thin) () -> Optional<Bool> {
+bb0:
+  %addr = alloc_stack $Optional<Bool>
+  %payload = init_enum_data_addr %addr, #Optional.some!enumelt
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  br bb1(%zero)
+
+bb1(%i : $Builtin.Word):
+  %done = builtin "cmp_eq_Word"(%i, %one) : $Builtin.Int1
+  cond_br %done, bb2, bb3
+
+bb2:
+  inject_enum_addr %addr, #Optional.some!enumelt
+  %result = load [trivial] %addr
+  dealloc_stack %addr
+  return %result
+
+bb3:
+  %dpi0 = dynamic_pack_index %i of $Pack{Bool}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Bool}>, shape $each T, id 19
+  %elt = unchecked_addr_cast %payload to $*@pack_element(19) each T
+  %get = function_ref @get_out : $@convention(thin) <T> () -> @out T
+  %r = apply %get<@pack_element(19) each T>(%elt) : $@convention(thin) <T> () -> @out T
+  %next = builtin "add_Word"(%i, %one) : $Builtin.Word
+  br bb1(%next)
+}
+
 // MARK: Simultaneous dynamic index rewriting.
 
 // The verifier checks for potential type errors when using pack_element_get/set

@@ -406,6 +406,15 @@ OpenPackElementInst::tryGetElementArchetypeSubstitutionMap() const {
             return;
           }
 
+          // Treat single-element packs as non-homogeneous. A loop over one may
+          // initialize memory only because it runs exactly once, which other
+          // passes cannot see once the element type is concrete
+          // (rdar://190731025).
+          if (pack->getNumElements() == 1) {
+            homogeneousScalar = false;
+            return;
+          }
+
           // Check if the rest of the elements are equal to the first. We know
           // the first element is scalar, so this catches pack expansions as
           // well as mismatched scalar types.
