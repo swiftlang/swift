@@ -1123,6 +1123,17 @@ public:
   /// reference it instead of emitting their own.
   bool isExportedSpecialization() const;
 
+  /// Whether this function is an exported specialized body that this module
+  /// creates of another module's generic function, as a '@specialized'
+  /// declaration without a body asks for. Other modules may export the same
+  /// one, so its definition is weak.
+  bool isWeakExportedSpecialization() const;
+
+  /// Whether this function, another module's, has a body from which this
+  /// module can create the exported specialized bodies that a '@specialized'
+  /// declaration without a body or extension asks for (see EagerSpecializer).
+  bool hasBodyForImportedSpecialization() const;
+
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }
 

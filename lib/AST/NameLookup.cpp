@@ -1600,6 +1600,11 @@ void MemberLookupTable::addMember(Decl *member) {
   if (!A && !vd->hasName())
     return;
 
+  // A '@specialized' declaration without a body names another module's member
+  // instead of declaring one.
+  if (SpecializedAttr::isSpecializationDeclaration(vd))
+    return;
+
   // If this declaration is already in the lookup table, don't add it
   // again.
   if (vd->isAlreadyInLookupTable()) {

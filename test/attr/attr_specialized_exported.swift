@@ -59,7 +59,7 @@ public struct NotExported<T> {}
 @specialized(exported: true, where T == Int)
 public struct NonGeneric {}
 
-// expected-flag-error@+1 {{'@specialized' attribute cannot be applied to this declaration}}
+// expected-flag-error@+1 {{'@specialized' on an extension of 'Box' of this module; put '@specialized' on the type instead}}
 @specialized(exported: true, where T == Int)
 extension Box {}
 

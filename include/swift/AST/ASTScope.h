@@ -1238,10 +1238,11 @@ public:
 class SpecializeAttributeScope final : public ASTScopeImpl {
 public:
   AbstractSpecializeAttr *const specializeAttr;
-  AbstractFunctionDecl *const whatWasSpecialized;
+  /// A function, or an extension of the type it specializes.
+  GenericContext *const whatWasSpecialized;
 
   SpecializeAttributeScope(AbstractSpecializeAttr *specializeAttr,
-                           AbstractFunctionDecl *whatWasSpecialized)
+                           GenericContext *whatWasSpecialized)
       : ASTScopeImpl(ScopeKind::SpecializeAttribute),
         specializeAttr(specializeAttr), whatWasSpecialized(whatWasSpecialized) {
   }

@@ -21,6 +21,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/GenericSpecializationMangler.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDefaultOverrideTable.h"
@@ -1086,6 +1087,15 @@ void SILModule::promoteLinkages() {
   // TODO: Promote linkage of other SIL entities
 }
 
+void SILModule::addExportedSpecializationOfImportedFunction(
+    SILDeclRef target, GenericSignature specializedSig, bool createdHere) {
+  // The same name the specializer gives the body.
+  auto name = Mangle::GenericSpecializationMangler::manglePrespecialization(
+      getASTContext(), target.mangle(),
+      target.getAbstractFunctionDecl()->getGenericSignature(), specializedSig);
+  exportedSpecializationsOfImportedFunctions[name] |= createdHere;
+}
+
 bool SILModule::isStdlibModule() const {
   return TheSwiftModule->isStdlibModule();
 }
@@ -1094,8 +1104,11 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   if (prespecializedFunctionDeclsImported)
     return;
 
-  // No prespecitalizations in embedded Swift
-  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // No prespecitalizations in embedded Swift, except those spelled
+  // '@specialized' (the action filters them).
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      !getASTContext().LangOpts.hasFeature(
+          Feature::ExtendedSpecializedAttribute))
     return;
 
   SmallVector<ModuleDecl *, 8> importedModules;

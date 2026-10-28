@@ -319,6 +319,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
+      // Skip a '@specialized' declaration without a body: it names another
+      // module's declaration, and the interface would declare it instead.
+      if (SpecializedAttr::isSpecializationDeclaration(D))
+        return false;
+
       // Skip the backing storage property of a wrapped property when the
       // wrapped property itself is printed. The attached wrapper attribute is
       // printed too, so the backing storage property is synthesized again when

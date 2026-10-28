@@ -1837,4 +1837,61 @@ public:
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
+  emitExportedTypeSpecializations(ed);
+}
+
+void SILGenModule::emitExportedTypeSpecializations(ExtensionDecl *ed) {
+  auto *nominal = ed->getExtendedNominal();
+  SmallVector<CanType, 2> types;
+  SpecializedAttr::getExportedTypeSpecializations(ed, types);
+  if (!nominal || types.empty())
+    return;
+  // Only in Embedded Swift does a module own the metadata.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    for (auto type : types)
+      M.addExportedTypeSpecialization(type);
+
+  // The members of the type, declared in its module.
+  SmallVector<Decl *, 16> members(nominal->getMembers().begin(),
+                                  nominal->getMembers().end());
+  for (auto *extension : nominal->getExtensions())
+    if (extension->getModuleContext() == nominal->getModuleContext())
+      llvm::append_range(members, extension->getMembers());
+  // Each of their entry points, e.g. both of a class initializer, with the
+  // exported specializations that this extension owns. Those whose bodies
+  // aren't available are skipped (as clients do, see SILFunctionBuilder).
+  auto prepare = [&](SILDeclRef constant) {
+    auto *member = constant.getAbstractFunctionDecl();
+    // Not one that is concrete already, e.g. in 'extension Box where T == Int':
+    // the type's module defines its only body.
+    auto memberSig = member->getGenericSignature();
+    if (!memberSig || llvm::all_of(memberSig.getGenericParams(), [&](auto param) {
+          return memberSig->isConcreteType(param);
+        }))
+      return;
+    SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> sigs;
+    SpecializedAttr::getTypeLevelSpecializations(member, sigs);
+    for (auto [sig, exported, module] : sigs)
+      // Only those of this extension's types, e.g. not of another module's.
+      if (exported && module == ed->getModuleContext() &&
+          llvm::is_contained(types, sig.getReducedType(
+                                        nominal->getDeclaredInterfaceType())))
+        (void)prepareExportedSpecialization(constant, sig);
+  };
+  for (auto *member : members) {
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+      for (auto *accessor : storage->getAllAccessors())
+        prepare(SILDeclRef(accessor));
+    } else if (auto *ctor = dyn_cast<ConstructorDecl>(member)) {
+      prepare(SILDeclRef(ctor, SILDeclRef::Kind::Allocator));
+      if (isa<ClassDecl>(nominal) && ctor->isDesignatedInit())
+        prepare(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
+    } else if (auto *dtor = dyn_cast<DestructorDecl>(member)) {
+      prepare(SILDeclRef(dtor, SILDeclRef::Kind::Deallocator));
+      if (isa<ClassDecl>(nominal))
+        prepare(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
+    } else if (isa<FuncDecl>(member)) {
+      prepare(SILDeclRef(cast<FuncDecl>(member)));
+    }
+  }
 }

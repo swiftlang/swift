@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -3074,9 +3075,46 @@ static bool isEmittedIntoClient(const Decl *decl) {
          parent->isAlwaysEmittedIntoClient();
 }
 
+/// Whether the module being compiled uses the exported '@specialized'
+/// extensions of \p module: it is that module or imports it directly, as for
+/// '@specialized' declarations without a body (see
+/// SILModule::performOnceForPrespecializedImportedExtensions).
+static bool usesSpecializationsOf(const ModuleDecl *module) {
+  auto *main = module->getASTContext().MainModule;
+  if (!main || module == main)
+    return true;
+  for (auto *file : main->getFiles())
+    if (auto *sourceFile = dyn_cast<SourceFile>(file))
+      for (auto &import : sourceFile->getImports())
+        if (import.module.importedModule == module)
+          return true;
+  return false;
+}
+
+/// The '@specialized' attributes that specialize \p nominal, each with the
+/// declaration it is on: the type's own, and if \p withExtensions the exported
+/// ones on extensions of it in other modules that the module being compiled
+/// uses.
+static SmallVector<std::pair<const Decl *, const SpecializedAttr *>, 2>
+getTypeSpecializedAttrs(const NominalTypeDecl *nominal, bool withExtensions) {
+  SmallVector<std::pair<const Decl *, const SpecializedAttr *>, 2> result;
+  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>())
+    result.push_back({nominal, attr});
+  if (!withExtensions)
+    return result;
+  for (auto *extension :
+       const_cast<NominalTypeDecl *>(nominal)->getExtensions())
+    if (extension->getModuleContext() != nominal->getModuleContext())
+      for (auto *attr : extension->getAttrs().getAttributes<SpecializedAttr>())
+        if (attr->isExported() &&
+            usesSpecializationsOf(extension->getModuleContext()))
+          result.push_back({extension, attr});
+  return result;
+}
+
 void SpecializedAttr::getTypeLevelSpecializations(
     const AbstractFunctionDecl *member,
-    SmallVectorImpl<std::pair<GenericSignature, bool>> &result) {
+    SmallVectorImpl<TypeLevelSpecialization> &result) {
   // Only members declared in the type's own module.
   auto *nominal = member->getDeclContext()->getSelfNominalTypeDecl();
   if (!nominal || nominal->getModuleContext() != member->getModuleContext())
@@ -3096,8 +3134,9 @@ void SpecializedAttr::getTypeLevelSpecializations(
       member->getFormalAccessScope().isPublic() &&
       !isEmittedIntoClient(member) &&
       !(accessor && isEmittedIntoClient(accessor->getStorage()));
-  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>()) {
-    auto typeSpecializedSig = attr->getSpecializedSignature(nominal);
+  for (auto [attrDecl, attr] :
+       getTypeSpecializedAttrs(nominal, /*withExtensions=*/true)) {
+    auto typeSpecializedSig = attr->getSpecializedSignature(attrDecl);
     if (!typeSpecializedSig)
       continue;
     // An exported specialization only for a member clients can use.
@@ -3125,14 +3164,19 @@ void SpecializedAttr::getTypeLevelSpecializations(
           return sig->isConcreteType(param);
         }))
       continue;
-    result.push_back({sig, attr->isExported()});
+    result.push_back({sig, attr->isExported(), attrDecl->getModuleContext()});
   }
 }
 
 void SpecializedAttr::getExportedTypeSpecializations(
-    const NominalTypeDecl *nominal, SmallVectorImpl<CanType> &result) {
-  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>()) {
-    auto sig = attr->getSpecializedSignature(nominal);
+    const Decl *decl, SmallVectorImpl<CanType> &result) {
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (auto *extension = dyn_cast<ExtensionDecl>(decl))
+    nominal = extension->getExtendedNominal();
+  if (!nominal)
+    return;
+  for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>()) {
+    auto sig = attr->getSpecializedSignature(decl);
     if (!attr->isExported() || !sig)
       continue;
     // Reduce 'Box<T>' to the specialized type, e.g. 'Box<Int>'; only fully
@@ -3143,14 +3187,20 @@ void SpecializedAttr::getExportedTypeSpecializations(
   }
 }
 
-bool SpecializedAttr::isExportedTypeSpecialization(CanType type) {
+ModuleDecl *SpecializedAttr::getExportedTypeSpecializationOwner(CanType type) {
   auto *nominal = type->getAnyNominal();
-  if (!nominal || !nominal->isGenericContext() ||
-      !nominal->getAttrs().hasAttribute<SpecializedAttr>())
-    return false;
-  SmallVector<CanType, 2> types;
-  getExportedTypeSpecializations(nominal, types);
-  return llvm::is_contained(types, type);
+  if (!nominal || !nominal->isGenericContext())
+    return nullptr;
+  // Only Embedded Swift has owners of metadata other than the type's module.
+  for (auto [attrDecl, attr] : getTypeSpecializedAttrs(
+           nominal, nominal->getASTContext().LangOpts.hasFeature(
+                        Feature::Embedded))) {
+    SmallVector<CanType, 2> types;
+    getExportedTypeSpecializations(attrDecl, types);
+    if (llvm::is_contained(types, type))
+      return attrDecl->getModuleContext();
+  }
+  return nullptr;
 }
 
 bool SpecializedAttr::isExportedConformanceSpecialization(
@@ -3172,6 +3222,10 @@ bool SpecializedAttr::isExportedConformanceSpecialization(
   if (generic->getExplicitCodeGenerationModel() ==
       CodeGenerationModel::Implementation)
     return false;
+  // An unavailable one, e.g. '@_unavailableInEmbedded', has no witness table.
+  if (auto *decl = generic->getDeclContext()->getAsDecl())
+    if (decl->isUnavailable())
+      return false;
   if (!isExportedTypeSpecialization(type))
     return false;
   // A conditional conformance needs requirements the type satisfies.
@@ -3179,6 +3233,24 @@ bool SpecializedAttr::isExportedConformanceSpecialization(
       CheckRequirementsResult::Success)
     return false;
   return true;
+}
+
+bool SpecializedAttr::isSpecializationDeclaration(const Decl *decl) {
+  auto *func = dyn_cast<AbstractFunctionDecl>(decl);
+  // Also with an invalid '@specialized', e.g. one naming nothing. A body macro
+  // (a custom attribute) adds the body later.
+  if (!func || isa<AccessorDecl>(func) || func->hasBody() ||
+      !func->getAttrs().hasAttribute<SpecializedAttr>(/*AllowInvalid=*/true) ||
+      func->getAttrs().hasAttribute<CustomAttr>())
+    return false;
+  // A free function, or a member in an extension of another module's type.
+  auto *dc = func->getDeclContext();
+  if (!dc->isModuleScopeContext() && !isa<ExtensionDecl>(dc))
+    return false;
+  // Declarations in module interfaces and SIL files have no bodies anyway.
+  auto *file = func->getDeclContext()->getParentSourceFile();
+  return file && (file->Kind == SourceFileKind::Library ||
+                  file->Kind == SourceFileKind::Main);
 }
 
 GenericSignature

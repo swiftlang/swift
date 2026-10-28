@@ -3278,6 +3278,10 @@ static bool requiresDefinition(Decl *decl) {
       return false;
   }
 
+  // A '@specialized' declaration names another module's declaration.
+  if (SpecializedAttr::isSpecializationDeclaration(decl))
+    return false;
+
   // Declarations in SIL and module interface files don't require
   // definitions.
   auto dc = decl->getDeclContext();

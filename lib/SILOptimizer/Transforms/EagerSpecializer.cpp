@@ -34,6 +34,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
+#include "swift/SIL/GenericSpecializationMangler.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -832,6 +833,20 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
   return NewFunc;
 }
 
+/// Whether this module creates the exported specialized body of \p F, another
+/// module's function, for \p SA (see
+/// SILGenModule::emitExportedTypeSpecializations).
+static bool createsImportedSpecialization(SILFunction &F,
+                                          const SILSpecializeAttr *SA) {
+  auto genericSig =
+      F.getLoweredFunctionType()->getInvocationGenericSignature();
+  return F.isAvailableExternally() && SA->isExported() && genericSig &&
+         F.getModule().createsExportedSpecializationOfImportedFunction(
+             Mangle::GenericSpecializationMangler::manglePrespecialization(
+                 F.getASTContext(), F.getName().str(), genericSig,
+                 SA->getSpecializedSignature()));
+}
+
 /// Run the pass.
 void EagerSpecializerTransform::run() {
   if (!EagerSpecializeFlag)
@@ -853,8 +868,13 @@ void EagerSpecializerTransform::run() {
     return;
   }
 
-  // Only specialize functions in their home module.
-  if (F.isExternalDeclaration() || F.isAvailableExternally())
+  // Only specialize functions in their home module, except another module's
+  // function whose exported specialized bodies this module creates.
+  if (F.isExternalDeclaration() ||
+      (F.isAvailableExternally() &&
+       !llvm::any_of(F.getSpecializeAttrs(), [&](SILSpecializeAttr *SA) {
+         return createsImportedSpecialization(F, SA);
+       })))
     return;
 
   if (F.isDynamicallyReplaceable())
@@ -876,8 +896,9 @@ void EagerSpecializerTransform::run() {
   bool onlyCreatePrespecializations = this->onlyCreatePrespecializations;
 
   for (auto *SA : F.getSpecializeAttrs()) {
-    if (onlyExportedSpecialized &&
-        !(SA->isExported() && SA->isSpecializedSpelling())) {
+    if ((onlyExportedSpecialized &&
+         !(SA->isExported() && SA->isSpecializedSpelling())) ||
+        (F.isAvailableExternally() && !createsImportedSpecialization(F, SA))) {
       SpecializedFuncs.push_back(nullptr);
       ReInfoVec.emplace_back(ReabstractionInfo(F.getModule()));
       continue;
@@ -898,7 +919,8 @@ void EagerSpecializerTransform::run() {
         assert(success);
       }
       onlyCreatePrespecializations = true;
-    } else if (targetFunc->getLinkage() == SILLinkage::Shared) {
+    } else if (targetFunc->getLinkage() == SILLinkage::Shared &&
+               !createsImportedSpecialization(F, SA)) {
       // We have `shared` linkage if we deserialize a public serialized
       // function.
       // That means we are loading it from another module. In this case, we

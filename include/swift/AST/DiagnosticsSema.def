@@ -8182,6 +8182,37 @@ ERROR(specialized_attr_exported_emitted_into_client,none,
       "%select{'@export(implementation)'|'@_alwaysEmitIntoClient'|"
       "'@_transparent'|the 'implementation' code generation model}0",
       (unsigned))
+ERROR(specialized_attr_declaration_not_exported,none,
+      "'@specialized' on a declaration without a body requires "
+      "'exported: true'", ())
+ERROR(specialized_attr_declaration_not_found,none,
+      "'@specialized' declaration without a body must name exactly one "
+      "function %0 of type %1 in an imported module", (DeclName, Type))
+ERROR(specialized_attr_declaration_local,none,
+      "'@specialized' declaration without a body names %0 of this module; "
+      "put '@specialized' on its definition instead", (DeclName))
+ERROR(specialized_attr_declaration_repeated,none,
+      "'@specialized' declaration without a body repeats one for %0; put all "
+      "of its '@specialized' attributes on one declaration", (DeclName))
+ERROR(specialized_attr_declaration_already_exported,none,
+      "module %0 already exports this specialization of %1", (Identifier,
+      DeclName))
+ERROR(specialized_attr_extension_not_exported,none,
+      "'@specialized' on an extension requires 'exported: true'", ())
+ERROR(specialized_attr_extension_local,none,
+      "'@specialized' on an extension of %0 of this module; put "
+      "'@specialized' on the type instead", (DeclName))
+ERROR(specialized_attr_extension_constrained,none,
+      "'@specialized' requires an extension without generic constraints of "
+      "its own", ())
+ERROR(specialized_attr_extension_member,none,
+      "an extension with '@specialized' can only contain '@specialized' "
+      "declarations without a body", ())
+ERROR(specialized_attr_extension_not_generic,none,
+      "'@specialized' on an extension requires a generic struct, enum or "
+      "class", ())
+ERROR(specialized_attr_extension_conformance,none,
+      "an extension with '@specialized' cannot declare conformances", ())
 ERROR(specialize_target_function_not_found, none,
      "target function %0 could not be found", (DeclNameRef))
 ERROR(specialize_target_function_of_type_not_found, none,

@@ -1638,6 +1638,11 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 void SILGenModule::emitFunction(FuncDecl *fd) {
   assert(!shouldSkipDecl(fd));
 
+  if (SpecializedAttr::isSpecializationDeclaration(fd)) {
+    emitSpecializationDeclaration(fd);
+    return;
+  }
+
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);
@@ -1648,12 +1653,74 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   }
 }
 
+void SILGenModule::emitSpecializationDeclaration(AbstractFunctionDecl *fd) {
+  for (auto *attr : fd->getAttrs().getAttributes<SpecializedAttr>()) {
+    auto *target = dyn_cast_or_null<AbstractFunctionDecl>(
+        attr->getTargetFunctionDecl(fd));
+    if (!attr->isExported() || !target)
+      continue;
+    auto sig = attr->getSpecializedSignature(fd);
+    // Each entry point, e.g. both of a class initializer.
+    SmallVector<SILDeclRef, 2> constants;
+    if (isa<ConstructorDecl>(target)) {
+      constants.push_back(SILDeclRef(target, SILDeclRef::Kind::Allocator));
+      // Only a designated initializer of a class has one, e.g. not a
+      // convenience initializer.
+      if (target->getDeclContext()->getSelfClassDecl() &&
+          cast<ConstructorDecl>(target)->isDesignatedInit())
+        constants.push_back(SILDeclRef(target, SILDeclRef::Kind::Initializer));
+    } else {
+      constants.push_back(SILDeclRef(target));
+    }
+    bool notSpecializable = false;
+    for (auto constant : constants)
+      if (!prepareExportedSpecialization(constant, sig, &notSpecializable)) {
+        diagnose(fd->getLoc(), diag::specialized_declaration_body_unavailable,
+                 target->getName(), notSpecializable);
+        break;
+      }
+  }
+}
+
+bool SILGenModule::prepareExportedSpecialization(
+    SILDeclRef constant, GenericSignature specializedSig,
+    bool *notSpecializable) {
+  auto *f = getFunction(constant, NotForDefinition);
+  if (f->isExternalDeclaration())
+    M.loadFunction(f, SILModule::LinkingMode::LinkAll);
+  if (!f->hasBodyForImportedSpecialization()) {
+    if (notSpecializable)
+      *notSpecializable = f->isDefinition();
+    return false;
+  }
+  // It may have been loaded without the specialization, e.g. with another
+  // function's body.
+  if (llvm::none_of(f->getSpecializeAttrs(), [&](SILSpecializeAttr *attr) {
+        return attr->isExported() &&
+               attr->getSpecializedSignature().getCanonicalSignature() ==
+                   specializedSig.getCanonicalSignature();
+      }))
+    f->addSpecializeAttr(SILSpecializeAttr::create(
+        M, specializedSig, /*typeErasedParams=*/{}, /*exported=*/true,
+        SILSpecializeAttr::SpecializationKind::Full, /*target=*/nullptr,
+        Identifier(), M.getSwiftModule(), AvailabilityRange::alwaysAvailable(),
+        /*isSpecializedSpelling=*/true));
+  M.addExportedSpecializationOfImportedFunction(constant, specializedSig,
+                                                /*createdHere=*/true);
+  return true;
+}
+
 void SILGenModule::addGlobalVariable(VarDecl *global) {
   // We create SILGlobalVariable here.
   getSILGlobalVariable(global, ForDefinition);
 }
 
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {
+  if (SpecializedAttr::isSpecializationDeclaration(decl)) {
+    emitSpecializationDeclaration(decl);
+    return;
+  }
+
   // FIXME: Handle 'self' like any other argument here.
   // Emit any default argument getter functions.
   emitAbstractFuncDecl(decl);

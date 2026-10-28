@@ -494,6 +494,11 @@ ERROR(cannot_prespecialize,none,
 ERROR(missing_prespecialization,none,
       "Pre-specialized function %0 missing in SwiftOnoneSupport module",
       (StringRef))
+ERROR(specialized_declaration_body_unavailable,none,
+      "cannot export a specialization of %0, %select{whose body isn't "
+      "available to this module; it must be '@inlinable', or its module built "
+      "with cross-module optimization|which can't be specialized, e.g. "
+      "because it's 'dynamic' or '@_optimize(none)'}1", (DeclName, bool))
 
 // Arithmetic diagnostics.
 ERROR(integer_conversion_overflow,none,

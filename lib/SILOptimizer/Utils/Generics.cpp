@@ -3269,6 +3269,19 @@ static bool usePrespecialized(
   for (auto *SA : refF->getSpecializeAttrs()) {
     if (!SA->isExported())
       continue;
+    // Another module, which declares it with '@specialized', creates it only
+    // if the function's body is available (see
+    // SILGenModule::prepareExportedSpecialization), so is it here too?
+    // (No module, e.g. parsed from SIL, means the function's own module.)
+    if (auto *decl = refF->getDeclRef().getDecl())
+      if (SA->isSpecializedSpelling() && SA->getSPIModule() &&
+          SA->getSPIModule() != decl->getModuleContext()) {
+        if (!refF->isDefinition())
+          funcBuilder.getModule().loadFunction(
+              refF, SILModule::LinkingMode::LinkNormal);
+        if (!refF->hasBodyForImportedSpecialization())
+          continue;
+      }
     // Check whether SPI allows using this function.
     auto spiGroup = SA->getSPIGroup();
     if (!spiGroup.empty()) {

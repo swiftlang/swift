@@ -118,15 +118,18 @@ void SILFunctionBuilder::addFunctionAttributes(
     // to default argument generators, which are emitted into clients.
     auto *member = constant.getAbstractFunctionDecl();
     if (member && !constant.isDefaultArgGenerator()) {
-      SmallVector<std::pair<GenericSignature, bool>, 2> typeLevelSigs;
+      SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> typeLevelSigs;
       SpecializedAttr::getTypeLevelSpecializations(member, typeLevelSigs);
-      for (auto [sig, exported] : typeLevelSigs)
+      // The module of the attribute, e.g. of an extension in another module
+      // (see usePrespecialized).
+      for (auto [sig, exported, module] : typeLevelSigs) {
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, sig, /*typeErasedParams=*/{}, exported,
             SILSpecializeAttr::SpecializationKind::Full,
-            /*target=*/nullptr, Identifier(), member->getModuleContext(),
+            /*target=*/nullptr, Identifier(), module,
             AvailabilityRange::alwaysAvailable(),
             /*isSpecializedSpelling=*/true));
+      }
     }
   }
 

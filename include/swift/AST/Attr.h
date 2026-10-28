@@ -2159,29 +2159,57 @@ public:
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
 
-  /// Adds to \p result the specialized signatures that the '@specialized'
-  /// attributes on \p member's type give it, if any, each with whether it's
-  /// exported. E.g. with '@specialized(exported: true, where T == Int) struct
-  /// Box<T>', the signature of 'Box.get()' with 'T == Int', exported.
+  /// A specialization of a member that a '@specialized' attribute on its type
+  /// gives it.
+  struct TypeLevelSpecialization {
+    GenericSignature signature;
+    bool exported;
+    /// The module with the attribute: the type's, or that of an extension.
+    const ModuleDecl *module;
+  };
+
+  /// Adds to \p result the specializations that the '@specialized' attributes
+  /// on \p member's type give it, if any. E.g. with
+  /// '@specialized(exported: true, where T == Int) struct Box<T>', the
+  /// signature of 'Box.get()' with 'T == Int', exported. The exported
+  /// attributes on extensions of the type in other modules count too, e.g.
+  /// '@specialized(exported: true, where T == Int) extension Lib.Box {}'.
   static void
-  getTypeLevelSpecializations(
-      const AbstractFunctionDecl *member,
-      SmallVectorImpl<std::pair<GenericSignature, bool>> &result);
+  getTypeLevelSpecializations(const AbstractFunctionDecl *member,
+                              SmallVectorImpl<TypeLevelSpecialization> &result);
 
   /// Adds to \p result the types that the exported '@specialized' attributes
-  /// on \p nominal specialize it for, one per attribute, e.g. 'Box<Int>'.
-  static void getExportedTypeSpecializations(const NominalTypeDecl *nominal,
+  /// on \p decl, a type or an extension of one, specialize the type for, one
+  /// per attribute, e.g. 'Box<Int>'.
+  static void getExportedTypeSpecializations(const Decl *decl,
                                              SmallVectorImpl<CanType> &result);
 
-  /// Whether \p type is a specialization that an exported '@specialized'
-  /// attribute on its type declares, so the type's module owns its metadata,
-  /// e.g. 'Box<Int>'.
-  static bool isExportedTypeSpecialization(CanType type);
+  /// The module that owns the metadata of \p type, if an exported
+  /// '@specialized' attribute declares it, e.g. 'Box<Int>': the type's module
+  /// for an attribute on the type, or, in Embedded Swift, the module of an
+  /// extension with the attribute.
+  static ModuleDecl *getExportedTypeSpecializationOwner(CanType type);
 
-  /// Whether the type's module owns \p conformance's witness table, e.g. for
-  /// 'Box<Int>: P' when the module declares 'extension Box: P'.
+  /// Whether \p type is a specialization that an exported '@specialized'
+  /// attribute declares, so a module owns its metadata, e.g. 'Box<Int>'.
+  static bool isExportedTypeSpecialization(CanType type) {
+    return getExportedTypeSpecializationOwner(type) != nullptr;
+  }
+
+  /// Whether the owner of the type's specialization (see
+  /// getExportedTypeSpecializationOwner) owns \p conformance's witness table,
+  /// e.g. for 'Box<Int>: P' when the type's module declares 'extension Box: P'.
   static bool
   isExportedConformanceSpecialization(const ProtocolConformance *conformance);
+
+  /// Whether \p decl is a '@specialized' declaration without a body in a
+  /// source file, which names a declaration of an imported module instead of
+  /// declaring one, e.g. in a client of 'Lib':
+  ///   @specialized(exported: true, where T == Int)
+  ///   public func sum<T: FixedWidthInteger>(_ a: T, _ b: T) -> T
+  /// It is a free function, or a method or initializer in an extension, e.g.
+  /// 'extension Lib.Box { @specialized(...) public func get() -> T }'.
+  static bool isSpecializationDeclaration(const Decl *decl);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialized;

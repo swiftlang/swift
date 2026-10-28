@@ -406,7 +406,11 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
 
 bool SpecializeAttributeScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
-  if (auto *params = whatWasSpecialized->getGenericParams())
+  // An extension's scope is outside the extended type, so also its outer
+  // types' parameters, e.g. for 'extension Outer.Inner'.
+  bool isExtension = isa<ExtensionDecl>(whatWasSpecialized);
+  for (auto *params = whatWasSpecialized->getGenericParams(); params;
+       params = isExtension ? params->getOuterParameters() : nullptr)
     for (auto *param : params->getParams())
       if (consumer.consume({param}))
         return true;
