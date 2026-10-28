@@ -96,6 +96,7 @@ FEATURE(EmbeddedDistributedSwift,                       (6, 5))
 FEATURE(DistributedAccessorIsolation,                   (6, 5))
 FEATURE(DynamicCastTest,                                (6, 5))
 FEATURE(OnceClosureDestroyedError,                      (6, 5))
+FEATURE(SynchronousOperationTask,                       (6, 5))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)

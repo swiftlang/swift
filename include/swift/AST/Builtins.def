@@ -1094,6 +1094,29 @@ BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
 /// Create a new discarding task.
 BUILTIN_SIL_OPERATION(CreateDiscardingTask, "createDiscardingTask", Special)
 
+/// createSynchronousDiscardingTask(
+///     flags: Int,
+///     initialSerialExecutor: (Builtin.Executor)? = nil,
+///     taskGroup: Builtin.RawPointer? = nil,
+///     initialTaskExecutor: (Builtin.Executor)? = nil,
+///     initialTaskExecutorConsuming: (any TaskExecutor)? = nil,
+///     taskName: Builtin.RawPointer? = nil,
+///     operation: sending @escaping () -> ()
+/// ) -> (Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Creates a discarding task whose operation is synchronous, non-throwing and
+/// returns Void. Oneway calls ('send' expressions) of synchronous functions
+/// use it; a oneway call of an async function uses 'createDiscardingTask'.
+/// The created task does not have an async context or a result future fragment.
+/// The returned initial context is not a usable async context.
+///
+/// The caller must pass the 'Task_HasSynchronousOperation' and
+/// 'Task_IsDiscardingTask' flags.
+///
+/// Introduced in Swift 6.5.
+BUILTIN_SIL_OPERATION(CreateSynchronousDiscardingTask,
+                      "createSynchronousDiscardingTask", Special)
+
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
 ///     sending @escaping () async throws -> T  // function

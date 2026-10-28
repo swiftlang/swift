@@ -1088,6 +1088,7 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
     Result.IsGroupChildTask = TaskInfo.IsGroupChildTask;
     Result.IsAsyncLetTask = TaskInfo.IsAsyncLetTask;
     Result.IsSynchronousStartTask = TaskInfo.IsSynchronousStartTask;
+    Result.HasSynchronousOperation = TaskInfo.HasSynchronousOperation;
 
     Result.MaxPriority = TaskInfo.MaxPriority;
     Result.IsCancelled = TaskInfo.IsCancelled;

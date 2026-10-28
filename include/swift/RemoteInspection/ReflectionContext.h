@@ -143,6 +143,7 @@ class ReflectionContext
   typename super::StoredPointer target_future_adapter = 0;
   typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
   typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
+  typename super::StoredPointer target_synchronous_operation_adapter = 0;
   bool supportsPriorityEscalation = false;
   typename super::StoredSize asyncTaskSize = 0;
 
@@ -191,6 +192,7 @@ public:
     bool IsGroupChildTask;
     bool IsAsyncLetTask;
     bool IsSynchronousStartTask;
+    bool HasSynchronousOperation;
 
     // Task flags.
     unsigned MaxPriority;
@@ -2073,6 +2075,7 @@ private:
     Info.IsFuture = JobFlags.task_isFuture();
     Info.IsGroupChildTask = JobFlags.task_isGroupChildTask();
     Info.IsAsyncLetTask = JobFlags.task_isAsyncLetTask();
+    Info.HasSynchronousOperation = JobFlags.task_hasSynchronousOperation();
 
     uint32_t TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags[0];
     Info.IsCancelled = TaskStatusFlags & ActiveTaskStatusFlags::IsCancelled;
@@ -2227,7 +2230,17 @@ private:
     Info.ResumeAsyncContext = TaskResumeContext;
 
     // Walk the async backtrace.
-    if (Info.HasIsRunning && !Info.IsRunning) {
+    if (Info.HasSynchronousOperation) {
+      // The resume context of a synchronous operation task is its
+      // bare initial context, and the operation never suspends, so there is
+      // no async context chain to walk. Its only frame is the operation,
+      // which a task that is not running did not start yet
+      if (Info.HasIsRunning && !Info.IsRunning && AsyncBacktraceLimit > 0) {
+        if (auto Operation =
+                getSynchronousOperation(AsyncTaskObj.get(), TaskResumeContext))
+          Info.AsyncBacktraceFrames.push_back(Operation);
+      }
+    } else if (Info.HasIsRunning && !Info.IsRunning) {
       auto ResumeContext = TaskResumeContext;
       unsigned AsyncBacktraceLoopCount = 0;
       while (ResumeContext && AsyncBacktraceLoopCount++ < AsyncBacktraceLimit) {
@@ -2275,6 +2288,36 @@ private:
     return {std::nullopt, Info};
   }
 
+  /// The synchronous operation function of a synchronous operation task,
+  /// read from the `SynchronousDiscardingContextPrefix` before its
+  /// initial context \p ResumeContextPtr, or 0 if it cannot be read
+  template <typename AsyncTaskType>
+  StoredPointer getSynchronousOperation(const AsyncTaskType *AsyncTaskObj,
+                                        StoredPointer ResumeContextPtr) {
+    swift::JobFlags JobFlags(AsyncTaskObj->Flags);
+    if (!JobFlags.task_hasSynchronousOperation() || !ResumeContextPtr)
+      return 0;
+
+    // The task runs 'synchronous_operation_adapter' for its whole lifetime,
+    // since the operation never suspends. Check that when the target tells
+    // us where the adapter is, to not read a stale or bogus prefix
+    loadTargetPointers();
+    auto Fptr = stripSignedPointer(AsyncTaskObj->RunJob).getRawAddress();
+    if (target_synchronous_operation_adapter &&
+        Fptr != target_synchronous_operation_adapter)
+      return 0;
+
+    using Prefix = SynchronousDiscardingContextPrefix<Runtime>;
+    auto PrefixAddr = ResumeContextPtr - sizeof(Prefix);
+    auto PrefixBytes = getReader().readBytes(
+        RemoteAddress(PrefixAddr, RemoteAddress::DefaultAddressSpace),
+        sizeof(Prefix));
+    if (!PrefixBytes)
+      return 0;
+    auto PrefixPtr = reinterpret_cast<const Prefix *>(PrefixBytes.get());
+    return stripSignedPointer(PrefixPtr->Function).getRawAddress();
+  }
+
   // Get the most human meaningful "run job" function pointer from the task,
   // like AsyncTask::getResumeFunctionForLogging does.
   template <typename AsyncTaskType>
@@ -2283,6 +2326,19 @@ private:
 
     loadTargetPointers();
     auto ResumeContextPtr = AsyncTaskObj->ResumeContextAndReserved[0];
+
+    // A synchronous operation task runs its operation from
+    // 'synchronous_operation_adapter', report the operation instead
+    if (swift::JobFlags(AsyncTaskObj->Flags).task_hasSynchronousOperation()) {
+      auto ResumeContext =
+          stripSignedPointer(RemoteAddress(ResumeContextPtr,
+                                           RemoteAddress::DefaultAddressSpace))
+              .getRawAddress();
+      if (auto Operation = getSynchronousOperation(AsyncTaskObj, ResumeContext))
+        return Operation;
+      return Fptr;
+    }
+
     if (target_non_future_adapter && Fptr == target_non_future_adapter) {
       using Prefix = AsyncContextPrefix<Runtime>;
       auto PrefixAddr = ResumeContextPtr - sizeof(Prefix);
@@ -2357,6 +2413,9 @@ private:
         "_swift_concurrency_debug_task_wait_throwing_resume_adapter");
     target_task_future_wait_resume_adapter = getPointerInProcessAddressSpace(
         "_swift_concurrency_debug_task_future_wait_resume_adapter");
+    // Only present in runtimes that can create synchronous operation tasks (Swift 6.5)
+    target_synchronous_operation_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_synchronous_operation_adapter");
     auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
         "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {

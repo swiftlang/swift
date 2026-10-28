@@ -70,6 +70,17 @@ SWIFT_CONCURRENCY_DEBUG_VAR(
     _swift_concurrency_debug_task_future_wait_resume_adapter)
 const void *const _swift_concurrency_debug_task_future_wait_resume_adapter;
 
+/// The resume function of a synchronous operation task
+/// (`JobFlags::Task_HasSynchronousOperation`). The operation itself
+/// can never suspend, but we still call it from an asynchronous context,
+/// and while the AsyncContext is much smaller than for any async code,
+/// functionally it still has one, so we don't need to adjust any other
+/// code that's checking the first allocated slab.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CONCURRENCY_DEBUG_VAR(
+    _swift_concurrency_debug_synchronous_operation_adapter)
+const void *const _swift_concurrency_debug_synchronous_operation_adapter;
+
 /// Whether the runtime we are inspecting supports priority escalation
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CONCURRENCY_DEBUG_VAR(_swift_concurrency_debug_supportsPriorityEscalation)
