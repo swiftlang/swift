@@ -25,6 +25,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Option/Options.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/Validation.h"
 
 #include "llvm/Option/OptTable.h"
@@ -1472,11 +1473,8 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
       // Check the version number specified via -user-module-version.
       StringRef current(args[I]), next(args[I + 1]);
       if (current == "-user-module-version") {
-        // Sanitize versions that are too long
-        while(next.count('.') > 3) {
-          next = next.rsplit('.').first;
-        }
-        result.tryParse(next);
+        if (auto version = VersionParser::parseUserModuleVersion(next))
+          result = *version;
         break;
       }
     }

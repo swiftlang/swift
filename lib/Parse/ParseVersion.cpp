@@ -234,3 +234,23 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
 
   return isValidVersion ? std::optional<Version>(TheVersion) : std::nullopt;
 }
+
+std::optional<llvm::VersionTuple>
+VersionParser::parseUserModuleVersion(StringRef VersionString) {
+  // llvm::VersionTuple supports a maximum of five components.
+  while (VersionString.count('.') > 4)
+    VersionString = VersionString.rsplit('.').first;
+
+  llvm::VersionTuple Result;
+  if (!Result.tryParse(VersionString))
+    return Result;
+
+  // The fifth component has a narrower range than the others. Rather than
+  // rejecting a version that compilers supporting only four components
+  // accepted, ignore the fifth component and try again.
+  if (VersionString.count('.') == 4 &&
+      !Result.tryParse(VersionString.rsplit('.').first))
+    return Result;
+
+  return std::nullopt;
+}
