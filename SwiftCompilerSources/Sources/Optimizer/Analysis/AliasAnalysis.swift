@@ -822,10 +822,19 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
     return .continueWalk
   }
 
-  // A value derived from a scoped borrow of an `@in_guaranteed` argument cannot write through
-  // that address, so the memory-effects query need not follow the capture. `isAddress` is false
-  // for the ownership query, which has no such guarantee and stays conservative.
-  var followBorrowedAddressableCaptures: Bool { !isAddress }
+  mutating func visitBorrowedAddressableCapture(operand: Operand, path: EscapePath) -> UseResult {
+    if !isAddress {
+      return .continueWalk
+    }
+    // Instead of following the result, assume that `apply` reads the address through it, e.g.
+    //   %span = apply %utf8Span(%s)
+    //   apply %sumSpanBytes(%span)  // reads %s
+    if calleeAnalysis.getSideEffects(ofApply: apply).memory.read {
+      result.memory.read = true
+    }
+    return .ignore
+  }
+
   var followTrivialTypes: Bool { isAddress }
   var followLoads: Bool { !isAddress }
 }

@@ -153,14 +153,16 @@ protocol EscapeVisitor {
   /// Called during the UseDef walk for each definition
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult
 
+  /// Called during the DefUse walk for an `@in_guaranteed` address argument of an apply, which is
+  /// only captured by the apply's result. `.ignore` doesn't follow the result, which can read the
+  /// address but not write it.
+  mutating func visitBorrowedAddressableCapture(operand: Operand, path: EscapePath) -> UseResult
+
   /// If true, the traversals follow values with trivial types.
   var followTrivialTypes: Bool { get }
 
   /// If true, the traversal follows loaded values.
   var followLoads: Bool { get }
-
-  /// If true, the traversal follows an `@in_guaranteed` argument's address into the lifetime-dependent result which captures it.
-  var followBorrowedAddressableCaptures: Bool { get }
 }
 
 extension EscapeVisitor {
@@ -172,11 +174,13 @@ extension EscapeVisitor {
     return .continueWalkUp
   }
 
+  mutating func visitBorrowedAddressableCapture(operand: Operand, path: EscapePath) -> UseResult {
+    return .continueWalk
+  }
+
   var followTrivialTypes: Bool { false }
 
   var followLoads: Bool { true }
-
-  var followBorrowedAddressableCaptures: Bool { true }
 }
 
 /// A visitor which returns a `result`.
@@ -666,13 +670,19 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
                 !hasAddressResult(apply) {
         // The result does not depend on the argument's address.
         return .continueWalk
-      } else if !visitor.followBorrowedAddressableCaptures,
-                !hasAddressResult(apply),
+      } else if !hasAddressResult(apply),
                 onlyResultDependsOnAddress(of: apply, argOp: argOp) {
-        // The argument's address is captured only by the result, which is declared to depend on a
-        // scoped borrow of an `@in_guaranteed` argument. For a client which only asks about
-        // writes, such a capture cannot contribute one.
-        return .continueWalk
+        // The address is only captured by the result. Constructing a mutable address from an
+        // `@in_guaranteed` argument is undefined behavior (except for `@_rawLayout` types, which
+        // are not handled here), so the result can only read it.
+        switch visitor.visitBorrowedAddressableCapture(operand: argOp, path: path) {
+        case .continueWalk:
+          break
+        case .ignore:
+          return .continueWalk
+        case .abort:
+          return .abortWalk
+        }
       }
     }
 
@@ -720,7 +730,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     return convention.hasAddressResult
   }
 
-  /// True if the only reason why `argOp` is addressable is a lifetime dependence of `apply`'s direct result on it, and the argument is passed read-only.
+  /// True if `argOp` is `@in_guaranteed` and only `apply`'s result depends on its address.
+  /// Checks the convention, because a `.scope` dependence can also be an inout dependence.
   private func onlyResultDependsOnAddress(of apply: ApplySite, argOp: Operand) -> Bool {
     guard apply.convention(of: argOp) == .indirectInGuaranteed else {
       return false
