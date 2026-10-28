@@ -5005,10 +5005,21 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       // For storage we reference by a property descriptor, the descriptor will
       // supply the settability if needed. We only reference it here if the
       // setter is public.
-      if (shouldUseExternalKeyPathComponent())
-        return storage->isSettableInSwift(useDC) &&
-               storage->isSetterAccessibleFrom(useDC);
-      return storage->isSettableInSwift(storage->getDeclContext());
+      bool isExternal = shouldUseExternalKeyPathComponent();
+      auto settableDC = isExternal ? useDC : storage->getDeclContext();
+
+      if (!storage->isSettableInSwift(settableDC))
+        return false;
+
+      bool emulatingSwift4_2 =
+          !getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
+
+      // Check if the setter will be accessible from the use site. Exceptions:
+      // * Property descriptors need to describe the whole property
+      // * Swift 4.2 and earlier didn't check access (Sema will have emitted a
+      //   warning instead of an error)
+      return forPropertyDescriptor || (emulatingSwift4_2 && !isExternal) ||
+                storage->isSetterAccessibleFrom(useDC);
     };
 
     if (auto var = dyn_cast<VarDecl>(storage)) {
