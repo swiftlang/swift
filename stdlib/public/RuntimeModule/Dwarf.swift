@@ -566,6 +566,33 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var attributes: [(Dwarf_Attribute, Dwarf_Form, Int64?)]
   }
 
+  /// The abbreviations for a unit.  Compilers number these sequentially from
+  /// 1, so we keep those in an array and look them up without hashing; any
+  /// that don't fit that pattern go in a dictionary.
+  struct AbbrevTable {
+    private var dense: [AbbrevInfo?] = [nil]
+    private var sparse: [DwarfAbbrev: AbbrevInfo] = [:]
+
+    subscript(abbrev: DwarfAbbrev) -> AbbrevInfo? {
+      get {
+        if abbrev < UInt64(dense.count) {
+          return dense[Int(abbrev)] ?? sparse[abbrev]
+        }
+        return sparse[abbrev]
+      }
+    }
+
+    mutating func insert(_ info: AbbrevInfo, for abbrev: DwarfAbbrev) {
+      if abbrev < UInt64(dense.count) {
+        dense[Int(abbrev)] = info
+      } else if abbrev == UInt64(dense.count) {
+        dense.append(info)
+      } else {
+        sparse[abbrev] = info
+      }
+    }
+  }
+
   var infoSection: ImageSource
   var abbrevSection: ImageSource
   var lineSection: ImageSource?
@@ -648,7 +675,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   /// headers until they are resolved.
   var units: [Unit] = []
 
-  private var abbrevCache: [Address: [DwarfAbbrev: AbbrevInfo]] = [:]
+  private var abbrevCache: [Address: AbbrevTable] = [:]
 
   private var lineNumberInfoCache: [UInt64: DwarfLineNumberInfo?] = [:]
 
@@ -895,7 +922,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
   private func abbrevs(
     for unit: Unit
-  ) throws -> [DwarfAbbrev: AbbrevInfo] {
+  ) throws -> AbbrevTable {
     if let abbrevs = abbrevCache[unit.abbrevOffset] {
       return abbrevs
     }
@@ -1192,8 +1219,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
   private func readAbbrevs(
     at offset: UInt64
-  ) throws -> [DwarfAbbrev: AbbrevInfo] {
-    var abbrevs: [DwarfAbbrev: AbbrevInfo] = [:]
+  ) throws -> AbbrevTable {
+    var abbrevs = AbbrevTable()
     var cursor = ImageSourceCursor(source: abbrevSection, offset: offset)
     while true {
       let abbrev = try cursor.readULEB128()
@@ -1224,9 +1251,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         }
       }
 
-      abbrevs[abbrev] = AbbrevInfo(tag: tag,
-                                   hasChildren: children != .DW_CHILDREN_no,
-                                   attributes: attributes)
+      abbrevs.insert(AbbrevInfo(tag: tag,
+                                hasChildren: children != .DW_CHILDREN_no,
+                                attributes: attributes),
+                     for: abbrev)
     }
 
     return abbrevs
