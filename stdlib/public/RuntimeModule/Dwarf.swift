@@ -2558,3 +2558,55 @@ public func testDwarfReaderFor(path: String) -> Bool {
     return false
   }
 }
+
+@available(BacktracingDT 6.2, *)
+private func printDwarfLookups<S: DwarfSource & AnyObject>(
+  _ reader: DwarfReader<S>,
+  at addresses: [UInt64]
+) {
+  for address in addresses {
+    print("address \(hex(address, width: 0)):")
+
+    if let function = reader.lookupFunction(at: address) {
+      print("  function: \(function.rawName)")
+    } else {
+      print("  function: <none>")
+    }
+
+    for site in reader.lookupInlineCallSites(at: address) {
+      print("  inline: \(site.rawName ?? "<none>") "
+              + "\(site.filename):\(site.line):\(site.column)")
+    }
+  }
+}
+
+/// Look up each of `addresses` in the DWARF in the ELF image at `path`, and
+/// print the function and the inline call sites (innermost first) that we
+/// find for it.
+@_spi(DwarfTest)
+@available(BacktracingDT 6.2, *)
+public func testDwarfLookupsFor(path: String, addresses: [UInt64]) -> Bool {
+  guard let source = try? ImageSource(path: path) else {
+    print("\(path) was not accessible")
+    return false
+  }
+
+  if let elfImage = try? Elf32Image(source: source) {
+    guard let reader = try? DwarfReader(source: elfImage) else {
+      print("Unable to create reader")
+      return false
+    }
+    printDwarfLookups(reader, at: addresses)
+    return true
+  } else if let elfImage = try? Elf64Image(source: source) {
+    guard let reader = try? DwarfReader(source: elfImage) else {
+      print("Unable to create reader")
+      return false
+    }
+    printDwarfLookups(reader, at: addresses)
+    return true
+  } else {
+    print("\(path) is not an ELF image")
+    return false
+  }
+}
