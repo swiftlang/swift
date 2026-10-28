@@ -1,17 +1,27 @@
-# Install the EmbeddedPlatform header into "swift".
+# Install the EmbeddedPlatform headers into "swift".
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_command(
-      OUTPUT "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
-      COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h" "${SWIFT_INCLUDE_DIR}/swift")
+      OUTPUT
+        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
+        "${SWIFT_INCLUDE_DIR}/swift/ExecutorTypes.h"
+      DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+      COMMAND "${CMAKE_COMMAND}" "-E" "copy"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+        "${SWIFT_INCLUDE_DIR}/swift")
 
   add_custom_target("copy_embedded_swift_platform_header"
-      DEPENDS "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
-      COMMENT "Copying Embedded Swift platform header to ${SWIFT_INCLUDE_DIR}/swift")
+      DEPENDS
+        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
+        "${SWIFT_INCLUDE_DIR}/swift/ExecutorTypes.h"
+      COMMENT "Copying Embedded Swift platform headers to ${SWIFT_INCLUDE_DIR}/swift")
 
   swift_install_in_component(FILES
       "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
+      "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
       DESTINATION "include/swift"
       COMPONENT stdlib)
 
