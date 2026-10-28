@@ -1655,11 +1655,11 @@ void ModuleDecl::getDisplayDeclsRecursivelyAndImports(
   // Look up imports recursively.
   collectExportedImports(this, importCollector);
   for (const auto &QI : importCollector.qualifiedImports) {
-    auto Module = QI.getFirst();
+    auto Module = QI.first;
     if (importCollector.imports.contains(Module))
       continue;
 
-    auto &Decls = QI.getSecond();
+    auto &Decls = QI.second;
     results.append(Decls.begin(), Decls.end());
   }
 
