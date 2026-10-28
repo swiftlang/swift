@@ -3156,14 +3156,15 @@ static bool sortClangDecls(Decl *lhs, Decl *rhs) {
   auto *LHS = getClangDecl(lhs), *RHS = getClangDecl(rhs);
   if (LHS && RHS) {
     // Both lhs and rhs are directly imported from Clang
-    // First, sort based on module name, if any
+    // First, sort based on module name, if any. Decls without an owning module
+    // (e.g., members of implicit template instantiations) fall through.
     auto *LMod = LHS->getOwningModule(), *RMod = RHS->getOwningModule();
-    if (!LMod || !RMod)
+    if (!LMod != !RMod)
       return (bool)LMod < (bool)RMod;
-    if (LMod != RMod)
+    if (LMod && LMod != RMod)
       return LMod->Name < RMod->Name;
 
-    // Both come from the same module; sort based on location, if any
+    // Same (or no) module; sort based on location, if any
     auto LLoc = LHS->getLocation(), RLoc = RHS->getLocation();
     if (!LLoc.isValid() || !RLoc.isValid())
       return LLoc.isValid() < RLoc.isValid();
