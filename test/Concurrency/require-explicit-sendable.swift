@@ -104,6 +104,20 @@ struct S11: Sendable {
   var s7: S7 // expected-warning{{stored property 's7' of 'Sendable'-conforming struct 'S11' has non-Sendable type 'S7'}}
 }
 
+@available(*, unavailable)
+public struct S13 { }
+
+@available(*, unavailable)
+extension S13: Sendable { }
+
+// FIXME: Missing note suggesting a Sendable conformance.
+// expected-note@+2{{consider suppressing conformance to 'Sendable' protocol}}
+@available(*, unavailable)
+public struct S14 { // expected-warning{{public struct 'S14' does not specify whether it is 'Sendable' or not}}
+  // expected-note@-1{{make struct 'S14' explicitly non-Sendable to suppress this warning}}
+  var s13: S13
+}
+
 @_nonSendable public struct S12 { }
 
 // Don't complain about global-actor-qualified classes or their subclasses.
