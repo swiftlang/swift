@@ -281,7 +281,7 @@ BRIDGED_OPTIONAL(SwiftInt, Int)
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 inline BridgedOptionalInt getFromAPInt(llvm::APInt i) {
   if (i.getSignificantBits() <=
-      std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
+      std::min<unsigned>(std::numeric_limits<SwiftInt>::digits, 64)) {
     return {(SwiftInt)i.getSExtValue()};
   }
   return {};
