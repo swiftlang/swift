@@ -642,6 +642,9 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var tag: Dwarf_Tag?
     var attributes: [Dwarf_Attribute:DwarfValue] = [:]
 
+    // Full paths of the files in the line number table, filled in as needed
+    var filePaths: [String?] = []
+
     // Set by scan(_:)
     var callSites: RangeIndex<CallSiteInfo>?
     var functions: RangeIndex<FunctionInfo>?
@@ -2103,10 +2106,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     let rawName = names.linkageName ?? name
 
     var filename: String = "<unknown>"
-    if let info = lineNumberInfo(for: unit),
-       let callFile,
-       let ndx = Int(exactly: callFile) {
-      filename = info.fullPathForFile(index: ndx)
+    if let callFile, let ndx = Int(exactly: callFile) {
+      filename = pathForFile(index: ndx, in: unit)
     }
 
     try forEachAddressRange(of: attributes, unit: unit) { lowPC, highPC in
@@ -2158,6 +2159,30 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   // .. Line number information ................................................
 
   /// Get the line number program for `unit`, reading it if necessary.
+  /// Get the full path for a file in the line number table for `unit`.
+  /// Many call sites share a file, so we remember the paths.
+  private func pathForFile(index: Int, in unit: Unit) -> String {
+    if index >= 0 && index < unit.filePaths.count,
+       let path = unit.filePaths[index] {
+      return path
+    }
+
+    guard let info = lineNumberInfo(for: unit) else {
+      return "<unknown>"
+    }
+
+    let path = info.fullPathForFile(index: index)
+    if index >= 0 && index < info.files.count {
+      if unit.filePaths.count < info.files.count {
+        unit.filePaths += [String?](repeating: nil,
+                                    count: info.files.count
+                                      - unit.filePaths.count)
+      }
+      unit.filePaths[index] = path
+    }
+    return path
+  }
+
   private func lineNumberInfo(for unit: Unit) -> DwarfLineNumberInfo? {
     // Units that we found using .debug_aranges won't have been resolved yet,
     // and we need their root DIE attributes to find the line number program.
@@ -2199,13 +2224,6 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       result = info
     }
 
-    // Index the sequences (this has to happen after the fix-ups above, since
-    // running the program needs the address size)
-    if var info = result {
-      try? info.buildSequenceIndex()
-      result = info
-    }
-
     lineNumberInfoCache[lineBase] = .some(result)
     return result
   }
@@ -2218,6 +2236,19 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     for unit in unitsContaining(address) {
       guard var info = lineNumberInfo(for: unit) else {
         continue
+      }
+
+      // Index the sequences the first time that we need to look something
+      // up; scanning a unit doesn't need the line number program itself.
+      if info.sequences == nil {
+        do {
+          try info.buildSequenceIndex()
+        } catch {
+          info.sequences = RangeIndex(sortedElements: [])
+        }
+        if let lineBase = unit.lineBase {
+          lineNumberInfoCache[lineBase] = .some(info)
+        }
       }
 
       // Only run the sequences that cover the address, in program order
