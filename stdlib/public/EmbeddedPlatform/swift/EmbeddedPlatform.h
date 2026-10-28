@@ -26,6 +26,10 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_H
 #define EMBEDDED_SWIFT_PLATFORM_H
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 #if defined(__SIZE_TYPE__) && defined(__PTRDIFF_TYPE__)
 typedef __SIZE_TYPE__ __swift_size_t;
 typedef __PTRDIFF_TYPE__ __swift_ptrdiff_t;
@@ -61,13 +65,7 @@ typedef __swift_ptrdiff_t __swift_tls_key_t;
  */
 #define SWIFT_TLS_KEY_COUNT 8
 
-#if __has_feature(nullability)
-#define EMBEDDED_SWIFT_NONNULL _Nonnull
-#define EMBEDDED_SWIFT_NULLABLE _Nullable
-#else
-#define EMBEDDED_SWIFT_NONNULL
-#define EMBEDDED_SWIFT_NULLABLE
-#endif
+#include "ExecutorTypes.h"
 
 /**
  * A function called with a non-NULL TLS value when the execution context that
@@ -630,6 +628,40 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * function.
  */
 void _swift_exit(int code) EMBEDDED_SWIFT_NORETURN;
+
+/**
+ * Enqueues a job on the global executor.
+ *
+ * The `_swift_concurrency_*` functions are the executor that runs the jobs of
+ * Swift Concurrency. `swift/ExecutorImpl.h` declares the three that concern
+ * the main executor: `_swift_concurrency_enqueueMainExecutor`,
+ * `_swift_concurrency_getMainExecutor` and `_swift_concurrency_isMainExecutor`.
+ * `libswift_ConcurrencyDefaultExecutor.a` defines all of them with a
+ * single-threaded executor. When the program is linked with dead stripping,
+ * each of them is required only by code that reaches it.
+ *
+ * On WebAssembly, `libswift_Concurrency.a` also defines them, as weak
+ * functions that run jobs on an executor written in Swift. An executor linked
+ * as an object file replaces them. An executor archive, such as
+ * `libswift_ConcurrencyDefaultExecutor.a`, replaces them only when it comes
+ * before `libswift_Concurrency.a` on the link line.
+ */
+void _swift_concurrency_enqueueGlobal(SwiftJob * EMBEDDED_SWIFT_NONNULL job);
+
+/**
+ * Runs the jobs enqueued on the main executor.
+ *
+ * This function is required by an `async` main function.
+ */
+void _swift_concurrency_asyncMainDrainQueue(void) EMBEDDED_SWIFT_NORETURN;
+
+/**
+ * Runs jobs from the global executor on the calling thread until
+ * `condition(conditionContext)` returns `true`, or until no job is left.
+ */
+void _swift_concurrency_donateThreadToGlobalExecutorUntil(
+    bool (* EMBEDDED_SWIFT_NONNULL condition)(void * EMBEDDED_SWIFT_NULLABLE),
+    void * EMBEDDED_SWIFT_NULLABLE conditionContext);
 
 #if defined(__cplusplus)
 }
