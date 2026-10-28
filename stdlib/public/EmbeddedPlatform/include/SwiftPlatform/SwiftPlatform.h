@@ -38,6 +38,10 @@
  * * StandardOutput.h: functions for printing to standard output.
  * * Mutex.h: functions for providing mutex lock/unlock, which are also used
  *   by the Concurrency PAL.
+ * * Semaphore.h: functions for counting semaphores, which are used by the
+ *   thread-pool executor.
+ * * Threads.h: functions for creating threads, which are used by the
+ *   thread-pool executor.
  * * Concurrency PAL: required to support the Swift Concurrency runtime.
  *   - ExecutorTypes.h: types used in the definition of concurrency PAL.
  *     There are no platform-provided PAL entrypoints declared here.
@@ -54,8 +58,10 @@
 #include "Heap.h"
 #include "Mutex.h"
 #include "Random.h"
+#include "Semaphore.h"
 #include "StandardOutput.h"
 #include "ThreadLocalStorage.h"
+#include "Threads.h"
 #include "Types.h"
 #include "Version.h"
 

@@ -40,7 +40,7 @@ extern "C" {
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 2
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 3
 
 /**
  * Determine the version of the platform abstraction layer that the Embedded

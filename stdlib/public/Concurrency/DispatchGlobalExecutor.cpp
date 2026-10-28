@@ -14,7 +14,7 @@
 ///
 /// It defines the Dispatch-specific functions for the runtime and, in
 /// Embedded builds, the executor entrypoints declared in
-/// SwiftPlatform/Concurrency.h and ExecutorImpl.h.
+/// SwiftPlatform/Concurrency.h.
 ///
 ///===------------------------------------------------------------------===///
 
