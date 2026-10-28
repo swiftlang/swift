@@ -931,6 +931,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
+  BLOCK_RECORD(index_block, ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS);
   BLOCK_RECORD(index_block, HIDDEN_TYPE_FALLBACK_TABLE);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
@@ -5027,6 +5028,7 @@ public:
                           accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           S.addTypeRef(ty),
+                          AbstractMemberTypeLayoutID(),
                           var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
@@ -5339,6 +5341,7 @@ public:
                                   contextID.getOpaqueValue(),
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
+                                  AbstractMemberTypeLayoutID(),
                                   (unsigned)rawValueKind,
                                   isRawValueImplicit,
                                   isNegative,
@@ -7856,6 +7859,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, AbstractConformancesToSerialize);
     writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
+    writeOffsets(Offsets, AbstractMemberTypeLayoutsToSerialize);
     writeOffsets(Offsets, HiddenTypeLayoutsToSerialize);
 
     SmallVector<uint32_t, 32> fallbackPairs;

@@ -133,6 +133,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
   allocateBuffer(HiddenTypeLayoutInfoDecls, core->HiddenTypeLayoutInfoDecls);
+  allocateBuffer(AbstractMemberTypeLayouts, core->AbstractMemberTypeLayouts);
 
   auto fallbackData = core->HiddenTypeFallbackTableData;
   for (unsigned index = 0; index + 1 < fallbackData.size(); index += 2) {

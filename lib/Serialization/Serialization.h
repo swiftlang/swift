@@ -232,6 +232,10 @@ class Serializer : public SerializerBase {
                        index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
       HiddenTypeLayoutsToSerialize;
 
+  ASTBlockRecordKeeper<const Decl *, AbstractMemberTypeLayoutID,
+                       index_block::ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS>
+      AbstractMemberTypeLayoutsToSerialize;
+
   SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
 
   ASTBlockRecordKeeper<Type, TypeID,
