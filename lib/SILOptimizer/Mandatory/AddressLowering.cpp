@@ -3789,6 +3789,7 @@ protected:
     case BuiltinValueKind::Id:
 #include "swift/AST/Builtins.def"
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+    case BuiltinValueKind::GetSplitContinuationAddr:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::TaskLocalValuePush:

@@ -121,6 +121,11 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
             await loopUntil(priority: .default)
             p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
           } onPriorityEscalated: { oldPriority, newPriority in
+            if oldPriority == newPriority {
+              // The call made when the handler is installed.
+              precondition(newPriority == .background, "installed at priority: \(newPriority)")
+              return
+            }
             p("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
             p("in onPriorityEscalated oldPriority = \(oldPriority)")
             precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
@@ -187,7 +192,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
       }
       triggerTwice_escalateToMediumAndThenAgainToHigh()
 
-      func dontTriggerInAlreadyEscalatedTask() {
+      func onlyInstallCallInAlreadyEscalatedTask() {
         let sem1 = DispatchSemaphore(value: 0)
         let sem2 = DispatchSemaphore(value: 0)
         let semEscalated = DispatchSemaphore(value: 0)
@@ -201,6 +206,11 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
             await loopUntil(priority: .default)
             p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
           } onPriorityEscalated: { oldPriority, newPriority in
+            if oldPriority == newPriority {
+              // The call made when the handler is installed.
+              precondition(newPriority == .background, "installed at priority: \(newPriority)")
+              return
+            }
             p("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
             p("in onPriorityEscalated oldPriority = \(oldPriority)")
             precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
@@ -212,12 +222,21 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
           // already escalated
           await loopUntil(priority: .default)
 
+          let installCalls = DispatchSemaphore(value: 0)
           await withTaskPriorityEscalationHandler {
             await loopUntil(priority: .default)
             p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
           } onPriorityEscalated: { oldPriority, newPriority in
-            fatalError("Task was already escalated earlier, no escalation triggered here")
+            // The task was already escalated earlier, so the handler is only
+            // called when it is installed, reporting that priority.
+            precondition(oldPriority == .default && newPriority == .default,
+                         "unexpected escalation \(oldPriority) -> \(newPriority)")
+            installCalls.signal()
           }
+          precondition(installCalls.wait(timeout: .now()) == .success,
+                       "handler was not called when installed")
+          precondition(installCalls.wait(timeout: .now()) == .timedOut,
+                       "handler was called more than once")
 
           p("Current priority = \(Task.currentPriority)")
           p("after withTaskPriorityEscalationHandler")
@@ -231,7 +250,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         semEscalated.wait()
         sem2.wait()
       }
-      dontTriggerInAlreadyEscalatedTask()
+      onlyInstallCallInAlreadyEscalatedTask()
     }
 
     await top_level.value

@@ -37,56 +37,315 @@ public protocol Executor: AnyObject, Sendable {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+/// Represents the time at which a scheduled job should run.
+///
+/// A fire time is either relative or absolute, and provides methods to
+/// convert to whichever form a given executor needs.  This lets
+/// `SchedulingExecutor` have a single `enqueue` requirement that accepts
+/// either a `Duration` or an `Instant`.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
-public protocol SchedulingExecutor: Executor {
+@available(StdlibDeploymentTarget 6.5, *)
+public enum SchedulingExecutorFireTime<C: Clock> {
+  /// A time relative to now.
+  case after(C.Duration)
 
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  /// An absolute time.
+  case at(C.Instant)
 
-  /// Enqueue a job to run after a specified delay.
+  /// Returns the duration from now until the fire time.
+  public func asDuration(clock: C) -> C.Duration {
+    switch self {
+    case let .after(duration):
+      return duration
+    case let .at(instant):
+      return clock.now.duration(to: instant)
+    }
+  }
+
+  /// Returns the absolute time represented by the fire time.
+  public func asInstant(clock: C) -> C.Instant {
+    switch self {
+    case let .after(duration):
+      return clock.now.advanced(by: duration)
+    case let .at(instant):
+      return instant
+    }
+  }
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+extension SchedulingExecutorFireTime: Sendable {}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+extension SchedulingExecutorFireTime: Equatable {
+  /// Two fire times are equal if they are both relative to now and have equal
+  /// durations, or are both absolute and have equal instants.  A relative time
+  /// is never equal to an absolute time, even if they happen to describe the
+  /// same moment, since that depends on what time it is.
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    switch (lhs, rhs) {
+    case let (.after(a), .after(b)):
+      return a == b
+    case let (.at(a), .at(b)):
+      return a == b
+    default:
+      return false
+    }
+  }
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+extension SchedulingExecutorFireTime: Hashable where C.Duration: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    switch self {
+    case let .after(duration):
+      hasher.combine(0 as UInt8)
+      hasher.combine(duration)
+    case let .at(instant):
+      hasher.combine(1 as UInt8)
+      hasher.combine(instant)
+    }
+  }
+}
+
+/// Something that can cancel a job that it scheduled.
+///
+/// Every `SchedulingExecutor` is one.  A `Clock` that schedules work itself
+/// (see `SchedulingClock`) can conform to this as well, if it needs to be the
+/// target of the cancellation tokens that it hands out, in which case it has to
+/// be a class.  (Being a class keeps `JobCancellationToken` small, since it
+/// holds a reference to its canceller.)
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+public protocol JobCanceller: AnyObject, Sendable {
+  /// Cancel a scheduled job.
   ///
-  /// You need only implement one of the two enqueue functions here;
-  /// the default implementation for the other will then call the one
-  /// you have implemented.
+  /// Every job must be run exactly once, so cancelling a job means running it
+  /// early: if the job identified by the token has not yet started, take it
+  /// off the timer, enqueue it to run now, where it would have run had the
+  /// timer fired, and return `true`.  If the job's `isResumption` is `true`,
+  /// run it here instead of enqueuing it (see below).  The job, not the
+  /// scheduler, deals with having been cancelled; the job that resumes a
+  /// scheduled continuation, for instance, has been told before it runs that
+  /// it is to resume by throwing.
+  ///
+  /// Return `false` if the job has already started running or has finished,
+  /// or if you can't run it early; it will then run (or has run) when its
+  /// timer fires.  `false` is always a safe answer, so a scheduler that is
+  /// unable to cancel jobs may always return it, but then cancelling a
+  /// `Task.sleep()` will not wake the task until its timer fires.  Nor need
+  /// cancelling be synchronous: a scheduler may hand the request to whatever
+  /// owns its timers (another thread, say) and return `false`, so long as the
+  /// job still runs exactly once, whether early or when its timer fires.
+  /// Callers use the result only to learn whether the job will run promptly.
+  ///
+  /// This may be called from any thread, unless the scheduler is documented as
+  /// being for use from a single thread only, as the cooperative executor is,
+  /// in which case it must be called from that thread.  A token for a job that
+  /// has already run or been cancelled must do nothing and return `false`,
+  /// and a token must never match a different job; in particular, `cancel` can
+  /// be called more than once with the same token, and only the first call
+  /// may return `true`.
+  ///
+  /// ### Implementing `cancel`
+  ///
+  /// Cancelling a `Task.sleep()` calls this from the task's cancellation
+  /// handler.  That handler runs synchronously, on whichever thread called
+  /// `task.cancel()`, and *while the runtime holds the task's status record
+  /// lock*.  The task cannot get past that lock (for instance to remove its
+  /// cancellation handler when it is resumed) until `cancel` returns, so:
+  ///
+  /// * `cancel` must return promptly, and must not call back into the task.
+  /// * It must *enqueue* the job, not run it, unless the job's `isResumption`
+  ///   is `true`.  An arbitrary job may do anything, including running a task,
+  ///   which needs the status record lock.  A resumption job only enqueues the
+  ///   task that it resumes, so it is safe to run here, and should be: the job's
+  ///   priority was fixed when it was created, and if the task has been
+  ///   escalated since, a job that was enqueued could wait behind work of lower
+  ///   priority than the task's, where running it enqueues the task at the
+  ///   task's own priority.  (The same goes for a resumption job whose timer
+  ///   fires: run it then, rather than enqueuing it.)
+  /// * It must not wait for a lock that another thread can hold while it
+  ///   runs a job.  If a thread holds your lock and runs the resumed task
+  ///   inline (as an event loop that runs jobs under a lock will), that task
+  ///   needs the status record lock, which `cancel` holds, which is waiting for
+  ///   your lock: a deadlock.  For the same reason, the executor that a
+  ///   resumption job enqueues its task on must not run the task inline.
+  ///
+  /// The simplest way to meet this is never to call out while holding your own
+  /// lock: do the bookkeeping under it, and drop it before you enqueue or run
+  /// anything, so that no one can wait for the status record lock with your
+  /// lock held.  Then `cancel` can take the lock, briefly.  If you cannot
+  /// arrange that, use a claim that doesn't need the lock: an atomic exchange
+  /// that decides whether `cancel` or the timer gets the job (as the Dispatch
+  /// executor does) lets `cancel` enqueue the job, or return `false`, without
+  /// waiting for anything.  And as a last resort, `cancel` may try to take
+  /// the lock and, if it can't, return `false`, or pass the request on to be
+  /// dealt with later: either way the job still runs, and only promptness is
+  /// lost.
+  ///
+  /// An implementation can rely on the tokens that it issued itself, and must
+  /// not trust any other, since the data in a token is not checked (see
+  /// `JobCancellationToken.init`).
+  ///
+  /// Parameters:
+  ///
+  /// - jobWithToken: The token returned when the job was scheduled.
+  ///
+  /// Returns `true` if the job had not started, and has been run, or enqueued
+  /// to run now.
+  func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool
+
+  /// Called when a token that this canceller issued is destroyed, so that it
+  /// can release anything it was keeping for the token (for example, a
+  /// reference to its own bookkeeping).
+  ///
+  /// This is called exactly once for each token that was issued, from the
+  /// token's `deinit`, on whatever thread that happens to be, and it is called
+  /// whether or not the job was cancelled.  `cancel` does not consume the token,
+  /// so `release` can be called after `cancel` has returned (and, if the token
+  /// is cancelled more than once, after all of the calls).  An implementation
+  /// that frees its bookkeeping in `cancel` must therefore not touch it again in
+  /// `release`: free it in one or the other (the Dispatch executor frees it only
+  /// here), or make them cope with having both run.
+  ///
+  /// It is called for every token, so it should do as little as it can; the
+  /// default does nothing.
+  func release(token: borrowing JobCancellationToken)
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+extension JobCanceller {
+  public func release(token: borrowing JobCancellationToken) {}
+}
+
+/// Represents a job that has been scheduled for future execution.
+///
+/// Executors create these in `SchedulingExecutor.schedule(...)`.  Calling
+/// `cancel()` asks the scheduler to run the job now, if it has not yet
+/// started running.
+///
+/// Dropping the token without cancelling does not affect the job; the
+/// canceller's `release(token:)` is called so that it can release any resources
+/// it is keeping for cancellation.
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+public struct JobCancellationToken: ~Copyable, Sendable {
+  /// What to ask to cancel the job: the executor that it was scheduled on or,
+  /// for work scheduled by a `Clock`, possibly the clock.
+  public let canceller: any JobCanceller
+
+  /// Opaque, executor-specific data, which is enough to identify the job to
+  /// the canceller, for example by holding a job ID that is never reused, or
+  /// the address of the executor's own record of the job.  (Executors that do
+  /// not need all of it can leave the rest zero.)
+  public let opaqueData: InlineArray<2, Int>
+
+  /// Create a token.
+  ///
+  /// Executors (and clocks) create tokens for the jobs they schedule, and they
+  /// trust the contents of the tokens they are given back when they are asked
+  /// to cancel; for example, an executor may treat `opaqueData` as the address
+  /// of its own bookkeeping.  Nothing checks that, so building a token that did
+  /// not come from `canceller` is unsafe.
+  @unsafe
+  public init(canceller: any JobCanceller,
+              opaqueData: InlineArray<2, Int>) {
+    self.canceller = canceller
+    self.opaqueData = opaqueData
+  }
+
+  deinit {
+    canceller.release(token: self)
+  }
+
+  /// Cancel the scheduled job.
+  ///
+  /// If the job had not started running, the executor takes it off the timer
+  /// and runs it (or enqueues it to run) now, and this returns `true`.  Returns `false` if
+  /// the job has started, has finished, has already been cancelled, or cannot
+  /// be run early by the executor, in which case it will run (or has run) when
+  /// its timer fires.  Either way, the job runs exactly once.
+  ///
+  /// This does not consume the token, so that it can be used from a closure
+  /// that only borrows it (such as a cancellation handler), and it is safe to
+  /// call more than once: only the first call can return `true`.  The token
+  /// is released when it is destroyed, as always.
+  @discardableResult
+  public borrowing func cancel() -> Bool {
+    return canceller.cancel(jobWithToken: self)
+  }
+}
+
+#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+public protocol SchedulingExecutor: Executor, JobCanceller {
+
+  /// Schedule a job to run at a specified time.
   ///
   /// Parameters:
   ///
   /// - job:       The job to schedule.
-  /// - after:     A `Duration` specifying the time after which the job
-  ///              is to run.  The job will not be executed before this
-  ///              time has elapsed.
+  /// - at:        A `SchedulingExecutorFireTime` saying when the job should
+  ///              run.  The job will not run before that time.
   /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay.
-  @available(StdlibDeploymentTarget 6.3, *)
-  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                         after delay: C.Duration,
-                         tolerance: C.Duration?,
-                         clock: C)
+  ///              job is executed.  `nil` means that the executor chooses a
+  ///              default.
+  /// - clock:     The clock used to interpret `at`.
+  ///
+  /// Returns a token that can be used to cancel the job before it runs.
+  @available(StdlibDeploymentTarget 6.5, *)
+  func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                          at: SchedulingExecutorFireTime<C>,
+                          tolerance: C.Duration?,
+                          clock: C) -> JobCancellationToken
 
-  /// Enqueue a job to run at a specified time.
+  /// Whether this executor schedules jobs against one of the standard
+  /// library's clocks itself.
   ///
-  /// You need only implement one of the two enqueue functions here;
-  /// the default implementation for the other will then call the one
-  /// you have implemented.
+  /// An executor says that it does by returning `true`, in which case it must
+  /// handle `schedule(_:at:tolerance:clock:)` for that clock.  If it returns
+  /// `false`, the runtime never asks it to schedule against that clock: a timer
+  /// for such a clock is handled by the default executor (for the standard
+  /// clocks' `schedule(_:on:at:tolerance:)`, which then gives the job to this
+  /// executor to run when the time comes; and for `Task.sleep()`, which runs
+  /// the job that resumes the task on the default executor, so that the task
+  /// then hops back to its own executor).  So an executor that only cares about
+  /// running jobs doesn't have to implement any scheduling for the standard
+  /// clocks, and doesn't need to worry about asking a clock to do it for them.
   ///
-  /// Parameters:
+  /// There is deliberately no default: an executor that schedules against the
+  /// standard clocks and forgets to say so would silently never be given a
+  /// timer.  If an executor that returns `false` is nevertheless asked to
+  /// schedule against that clock (by code that calls `schedule` directly, say),
+  /// it should forward to the clock if the clock is a `SchedulingClock`, by
+  /// calling `schedule(_:on:at:tolerance:)` on it, which is safe because the
+  /// standard clocks do not ask an executor that has said that it does not
+  /// schedule against them; and otherwise it should stop the program, since it
+  /// has been asked for something that it said it could not do.
   ///
-  /// - job:       The job to schedule.
-  /// - at:        The `Instant` at which the job should run.  The job
-  ///              will not be executed before this time.
-  /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay.
-  @available(StdlibDeploymentTarget 6.3, *)
-  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                         at instant: C.Instant,
-                         tolerance: C.Duration?,
-                         clock: C)
-
-  #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  /// Whatever it returns for a given clock must not change.  The default
+  /// executor must return `true` for both clocks, or provide
+  /// `swift_task_enqueueGlobalWithDeadlineImpl` itself, since it is what
+  /// everything else relies on.
+  func supportsScheduling(on clock: SystemClockID) -> Bool
 
 }
+#else
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+public protocol SchedulingExecutor: Executor {
+}
+#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 extension Actor {
 
@@ -125,7 +384,7 @@ extension Executor {
   #if !os(Windows)
   @_weakLinked
   #endif
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   internal var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
   }
@@ -167,35 +426,160 @@ extension Executor {
 
 // Delay support
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension SchedulingExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  @available(StdlibDeploymentTarget 6.3, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    // If you crash here with a mutual recursion, it's because you didn't
-    // implement one of these two functions
-    enqueue(job, at: clock.now.advanced(by: delay),
-            tolerance: tolerance, clock: clock)
+  /// Schedule a job to run at a specified time, with no tolerance.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 clock: C) -> JobCancellationToken {
+    return schedule(job, at: fireTime, tolerance: nil, clock: clock)
   }
 
-  @available(StdlibDeploymentTarget 6.3, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    // If you crash here with a mutual recursion, it's because you didn't
-    // implement one of these two functions
-    enqueue(job, after: clock.now.duration(to: instant),
-            tolerance: tolerance, clock: clock)
+  /// Schedule a continuation to be resumed at a specified time.
+  ///
+  /// The continuation is consumed, and is resumed when the timer fires.  If
+  /// its error type is `CancellationError`, pass the returned
+  /// ``ScheduledContinuation`` to `ContinuationWaiter.wait(for:)`, which
+  /// cancels the timer if the task is cancelled while waiting.  Executors don't need to do anything special to support
+  /// this; the continuation is scheduled as a job.
+  ///
+  /// Parameters:
+  ///
+  /// - continuation: The continuation to resume.
+  /// - at:           The time at which to resume it.
+  /// - tolerance:    The ideal maximum delay we are willing to tolerate.
+  /// - clock:        The clock that `at` is measured against.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func schedule<C: Clock, E: Error>(
+    _ continuation: consuming Continuation<Void, E>,
+    at fireTime: SchedulingExecutorFireTime<C>,
+    tolerance: C.Duration?,
+    clock: C
+  ) -> ScheduledContinuation<E> {
+    return ScheduledContinuation(continuation) { job in
+      self.schedule(job, at: fireTime, tolerance: tolerance, clock: clock)
+    }
+  }
+
+  /// Schedule a continuation to be resumed at a specified time, with no
+  /// tolerance.
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func schedule<C: Clock, E: Error>(
+    _ continuation: consuming Continuation<Void, E>,
+    at fireTime: SchedulingExecutorFireTime<C>,
+    clock: C
+  ) -> ScheduledContinuation<E> {
+    return schedule(continuation, at: fireTime, tolerance: nil, clock: clock)
   }
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+/// A continuation that has been scheduled to be resumed at some point in the
+/// future.
+///
+/// It is resumed when the scheduled time arrives, unless it is cancelled before
+/// then, which happens if this is passed to `ContinuationWaiter.wait(for:)`
+/// and the task is cancelled while waiting.  Dropping this instead is fine
+/// (and is what to do for a continuation whose error type isn't
+/// `CancellationError`); the continuation will be resumed when its time comes.
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+@safe
+public struct ScheduledContinuation<Failure: Error>: ~Copyable, Sendable {
+  private let token: JobCancellationToken
+  private let continuation: UnsafeContinuation<Void, Failure>
+
+  /// Give `continuation` to `schedule` as a job.
+  internal init(
+    _ continuation: consuming Continuation<Void, Failure>,
+    schedule: (consuming ExecutorJob) -> JobCancellationToken
+  ) {
+    let raw = unsafe UnsafeContinuation<Void, Failure>(
+      continuation._takeContext())
+    unsafe self.continuation = raw
+    self.token = unsafe schedule(_jobToResume(raw))
+  }
+
+  /// Whether this is the continuation that `context` refers to.
+  internal func _isContinuation(_ context: Builtin.RawUnsafeContinuation)
+    -> Bool {
+    return unsafe unsafeBitCast(continuation.context, to: UInt.self)
+      == unsafeBitCast(context, to: UInt.self)
+  }
+
+  /// Arrange for the continuation to be resumed by throwing `error`, if the
+  /// timer hasn't fired, and ask for the timer to fire now.
+  ///
+  /// This must only be called while the task that is waiting for the
+  /// continuation can't have been resumed, which is to say from the
+  /// cancellation handler of `ContinuationWaiter.wait(for:)`: the
+  /// continuation's storage, where we record the error, is freed once it has.
+  internal borrowing func _cancel(throwing error: Failure) {
+    // The job that resumes the continuation is part of its storage, so the
+    // executor still has it, and will run it; tell it to throw first.
+    guard unsafe _continuationCancelScheduled(continuation.context, error) else {
+      return
+    }
+    // Get the executor to run it now, rather than when the timer fires.  If it
+    // can't, it will throw then instead.
+    token.cancel()
+  }
+}
+
+/// Arrange for a split continuation that has been scheduled as a job to be
+/// resumed by throwing `error` when the job runs, if the job hasn't run yet.
+/// Takes ownership of `error`.
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_continuation_cancelScheduled")
+internal func _continuationCancelScheduled(
+  _ continuation: Builtin.RawUnsafeContinuation,
+  _ error: __owned any Error
+) -> Bool
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 6.5, *)
+extension ContinuationWaiter
+  where Success == Void, Failure == CancellationError {
+  /// Suspend until the paired continuation, which has been scheduled, is
+  /// resumed, or until the current task is cancelled.
+  ///
+  /// If the task is cancelled while we wait (or already has been), and the
+  /// timer hasn't fired, the continuation is made to throw a
+  /// `CancellationError` with the reason the task was cancelled with, and
+  /// the executor is asked to fire the timer now.  If it can't, the error is
+  /// thrown when the timer would have fired.  If the timer has already fired,
+  /// this returns normally.
+  ///
+  /// - Parameters:
+  ///   - scheduled: The scheduled continuation, which must be the one that
+  ///     pairs with this waiter.
+  public nonisolated(nonsending) consuming func wait(
+    for scheduled: consuming ScheduledContinuation<CancellationError>
+  ) async throws(CancellationError) {
+    let context = _takeContext()
+    precondition(scheduled._isContinuation(context),
+                 "waiting for a scheduled continuation that isn't ours")
+    let scheduled = scheduled
+    // A cancellation handler runs either before we suspend or while the task
+    // can't get past the status record lock, so the continuation's storage is
+    // there for `_cancel` to use.
+    try await Self._wait(
+      context: context,
+      onCancel: {
+        scheduled._cancel(throwing: CancellationError(
+          reason: CancellationError.Reason(_rawValue: $0) ?? .unspecified))
+      })
+  }
+}
+
+#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 /// A service that executes jobs.
 ///
@@ -726,7 +1110,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulingExecutor`.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.5, *)
   static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
        let scheduling = activeExecutor.asSchedulingExecutor {

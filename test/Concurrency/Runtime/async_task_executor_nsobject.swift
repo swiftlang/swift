@@ -33,12 +33,16 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
     }
   }
 
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
+  }
+
+  public func schedule<C: Clock>(_ _job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
     // Convert to `Swift.Duration`
-    let duration = delay as! Swift.Duration
+    let duration = fireTime.asDuration(clock: clock) as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
@@ -55,6 +59,12 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return JobCancellationToken(canceller: self, opaqueData: [0, 0])
+  }
+
+  public func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool {
+    return false
   }
 }
 

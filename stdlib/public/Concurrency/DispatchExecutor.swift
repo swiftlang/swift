@@ -25,8 +25,7 @@ import Swift
 
 /// A Dispatch-based main executor.
 @available(StdlibDeploymentTarget 6.3, *)
-class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
-                            @unchecked Sendable {
+class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   var threaded = false
 
   public init() {}
@@ -42,14 +41,6 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
 
   public func stop() {
     fatalError("DispatchMainExecutor cannot be stopped")
-  }
-
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
-                     executor: self, global: false)
   }
 }
 
@@ -68,24 +59,62 @@ extension DispatchMainExecutor: SerialExecutor {
 @available(StdlibDeploymentTarget 6.3, *)
 extension DispatchMainExecutor: MainExecutor {}
 
+@available(StdlibDeploymentTarget 6.5, *)
+extension DispatchMainExecutor: SchedulingExecutor {
+  public func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
+    return _dispatchEnqueue(job, run: fireTime, tolerance: tolerance,
+                            clock: clock, executor: self, global: false)
+  }
+
+  public func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> Bool {
+    return _dispatchCancel(token.opaqueData[0])
+  }
+
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
+  }
+
+  public func release(token: borrowing JobCancellationToken) {
+    _dispatchReleaseSource(token.opaqueData[0])
+  }
+}
+
 // .. Task Executor ............................................................
 
 /// A Dispatch-based `TaskExecutor`
 @available(StdlibDeploymentTarget 6.3, *)
-class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
-                                  @unchecked Sendable {
+class DispatchGlobalTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueGlobal(UnownedJob(job))
   }
+}
+@available(StdlibDeploymentTarget 6.5, *)
+extension DispatchGlobalTaskExecutor: SchedulingExecutor {
+  public func schedule<C: Clock>(_ job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
+    return _dispatchEnqueue(job, run: fireTime, tolerance: tolerance,
+                            clock: clock, executor: self, global: true)
+  }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
-                     executor: self, global: true)
+  public func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> Bool {
+    return _dispatchCancel(token.opaqueData[0])
+  }
+
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
+  }
+
+  public func release(token: borrowing JobCancellationToken) {
+    _dispatchReleaseSource(token.opaqueData[0])
   }
 }
 
@@ -136,17 +165,23 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
   fatalError("unknown clock in Dispatch Executor")
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
-fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
-  _ job: consuming ExecutorJob,
-  at instant: C.Instant,
+/// Returns `true` if `clock` is one of the clocks that we schedule ourselves.
+fileprivate func _isDispatchClock<C: Clock>(_ clock: C) -> Bool {
+  return clock is ContinuousClock || clock is SuspendingClock
+}
+
+/// The arguments that `swift_dispatchEnqueueWithDeadline` and its
+/// continuation counterpart take in place of a fire time and tolerance.
+@available(StdlibDeploymentTarget 6.5, *)
+fileprivate func _deadlineArguments<C: Clock>(
+  run: SchedulingExecutorFireTime<C>,
   tolerance: C.Duration?,
-  clock: C,
-  executor: E,
-  global: Bool
-) {
+  clock: C
+) -> (clockID: CInt, seconds: CLongLong, nanoseconds: CLongLong,
+      tolSec: CLongLong, tolNanosec: CLongLong) {
   // If it's a clock we know, convert it to something we can use; otherwise,
-  // call the clock's `enqueue` function to schedule the enqueue of the job.
+  // fail.
+  let instant = run.asInstant(clock: clock)
 
   guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                         clock: clock) else {
@@ -162,11 +197,41 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
     tolNanosec = -1
   }
 
-  _dispatchEnqueueWithDeadline(CBool(global),
-                               CLongLong(seconds), CLongLong(nanoseconds),
-                               CLongLong(tolSec), CLongLong(tolNanosec),
-                               clockID.rawValue,
-                               UnownedJob(job))
+  return (clockID: clockID.rawValue,
+          seconds: CLongLong(seconds), nanoseconds: CLongLong(nanoseconds),
+          tolSec: CLongLong(tolSec), tolNanosec: CLongLong(tolNanosec))
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+fileprivate func _dispatchToken<E: SchedulingExecutor>(
+  executor: E, source: Int
+) -> JobCancellationToken {
+  return unsafe JobCancellationToken(canceller: executor,
+                                     opaqueData: [source, 0])
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+fileprivate func _dispatchEnqueue<C: Clock, E: SchedulingExecutor>(
+  _ job: consuming ExecutorJob,
+  run: SchedulingExecutorFireTime<C>,
+  tolerance: C.Duration?,
+  clock: C,
+  executor: E,
+  global: Bool
+) -> JobCancellationToken {
+  // A clock we don't recognise may know how to schedule the job itself.
+  if !_isDispatchClock(clock) && _isSchedulingClock(clock) {
+    return _scheduleUsingClock(job, on: executor, at: run,
+                              tolerance: tolerance, clock: clock)
+  }
+
+  let args = _deadlineArguments(run: run, tolerance: tolerance, clock: clock)
+  let source = _dispatchEnqueueWithDeadline(CBool(global),
+                                            args.seconds, args.nanoseconds,
+                                            args.tolSec, args.tolNanosec,
+                                            args.clockID,
+                                            UnownedJob(job))
+  return _dispatchToken(executor: executor, source: source)
 }
 
 #endif // !$Embedded && !os(WASI) && !os(Emscripten)

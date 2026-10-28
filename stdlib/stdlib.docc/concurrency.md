@@ -88,6 +88,8 @@ Perform asynchronous and parallel operations.
 - ``Swift/UnimplementedMainExecutor``
 - ``Swift/UnimplementedTaskExecutor``
 - ``SchedulingExecutor``
+- ``SchedulingExecutorFireTime``
+- ``JobCancellationToken``
 - ``Swift/globalConcurrentExecutor``
 - ``Swift/withTaskExecutorPreference(_:isolation:operation:)``
 

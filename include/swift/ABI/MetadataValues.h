@@ -2797,6 +2797,9 @@ enum class JobKind : size_t {
   NullaryContinuation,
   IsolatedDeinit,
   TaskStealer,
+
+  /// A split continuation, which resumes the task awaiting it if it is run.
+  SplitContinuation,
 };
 
 /// The priority of a job.  Higher priorities are larger values.

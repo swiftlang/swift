@@ -28,9 +28,11 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include <atomic>
 #include <cstddef>
 
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
@@ -206,16 +208,52 @@ void swift_dispatchEnqueueGlobal(SwiftJob *job) {
 #define DISPATCH_WALLTIME_MASK  (1ULL << 62)
 #define DISPATCH_TIME_MAX_VALUE (DISPATCH_WALLTIME_MASK - 1)
 
-struct __swift_job_source {
+/// State shared between a scheduled timer, its dispatch source's event
+/// handler and (optionally) a cancellation token.
+///
+/// The job is "claimed" by atomically exchanging `job` with null: whoever
+/// gets a non-null result owns the job and is responsible for releasing the
+/// dispatch source, so exactly one of the timer firing and cancellation
+/// can run or take the job.
+///
+/// This can't live in the job's allocator: it must outlive the job (it's
+/// consulted after the job has run, at which point the task may have gone).
+///
+/// There are two references: one owned by the dispatch source (released by its
+/// finalizer) and one owned by the token (released by
+/// swift_dispatchReleaseSource).
+struct swift_job_source {
+  std::atomic<uint32_t> refcount;
   dispatch_source_t source;
-  SwiftJob *job;
+  std::atomic<SwiftJob *> job;
+
+  swift_job_source(dispatch_source_t source_, SwiftJob *job_)
+    : refcount(2), source(source_), job(job_) {}
 };
 
-static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
-  dispatch_source_t source = jobSource->source;
-  dispatch_release(source);
-  SwiftJob *job = jobSource->job;
-  swift_job_dealloc(job, jobSource);
+static void job_source_release(struct swift_job_source *jobSource) {
+  if (jobSource->refcount.fetch_sub(1, std::memory_order_acq_rel) == 1)
+    swift_cxx_deleteObject(jobSource);
+}
+
+/// The dispatch source's finalizer; releases the source's reference.
+static void _swift_job_source_finalize(void *context) {
+  job_source_release(static_cast<struct swift_job_source *>(context));
+}
+
+static void _swift_run_job_timer(struct swift_job_source *jobSource) {
+  SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
+
+  // If the job was taken by a cancellation, there is nothing to do; the
+  // canceller will have released the source.
+  if (!job)
+    return;
+
+  // The timer has fired and won't fire again, but make sure that it is
+  // finished with before we let go of it, so that its finalizer (which frees
+  // `jobSource`) runs promptly.
+  dispatch_source_cancel(jobSource->source);
+  dispatch_release(jobSource->source);
   __swift_run_job(job);
 }
 
@@ -284,13 +322,30 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
   __builtin_unreachable();
 }
 
+static inline uint64_t seconds_nanos_to_nanos(long long sec, long long nsec) {
+  uint64_t value;
+  if (sec < 0 || (sec == 0 && nsec < 0))
+    value = 0;
+  else if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &value)
+           || __builtin_add_overflow(nsec, value, &value)) {
+    value = UINT64_MAX;
+  }
+  return value;
+}
+
 extern "C" SWIFT_CC(swift)
-void swift_dispatchEnqueueWithDeadline(bool global,
-                                       long long sec,
-                                       long long nsec,
-                                       long long tsec,
-                                       long long tnsec,
-                                       int clock, SwiftJob *job) {
+void swift_dispatchEnqueueMain(SwiftJob *job);
+
+/// The most slack that we give a timer by default, however far away it is.
+static const uint64_t MaxDefaultLeewayNanos = 60ull * NSEC_PER_SEC;
+
+extern "C" SWIFT_CC(swift)
+uintptr_t swift_dispatchEnqueueWithDeadline(bool global,
+                                            long long sec,
+                                            long long nsec,
+                                            long long tsec,
+                                            long long tnsec,
+                                            int clock, SwiftJob *job) {
   assert(job && "no job provided");
 
   SwiftJobPriority priority = swift_job_getPriority(job);
@@ -310,36 +365,110 @@ void swift_dispatchEnqueueWithDeadline(bool global,
 
   dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
-  if (tnsec != -1) {
-    uint64_t leeway;
-    if (tsec < 0 || (tsec == 0 && tnsec < 0))
-      leeway = 0;
-    else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
-             || __builtin_add_overflow(tnsec, leeway, &leeway)) {
-      leeway = UINT64_MAX;
-    }
+  long long nowSec, nowNsec;
+  swift_get_time(&nowSec, &nowNsec, (swift_clock_id)clock);
 
-    dispatch_source_t source =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-    dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
+  uint64_t now = seconds_nanos_to_nanos(nowSec, nowNsec);
+  uint64_t deadline = seconds_nanos_to_nanos(sec, nsec);
 
-    size_t sz = sizeof(struct __swift_job_source);
-
-    struct __swift_job_source *jobSource =
-      (struct __swift_job_source *)swift_job_alloc(job, sz);
-
-    jobSource->job = job;
-    jobSource->source = source;
-
-    dispatch_set_context(source, jobSource);
-    dispatch_source_set_event_handler_f(source,
-      (dispatch_function_t)&_swift_run_job_leeway);
-
-    dispatch_activate(source);
-  } else {
-    dispatch_after_f(when, queue, (void *)job,
-      (dispatch_function_t)&__swift_run_job);
+  // If the deadline has already passed there is nothing to wait for, and
+  // creating, activating and firing a dispatch source would cost several
+  // times as much as just running the job.  Enqueue it directly and return a
+  // null token, which cancels as "already started".
+  //
+  // We don't do this for deadlines that are merely close: dispatch_after_f()
+  // is no cheaper than a source for anything beyond about a microsecond, and
+  // its coalescing makes sleeps of tens of microseconds take several times
+  // longer than a source does.
+  if (deadline <= now) {
+    if (global)
+      swift_dispatchEnqueueGlobal(job);
+    else
+      swift_dispatchEnqueueMain(job);
+    return 0;
   }
+
+  uint64_t leeway;
+  if (tnsec == -1) {
+    // No tolerance was specified.  We used to call dispatch_after() in this
+    // case, which sets the leeway according to the priority (5% for
+    // interactive and above, 6.7% for default and above, 10% otherwise).  We
+    // need a source so that we can cancel, and we have no way to ask Dispatch
+    // for its idea of the priority, so use 6.7%.  Don't let that grow without
+    // limit for very long timers; a minute's slack is plenty.
+    uint64_t delta = deadline - now;
+
+    leeway = delta / 15;
+    if (leeway > MaxDefaultLeewayNanos)
+      leeway = MaxDefaultLeewayNanos;
+  } else if (tsec < 0 || (tsec == 0 && tnsec < 0)) {
+    leeway = 0;
+  } else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
+             || __builtin_add_overflow(tnsec, leeway, &leeway)) {
+    leeway = UINT64_MAX;
+  }
+
+  dispatch_source_t source =
+    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+  dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
+
+  struct swift_job_source *jobSource =
+    swift_cxx_newObject<struct swift_job_source>(source, job);
+
+  dispatch_set_context(source, jobSource);
+  dispatch_set_finalizer_f(source, &_swift_job_source_finalize);
+  dispatch_source_set_event_handler_f(source,
+    (dispatch_function_t)&_swift_run_job_timer);
+
+  dispatch_activate(source);
+
+  return reinterpret_cast<uintptr_t>(jobSource);
+}
+
+/// Cancel a job scheduled by swift_dispatchEnqueueWithDeadline(), which
+/// means running or enqueuing it now, rather than when its timer fires.
+///
+/// Returns true if the job had not already been run (or cancelled), and so
+/// has been enqueued, or false.  This does not release the caller's
+/// reference; call swift_dispatchReleaseSource() for that.
+extern "C" SWIFT_CC(swift)
+bool swift_dispatchCancel(uintptr_t token) {
+  if (!token)
+    return false;  // The job was enqueued directly
+  auto *jobSource = reinterpret_cast<struct swift_job_source *>(token);
+  SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
+
+  if (!job)
+    return false;
+
+  dispatch_source_cancel(jobSource->source);
+  dispatch_release(jobSource->source);
+
+  // A job that only resumes a task can run here and now, which also means
+  // that the task is enqueued at its own priority, rather than the job waiting
+  // in a queue chosen by the job's priority, which may be out of date.
+  if (swift_job_isResumption(job)) {
+    __swift_run_job(job);
+    return true;
+  }
+
+  // Otherwise enqueue the job where the timer would have run it.  (We must not
+  // run it here: we may be in a task's cancellation handler.)
+  if (job->schedulerPrivate[SwiftJobDispatchQueueIndex]
+        == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
+    swift_dispatchEnqueueGlobal(job);
+  else
+    swift_dispatchEnqueueMain(job);
+  return true;
+}
+
+/// Release the reference to a scheduled job's state that was returned from
+/// swift_dispatchEnqueueWithDeadline().
+extern "C" SWIFT_CC(swift)
+void swift_dispatchReleaseSource(uintptr_t token) {
+  if (!token)
+    return;
+  job_source_release(reinterpret_cast<struct swift_job_source *>(token));
 }
 
 extern "C" SWIFT_CC(swift)

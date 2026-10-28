@@ -16,14 +16,14 @@ import Dispatch
 import StdlibUnittest
 @_spi(ExperimentalScheduling) import _Concurrency
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 actor MyActor {
   public func doSleep() async {
     try! await Task.sleep(for: .seconds(0.1))
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   var asScheduling: SchedulingExecutor? {
     return self
@@ -36,12 +36,16 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
     }
   }
 
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
+  }
+
+  public func schedule<C: Clock>(_ _job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
     // Convert to `Swift.Duration`
-    let duration = delay as! Swift.Duration
+    let duration = fireTime.asDuration(clock: clock) as! Swift.Duration
 
     // Now turn that into nanoseconds
     let (seconds, attoseconds) = duration.components
@@ -56,10 +60,17 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return JobCancellationToken(canceller: self, opaqueData: [0, 0])
+  }
+
+  // We can't remove jobs from `asyncAfter`, so we never cancel.
+  public func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool {
+    return false
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_executor")

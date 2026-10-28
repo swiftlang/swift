@@ -73,6 +73,36 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
   fatalError("unknown clock in fallback path")
 }
 
+#if !$Embedded
+/// A flag that is claimed exactly once, by whichever of the timer and the
+/// cancellation handler gets there first.
+@available(StdlibDeploymentTarget 5.7, *)
+@safe
+fileprivate final class _SleepClaim: @unchecked Sendable {
+  let wordPtr: UnsafeMutablePointer<Builtin.Word>
+
+  init() {
+    unsafe wordPtr = .allocate(capacity: 1)
+    unsafe Builtin.atomicstore_seqcst_Word(
+      wordPtr._rawValue, (0 as Int)._builtinWordValue)
+  }
+
+  /// Returns `true` for the first caller only.
+  func claim() -> Bool {
+    let (_, won) = unsafe Builtin.cmpxchg_seqcst_seqcst_Word(
+      wordPtr._rawValue,
+      (0 as Int)._builtinWordValue,
+      (1 as Int)._builtinWordValue)
+    return Bool(_builtinBooleanLiteral: won)
+  }
+
+  deinit {
+    unsafe wordPtr.deallocate()
+  }
+}
+
+#endif
+
 @available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
@@ -83,127 +113,191 @@ extension Task where Success == Never, Failure == Never {
     tolerance: C.Duration?,
     clock: C
   ) async throws {
-    // Create a token which will initially have the value "not started", which
-    // means the continuation has neither been created nor completed.
-    let token = unsafe UnsafeSleepStateToken()
+    #if !$Embedded
+    if #available(StdlibDeploymentTarget 6.5, *) {
+      try await _sleep(run: .at(instant), tolerance: tolerance, clock: clock)
+      return
+    }
+    #endif
+    try await _sleepWithoutSchedulingExecutor(
+      until: instant, tolerance: tolerance, clock: clock)
+  }
 
-    do {
-      // Install a cancellation handler to resume the continuation by
-      // throwing CancellationError.
-      try await withTaskCancellationHandler {
-        let _: () = try unsafe await withUnsafeThrowingContinuation { continuation in
-          while true {
-            let state = unsafe token.load()
-            switch unsafe state {
-            case .notStarted:
-              // Try to swap in the continuation word.
-              let newState = unsafe SleepState.activeContinuation(continuation)
-              if unsafe !token.exchange(expected: state, desired: newState) {
-                // Keep trying!
-                continue
-              }
+  #if !$Embedded
 
-              // Create a task that resumes the continuation normally if it
-              // finishes first. Enqueue it directly with the delay, so it fires
-              // when we're done sleeping.
-              let sleepTaskFlags = taskCreateFlags(
-                priority: nil, isChildTask: false, copyTaskLocals: false,
-                inheritContext: false, enqueueJob: false,
-                addPendingGroupTaskUnconditionally: false,
-                isDiscardingTask: false, isSynchronousStart: false)
-              let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
-                unsafe onSleepWake(token)
-              }
+  /// Sleep until the given time, or until the task is cancelled.
+  ///
+  /// We hand the continuation's resume half to the current scheduling
+  /// executor, which resumes it when the timer fires, and keep the token that
+  /// lets us cancel the timer.  If the task is cancelled before the timer
+  /// fires, we tell the continuation to throw when it is resumed, and ask the
+  /// executor to fire the timer now; if the timer has already fired (or is
+  /// firing), it resumes the continuation normally.  Either way the timer is
+  /// what resumes the continuation, so it is resumed exactly once, and a
+  /// cancelled sleep doesn't leave its timer behind in an executor that can
+  /// fire it early.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
+  internal static func _sleep<C: Clock>(
+    run fireTime: SchedulingExecutorFireTime<C>,
+    tolerance: C.Duration?,
+    clock: C
+  ) async throws {
+    // An executor may decline to cancel a timer that is about to fire, so
+    // make sure a task that is already cancelled doesn't sleep at all.
+    try Task.checkCancellation()
 
-              let job = Builtin.convertTaskToJob(sleepTask)
+    // Use the current scheduling executor, unless it has said that it doesn't
+    // schedule against this clock itself, in which case the default executor
+    // does it (and failing that, the runtime's global enqueue function).
+    var scheduler = Task.currentSchedulingExecutor
+    if let systemClock = _systemClockID(clock),
+       !(scheduler?.supportsScheduling(on: systemClock) ?? false) {
+      if let defaultScheduler = Task.defaultExecutor.asSchedulingExecutor,
+         defaultScheduler.supportsScheduling(on: systemClock) {
+        scheduler = defaultScheduler
+      } else {
+        scheduler = nil
+      }
+    }
 
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                #if !$Embedded
-                if let executor = Task.currentSchedulingExecutor {
-                  executor.enqueue(ExecutorJob(context: job),
-                                   at: instant,
-                                   tolerance: tolerance,
-                                   clock: clock)
-                  return
-                }
-                #endif
-              } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
-              }
+    guard let executor = scheduler else {
+      try await _sleepWithoutSchedulingExecutor(
+        until: fireTime.asInstant(clock: clock),
+        tolerance: tolerance,
+        clock: clock)
+      return
+    }
 
-              // If there is no current scheduling executor, fall back to
-              // calling _enqueueJobGlobalWithDeadline().
-              let (clockID, seconds, nanoseconds) = timestamp(for: instant,
-                                                              clock: clock)
-              let toleranceSeconds: Int64
-              let toleranceNanoseconds: Int64
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                if let tolerance = tolerance {
-                  (toleranceSeconds, toleranceNanoseconds)
-                    = durationComponents(for: tolerance, clock: clock)
-                } else {
-                  toleranceSeconds = 0
-                  toleranceNanoseconds = -1
-                }
-              } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
-              }
+    try await _sleepScheduling { continuation in
+      executor.schedule(continuation,
+                        at: fireTime,
+                        tolerance: tolerance,
+                        clock: clock)
+    }
+  }
 
-              if #available(StdlibDeploymentTarget 5.9, *) {
-                _enqueueJobGlobalWithDeadline(
-                  seconds, nanoseconds,
-                  toleranceSeconds, toleranceNanoseconds,
-                  clockID.rawValue, UnownedJob(context: job))
-              } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
-              }
-              return
+  /// Suspend the current task until a timer fires, or until the task is
+  /// cancelled.
+  ///
+  /// `schedule` is handed the continuation that the sleeping task is waiting
+  /// on, and must arrange for it to be resumed when the timer fires.  If the
+  /// task is cancelled, we use the result to make the continuation throw, and
+  /// to fire the timer early.
+  @available(StdlibDeploymentTarget 6.5, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
+  internal static func _sleepScheduling(
+    _ schedule: (consuming Continuation<Void, _Concurrency.CancellationError>)
+      -> ScheduledContinuation<_Concurrency.CancellationError>
+  ) async throws {
+    try await withContinuation(
+      of: Void.self, throwing: _Concurrency.CancellationError.self
+    ) { (continuation: consuming Continuation<Void, _Concurrency.CancellationError>,
+         waiter: consuming ContinuationWaiter<Void, _Concurrency.CancellationError>)
+        async throws(_Concurrency.CancellationError) -> Void in
+      try await waiter.wait(for: schedule(continuation))
+    }
+  }
 
-            case .activeContinuation, .finished:
-              fatalError("Impossible to have multiple active continuations")
+  #endif // !$Embedded
 
-            case .cancelled:
-              fatalError("Impossible to have cancelled before we began")
+  /// The fallback for when there is no scheduling executor, which uses the
+  /// runtime's global enqueue functions.  Those can't cancel the timer, so
+  /// it stays queued until it fires, but cancelling the task still wakes it at
+  /// once.
+  ///
+  /// Those functions can only do anything useful if something provides them:
+  /// by default they use the default executor, which is the scheduling executor
+  /// that we just failed to find, so this is only of use where the executor
+  /// factory supplies its own implementation of
+  /// `swift_task_enqueueGlobalWithDeadlineImpl` (or a hook).
+  @available(StdlibDeploymentTarget 5.7, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
+  internal static func _sleepWithoutSchedulingExecutor<C: Clock>(
+    until instant: C.Instant,
+    tolerance: C.Duration?,
+    clock: C
+  ) async throws {
+    // We are the runtime, so this is always true; the check is only here to
+    // let us use the declarations below.  (This is not a fallback for an older
+    // runtime: an older runtime has its own, older, copy of this code.)
+    guard #available(StdlibDeploymentTarget 6.5, *) else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
 
-            case .cancelledBeforeStarted:
-              // Finish the continuation normally. We'll throw later, after
-              // we clean up.
-              unsafe continuation.resume()
-              return
-          }
+    try Task.checkCancellation()
+
+    let (clockID, seconds, nanoseconds) = timestamp(for: instant, clock: clock)
+    let toleranceSeconds: Int64
+    let toleranceNanoseconds: Int64
+    if let tolerance = tolerance {
+      (toleranceSeconds, toleranceNanoseconds)
+        = durationComponents(for: tolerance, clock: clock)
+    } else {
+      toleranceSeconds = 0
+      toleranceNanoseconds = -1
+    }
+
+    #if !$Embedded
+    // The timer can only resume a continuation, and can't be cancelled, so
+    // we can't hand it the continuation that the sleeping task is waiting on:
+    // if the task were cancelled, the timer would later resume it a second
+    // time.  Instead, a helper task waits for the timer, and whichever of the
+    // helper and the cancellation handler gets to the claim first resumes the
+    // sleeping task.
+    let claim = _SleepClaim()
+    try await withContinuation(
+      of: Void.self, throwing: _Concurrency.CancellationError.self
+    ) { (continuation: consuming Continuation<Void, _Concurrency.CancellationError>,
+         waiter: consuming ContinuationWaiter<Void, _Concurrency.CancellationError>)
+        async throws(_Concurrency.CancellationError) -> Void in
+      let sleeper = unsafe UnsafeContinuation<Void, _Concurrency.CancellationError>(
+        continuation._takeContext())
+
+      _ = Task<Void, Never>.detached(priority: Task.currentPriority) {
+        await Task<Never, Never>._waitForTimer(
+          clockID: clockID.rawValue,
+          seconds: seconds, nanoseconds: nanoseconds,
+          toleranceSeconds: toleranceSeconds,
+          toleranceNanoseconds: toleranceNanoseconds)
+        if claim.claim() {
+          unsafe sleeper.resume()
         }
+      }
+
+      try await waiter.wait(onCancel: { reason in
+        if claim.claim() {
+          unsafe sleeper.resume(
+            throwing: _Concurrency.CancellationError(reason: reason))
         }
-      } onCancel: {
-        unsafe onSleepCancel(token)
-      }
+      })
+    }
+    #else
+    await _waitForTimer(clockID: clockID.rawValue,
+                        seconds: seconds, nanoseconds: nanoseconds,
+                        toleranceSeconds: toleranceSeconds,
+                        toleranceNanoseconds: toleranceNanoseconds)
+    try Task.checkCancellation()
+    #endif
+  }
 
-      // Determine whether we got cancelled before we even started.
-      let cancelledBeforeStarted: Bool
-      switch unsafe token.load() {
-      case .notStarted, .activeContinuation, .cancelled:
-        fatalError("Invalid state for non-cancelled sleep task")
+  /// Wait until the timer fires, using the runtime's global enqueue functions.
+  @available(StdlibDeploymentTarget 5.7, *)
+  internal static func _waitForTimer(
+    clockID: Int32,
+    seconds: Int64, nanoseconds: Int64,
+    toleranceSeconds: Int64, toleranceNanoseconds: Int64
+  ) async {
+    let _: () = await Builtin.withUnsafeContinuation {
+      (continuation: Builtin.RawUnsafeContinuation) -> Void in
+      let job = _taskCreateNullaryContinuationJob(
+        priority: Int(Task.currentPriority.rawValue),
+        continuation: continuation)
 
-      case .cancelledBeforeStarted:
-        cancelledBeforeStarted = true
-
-      case .finished:
-        cancelledBeforeStarted = false
-      }
-
-      // We got here without being cancelled, so deallocate the storage for
-      // the flag word and continuation.
-      unsafe token.deallocate()
-
-      // If we got cancelled before we even started, through the cancellation
-      // error now.
-      if cancelledBeforeStarted {
-        throw _Concurrency.CancellationError()
-      }
-    } catch {
-      // The task was cancelled; propagate the error. The "on wake" task is
-      // responsible for deallocating the flag word and continuation, if it's
-      // still running.
-      throw error
+      _enqueueJobGlobalWithDeadline(
+        seconds, nanoseconds,
+        toleranceSeconds, toleranceNanoseconds,
+        clockID, UnownedJob(context: job))
     }
   }
 
@@ -211,7 +305,7 @@ extension Task where Success == Never, Failure == Never {
   /// Suspends the current task until the given deadline within a tolerance.
   ///
   /// If the task is canceled before the time ends, this function throws
-  /// `CancellationError`.
+  /// `_Concurrency.CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
   ///
@@ -229,7 +323,7 @@ extension Task where Success == Never, Failure == Never {
   /// Suspends the current task for the given duration.
   ///
   /// If the task is canceled before the time ends, this function throws
-  /// `CancellationError`.
+  /// `_Concurrency.CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
   ///
