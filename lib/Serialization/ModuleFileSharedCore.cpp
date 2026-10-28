@@ -358,21 +358,29 @@ static ValidationInfo validateControlBlock(
       switch (scratch.size()) {
       default:
       // Add new cases here, in descending order.
+      case 9:
       case 8:
       case 7:
       case 6:
       case 5: {
         auto subMinor = 0;
         auto build = 0;
-        // case 7 and 8 were added after case 5 and 6, so we need to have this
-        // special handling to make sure we can still load the module without
-        // case 7 and case 8 successfully.
+        auto subbuild = 0;
+        // The sub-minor, build, and sub-build fields were added later. Records
+        // without them come from older swiftmodule formats, which are only
+        // read this far for diagnostics, or from swiftdoc and swiftsourceinfo
+        // files, which share this layout but have their own format versions.
         if (scratch.size() >= 8) {
           subMinor = scratch[6];
           build = scratch[7];
         }
-        result.userModuleVersion = llvm::VersionTuple(scratch[4], scratch[5],
-                                                      subMinor, build);
+        if (scratch.size() >= 9)
+          subbuild = scratch[8];
+        result.userModuleVersion =
+            subbuild
+                ? llvm::VersionTuple(scratch[4], scratch[5], subMinor, build,
+                                     subbuild)
+                : llvm::VersionTuple(scratch[4], scratch[5], subMinor, build);
         LLVM_FALLTHROUGH;
       }
       case 4:

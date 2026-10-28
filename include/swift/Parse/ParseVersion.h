@@ -44,6 +44,13 @@ public:
   static std::optional<version::Version>
   parseVersionString(StringRef VersionString, SourceLoc Loc,
                      DiagnosticEngine *Diags);
+
+  /// Parse a user module version, as specified by `-user-module-version`.
+  ///
+  /// Components beyond the fifth are ignored, as is a fifth component that is
+  /// out of range for \c llvm::VersionTuple.
+  static std::optional<llvm::VersionTuple>
+  parseUserModuleVersion(StringRef VersionString);
 };
 } // namespace swift
 

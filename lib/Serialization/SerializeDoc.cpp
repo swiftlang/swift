@@ -469,6 +469,7 @@ void DocSerializer::writeDocHeader() {
                   /*user module version minor*/0,
                   /*user module version subminor*/0,
                   /*user module version build*/0,
+                  /*user module version sub-build*/0,
                   verText);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
@@ -883,6 +884,7 @@ public:
                     /*user module version minor*/0,
                     /*user module version sub-minor*/0,
                     /*user module version build*/0,
+                    /*user module version sub-build*/0,
                     verText);
 
       ModuleName.emit(ScratchRecord, M->getName().str());
