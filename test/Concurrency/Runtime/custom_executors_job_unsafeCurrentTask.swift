@@ -6,6 +6,7 @@
 // UNSUPPORTED: freestanding
 
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: use_os_stdlib
 // REQUIRES: concurrency_runtime
 // REQUIRES: stdlib_6_5_runtime
 // REQUIRES: synchronization
