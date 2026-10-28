@@ -1893,9 +1893,7 @@ bool LinkEntity::isBackDeployedIntoClient() const {
   case Kind::GenericProtocolWitnessTableInstantiationFunction: {
     auto *dc = getDeclContextForEmission();
     nominal = dc->getSelfNominalTypeDecl();
-    if (nominal && dc->getParentModule() != nominal->getParentModule())
-      return false;
-    break;
+    return nominal && nominal->emitsConformanceIntoClient(dc);
   }
 
   default:

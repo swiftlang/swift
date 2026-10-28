@@ -4760,6 +4760,13 @@ public:
   /// copy of the type's metadata and conformances.
   bool isBackDeployedIntoClient() const;
 
+  /// Whether the module being compiled emits its own copy of a conformance of
+  /// this type that is declared in \p conformanceDC: that is, this type is
+  /// back-deployed into the client (\c isBackDeployedIntoClient), and the
+  /// conformance is declared alongside it, in the same module, and isn't only
+  /// available where that module provides the type.
+  bool emitsConformanceIntoClient(const DeclContext *conformanceDC) const;
+
   /// True if the decl is resilient AND also its defining module does
   /// _not_ allow non-resilient access; the module can allow such access
   /// if package optimization is enabled so its client modules within the

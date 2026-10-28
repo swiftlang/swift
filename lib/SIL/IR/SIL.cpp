@@ -97,8 +97,7 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
 
   // The conformances declared alongside a back-deployed type are emitted
   // into each client that uses the type.
-  if (typeDecl->isBackDeployedIntoClient() &&
-      C->getDeclContext()->getParentModule() == typeDecl->getParentModule())
+  if (typeDecl->emitsConformanceIntoClient(C->getDeclContext()))
     return SILLinkage::Shared;
 
   // In embedded Swift, conformances get special treatment.

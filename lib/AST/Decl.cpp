@@ -6579,6 +6579,24 @@ bool NominalTypeDecl::isBackDeployedIntoClient() const {
   return query && !query->isAlwaysTrueForDeploymentTargets(getASTContext());
 }
 
+bool NominalTypeDecl::emitsConformanceIntoClient(
+    const DeclContext *conformanceDC) const {
+  if (!isBackDeployedIntoClient())
+    return false;
+
+  if (conformanceDC->getParentModule() != getParentModule())
+    return false;
+
+  // A conformance in an extension that is only available where the type's
+  // module provides the type isn't back-deployed with the type.
+  if (auto *ext = dyn_cast<ExtensionDecl>(conformanceDC))
+    if (auto attrAndRange = getBackDeployedAttrAndRange())
+      if (ext->isOnlyAvailableWithinBackDeployedRange(attrAndRange->second))
+        return false;
+
+  return true;
+}
+
 bool NominalTypeDecl::isStrictlyResilient() const {
   return isResilient() && !getModuleContext()->allowNonResilientAccess();
 }
