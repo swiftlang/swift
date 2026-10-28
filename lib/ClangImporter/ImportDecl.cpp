@@ -1071,7 +1071,8 @@ namespace {
   VarDecl *
   identifyPropertyRedeclarationPoint(ClangImporter::Implementation &Impl,
                                      const clang::ObjCPropertyDecl *decl,
-                                     ClassDecl *subject, Identifier name) {
+                                     ClassDecl *subject, Identifier name,
+                                     CArrayProjection projection) {
     llvm::SetVector<Decl *> lookup;
     // First, pull in all available members of the base class so we can catch
     // redeclarations of APIs that are refined for Swift.
@@ -1094,6 +1095,16 @@ namespace {
 
       if (var->isInstanceMember() != decl->isInstanceProperty())
         continue;
+
+      // Filter out `var`s which are other projections of `decl` itself.
+      if (var->getClangDecl() == decl)
+        continue;
+
+      // Filter out `var`s which don't match the C array projection we're
+      // currently trying to import.
+      if (auto *attr = var->getAttrs().getAttribute<CArrayProjectionAttr>())
+        if (attr->getProjection() != projection)
+          continue;
 
       // If the selectors of the getter match in Objective-C, we have a
       // redeclaration.
@@ -7089,6 +7100,26 @@ namespace {
     /// \see VisitObjCPropertyDecl
     void handlePropertyRedeclaration(VarDecl *original,
                                      const clang::ObjCPropertyDecl *redecl) {
+      applyPropertyRedeclaration(original, redecl);
+
+      // The original's other projection (if it has one) is also redeclared. A
+      // setter for it has to be imported as that projection.
+      if (auto *counterpart =
+              importer::getDeclForCounterpartCArrayProjection(original)) {
+        auto *attr =
+            counterpart->getAttrs().getAttribute<CArrayProjectionAttr>();
+        llvm::SaveAndRestore<CArrayProjection>
+            saveProjection(currentCArrayProjection, attr->getProjection());
+        llvm::SaveAndRestore<bool>
+            saveAccessLevel(hasComputedAccessLevel, false);
+        applyPropertyRedeclaration(counterpart, redecl);
+      }
+    }
+
+    /// Apply the redeclaration \p redecl of a property to \p original , which
+    /// is one projection of it.
+    void applyPropertyRedeclaration(VarDecl *original,
+                                    const clang::ObjCPropertyDecl *redecl) {
       // If the property isn't from Clang, we can't safely update it.
       if (!original->hasClangNode())
         return;
@@ -7185,9 +7216,8 @@ namespace {
         // Try searching the class for a property redeclaration. We can use
         // the redeclaration to refine the already-imported property with a
         // setter and also cut off any double-importing behavior.
-        auto *redecl
-            = identifyPropertyRedeclarationPoint(Impl, decl,
-                                                 dc->getSelfClassDecl(), name);
+        auto *redecl = identifyPropertyRedeclarationPoint(
+            Impl, decl, dc->getSelfClassDecl(), name, currentCArrayProjection);
         if (redecl) {
           handlePropertyRedeclaration(redecl, decl);
           return nullptr;
