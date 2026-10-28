@@ -1638,63 +1638,142 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     }
   }
 
+  /// Skip over a single attribute value without decoding it, which saves
+  /// allocating the value.  Forms that we don't know how to skip cheaply
+  /// are decoded and discarded.
+  private func skip(form: Dwarf_Form,
+                    at cursor: inout ImageSourceCursor,
+                    unit: Unit,
+                    constantValue: Int64?) throws {
+    switch form {
+      case .DW_FORM_flag_present, .DW_FORM_implicit_const:
+        break
+      case .DW_FORM_data1, .DW_FORM_ref1, .DW_FORM_flag,
+           .DW_FORM_addrx1, .DW_FORM_strx1:
+        cursor.pos += 1
+      case .DW_FORM_data2, .DW_FORM_ref2, .DW_FORM_addrx2,
+           .DW_FORM_strx2:
+        cursor.pos += 2
+      case .DW_FORM_addrx3, .DW_FORM_strx3:
+        cursor.pos += 3
+      case .DW_FORM_data4, .DW_FORM_ref4, .DW_FORM_addrx4,
+           .DW_FORM_strx4, .DW_FORM_ref_sup4:
+        cursor.pos += 4
+      case .DW_FORM_data8, .DW_FORM_ref8, .DW_FORM_ref_sig8,
+           .DW_FORM_ref_sup8:
+        cursor.pos += 8
+      case .DW_FORM_data16:
+        cursor.pos += 16
+      case .DW_FORM_sec_offset, .DW_FORM_strp, .DW_FORM_line_strp,
+           .DW_FORM_strp_sup, .DW_FORM_ref_addr:
+        cursor.pos += unit.isDwarf64 ? 8 : 4
+      case .DW_FORM_udata, .DW_FORM_sdata, .DW_FORM_ref_udata,
+           .DW_FORM_addrx, .DW_FORM_strx, .DW_FORM_loclistx,
+           .DW_FORM_rnglistx:
+        _ = try cursor.readULEB128()
+      case .DW_FORM_block, .DW_FORM_exprloc:
+        let length = try cursor.readULEB128()
+        cursor.pos += length
+      case .DW_FORM_block1:
+        cursor.pos += UInt64(try cursor.read(as: UInt8.self))
+      case .DW_FORM_block2:
+        cursor.pos += UInt64(maybeSwap(try cursor.read(as: UInt16.self)))
+      case .DW_FORM_block4:
+        cursor.pos += UInt64(maybeSwap(try cursor.read(as: UInt32.self)))
+      default:
+        _ = try read(form: form,
+                     at: &cursor,
+                     addressSize: unit.addressSize,
+                     isDwarf64: unit.isDwarf64,
+                     unit: unit,
+                     shouldFetchIndirect: false,
+                     constantValue: constantValue)
+    }
+  }
+
   /// Skip over the attributes of a DIE without decoding them, which saves
   /// allocating the values (and the dictionary to hold them) for DIEs that
-  /// we don't care about.  Forms that we don't know how to skip cheaply
-  /// are decoded and discarded.
+  /// we don't care about.
   private func skipDieAttributes(
     at cursor: inout ImageSourceCursor,
     unit: Unit,
     abbrevInfo: AbbrevInfo
   ) throws {
-    let offsetSize: UInt64 = unit.isDwarf64 ? 8 : 4
-
     for (_, form, constantValue) in abbrevInfo.attributes {
-      switch form {
-        case .DW_FORM_flag_present, .DW_FORM_implicit_const:
-          break
-        case .DW_FORM_data1, .DW_FORM_ref1, .DW_FORM_flag,
-             .DW_FORM_addrx1, .DW_FORM_strx1:
-          cursor.pos += 1
-        case .DW_FORM_data2, .DW_FORM_ref2, .DW_FORM_addrx2,
-             .DW_FORM_strx2:
-          cursor.pos += 2
-        case .DW_FORM_addrx3, .DW_FORM_strx3:
-          cursor.pos += 3
-        case .DW_FORM_data4, .DW_FORM_ref4, .DW_FORM_addrx4,
-             .DW_FORM_strx4, .DW_FORM_ref_sup4:
-          cursor.pos += 4
-        case .DW_FORM_data8, .DW_FORM_ref8, .DW_FORM_ref_sig8,
-             .DW_FORM_ref_sup8:
-          cursor.pos += 8
-        case .DW_FORM_data16:
-          cursor.pos += 16
-        case .DW_FORM_sec_offset, .DW_FORM_strp, .DW_FORM_line_strp,
-             .DW_FORM_strp_sup, .DW_FORM_ref_addr:
-          cursor.pos += offsetSize
-        case .DW_FORM_udata, .DW_FORM_sdata, .DW_FORM_ref_udata,
-             .DW_FORM_addrx, .DW_FORM_strx, .DW_FORM_loclistx,
-             .DW_FORM_rnglistx:
-          _ = try cursor.readULEB128()
-        case .DW_FORM_block, .DW_FORM_exprloc:
-          let length = try cursor.readULEB128()
-          cursor.pos += length
-        case .DW_FORM_block1:
-          cursor.pos += UInt64(try cursor.read(as: UInt8.self))
-        case .DW_FORM_block2:
-          cursor.pos += UInt64(maybeSwap(try cursor.read(as: UInt16.self)))
-        case .DW_FORM_block4:
-          cursor.pos += UInt64(maybeSwap(try cursor.read(as: UInt32.self)))
+      try skip(form: form, at: &cursor, unit: unit,
+               constantValue: constantValue)
+    }
+  }
+
+  /// The attributes of a function or inlined call site DIE that we use.
+  /// Reading these directly, rather than building a dictionary of all of
+  /// the attributes, is considerably cheaper.
+  struct FunctionAttributes {
+    var name: DwarfValue?
+    var linkageName: DwarfValue?
+    var abstractOrigin: Address?
+    var specification: Address?
+    var lowPC: DwarfValue?
+    var highPC: DwarfValue?
+    var ranges: DwarfValue?
+    var callFile: DwarfValue?
+    var callLine: DwarfValue?
+    var callColumn: DwarfValue?
+  }
+
+  private func readFunctionAttributes(
+    at cursor: inout ImageSourceCursor,
+    unit: Unit,
+    abbrevInfo: AbbrevInfo
+  ) throws -> FunctionAttributes {
+    var result = FunctionAttributes()
+
+    for (attribute, form, constantValue) in abbrevInfo.attributes {
+      switch attribute {
+        case .DW_AT_name, .DW_AT_linkage_name,
+             .DW_AT_abstract_origin, .DW_AT_specification,
+             .DW_AT_low_pc, .DW_AT_high_pc, .DW_AT_ranges,
+             .DW_AT_call_file, .DW_AT_call_line, .DW_AT_call_column:
+          let value = try read(form: form,
+                               at: &cursor,
+                               addressSize: unit.addressSize,
+                               isDwarf64: unit.isDwarf64,
+                               unit: unit,
+                               shouldFetchIndirect: true,
+                               constantValue: constantValue)
+          switch attribute {
+            case .DW_AT_name:
+              result.name = value
+            case .DW_AT_linkage_name:
+              result.linkageName = value
+            case .DW_AT_abstract_origin:
+              if case let .reference(ref) = value {
+                result.abstractOrigin = ref
+              }
+            case .DW_AT_specification:
+              if case let .reference(ref) = value {
+                result.specification = ref
+              }
+            case .DW_AT_low_pc:
+              result.lowPC = value
+            case .DW_AT_high_pc:
+              result.highPC = value
+            case .DW_AT_ranges:
+              result.ranges = value
+            case .DW_AT_call_file:
+              result.callFile = value
+            case .DW_AT_call_line:
+              result.callLine = value
+            default:
+              result.callColumn = value
+          }
         default:
-          _ = try read(form: form,
-                       at: &cursor,
-                       addressSize: unit.addressSize,
-                       isDwarf64: unit.isDwarf64,
-                       unit: unit,
-                       shouldFetchIndirect: false,
-                       constantValue: constantValue)
+          try skip(form: form, at: &cursor, unit: unit,
+                   constantValue: constantValue)
       }
     }
+
+    return result
   }
 
   private func readDieAttributes(
@@ -1928,8 +2007,34 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     unit: Unit,
     _ fn: (Address, Address) -> ()
   ) throws {
-    if let lowPCVal = attributes[.DW_AT_low_pc],
-       let highPCVal = attributes[.DW_AT_high_pc],
+    try forEachAddressRange(lowPC: attributes[.DW_AT_low_pc],
+                            highPC: attributes[.DW_AT_high_pc],
+                            ranges: attributes[.DW_AT_ranges],
+                            unit: unit,
+                            fn)
+  }
+
+  private func forEachAddressRange(
+    of attributes: FunctionAttributes,
+    unit: Unit,
+    _ fn: (Address, Address) -> ()
+  ) throws {
+    try forEachAddressRange(lowPC: attributes.lowPC,
+                            highPC: attributes.highPC,
+                            ranges: attributes.ranges,
+                            unit: unit,
+                            fn)
+  }
+
+  private func forEachAddressRange(
+    lowPC lowPCAttr: DwarfValue?,
+    highPC highPCAttr: DwarfValue?,
+    ranges: DwarfValue?,
+    unit: Unit,
+    _ fn: (Address, Address) -> ()
+  ) throws {
+    if let lowPCVal = lowPCAttr,
+       let highPCVal = highPCAttr,
        case let .address(lowPC) = lowPCVal {
       let highPC: Address
       if case let .address(highPCAddr) = highPCVal {
@@ -1942,7 +2047,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       }
 
       fn(lowPC, highPC)
-    } else if let rangeVal = attributes[.DW_AT_ranges] {
+    } else if let rangeVal = ranges {
       try forEachRange(of: rangeVal, unit: unit, fn)
     }
   }
@@ -1980,7 +2085,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   ///   or is not a subprogram.
   private func readReferencedSubprogram(
     at offset: Address
-  ) throws -> [Dwarf_Attribute:DwarfValue]? {
+  ) throws -> FunctionAttributes? {
     guard let target = unit(containing: offset) else {
       throw DwarfError.badReference(offset)
     }
@@ -2000,11 +2105,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       return nil
     }
 
-    return try readDieAttributes(
+    return try readFunctionAttributes(
       at: &cursor,
       unit: target,
-      abbrevInfo: abbrevInfo,
-      shouldFetchIndirect: true
+      abbrevInfo: abbrevInfo
     )
   }
 
@@ -2024,20 +2128,15 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   /// itself take precedence over inherited ones.  Returns `nil` if one of
   /// the references doesn't lead to a `DW_TAG_subprogram`.
   private func inheritedNames(
-    of attributes: [Dwarf_Attribute:DwarfValue]
+    of attributes: FunctionAttributes
   ) throws -> ReferencedNames? {
-    var nameVal = attributes[.DW_AT_name]
-    var linkageNameVal = attributes[.DW_AT_linkage_name]
+    var nameVal = attributes.name
+    var linkageNameVal = attributes.linkageName
     var current = attributes
 
     // Don't loop forever if the DWARF is malformed
     for _ in 0..<8 {
-      let target: Address
-      if case let .reference(ref)? = current[.DW_AT_abstract_origin] {
-        target = ref
-      } else if case let .reference(ref)? = current[.DW_AT_specification] {
-        target = ref
-      } else {
+      guard let target = current.abstractOrigin ?? current.specification else {
         break
       }
 
@@ -2045,10 +2144,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         return nil
       }
       if nameVal == nil {
-        nameVal = next[.DW_AT_name]
+        nameVal = next.name
       }
       if linkageNameVal == nil {
-        linkageNameVal = next[.DW_AT_linkage_name]
+        linkageNameVal = next.linkageName
       }
       current = next
     }
@@ -2081,19 +2180,18 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   private func buildCallSiteInfo(
     depth: Int,
     unit: Unit,
-    attributes: [Dwarf_Attribute:DwarfValue],
+    attributes: FunctionAttributes,
     _ fn: (CallSiteInfo) -> ()
   ) throws {
-    guard let abstractOriginVal = attributes[.DW_AT_abstract_origin],
-          case let .reference(abstractOrigin) = abstractOriginVal else {
+    guard let abstractOrigin = attributes.abstractOrigin else {
       return
     }
 
     // Compilers leave out DW_AT_call_line and DW_AT_call_column when they
     // are zero, and DW_AT_call_file when there isn't one.
-    let callFile = attributes[.DW_AT_call_file]?.uint64Value()
-    let callLine = attributes[.DW_AT_call_line]?.uint64Value() ?? 0
-    let callColumn = attributes[.DW_AT_call_column]?.uint64Value() ?? 0
+    let callFile = attributes.callFile?.uint64Value()
+    let callLine = attributes.callLine?.uint64Value() ?? 0
+    let callColumn = attributes.callColumn?.uint64Value() ?? 0
 
     // Attributes on a DIE override those it inherits from its specification;
     // in particular the specification might have a different (e.g. C4/D4)
@@ -2134,7 +2232,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   private func buildFunctionInfo (
     depth: Int,
     unit: Unit,
-    attributes: [Dwarf_Attribute:DwarfValue],
+    attributes: FunctionAttributes,
     _ fn: (FunctionInfo) -> ()
   ) throws {
     // Out-of-line instances of inlined functions get their names from their
@@ -2561,11 +2659,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
           continue
         }
 
-        let attributes = try readDieAttributes(
+        let attributes = try readFunctionAttributes(
           at: &cursor,
           unit: unit,
-          abbrevInfo: abbrevInfo,
-          shouldFetchIndirect: true
+          abbrevInfo: abbrevInfo
         )
 
         if tag == .DW_TAG_inlined_subroutine {
