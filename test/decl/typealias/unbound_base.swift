@@ -3,13 +3,13 @@
 struct OtherGeneric<U> {}
 
 struct Constrained<T> {
-  // expected-note@-1 12{{'T' declared as parameter to type 'Constrained'}}
+  // expected-note@-1 10{{'T' declared as parameter to type 'Constrained'}}
   // expected-note@-2 10{{generic struct 'Constrained' declared here}}
   typealias NonGeneric = Int where T == Int // expected-note {{requirement specified as 'T' == 'Int'}}
   typealias FakeGeneric = T where T == Int // expected-note {{requirement specified as 'T' == 'Int'}}
 
   typealias Unbound = OtherGeneric where T == Int
-  typealias Generic/*<U>*/ = OtherGeneric/*<U>*/ where T == Int // FIXME: Adding the generic params crashes the compiler
+  typealias Generic<U> = OtherGeneric<U> where T == Int // expected-note {{requirement specified as 'T' == 'Int'}}
 }
 
 extension Constrained where T == Int { // expected-note 2{{requirement specified as 'T' == 'Int'}}
@@ -22,12 +22,16 @@ extension Constrained where T == Int { // expected-note 2{{requirement specified
 
 struct Unconstrained<T> {
   // expected-note@-1 4{{generic struct 'Unconstrained' declared here}}
-  // expected-note@-2 9{{'T' declared as parameter to type 'Unconstrained'}}
+  // expected-note@-2 11{{'T' declared as parameter to type 'Unconstrained'}}
   typealias NonGeneric = Int
   typealias GenericParam = T
 
   typealias Unbound = OtherGeneric
-  typealias Generic/*<U>*/ = OtherGeneric/*<U>*/ // FIXME: Adding the generic params crashes the compiler
+  typealias Generic<U> = OtherGeneric<U>
+
+  struct Inner {
+    typealias Generic<U> = OtherGeneric<U>
+  }
 }
 
 // Referencing an unbound generic parameter through a typealias is always invalid.
@@ -42,6 +46,7 @@ func invalid(
 }
 
 // But if the underlying type does not reference the generic parameter it's fine.
+// FIXME: These should all work
 func use(
   _: Constrained.NonGeneric,
   _: Constrained.FakeGeneric,
@@ -55,11 +60,10 @@ func use(
   _: Unconstrained.Generic<String>,
 ) {
 
-  // FIXME: These should all work
   let _ = Constrained.NonGeneric.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
   let _ = Constrained.FakeGeneric.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
   let _ = Constrained.Unbound<String>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-  let _ = Constrained.Generic<String>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+  let _ = Constrained.Generic<String>.self
 
   let _ = Constrained.NonGenericInExtension.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
   let _ = Constrained.FakeGenericInExtension.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
@@ -76,7 +80,7 @@ func use(
   let _ = Constrained<_>.FakeGenericInExtension.self // expected-error {{could not infer type for placeholder}}
 
   let _ = Constrained<_>.Unbound<String>.self // expected-error {{could not infer type for placeholder}}
-  let _ = Constrained<_>.Generic<String>.self // expected-error {{could not infer type for placeholder}}
+  let _ = Constrained<_>.Generic<String>.self
   let _ = Constrained<_>.UnboundInExtension<String>.self // expected-error {{could not infer type for placeholder}}
   let _ = Constrained<_>.GenericInExtension<String>.self // expected-error {{could not infer type for placeholder}}
 
@@ -85,7 +89,7 @@ func use(
   let _ = Unconstrained<_>.Generic<String>.self // expected-error {{could not infer type for placeholder}}
 
   let _: OtherGeneric<String>.Type = Constrained.Unbound<_>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-  let _: OtherGeneric<String>.Type = Constrained.Generic<_>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+  let _: OtherGeneric<String>.Type = Constrained.Generic<_>.self
   let _: OtherGeneric<String>.Type = Constrained.UnboundInExtension<_>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
   let _: OtherGeneric<String>.Type = Constrained.GenericInExtension<_>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
 
@@ -93,7 +97,7 @@ func use(
   let _: OtherGeneric<String>.Type = Unconstrained<_>.Generic.self // expected-error {{could not infer type for placeholder}}
 
   let _: OtherGeneric<String>.Type = Constrained<_>.Unbound<_>.self // expected-error {{could not infer type for placeholder}}
-  let _: OtherGeneric<String>.Type = Constrained<_>.Generic<_>.self // expected-error {{could not infer type for placeholder}}
+  let _: OtherGeneric<String>.Type = Constrained<_>.Generic<_>.self
   let _: OtherGeneric<String>.Type = Constrained<_>.UnboundInExtension<_>.self // expected-error {{could not infer type for placeholder}}
   let _: OtherGeneric<String>.Type = Constrained<_>.GenericInExtension<_>.self // expected-error {{could not infer type for placeholder}}
 
@@ -112,9 +116,8 @@ func use(
 
   let _: Unconstrained.NonGeneric = 123
   let _: Unconstrained.Unbound = OtherGeneric<String>()
-  let _: Unconstrained.Generic = OtherGeneric<String>()
+  let _: Unconstrained.Generic = OtherGeneric<String>() // expected-error {{generic parameter 'T' could not be inferred}}
 
-  // FIXME: These should work
   let _: Constrained<_>.NonGeneric = 123 // expected-error {{'Constrained<T>.NonGeneric' (aka 'Int') requires the types '_' and 'Int' be equivalent}}
   let _: Constrained<_>.FakeGeneric = 123 // expected-error {{'Constrained<T>.FakeGeneric' (aka 'T') requires the types '_' and 'Int' be equivalent}}
   let _: Constrained<_>.NonGenericInExtension = 123 // expected-error {{'Constrained<T>.NonGenericInExtension' (aka 'Int') requires the types '_' and 'Int' be equivalent}}
@@ -122,7 +125,7 @@ func use(
 
   let _: Unconstrained<_>.NonGeneric = 123 // expected-error {{could not infer type for placeholder}}
   let _: Unconstrained<_>.Unbound = OtherGeneric<String>()
-  let _: Unconstrained<_>.Generic = OtherGeneric<String>()
+  let _: Unconstrained<_>.Generic = OtherGeneric<String>() // expected-error {{could not infer type for placeholder}}
 
   let _: Constrained<_>.Unbound = OtherGeneric<String>()
   let _: Constrained<_>.Generic = OtherGeneric<String>()
@@ -135,24 +138,26 @@ func use(
   let _: Constrained.GenericInExtension<_> = OtherGeneric<String>()
 
   let _: Constrained<_>.Unbound<_> = OtherGeneric<String>()
-  let _: Constrained<_>.Generic<_> = OtherGeneric<String>()
+  let _: Constrained<_>.Generic<_> = OtherGeneric<String>() // expected-error {{'Constrained<_>.Generic' requires the types '_' and 'Int' be equivalent}}
   let _: Constrained<_>.UnboundInExtension<_> = OtherGeneric<String>()
   let _: Constrained<_>.GenericInExtension<_> = OtherGeneric<String>()
 
   let _: Unconstrained<_>.Unbound<_> = OtherGeneric<String>()
-  let _: Unconstrained<_>.Generic<_> = OtherGeneric<String>()
+  let _: Unconstrained<_>.Generic<_> = OtherGeneric<String>() // expected-error {{could not infer type for placeholder}}
 
-  // FIXME: These should all work
   _ = { (_:Unconstrained.NonGeneric) in }(123)
   _ = { (_:Unconstrained<_>.NonGeneric) in }(123) // expected-error {{could not infer type for placeholder}}
   _ = { (_:Unconstrained.Unbound) in }(OtherGeneric<String>())
-  _ = { (_:Unconstrained.Generic) in }(OtherGeneric<String>())
+  _ = { (_:Unconstrained.Generic) in }(OtherGeneric<String>()) // expected-error {{generic parameter 'T' could not be inferred}}
   _ = { (_:Unconstrained<_>.Unbound) in }(OtherGeneric<String>())
-  _ = { (_:Unconstrained<_>.Generic) in }(OtherGeneric<String>())
+  _ = { (_:Unconstrained<_>.Generic) in }(OtherGeneric<String>()) // expected-error {{could not infer type for placeholder}})
   _ = { (_:Unconstrained.Unbound<_>) in }(OtherGeneric<String>())
   _ = { (_:Unconstrained.Generic<_>) in }(OtherGeneric<String>())
   _ = { (_:Unconstrained<_>.Unbound<_>) in }(OtherGeneric<String>())
-  _ = { (_:Unconstrained<_>.Generic<_>) in }(OtherGeneric<String>())
+  _ = { (_:Unconstrained<_>.Generic<_>) in }(OtherGeneric<String>()) // expected-error {{could not infer type for placeholder}}
+
+  _ = { (x: Unconstrained.Inner.Generic<Int>) in }
+  _ = { (x: Unconstrained.Generic<Int>) in }
 
   _ = { () -> Unconstrained.NonGeneric in 123 } // expected-error {{generic parameter 'T' could not be inferred}}
   _ = { () -> Unconstrained<_>.NonGeneric in 123 }  // expected-error {{could not infer type for placeholder}}

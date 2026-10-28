@@ -356,3 +356,19 @@ struct Outer {
     }
   }
 }
+extension Outer.NestedValidation {
+  typealias U = A.B
+}
+
+func testNestedProtocolTypeAlias() {
+  let _: Outer.NestedValidation.T
+  let _: Outer.NestedValidation.U
+}
+
+extension Delegate where Self: Equatable {
+  struct Nested {} // expected-error {{type 'Nested' cannot be nested in protocol extension of 'Delegate'}}
+}
+struct HasNested: Delegate {}
+func testNestedInExtension() {
+  let _: HasNested.Nested
+}
