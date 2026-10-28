@@ -2332,6 +2332,9 @@ NOTE(cxx_reference_param_aliasing,none,
 NOTE(cxx_reference_param_declared_here,none,
      "%select{parameter|%1}0 declared as a C++ reference here",
      (bool, const clang::NamedDecl *))
+NOTE(cdecl_suggest_objc,none,
+     "use '@objc' to expose this function to Objective-C",
+     ())
 
 // @used and @section
 ERROR(section_empty_name,none,

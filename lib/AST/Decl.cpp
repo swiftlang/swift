@@ -2521,6 +2521,13 @@ bool Decl::hasOnlyCEntryPoint() const {
   if (getAttrs().hasAttribute<CxxDeclAttr>())
     return true;
 
+  // @objc global function with a C-compatible signature uses the @c model
+  // (single C entry point, no Swift symbol or bridging thunk).
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {
+    if (AFD->isObjCGlobalFunction() && !AFD->signatureRequiresObjCBridging())
+      return true;
+  }
+
   return false;
 }
 
@@ -5263,6 +5270,18 @@ StringRef ValueDecl::getCDeclName() const {
           .getIdentifier(("operator" + getBaseIdentifier().str()).str())
           .str();
     return nameOrBaseIdentifier(cxxAttr->Name);
+  }
+
+  // Handle @objc on a top-level function (SE-0495). The C symbol name is the
+  // optional @objc(name) argument, or the base identifier when omitted.
+  if (auto *FD = dyn_cast<FuncDecl>(this)) {
+    if (FD->isObjCGlobalFunction()) {
+      if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>()) {
+        if (auto name = objcAttr->getName())
+          return name->getSelectorPieces().front().str();
+        return getBaseIdentifier().str();
+      }
+    }
   }
 
   return "";
@@ -11567,16 +11586,56 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
+bool AbstractFunctionDecl::isObjCGlobalFunction() const {
+  return getDeclContext()->isModuleScopeContext() &&
+         !isa<AccessorDecl>(this) && getAttrs().hasAttribute<ObjCAttr>();
+}
+
 std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
   if (getAttrs().hasAttribute<CxxDeclAttr>())
     return ForeignLanguage::Cxx;
 
-  auto attr = getAttrs().getAttribute<CDeclAttr>();
-  if (!attr)
-    return std::nullopt;
+  if (auto attr = getAttrs().getAttribute<CDeclAttr>())
+    return attr->Underscored ? ForeignLanguage::ObjectiveC
+                             : ForeignLanguage::C;
 
-  return attr->Underscored ? ForeignLanguage::ObjectiveC
-                           : ForeignLanguage::C;
+  // @objc on a top-level function (SE-0495) is a C export accepting
+  // Objective-C types. The single-vs-thunk symbol model is decided by
+  // signatureRequiresObjCBridging().
+  if (isObjCGlobalFunction())
+    return ForeignLanguage::ObjectiveC;
+
+  return std::nullopt;
+}
+
+bool AbstractFunctionDecl::signatureRequiresObjCBridging() const {
+  auto *dc = getDeclContext();
+
+  // Inspect interface types, not types substituted into a particular
+  // reference: a substitution cannot turn a bridged declaration into a
+  // single-C-entry-point declaration.
+  //
+  // Types trivially representable in ObjC (Int, NSObject, pointers) need no
+  // thunk; bridged types (String <-> NSString, Array <-> NSArray) do.
+
+  // Check return type.
+  if (auto *FD = dyn_cast<FuncDecl>(this)) {
+    auto resultTy = FD->getResultInterfaceType();
+    if (resultTy && !resultTy->isVoid() &&
+        !resultTy->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC, dc))
+      return true;
+  }
+
+  // Check parameter types.
+  if (auto *params = getParameters()) {
+    for (auto *param : *params) {
+      if (!param->getInterfaceType()
+              ->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC, dc))
+        return true;
+    }
+  }
+
+  return false;
 }
 
 bool AbstractFunctionDecl::needsNewVTableEntry() const {

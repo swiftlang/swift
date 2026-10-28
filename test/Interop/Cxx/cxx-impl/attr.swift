@@ -70,7 +70,7 @@ var accessorHost: Int32 {
 // Reject using both @cxx and @objc on the same decl.
 
 // expected-error@+3{{cannot apply both '@cxx' and '@objc' to global function}}
-// expected-error@+2{{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}}
+// expected-error@+2{{Objective-C interoperability is disabled}}
 // expected-error@+1{{'@cxx' must be combined with '@implementation'}}
 @objc @cxx
 func conflictWithObjC(x: Int32) -> Int32 { return x }
