@@ -4170,6 +4170,7 @@ public:
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     bool isIUO;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID, opaqueReturnTypeID;
@@ -4185,6 +4186,7 @@ public:
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
                                        interfaceTypeID,
+                                       memberAbstractTypeLayoutID,
                                        isIUO,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
@@ -5337,6 +5339,7 @@ public:
                                           StringRef blobData) {
     DeclContextID contextID;
     bool isImplicit, hasPayload, isRawValueImplicit, isNegative;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
     unsigned numArgNames;
@@ -5344,6 +5347,7 @@ public:
 
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
+                                               memberAbstractTypeLayoutID,
                                                rawValueKindID,
                                                isRawValueImplicit, isNegative,
                                                rawValueData,
