@@ -1829,3 +1829,59 @@ bb0(%0 : @owned $K):
   %t = tuple ()
   return %t
 }
+
+// The borrowed value aliases the memory until its `end_borrow`, so a take inside that region
+// must be a copy.
+// CHECK-LABEL: sil [ossa] @take_within_load_borrow :
+// CHECK:          [[A:%.*]] = alloc_stack [lexical] $K
+// CHECK:          [[LB:%.*]] = load_borrow [[A]] : $*K
+// CHECK-NEXT:     load [copy] [[A]] : $*K
+// CHECK:          end_borrow [[LB]]
+// CHECK-NEXT:     destroy_addr [[A]]
+// CHECK:       } // end sil function
+sil [ossa] @take_within_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $K
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+  %v = apply %getK() : $@convention(thin) () -> @owned K
+  store %v to [init] %a
+  %lb = load_borrow %a
+  %l = load [copy] %a
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %consumeK(%l) : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  apply %useK(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  end_borrow %lb
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @take_after_load_borrow :
+// CHECK:          [[A:%.*]] = alloc_stack [lexical] $K
+// CHECK:          [[LB:%.*]] = load_borrow [[A]] : $*K
+// CHECK:          end_borrow [[LB]]
+// CHECK-NEXT:     load [take] [[A]] : $*K
+// CHECK-NOT:      destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @take_after_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $K
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+  %v = apply %getK() : $@convention(thin) () -> @owned K
+  store %v to [init] %a
+  %lb = load_borrow %a
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  apply %useK(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  end_borrow %lb
+  %l = load [copy] %a
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %consumeK(%l) : $@convention(thin) (@owned K) -> ()
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
