@@ -163,7 +163,7 @@ GenericSignature DeclContext::getGenericSignatureOfContext() const {
     if (auto decl = dc->getAsDecl())
       if (auto GC = decl->getAsGenericContext())
         return GC->getGenericSignature();
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return nullptr;
 }
@@ -174,7 +174,7 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
     if (auto decl = dc->getAsDecl())
       if (auto GC = decl->getAsGenericContext())
         return GC->getGenericEnvironment();
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return nullptr;
 }
@@ -326,7 +326,7 @@ DeclContext *DeclContext::getParentForLookup() const {
   if (isa<NominalTypeDecl>(this)) {
     // If we are inside a nominal type that is inside a protocol,
     // skip the protocol.
-    if (isa<ProtocolDecl>(getParent()))
+    if (getParent()->getSelfProtocolDecl())
       return getModuleScopeContext();
   }
   return getParent();

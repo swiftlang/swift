@@ -530,7 +530,11 @@ NominalTypeScope::getLookupLimitForDecl() const {
 
   // Otherwise, nominals can be nested inside anything but a ProtocolDecl.
   return ancestorWithDeclSatisfying(
-      [&](const Decl *const d) { return isa<ProtocolDecl>(d); });
+      [&](const Decl *const d) -> bool {
+        if (auto *dc = dyn_cast<DeclContext>(d))
+          return dc->getSelfProtocolDecl();
+        return false;
+      });
 }
 
 NullablePtr<const ASTScopeImpl> ExtensionScope::getLookupLimitForDecl() const {
