@@ -1225,6 +1225,16 @@ namespace {
       }
     }
 
+    /// Adds \p method to the appropriate method list for \p decl, unless the
+    /// method is skipped during lowering.
+    void addMethod(SmallVectorImpl<MethodDescriptor> &methodList,
+                   AbstractFunctionDecl *method) {
+      if (!method->isAvailableDuringLowering())
+        return;
+
+      methodList.push_back(method);
+    }
+
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      const ClassLayout &fieldLayout)
@@ -1763,14 +1773,14 @@ namespace {
       // Don't emit getters/setters for @NSManaged methods.
       if (method->getAttrs().hasAttribute<NSManagedAttr>()) return;
 
-      getMethodList(method).push_back(method);
+      addMethod(getMethodList(method), method);
     }
 
     /// Constructors need to be collected into the appropriate methods list.
     void visitConstructorDecl(ConstructorDecl *constructor) {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
-      getMethodList(constructor).push_back(constructor);
+      addMethod(getMethodList(constructor), constructor);
     }
 
     /// Determine whether the given destructor has an Objective-C
@@ -1798,7 +1808,7 @@ namespace {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
           hasObjCDeallocDefinition(destructor)) {
-        InstanceMethods.push_back(destructor);
+        addMethod(getMethodList(destructor), destructor);
       }
     }
 
@@ -1849,8 +1859,7 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
-      if (!method->isAvailableDuringLowering())
-        return;
+      ASSERT(method->isAvailableDuringLowering());
 
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
@@ -2173,11 +2182,10 @@ namespace {
         if (var->getAttrs().hasAttribute<NSManagedAttr>())
           return;
 
-        auto &methods = getMethodList(var);
-        methods.push_back(getter);
+        addMethod(getMethodList(var), getter);
 
         if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
-          methods.push_back(setter);
+          addMethod(getMethodList(var), setter);
       }
     }
     
@@ -2435,11 +2443,10 @@ namespace {
       auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
-      auto &methods = getMethodList(subscript);
-      methods.push_back(getter);
+      addMethod(getMethodList(subscript), getter);
 
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
-        methods.push_back(setter);
+        addMethod(getMethodList(subscript), setter);
     }
     
     SWIFT_DEBUG_DUMP {

@@ -59,6 +59,7 @@
 // CHECK-METADATA: @_PROPERTIES__TtC4Test20AlwaysAvailableClass = internal constant { i32, i32, [2 x { ptr, ptr }] } { i32 {{[0-9]+}}, i32 2, [2 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.21.enabledDomainProperty, ptr @"{{.*}},R" }, { ptr, ptr } { ptr @.str.26.propertyWithDisabledSetter, ptr @"{{.*}},R" }]
 // CHECK-METADATA: @_PROTOCOL_INSTANCE_METHODS__TtP4Test20AlwaysAvailableProto_ = weak hidden constant { i32, i32, [2 x { ptr, ptr, ptr }] } { i32 {{[0-9]+}}, i32 2, [2 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(enabledDomainMethod)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(enabledDomainProperty)",
 // CHECK-METADATA: @_PROTOCOL_PROPERTIES__TtP4Test20AlwaysAvailableProto_ = weak hidden constant { i32, i32, [1 x { ptr, ptr }] } { i32 {{[0-9]+}}, i32 1, [1 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.21.enabledDomainProperty,
+// CHECK-METADATA: @_PROTOCOL_METHOD_TYPES__TtP4Test20AlwaysAvailableProto_ = weak hidden constant [2 x ptr] [ptr @{{[^,]+}}, ptr @{{[^,]+}}]
 @objc public protocol AlwaysAvailableProto {
   @available(EnabledDomain)
   func enabledDomainMethod()
@@ -71,6 +72,9 @@
 
   @available(DisabledDomain)
   var disabledDomainProperty: Int { get set }
+
+  @available(DisabledDomain)
+  subscript(disabledDomainSubscript: Int) -> Int { get set }
 }
 
 @available(EnabledDomain)

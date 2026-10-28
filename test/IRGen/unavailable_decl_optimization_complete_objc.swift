@@ -50,9 +50,11 @@ public class Class: NSObject {
 
 // CHECK-METADATA-NO-STRIP: @_PROTOCOL_INSTANCE_METHODS__TtP4Test5Proto_ = weak hidden constant { i32, i32, [7 x { ptr, ptr, ptr }] } { i32 {{[0-9]+}}, i32 7, [7 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(availableMethod)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(unavailableMethod)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(availableProperty)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(unavailableProperty)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(setUnavailableProperty:)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(objectAtIndexedSubscript:)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(setObject:atIndexedSubscript:)",
 // CHECK-METADATA-NO-STRIP: @_PROTOCOL_PROPERTIES__TtP4Test5Proto_ = weak hidden constant { i32, i32, [2 x { ptr, ptr }] } { i32 {{[0-9]+}}, i32 2, [2 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.17.availableProperty, {{.*}} }, { ptr, ptr } { ptr @.str.19.unavailableProperty,
+// CHECK-METADATA-NO-STRIP: @_PROTOCOL_METHOD_TYPES__TtP4Test5Proto_ = weak hidden constant [7 x ptr]
 
 // CHECK-METADATA-STRIP: @_PROTOCOL_INSTANCE_METHODS__TtP4Test5Proto_ = weak hidden constant { i32, i32, [2 x { ptr, ptr, ptr }] } { i32 {{[0-9]+}}, i32 2, [2 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(availableMethod)", {{.*}} }, { ptr, ptr, ptr } { ptr @"\01L_selector_data(availableProperty)",
 // CHECK-METADATA-STRIP: @_PROTOCOL_PROPERTIES__TtP4Test5Proto_ = weak hidden constant { i32, i32, [1 x { ptr, ptr }] } { i32 {{[0-9]+}}, i32 1, [1 x { ptr, ptr }] [{ ptr, ptr } { ptr @.str.17.availableProperty,
+// CHECK-METADATA-STRIP: @_PROTOCOL_METHOD_TYPES__TtP4Test5Proto_ = weak hidden constant [2 x ptr] [ptr @{{[^,]+}}, ptr @{{[^,]+}}]
 @objc public protocol Proto {
   func availableMethod()
 
