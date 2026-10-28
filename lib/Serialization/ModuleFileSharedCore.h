@@ -267,9 +267,7 @@ private:
   /// Identifiers referenced by this module.
   ArrayRef<RawBitOffset> Identifiers;
 
-  ArrayRef<RawBitOffset> HiddenTypeLayoutInfoDecls;
   ArrayRef<RawBitOffset> AbstractMemberTypeLayouts;
-  ArrayRef<uint64_t> HiddenTypeFallbackTableData;
 
   class DeclTableInfo;
   using SerializedDeclTable =
