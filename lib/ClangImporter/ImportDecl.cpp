@@ -5944,6 +5944,11 @@ namespace {
       if (!classDecl)
         return false;
 
+      // Apply this check only to modern projections so they don't conflict with
+      // their own legacy projections.
+      if (currentCArrayProjection == CArrayProjection::Legacy)
+        return false;
+
       auto matchesImportedDecl = [&](Decl *member) -> bool {
         auto *afd = dyn_cast<AbstractFunctionDecl>(member);
         if (!afd)
@@ -8634,7 +8639,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Create the actual constructor.
   assert(!importedName.getAsyncInfo());
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      objcMethod, AccessLevel::Public, importedName.getDeclName(),
+      objcMethod, limitAccessForCArrayProjection(AccessLevel::Public),
+      importedName.getDeclName(),
       /*NameLoc=*/Impl.importSourceLoc(objcMethod->getLocation()), failability,
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
