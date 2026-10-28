@@ -203,6 +203,7 @@ struct BridgedPassContext {
   /// Visits the type of every non-copyable nominal type declared in this
   /// module for which IRGen may emit type metadata (and therefore value
   /// witnesses, which destroy the type).
+  /// Also every exported type specialization.
   void visitTypesWithEmittedMetadata(
       void *_Nonnull context,
       void (*_Nonnull callback)(void *_Nonnull context, BridgedType type)) const;
@@ -210,6 +211,7 @@ struct BridgedPassContext {
   /// Visits the conformance of every non-generic witness table in this module
   /// which IRGen emits eagerly in Embedded Swift, i.e. the ones of
   /// `@export(interface)` conformances.
+  /// Also the conformances of exported type specializations.
   void visitConformancesWithEagerlyEmittedWitnessTables(
       void *_Nonnull context,
       void (*_Nonnull callback)(void *_Nonnull context,

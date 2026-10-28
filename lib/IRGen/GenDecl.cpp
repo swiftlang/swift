@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1242,6 +1243,19 @@ void IRGenerator::emitGlobalTopLevel(
   for (auto &directive: linkerDirectives) {
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
+
+  // In Embedded Swift, emit the metadata of exported type specializations, so
+  // that clients reference it instead of emitting their own copy.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    auto &silModule = PrimaryIGM->getSILModule();
+    for (CanType type : silModule.getExportedTypeSpecializations()) {
+      // Queue the metadata as if it were used.
+      if (type->getClassDecl())
+        noteUseOfSpecializedClassMetadata(type);
+      else
+        noteUseOfSpecializedValueMetadata(type);
+    }
+  }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     if (isLazilyEmittedGlobalVariable(v, PrimaryIGM->getSILModule()))
       continue;
@@ -1670,13 +1684,29 @@ void IRGenerator::noteUseOfClassMetadata(CanType classType) {
   }
 }
 
+/// Whether another module owns \p type's metadata.
+static bool isExportedTypeSpecializationOfOtherModule(IRGenerator &IRGen,
+                                                      CanType type) {
+  auto *nominal = type->getAnyNominal();
+  return nominal && nominal->getParentModule() != IRGen.SIL.getSwiftModule() &&
+         SpecializedAttr::isExportedTypeSpecialization(type);
+}
+
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
+  // Don't queue it for emission into this module if another module owns it;
+  // this module only references it.
+  if (isExportedTypeSpecializationOfOtherModule(*this, classType))
+    return;
   if (LazilyEmittedSpecializedMetadata.insert(classType.getPointer()).second) {
     LazySpecializedClassMetadata.push_back(classType);
   }
 }
 
 void IRGenerator::noteUseOfSpecializedValueMetadata(CanType valueType) {
+  // Don't queue it for emission into this module if another module owns it;
+  // this module only references it.
+  if (isExportedTypeSpecializationOfOtherModule(*this, valueType))
+    return;
   if (LazilyEmittedSpecializedMetadata.insert(valueType.getPointer()).second) {
     LazySpecializedValueMetadata.push_back(valueType);
   }

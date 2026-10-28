@@ -27,10 +27,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Strings.h"
@@ -1637,11 +1639,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       }
     }
     SmallVector<Requirement, 4> requirementsScratch;
-    auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    auto specializedSig = attr->getSpecializedSignature(FnDecl);
+    auto *GC = D->getAsGenericContext();
+    auto specializedSig = attr->getSpecializedSignature(D);
     auto requirements = specializedSig.getRequirements();
-    if (FnDecl && FnDecl->getGenericSignature()) {
-      auto genericSig = FnDecl->getGenericSignature();
+    if (GC && GC->getGenericSignature()) {
+      auto genericSig = GC->getGenericSignature();
 
       if (auto sig = specializedSig) {
         requirementsScratch = sig.requirementsNotSatisfiedBy(genericSig);
@@ -3059,8 +3061,128 @@ ValueDecl * AbstractSpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDec
                            nullptr);
 }
 
-GenericSignature AbstractSpecializeAttr::getSpecializedSignature(
-    const AbstractFunctionDecl *onDecl) const {
+/// Whether \p decl is emitted into clients: '@_transparent' (unless implicit,
+/// like synthesized accessors) or the explicit 'implementation' model, which a
+/// synthesized member takes from its type or extension.
+static bool isEmittedIntoClient(const Decl *decl) {
+  auto *transparent = decl->getAttrs().getAttribute<TransparentAttr>();
+  if ((transparent && !transparent->isImplicit()) ||
+      decl->isAlwaysEmittedIntoClient())
+    return true;
+  auto *parent = decl->getDeclContext()->getAsDecl();
+  return cast<ValueDecl>(decl)->isSynthesized() && parent &&
+         parent->isAlwaysEmittedIntoClient();
+}
+
+void SpecializedAttr::getTypeLevelSpecializations(
+    const AbstractFunctionDecl *member,
+    SmallVectorImpl<std::pair<GenericSignature, bool>> &result) {
+  // Only members declared in the type's own module.
+  auto *nominal = member->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal || nominal->getModuleContext() != member->getModuleContext())
+    return;
+  // Not members with generic parameters of their own, e.g. 'map<U>'.
+  auto memberSig = member->getGenericSignature();
+  auto typeSig = nominal->getGenericSignature();
+  if (!memberSig || !typeSig ||
+      memberSig.getGenericParams().size() != typeSig.getGenericParams().size())
+    return;
+
+  // Whether an exported specialization of the member can be used by clients:
+  // they only see public members, and the library can't own the specialized
+  // body of code that is emitted into its clients.
+  auto *accessor = dyn_cast<AccessorDecl>(member);
+  bool clientsCanUse =
+      member->getFormalAccessScope().isPublic() &&
+      !isEmittedIntoClient(member) &&
+      !(accessor && isEmittedIntoClient(accessor->getStorage()));
+  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>()) {
+    auto typeSpecializedSig = attr->getSpecializedSignature(nominal);
+    if (!typeSpecializedSig)
+      continue;
+    // An exported specialization only for a member clients can use.
+    if (attr->isExported() && !clientsCanUse)
+      continue;
+    // The non-exported form adds a fast path to the generic member that calls
+    // the specialization, which EagerSpecializer can't build for a coroutine
+    // accessor (e.g. 'modify'). Such an accessor gets no fast path; calls with
+    // concrete types are still specialized as usual.
+    if (!attr->isExported() && accessor && accessor->isCoroutine())
+      continue;
+    // Add the type's requirements (e.g. 'T == Int') to the member's own
+    // signature, which also has the constraints of its extension, if any.
+    auto sigWithError = buildGenericSignatureWithError(
+        member->getASTContext(), memberSig, {},
+        SmallVector<Requirement, 2>(typeSpecializedSig.getRequirements()),
+        DefaultRequirementOptions());
+    // Skip the member if the requirements conflict (e.g. 'T == Int' with
+    // 'T: StringProtocol' from its extension) or leave a generic parameter
+    // unbound.
+    auto sig = sigWithError.getPointer();
+    if (sigWithError.getInt().contains(
+            GenericSignatureErrorFlags::HasInvalidRequirements) ||
+        !sig || !llvm::all_of(sig.getGenericParams(), [&](auto param) {
+          return sig->isConcreteType(param);
+        }))
+      continue;
+    result.push_back({sig, attr->isExported()});
+  }
+}
+
+void SpecializedAttr::getExportedTypeSpecializations(
+    const NominalTypeDecl *nominal, SmallVectorImpl<CanType> &result) {
+  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>()) {
+    auto sig = attr->getSpecializedSignature(nominal);
+    if (!attr->isExported() || !sig)
+      continue;
+    // Reduce 'Box<T>' to the specialized type, e.g. 'Box<Int>'; only fully
+    // concrete types.
+    auto type = sig.getReducedType(nominal->getDeclaredInterfaceType());
+    if (!type->hasTypeParameter())
+      result.push_back(type);
+  }
+}
+
+bool SpecializedAttr::isExportedTypeSpecialization(CanType type) {
+  auto *nominal = type->getAnyNominal();
+  if (!nominal || !nominal->isGenericContext() ||
+      !nominal->getAttrs().hasAttribute<SpecializedAttr>())
+    return false;
+  SmallVector<CanType, 2> types;
+  getExportedTypeSpecializations(nominal, types);
+  return llvm::is_contained(types, type);
+}
+
+bool SpecializedAttr::isExportedConformanceSpecialization(
+    const ProtocolConformance *conformance) {
+  auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance);
+  // Marker and Objective-C protocols have no witness table, and clients can
+  // only use conformances to protocols they can see.
+  auto *proto = conformance->getProtocol();
+  if (!specialized || proto->isMarkerProtocol() || proto->isObjC() ||
+      !proto->getFormalAccessScope().isPublic())
+    return false;
+  auto type = specialized->getType()->getCanonicalType();
+  auto *generic = specialized->getGenericConformance();
+  // Only conformances declared in the type's own module.
+  if (generic->getDeclContext()->getParentModule() !=
+      type->getAnyNominal()->getParentModule())
+    return false;
+  // A conformance emitted into clients isn't the library's.
+  if (generic->getExplicitCodeGenerationModel() ==
+      CodeGenerationModel::Implementation)
+    return false;
+  if (!isExportedTypeSpecialization(type))
+    return false;
+  // A conditional conformance needs requirements the type satisfies.
+  if (checkRequirements(specialized->getConditionalRequirements()) !=
+      CheckRequirementsResult::Success)
+    return false;
+  return true;
+}
+
+GenericSignature
+AbstractSpecializeAttr::getSpecializedSignature(const Decl *onDecl) const {
   return evaluateOrDefault(onDecl->getASTContext().evaluator,
                            SerializeAttrGenericSignatureRequest{
                                onDecl, const_cast<AbstractSpecializeAttr *>(this)},

@@ -3208,6 +3208,41 @@ lookupOrCreatePrespecialization(SILOptFunctionBuilder &funcBuilder,
   return declaration;
 }
 
+SILFunction *
+swift::lookupExportedSpecialization(SILOptFunctionBuilder &funcBuilder,
+                                    SILFunction *origF, SubstitutionMap subs,
+                                    CanSILFunctionType specializedType) {
+  SILModule &M = funcBuilder.getModule();
+  auto genericSig =
+      origF->getLoweredFunctionType()->getInvocationGenericSignature();
+  for (auto *SA : origF->getSpecializeAttrs()) {
+    // Only exported '@specialized' attributes.
+    if (!SA->isExported() || !SA->isSpecializedSpelling())
+      continue;
+    // Its concrete types must be the ones 'subs' gives, e.g. 'T == Int'.
+    auto specializedSig = SA->getSpecializedSignature();
+    if (!llvm::all_of(genericSig.getGenericParams(), [&](auto param) {
+          return specializedSig.getReducedType(param) ==
+                 Type(param).subst(subs)->getCanonicalType();
+        }))
+      continue;
+    // Its function type must be the one the caller expects, or the calling
+    // convention would differ.
+    ReabstractionInfo reInfo(M.getSwiftModule(), M.isWholeModule(), origF,
+                             specializedSig, /*isPrespecialization=*/true);
+    if (reInfo.getSpecializedType() != specializedType)
+      continue;
+    // The definition if this module has it, otherwise an external declaration.
+    Mangle::GenericSpecializationMangler mangler(
+        origF->getASTContext(), origF, reInfo.getSerializedKind());
+    return lookupOrCreatePrespecialization(
+        funcBuilder, origF,
+        mangler.manglePrespecialized(reInfo.getCalleeParamSubstitutionMap()),
+        reInfo);
+  }
+  return nullptr;
+}
+
 static bool usePrespecialized(
     SILOptFunctionBuilder &funcBuilder, ApplySite apply, SILFunction *refF,
     ReabstractionInfo &prespecializedReInfo, SpecializedFunction &result) {

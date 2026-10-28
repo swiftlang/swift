@@ -333,6 +333,8 @@ private:
   /// deinits must be specialized before IRGen runs.
   std::vector<SILType> noncopyableTypesWithEmittedMetadata;
 
+  std::vector<CanType> exportedTypeSpecializations;
+
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
@@ -724,6 +726,17 @@ public:
 
   void addNonCopyableTypeWithEmittedMetadata(SILType type) {
     noncopyableTypesWithEmittedMetadata.push_back(type);
+  }
+
+  /// The specializations that exported '@specialized' attributes on types
+  /// declared in this module declare. In Embedded Swift, this module emits
+  /// their metadata.
+  ArrayRef<CanType> getExportedTypeSpecializations() const {
+    return exportedTypeSpecializations;
+  }
+
+  void addExportedTypeSpecialization(CanType type) {
+    exportedTypeSpecializations.push_back(type);
   }
 
   using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;

@@ -651,6 +651,7 @@ struct BridgedFunction {
   BRIDGED_INLINE void setIsSerialized(bool isSerialized) const;
   BRIDGED_INLINE bool conformanceMatchesActorIsolation(BridgedConformance conformance) const;
   BRIDGED_INLINE bool isSpecialization() const;
+  BRIDGED_INLINE bool isExportedSpecialization() const;
   BRIDGED_INLINE bool hasOwnershipForTrivialValues() const;
   BRIDGED_INLINE void setOwnershipForTrivialValues(bool hotv) const;
   bool isTrapNoReturn() const;
