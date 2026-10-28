@@ -87,6 +87,57 @@ public func backDeployedCaller(_ s: inout S<Z>) {
   s.x = Z()
 }
 
+public protocol P {
+  func defaultedRequirement()
+}
+
+extension P {
+  @backDeployed(before: macOS 10.52)
+  public func defaultedRequirement() {}
+}
+
+struct ConformsToP: P {}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11back_deploy11ConformsToPVAA1PA2aDP20defaultedRequirementyyFTW
+// CHECK-BACK-DEPLOY: function_ref @$s11back_deploy1PPAAE20defaultedRequirementyyFTwb : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NATIVE: function_ref @$s11back_deploy1PPAAE20defaultedRequirementyyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+
+protocol HasX {
+  associatedtype T
+  var x: T { get set }
+}
+
+extension S: HasX {}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11back_deploy1SVyxGAA4HasXA2aEP1x1TQzvgTW
+// CHECK-BACK-DEPLOY: function_ref @$s11back_deploy1SV1xxvgTwb : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
+// CHECK-NATIVE: function_ref @$s11back_deploy1SV1xxvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @out τ_0_0
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11back_deploy1SVyxGAA4HasXA2aEP1x1TQzvsTW
+// CHECK-BACK-DEPLOY: function_ref @$s11back_deploy1SV1xxvsTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
+// CHECK-NATIVE: function_ref @$s11back_deploy1SV1xxvs : $@convention(method) <τ_0_0> (@in τ_0_0, @inout S<τ_0_0>) -> ()
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11back_deploy1SVyxGAA4HasXA2aEP1x1TQzvMTW
+// CHECK-BACK-DEPLOY: function_ref @$s11back_deploy1SV1xxvMTwb : $@yield_once @convention(method) <τ_0_0> (@inout S<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK-NATIVE: function_ref @$s11back_deploy1SV1xxvM : $@yield_once @convention(method) <τ_0_0> (@inout S<τ_0_0>) -> @yields @inout τ_0_0
+
+extension Z {
+  @backDeployed(before: macOS 10.52)
+  public init(value: Int) {
+    self.init()
+  }
+}
+
+protocol InitWithValue {
+  init(value: Int)
+}
+
+extension Z: InitWithValue {}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s11back_deploy1ZVAA13InitWithValueA2aDP5valuexSi_tcfCTW
+// CHECK-BACK-DEPLOY: function_ref @$s11back_deploy1ZV5valueACSi_tcfCTwb : $@convention(method) (Int, @thin Z.Type) -> Z
+// CHECK-NATIVE: function_ref @$s11back_deploy1ZV5valueACSi_tcfC : $@convention(method) (Int, @thin Z.Type) -> Z
+
 // The same bug from test/Concurrency/nonisolated_nonsending.swift also applied to
 // back-deployment thunks.
 

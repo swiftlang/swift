@@ -347,6 +347,29 @@ bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
   return true;
 }
 
+SILDeclRef
+SILGenModule::getBackDeploymentEntryPoint(SILDeclRef constant,
+                                          ResilienceExpansion expansion) {
+  // Back deployment thunks are only emitted for the primary entry points of
+  // functions, accessors, and initializers.
+  switch (constant.kind) {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::Allocator:
+    break;
+  default:
+    return constant;
+  }
+
+  if (constant.isForeign || constant.getDerivativeFunctionIdentifier() ||
+      constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return constant;
+
+  if (!requiresBackDeploymentThunk(constant.getDecl(), expansion))
+    return constant;
+
+  return constant.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
+}
+
 void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   // Generate code equivalent to:
   //
