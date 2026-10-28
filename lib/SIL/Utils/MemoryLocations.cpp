@@ -474,7 +474,7 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
   loc.numNonTrivialFieldsNotCovered = 0;
   SILFunction *function = loc.representativeValue->getFunction();
   SILType ty = loc.representativeValue->getType();
-  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
+  if (StructDecl *decl = ty.getStructDecl()) {
     if (decl->isResilient(function->getModule().getSwiftModule(),
                           function->getResilienceExpansion())) {
       loc.numFieldsNotCoveredBySubfields = INT_MAX;
@@ -528,7 +528,7 @@ bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
     return true;
   }
 
-  if (StructDecl *structDecl = type.getStructOrBoundGenericStruct()) {
+  if (StructDecl *structDecl = type.getStructDecl()) {
     if (structDecl->isResilient(inFunction->getModule().getSwiftModule(),
                                 inFunction->getResilienceExpansion())) {
       return false;
@@ -547,7 +547,7 @@ bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
     return true;
   }
 
-  if (EnumDecl *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *enumDecl = type.getEnumDecl()) {
     // An enum is trivial if _any_ case is trivial.
     for (EnumElementDecl *caseDecl : enumDecl->getAllElements()) {
       if (!caseDecl->hasAssociatedValues())

@@ -476,6 +476,10 @@ enum class FixKind : uint8_t {
   /// Ignore an out-of-place \c then statement.
   IgnoreOutOfPlaceThenStmt,
 
+  /// Ignore an argument to \c withoutActuallyDiscarding that isn't an
+  /// exactly-once function.
+  AllowNonExactlyOnceDiscardArgument,
+
   /// Ignore situations when provided number of generic arguments didn't match
   /// expected number of parameters.
   IgnoreGenericSpecializationArityMismatch,
@@ -510,7 +514,7 @@ enum class FixKind : uint8_t {
   IgnoreClassRequirementForDynamicMemberLookup,
 
   /// Ignore an attempt to convert between function types with different
-  /// execution semantics i.e. go from `@called(atMostOnce)` to a regular
+  /// execution semantics, such as going from at-most-once to a regular
   /// function type.
   ExecutionSemanticsMismatch,
 };
@@ -907,26 +911,6 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool coalesceAndDiagnose(const Solution &solution,
-                           ArrayRef<ConstraintFix *> secondaryFixes,
-                           bool asNote = false) const override {
-    // If the from type or to type is a placeholder type that corresponds to an
-    // ErrorExpr, the issue has already been diagnosed. There's no need to
-    // produce another diagnostic for the contextual mismatch complaining that
-    // a type is not convertible to a placeholder type.
-    if (auto fromPlaceholder = getFromType()->getAs<PlaceholderType>()) {
-      if (isa<ErrorExpr *>(fromPlaceholder->getOriginator())) {
-        return true;
-      }
-    }
-    if (auto toPlaceholder = getToType()->getAs<PlaceholderType>()) {
-      if (isa<ErrorExpr *>(toPlaceholder->getOriginator())) {
-        return true;
-      }
-    }
-    return ConstraintFix::coalesceAndDiagnose(solution, secondaryFixes, asNote);
-  }
-
   bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
@@ -1244,8 +1228,8 @@ protected:
       : ContextualMismatch(cs, FixKind::GenericArgumentsMismatch, actual,
                            required, locator),
         NumMismatches(mismatches.size()) {
-    assert(actual->is<BoundGenericType>());
-    assert(required->is<BoundGenericType>());
+    assert(actual->is<NominalType>());
+    assert(required->is<NominalType>());
     std::uninitialized_copy(mismatches.begin(), mismatches.end(),
                             getMismatchesBuf().begin());
   }
@@ -2727,7 +2711,7 @@ public:
 
   static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
                                       Type toType, bool useConditionalCast,
-                                      ConstraintLocator *locator);
+                                      ConstraintLocatorBuilder locator);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::CoerceToCheckedCast;
@@ -3943,6 +3927,37 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreOutOfPlaceThenStmt;
+  }
+};
+
+/// Diagnose an argument to \c withoutActuallyDiscarding(_:do:) that isn't an
+/// exactly-once function.
+class AllowNonExactlyOnceDiscardArgument final : public ConstraintFix {
+  Type ArgType;
+
+  AllowNonExactlyOnceDiscardArgument(ConstraintSystem &cs, Type argType,
+                                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowNonExactlyOnceDiscardArgument, locator),
+        ArgType(argType) {}
+
+public:
+  std::string getName() const override {
+    return "allow non-exactly-once argument to 'withoutActuallyDiscarding'";
+  }
+
+  Type getArgType() const { return ArgType; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static AllowNonExactlyOnceDiscardArgument *
+  create(ConstraintSystem &cs, Type argType, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowNonExactlyOnceDiscardArgument;
   }
 };
 

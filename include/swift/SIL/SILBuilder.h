@@ -1105,6 +1105,13 @@ public:
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
+  /// Create a debug_value for an undef empty tuple. Used when the type of the
+  /// variable cannot be represented.
+  DebugValueInst *createVoidVariableDebugValue(
+      SILLocation Loc, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
+
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
   }
@@ -1248,20 +1255,21 @@ public:
                                                      base, inToken, tokenTy));
   }
 
-  ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
-                                             SILType Ty,
-                                             bool WithoutActuallyEscaping) {
-    return createConvertFunction(Loc, Op, Ty, WithoutActuallyEscaping,
+  ConvertFunctionInst *
+  createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
+                        ConvertFunctionInst::Kind ConversionKind =
+                            ConvertFunctionInst::Kind::Ordinary) {
+    return createConvertFunction(Loc, Op, Ty, ConversionKind,
                                  Op->getOwnershipKind());
   }
 
   ConvertFunctionInst *
   createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
-                        bool WithoutActuallyEscaping,
+                        ConvertFunctionInst::Kind ConversionKind,
                         ValueOwnershipKind forwardingOwnershipKind) {
-    return insert(ConvertFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getModule(), F,
-        WithoutActuallyEscaping, forwardingOwnershipKind));
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              getModule(), F, ConversionKind,
+                                              forwardingOwnershipKind));
   }
 
   ThunkInst *createThunk(SILLocation Loc, SILValue Op, ThunkInst::Kind kind,
@@ -2112,7 +2120,7 @@ public:
     SILType opTy = operand->getType();
     if (opTy.is<TupleType>())
       return createDestructureTuple(loc, operand);
-    if (opTy.getStructOrBoundGenericStruct())
+    if (opTy.getStructDecl())
       return createDestructureStruct(loc, operand);
     llvm_unreachable("Can not emit a destructure for this type of operand.");
   }

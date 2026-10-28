@@ -87,6 +87,12 @@ public:
   }
 
   bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
+    // Clang only defines a defaulted constructor, such as the copy constructor
+    // of a lambda's closure type, once it is used. Until then there is no body
+    // to walk, and recording it here would keep us from walking it after Clang
+    // defines it. The expression that uses it records it instead.
+    if (CXXCD->isDefaulted() && !CXXCD->hasBody())
+      return true;
     callback(CXXCD);
     for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
       if (clang::FieldDecl *FD = CXXCI->getMember()) {

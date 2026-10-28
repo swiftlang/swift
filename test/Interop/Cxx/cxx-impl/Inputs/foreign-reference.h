@@ -38,9 +38,11 @@ __attribute__((swift_attr("release:releaseNode"))) Node {
 int takesNode(Node *_Nonnull n);
 int takesNullableNode(Node *_Nullable n);
 int takesNodeByRef(Node &n);
+int consumesConstNodeRef(const Node &n);
 
 // A reference to a pointer to a foreign reference type is implemented by an
-// `inout` parameter of the reference type, a const one by a plain parameter.
+// `inout` parameter of the reference type, a const one by a `borrowing`
+// parameter.
 void reseatNode(Node *_Nonnull &p, Node *_Nonnull to);
 int readNodePtr(Node *_Nonnull const &p);
 void mismatchedNodePtrSpelling(Node *_Nonnull &p);

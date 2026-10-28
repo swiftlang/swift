@@ -960,6 +960,22 @@ ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
+/// Returns the module that wraps the top-level Clang module owning `node`, or
+/// null if `node` has no owning module.
+static ModuleDecl *
+getWrapperForClangOwningModule(ClangModuleLoader *clangImporter,
+                               ClangNode node) {
+  auto clangModule = clangImporter->getClangOwningModule(node);
+  if (!clangModule)
+    return nullptr;
+
+  // Swift groups all submodules of a Clang module together, and imports them as
+  // a single top-level module.
+  clangModule = clangModule->getTopLevelModule();
+
+  return clangImporter->getWrapperForModule(clangModule);
+}
+
 /// If `decl` is an imported Cxx decl, returns the actual module that the decl
 /// was imported from. This is necessary to compensate for the way that
 /// Cxx `namespace` declarations are imported. Since namespaces can span
@@ -998,15 +1014,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
     return nullptr;
   }
 
-  auto clangModule = clangImporter->getClangOwningModule(decl->getClangNode());
-  if (!clangModule)
-    return nullptr;
-
-  // Swift groups all submodules of a Clang module together, and imports them as
-  // a single top-level module.
-  clangModule = clangModule->getTopLevelModule();
-
-  return clangImporter->getWrapperForModule(clangModule);
+  return getWrapperForClangOwningModule(clangImporter, decl->getClangNode());
 }
 
 ModuleDecl *Decl::getModuleContextForNameLookup() const {
@@ -1014,6 +1022,28 @@ ModuleDecl *Decl::getModuleContextForNameLookup() const {
     return parentModule;
 
   return getModuleContext();
+}
+
+void Decl::getModuleContextsForNameLookup(
+    SmallVectorImpl<ModuleDecl *> &modules) const {
+  // The Clang node of a namespace is just one of its redeclarations, and the
+  // other redeclarations may belong to other Clang modules.
+  auto namespaceDecl = dyn_cast_or_null<clang::NamespaceDecl>(getClangDecl());
+  if (!namespaceDecl ||
+      !getModuleContext()->isClangBridgingHeaderImportModule()) {
+    modules.push_back(getModuleContextForNameLookup());
+    return;
+  }
+
+  auto clangImporter = getASTContext().getClangModuleLoader();
+  for (auto redecl : namespaceDecl->redecls()) {
+    auto module = getWrapperForClangOwningModule(clangImporter, redecl);
+    if (!module)
+      module = getModuleContext();
+
+    if (!llvm::is_contained(modules, module))
+      modules.push_back(module);
+  }
 }
 
 /// Retrieve the diagnostic engine for diagnostics emission.
@@ -1301,6 +1331,24 @@ bool Decl::preconcurrency() const {
   }
 
   return false;
+}
+
+bool Decl::preconcurrencyIncludingInferred() const {
+  if (preconcurrency())
+    return true;
+
+  // An inferred `@preconcurrency` is recorded as an implicit attribute when
+  // the isolation of a source decl is computed. Don't compute it for other
+  // decls: their attributes are already complete, and doing so can be cyclic
+  // (e.g. looking up the source location of a deserialized decl mangles it).
+  auto *value = dyn_cast<ValueDecl>(this);
+  if (!value || !getDeclContext()->getParentSourceFile() ||
+      !DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Preconcurrency,
+                                               this))
+    return false;
+
+  (void)getActorIsolation(const_cast<ValueDecl *>(value));
+  return getAttrs().hasAttribute<PreconcurrencyAttr>();
 }
 
 /// Look at the attributes to determine whether they involve an attribute
@@ -4768,6 +4816,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 }
 
 CanType ValueDecl::getOverloadSignatureType() const {
+  // FIXME: Erase scopes.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     bool isMethod = afd->hasImplicitSelfDecl();
     return mapSignatureFunctionType(getASTContext(), getInterfaceType(),
@@ -6488,7 +6537,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
         args.push_back(argTy);
       }
 
-      return BoundGenericType::get(decl, ParentTy, args);
+      return NominalType::get(decl, ParentTy, args, ctx);
     }
     }
 
@@ -9326,6 +9375,23 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
                            ParamDecl::Specifier::Default);
 }
 
+LoweredOwnership ParamDecl::getLoweredOwnership() const {
+  auto *dc = getDeclContext();
+  auto ownership = getValueOwnership();
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+    auto params = closure->getParameters()->getArray();
+    auto found = llvm::find(params, this);
+    auto closureType = closure->getType();
+    if (auto *fnType =
+            closureType ? closureType->getAs<AnyFunctionType>() : nullptr;
+        fnType && found != params.end())
+      ownership =
+          fnType->getParams()[found - params.begin()].getValueOwnership();
+  }
+  return swift::getLoweredOwnership(
+      ownership, dyn_cast<AbstractFunctionDecl>(dc), isSelfParameter());
+}
+
 LifetimeAnnotation ParamDecl::getLifetimeAnnotation() const {
   auto specifier = getSpecifier();
   // Copyable parameters which are consumed have eager-move semantics.
@@ -10069,10 +10135,8 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
   if (auto *AT = dyn_cast<VariadicSequenceType>(T))
     return AT->getBaseType();
-  if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
-    // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
-  }
+  if (T->isArray())
+    return T->castTo<NominalType>()->getGenericArgs()[0];
   return T;
 }
 
@@ -10563,7 +10627,7 @@ void SubscriptDecl::setElementInterfaceType(Type type) {
                                         std::move(type));
 }
 
-BoundGenericType *
+NominalType *
 SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
   // Allow composing a key path type with a `Sendable` protocol as a way to
   // express sendability requirements.
@@ -10590,7 +10654,7 @@ SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
     return nullptr;
   }
 
-  return paramTy->getAs<BoundGenericType>();
+  return paramTy->getAs<NominalType>();
 }
 
 SubscriptDecl *
@@ -10702,7 +10766,7 @@ SubscriptDecl::getDynamicMemberLookupKind() const {
   return eligibility.getDynamicMemberKind();
 }
 
-BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType() const {
+NominalType *SubscriptDecl::getDynamicMemberLookupKeyPathType() const {
   if (getDynamicMemberLookupKind() != DynamicMemberLookupKind::KeyPath) {
     return nullptr;
   }
@@ -12660,8 +12724,16 @@ Type EnumElementDecl::getPayloadInterfaceType() const {
 void EnumElementDecl::setParameterList(ParameterList *params) {
   Params = params;
 
-  if (params)
+  if (params) {
     params->setDeclContextOfParamDecls(this);
+
+    // An enum case payload cannot be isolated, and 'isolated' is diagnosed
+    // during type resolution. ParamDecl::setTypeRepr still derives the flag
+    // from the specifier, so clear it here; otherwise the case constructor's
+    // type would carry an isolated parameter that its ExtInfo can't record.
+    for (auto *param : *params)
+      param->setIsolated(false);
+  }
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
@@ -12913,7 +12985,7 @@ void FuncDecl::setHasTopLevelLocalContextCaptures(bool hasCaptures) {
 }
 
 Type TypeBase::getSwiftNewtypeUnderlyingType() {
-  auto structDecl = getStructOrBoundGenericStruct();
+  auto structDecl = getStructDecl();
   if (!structDecl)
     return {};
 
@@ -13028,7 +13100,7 @@ void ClassDecl::setSuperclass(Type superclass) {
          && "superclass must be interface type");
   LazySemanticInfo.SuperclassType.setPointerAndInt(superclass, true);
   LazySemanticInfo.SuperclassDecl.setPointerAndInt(
-    superclass ? superclass->getClassOrBoundGenericClass() : nullptr,
+    superclass ? superclass->getClassDecl() : nullptr,
     true);
 }
 

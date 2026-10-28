@@ -43,6 +43,12 @@ public protocol Countable {
   var count: Int { get }
 }
 
+/// Describes types that can be summed.
+public protocol Summable {
+  var values: [Int] { get }
+  func sum() -> Int
+}
+
 public enum BadError: Error, Equatable {
   /// Indicates badness
   case bad
@@ -225,6 +231,16 @@ extension ReferenceIntArray {
   public final func removeLast() -> Int? {
     defer { _values.removeLast() }
     return _values.last
+  }
+}
+
+extension Summable {
+  @available(BackDeploy 1.0, *)
+  @backDeployed(before: BackDeploy 2.0)
+  public func sum() -> Int {
+    let result = values.reduce(0, +)
+    testPrint(handle: #dsohandle, "sum: \(result)")
+    return result
   }
 }
 

@@ -206,7 +206,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // generated header would make the C++ client fail to launch when back
   // deployed.
   auto isAvailableAtDeploymentTarget = [&](Type type) {
-    auto nominal = type->getNominalOrBoundGenericNominal();
+    auto nominal = type->getNominalDecl();
     if (!nominal)
       return false;
     if (embedded)
@@ -231,7 +231,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
   for (Type type : supportedPrimitiveTypes) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
-        type->getNominalOrBoundGenericNominal());
+        type->getNominalDecl());
 
     if (!isCForwardDefinition) {
       os << "template<>\n";

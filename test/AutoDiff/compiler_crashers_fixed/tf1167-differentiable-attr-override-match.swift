@@ -12,12 +12,12 @@ public protocol Base {
   // expected-error @+1 {{cannot find type 'Differentiable' in scope}}
   associatedtype Output: Differentiable
 
-  // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}
+  // expected-error @+1 {{'@differentiable' attribute used without importing module '_Differentiation'}}
   @differentiable(reverse, wrt: self)
   func callAsFunction(_ input: Input) -> Output
 }
 public protocol Derived: Base {
-  // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}
+  // expected-error @+1 {{'@differentiable' attribute used without importing module '_Differentiation'}}
   @differentiable(reverse)
   func callAsFunction(_ input: Input) -> Output
 }

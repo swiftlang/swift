@@ -546,7 +546,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
   if (CONDITIONAL_ASSERT_enabled()) {
     auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
-        ->getClassOrBoundGenericClass();
+        ->getClassDecl();
     ASSERT(baseClass->isSuperclassOf(currentClass) &&
            "no inheritance relationship between given classes");
   }
@@ -562,7 +562,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
 SubstitutionMap TypeBase::getContextSubstitutionMap() {
   // Fast path.
-  auto *nominalTy = castTo<NominalOrBoundGenericNominalType>();
+  auto *nominalTy = castTo<NominalType>();
   if (nominalTy->ContextSubMap)
     return nominalTy->ContextSubMap;
 
@@ -588,14 +588,24 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
   while (baseTy) {
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
-    if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
-      auto args = boundGeneric->getGenericArgs();
+    if (auto nominalTy = baseTy->getAs<NominalType>()) {
+      // Except that if we see a ProtocolType, we have invalid nesting
+      // of types.
+      if (isa<ProtocolType>(nominalTy)) {
+        if (!first)
+          break;
+
+        replacementTypes.push_back(getASTContext().TheErrorType);
+        break;
+      }
+
+      auto args = nominalTy->getGenericArgs();
       for (auto arg : llvm::reverse(args)) {
         replacementTypes.push_back(arg);
       }
 
       // Continue looking into the parent.
-      baseTy = boundGeneric->getParent();
+      baseTy = nominalTy->getParent();
       first = false;
       continue;
     }
@@ -609,22 +619,6 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
         (void) paramDecl;
       }
       baseTy = unboundGeneric->getParent();
-      first = false;
-      continue;
-    }
-
-    // This case indicates we have invalid nesting of types.
-    if (baseTy->is<ProtocolType>()) {
-      if (!first)
-        break;
-
-      replacementTypes.push_back(getASTContext().TheErrorType);
-      break;
-    }
-
-    // Continue looking into the parent.
-    if (auto nominalTy = baseTy->getAs<NominalType>()) {
-      baseTy = nominalTy->getParent();
       first = false;
       continue;
     }
@@ -717,29 +711,20 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
-    if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
-      auto args = boundGeneric->getGenericArgs();
+    if (auto nominalTy = baseTy->getAs<NominalType>()) {
+      auto args = nominalTy->getGenericArgs();
       for (unsigned i = 0, e = args.size(); i < e; ++i) {
         substitutions[params[n - e + i]->getCanonicalType()
                         ->castTo<GenericTypeParamType>()] = args[i];
       }
 
       // Continue looking into the parent.
-      baseTy = boundGeneric->getParent();
-      n -= args.size();
-      continue;
-    }
-
-    // Continue looking into the parent.
-    if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
-      baseTy = protocolTy->getParent();
-      --n;
-      continue;
-    }
-
-    // Continue looking into the parent.
-    if (auto nominalTy = baseTy->getAs<NominalType>()) {
       baseTy = nominalTy->getParent();
+      if (isa<ProtocolType>(nominalTy)) {
+        n -= 1; // account for Self, which does not have a generic arg
+      } else {
+        n -= args.size();
+      }
       continue;
     }
 

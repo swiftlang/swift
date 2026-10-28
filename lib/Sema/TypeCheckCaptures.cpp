@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTWalker.h"
@@ -63,6 +64,10 @@ class FindCapturedVars : public ASTWalker {
   /// The values that have consuming uses in the closure.
   llvm::SmallPtrSet<ValueDecl *, 1> ConsumedValues;
 
+  /// The values whose consumed captures were diagnosed because this closure
+  /// can't own them.
+  llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedOwnedCaptures;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
@@ -70,17 +75,23 @@ class FindCapturedVars : public ASTWalker {
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
   bool NoEscape, ObjC, HasCalledAtMostOnceSemantics;
+  /// Whether this function can be destroyed without running, which is true
+  /// for every function except an exactly-once closure.
+  bool IsDeinitable;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
+  // True if needs to capture the surrounding context's isolation
+  bool NeedsImplicitIsolationCapture = false;
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
                    bool ObjC, bool IsGenericFunction,
-                   bool HasCalledAtMostOnceSemantics)
+                   bool HasCalledAtMostOnceSemantics, bool IsDeinitable = true)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
         NoEscape(NoEscape), ObjC(ObjC),
         HasCalledAtMostOnceSemantics(HasCalledAtMostOnceSemantics),
-        HasGenericParamCaptures(IsGenericFunction) {}
+        IsDeinitable(IsDeinitable), HasGenericParamCaptures(IsGenericFunction) {
+  }
 
   CaptureInfo getCaptureInfo() const {
     DynamicSelfType *dynamicSelfToRecord = nullptr;
@@ -91,14 +102,23 @@ public:
         dynamicSelfToRecord = DynamicSelf;
     }
 
-    return CaptureInfo(Context, Captures, dynamicSelfToRecord,
-                       OpaqueValue, HasGenericParamCaptures,
-                       CapturedEnvironments.getArrayRef(),
+    OptionSet<CaptureInfo::Flags> flags;
+    if (HasGenericParamCaptures)
+      flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+    if (NeedsImplicitIsolationCapture)
+      flags |= CaptureInfo::Flags::NeedsImplicitIsolationCapture;
+
+    return CaptureInfo(Context, Captures, dynamicSelfToRecord, OpaqueValue,
+                       flags, CapturedEnvironments.getArrayRef(),
                        CapturedTypes);
   }
 
   bool hasUsesOfCurrentIsolation() const {
     return HasUsesOfCurrentIsolation;
+  }
+
+  void setNeedsImplicitIsolationCapture() {
+    NeedsImplicitIsolationCapture = true;
   }
 
   bool hasGenericParamCaptures() const {
@@ -260,6 +280,8 @@ public:
       capture = CapturedValue(VD, flags, existing.getLoc());
       Captures[entryNumber-1] = capture;
     }
+
+    checkOwnedCapture(capture);
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
@@ -443,7 +465,35 @@ public:
     return Action::SkipNode(DRE);
   }
 
+  /// A closure owns the captures that it consumes, and destroying a closure
+  /// destroys what it owns. Therefore a closure that can be destroyed without
+  /// running can't own a non-Deinitable value.
+  void checkOwnedCapture(const CapturedValue &capture) {
+    if (!IsDeinitable || !capture.isConsumed())
+      return;
+
+    // Capture list entries are diagnosed where they're declared.
+    auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+    if (!var || !var->hasInterfaceType() || var->isCaptureList())
+      return;
+
+    auto type = var->getTypeInContext();
+    if (type->hasError() || type->isDeinitable())
+      return;
+
+    if (DiagnosedOwnedCaptures.insert(var).second) {
+      Context.Diags.diagnose(capture.getLoc(),
+                             diag::deinitable_closure_nondeinitable_capture,
+                             /*captureList=*/0, var, type);
+    }
+  }
+
   void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
+    // E.g. an async defer that captures the actor it must execute on,
+    // necessarily also will use it.
+    if (captureInfo.needsImplicitIsolationCapture())
+      HasUsesOfCurrentIsolation = true;
+
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl() &&
@@ -520,7 +570,7 @@ public:
         auto *var = PBD->getSingleVar();
         if (var && var->hasStorage()) {
           if (auto *init = var->getParentExecutableInitializer()) {
-            if (auto *V = getReferencedNonCopyableValue(init))
+            if (auto *V = getReferencedConsumableValue(init))
               recordConsumingUse(V);
           }
         }
@@ -689,19 +739,19 @@ public:
     ConsumedValues.insert(V);
   }
 
-  ValueDecl *getReferencedNonCopyableValue(Expr *E) {
+  ValueDecl *getReferencedConsumableValue(Expr *E) {
     if (!E)
       return nullptr;
 
     E = E->getSemanticsProvidingExpr();
     if (auto *L = dyn_cast<LoadExpr>(E))
-      return getReferencedNonCopyableValue(L->getSubExpr());
+      return getReferencedConsumableValue(L->getSubExpr());
 
     if (auto *erasure = dyn_cast<ErasureExpr>(E))
-      return getReferencedNonCopyableValue(erasure->getSubExpr());
+      return getReferencedConsumableValue(erasure->getSubExpr());
 
     if (auto *FCE = dyn_cast<FunctionConversionExpr>(E))
-      return getReferencedNonCopyableValue(FCE->getSubExpr());
+      return getReferencedConsumableValue(FCE->getSubExpr());
 
     auto *DRE = dyn_cast<DeclRefExpr>(E);
     if (!DRE)
@@ -712,7 +762,58 @@ public:
       return nullptr;
 
     auto type = DRE->getType()->getWithoutSpecifierType();
-    return type->isNoncopyable() ? ref.getDecl() : nullptr;
+    if (!type->isNoncopyable())
+      return nullptr;
+
+    ValueDecl *V = ref.getDecl();
+    if (auto *param = dyn_cast<ParamDecl>(V)) {
+      if (param->getLoweredOwnership() == LoweredOwnership::Shared)
+        return nullptr;
+    }
+
+    return V;
+  }
+
+  /// Returns true if the representation of a value of \p type depends on
+  /// abstraction, as that of a function or a metatype does, possibly as an
+  /// element of a tuple or the payload of an optional.
+  static bool hasAbstractionDependentRepresentation(Type type) {
+    type = type->getWithoutSpecifierType();
+    if (auto objectType = type->getOptionalObjectType())
+      return hasAbstractionDependentRepresentation(objectType);
+    if (auto *tuple = type->getAs<TupleType>()) {
+      return llvm::any_of(tuple->getElementTypes(), [](Type elementType) {
+        return hasAbstractionDependentRepresentation(elementType);
+      });
+    }
+    return type->is<AnyFunctionType>() || type->is<AnyMetatypeType>();
+  }
+
+  /// Returns true if \p type is a COM existential, possibly as the payload of
+  /// an optional.
+  static bool isCOMExistential(Type type) {
+    return type->getWithoutSpecifierType()
+        ->lookThroughAllOptionalTypes()
+        ->isCOMExistentialType();
+  }
+
+  /// Returns true if \p cast is an `is` check that only borrows its operand.
+  /// SILGen lowers an `is` check of a value to a type test that reads it in
+  /// place, unless a COM existential is involved or the value's
+  /// representation depends on abstraction (see emitIsa() and
+  /// canUseTypeTestForIsa()).
+  static bool isBorrowingIsCheck(ExplicitCastExpr *cast) {
+    auto *isExpr = dyn_cast<IsExpr>(cast);
+    if (!isExpr || isExpr->getCastKind() != CheckedCastKind::ValueCast)
+      return false;
+
+    auto type = cast->getSubExpr()->getType();
+    auto castType = isExpr->getCastType();
+    if (!type || !castType)
+      return false;
+
+    return !isCOMExistential(type) && !isCOMExistential(castType) &&
+           !hasAbstractionDependentRepresentation(type);
   }
 
   /// Check whether the given expression represents a consuming use of some
@@ -724,13 +825,13 @@ public:
   void recordConsumedValues(Expr *E) {
     // `consume x`
     if (auto *consume = dyn_cast<ConsumeExpr>(E)) {
-      if (auto *V = getReferencedNonCopyableValue(consume->getSubExpr()))
+      if (auto *V = getReferencedConsumableValue(consume->getSubExpr()))
         recordConsumingUse(V);
     }
 
     // assignments - `... = x`
     if (auto *assignment = dyn_cast<AssignExpr>(E)) {
-      if (auto *V = getReferencedNonCopyableValue(assignment->getSrc()))
+      if (auto *V = getReferencedConsumableValue(assignment->getSrc()))
         recordConsumingUse(V);
     }
 
@@ -745,20 +846,21 @@ public:
                                 : AccessorKind::Get;
 
         auto *accessor = property->getAccessor(accessorKind);
-        if (accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
-          if (auto *base = getReferencedNonCopyableValue(memberRef->getBase()))
+        if (accessor && accessor->getAttrs().hasAttribute<ConsumingAttr>()) {
+          if (auto *base = getReferencedConsumableValue(memberRef->getBase()))
             recordConsumingUse(base);
         }
       }
     }
 
-    // Casts are consuming operations.
-    if (auto *cast = dyn_cast<ExplicitCastExpr>(E)) {
-      if (auto *V = getReferencedNonCopyableValue(cast->getSubExpr()))
+    // Casts are consuming operations, except for most `is` checks.
+    if (auto *cast = dyn_cast<ExplicitCastExpr>(E);
+        cast && !isBorrowingIsCheck(cast)) {
+      if (auto *V = getReferencedConsumableValue(cast->getSubExpr()))
         recordConsumingUse(V);
     }
 
-    // - calling `@called(atMostOnce)` value
+    // - calling at-most-once value
     // - passing a value to a `consuming` parameter
     // - calling a `consuming` method ("self" is consumed).
     if (auto *callSite = dyn_cast<ApplyExpr>(E)) {
@@ -767,7 +869,7 @@ public:
       bool isInitializer = false;
       if (auto *callee =
               callSite->getCalledValue(/*skipFunctionConversions=*/true)) {
-        // Calling a `@called(atMostOnce)` value is a consuming operation.
+        // Calling an at-most-once value is a consuming operation.
         if (fnTy->hasCalledAtMostOnceSemantics())
           recordConsumingUse(callee);
 
@@ -786,7 +888,7 @@ public:
                    ParamSpecifier::Borrowing)))
           continue;
 
-        if (auto *V = getReferencedNonCopyableValue(arguments->getExpr(i)))
+        if (auto *V = getReferencedConsumableValue(arguments->getExpr(i)))
           recordConsumingUse(V);
       }
     }
@@ -913,7 +1015,7 @@ public:
     if (HasCalledAtMostOnceSemantics && isa<ReturnStmt>(S)) {
       auto *returnStmt = cast<ReturnStmt>(S);
       if (returnStmt->hasResult()) {
-        if (auto *V = getReferencedNonCopyableValue(returnStmt->getResult()))
+        if (auto *V = getReferencedConsumableValue(returnStmt->getResult()))
           recordConsumingUse(V);
       }
     }
@@ -940,17 +1042,10 @@ public:
 
 } // end anonymous namespace
 
-/// Given that a local function is isolated to the given var, should we
-/// force a capture of the var?
-static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
-                                              VarDecl *var,
-                                              bool hasUsesOfCurrentIsolation) {
-  assert(isa<ParamDecl>(var));
-
-  // Don't try to capture an isolated parameter of the function itself.
-  if (var->getDeclContext() == AFD)
-    return false;
-
+/// Given that a local function inherits the isolation of its context,
+/// whether it needs to capture the actor it is isolated to
+static bool shouldLocalFuncCaptureIsolation(AbstractFunctionDecl *AFD,
+                                            bool hasUsesOfCurrentIsolation) {
   // Force capture if we have uses of the isolation in the function body.
   if (hasUsesOfCurrentIsolation)
     return true;
@@ -968,6 +1063,18 @@ static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
       return false;
 
   return true;
+}
+
+/// Given that a local function is isolated to the given var, should we
+/// force a capture of the var?
+static bool shouldCaptureIsolationInLocalFunc(AbstractFunctionDecl *AFD,
+                                              ParamDecl *var,
+                                              bool hasUsesOfCurrentIsolation) {
+  // Don't try to capture an isolated parameter of the function itself.
+  if (var->getDeclContext() == AFD)
+    return false;
+
+  return shouldLocalFuncCaptureIsolation(AFD, hasUsesOfCurrentIsolation);
 }
 
 CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
@@ -990,13 +1097,26 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     finder.checkType(type, AFD->getLoc());
   }
 
-  if (AFD->isLocalCapture()) {
+  if (isDeferInClosureContext(AFD)) {
+    // A defer in a closure inherits the isolation of the closure. That
+    // isolation is not known yet: it is determined from the captures of the
+    // closure, which include the captures of the defer, and asking for the
+    // isolation of the defer here would also use, and cache, a stale one. So
+    // the isolated parameter is not captured here. Instead, record that it is
+    // needed, using the same rule as for other local functions, see
+    // shouldLocalFuncCaptureIsolation, and add the capture when the captures
+    // are lowered. This is the same as what is done for closures that always
+    // inherit the actor context, see TypeConverter::getLoweredLocalCaptures
+    if (shouldLocalFuncCaptureIsolation(AFD,
+                                        finder.hasUsesOfCurrentIsolation()))
+      finder.setNeedsImplicitIsolationCapture();
+  } else if (AFD->isLocalCapture()) {
     // If a local function inherits isolation from the enclosing context,
     // make sure we capture the isolated parameter, if we haven't already.
     auto actorIsolation = getActorIsolation(AFD);
     if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
       if (auto *var = actorIsolation.getActorInstance()) {
-        if (shouldCaptureIsolationInLocalFunc(AFD, var,
+        if (shouldCaptureIsolationInLocalFunc(AFD, cast<ParamDecl>(var),
                                               finder.hasUsesOfCurrentIsolation()))
           finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
       }
@@ -1049,7 +1169,7 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
   bool hasCalledAtMostOnceSemantics = fnType->hasCalledAtMostOnceSemantics();
   FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
                           /*isObjC=*/false, /*isGeneric=*/false,
-                          hasCalledAtMostOnceSemantics);
+                          hasCalledAtMostOnceSemantics, fnType->isDeinitable());
   body->walk(finder);
 
   finder.checkType(type, ACE->getLoc());

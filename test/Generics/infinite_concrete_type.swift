@@ -63,6 +63,6 @@ struct G2<T> {
 // expected-note@-2 {{failed rewrite rule is }}
 // expected-error@-3 {{generic parameter 'A' is not used in function signature}}
   where (repeat each A, T) == T {}
-// expected-error@-1 {{tuple with noncopyable element type 'repeat each A' is not supported}}
+// expected-error@-1 {{tuple with non-'Copyable' element type 'repeat each A' is not supported}}
 
 }

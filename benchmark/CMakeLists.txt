@@ -31,6 +31,7 @@ set(SWIFT_BENCH_MODULES
     single-source/AnyHashableWithAClass
     single-source/Array2D
     single-source/ArrayAppend
+    single-source/ArrayCastTest
     single-source/ArrayInClass
     single-source/ArrayLiteral
     single-source/ArrayOfGenericPOD
@@ -209,11 +210,13 @@ set(SWIFT_BENCH_MODULES
     single-source/StringSplitting
     single-source/StringSwitch
     single-source/StringTests
+    single-source/StringValidating
     single-source/StringWalk
     single-source/SubstringTest
     single-source/Suffix
     single-source/SuperChars
     single-source/TaskGroups
+    single-source/TaskIDBenchmark
     single-source/TaskLocalGet
     single-source/TaskRegistryStress
     single-source/ToddCoxeter

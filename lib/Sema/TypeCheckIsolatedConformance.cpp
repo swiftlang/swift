@@ -93,16 +93,16 @@ void TypeChecker::checkIsolatedConformancesInType(Type type, SourceLoc loc) {
               TA->getSubstitutionMap());
       }
 
-      auto boundGeneric = ty->getAs<BoundGenericType>();
-      if (!boundGeneric)
+      auto nominalTy = ty->getAs<NominalType>();
+      if (!nominalTy)
         return Action::Continue;
 
-      auto *decl = boundGeneric->getDecl();
+      auto *decl = nominalTy->getDecl();
       auto signature = decl->getGenericSignature();
       if (!signature)
         return Action::Continue;
 
-      check(decl, ty, signature, boundGeneric->getContextSubstitutionMap()); 
+      check(decl, ty, signature, nominalTy->getContextSubstitutionMap());
       return Action::Continue;
     }
 

@@ -488,9 +488,9 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
     // If we add non-Int value generic parameters in the future, the destructuring
     // and equality checking logic below will also need to change.
     GenericWord = Builder.createStructExtract(Loc, genericInt,
-      valueTy->getStructOrBoundGenericStruct()->getStoredProperties().front());
+      valueTy->getStructDecl()->getStoredProperties().front());
     SpecializedWord = Builder.createStructExtract(Loc, specializedInt,
-      valueTy->getStructOrBoundGenericStruct()->getStoredProperties().front());
+      valueTy->getStructDecl()->getStoredProperties().front());
   } else {
     auto WordTy = SILType::getBuiltinWordType(Ctx);
     auto GenericMT = Builder.createMetatype(
@@ -776,9 +776,14 @@ SILValue EagerDispatch::emitArgumentConversion(
 namespace {
 class EagerSpecializerTransform : public SILFunctionTransform {
   const bool onlyCreatePrespecializations;
+  /// Only create the specialized bodies of `@specialized(exported: true)`
+  /// attributes, for Embedded Swift.
+  const bool onlyExportedSpecialized;
 public:
-  EagerSpecializerTransform(bool onlyPrespecialize)
-      : onlyCreatePrespecializations(onlyPrespecialize) {}
+  EagerSpecializerTransform(bool onlyPrespecialize,
+                            bool onlyExportedSpecialized = false)
+      : onlyCreatePrespecializations(onlyPrespecialize),
+        onlyExportedSpecialized(onlyExportedSpecialized) {}
 
   void run() override;
 
@@ -832,6 +837,11 @@ void EagerSpecializerTransform::run() {
   if (!EagerSpecializeFlag)
     return;
 
+  if (onlyExportedSpecialized &&
+      !getFunction()->getASTContext().LangOpts.hasFeature(
+          Feature::ExtendedSpecializedAttribute))
+    return;
+
   SILOptFunctionBuilder FuncBuilder(*this);
   auto &F = *getFunction();
 
@@ -866,6 +876,12 @@ void EagerSpecializerTransform::run() {
   bool onlyCreatePrespecializations = this->onlyCreatePrespecializations;
 
   for (auto *SA : F.getSpecializeAttrs()) {
+    if (onlyExportedSpecialized &&
+        !(SA->isExported() && SA->isSpecializedSpelling())) {
+      SpecializedFuncs.push_back(nullptr);
+      ReInfoVec.emplace_back(ReabstractionInfo(F.getModule()));
+      continue;
+    }
     if (onlyCreatePrespecializations && !SA->isExported()) {
       attrsToRemove.push_back(SA);
       continue;
@@ -953,4 +969,9 @@ SILTransform *swift::createEagerSpecializer() {
 
 SILTransform *swift::createOnonePrespecializations() {
   return new EagerSpecializerTransform(true /*onlyCreatePrespecializations*/);
+}
+
+SILTransform *swift::createEmbeddedExportedPrespecializations() {
+  return new EagerSpecializerTransform(true /*onlyCreatePrespecializations*/,
+                                       true /*onlyExportedSpecialized*/);
 }

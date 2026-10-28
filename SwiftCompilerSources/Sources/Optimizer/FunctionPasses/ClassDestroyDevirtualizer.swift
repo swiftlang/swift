@@ -189,7 +189,10 @@ private struct FindAllocationWalker : ValueUseDefWalker {
 
 private extension Type {
   func containsSingleReference(in function: Function) -> Bool {
-    if isClass {
+    // Beside class references this also includes `Builtin.NativeObject` and `Builtin.BridgeObject`,
+    // which a class reference can be casted to. For example, an array buffer reference is casted to
+    // a `Builtin.BridgeObject` before it's destroyed.
+    if isHeapObjectReferenceType {
       return true
     }
     if isStruct {

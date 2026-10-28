@@ -1147,6 +1147,16 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
                  /*isConstant*/false, /*asContiguousArray*/true);
+
+  // @llvm.global_ctors
+
+  // ClangCodeGen creates llvm.global_ctors from scratch when it finishes, so
+  // the static initializers can only be added to it now. Use a priority
+  // slightly lower than the one for C++ global constructors, so that the
+  // static initializers run before the ones in this module.
+  for (auto *fn : StaticInitializers)
+    llvm::appendToGlobalCtors(Module, fn, 60000, nullptr);
+  EmittedStaticInitializers = true;
 }
 
 // Eagerly emit functions that are externally visible. Functions that are
@@ -1419,7 +1429,7 @@ void IRGenerator::emitLazyDefinitions() {
       TypeMetadataCanonicality canonicality;
       std::tie(theType, canonicality) =
           LazySpecializedTypeMetadataRecords.pop_back_val();
-      auto *nominal = theType->getNominalOrBoundGenericNominal();
+      auto *nominal = theType->getNominalDecl();
       CurrentIGMPtr IGMPtr = getGenModule(nominal->getDeclContext());
       auto &IGM = *IGMPtr.get();
       // A new canonical prespecialized metadata changes both the type
@@ -1519,19 +1529,19 @@ void IRGenerator::emitLazyDefinitions() {
 
     while (!LazyClassMetadata.empty()) {
       CanType classType = LazyClassMetadata.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      CurrentIGMPtr IGM = getGenModule(classType->getClassDecl());
       emitLazyClassMetadata(*IGM.get(), classType);
     }
 
     while (!LazySpecializedClassMetadata.empty()) {
       CanType classType = LazySpecializedClassMetadata.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      CurrentIGMPtr IGM = getGenModule(classType->getClassDecl());
       emitLazySpecializedClassMetadata(*IGM.get(), classType);
     }
 
     while(!LazySpecializedValueMetadata.empty()) {
       CanType valueType = LazySpecializedValueMetadata.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(valueType->getNominalOrBoundGenericNominal());
+      CurrentIGMPtr IGM = getGenModule(valueType->getNominalDecl());
       emitLazySpecializedValueMetadata(*IGM.get(), valueType);
     }
   }
@@ -1779,11 +1789,8 @@ void IRGenerator::noteUseOfCanonicalSpecializedMetadataAccessor(
 static bool typeKindCanBePrespecialized(TypeKind theKind) {
   switch (theKind) {
   case TypeKind::Struct:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::Enum:
-  case TypeKind::BoundGenericEnum:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
     return true;
   default:
     return false;
@@ -2188,11 +2195,10 @@ void IRGenerator::emitEagerClassInitialization() {
   }
   RegisterIGF.Builder.CreateRetVoid();
 
-  // Add the registration function as a static initializer. We use a priority
-  // slightly lower than used for C++ global constructors, so that the code is
+  // Add the registration function as a static initializer, so that the code is
   // executed before C++ global constructors (in case someone uses archives
   // from a C++ global constructor).
-  llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
+  IGM->addStaticInitializer(RegisterFn);
 }
 
 void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
@@ -2234,11 +2240,10 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
   }
   RegisterIGF.Builder.CreateRetVoid();
 
-  // Add the registration function as a static initializer. We use a priority
-  // slightly lower than used for C++ global constructors, so that the code is
+  // Add the registration function as a static initializer, so that the code is
   // executed before C++ global constructors (in case someone manages to access
   // an @objc actor from a global constructor).
-  llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
+  IGM->addStaticInitializer(RegisterFn);
 }
 
 /// Emit symbols for eliminated dead methods, which can still be referenced
@@ -2943,15 +2948,20 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     if (!forDefinition)
       gvar->setComdat(nullptr);
 
-    // Mark as llvm.used if @used, set section if @section
-    if (var->markedAsUsed())
-      addUsedGlobal(gvar);
-    else if (var->shouldBePreservedForDebugger() && forDefinition) 
-      addUsedGlobal(gvar);
+    // Set section if @section.
     if (!var->section().empty())
       gvar->setSection(var->section());
   }
   if (forDefinition && !gvar->hasInitializer()) {
+    if (const ExposeAttr *expose = var->getWasmExposeAttr())
+      gvar->addAttribute("wasm-export-name",
+                         expose->Name.empty() ? gvar->getName() : expose->Name);
+    // llvm.used only allows definitions, so only add declarations
+    // when we're actually emitting the definition.
+    if (var->markedAsUsed())
+      addUsedGlobal(gvar);
+    else if (var->shouldBePreservedForDebugger())
+      addUsedGlobal(gvar);
     if (initVal) {
       gvar->setInitializer(initVal);
       if (var->isLet() &&
@@ -3809,10 +3819,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
 
-  // Mark as llvm.used if @used, set section if @section
-  if (f->markedAsUsed())
-    addUsedGlobal(fn);
+  // If the function is `@used`, we'll add it to `llvm.used` in
+  // `emitSILFunction` whenever we decide to emit the definition.
 
+  // Set section if @section.
   if (!f->section().empty())
     fn->setSection(f->section());
 
@@ -5056,9 +5066,9 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
 llvm::Constant *
 IRGenModule::getAddrOfCanonicalSpecializedGenericMetaclassObject(
     CanType concreteType, ForDefinition_t forDefinition) {
-  auto *theClass = concreteType->getClassOrBoundGenericClass();
+  auto *theClass = concreteType->getClassDecl();
   assert(theClass && "only classes have metaclasses");
-  assert(concreteType->getClassOrBoundGenericClass()->isGenericContext());
+  assert(concreteType->getClassDecl()->isGenericContext());
 
   auto entity =
       LinkEntity::forSpecializedGenericSwiftMetaclassStub(concreteType);
@@ -5115,7 +5125,7 @@ llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
-  NominalTypeDecl *Nominal = type->getNominalOrBoundGenericNominal();
+  NominalTypeDecl *Nominal = type->getNominalDecl();
   IRGen.noteUseOfTypeMetadata(Nominal);
 
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
@@ -5404,7 +5414,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
                 concreteType)
           : (isObjCImpl
                 ? LinkEntity::forObjCClass(
-                      concreteType->getClassOrBoundGenericClass())
+                      concreteType->getClassDecl())
                 : LinkEntity::forTypeMetadata(
                       concreteType, TypeMetadataAddress::FullMetadata));
 
@@ -5428,7 +5438,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     var->setSection(section);
 
   if (getOptions().VirtualFunctionElimination) {
-    if (auto classDecl = concreteType->getClassOrBoundGenericClass()) {
+    if (auto classDecl = concreteType->getClassDecl()) {
       addVTableTypeMetadata(classDecl, var, vtableEntries);
     }
   }
@@ -5540,7 +5550,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
   } else if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
-    if (concreteType->getClassOrBoundGenericClass() && !foreign) {
+    if (concreteType->getClassDecl() && !foreign) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
     } else {
       adjustmentIndex = MetadataAdjustmentIndex::ValueType;
@@ -5609,7 +5619,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   switch (canonicality) {
   case TypeMetadataCanonicality::Canonical: {
-    auto classDecl = concreteType->getClassOrBoundGenericClass();
+    auto classDecl = concreteType->getClassDecl();
     if (classDecl && classDecl->getObjCImplementationDecl()) {
       entity = LinkEntity::forObjCClass(classDecl);
     } else {

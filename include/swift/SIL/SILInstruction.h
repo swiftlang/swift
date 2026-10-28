@@ -2720,6 +2720,13 @@ public:
   SubstitutionMap getSubstitutions() const { return Subs; }
 };
 
+/// Checks if \p Subs2 is an expanded version of \p Subs1, i.e. if at least one
+/// replacement type in \p Subs2 (partially) contains the corresponding
+/// replacement type of \p Subs1. Both substitution maps must have the same
+/// generic signature.
+/// This is used to detect infinitely growing specialization loops.
+bool growingSubstitutions(SubstitutionMap Subs1, SubstitutionMap Subs2);
+
 class PartialApplyInst;
 
 // There's no good reason for the OverloadToken type to be internal
@@ -4438,7 +4445,7 @@ class KeyPathInst final
   }
 
 public:
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   KeyPathPattern *getPattern() const;
   bool hasPattern() const { return (bool)Pattern; }
@@ -6294,15 +6301,30 @@ class ConvertFunctionInst final
   friend SILBuilder;
   USE_SHARED_UINT8;
 
+public:
+  /// The kind of a conversion. The values are part of the serialized format.
+  enum class Kind : uint8_t {
+    /// An ordinary conversion between ABI-compatible function types.
+    Ordinary = 0,
+
+    /// The conversion turns a non-escaping closure into an escaping function
+    /// type. See withoutActuallyEscaping().
+    WithoutActuallyEscaping = 1,
+
+    /// The conversion turns an exactly-once function into an at-most-once
+    /// function. See withoutActuallyDiscarding().
+    WithoutActuallyDiscarding = 2,
+  };
+
+private:
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
-                      bool WithoutActuallyEscaping,
+                      Kind ConversionKind,
                       ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
                                                       TypeDependentOperands, Ty,
                                                       forwardingOwnershipKind) {
-    sharedUInt8().ConvertFunctionInst.withoutActuallyEscaping =
-        WithoutActuallyEscaping;
+    sharedUInt8().ConvertFunctionInst.conversionKind = uint8_t(ConversionKind);
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
                 Ty.castTo<SILFunctionType>()->isNoEscape() ||
             Ty.castTo<SILFunctionType>()->getRepresentation() !=
@@ -6310,12 +6332,17 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *create(
-      SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-      SILFunction *F,
-      bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind);
+  static ConvertFunctionInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, SILFunction *F, Kind ConversionKind,
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
+  /// Returns the kind of this conversion.
+  Kind getConversionKind() const {
+    return Kind(sharedUInt8().ConvertFunctionInst.conversionKind);
+  }
+
   /// Returns `true` if this converts a non-escaping closure into an escaping
   /// function type. `True` must be returned whenever the closure operand has an
   /// unboxed capture (via @inout_aliasable) *and* the resulting function type
@@ -6325,7 +6352,13 @@ public:
   /// not be @noescape. Note that a non-escaping closure may have unboxed
   /// captured even though its SIL function type is "escaping".
   bool withoutActuallyEscaping() const {
-    return sharedUInt8().ConvertFunctionInst.withoutActuallyEscaping;
+    return getConversionKind() == Kind::WithoutActuallyEscaping;
+  }
+
+  /// Returns `true` if this converts an exactly-once function into an
+  /// at-most-once function.
+  bool withoutActuallyDiscarding() const {
+    return getConversionKind() == Kind::WithoutActuallyDiscarding;
   }
 
   /// Returns `true` if the function conversion is between types with the same
@@ -6972,7 +7005,7 @@ public:
   }
 
   StructDecl *getStructDecl() const {
-    auto s = getType().getStructOrBoundGenericStruct();
+    auto s = getType().getStructDecl();
     assert(s && "A struct should always have a StructDecl associated with it");
     return s;
   }
@@ -7479,7 +7512,7 @@ public:
   }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
+    auto *E = getOperand()->getType().getEnumDecl();
     assert(E && "Operand of unchecked_enum_data must be of enum type");
     return E;
   }
@@ -7601,7 +7634,7 @@ public:
   }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getEnum()->getType().getEnumOrBoundGenericEnum();
+    auto *E = getEnum()->getType().getEnumDecl();
     assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
                 " type");
     return E;
@@ -7795,7 +7828,7 @@ public:
     auto enumValue = getEnumOperand();
     SILType enumType = enumValue->getType();
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     if (!enumType.isEffectivelyExhaustiveEnumType(this->getFunction())) {
@@ -8074,7 +8107,7 @@ public:
 
   NominalTypeDecl *getParentDecl() const {
     auto s =
-        ParentTy::getOperand(0)->getType().getNominalOrBoundGenericNominal();
+        ParentTy::getOperand(0)->getType().getNominalDecl();
     assert(s);
     return s;
   }
@@ -8177,7 +8210,7 @@ class RefTailAddrInst
 
 public:
   ClassDecl *getClassDecl() const {
-    auto s = getOperand()->getType().getClassOrBoundGenericClass();
+    auto s = getOperand()->getType().getClassDecl();
     assert(s);
     return s;
   }
@@ -8909,6 +8942,13 @@ public:
   AnyPackIndexInst *getIndexOperand() const {
     return cast<AnyPackIndexInst>(getOperand());
   }
+
+  /// Build a SubstitutionMap that maps each element archetype in the opened
+  /// generic environment to the concrete type at the index in its corresponding
+  /// pack indicated by this instruction's index operand.
+  ///
+  /// If this is not possible, returns an empty SubstitutionMap.
+  SubstitutionMap tryGetElementArchetypeSubstitutionMap() const;
 };
 
 /// Get the value previously stored in a pack by pack_element_set.
@@ -9312,6 +9352,10 @@ public:
 
     /// The marked value is a copy that is not permitted by the language model.
     UnpermittedCopy,
+
+    /// The marked address is the destination of a second initialization of
+    /// immutable storage.
+    LetReinit,
   };
 
 private:
@@ -11338,7 +11382,7 @@ public:
     if (!enumType.isEffectivelyExhaustiveEnumType(f))
       return nullptr;
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
@@ -11362,7 +11406,7 @@ public:
   getUniqueCaseForDestination(SILBasicBlock *block) {
     SILValue value = getOperand();
     SILType enumType = value->getType();
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
     (void)decl;
 
@@ -12366,7 +12410,7 @@ public:
          ValueOwnershipKind forwardingOwnershipKind);
 
   StructDecl *getStructDecl() const {
-    return getOperand()->getType().getStructOrBoundGenericStruct();
+    return getOperand()->getType().getStructDecl();
   }
 
   static bool classof(SILNodePointer node) {

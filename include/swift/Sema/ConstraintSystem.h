@@ -1317,6 +1317,9 @@ private:
   void incrementScopeCounter();
   void incrementLeafScopes();
 
+  /// All type variables seen with conflicting types while solving
+  AmbiguousBindings ambiguousBindings;
+
 public:
   /// Introduces a new solver scope, which any changes to the
   /// solver state or constraint system are temporary and will be undone when
@@ -2071,12 +2074,14 @@ public:
   bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
+  void recordConflictedType(TypeVariableType *root, Type conflict,
+                            ConstraintLocator *loc, ConflictReason reason);
+
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
 
-  /// Record all unbound type variables that occur in the given type
-  /// as being bound to "hole" type represented by \c PlaceholderType
-  /// in this constraint system.
+  /// Record all unbound type variables that occur in the given type as being
+  /// bound to "hole" type represented by \c HoleType in this constraint system.
   ///
   /// \param type The type on which to holeify.
   void recordTypeVariablesAsHoles(Type type);
@@ -3129,6 +3134,8 @@ public:
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
+  bool isCGFloatDoubleConversionSupported(ConstraintLocatorBuilder locator);
+
   SolutionKind
   matchPackTypes(PackType *pack1, PackType *pack2,
                  ConstraintKind kind, TypeMatchOptions flags,
@@ -3154,8 +3161,8 @@ public:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
-  /// Match the execution semantics between two functions currently
-  /// represented by `@called(atMostOnce)` bit.
+  /// Match the execution semantics (exactly-once, at-most-once, or
+  /// unconstrained) between two functions.
   SolutionKind
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
@@ -3553,6 +3560,12 @@ private:
                                          Type type1, Type type2,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the given DiscardableFunctionOf constraint.
+  SolutionKind
+  simplifyDiscardableFunctionOfConstraint(Type type1, Type type2,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given OpenedExistentialOf constraint.
   SolutionKind simplifyOpenedExistentialOfConstraint(
@@ -4396,6 +4409,15 @@ ValueDecl *getOverloadChoiceDecl(Constraint *choice);
 ///
 /// This function requires the type to be fully resolved.
 bool isSendableCapture(Type type);
+
+/// Determine the execution semantics of an unapplied reference to a consuming
+/// method on the given base type. Such a reference owns its base, so it can't
+/// be copied if the base is non-Copyable, and has to be called if the base is
+/// also non-Deinitable.
+///
+/// This function requires the type to be fully resolved.
+std::optional<ExecutionSemantics>
+getUnappliedConsumingMethodExecutionSemantics(Type baseType);
 
 /// Find any references to external type variables used in the body of a
 /// conjunction element (e.g closures, taps, if/switch expressions).

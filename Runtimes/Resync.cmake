@@ -212,9 +212,13 @@ message(STATUS "Windows modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT
 copy_files(public/Platform Overlay/Windows/clang
   FILES
     ucrt.modulemap
+    SwiftUCRT.h
+    SwiftWinRT.h
     WinSDK.apinotes
-    winsdk_um.modulemap
-    winsdk_shared.modulemap
+    winrt.modulemap
+    winsdk.modulemap
+    um.modulemap
+    shared.modulemap
     vcruntime.modulemap
     vcruntime.apinotes)
 

@@ -3,7 +3,8 @@
 Calling Convention Summary
 ==========================
 
-Below is a summary of the calling conventions used on macOS and iOS.
+Below is a summary of the calling conventions used on macOS and iOS, and on
+WebAssembly.
 
 The `ABI stability manifesto <../ABIStabilityManifesto.md>`_ gives more details
 on the use of the Swift error return and ``self`` registers, while `The Swift
@@ -210,3 +211,31 @@ accesses.
 
 .. [1] See Apple documentation, however.  Unlike the official ARM64 ABI, we pack
        arguments, so this might also hold argument 1, argument 2 and so on.
+
+
+WebAssembly
+-----------
+
+See `WebAssembly Basic C ABI`_.
+
+.. _WebAssembly Basic C ABI: https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md
+
+Parameters
+^^^^^^^^^^
+
+WebAssembly has no registers; in other words, the position of an argument is
+also its name: the parameter at index n is passed as ``local n``.  The Swift
+calling convention puts the parameters in this order:
+
+1. The async context, if the function has one.  A ``swifttailcc`` function
+   without an async context has an unused parameter here. The async context
+   argument is always in ``local 0``.  In an await resume funclet, local 0
+   first holds the async context of the callee that returned; the funclet then
+   writes its own async context to local 0 once, before any call. No other
+   values may be written to this local.
+2. Other arguments, in order, including ``self`` and the pointer to the
+   error return.
+3. An unused parameter if the function has no ``self`` argument, and another
+   one if it has no error return.  Because of these parameters, the caller and
+   the callee agree on the function type in indirect calls.
+

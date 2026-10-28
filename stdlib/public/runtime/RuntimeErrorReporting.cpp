@@ -41,6 +41,7 @@
 #include "swift/Runtime/Config.h"
 #endif
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Win32.h"
 #include "swift/Threading/Errors.h"
@@ -459,6 +460,14 @@ std::atomic<const char *> *swift::swift_getFatalErrorMessageBuffer() {
 SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "Fatal error: Call of deleted method\n");
+}
+
+// Crash when an exactly-once closure is destroyed without being called.
+SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void
+swift_onceClosureDestroyedError(HeapObject *context) {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Fatal error: Exactly-once closure was destroyed without "
+                    "being called\n");
 }
 
 // Crash due to a retain count overflow.

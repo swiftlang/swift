@@ -38,6 +38,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
@@ -762,8 +763,9 @@ namespace {
             // All checks passed: the imported element type is SIMDScalar,
             // and a generic SIMDn type exists with n == count. Construct the
             // bound generic type and return that.
-            return BoundGenericType::get(
-              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element }
+            return NominalType::get(
+              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element },
+              Impl.SwiftContext
             );
           }
         }
@@ -1246,8 +1248,8 @@ namespace {
             }
           }
           assert(importedTypeArgs.size() == typeParamCount);
-          importedType = BoundGenericClassType::get(
-            imported, parentTy, importedTypeArgs);
+          importedType = ClassType::get(
+            imported, parentTy, importedTypeArgs, Impl.SwiftContext);
         } else {
           importedType = imported->getDeclaredInterfaceType();
         }
@@ -1366,8 +1368,9 @@ namespace {
             } else {
               // Everything else.
               bridgedType =
-                  BoundGenericType::get(cast<NominalTypeDecl>(unboundDecl),
-                                        Type(), importedTypeArgs);
+                  NominalType::get(cast<NominalTypeDecl>(unboundDecl),
+                                   Type(), importedTypeArgs,
+                                   Impl.SwiftContext);
             }
           }
 
@@ -1483,9 +1486,10 @@ static Type getUnmanagedType(ClangImporter::Implementation &impl,
   if (!unmanagedDecl || unmanagedDecl->getGenericParams()->size() != 1)
     return payloadType;
 
-  Type unmanagedClassType = BoundGenericType::get(unmanagedDecl,
-                                                  /*parent*/ Type(),
-                                                  payloadType);
+  Type unmanagedClassType = NominalType::get(unmanagedDecl,
+                                             /*parent*/ Type(),
+                                             payloadType,
+                                             impl.SwiftContext);
   return unmanagedClassType;
 }
 
@@ -1514,7 +1518,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (!elementObj)
     return Type();
 
-  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  auto elementClass = elementObj->getClassDecl();
   if (!elementClass)
     return Type();
 
@@ -1555,7 +1559,7 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
   if (!insideOptionalType)
     insideOptionalType = elementType;
 
-  auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
+  auto boundGenericTy = insideOptionalType->getAs<NominalType>();
   if (!boundGenericTy)
     return Type();
 
@@ -1756,12 +1760,12 @@ static ImportedType adjustTypeForConcreteImport(
   case ImportHint::IntrusivelyRefCountedSmartPtr:
     if (bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
       auto decl = importedType->castTo<StructType>()->getDecl();
-      auto lookupResult = decl->lookupDirect(
-          DeclName(impl.SwiftContext.getIdentifier("asReference")));
-      ASSERT(lookupResult.size() == 1);
-      auto asReference = cast<VarDecl>(lookupResult.front());
-      importedType = asReference->getInterfaceType();
-      optKind = OTK_None;
+      // If the annotation is invalid, VisitRecordDecl() diagnoses it and does
+      // not import the smart pointer, so leave it unbridged here.
+      if (auto *asReference = impl.lookupAndImportAsReference(decl)) {
+        importedType = asReference->getInterfaceType();
+        optKind = OTK_None;
+      }
     }
     break;
   }
@@ -1884,6 +1888,9 @@ ImportedType ClangImporter::Implementation::importType(
     std::optional<unsigned> completionHandlerErrorParamIndex) {
   if (type.isNull())
     return {Type(), false};
+
+  if (auto *Stats = SwiftContext.Stats)
+    ++Stats->getFrontendCounters().ClangImportType;
 
   // The "built-in" Objective-C types id, Class, and SEL can actually be (and
   // are) defined within the library. Clang tracks the redefinition types
@@ -2145,6 +2152,7 @@ private:
   }
 
   NEVER_VISIT(PlaceholderType)
+  NEVER_VISIT(HoleType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
   NEVER_VISIT(IntegerType)
@@ -2154,14 +2162,7 @@ private:
 
   NEVER_VISIT(ReferenceStorageType)
 
-  VISIT(EnumType, pass)
-  VISIT(StructType, pass)
-  VISIT(ClassType, compose)
-  VISIT(ProtocolType, compose)
-
-  Result visitBoundGenericType(BoundGenericType *ty) {
-    assert(!isa<BoundGenericClassType>(ty) && "classes handled elsewhere");
-
+  Result visitNominalType(NominalType *ty) {
     // These types are produced during bridging and have conditional
     // conformances to Sendable depending on their generic parameters, so we
     // want to make their generic parameters `Sendable`.
@@ -2172,11 +2173,13 @@ private:
         ty->isDictionary())
       return recurse(ty);
 
-    // Other non-class generic types (e.g. pointers) cannot be made Sendable.
-    return pass(ty);
+    if (isa<EnumType>(ty) || isa<StructType>(ty))
+      return pass(ty);
+    if (isa<ClassType>(ty) || isa<ProtocolType>(ty))
+      return compose(ty);
+    llvm_unreachable("unknown nominal type kind");
   }
 
-  VISIT(BoundGenericClassType, compose)
   NEVER_VISIT(UnboundGenericType)
 
   VISIT(AnyMetatypeType, recurse)
@@ -3893,8 +3896,8 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum()) {
+  if (type->getStructDecl() ||
+      type->getEnumDecl()) {
     auto nominal = type->getAnyNominal();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;

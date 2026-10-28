@@ -1212,8 +1212,7 @@ bool DifferentiationTransformer::emitDefaultDerivative(
                                               unsubstFromType, unsubstToType);
   if (fromType != unsubstFromType)
     defaultDeriv = builder.createConvertFunction(
-        loc, defaultDeriv, SILType::getPrimitiveObjectType(unsubstFromType),
-        /*withoutActuallyEscaping*/ false);
+        loc, defaultDeriv, SILType::getPrimitiveObjectType(unsubstFromType));
 
   auto *thunkRef = builder.createFunctionRef(loc, thunk);
   SmallVector<SILValue, 4> args(fn->getArguments());

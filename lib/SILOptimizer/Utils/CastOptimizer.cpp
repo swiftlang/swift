@@ -502,13 +502,13 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     return std::nullopt;
   SmallVector<ValueDecl *, 2> results;
   modDecl->lookupMember(results,
-                        sourceFormalType.getNominalOrBoundGenericNominal(),
+                        sourceFormalType.getNominalDecl(),
                         ctx.Id_bridgeToObjectiveC,
                         Identifier());
   ArrayRef<ValueDecl *> resultsRef(results);
   if (resultsRef.empty()) {
     mod->lookupMember(
-        results, sourceFormalType.getNominalOrBoundGenericNominal(),
+        results, sourceFormalType.getNominalDecl(),
         ctx.Id_bridgeToObjectiveC, Identifier());
     resultsRef = results;
   }
@@ -817,10 +817,10 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   // and that one of the types is a class and another one is a struct.
   if (source.isAnyExistentialType() || target.isAnyExistentialType() ||
       source->is<ArchetypeType>() || target->is<ArchetypeType>() ||
-      (source.getClassOrBoundGenericClass() &&
-       !target.getStructOrBoundGenericStruct()) ||
-      (target.getClassOrBoundGenericClass() &&
-       !source.getStructOrBoundGenericStruct()))
+      (source.getClassDecl() &&
+       !target.getStructDecl()) ||
+      (target.getClassDecl() &&
+       !source.getStructDecl()))
     return nullptr;
 
   // Casts involving non-bound generic types cannot be optimized.

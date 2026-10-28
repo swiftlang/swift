@@ -84,12 +84,7 @@ void swift::forEachRequiredHiddenTypeLayout(
           return;
         }
 
-        NominalTypeDecl *nominal = nullptr;
-        if (auto *bgt = type->getAs<BoundGenericType>())
-          nominal = bgt->getDecl();
-        else
-          nominal = type->getAnyNominal();
-
+        NominalTypeDecl *nominal = type->getAnyNominal();
         if (!nominal)
           return;
 

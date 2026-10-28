@@ -296,26 +296,12 @@ static void printImports(raw_ostream &out,
 
 // MARK: Dummy protocol conformances
 
-// FIXME: Copied from ASTPrinter.cpp...
-static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
-  AccessScope scope =
-      VD->getFormalAccessScope(/*useDC*/nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  return scope.isPublic();
+static bool isPrinted(const Decl *D, const PrintOptions &printOptions) {
+  return printOptions.printsInterfaceVisibility(getInterfaceVisibility(D));
 }
 
-static bool isPublicOrUsableFromInline(Type ty) {
-  // Note the double negative here: we're looking for any referenced decls that
-  // are *not* public-or-usableFromInline.
-  return !ty.findIf([](Type typePart) -> bool {
-    // FIXME: If we have an internal typealias for a non-internal type, we ought
-    // to be able to print it by desugaring.
-    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
-      return !isPublicOrUsableFromInline(aliasTy->getDecl());
-    if (auto *nominal = typePart->getAnyNominal())
-      return !isPublicOrUsableFromInline(nominal);
-    return false;
-  });
+static bool isPrinted(Type ty, const PrintOptions &printOptions) {
+  return printOptions.printsInterfaceVisibility(getInterfaceVisibility(ty));
 }
 
 namespace {
@@ -392,10 +378,6 @@ class InheritedProtocolCollector {
     return results;
   }
 
-  static bool canPrintProtocolTypeNormally(Type type, const Decl *D) {
-    return isPublicOrUsableFromInline(type);
-  }
-
   static ProtocolConformanceOptions filterOptions(ProtocolConformanceOptions options) {
     options -= ProtocolConformanceFlags::Preconcurrency;
     options -= ProtocolConformanceFlags::Retroactive;
@@ -416,6 +398,7 @@ class InheritedProtocolCollector {
   /// print, such as synthesized conformances or conformances to non-public
   /// protocols.
   void recordProtocols(InheritedTypes directlyInherited, const Decl *D,
+                       const PrintOptions &printOptions,
                        bool skipExtra = false) {
     PrettyStackTraceDecl stackTrace("recording protocols for", D);
     std::optional<AvailableAttrList> availableAttrs;
@@ -425,7 +408,13 @@ class InheritedProtocolCollector {
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
 
-      bool canPrintNormally = canPrintProtocolTypeNormally(inheritedTy, D);
+      // Treat SPI protocols as printable even in the public interface, so that
+      // the public protocols they inherit from aren't printed as synthesized
+      // conformances. Conformances declared through SPI stay out of the public
+      // interface.
+      auto visibility = getInterfaceVisibility(inheritedTy);
+      bool canPrintNormally = visibility == InterfaceVisibility::SPI ||
+                              printOptions.printsInterfaceVisibility(visibility);
       if (!canPrintNormally && skipExtra)
         continue;
 
@@ -464,7 +453,8 @@ class InheritedProtocolCollector {
 
   /// For each type directly inherited by \p extension, record any protocols
   /// that we would have printed in ConditionalConformanceProtocols.
-  void recordConditionalConformances(const ExtensionDecl *extension) {
+  void recordConditionalConformances(const ExtensionDecl *extension,
+                                     const PrintOptions &printOptions) {
     auto inheritedTypes = extension->getInherited();
     for (unsigned i : inheritedTypes.getIndices()) {
       Type inheritedTy = inheritedTypes.getResolvedType(i);
@@ -483,7 +473,7 @@ class InheritedProtocolCollector {
           continue;
 
         auto protoTy = protoDecl->getDeclaredInterfaceType()->castTo<ProtocolType>();
-        if (!isPublicOrUsableFromInline(protoTy))
+        if (!isPrinted(protoTy, printOptions))
           continue;
         ConditionalConformanceProtocols.push_back(protoTy);
       }
@@ -499,7 +489,8 @@ public:
   /// Given that we're about to print \p D, record its protocols in \p map.
   ///
   /// \sa recordProtocols
-  static void collectProtocols(PerTypeMap &map, const Decl *D) {
+  static void collectProtocols(PerTypeMap &map, const Decl *D,
+                               const PrintOptions &printOptions) {
     PrettyStackTraceDecl stackTrace("collecting protocols for", D);
     InheritedTypes directlyInherited = InheritedTypes(D);
     const NominalTypeDecl *nominal;
@@ -534,19 +525,19 @@ public:
       return;
     }
 
-    if (!isPublicOrUsableFromInline(nominal))
+    if (!isPrinted(nominal, printOptions))
       return;
 
-    map[nominal].recordProtocols(directlyInherited, D);
+    map[nominal].recordProtocols(directlyInherited, D, printOptions);
     // Collect protocols inherited from super classes
     if (auto *CD = dyn_cast<ClassDecl>(D)) {
       for (auto *SD = CD->getSuperclassDecl(); SD;
            SD = SD->getSuperclassDecl()) {
-        map[nominal].recordProtocols(SD->getInherited(), SD,
+        map[nominal].recordProtocols(SD->getInherited(), SD, printOptions,
                                      /*skipExtra=*/true);
         for (auto *Ext: SD->getExtensions()) {
           if (shouldInclude(Ext)) {
-            map[nominal].recordProtocols(Ext->getInherited(), Ext,
+            map[nominal].recordProtocols(Ext->getInherited(), Ext, printOptions,
                                          /*skipExtra=*/true);
           }
         }
@@ -555,7 +546,7 @@ public:
 
     // Recurse to find any nested types.
     for (const Decl *member : memberContext->getMembers())
-      collectProtocols(map, member);
+      collectProtocols(map, member, printOptions);
   }
 
   /// If \p D is an extension providing conditional conformances, record those
@@ -570,15 +561,16 @@ public:
     if (!extension || !extension->isConstrainedExtension())
       return;
 
-    // Skip SPI extensions in the public interface.
-    if (printOptions.printPublicInterface() && extension->isSPI())
+    // Skip extensions that aren't visible in this interface, such as SPI
+    // extensions in the public interface.
+    if (!isPrinted(extension, printOptions))
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
-    if (!isPublicOrUsableFromInline(nominal))
+    if (!isPrinted(nominal, printOptions))
       return;
 
-    map[nominal].recordConditionalConformances(extension);
+    map[nominal].recordConditionalConformances(extension, printOptions);
     // No recursion here because extensions are never nested.
   }
 
@@ -621,10 +613,28 @@ public:
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
 
     // First record all protocols that have already been handled.
-    for (ProtocolDecl *proto : IncludedProtocols) {
+    auto recordHandled = [&](ProtocolDecl *proto) {
       handledProtocols.insert(proto);
       auto allInherited = proto->getAllInheritedProtocols();
       handledProtocols.insert(allInherited.begin(), allInherited.end());
+    };
+    for (ProtocolDecl *proto : IncludedProtocols)
+      recordHandled(proto);
+
+    // The ASTPrinter may also print conformances in the inheritance clause that
+    // aren't written in source, such as the synthesized Sendable conformances
+    // of package types.
+    SmallVector<InheritedEntry, 8> printedInherited;
+    getInheritedForPrinting(nominal, printOptions, printedInherited);
+    for (const auto &entry : printedInherited) {
+      if (entry.isSuppressed())
+        continue;
+      auto ty = entry.getType();
+      if (!ty || !ty->isExistentialType())
+        continue;
+      ExistentialLayout layout = ty->getExistentialLayout();
+      for (ProtocolDecl *proto : layout.getProtocols())
+        recordHandled(proto);
     }
 
     // Preserve the behavior of previous implementations which formatted of
@@ -664,10 +674,7 @@ public:
           if (getInvertibleProtocolKind(*kp))
             return TypeWalker::Action::SkipNode;
 
-        if (inherited->isSPI() && printOptions.printPublicInterface())
-          return TypeWalker::Action::Continue;
-
-        if (isPublicOrUsableFromInline(inherited) &&
+        if (isPrinted(inherited, printOptions) &&
             conformanceDeclaredInModule(M, nominal, inherited) &&
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
           auto protoAndAvailability = ProtocolAndAvailability(
@@ -809,7 +816,8 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
-    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
+    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D,
+                                                 printOptions);
 
     if (!D->shouldPrintInContext(printOptions) ||
         !printOptions.shouldPrint(D)) {

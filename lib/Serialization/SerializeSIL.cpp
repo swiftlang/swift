@@ -15,6 +15,7 @@
 #include "SILFormat.h"
 #include "Serialization.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -699,6 +700,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
     SILSpecializeAttrLayout::emitRecord(
         Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
+        (unsigned)SA->isSpecializedSpelling(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()),
         targetFunctionNameID, spiGroupID, spiModuleDeclID,
@@ -866,7 +868,14 @@ void SILSerializer::writeDebugReconstructionBlock(const SILBasicBlock &DebugBB) 
 /// deserialization.
 static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
                              SmallVectorImpl<uint64_t> &ListOfValues) {
-  ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
+  ValueDecl *decl = Ref.getDecl();
+  // A distributed thunk cannot be found by cross-reference lookup, so
+  // serialize the decl it was synthesized for; the reader re-derives it.
+  if (auto *thunk = Ref.getDistributedThunk())
+    if (thunk->isDistributedThunk())
+      if (auto *original = getDistributedThunkOriginalDecl(thunk))
+        decl = original;
+  ListOfValues.push_back(S.addDeclRef(decl));
   ListOfValues.push_back((unsigned)Ref.kind);
   ListOfValues.push_back(Ref.isForeign);
 }
@@ -2369,8 +2378,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         attrs |= 0x01;
     }
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
-      if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
-        attrs |= 0x01;
+      attrs |= unsigned(cast<ConvertFunctionInst>(SI).getConversionKind());
     } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
       attrs = encodeValueOwnership(refCast->getOwnershipKind());
     } else if (auto *opening = dyn_cast<OpenCOMExistentialInst>(&SI)) {

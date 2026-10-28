@@ -240,7 +240,7 @@ void PropertyMap::recordSuperclassRelation(Term key,
                                            const ClassDecl *otherClass) {
   auto derivedType = superclassType.getConcreteType();
   CONDITIONAL_ASSERT(otherClass->isSuperclassOf(
-      derivedType->getClassOrBoundGenericClass()));
+      derivedType->getClassDecl()));
 
   auto baseType = derivedType->getSuperclassForDecl(otherClass)
       ->getCanonicalType();
@@ -283,7 +283,7 @@ void PropertyMap::addSuperclassProperty(
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   const auto *superclassDecl = property.getConcreteType()
-      ->getClassOrBoundGenericClass();
+      ->getClassDecl();
   ASSERT(superclassDecl != nullptr);
 
   if (checkRuleOnce(ruleID)) {
@@ -699,7 +699,7 @@ void PropertyMap::checkConcreteTypeRequirements() {
 
       // If the concrete type is not a class and we have a superclass
       // requirement, we have a conflict.
-      if (!concreteType.getConcreteType()->getClassOrBoundGenericClass() &&
+      if (!concreteType.getConcreteType()->getClassDecl() &&
           !(concreteType.getConcreteType()->isObjCExistentialType() &&
             concreteType.getConcreteType()->getSuperclass()) &&
           props->hasSuperclassBound()) {
@@ -722,7 +722,7 @@ void PropertyMap::checkConcreteTypeRequirements() {
       if (checkRuleOnce(concreteTypeRule)) {
         if (concreteType.getConcreteType()->satisfiesClassConstraint()) {
           Type superclassType = concreteType.getConcreteType();
-          if (!superclassType->getClassOrBoundGenericClass())
+          if (!superclassType->getClassDecl())
             superclassType = superclassType->getSuperclass();
 
           if (superclassType) {
@@ -741,7 +741,7 @@ void PropertyMap::checkConcreteTypeRequirements() {
           // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
           auto layoutConstraint = LayoutConstraintKind::Class;
           if (superclassType)
-            if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
+            if (auto *classDecl = superclassType->getClassDecl())
               layoutConstraint = classDecl->getLayoutConstraintKind();
 
           auto layout =

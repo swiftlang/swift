@@ -17,6 +17,7 @@ private func log(_ message: @autoclosure () -> String) {
   llvmDebug("lifetime-resolution", message())
 }
 
+// TODO: determine whether this needs OSSACompleteLifetime to run first.
 let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   (function: Function, context: FunctionPassContext) in
 
@@ -27,8 +28,9 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   var resolver = Resolver(function, context)
   var indexCache = FieldIndexTrieCache(for: function)
 
-  // Process results in reverse post-order to ensure dependent uses are already resolved.
-  for block in function.blocks.reversed() {
+  // Visit blocks in post-order, each bottom-up, so a value's uses in the blocks it dominates are
+  // resolved before the value itself.
+  for block in function.postOrderBlocks(context) {
     for inst in block.instructions.reversed() {
       // Ignore `mark_uninitialized` this pass is driven by the storage itself.
       if inst is MarkUninitializedInst { continue }
@@ -75,17 +77,32 @@ struct ResolvableRoot {
   /// The source variable, for diagnostics.
   let varDecl: VarDecl?
 
-  /// Whether the binding is a `let` (vs a `var`). Selects the diagnostic wording.
-  let isLet: Bool
+  /// The `mark_uninitialized` of the storage, if any; its kind identifies `self` in an initializer.
+  let markUninitialized: MarkUninitializedInst?
 
   let isLexical: Bool
 
   // Does this address start fully initialized?
   let startsInitialized: Bool
 
+  /// An instruction requiring the whole root to be initialized, which is not found by walking uses of the address.
+  enum ExtraLivenessUse {
+    /// The function exits, at which point an `inout` parameter must be initialized.
+    case functionExit(TermInst)
+    /// The lifetime of the `alloc_box` ends.
+    case boxLifetimeEnd(Instruction)
+
+    var instruction: Instruction {
+      switch self {
+      case .functionExit(let exit): return exit
+      case .boxLifetimeEnd(let end): return end
+      }
+    }
+  }
+
   // Extra instructions to consider as full liveness uses of this root, that are not captured by walking uses of
   // the address.
-  let extraLivenessUses: [Instruction]
+  let extraLivenessUses: [ExtraLivenessUse]
 
   // Either the instruction defining this root, or the very first instruction
   // after which it is defined.
@@ -96,17 +113,49 @@ struct ResolvableRoot {
       return address.nextInstruction
   }
 
+  /// Whether the binding is a `let` (vs a `var`), which may only be initialized once.
+  var isLet: Bool { !(storage is FunctionArgument) && (varDecl?.isLet ?? false) }
+
+  /// `self` in a struct or enum initializer that initializes the stored properties itself.
+  var isRootSelf: Bool {
+    switch markUninitialized?.kind {
+    case .rootSelf?, .crossModuleRootSelf?: true
+    default: false
+    }
+  }
+
+  /// The leaves of the storage that may only be initialized once: all of a `let` binding,
+  /// or the `let` stored properties of `self` in a struct initializer.
+  func immutableLeaves(_ indices: FieldIndexTrie) -> Set<Int> {
+    switch markUninitialized?.kind {
+    case .variable?, nil:
+      return isLet ? Set(indices.wholeRange) : []
+    case .rootSelf?, .crossModuleRootSelf?:
+      guard let fields = address.type.getNominalFields(in: address.parentFunction) else {
+        return []
+      }
+      var leaves = Set<Int>()
+      for field in fields.indices where fields.getUserFacingFieldDecl(withIndex: field)?.isLet ?? false {
+        leaves.formUnion(indices.range(of: SmallProjectionPath(.structField, index: field)))
+      }
+      return leaves
+    default:
+      return []
+    }
+  }
+
   /// Build from a storage allocation (`alloc_box` / `alloc_stack`). Callers holding only
   /// an address must first walk up to the allocation.
   init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache, _ context: FunctionPassContext) {
     let function = val.parentFunction
-    var extraUses: [Instruction] = []
+    var extraUses: [ExtraLivenessUse] = []
 
     switch val {
     case let allocStack as AllocStackInst:
       storage = val
+      markUninitialized = Self.findMarkUninitialized(allocStack)
 
-      if let mu = Self.findMarkUninitialized(storage) {
+      if let mu = markUninitialized {
         address = mu
 
         let indicies = indexCache.fieldIndices(for: storage.type.objectType)
@@ -121,7 +170,6 @@ struct ResolvableRoot {
       }
 
       varDecl = allocStack.varDecl
-      isLet = allocStack.debugVariable?.isLet() ?? true   // TODO: find a more reliable way to discover this.
       isLexical = allocStack.isLexical
 
     case let allocBox as AllocBoxInst:
@@ -130,28 +178,23 @@ struct ResolvableRoot {
         return nil
       }
       address = projectBox
+      markUninitialized = Self.findMarkUninitialized(allocBox)
       varDecl = allocBox.varDecl
-      isLet = !allocBox.type.getBoxFields(in: function).isMutable(fieldIndex: 0)
       isLexical = boxIsLexical
       startsInitialized = false
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
-      let box: Value
-      if let mu = Self.findMarkUninitialized(storage) {
-        box = mu
-      } else {
-        box = storage
-      }
-      box.uses.endingLifetime.forEach { extraUses.append($0.instruction) }
+      let box: Value = markUninitialized ?? storage
+      box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
       // TODO: add copies of the box too
 
 
     case let arg as FunctionArgument where arg.type.isAddress:
       storage = arg
       address = arg
+      markUninitialized = nil
       varDecl = arg.findVarDecl()
       isLexical = arg.isLexical
-      isLet = false
 
       switch arg.convention {
       case .indirectIn:
@@ -162,7 +205,7 @@ struct ResolvableRoot {
         startsInitialized = true
 
         // For an inout parameter, all function exit terminators are considered uses.
-        function.exitingBlocks.forEach { extraUses.append($0.terminator) }
+        function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
 
       default:
@@ -627,6 +670,7 @@ private struct Resolver {
     typealias PartialAvailability = (inst: Instruction, avail: [Availability], range: FieldIndexTrie.IndexRange)
     var partialDestroys: [PartialAvailability] = []
     var destroysBeforeInit: [PartialAvailability] = []
+    let immutableLeaves = root.immutableLeaves(indices)
 
     // Do a first pass over blocks, collecting any needed partial destroys for a second step.
     for block in function.blocks {
@@ -650,6 +694,13 @@ private struct Resolver {
 
         switch kind {
         case let .def(op):
+          // All of `self` may be reassigned, even after initializing its `let` properties.
+          let assignsWholeSelf = root.isRootSelf && op.value.accessPath.projectionPath.isEmpty
+          if !assignsWholeSelf,
+             range.contains(where: { immutableLeaves.contains($0) && current[$0].contains(.yes) }) {
+            Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
+          }
+
           let nontrivial = range.filter { !indices.leafType($0).isTrivial(in: function) }
           if nontrivial.isEmpty {
             break
@@ -856,7 +907,7 @@ private struct Resolver {
       }
 
       // Add any extra uses specific to this root.
-      root.extraLivenessUses.forEach { addUse(.unknown($0), indices.wholeRange) }
+      root.extraLivenessUses.forEach { addUse(.unknown($0.instruction), indices.wholeRange) }
 
       // Ensure correct order within each block
       for blk in uses.keys {
@@ -1383,6 +1434,9 @@ private struct PartitionedUses: CustomStringConvertible {
 
     liverange.insert(contentsOf: consumes.users)
     liverange.insert(contentsOf: uses.users)
+    // FIXME: this should add `indirectUses`. We also need a cache of information about the dependent values's uses, to
+    //  effectively extend the range of instructions to be considered deinit barriers so it includes all
+    //  dependent value's lifetimeLimits too.
 
     collectDeinitBarriers(into: &indirectUses, liverange: liverange,
       lifetimeLimits: lifetimeLimits, def: root, context)

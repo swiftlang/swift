@@ -676,6 +676,8 @@ actor AnActorWithClosures {
   var counter: Int = 0 // expected-note 2 {{mutation of this property is only permitted within the actor}}
   func exec() {
     acceptEscapingClosure { [unowned self] in
+      // expected-error@-1 {{actor-isolated closure cannot capture 'self' as 'unowned'}}
+      // expected-note@-2 {{capture 'self' as 'weak' instead}}
       self.counter += 1
 
       acceptEscapingClosure {
@@ -1801,7 +1803,7 @@ actor UserDefinedActorSelfDotMethod {
 }
 
 func requireSendableInheritContext(@_inheritActorContext _: @Sendable () -> ()) {}
-// expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+// expected-warning@-1 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
 
 actor InvalidInheritedActorIsolation {
   func actorFunction() {} // expected-note {{calls to instance method 'actorFunction()' from outside of its actor context are implicitly asynchronous}}

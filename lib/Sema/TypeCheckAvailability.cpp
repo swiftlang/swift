@@ -1916,7 +1916,7 @@ static bool diagnoseTypedThrowsAvailability(
 ///          one of the generic arguments, or none if all are present for
 ///          every generic argument.
 static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
-    BoundGenericType *boundTy) {
+    NominalType *boundTy) {
   for (auto arg : boundTy->getGenericArgs()) {
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       switch (ip) {
@@ -1980,7 +1980,8 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   // Both need a runtime that understands `InvertedProtocols` requirements.
   std::optional<InvertibleProtocolKind> missing;
   bool fromExistential = false;
-  if (auto boundTy = dyn_cast<BoundGenericType>(type))
+  if (auto boundTy = dyn_cast<NominalType>(type);
+      boundTy && boundTy->hasGenericArgs())
     missing = checkGenericArgsForInvertibleReqs(boundTy);
   if (!missing) {
     missing = checkExistentialForInvertibleReqs(type);
@@ -2016,11 +2017,8 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   return false;
 }
 
-/// Performing an `is` test or an `as?` or `as!` casting conversion requires
-/// updated runtime support if non-copyable values are involved.  In the older
-/// runtimes:
-/// * `is` testing was implemented via `as?` (new runtime has a separate entry point)
-/// * `as?`/`as!` could implicitly copy the value out of the existential box
+/// Emit a suitable diagnostic if this cast would require new runtime
+/// support that's not available on the target.
 ///
 /// \param srcType the source type of the cast
 /// \param targetType the target type of the cast
@@ -2028,29 +2026,32 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 /// \param refDC decl context in which the cast occurs
 /// \return true if diagnosed
 static bool
-checkNoncopyableExistentialCastingAvailability(Type srcType, Type targetType,
-                                               SourceRange refLoc,
-                                               const DeclContext *refDC) {
+checkNoncopyableCastingAvailability(Type srcType, Type targetType,
+                                    SourceRange refLoc,
+                                    const DeclContext *refDC) {
   if (!srcType || !targetType)
     return false;
 
-  auto type = srcType->getCanonicalType();
-  // Not a problem if source isn't a non-copyable existential
-  if (!type->isAnyExistentialType() || !type->isNoncopyable())
+  // Copyable types are supported in the old runtime
+  if (!srcType->getCanonicalType()->isNoncopyable())
     return false;
 
-  // When the target is a concrete `Copyable` type, a successful cast proves the
-  // payload was that type, so the copy an older runtime performs is legal; and
-  // a failed cast copies nothing.
-  //
-  // Existential targets stay gated even where they are themselves `Copyable`:
-  // `AnyObject` accepts any payload at all by boxing it in `__SwiftValue`, which
-  // copies.
+  // A cast that can never succeed never copies anything, and is already
+  // diagnosed as always failing.
+  if (TypeChecker::isStaticallyImpossibleNoncopyableCast(srcType, targetType))
+    return false;
+
+  // If the target is a concrete (non-existential) `Copyable`,
+  // then older runtimes work: It will only try to copy if the
+  // cast is successful, which can only happen if the type is `Copyable`.
+  // (This logic doesn't work for existential targets which might
+  // legitimately try to box the source by copying.)
   auto target = targetType->getCanonicalType();
   if (!target->isNoncopyable() && !target->isAnyExistentialType())
     return false;
 
-  // Don't bother checking if NoncopyableCasting isn't enabled
+  // Without NoncopyableCasting, we can't reach casts that
+  // aren't supported in old runtimes
   auto &ctx = refDC->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableCasting))
     return false;
@@ -2059,7 +2060,7 @@ checkNoncopyableExistentialCastingAvailability(Type srcType, Type targetType,
   return TypeChecker::checkAvailability(
       refLoc,
       ctx.getDynamicCastTestAvailability(),
-      diag::availability_noncopyable_existential_casting_only_version_newer,
+      diag::availability_noncopyable_casting_only_version_newer,
       refDC);
 }
 
@@ -2492,9 +2493,12 @@ public:
                                       Where.getDeclContext());
         checkTypeMetadataAvailabilityForConverted(CE->getSubExpr()->getType(),
                                                   loc, Where.getDeclContext());
-        checkNoncopyableExistentialCastingAvailability(
-            CE->getSubExpr()->getType(), CE->getCastType(), loc,
-            Where.getDeclContext());
+        auto *checked = dyn_cast<CheckedCastExpr>(CE);
+        if (!checked || checked->getCastKind() != CheckedCastKind::Coercion) {
+          checkNoncopyableCastingAvailability(
+              CE->getSubExpr()->getType(), CE->getCastType(), loc,
+              Where.getDeclContext());
+        }
       }
 
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
@@ -3193,8 +3197,8 @@ public:
                                P->getLoc(), where, std::nullopt);
       // The subject type is absent when the pattern is malformed, as in
       // `x is _`, where the placeholder is diagnosed on its own.
-      if (IP->hasType()) {
-        checkNoncopyableExistentialCastingAvailability(
+      if (IP->hasType() && IP->getCastKind() != CheckedCastKind::Coercion) {
+        checkNoncopyableCastingAvailability(
             IP->getType(), IP->getCastType(), P->getLoc(), DC);
       }
     }
@@ -3354,14 +3358,6 @@ public:
       return Action::Continue;
 
     auto subs = ty->getContextSubstitutionMap();
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
-    return Action::Continue;
-  }
-
-  Action visitBoundGenericType(BoundGenericType *ty) override {
-    visitTypeDecl(ty->getDecl());
-
-    auto subs = ty->getContextSubstitutionMap();
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),
@@ -3369,6 +3365,7 @@ public:
         /*warnIfConformanceUnavailablePreSwift6=*/false,
         /*suppressParameterizationCheckForOptional=*/ty->isOptional(),
         /*preconcurrency*/ty->getAnyNominal()->preconcurrency());
+
     return Action::Continue;
   }
 

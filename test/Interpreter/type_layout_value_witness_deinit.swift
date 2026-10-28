@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift(-O -enable-experimental-feature RawLayout -enable-builtin-module) | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_RawLayout
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 // UNSUPPORTED: back_deployment_runtime
 
 // A type's own deinit, and only that deinit, must run when it is destroyed

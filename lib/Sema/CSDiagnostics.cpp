@@ -34,6 +34,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -745,26 +746,42 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   emitDiagnostic(diag::type_cannot_conform,
                  nonConformingType, protocolType);
 
-  bool emittedSpecializedNote = false;
+  bool emitCanNeverConformNote = true;
   if (auto protoType = protocolType->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
-    if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      if (nonConformingType->is<FunctionType>()) {
-        emitDiagnostic(diag::nonsendable_function_type);
-        emittedSpecializedNote = true;
-      } else if (nonConformingType->is<TupleType>()) {
-        emitDiagnostic(diag::nonsendable_tuple_type);
-        emittedSpecializedNote = true;
+
+    auto emitSpecializedNote = [&](Diag<> note) {
+      emitDiagnostic(note);
+      emitCanNeverConformNote = false;
+    };
+
+    if (nonConformingType->is<FunctionType>()) {
+      if (auto known = protoDecl->getKnownProtocolKind()) {
+        switch (*known) {
+        case KnownProtocolKind::Sendable:
+          emitSpecializedNote(diag::nonsendable_function_type);
+          break;
+
+        case KnownProtocolKind::Escapable:
+          emitSpecializedNote(diag::nonescapable_function_type);
+          break;
+
+        case KnownProtocolKind::Copyable:
+        case KnownProtocolKind::Deinitable:
+          emitCanNeverConformNote = false;
+          break;
+
+        default:
+          break;
+        }
       }
-    } else if (protoDecl->isSpecificProtocol(KnownProtocolKind::Escapable)) {
-      if (nonConformingType->is<AnyFunctionType>()) {
-        emitDiagnostic(diag::nonescapable_function_type);
-        emittedSpecializedNote = true;
-      }
+    } else if (nonConformingType->is<TupleType>() &&
+               protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      emitSpecializedNote(diag::nonsendable_tuple_type);
     }
   }
 
-  if (!emittedSpecializedNote)
+  if (emitCanNeverConformNote)
     emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
@@ -972,6 +989,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OptionalPayload>() ||
         last.is<LocatorPathElt::OpenedGeneric>() ||
         last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||
@@ -984,15 +1002,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   }
 
   std::optional<Diag<Type, Type>> diagnostic;
-  if (path.empty()) {
-    if (isExpr<AssignExpr>(anchor)) {
-      diagnostic = getDiagnosticFor(CTP_AssignSource);
-    } else if (locator->isForCoercion()) {
-      diagnostic = getDiagnosticFor(CTP_CoerceOperand);
-    } else {
-      return false;
-    }
-  } else {
+  if (!path.empty()) {
     const auto &last = path.back();
     switch (last.getKind()) {
     case ConstraintLocator::TernaryBranch:
@@ -1111,8 +1121,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   }
 
   if (!diagnostic) {
-    // Handle all mismatches involving an `AssignExpr`
-    if (auto *assignExpr = getAsExpr<AssignExpr>(anchor)) {
+    // Handle all mismatches involving an `OptionalTryExpr`.
+    if (isExpr<OptionalTryExpr>(anchor)) {
+      diagnostic = diag::cannot_convert_initializer_value;
+    // Handle all mismatches involving an `AssignExpr`.
+    } else if (auto *assignExpr = getAsExpr<AssignExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_AssignSource);
       fromType = getType(assignExpr->getSrc());
       toType = getType(assignExpr->getDest());
@@ -1858,12 +1871,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
-  assert(!baseType->isPlaceholder() &&
-         "Base type must not be a type placeholder");
+  assert(!baseType->is<HoleType>() && "Base type must not be a type hole");
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
-  assert(!unwrappedType->isPlaceholder() &&
-         "Unwrapped type must not be a type placeholder");
+  assert(!unwrappedType->is<HoleType>() &&
+         "Unwrapped type must not be a type hole");
 
   if (!baseType->getOptionalObjectType())
     return false;
@@ -4398,7 +4410,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
     Type Ty, TypoCorrectionResults &corrections, DeclNameRef memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
-  if (!Ty->getEnumOrBoundGenericEnum())
+  if (!Ty->getEnumDecl())
     return DeclName();
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
@@ -4415,10 +4427,10 @@ ValueDecl *MissingMemberFailure::
 findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
   IterableDeclContext *idc = nullptr;
 
-  if (auto ED = instanceTy->getEnumOrBoundGenericEnum()) {
+  if (auto ED = instanceTy->getEnumDecl()) {
     idc = ED;
   }
-  else if (auto SD = instanceTy->getStructOrBoundGenericStruct()) {
+  else if (auto SD = instanceTy->getStructDecl()) {
     // Did ClangImporter add OptionSet to this struct?
     for (auto protoAttr :
             SD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -4626,7 +4638,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     return true;
   } else {
     // Check for a few common cases that can cause missing members.
-    auto *ED = baseType->getEnumOrBoundGenericEnum();
+    auto *ED = baseType->getEnumDecl();
     if (ED && getName().isSimpleName("rawValue")) {
       auto loc = ED->getNameLoc();
       if (loc.isValid()) {
@@ -7649,16 +7661,20 @@ bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
     return std::nullopt;
   };
 
-  // The source has the execution semantics, unless the constraint required
-  // the two types to be equal.
-  auto semantics = getSemantics(getFromType());
-  if (!semantics)
-    semantics = getSemantics(getToType());
+  // Usually the source has the execution semantics. When the constraint
+  // requires the two types to be equal, only the destination might.
+  if (auto semantics = getSemantics(getFromType())) {
+    emitDiagnostic(diag::execution_semantics_function_type_mismatch,
+                   getExecutionSemanticsAttrSpelling(*semantics), getFromType(),
+                   getToType());
+    return true;
+  }
 
-  emitDiagnostic(diag::called_attr_function_type_mismatch,
-                 CalledAttr::getSemanticsName(
-                     semantics.value_or(ExecutionSemantics::AtMostOnce)),
-                 getFromType(), getToType());
+  emitDiagnostic(
+      diag::execution_semantics_function_type_mismatch_to, getFromType(),
+      getExecutionSemanticsAttrSpelling(
+          getSemantics(getToType()).value_or(ExecutionSemantics::AtMostOnce)),
+      getToType());
   return true;
 }
 
@@ -7839,7 +7855,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   // Unresolved key path argument requires a tailored diagnostic
   // that doesn't mention a fallback type - `KeyPath<_, _>`.
   if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
-    auto keyPathTy = argType->castTo<BoundGenericType>();
+    auto keyPathTy = argType->castTo<NominalType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
     if (rootTy->isBareErrorType()) {
       emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
@@ -8232,7 +8248,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   if (!argType->isKnownKeyPathType())
     return false;
 
-  auto kpType = argType->castTo<BoundGenericType>();
+  auto kpType = argType->castTo<NominalType>();
   auto kpRootType = kpType->getGenericArgs()[0];
   auto kpValueType = kpType->getGenericArgs()[1];
 
@@ -10028,6 +10044,12 @@ bool InvalidFunctionSpecialization::diagnoseAsError() {
 
 bool OutOfPlaceThenStmtFailure::diagnoseAsError() {
   emitDiagnostic(diag::out_of_place_then_stmt);
+  return true;
+}
+
+bool NonExactlyOnceDiscardArgumentFailure::diagnoseAsError() {
+  emitDiagnostic(diag::without_actually_discarding_requires_exactly_once,
+                 ArgType);
   return true;
 }
 

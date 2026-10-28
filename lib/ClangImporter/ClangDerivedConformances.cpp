@@ -999,7 +999,7 @@ static void conformToCxxIterableIfNeeded(
   // Substitute generic `Self` parameter.
   auto declSelfTy = decl->getDeclaredInterfaceType();
   auto borrowingIteratorTy =
-      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
+      NominalType::get(borrowingIteratorNominal, Type(), {declSelfTy}, ctx);
 
   auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
       ctx.getIdentifier("DereferenceResult"));
@@ -1087,19 +1087,10 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   if (!begin || !end)
     return;
 
-  // Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, begin() and end() are always
-  // renamed; with it they keep their original names and the renamed spellings
-  // become migration stubs.
-  if (ctx.LangOpts.hasFeature(
-          Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
-    ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
-           "begin() and end() should keep their names");
-  } else {
-    ASSERT(begin->getBaseName() == "__beginUnsafe" &&
-           "begin() should always be __Unsafe");
-    ASSERT(end->getBaseName() == "__endUnsafe" &&
-           "end() should always be __Unsafe");
-  }
+  // begin() and end() keep their original names; the renamed spellings are
+  // migration stubs.
+  ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
+         "begin() and end() should keep their names");
   ASSERT(!begin->isMutating() && !end->isMutating() &&
          "begin() and end() should not be mutating");
 
@@ -1502,6 +1493,15 @@ static void conformToCxxVector(ClangImporter::Implementation &impl,
   auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
       impl.importDecl(const_iterator, impl.CurrentVersion));
   if (!Element || !Size || !RawIterator)
+    return;
+
+  // Before synthesizing the conformance to CxxVector, check if `RawIterator`
+  // conforms to `UnsafeCxxRandomAccessIterator`.
+  auto cxxRandomAccessIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRandomAccessIteratorProto ||
+      !checkConformance(RawIterator->getUnderlyingType(),
+                        cxxRandomAccessIteratorProto))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,

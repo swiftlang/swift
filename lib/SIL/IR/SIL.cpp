@@ -154,7 +154,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Ignore non-nominal types -- except for opaque result types which can be
     // private and in a different translation unit in which case they can't be
     // accessed.
-    ValueDecl *decl = type.getNominalOrBoundGenericNominal();
+    ValueDecl *decl = type.getNominalDecl();
     if (!decl)
       decl = isa<OpaqueTypeArchetypeType>(type)
                  ? cast<OpaqueTypeArchetypeType>(type)->getDecl()
@@ -252,7 +252,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
 
     Action walkToTypePre(Type ty) override {
       // Non-nominal types are always available.
-      auto decl = ty->getNominalOrBoundGenericNominal();
+      auto decl = ty->getNominalDecl();
       if (!decl)
         return Action::Continue;
       

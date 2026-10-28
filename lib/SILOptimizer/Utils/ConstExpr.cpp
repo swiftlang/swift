@@ -745,7 +745,7 @@ extractStringOrStaticStringValue(SymbolicValue stringValue) {
 /// If the specified type is a Swift.Array of some element type, then return the
 /// element type.  Otherwise, return a null Type.
 static Type getArrayElementType(Type ty) {
-  if (auto bgst = ty->getAs<BoundGenericStructType>())
+  if (auto bgst = ty->getAs<StructType>())
     if (bgst->isArray())
       return bgst->getGenericArgs()[0];
   return Type();
@@ -1170,7 +1170,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                  ->getSelfInstanceType(
                      callee->getModule(),
                      apply->getFunction()->getTypeExpansionContext())
-                 ->getClassOrBoundGenericClass() &&
+                 ->getClassDecl() &&
              "class methods are not supported");
   if (calleeFnType->getInvocationGenericSignature()) {
     // Get the substitution map of the call.  This maps from the callee's space
@@ -1691,7 +1691,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     // If a struct with no stored properties is created, no initialization is
     // needed. Hence, create a empty aggregate as the initial value.
     CanType structType = asi->getElementType().getASTType();
-    StructDecl *structDecl = structType.getStructOrBoundGenericStruct();
+    StructDecl *structDecl = structType.getStructDecl();
 
     if (structDecl && structDecl->getStoredProperties().empty()) {
       createMemoryObject(asi, SymbolicValue::getAggregate(

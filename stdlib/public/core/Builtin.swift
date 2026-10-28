@@ -1118,6 +1118,66 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
   Builtin.unreachable()
 }
 
+/// Calls a closure with a `@callable(once)` copy of a `@once` function. You
+/// can use this function to call an API that takes a `@callable(once)` closure
+/// and always calls it in practice, or to allow an `@escaping @once` function
+/// to be stored temporarily before it is called.
+///
+/// The following example stores the `@callable(once)` copy in a noncopyable
+/// wrapper, which a final class holds. The class calls the function through
+/// the wrapper from a callback. The callback isn't annotated as taking a
+/// `@callable(once)` closure, even though it calls the function only once.
+///
+///     struct Deferred: ~Copyable {
+///         var action: @callable(once) () -> Void
+///
+///         consuming func run() { action() }
+///     }
+///
+///     final class Callback {
+///         var deferred: Deferred?
+///
+///         init(_ deferred: consuming Deferred) {
+///             self.deferred = consume deferred
+///         }
+///
+///         func run() { deferred.take()?.run() }
+///     }
+///
+///     func perform(_ f: consuming @escaping @once () -> Void) {
+///         let callback = withoutActuallyDiscarding(f) { action in
+///             Callback(Deferred(action: action))
+///         }
+///         register { callback.run() }
+///     }
+///
+/// - Important: If the `@callable(once)` copy of the function is dropped
+///   without being called then the program will trap.
+///
+/// - Parameters:
+///   - closure: A `@once` function that is converted to a `@callable(once)`
+///     function.
+///   - body: A closure that is executed immediately with the `@callable(once)`
+///     function as its argument.
+/// - Returns: The return value, if any, of the `body` closure.
+@export(implementation)
+@_transparent
+@_semantics("typechecker.withoutActuallyDiscarding(_:do:)")
+public func withoutActuallyDiscarding<
+  ClosureType: ~Copyable & ~Deinitable, ResultType, Failure
+>(
+  _ closure: consuming ClosureType,
+  do body: (_ discardableClosure: consuming ClosureType) throws(Failure) -> ResultType
+) throws(Failure) -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift.withoutActuallyDiscarding(_:do:)` are resolved as a special case by
+  // the type checker.
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'withoutActuallyDiscarding(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
 @_unavailableInEmbedded
 @export(implementation)
 @_transparent

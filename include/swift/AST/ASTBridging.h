@@ -82,8 +82,8 @@ class RequirementRepr;
 class Type;
 class CanType;
 class TypeBase;
-class ScopeDescriptor;
-class ScopeSpecifier;
+class ScopeRepr;
+class ScopeRestrictionRepr;
 class StmtConditionElement;
 class SubstitutionMap;
 enum class RequirementReprKind : unsigned;
@@ -100,6 +100,7 @@ struct BridgedCanGenericSignature;
 struct BridgedGenericEnvironment;
 struct BridgedConformance;
 class BridgedParameterList;
+class BridgedDiagnosticArgument;
 
 // Forward declare the underlying AST node type for each wrapper.
 namespace swift {
@@ -353,11 +354,16 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc Value_getNameLoc() const;
+  BRIDGED_INLINE BridgedDiagnosticArgument Value_asDiagnosticArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
   Value_getBaseIdentifier() const;
   BRIDGED_INLINE bool hasClangNode() const;
   BRIDGED_INLINE bool Value_isObjC() const;
   BRIDGED_INLINE bool AbstractStorage_isConst() const;
+  BRIDGED_INLINE bool Var_isLet() const;
+  BRIDGED_INLINE bool Var_hasInitialValue() const;
+  BRIDGED_INLINE void Var_emitLetToVarNoteIfSimple() const;
+  SWIFT_IMPORT_UNSAFE swift::SourceLoc Param_getConsumingSpecifierLoc() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   BRIDGED_INLINE bool NominalType_hasNonUniqueDefinition() const;
@@ -383,7 +389,10 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ProtocolDecl_getInheritedProtocols(SwiftInt index) const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedParameterList
+  AbstractFunction_getParameterList() const;
   BRIDGED_INLINE bool Constructor_isInheritable() const;
+  BRIDGED_INLINE bool Constructor_isFailable() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
   BRIDGED_INLINE bool EnumElementDecl_hasAssociatedValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedParameterList
@@ -1382,6 +1391,11 @@ BridgedTargetAttr BridgedTargetAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cValue);
 
+SWIFT_NAME("BridgedScopeParamsAttr.createParsed(_:atLoc:range:params:)")
+BridgedScopeParamsAttr BridgedScopeParamsAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedArrayRef cParams);
+
 SWIFT_NAME("BridgedSetterAccessAttr.createParsed(_:range:accessLevel:)")
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
@@ -1452,11 +1466,10 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext,
 
 BRIDGED_OPTIONAL(swift::ExecutionSemantics, ExecutionSemantics)
 
-SWIFT_NAME("BridgedCalledAttr.createParsed(_:atLoc:range:semantics:)")
-BridgedCalledAttr
-BridgedCalledAttr_createParsed(BridgedASTContext cContext,
-                               swift::SourceLoc atLoc, swift::SourceRange range,
-                               swift::ExecutionSemantics semantics);
+SWIFT_NAME("BridgedCallableAttr.createParsed(_:atLoc:range:)")
+BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
+                                                     swift::SourceLoc atLoc,
+                                                     swift::SourceRange range);
 
 //===----------------------------------------------------------------------===//
 // MARK: Decls
@@ -2663,11 +2676,6 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {
   BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation,
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCalledTypeAttrSemantics {
-  BridgedCalledTypeAttrSemantics_AtMostOnce,
-  BridgedCalledTypeAttrSemantics_ExactlyOnce,
-};
-
 SWIFT_NAME("BridgedConventionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
            "name:nameLoc:witnessMethodProtocol:clangType:clangTypeLoc:)")
 BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
@@ -2708,76 +2716,88 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
     swift::SourceRange parens, BridgedStringRef cMangled,
     swift::SourceLoc mangledDoc, size_t index, swift::SourceLoc indexLoc);
 
-SWIFT_NAME("BridgedCalledTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
-           "semantics:semanticsLoc:)")
-BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
+SWIFT_NAME("BridgedCallableTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:)")
+BridgedCallableTypeAttr BridgedCallableTypeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
-    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
-    BridgedCalledTypeAttrSemantics semantics, swift::SourceLoc semanticsLoc);
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange);
 
-class BridgedScopeDescriptor {
-  enum class Kind { ScopeName, AccessedValue, Self, SelfAccess, Immortal } kind;
+class BridgedScopeRepr {
+  enum class Kind { ScopeName, AccessedValue, Self, AccessedSelf, Immortal } kind;
   swift::Identifier name;
   swift::SourceLoc loc;
 
-  BridgedScopeDescriptor(Kind kind, swift::Identifier name,
-                         swift::SourceLoc loc)
+  BridgedScopeRepr(Kind kind, swift::Identifier name, swift::SourceLoc loc)
       : kind(kind), name(name), loc(loc) {}
 
 public:
   SWIFT_NAME("forScopeName(_:loc:)")
-  static BridgedScopeDescriptor forScopeName(swift::Identifier name,
-                                             swift::SourceLoc loc) {
+  static BridgedScopeRepr forScopeName(swift::Identifier name,
+                                       swift::SourceLoc loc) {
     return {Kind::ScopeName, name, loc};
   }
 
   SWIFT_NAME("forAccessedValue(_:loc:)")
-  static BridgedScopeDescriptor forAccessedValue(swift::Identifier name,
-                                                 swift::SourceLoc loc) {
+  static BridgedScopeRepr forAccessedValue(swift::Identifier name,
+                                           swift::SourceLoc loc) {
     return {Kind::AccessedValue, name, loc};
   }
 
   SWIFT_NAME("forSelf(loc:isAccess:)")
-  static BridgedScopeDescriptor forSelf(swift::SourceLoc loc, bool isAccess) {
-    return {isAccess ? Kind::SelfAccess : Kind::Self, swift::Identifier(), loc};
+  static BridgedScopeRepr forSelf(swift::SourceLoc loc, bool isAccess) {
+    return {isAccess ? Kind::AccessedSelf : Kind::Self, swift::Identifier(),
+            loc};
   }
 
   SWIFT_NAME("forImmortal(loc:)")
-  static BridgedScopeDescriptor forImmortal(swift::SourceLoc loc) {
+  static BridgedScopeRepr forImmortal(swift::SourceLoc loc) {
     return {Kind::Immortal, swift::Identifier(), loc};
   }
 
-  swift::ScopeDescriptor unbridged() const;
+  swift::ScopeRepr unbridged() const;
 };
 
-class BridgedScopeSpecifier {
+class BridgedScopeRestrictionRepr {
   /// Null when not specifying a scope restriction by name, e.g. `array` in
   /// `@_scoped(array)`.
   swift::Identifier label;
   swift::SourceLoc labelLoc;
-  BridgedScopeDescriptor scope;
+  BridgedScopeRepr scope;
 
-  BridgedScopeSpecifier(swift::Identifier label, swift::SourceLoc labelLoc,
-                        BridgedScopeDescriptor scope)
+  BridgedScopeRestrictionRepr(swift::Identifier label,
+                              swift::SourceLoc labelLoc, BridgedScopeRepr scope)
       : label(label), labelLoc(labelLoc), scope(scope) {}
 
 public:
   SWIFT_NAME("create(label:labelLoc:scope:)")
-  static BridgedScopeSpecifier create(swift::Identifier label,
-                                      swift::SourceLoc labelLoc,
-                                      BridgedScopeDescriptor scope) {
+  static BridgedScopeRestrictionRepr create(swift::Identifier label,
+                                            swift::SourceLoc labelLoc,
+                                            BridgedScopeRepr scope) {
     return {label, labelLoc, scope};
   }
 
-  swift::ScopeSpecifier unbridged() const;
+  swift::ScopeRestrictionRepr unbridged() const;
 };
 
 SWIFT_NAME("BridgedScopedTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
-           "specifiers:)")
+           "restrictions:)")
 BridgedScopedTypeAttr BridgedScopedTypeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceLoc nameLoc, swift::SourceRange parensRange,
-    BridgedArrayRef cSpecifiers);
+    BridgedArrayRef cRestrictions);
+
+SWIFT_NAME("BridgedAccessScopeTypeAttr.createParsed(_:atLoc:nameLoc:"
+           "parensRange:scope:)")
+BridgedAccessScopeTypeAttr BridgedAccessScopeTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedScopeRepr scope);
+
+SWIFT_NAME("BridgedScopeParamsTypeAttr.createParsed(_:atLoc:nameLoc:"
+           "parensRange:params:)")
+BridgedScopeParamsTypeAttr BridgedScopeParamsTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedArrayRef cParams);
 
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
@@ -3243,6 +3263,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool hasOpaqueArchetype() const;
   BRIDGED_INLINE bool hasExistentialArchetype() const;
   BRIDGED_INLINE bool hasDynamicSelf() const;
   BRIDGED_INLINE bool isArchetype() const;
@@ -3274,6 +3295,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinBridgeObject() const;
   BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isPackExpansion() const;
   BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
@@ -3288,7 +3310,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isUnsafeMutableBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeRawBufferPointerType() const;
   BRIDGED_INLINE bool isUnsafeMutableRawBufferPointerType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalDecl() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
@@ -3315,7 +3337,9 @@ struct BridgedASTType {
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
-  BoundGenericType_getGenericArgs() const;
+  NominalType_getGenericArgs() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
+  PackType_getElementTypes() const;
 };
 
 class BridgedCanType {

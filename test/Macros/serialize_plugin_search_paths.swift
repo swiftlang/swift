@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -g -o %t/a.out \
+// RUN: %target-build-swift -no-explicit-module-build %s -g -o %t/a.out \
 // RUN:   -emit-executable -emit-module \
 // RUN:   -Xfrontend -serialize-debugging-options \
 // RUN:   -module-name MyApp \

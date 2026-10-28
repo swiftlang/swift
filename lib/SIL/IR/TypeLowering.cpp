@@ -85,9 +85,6 @@ namespace {
         return true;
       return false;
     }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
-    }
     bool visitDynamicSelfType(CanDynamicSelfType type) {
       return false;
     }
@@ -160,12 +157,13 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
-  // its boxed form so we can obey Swift's capture reference semantics.
+  // its boxed form so we can obey Swift's capture reference semantics. An
+  // unannotated closure parameter is shared if the closure's type says so.
   if (!var->supportsMutation()
       && contextTy->isNoncopyable()
       && !capture.isNoEscape()) {
       auto *param = dyn_cast<ParamDecl>(var);
-      if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
+      if (!param || (param->getLoweredOwnership() != LoweredOwnership::Shared &&
                      !param->isSelfParameter())) {
         return CaptureKind::ImmutableBox;
       }
@@ -911,22 +909,9 @@ namespace {
                                         isSensitive);
     }
 
-    RetTy visitBoundGenericClassType(CanBoundGenericClassType type,
-                                     AbstractionPattern origType,
-                                     IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().visitAnyClassType(type, origType, type->getDecl(),
-                                        isSensitive);
-    }
-
     // Enums depend on their enumerators.
     RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,
                         IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().visitAnyEnumType(type, origType, type->getDecl(),
-                                       isSensitive);
-    }
-    RetTy visitBoundGenericEnumType(CanBoundGenericEnumType type,
-                                    AbstractionPattern origType,
-                                    IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyEnumType(type, origType, type->getDecl(),
                                        isSensitive);
     }
@@ -934,12 +919,6 @@ namespace {
     // Structs depend on their physical fields.
     RetTy visitStructType(CanStructType type, AbstractionPattern origType,
                           IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().visitAnyStructType(type, origType, type->getDecl(),
-                                         isSensitive);
-    }
-    RetTy visitBoundGenericStructType(CanBoundGenericStructType type,
-                                      AbstractionPattern origType,
-                                      IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyStructType(type, origType, type->getDecl(),
                                          isSensitive);
     }
@@ -1701,7 +1680,7 @@ namespace {
     void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
@@ -1882,7 +1861,7 @@ namespace {
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
       // A value type with a deinit cannot be memberwise destroyed.
-      if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
+      if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
           emitDestroyValue(B, loc, aggValue);
           return;
@@ -1895,7 +1874,7 @@ namespace {
     void lowerChildren(TypeConverter &TC,
                        SmallVectorImpl<Child> &children) const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
 
       for (auto prop : structDecl->getStoredProperties()) {
@@ -2424,6 +2403,18 @@ namespace {
       } else {
         SILValue value = emitLoadOfCopy(B, loc, src, isTake);
         emitStoreOfCopy(B, loc, value, dest, isInit);
+      }
+    }
+
+    // Once AddressLowering has run the value really is in memory, so it has
+    // to be destroyed in place: loading an address-only type is invalid there.
+    // Mirrors the lowered-addresses branch in emitCopyInto() above.
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createDestroyAddr(loc, addr);
+      } else {
+        LeafLoadableTypeLowering::emitDestroyAddress(B, loc, addr);
       }
     }
 
@@ -3257,8 +3248,8 @@ namespace {
                                              TypeExpansionContext expansion) {
       TypeConverter::NonLayoutTypeRAII nonLayoutLowering(tc);
       SILTypeProperties props;
-      if (auto bgt = dyn_cast<BoundGenericType>(type)) {
-        for (auto paramType : bgt->getGenericArgs()) {
+      if (auto bgt = dyn_cast<NominalType>(type)) {
+        for (auto paramType : bgt.getGenericArgs()) {
           // Use an opaque abstraction pattern for the element type because
           // abstraction does not apply to the generic parameter itself.
           AbstractionPattern origElementType = AbstractionPattern::getOpaque();
@@ -3409,7 +3400,7 @@ static CanType computeLoweredOptionalType(TypeConverter &tc,
   }
 
   auto optDecl = tc.Context.getOptionalDecl();
-  return CanType(BoundGenericEnumType::get(optDecl, Type(), loweredObjectType));
+  return CanEnumType::get(optDecl, CanType(), loweredObjectType, tc.Context);
 }
 
 static CanType
@@ -3587,8 +3578,8 @@ bool TypeConverter::visitAggregateLeaves(
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
            isa<BuiltinFixedArrayType>(ty) ||
-           ty.getEnumOrBoundGenericEnum() ||
-           ty.getStructOrBoundGenericStruct();
+           ty.getEnumDecl() ||
+           ty.getStructDecl();
   };
   insertIntoWorklist(substType, origType, nullptr, std::nullopt);
   while (!worklist.empty()) {
@@ -3629,7 +3620,7 @@ bool TypeConverter::visitAggregateLeaves(
       } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
         insertIntoWorklist(array->getElementType(),
                            AbstractionPattern::getOpaque(), field, index);
-      } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+      } else if (auto *decl = ty.getStructDecl()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
@@ -3644,7 +3635,7 @@ bool TypeConverter::visitAggregateLeaves(
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              std::nullopt);
         }
-      } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
+      } else if (auto *decl = ty.getEnumDecl()) {
         auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
@@ -4715,13 +4706,11 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
   if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
     if (auto Int8Decl = C.getInt8Decl()) {
       Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
-      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
-                                                 nullptr,
-                                                 Int8Ty);
+      Type PointerInt8Ty = NominalType::get(PointerDecl, nullptr,
+                                            Int8Ty, C);
       Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
-      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
-                                           nullptr,
-                                           OptPointerInt8Ty)
+      PtrPtrInt8Ty = NominalType::get(PointerDecl, nullptr,
+                                      OptPointerInt8Ty, C)
         ->getCanonicalType();
     }
   }
@@ -5217,7 +5206,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           //
           // However, only do this if its a 'let'; if the capture is
           // mutable, we're going to be capturing a box or an address.
-          if (captureType->getClassOrBoundGenericClass() &&
+          if (captureType->getClassDecl() &&
               capturedVar->isLet()) {
             // If we've already captured the same value already, just merge
             // flags.
@@ -5302,14 +5291,28 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
   collectConstantCaptures(fn);
 
-  // @_inheritActorContext(always) attribute allows implicit
-  // capture of isolation parameter from the context. This
-  // cannot be done as part of computing captures because
-  // isolation is not available at that point because it in
-  // turn depends on captures sometimes.
+  // Handle implicit isolation captures:
   if (auto *closure = fn.getClosureExpr()) {
+    // @_inheritActorContext(always) attribute allows implicit
+    // capture of isolation parameter from the context. This
+    // cannot be done as part of computing captures because
+    // isolation is not available at that point because it in
+    // turn depends on captures sometimes.
     if (closure->alwaysInheritsActorContext()) {
       auto isolation = closure->getActorIsolation();
+      if (isolation.isActorInstanceIsolated()) {
+        if (auto *var = isolation.getActorInstance()) {
+          recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
+        } else if (auto *actorExpr = isolation.getActorInstanceExpr()) {
+          recordCapture(CapturedValue(actorExpr, /*flags=*/0));
+        }
+      }
+    }
+  } else if (auto *deferBody = fn.getDeferBodyFuncDecl()) {
+    // A defer in a closure inherits the isolation of the closure, and may
+    // need to capture the actor it is isolated to.
+    if (deferBody->getCaptureInfo().needsImplicitIsolationCapture()) {
+      auto isolation = getActorIsolation(deferBody);
       if (isolation.isActorInstanceIsolated()) {
         if (auto *var = isolation.getActorInstance()) {
           recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
@@ -5344,9 +5347,11 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the result.
-  CaptureInfo info(Context, resultingCaptures,
-                   capturesDynamicSelf, capturesOpaqueValue,
-                   capturesGenericParams, genericEnv.getArrayRef(),
+  OptionSet<CaptureInfo::Flags> flags;
+  if (capturesGenericParams)
+    flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+  CaptureInfo info(Context, resultingCaptures, capturesDynamicSelf,
+                   capturesOpaqueValue, flags, genericEnv.getArrayRef(),
                    capturedTypes);
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
@@ -5566,6 +5571,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // Erased isolation is a restriction on the context value, so we can
   // remove it but not add it.
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
+    return ABIDifference::NeedsThunk;
+
+  // An exactly-once value needs a context of its own, so forming one from any
+  // other thick function value needs a thunk, even from an at-most-once value
+  // with the same ABI. A thin function has no context, so thin-to-thick can
+  // form the value directly.
+  if (fnTy2->isCalledOnce() && !fnTy1->isCalledOnce() &&
+      fnTy1->getExtInfo().hasContext())
     return ABIDifference::NeedsThunk;
 
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
@@ -5821,7 +5834,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
     TypeExpansionContext context, SILType enumType, EnumElementDecl *elt) {
 
-  auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
+  auto *enumDecl = enumType.getEnumDecl();
 
   assert(elt->getDeclContext() == enumDecl);
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
@@ -5933,7 +5946,7 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
                                      SILType Ty,
                                      TypeExpansionContext expansion) {
-  if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = Ty.getStructDecl()) {
     assert(
         !structDecl->isResilient(&TC.M, expansion.getResilienceExpansion()) &&
         " FSO should not be trying to explode resilient (ie address-only) "
@@ -5967,7 +5980,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     return;
   }
 
-  if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = Ty.getEnumDecl()) {
     if (enumDecl->isIndirect()) {
       return;
     }

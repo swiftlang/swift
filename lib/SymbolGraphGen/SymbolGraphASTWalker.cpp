@@ -285,15 +285,26 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       // composed protocol type alias) with `getInheritedProtocols`. Each new
       // protocol is added to `UnexpandedProtocols` until there are no new
       // protocols to add. At that point, all direct and indirect conformances
-      // are stored in `Protocols`.
+      // are stored in `Protocols`, except for those to the invertible
+      // protocols, which SymbolGraph leaves out of conformance relationships.
 
       SmallPtrSet<const ProtocolDecl *, 4> Protocols;
       SmallVector<const ProtocolDecl *, 4> UnexpandedProtocols;
 
+      auto addUnexpanded = [&](const ProtocolDecl *Proto) {
+        // FIXME(noncopyable_generics): Figure out what we want here. This
+        // matches behavior in `SymbolGraph::recordConformanceRelationships`
+        // that ignores invertible protocol conformances.
+        if (Proto->getInvertibleProtocolKind())
+          return;
+
+        UnexpandedProtocols.push_back(Proto);
+      };
+
       // Start the process with the conformances stated
       // explicitly on the extension.
       for (const auto *Conformance : Extension->getLocalConformances()) {
-        UnexpandedProtocols.push_back(Conformance->getProtocol());
+        addUnexpanded(Conformance->getProtocol());
       }
 
       // "Recursively" expand the unexpanded list and populate
@@ -302,7 +313,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
         const auto *Proto = UnexpandedProtocols.pop_back_val();
         if (!Protocols.contains(Proto)) {
           for (const auto *InheritedProtocol : Proto->getInheritedProtocols()) {
-            UnexpandedProtocols.push_back(InheritedProtocol);
+            addUnexpanded(InheritedProtocol);
           }
           Protocols.insert(Proto);
         }

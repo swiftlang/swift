@@ -1297,7 +1297,7 @@ bool ScalarTypeLayoutEntry::refCountString(IRGenModule &IGM,
     B.addRefCount(LayoutStringBuilder::RefCountingKind::Block, size);
     break;
   case ScalarKind::ObjCReference: {
-    if (auto *classDecl = representative.getClassOrBoundGenericClass()) {
+    if (auto *classDecl = representative.getClassDecl()) {
       if (!classDecl->hasClangNode()) {
         B.addRefCount(LayoutStringBuilder::RefCountingKind::NativeSwiftObjC,
                       size);
@@ -2021,7 +2021,7 @@ void AlignedGroupEntry::assignWithTake(IRGenFunction &IGF, Address dest,
   // If the type has a deinit, the value being overwritten in the destination
   // must be destroyed via that deinit; elementwise assignment would skip it.
   // Destroy the old value first, then take-initialize.
-  if (auto *nominal = ty.getNominalOrBoundGenericNominal();
+  if (auto *nominal = ty.getNominalDecl();
       nominal && nominal->getValueTypeDestructor()) {
     destroy(IGF, dest);
     initWithTake(IGF, dest, src);

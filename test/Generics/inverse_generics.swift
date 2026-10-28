@@ -7,7 +7,7 @@
 
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
 struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
-  var t: T // expected-error {{stored property 't' of 'Copyable'-conforming generic struct 'AttemptImplicitConditionalConformance' has non-Copyable type 'T'}}
+  var t: T // expected-error {{stored property 't' of 'Copyable'-conforming generic struct 'AttemptImplicitConditionalConformance' has non-'Copyable' type 'T'}}
 }
 extension AttemptImplicitConditionalConformance: Copyable {}
 // expected-error@-1 {{generic struct 'AttemptImplicitConditionalConformance' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -76,13 +76,13 @@ protocol RemovedAgain where Self: ~Copyable {
 
 struct StructContainment<T: ~Copyable> : Copyable {
     var storage: Maybe<T>
-    // expected-error@-1 {{stored property 'storage' of 'Copyable'-conforming generic struct 'StructContainment' has non-Copyable type 'Maybe<T>'}}
+    // expected-error@-1 {{stored property 'storage' of 'Copyable'-conforming generic struct 'StructContainment' has non-'Copyable' type 'Maybe<T>'}}
 }
 
 enum EnumContainment<T: ~Copyable> : Copyable {
     // expected-note@-1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
 
-    case some(T) // expected-error {{associated value 'some' of 'Copyable'-conforming generic enum 'EnumContainment' has non-Copyable type 'T'}}
+    case some(T) // expected-error {{associated value 'some' of 'Copyable'-conforming generic enum 'EnumContainment' has non-'Copyable' type 'T'}}
     case other(Int)
     case none
 }
@@ -99,7 +99,7 @@ class ClassContainment<T: ~Copyable> {
 
 struct ConditionalContainment<T: ~Copyable>: ~Copyable {
   var x: T
-  var y: NC // expected-error {{stored property 'y' of 'Copyable'-conforming generic struct 'ConditionalContainment' has non-Copyable type 'NC'}}
+  var y: NC // expected-error {{stored property 'y' of 'Copyable'-conforming generic struct 'ConditionalContainment' has non-'Copyable' type 'NC'}}
 }
 
 extension ConditionalContainment: Copyable where T: Copyable {}
@@ -107,19 +107,19 @@ extension ConditionalContainment: Copyable where T: Copyable {}
 func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
 
 func chk(_ t: ConditionalContainment<NC>) {}
-// expected-error@-1 {{parameter of noncopyable type 'ConditionalContainment<NC>' must specify ownership}}
+// expected-error@-1 {{parameter of non-'Copyable' type 'ConditionalContainment<NC>' must specify ownership}}
 // expected-note@-2 3{{add}}
 
 /// ----------------
 
 // expected-note@+2 3{{add}}
-// expected-error@+1 {{parameter of noncopyable type 'some Escapable & ~Copyable' must specify ownership}}
+// expected-error@+1 {{parameter of non-'Copyable' type 'some Escapable & ~Copyable' must specify ownership}}
 func dogDays(_ t: some Escapable & ~Copyable) {}
 
 /// ----------------
 
 struct AlwaysCopyableDeinit<T: ~Copyable> : Copyable {
-  let nc: NC // expected-error {{stored property 'nc' of 'Copyable'-conforming generic struct 'AlwaysCopyableDeinit' has non-Copyable type 'NC'}}
+  let nc: NC // expected-error {{stored property 'nc' of 'Copyable'-conforming generic struct 'AlwaysCopyableDeinit' has non-'Copyable' type 'NC'}}
   deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'AlwaysCopyableDeinit' that conforms to 'Copyable'}}
 }
 
@@ -274,7 +274,7 @@ func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
 struct NonescapingType: ~Escapable {}
 
 struct NonescapeDoesNotAllowNoncopyable: ~Escapable { // expected-note {{consider adding '~Copyable' to struct 'NonescapeDoesNotAllowNoncopyable'}}
-  let x: NC // expected-error {{stored property 'x' of 'Copyable'-conforming struct 'NonescapeDoesNotAllowNoncopyable' has non-Copyable type 'NC'}}
+  let x: NC // expected-error {{stored property 'x' of 'Copyable'-conforming struct 'NonescapeDoesNotAllowNoncopyable' has non-'Copyable' type 'NC'}}
   init(_ x: borrowing NC) {
     self.x = x
   }
@@ -288,7 +288,7 @@ enum MaybeEscapes<T: ~Escapable>: ~Escapable { // expected-note {{generic enum '
 extension MaybeEscapes: Escapable where T: Escapable {}
 
 struct Escapes { // expected-note {{consider adding '~Escapable' to struct 'Escapes'}}
-  let t: MaybeEscapes<NonescapingType> // expected-error {{stored property 't' of 'Escapable'-conforming struct 'Escapes' has non-Escapable type 'MaybeEscapes<NonescapingType>'}}
+  let t: MaybeEscapes<NonescapingType> // expected-error {{stored property 't' of 'Escapable'-conforming struct 'Escapes' has non-'Escapable' type 'MaybeEscapes<NonescapingType>'}}
 }
 
 enum Boring {
@@ -391,7 +391,7 @@ func checkClassBound1<T>(_ t: T) where T: ~Copyable, T: Soup {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
 
 // expected-note@+2 3{{add}}
-// expected-error@+1 {{parameter of noncopyable type 'T' must specify ownership}}
+// expected-error@+1 {{parameter of non-'Copyable' type 'T' must specify ownership}}
 func checkClassBound2<T>(_ t: T) where T: ~Escapable, T: AnyObject, T: ~Copyable {}
 // expected-error@-1 {{'T' required to be 'Escapable' but is marked with '~Escapable'}}
 // expected-error@-2 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
@@ -442,10 +442,10 @@ func checkOwnership<T: HasMember>(_ t: T,
                                   _ l: T.NCBuddy.Buddy.Member.Buddy,
                                   _ m: T.Member.Member,
                                   _ n: T.Member.NCMember,
-// expected-error@-1 {{parameter of noncopyable type 'T.Member.NCMember' must specify ownership}} // expected-note@-1 3{{add}}
+// expected-error@-1 {{parameter of non-'Copyable' type 'T.Member.NCMember' must specify ownership}} // expected-note@-1 3{{add}}
 
                                   _ o: T.Member.NCBuddy.NCBuddy
-// expected-error@-1 {{parameter of noncopyable type 'T.Member.NCBuddy.NCBuddy' must specify ownership}} // expected-note@-1 3{{add}}
+// expected-error@-1 {{parameter of non-'Copyable' type 'T.Member.NCBuddy.NCBuddy' must specify ownership}} // expected-note@-1 3{{add}}
 ) {}
 
 // Covers an issue when building Combine from its interface.
@@ -464,10 +464,10 @@ protocol Q: Copyable {}
 // expected-note@-1 {{type 'Blahaj<Value>' does not conform to inherited protocol 'Copyable'}}
 
 // expected-note@+2 3{{add}}
-// expected-error@+1 {{parameter of noncopyable type 'Blahaj<T>' must specify ownership}}
+// expected-error@+1 {{parameter of non-'Copyable' type 'Blahaj<T>' must specify ownership}}
 func testBlahaj<T, U: Q>(_ x: Blahaj<T>,
 // expected-note@+2 3{{add}}
-// expected-error@+1 {{parameter of noncopyable type 'Blahaj<U>' must specify ownership}}
+// expected-error@+1 {{parameter of non-'Copyable' type 'Blahaj<U>' must specify ownership}}
                          _ y: Blahaj<U>) {}
 
 extension Int: NeedsCopyable {}
@@ -511,11 +511,11 @@ let global__new__: any PPP & ~Copyable = SSS()
 struct Example<T> {}
 
 struct TestResolution1 { // expected-note {{consider adding '~Copyable' to struct 'TestResolution1'}}
-  var maybeNC: NC? = nil // expected-error {{stored property 'maybeNC' of 'Copyable'-conforming struct 'TestResolution1' has non-Copyable type 'NC?'}}
+  var maybeNC: NC? = nil // expected-error {{stored property 'maybeNC' of 'Copyable'-conforming struct 'TestResolution1' has non-'Copyable' type 'NC?'}}
 }
 
 struct TestResolution2 { // expected-note {{consider adding '~Copyable' to struct 'TestResolution2'}}
-  var maybeIOUNC: NC! = nil // expected-error {{stored property 'maybeIOUNC' of 'Copyable'-conforming struct 'TestResolution2' has non-Copyable type 'NC?'}}
+  var maybeIOUNC: NC! = nil // expected-error {{stored property 'maybeIOUNC' of 'Copyable'-conforming struct 'TestResolution2' has non-'Copyable' type 'NC?'}}
 }
 
 struct TestResolution3 {
@@ -527,7 +527,7 @@ struct TestResolution3 {
 public struct Box<Wrapped: ~Copyable>: ~Copyable {}
 // Box is never copyable, so we can't support this conditional conformance.
 public enum List<Element: ~Copyable>: ~Copyable {
-  case cons(Element, Box<List<Element>>)   // expected-error {{associated value 'cons' of 'Copyable'-conforming generic enum 'List' has non-Copyable type '(Element, Box<List<Element>>)'}}
+  case cons(Element, Box<List<Element>>)   // expected-error {{associated value 'cons' of 'Copyable'-conforming generic enum 'List' has non-'Copyable' type '(Element, Box<List<Element>>)'}}
   case empty
 }
 extension List: Copyable where Element: Copyable {}

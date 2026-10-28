@@ -480,7 +480,7 @@ bool importer::isBoolOrBoolEnumType(Type ty) {
     return true;
 
   // Check if this is a C++ enum with an underlying type of "bool".
-  if (auto *SD = ty->getStructOrBoundGenericStruct()) {
+  if (auto *SD = ty->getStructDecl()) {
     if (auto *clangD = SD->getClangDecl()) {
       if (auto *ED = dyn_cast<clang::EnumDecl>(clangD)) {
         if (ED->getIntegerType()->isBooleanType())
@@ -738,11 +738,6 @@ void importer::getNormalInvocationArguments(
     // 'attribute push' pragma.
     if (clangSupportsPragmaAttributeWithSwiftAttr())
       invocationArgStrs.push_back("-D__SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS=1");
-
-    if (triple.isXROS()) {
-      // FIXME: This is a gnarly hack until some macros get adjusted in the SDK.
-      llvm::append_values(invocationArgStrs, "-DOS_OBJECT_HAVE_OBJC_SUPPORT=1");
-    }
 
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
@@ -1435,6 +1430,15 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
       /*needSystemVFSOverlay=*/!clangFileMapping.redirectedFiles.empty() &&
           !ctx.CASOpts.HasImmutableFileSystem,
       ignoreClangTarget);
+  if (ctx.LangOpts.Target.isWindowsMSVCEnvironment()) {
+    auto iterator = llvm::find_if(clangFileMapping.redirectedFiles,
+                                  [](const auto &mapping) {
+        return llvm::sys::path::filename(mapping.second) == "winsdk.modulemap";
+    });
+    if (iterator != clangFileMapping.redirectedFiles.end())
+      invocationArgStrs
+          .push_back((Twine("-fmodule-map-file=") + iterator->first).str());
+  }
   return invocationArgStrs;
 }
 
@@ -3085,7 +3089,7 @@ ClangImporter::Implementation::Implementation(
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
-      BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
+      BridgingHeaderLookupTable(new SwiftLookupTable(nullptr, ctx)),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       SwiftDependencyTracker(dependencyTracker) {}
@@ -6582,7 +6586,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
     if (getterDecl->getResultInterfaceType()->isForeignReferenceType()) {
       auto *frtClass = getterDecl->getResultInterfaceType()
                            ->lookThroughAllOptionalTypes()
-                           ->getClassOrBoundGenericClass();
+                           ->getClassDecl();
       if (auto *frtClangDecl = dyn_cast_or_null<clang::RecordDecl>(
               frtClass ? frtClass->getClangDecl() : nullptr)) {
         retainFn = ctx.getClangModuleLoader()
@@ -9553,126 +9557,6 @@ importer::explainRecordUnsafety(const clang::RecordDecl *recordDecl,
 
 bool ClangDeclExplicitSafety::isCached() const {
   return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
-}
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           ClangRefCountedSmartPointerDescriptor desc) {
-  out << "Validating SWIFT_REFCOUNTED_PTR for '";
-  out << desc.smartPtr->getNameStr();
-  out << "'\n";
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc) {
-  return SourceLoc();
-}
-
-CustomAttr *importer::getRefCountedPtrAttr(Decl *decl) {
-  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    if (attr->getTypeRepr()->isSimpleUnqualifiedIdentifier("_refCountedPtr"))
-      return attr;
-  }
-
-  return nullptr;
-}
-
-RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
-    Evaluator &evaluator, ClangRefCountedSmartPointerDescriptor desc) const {
-  auto *customAttr = importer::getRefCountedPtrAttr(desc.smartPtr);
-  if (!customAttr)
-    return {RefCountedPtrError::NotAnnotated, nullptr};
-
-  StringRef ToRawPtrFuncName;
-  for (auto arg : *customAttr->getArgs()) {
-    if (arg.getLabel().str() == "ToRawPointer") {
-      if (const auto *literal = dyn_cast<StringLiteralExpr>(arg.getExpr()))
-        ToRawPtrFuncName = literal->getValue();
-    }
-  }
-  if (ToRawPtrFuncName.empty())
-    return {RefCountedPtrError::MissingToRawPointer, nullptr};
-
-  auto results = getValueDeclsForName(desc.smartPtr, ToRawPtrFuncName);
-  if (results.empty())
-    return {RefCountedPtrError::ToRawPointerLookupFailure, nullptr,
-            ToRawPtrFuncName};
-
-  if (results.size() > 1)
-    return {RefCountedPtrError::ToRawPointerLookupAmbiguity, nullptr,
-            ToRawPtrFuncName};
-
-  auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
-  if (!toRawPtrFunc)
-    return {RefCountedPtrError::ToRawPointerNotFunction, toRawPtrFunc};
-
-  auto pointeeType = toRawPtrFunc->getResultInterfaceType()
-                         ->lookThroughSingleOptionalType();
-  ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
-
-  if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl)
-    return {RefCountedPtrError::ToRawPointerWrongSignature, toRawPtrFunc};
-
-  auto ctors =
-      desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
-  // We accept a constructor whose parameter imports as the foreign
-  // reference type. In C++ that means a raw pointer (T*, possibly
-  // const-qualified) or an lvalue reference (T&, possibly
-  // const-qualified). We rank candidates so that more-specific
-  // forms win when several are available:
-  //   T*  >  const T*  >  T&  >  const T&
-  // Per-rank duplicates are still ambiguous. Rvalue-reference and
-  // deleted ctors aren't bridgeable. The selected constructor is
-  // relied on during SILGen to introduce implicit bridging.
-  ConstructorDecl *selected = nullptr;
-  std::optional<int> selectedRank;
-  for (auto result : ctors) {
-    auto ctor = cast<ConstructorDecl>(result);
-    if (ctor->getParameters()->size() != 1)
-      continue;
-    Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
-    if (!ctorParamType->isForeignReferenceType())
-      continue;
-
-    auto *clangCtor =
-        dyn_cast_or_null<clang::CXXConstructorDecl>(ctor->getClangDecl());
-    if (!clangCtor || clangCtor->isDeleted())
-      continue;
-
-    clang::QualType paramTy = clangCtor->getParamDecl(0)->getType();
-    int rank;
-    if (paramTy->isLValueReferenceType()) {
-      rank = paramTy->getPointeeType().isConstQualified() ? 3 : 2;
-    } else if (paramTy->isPointerType()) {
-      rank = paramTy->getPointeeType().isConstQualified() ? 1 : 0;
-    } else {
-      // Not a pointer or lvalue reference (e.g., rvalue ref).
-      continue;
-    }
-
-    if (!selectedRank || rank < *selectedRank) {
-      selected = ctor;
-      selectedRank = rank;
-    } else if (rank == *selectedRank) {
-      return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
-    }
-  }
-  if (!selected)
-    return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
-  Type selectedCtorParamType =
-      selected->getParameters()->get(0)->getInterfaceType();
-  if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
-          pointeeType))
-    return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};
-
-  return {RefCountedPtrInfo{selected}, toRawPtrFunc};
-}
-
-RefCountedPtrRequestResult
-importer::getClangRefCountedSmartPointer(NominalTypeDecl *decl) {
-  return evaluateOrDefault(
-      decl->getASTContext().evaluator,
-      ClangRefCountedSmartPointer(ClangRefCountedSmartPointerDescriptor{decl}),
-      RefCountedPtrRequestResult{RefCountedPtrError::NotAnnotated, nullptr});
 }
 
 const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(

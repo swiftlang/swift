@@ -64,7 +64,7 @@ if(APPLE)
   # SDK as a tbd for a shared library in the shared cache.
   find_path(dispatch_INCLUDE_DIR "dispatch/dispatch.h")
   find_library(dispatch_IMPLIB
-    NAMES "libdispatch.tbd"
+    NAMES "libdispatch.tbd" "libSystem.tbd"
     PATH "usr/lib"
     PATH_SUFFIXES system)
   add_library(dispatch SHARED IMPORTED GLOBAL)

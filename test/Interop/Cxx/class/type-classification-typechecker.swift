@@ -4,25 +4,25 @@ import TypeClassification
 
 func test() {
   let x = StructWithPointerNonCopyableTriviallyMovable()
-  let v = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
+  let v = copy x // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
   _ = v
 }
 
 func testField() {
   let x = StructWithPointerNonCopyableTriviallyMovableField()
-  let v = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
+  let v = copy x // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
   _ = v
 }
 
 func testAnnotated() {
   let x = StructCopyableMovableAnnotatedNonCopyable()
-  let v = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
+  let v = copy x // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
   _ = v
 }
 
 func testHasCopyTypeOperations() {
   let x = HasCopyConstructorWithDefaultArgs(5)
-  let v = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
+  let v = copy x // expected-error {{'copy' cannot be applied to non-'Copyable' types}}
   _ = v
 }
 
@@ -30,7 +30,7 @@ func testFuncCallNoncopyable() {
   func aux(input: HasCopyConstructorWithDefaultArgs) {}
   let x = HasCopyConstructorWithDefaultArgs(5)
   aux(input: x) 
-  // expected-error@-3 {{parameter of noncopyable type 'HasCopyConstructorWithDefaultArgs' must specify ownership}}
+  // expected-error@-3 {{parameter of non-'Copyable' type 'HasCopyConstructorWithDefaultArgs' must specify ownership}}
   // expected-note@-4 {{add 'borrowing' for an immutable reference}}
   // expected-note@-5 {{add 'consuming' to take the value from the caller}}
   // expected-note@-6 {{add 'inout' for a mutable reference}}

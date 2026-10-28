@@ -133,11 +133,6 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
-
     let span = unsafe Span(
       _unchecked: UnsafeRawPointer(buffer.baseAddress),
       count: buffer.count
@@ -192,6 +187,20 @@ extension Span where Element: ~Copyable {
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: pointer)
+  }
+
+  /// Create a span over a single value.
+  ///
+  /// The span has a `count` of 1, and borrows `value`.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be borrowed by the span
+  @export(implementation)
+  @_lifetime(borrow value)
+  public init(ofOne value: borrowing @_addressable Element) {
+    let address = Builtin.unprotectedAddressOfBorrow(value)
+    let span = unsafe Span(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, borrowing: value)
   }
 }
 

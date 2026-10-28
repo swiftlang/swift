@@ -64,6 +64,69 @@
 // RUN:     %t/%target-library-name(ResilientLib)                              \
 // RUN:     | %FileCheck %s
 
+/// Build and run everything again with opaque values
+// RUN: %empty-directory(%t/opaque-values)
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/FakeDistributedActorSystems.swiftmodule \
+// RUN:     -module-name FakeDistributedActorSystems                           \
+// RUN:      %S/../Inputs/FakeDistributedActorSystems.swift                    \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -o %t/opaque-values/%target-library-name(FakeDistributedActorSystems)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/ResilientLib.swiftmodule        \
+// RUN:     -module-name ResilientLib                                          \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     %t/src/ResilientLib.swift                                          \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -o %t/opaque-values/%target-library-name(ResilientLib)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/ResilientActorLib.swiftmodule   \
+// RUN:     -module-name ResilientActorLib                                     \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     %t/src/ResilientActorLib.swift                                     \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -lResilientLib                                                     \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -o %t/opaque-values/%target-library-name(ResilientActorLib)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-5.7-abi-triple                               \
+// RUN:     -parse-as-library                                                  \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -lResilientLib                                                     \
+// RUN:     -lResilientActorLib                                                \
+// RUN:     -module-name main                                                  \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     %s                                                                 \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -o %t/opaque-values/a.out
+
+// RUN: %target-codesign %t/opaque-values/a.out
+// RUN: %target-codesign %t/opaque-values/%target-library-name(FakeDistributedActorSystems)
+// RUN: %target-codesign %t/opaque-values/%target-library-name(ResilientActorLib)
+// RUN: %target-codesign %t/opaque-values/%target-library-name(ResilientLib)
+
+// RUN: %target-run %t/opaque-values/a.out                                     \
+// RUN:     %t/opaque-values/%target-library-name(FakeDistributedActorSystems) \
+// RUN:     %t/opaque-values/%target-library-name(ResilientActorLib)           \
+// RUN:     %t/opaque-values/%target-library-name(ResilientLib)                \
+// RUN:     | %FileCheck %s
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed

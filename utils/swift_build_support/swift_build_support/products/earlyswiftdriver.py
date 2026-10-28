@@ -127,6 +127,9 @@ def run_build_script_helper(action, host_target, product, args):
         '--local_compiler_build'
     ]
 
+    if action != 'clean':
+        helper_cmd += ["--jobs", str(args.build_jobs)]
+
     if os.path.exists(lit_test_dir) and action == 'test':
         helper_cmd += [
             '--lit-test-dir', lit_test_dir

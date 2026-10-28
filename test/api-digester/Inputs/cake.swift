@@ -160,3 +160,5 @@ public func availableAnyAppleOS26ButMacOS26_4() {}
 
 @available(anyAppleOS, unavailable)
 public func unavailableAnyAppleOS() {}
+
+public func typedThrows<E: Error>(_ e: E) throws(E) {}

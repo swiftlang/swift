@@ -404,8 +404,7 @@ bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
   decls.erase(
     std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) -> bool {
       bool inScope = llvm::any_of(visibleFrom, [&](ModuleDecl *visibleFromMod) {
-        return ctx.getImportCache().isImportedBy(
-                       decl->getModuleContextForNameLookup(), visibleFromMod);
+        return visibleFromMod->isDeclImported(decl);
       });
 
       LLVM_DEBUG(decl->dumpRef(llvm::dbgs()));
@@ -2638,7 +2637,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
 
     // Look into the superclasses of this archetype.
     if (auto superclass = archetypeTy->getSuperclass()) {
-      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
+      if (auto superclassDecl = superclass->getClassDecl())
         decls.push_back(superclassDecl);
     }
 
@@ -2653,7 +2652,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      auto *superclassDecl = superclass->getClassDecl();
       if (superclassDecl)
         decls.push_back(superclassDecl);
     }
@@ -2711,8 +2710,12 @@ bool DeclContext::lookupQualified(Type type,
 }
 
 bool DeclContext::isDeclImported(const Decl *decl) const {
-  auto declModule = decl->getModuleContextForNameLookup();
-  return getASTContext().getImportCache().isImportedBy(declModule, this);
+  auto &importCache = getASTContext().getImportCache();
+  SmallVector<ModuleDecl *, 1> declModules;
+  decl->getModuleContextsForNameLookup(declModules);
+  return llvm::any_of(declModules, [&](ModuleDecl *declModule) {
+    return importCache.isImportedBy(declModule, this);
+  });
 }
 
 static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
@@ -3889,7 +3892,7 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   return llvm::any_of(decls, [&](const TypeDecl *decl) {
     if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
       auto ty = alias->getUnderlyingType();
-      decl = ty->getNominalOrBoundGenericNominal();
+      decl = ty->getNominalDecl();
       if (decl == nullptr || ty->is<ExistentialType>())
         return false;
     }

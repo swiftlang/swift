@@ -286,10 +286,6 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
-def swift_module_file: Joined<["-"], "swift-module-file=">,
-  MetaVarName<"<name>=<path>">,
-  HelpText<"Specify Swift module input explicitly built from textual interface">;
-
 def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
   MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
   HelpText<"Specify the cross import module">;
@@ -308,6 +304,7 @@ def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
@@ -1050,6 +1047,12 @@ def solver_enable_promote_supertypes : Flag<["-"], "solver-enable-promote-supert
 def solver_disable_promote_supertypes : Flag<["-"], "solver-disable-promote-supertypes">,
   HelpText<"Disable an experimental optimization which will be on by default at some point">;
 
+def solver_enable_short_conversions : Flag<["-"], "solver-enable-short-conversions">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_short_conversions : Flag<["-"], "solver-disable-short-conversions">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
@@ -1684,18 +1687,22 @@ def always_compile_output_files :
   HelpText<"Always compile output files even it might not change the results">;
 
 // CAS/Caching related options.
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def input_file_key : Separate<["-"], "input-file-key">,
   HelpText<"Cache Key for input file">;
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
   HelpText<"Cache Key for bridging header pch">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
   HelpText<"Read the input files from disk and overlay them on the CAS file "
@@ -1733,12 +1740,6 @@ def scanner_output_dir: Separate<["-"], "scanner-output-dir">,
 def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
   HelpText<"Write generated output from scanner for debugging purpose">,
   Flags<[HelpHidden]>;
-
-def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
-  HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
-
-def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
-  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
 
 def gen_reproducer : Flag<["-"], "gen-reproducer">,
                      HelpText<"Generate a reproducer for current compilation.">;

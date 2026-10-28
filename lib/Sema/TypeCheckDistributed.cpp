@@ -720,13 +720,6 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
     return true;
   }
 
-  auto &C = nominal->getASTContext();
-  if (C.LangOpts.hasFeature(Feature::Embedded) &&
-      !C.LangOpts.hasFeature(Feature::EmbeddedDistributed)) {
-    nominal->diagnose(diag::distributed_embedded_requires_feature);
-    return true;
-  }
-
   // === AssociatedTypes
   // --- SerializationRequirement MUST be a protocol TODO(distributed): rdar://91663941
   // we may lift this in the future and allow classes but this requires more
@@ -1204,18 +1197,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
   recordRequiredImportAccessLevelForDecl(distributedActorProto, nominal,
                                          nominal->getEffectiveAccess(), loc);
-
-  // Embedded distributed support is gated behind an experimental feature that
-  // is not available in production compilers. Reject distributed actors under
-  // Embedded Swift unless the feature is enabled. Protocols are skipped: the
-  // `DistributedActor` protocol (and refinements) reach this check too, and the
-  // gate concerns concrete actors that would trigger embedded synthesis.
-  if (C.LangOpts.hasFeature(Feature::Embedded) &&
-      !C.LangOpts.hasFeature(Feature::EmbeddedDistributed) &&
-      !isa<ProtocolDecl>(nominal)) {
-    nominal->diagnose(diag::distributed_embedded_requires_feature);
-    return;
-  }
 
   // In Embedded Swift the serialization surface is monomorphized: every
   // recordArgument / decodeNextArgument / onReturn call, and the synthesized

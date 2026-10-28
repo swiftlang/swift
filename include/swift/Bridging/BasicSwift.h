@@ -22,8 +22,8 @@ extern "C" {
 /// Create a new static build configuration for the given language options.
 void * _Nonnull swift_Basic_createStaticBuildConfiguration(BridgedLangOptions cLangOpts);
 
-/// Free the given static build configuration.
-void swift_Basic_freeStaticBuildConfiguration(void * _Nonnull staticBuildConfiguration);
+/// Free the given static build configuration. Does nothing if it is null.
+void swift_Basic_freeStaticBuildConfiguration(void * _Nullable staticBuildConfiguration);
 
 #ifdef __cplusplus
 }

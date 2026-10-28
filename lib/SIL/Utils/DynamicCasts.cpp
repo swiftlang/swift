@@ -166,7 +166,7 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
 
   // If it is a class and it can be proven that this class and its
   // superclasses cannot have unknown subclasses, then it is safe to proceed.
-  if (auto *CD = source.getClassOrBoundGenericClass()) {
+  if (auto *CD = source.getClassDecl()) {
     if (canClassOrSuperclassesHaveUnknownSubclasses(CD, isWholeModuleOpts))
       return DynamicCastFeasibility::MaySucceed;
     // Derived types may conform to the protocol.
@@ -236,11 +236,11 @@ classifyDynamicCastFromProtocol(ModuleDecl *M, CanType source, CanType target,
   // Casts from class existential into a non-class can never succeed.
   if (source->isClassExistentialType() &&
       !target.isAnyExistentialType() &&
-      !target.getClassOrBoundGenericClass() &&
+      !target.getClassDecl() &&
       !isa<ArchetypeType>(target) &&
       !mayBridgeToObjectiveC(M, target)) {
-    assert((target.getEnumOrBoundGenericEnum() ||
-            target.getStructOrBoundGenericStruct() ||
+    assert((target.getEnumDecl() ||
+            target.getStructDecl() ||
             isa<TupleType>(target) ||
             isa<SILFunctionType>(target) ||
             isa<FunctionType>(target) ||
@@ -482,7 +482,7 @@ classifyClassHierarchyCast(CanType source, CanType target) {
 }
 
 CanType swift::getNSBridgedClassOfCFClass(CanType type) {
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  if (auto classDecl = type->getClassDecl()) {
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       if (auto bridgedAttr =
             classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()) {
@@ -657,7 +657,7 @@ swift::classifyDynamicCast(SILFunction *function,
     // can never succeed.
     if (source->isClassExistentialType() &&
         !target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass())
+        !target.getClassDecl())
       return DynamicCastFeasibility::WillFail;
 
     // TODO: prove that some conversions to existential metatype will
@@ -674,19 +674,19 @@ swift::classifyDynamicCast(SILFunction *function,
 
     // If both metatypes are class metatypes, check if classes can be
     // cast.
-    if (source.getClassOrBoundGenericClass() &&
-        target.getClassOrBoundGenericClass())
+    if (source.getClassDecl() &&
+        target.getClassDecl())
       return classifyClassHierarchyCast(source, target);
 
     // Different structs cannot be cast to each other.
-    if (source.getStructOrBoundGenericStruct() &&
-        target.getStructOrBoundGenericStruct() &&
+    if (source.getStructDecl() &&
+        target.getStructDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
     // Different enums cannot be cast to each other.
-    if (source.getEnumOrBoundGenericEnum() &&
-        target.getEnumOrBoundGenericEnum() &&
+    if (source.getEnumDecl() &&
+        target.getEnumDecl() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
@@ -761,8 +761,8 @@ swift::classifyDynamicCast(SILFunction *function,
   }
 
   // Class casts.
-  auto sourceClass = source.getClassOrBoundGenericClass();
-  auto targetClass = target.getClassOrBoundGenericClass();
+  auto sourceClass = source.getClassDecl();
+  auto targetClass = target.getClassDecl();
   if (sourceClass) {
     if (targetClass) {
       // Imported Objective-C generics don't check the generic parameters, which
@@ -820,11 +820,11 @@ swift::classifyDynamicCast(SILFunction *function,
     // be bridged to a SwiftValueBox. You would need an AnyObject source for
     // that.
     if (!target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass() &&
+        !target.getClassDecl() &&
         !isa<ArchetypeType>(target) &&
         mustBridgeToSwiftValueBox(M, target)) {
-      assert((target.getEnumOrBoundGenericEnum() ||
-              target.getStructOrBoundGenericStruct() ||
+      assert((target.getEnumDecl() ||
+              target.getStructDecl() ||
               isa<TupleType>(target) ||
               isa<SILFunctionType>(target) ||
               isa<FunctionType>(target) ||
@@ -860,11 +860,11 @@ swift::classifyDynamicCast(SILFunction *function,
   // We know that a cast from Int -> class foobar will fail.
   if (targetClass &&
       !source.isAnyExistentialType() &&
-      !source.getClassOrBoundGenericClass() &&
+      !source.getClassDecl() &&
       !isa<ArchetypeType>(source) &&
       mustBridgeToSwiftValueBox(M, source)) {
-      assert((source.getEnumOrBoundGenericEnum() ||
-              source.getStructOrBoundGenericStruct() ||
+      assert((source.getEnumDecl() ||
+              source.getStructDecl() ||
               isa<TupleType>(source) ||
               isa<SILFunctionType>(source) ||
               isa<FunctionType>(source) ||
@@ -903,8 +903,8 @@ swift::classifyDynamicCast(SILFunction *function,
   }
 
   // Check for a viable collection cast.
-  if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
-    if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
+  if (auto sourceStruct = dyn_cast<StructType>(source)) {
+    if (auto targetStruct = dyn_cast<StructType>(target)) {
       // Both types have to be the same kind of collection.
       if (sourceStruct->getDecl() == targetStruct->getDecl()) {
         auto sourceArgs = sourceStruct.getGenericArgs();
@@ -1357,8 +1357,8 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
   if (src->getType() != dest->getType())
   if (src->getType().isAnyExistentialType() !=
       dest->getType().isAnyExistentialType() ||
-      !(src->getType().getClassOrBoundGenericClass() &&
-       dest->getType().getClassOrBoundGenericClass())) {
+      !(src->getType().getClassDecl() &&
+       dest->getType().getClassDecl())) {
 
     // If there is an existing cast with the same arguments,
     // indicate we cannot improve it.
@@ -1419,12 +1419,11 @@ bool swift::canOptimizeToScalarCheckedCastInstructions(
     return false;
   }
 
-  // A scalar cast produces a value in its success block, which is precisely
-  // what test_only must not do. (Unreachable today: test_only is only emitted
-  // for address-only existential sources, which canSILUseScalarCheckedCast-
-  // Instructions already rejects above.)
+  // A test_only (`is`) cast reads its source in place and produces nothing.
+  // This can be optimized to use an efficient scalar/class cast by ignoring
+  // the result.
   if (consumption == CastConsumptionKind::TestOnly)
-    return false;
+    return true;
 
   if (consumption == CastConsumptionKind::CopyOnSuccess) {
     // If it's a copy-on-success cast, check whether the cast preserves
@@ -1545,10 +1544,29 @@ void swift::emitIndirectConditionalCastWithScalar(
   // 3. If the original cast was take_on_success, then on success we place the
   // casted value into dest and on failure, store the original value back into
   // src.
-  SILType targetLoweredType = destAddr->getType().getObjectType();
+  //
+  // 4. If the original cast was test_only, there is no destination: borrow the
+  // source, end the borrow on either path, and discard the cast result.
+  SILType targetLoweredType =
+      destAddr
+          ? destAddr->getType().getObjectType()
+          : B.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                                targetFormalType,
+                                                B.getTypeExpansionContext());
+  // A test borrows its source when the cast can forward a borrow. When it
+  // cannot (for example from AnyObject), test a copy and destroy it on both
+  // paths; a retain and release is still far cheaper than a runtime call.
+  bool testByCopy = consumption == CastConsumptionKind::TestOnly &&
+                    B.hasOwnership() &&
+                    !doesCastPreserveOwnershipForTypes(
+                        B.getModule(), sourceFormalType, targetFormalType);
   // Inline constructor
   auto srcValue = ([&]() -> SILValue {
-    if (consumption == CastConsumptionKind::CopyOnSuccess)
+    if (testByCopy)
+      return B.emitLoadValueOperation(loc, srcAddr,
+                                      LoadOwnershipQualifier::Copy);
+    if (consumption == CastConsumptionKind::CopyOnSuccess ||
+        consumption == CastConsumptionKind::TestOnly)
       return B.emitLoadBorrowOperation(loc, srcAddr);
     return B.emitLoadValueOperation(loc, srcAddr, LoadOwnershipQualifier::Take);
   })();
@@ -1563,26 +1581,36 @@ void swift::emitIndirectConditionalCastWithScalar(
     SILValue succValue = scalarSuccBB->createPhiArgument(
         targetLoweredType, ccb->getForwardingOwnershipKind());
 
-    switch (consumption) {
-    // On success, we take with both take_always and take_on_success.
-    case CastConsumptionKind::TakeAlways:
-    case CastConsumptionKind::TakeOnSuccess:
-      break;
-    case CastConsumptionKind::CopyOnSuccess: {
-      succValue = B.emitCopyValueOperation(loc, succValue);
-      B.emitEndBorrowOperation(loc, srcValue);
-      break;
-    }
-    case CastConsumptionKind::BorrowAlways:
-      llvm_unreachable("should never see a borrow_always here");
-    case CastConsumptionKind::TestOnly:
-      llvm_unreachable("test_only produces no scalar result");
-    }
+    // A test produces nothing: the answer is the branch itself, so there is no
+    // result to store and the borrow of the source simply ends.
+    if (consumption == CastConsumptionKind::TestOnly) {
+      if (testByCopy)
+        B.emitDestroyValueOperation(loc, succValue);
+      else
+        B.emitEndBorrowOperation(loc, srcValue);
+      B.createBranch(loc, indirectSuccBB);
+    } else {
+      switch (consumption) {
+      // On success, we take with both take_always and take_on_success.
+      case CastConsumptionKind::TakeAlways:
+      case CastConsumptionKind::TakeOnSuccess:
+        break;
+      case CastConsumptionKind::CopyOnSuccess: {
+        succValue = B.emitCopyValueOperation(loc, succValue);
+        B.emitEndBorrowOperation(loc, srcValue);
+        break;
+      }
+      case CastConsumptionKind::BorrowAlways:
+        llvm_unreachable("should never see a borrow_always here");
+      case CastConsumptionKind::TestOnly:
+        llvm_unreachable("handled above");
+      }
 
-    // And then store the succValue into dest.
-    B.emitStoreValueOperation(loc, succValue, destAddr,
-                              StoreOwnershipQualifier::Init);
-    B.createBranch(loc, indirectSuccBB);
+      // And then store the succValue into dest.
+      B.emitStoreValueOperation(loc, succValue, destAddr,
+                                StoreOwnershipQualifier::Init);
+      B.createBranch(loc, indirectSuccBB);
+    }
   }
 
   // Emit the failure block.
@@ -1612,10 +1640,14 @@ void swift::emitIndirectConditionalCastWithScalar(
     case CastConsumptionKind::CopyOnSuccess:
       B.emitEndBorrowOperation(loc, srcValue);
       break;
+    case CastConsumptionKind::TestOnly:
+      if (testByCopy)
+        B.emitDestroyValueOperation(loc, failValue);
+      else
+        B.emitEndBorrowOperation(loc, srcValue);
+      break;
     case CastConsumptionKind::BorrowAlways:
       llvm_unreachable("borrow_on_success should never appear here");
-    case CastConsumptionKind::TestOnly:
-      llvm_unreachable("test_only produces no scalar result");
     }
 
     B.createBranch(loc, indirectFailBB);

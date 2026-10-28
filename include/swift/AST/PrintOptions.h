@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <limits.h>
 #include <optional>
 #include <vector>
@@ -134,6 +135,19 @@ enum class NonRecursivePrintOption : uint32_t {
   SkipNonisolatedNonsending = 1 << 1,
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
+
+/// The most restrictive interface that a declaration or type can be printed in.
+/// The cases are ordered from least to most restrictive.
+enum class InterfaceVisibility : uint8_t {
+  /// Printed in every interface.
+  Public,
+  /// Printed in the private and package interfaces.
+  SPI,
+  /// Printed only in the package interface.
+  Package,
+  /// Not printed in any interface.
+  None,
+};
 
 /// Options for printing AST nodes.
 ///
@@ -258,6 +272,22 @@ public:
     InterfaceContentKind = mode;
   }
 
+  /// Whether something with the given visibility is printed in the interface
+  /// described by these options.
+  bool printsInterfaceVisibility(InterfaceVisibility visibility) const {
+    switch (visibility) {
+    case InterfaceVisibility::Public:
+      return true;
+    case InterfaceVisibility::SPI:
+      return !printPublicInterface();
+    case InterfaceVisibility::Package:
+      return printPackageInterface();
+    case InterfaceVisibility::None:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
   /// spelling of the type name.
@@ -286,7 +316,8 @@ public:
 
     /// If there is an exported module name and the named module is the main
     /// module or has been loaded by the main module, use it instead of the
-    /// regular name.
+    /// regular name. A loaded module must also be visible through the imports
+    /// printed in the interface, so that clients can refer to it.
     IfLoaded,
 
     /// Always use the regular name.
@@ -472,6 +503,10 @@ public:
 
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
+
+  /// Suppress 'consuming' on parameters whose function type implies it, as one
+  /// with at-most-once semantics does.
+  bool SuppressImpliedConsumingParams = false;
 
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
@@ -748,6 +783,7 @@ public:
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
     result.PrintHomogeneousTuplesCompactly = true;
+    result.SuppressImpliedConsumingParams = true;
     return result;
   }
 

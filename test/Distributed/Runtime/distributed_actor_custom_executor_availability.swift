@@ -3,6 +3,9 @@
 // RUN: %target-build-swift -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift %S/../Inputs/CustomSerialExecutorAvailability.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name a -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift %S/../Inputs/CustomSerialExecutorAvailability.swift -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out
 
 // These are the only platforms for which compiling a Swift 5.7 aligned deployment target is possible.
 // REQUIRES: OS=macosx || OS=ios || OS=watchos || OS=tvos

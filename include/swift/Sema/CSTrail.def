@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This file enumerates the kinds of SolverTrail::Change.
+/// If the change is stored in a Map, then the macros below generate the appropriate
+/// change, addition, removal, and dump methods when given the element types.
+/// If more control is needed, add the kind of the change to CHANGE and add
+/// appropriate code manually to CSTrail.h and CSTrail.cpp
 ///
 //===----------------------------------------------------------------------===//
 
@@ -171,6 +175,7 @@ CHANGE(RecordedKeyPath)
 CHANGE(RetiredConstraint)
 CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
+CHANGE(AddedConflict)
 CHANGE(PrunedDisjunction)
 
 LAST_CHANGE(PrunedDisjunction)

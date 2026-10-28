@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D ONE_MODULE %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D SUB_MODULE %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules -D TWO_MODULES %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/RedeclaredProperties -D ONE_MODULE %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/RedeclaredProperties -D SUB_MODULE %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules/RedeclaredProperties -D TWO_MODULES %s -verify
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredProperties -I %S/Inputs/custom-modules -source-filename %s | %FileCheck %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSub -module-to-print RedeclaredPropertiesSub.Private -I %S/Inputs/custom-modules -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SUB
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSplit -module-to-print RedeclaredPropertiesSplit2 -I %S/Inputs/custom-modules -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-TWO
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredProperties -I %S/Inputs/custom-modules/RedeclaredProperties -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSub -module-to-print RedeclaredPropertiesSub.Private -I %S/Inputs/custom-modules/RedeclaredProperties -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-SUB
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-module -module-to-print RedeclaredPropertiesSplit -module-to-print RedeclaredPropertiesSplit2 -I %S/Inputs/custom-modules/RedeclaredProperties -source-filename %s | %FileCheck %s --check-prefixes=CHECK,CHECK-TWO
 
 // REQUIRES: objc_interop
 
@@ -19,7 +19,7 @@ import RedeclaredPropertiesSplit2
 #endif
 
 func test(obj: RPFoo) {
-  if let _ = obj.nonnullToNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
+  if let _ = obj.nonnullToNullable {} // expected-warning {{initializer for conditional binding has non-optional type}}
   obj.nonnullToNullable = obj // expected-error {{cannot assign to property: 'nonnullToNullable' is a get-only property}}
   // expected-error@-1 {{cannot assign value of type 'RPFoo' to type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
 
@@ -33,8 +33,8 @@ func test(obj: RPFoo) {
   let _: RPFoo = obj.typeChangeMoreGeneral
   obj.typeChangeMoreGeneral = obj // expected-error {{cannot assign to property: 'typeChangeMoreGeneral' is a get-only property}}
 
-  if let _ = obj.accessorRedeclaredAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
-  if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
+  if let _ = obj.accessorRedeclaredAsNullable {} // expected-warning {{initializer for conditional binding has non-optional type}}
+  if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-warning {{initializer for conditional binding has non-optional type}}
 
   obj.accessorInProto = nil // okay
 

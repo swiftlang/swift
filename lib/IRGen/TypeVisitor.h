@@ -31,8 +31,6 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   RetTy visit##Id##Type(Can##Id##Type T, Args... args) { \
     llvm_unreachable(#Id "Type is not a reference type"); \
   }
-  TYPE(BoundGenericEnum)
-  TYPE(BoundGenericStruct)
   TYPE(BuiltinFloat)
   TYPE(BuiltinInteger)
   TYPE(BuiltinRawPointer)
@@ -49,7 +47,6 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   // BuiltinNativeObject
   // BuiltinBridgeObject
   // Class
-  // BoundGenericClass
   // Protocol
   // ProtocolComposition
   // Archetype

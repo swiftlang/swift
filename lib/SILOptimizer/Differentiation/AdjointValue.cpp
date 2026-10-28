@@ -26,7 +26,7 @@ void swift::autodiff::AdjointValue::print(llvm::raw_ostream &s) const {
     break;
   case AdjointValueKind::Aggregate:
     s << "Aggregate[" << getType() << "](";
-    if (auto *decl = getType().getASTType()->getStructOrBoundGenericStruct()) {
+    if (auto *decl = getType().getASTType()->getStructDecl()) {
       interleave(
           llvm::zip(decl->getStoredProperties(), getAggregateElements()),
           [&s](std::tuple<VarDecl *, const AdjointValue &> elt) {

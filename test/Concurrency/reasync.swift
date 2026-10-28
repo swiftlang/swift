@@ -161,3 +161,21 @@ func callReasyncWithAutoclosure4(_: () async -> ()) reasync {
     _ = await x
   }
 }
+
+//// consuming parameters
+
+func reasyncConsuming(_ body: consuming @escaping () async -> ()) reasync {
+  await body()
+}
+
+func reasyncConsumingReassigned(
+  _ body: consuming @escaping () async -> ()
+) reasync {
+// expected-note@-3 {{add 'async' to function 'reasyncConsumingReassigned' to make it asynchronous}}
+  body = { await Task.yield() }
+  await body() // expected-error {{'async' call in a function that does not support concurrency}}
+}
+
+func callReasyncConsuming() {
+  reasyncConsuming {}
+}

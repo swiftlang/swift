@@ -65,6 +65,23 @@ internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   return false
 }
 
+/// Called by the casting machinery to answer `source is [TargetValue]`.
+///
+/// Unlike `_arrayDownCastConditionalIndirect`, this builds no result array: it
+/// only checks each element in place.
+@_silgen_name("_swift_arrayDownCastTestIndirect")
+internal func _arrayDownCastTestIndirect<SourceValue, TargetValue>(
+  _ source: UnsafePointer<Array<SourceValue>>,
+  _ targetType: TargetValue.Type
+) -> Bool {
+  for element in unsafe source.pointee {
+    if !(element is TargetValue) {
+      return false
+    }
+  }
+  return true
+}
+
 /// Implements `source as? [TargetElement]`: convert each element of
 /// `source` to a `TargetElement` and return the resulting array, or
 /// return `nil` if any element fails to convert.

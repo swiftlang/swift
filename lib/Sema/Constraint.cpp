@@ -50,6 +50,8 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 }
 
 static bool isAdmissibleType(Type type) {
+  // FIXME: We should also reject placeholders here but they can currently leak
+  // into constraint system.
   return !type->hasUnboundGenericType() && !type->hasTypeParameter();
 }
 
@@ -82,6 +84,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::DiscardableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
@@ -164,6 +167,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::DiscardableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
@@ -409,6 +413,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << " dynamic callable applicable fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
+  case ConstraintKind::DiscardableFunctionOf:
+    Out << " @callable(once) type of ";
+    break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
   case ConstraintKind::FallbackType:
@@ -634,6 +641,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::DiscardableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:

@@ -184,16 +184,7 @@ findOriginalDistributedFuncDecl(AbstractFunctionDecl *thunkOrFunc) {
     return thunkOrFunc->isDistributed() ? thunkOrFunc : nullptr;
 
   // Case 3: synthesized regular distributed thunk; recover its original.
-  if (auto *nominal = thunkOrFunc->getDeclContext()->getSelfNominalTypeDecl()) {
-    for (auto *member : nominal->lookupDirect(thunkOrFunc->getName())) {
-      auto *afd = dyn_cast<AbstractFunctionDecl>(member);
-      if (afd && afd->isDistributed() &&
-          !afd->isDistributedThunk() &&
-          afd->getDistributedThunk() == thunkOrFunc)
-        return afd;
-    }
-  }
-  return nullptr;
+  return getDistributedThunkOriginalDecl(cast<FuncDecl>(thunkOrFunc));
 }
 
 /// Recover the user-declared distributed target's 'resolvable proxy

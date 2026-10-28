@@ -54,6 +54,7 @@ static SILValue getRCIdentityPreservingCastOperand(SILValue V) {
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::ConvertFunctionInst:
+  case ValueKind::EndInitLetRefInst:
     return cast<SingleValueInstruction>(V)->getOperand(0);
   case ValueKind::UnconditionalCheckedCastInst: {
     auto *castInst = cast<UnconditionalCheckedCastInst>(V);
@@ -398,7 +399,7 @@ SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
 
   // At this point, we know that we have *some* NoPayloadEnums. If FirstIV is
   // not an enum, then we must bail. We do not try to analyze this case.
-  if (!FirstIV->getType().getEnumOrBoundGenericEnum())
+  if (!FirstIV->getType().getEnumDecl())
     return SILValue();
 
   // Now we know that FirstIV is an enum and that all payloaded enum cases after

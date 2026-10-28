@@ -128,8 +128,7 @@ bb3:
 
 // When an existential alloc_stack is replaced by its concrete type, the
 // existential value cannot be recreated from a reconstruction block.
-// Plain debug_values are retyped to the concrete type. Debug values which
-// already have a reconstruction block are killed as unsalvageable.
+// Debug values which have a reconstruction block are killed as unsalvageable.
 // CHECK-LABEL: sil [ossa] @kill_transform_operand_of_existential :
 // CHECK:         alloc_stack $T
 // CHECK:         debug_value undef : $*any P, var, name "x", type $Builtin.RawPointer, transform {
@@ -152,4 +151,27 @@ bb0(%0 : @owned $T):
   dealloc_stack %1
   %r = tuple ()
   return %r : $()
+}
+
+// The debug_value of an existential alloc_stack which is replaced by its
+// concrete type is killed and not retyped, because other debug_values of the
+// variable, like the `undef` marker, would still have the existential type.
+// CHECK-LABEL: sil [ossa] @kill_debug_value_of_existential :
+// CHECK:         alloc_stack $T
+// CHECK:         debug_value undef : $*any P, var, name "x", expr op_deref
+// CHECK:         debug_value undef : $*any P, var, name "x", expr op_deref
+// CHECK:       } // end sil function 'kill_debug_value_of_existential'
+sil_scope 10 { loc "a.swift":1:1 parent @kill_debug_value_of_existential : $@convention(thin) (@owned T) -> () }
+sil [ossa] @kill_debug_value_of_existential : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $any P, scope 10
+  %2 = init_existential_addr %1, $T, scope 10
+  store %0 to [init] %2, scope 10
+  debug_value %1, var, name "x", expr op_deref, loc "a.swift":2:7, scope 10
+  debug_value undef : $*any P, var, name "x", expr op_deref, loc "a.swift":2:7, scope 10
+  %4 = open_existential_addr mutable_access %1 to $*@opened(10, P) Self, scope 10
+  destroy_addr %4, scope 10
+  dealloc_stack %1, scope 10
+  %r = tuple (), scope 10
+  return %r, scope 10
 }

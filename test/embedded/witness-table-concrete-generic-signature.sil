@@ -1,0 +1,109 @@
+// RUN: %target-sil-opt -enable-experimental-feature Embedded -module-name test %s -mandatory-performance-optimizations | %FileCheck %s
+
+// REQUIRES: swift_feature_Embedded
+
+// If all generic parameters of a conformance are bound to concrete types, the
+// witnesses are not generic, but the conformance at the use site is still a
+// specialized conformance. Specializing its witness table must keep the
+// original witnesses instead of trying to specialize them.
+
+sil_stage canonical
+
+import Builtin
+
+public struct X {}
+
+public struct G<T> {}
+
+public struct H<T> {}
+
+public protocol P {
+  func foo()
+}
+
+extension G : P where T == X {
+  public func foo()
+}
+
+extension H : P where T == X {
+  public func foo()
+}
+
+public protocol Q {
+  associatedtype B : P
+}
+
+public struct S : Q {
+  public typealias B = H<X>
+}
+
+sil @G_foo : $@convention(method) (G<X>) -> () {
+bb0(%0 : $G<X>):
+  %1 = tuple ()
+  return %1
+}
+
+sil shared [transparent] [thunk] @G_foo_witness : $@convention(witness_method: P) (@in_guaranteed G<X>) -> () {
+bb0(%0 : $*G<X>):
+  %1 = struct $G<X> ()
+  %2 = function_ref @G_foo : $@convention(method) (G<X>) -> ()
+  %3 = apply %2(%1) : $@convention(method) (G<X>) -> ()
+  %4 = tuple ()
+  return %4
+}
+
+sil @H_foo : $@convention(method) (H<X>) -> () {
+bb0(%0 : $H<X>):
+  %1 = tuple ()
+  return %1
+}
+
+sil shared [transparent] [thunk] @H_foo_witness : $@convention(witness_method: P) (@in_guaranteed H<X>) -> () {
+bb0(%0 : $*H<X>):
+  %1 = struct $H<X> ()
+  %2 = function_ref @H_foo : $@convention(method) (H<X>) -> ()
+  %3 = apply %2(%1) : $@convention(method) (H<X>) -> ()
+  %4 = tuple ()
+  return %4
+}
+
+// The witness table of `G<X>: P` is specialized directly.
+sil @test_specialized_conformance : $@convention(thin) (G<X>) -> @out any P {
+bb0(%0 : $*any P, %1 : $G<X>):
+  %2 = init_existential_addr %0, $G<X>
+  store %1 to %2
+  %4 = tuple ()
+  return %4
+}
+
+// The witness table of `H<X>: P` is specialized as an associated conformance
+// of the non-generic `S: Q` witness table.
+sil @test_nested_conformance : $@convention(thin) () -> @out any Q {
+bb0(%0 : $*any Q):
+  %1 = struct $S ()
+  %2 = init_existential_addr %0, $S
+  store %1 to %2
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil_witness_table shared [specialized] H<X>: specialize <X> (<T where T == X> H<T>: P module test) {
+// CHECK-NEXT:    method #P.foo: {{.*}} : @H_foo_witness
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_witness_table shared [specialized] G<X>: specialize <X> (<T where T == X> G<T>: P module test) {
+// CHECK-NEXT:    method #P.foo: {{.*}} : @G_foo_witness
+// CHECK-NEXT:  }
+
+sil_witness_table shared <T where T == X> G<T>: P module test {
+  method #P.foo: <Self where Self : P> (Self) -> () -> () : @G_foo_witness
+}
+
+sil_witness_table shared <T where T == X> H<T>: P module test {
+  method #P.foo: <Self where Self : P> (Self) -> () -> () : @H_foo_witness
+}
+
+sil_witness_table shared S: Q module test {
+  associated_conformance (B: P): H<X>: specialize <X> (<T where T == X> H<T>: P module test)
+  associated_type B: H<X>
+}

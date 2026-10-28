@@ -3110,7 +3110,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
-    case DeclAttrKind::Called:
+    case DeclAttrKind::Callable:
+    case DeclAttrKind::ScopeParams:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -4863,9 +4864,9 @@ public:
     if (theClass->hasSuperclass()) {
       // FIXME: Nested types can still be a problem here: it's possible that (for
       // whatever reason) they won't be able to be deserialized, in which case
-      // we'll be in trouble forming the actual superclass type. However, we
-      // need a more robust handling of deserialization dependencies that can
-      // handle circularities. rdar://problem/50835214
+      // we'll be in trouble forming the actual superclass type. The
+      // deserializer skips re-entrant dependency checks to avoid infinite
+      // recursion, so a cycle can still leave a class only partly checked.
       collectDependenciesFromType(dependencyTypes, theClass->getSuperclass(),
                                   /*excluding*/theClass);
     }
@@ -5952,6 +5953,7 @@ public:
   UNSUPPORTED_TYPE(InOut)
   UNSUPPORTED_TYPE(LValue)
   UNSUPPORTED_TYPE(TypeVariable)
+  UNSUPPORTED_TYPE(Hole)
   UNSUPPORTED_TYPE(ErrorUnion)
   UNSUPPORTED_TYPE(Join)
   UNSUPPORTED_TYPE(Meet)
@@ -6084,6 +6086,9 @@ public:
   }
 
   void visitNominalType(const NominalType *nominalTy) {
+    if (nominalTy->hasGenericArgs())
+      return serializeBoundGenericType(nominalTy);
+
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
     NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -6535,7 +6540,7 @@ public:
         S.addTypeRef(generic->getParent()));
   }
 
-  void visitBoundGenericType(const BoundGenericType *generic) {
+  void serializeBoundGenericType(const NominalType *generic) {
     using namespace decls_block;
     SmallVector<TypeID, 8> genericArgIDs;
 

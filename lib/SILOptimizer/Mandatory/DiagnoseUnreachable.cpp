@@ -916,7 +916,7 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   if (!SWI)
     return false;
 
-  EnumDecl *ED = SWI->getOperand(0)->getType().getEnumOrBoundGenericEnum();
+  EnumDecl *ED = SWI->getOperand(0)->getType().getEnumDecl();
   assert(ED && "operand is not an enum");
 
   // No need to check the instruction if all elements are available.

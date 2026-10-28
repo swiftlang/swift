@@ -285,14 +285,16 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
     // The *_n forms are normally only created by LLVMARCContract, which
     // runs after this pass. But IR that defines the runtime entry points
     // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
-    // directly, so just leave them alone.
+    // directly, or get them by inlining an entry point that calls one. Don't
+    // move the release past them.
     case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_RetainN:
     case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
     case RT_ReleaseN:
-        break;
+      ++BBI;
+      goto OutOfLoop;
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
@@ -447,14 +449,15 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
     // The *_n forms are normally only created by LLVMARCContract, which
     // runs after this pass. But IR that defines the runtime entry points
     // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
-    // directly, so just leave them alone.
+    // directly, or get them by inlining an entry point that calls one. Don't
+    // move the retain past them.
     case RT_RetainN:
     case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_ReleaseN:
     case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
-        break;
+      goto OutOfLoop;
     case RT_NoMemoryAccessed:
     case RT_AllocObject:
     case RT_CheckUnowned:

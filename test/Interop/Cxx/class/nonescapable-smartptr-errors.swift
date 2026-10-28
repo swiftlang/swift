@@ -42,24 +42,24 @@ private:
     const int *member;
 };
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 std::unique_ptr<View> o1();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 std::shared_ptr<View> o2();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 
 //--- test.swift
 import Test
 import CxxStdlib
 
-// expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+3 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 public func noAnnotations() -> View {
     o1()
     o2()

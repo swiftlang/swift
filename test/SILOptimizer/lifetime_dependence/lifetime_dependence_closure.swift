@@ -284,3 +284,36 @@ func testLocalSpanCaptureReturnSpan() -> Span<Int> {
   // expected-error@-1{{lifetime-dependent value escapes its scope}}
   // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
 }
+
+// rdar://189095063 (non-escaping closure capture of a value that borrows a getter temporary)
+//
+// An address-only ~Escapable value that depends on a getter's temporary result is captured by a non-escaping closure.
+final class AnyOwner {
+  var value: Any = 1
+}
+
+struct AnyDependent : ~Escapable {
+  let value: Any
+
+  @_lifetime(borrow owner)
+  init(owner: borrowing AnyOwner) { value = owner.value }
+}
+
+extension AnyOwner {
+  var dependent: AnyDependent {
+    @_lifetime(borrow self)
+    get { AnyDependent(owner: self) }
+  }
+}
+
+func runClosure(_ body: () -> Void) { body() }
+
+struct AnyOwnerClient {
+  let storedOwner: AnyOwner
+  var computedOwner: AnyOwner { storedOwner }
+
+  func capturedThroughComputed() {
+    let d = computedOwner.dependent
+    runClosure { _ = d.value }
+  }
+}

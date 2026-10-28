@@ -93,7 +93,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(isGlobalLet(Module, Decl, LoweredType));
-  setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
+  setMarkedAsUsed(Decl && (Decl->getAttrs().hasAttribute<UsedAttr>() ||
+                           getWasmExposeAttr()));
   if (Decl) {
     auto cgModel = Decl->getExplicitCodeGenerationModel();
     if (!cgModel && Module.getOptions().EmbeddedSwift)
@@ -124,6 +125,15 @@ void SILGlobalVariable::setAsmName(StringRef value) {
     // Update the variable-by-asm-name-table.
     getModule().GlobalVariableByAsmNameMap.insert({AsmName, this});
   }
+}
+
+const ExposeAttr *SILGlobalVariable::getWasmExposeAttr() const {
+  if (!VDecl)
+    return nullptr;
+  for (auto *attr : VDecl->getAttrs().getAttributes<ExposeAttr>())
+    if (attr->getExposureKind() == ExposureKind::Wasm)
+      return attr;
+  return nullptr;
 }
 
 std::optional<CodeGenerationModel>

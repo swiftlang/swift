@@ -499,6 +499,7 @@ public:
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
   std::string getConstValuesFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
+  std::string getSARIFDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
   /// so return the TBDPath when in that mode and fail an assert
@@ -801,7 +802,8 @@ private:
   bool setUpASTContextIfNeeded();
   void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
-  bool setupCASIfNeeded(ArrayRef<const char *> Args);
+  bool setupCASIfNeeded();
+  bool setupCompileJobBaseKeyIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
   void setupCachingDiagnosticsProcessorIfNeeded();
 

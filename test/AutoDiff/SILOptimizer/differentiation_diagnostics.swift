@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -parse-stdlib -verify %s
 
 // Test differentiation transform diagnostics.
 
+import Swift
 import _Differentiation
 
 //===----------------------------------------------------------------------===//
@@ -868,3 +869,20 @@ func TF_1115_modifyNonSelfProjection(x: Float) -> Float {
 
 // expected-error @+1 {{conversion to '@differentiable(_linear)' function type is not yet supported}}
 let _: @differentiable(_linear) (Float) -> Float = { x in x }
+
+//===----------------------------------------------------------------------===//
+// Unsupported projections / casts
+//===----------------------------------------------------------------------===//
+
+struct FloatWrapper: Differentiable {
+  var value: Float
+}
+
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+2 {{when differentiating this function definition}}
+@differentiable(reverse)
+func castThroughPointer(_ x: Float) -> FloatWrapper {
+  var y = x
+  // expected-note @+1 {{cannot differentiate non-projection raw pointer operation}}
+  return Builtin.load(Builtin.addressof(&y))
+}

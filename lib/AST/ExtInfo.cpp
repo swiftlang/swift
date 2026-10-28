@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -156,15 +157,58 @@ void ASTExtInfoBuilder::checkInvariants() const {
     error.value().dump();
     llvm_unreachable("Ill-formed ASTExtInfoBuilder.");
   }
-  if (sendableDependentType)
-    ASSERT(!isSendable() && sendableDependentType->hasTypeVariable());
+  std::optional<TypeDependenceKind> previousKind;
+  for (auto dependentType : typeDependencies) {
+    auto kind = dependentType.getInt();
+    ASSERT((!previousKind || *previousKind < kind) &&
+           "dependent types must be ordered by kind, at most one per kind");
+    previousKind = kind;
 
-  if (executionSemanticsDependentType)
-    ASSERT(!hasCalledAtMostOnceSemantics() &&
-           executionSemanticsDependentType->hasTypeVariable());
+    ASSERT(dependentType.getPointer()->hasTypeVariable());
+    switch (kind) {
+    case TypeDependenceKind::Sendable:
+      ASSERT(!isSendable());
+      break;
+    case TypeDependenceKind::ExecutionSemantics:
+      ASSERT(!hasCalledAtMostOnceSemantics());
+      break;
+    }
+  }
 }
 
 // MARK: - ASTExtInfo
+
+ASTExtInfoBuilder ASTExtInfoBuilder::withTypeDependency(TypeDependenceKind kind,
+                                                        Type type) const {
+  SmallVector<TypeDependency, NumTypeDependenceKinds> newTypeDependencies;
+  for (auto dependentType : typeDependencies) {
+    if (dependentType.getInt() != kind)
+      newTypeDependencies.push_back(dependentType);
+  }
+
+  // Keep the dependent types ordered by kind.
+  if (type) {
+    auto position =
+        llvm::find_if(newTypeDependencies, [&](TypeDependency dependentType) {
+          return dependentType.getInt() > kind;
+        });
+    newTypeDependencies.insert(position,
+                               TypeDependency(type.getPointer(), kind));
+  }
+
+  ArrayRef<TypeDependency> allocated;
+  if (!newTypeDependencies.empty()) {
+    auto *anyType = newTypeDependencies.front().getPointer();
+    // Dependent types contain type variables, so they and this array only live
+    // as long as the constraint solver.
+    ASSERT(anyType->hasTypeVariable());
+    allocated = anyType->getASTContext().AllocateCopy(
+        newTypeDependencies, AllocationArena::ConstraintSolver);
+  }
+
+  return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                           allocated, lifetimeDependencies);
+}
 
 ASTExtInfo ASTExtInfoBuilder::build() const {
   checkInvariants();

@@ -14,7 +14,7 @@ func testAsync() async {}
 // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
 struct A {
-  // expected-error @+1 {{@_unsafeInheritExecutor may only be used on 'func' declarations}}
+  // expected-error @+1 {{'@_unsafeInheritExecutor' may only be used on 'func' declarations}}
   @_unsafeInheritExecutor
   init() async {}
 

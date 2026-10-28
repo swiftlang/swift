@@ -387,7 +387,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType();
-    if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
+    if (auto BGT = Ty.getAs<StructType>()) {
       // Check the array element type parameter.
       bool isClass = false;
       for (auto EltTy : BGT->getGenericArgs()) {
@@ -536,10 +536,7 @@ protected:
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SSAUp.rewriteUse(*Use);
-    }
+    SSAUp.rewriteUses(UseList);
   }
 
   void updateSSAForm() {
@@ -617,7 +614,7 @@ protected:
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
   SILType Ty = Opd->getType();
-  auto SD = Ty.getStructOrBoundGenericStruct();
+  auto SD = Ty.getStructDecl();
   auto Properties = SD->getStoredProperties();
   unsigned Counter = 0;
   for (auto *D : Properties)

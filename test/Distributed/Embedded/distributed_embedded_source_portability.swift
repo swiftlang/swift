@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 %s %S/Runtime/Inputs/PortableRoundtripActorSystem.swift
+// RUN: %target-swift-frontend -typecheck -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 %s %S/Runtime/Inputs/PortableRoundtripActorSystem.swift
 // RUN: %target-swift-frontend -typecheck -target %target-cpu-apple-macos14 %s %S/Runtime/Inputs/PortableRoundtripActorSystem.swift
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
 // The SAME distributed-actor source below type-checks in both Embedded and

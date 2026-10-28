@@ -266,7 +266,7 @@ SILFunctionType::getWitnessMethodClass(SILModule &M,
     assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
     auto superclass = genericSig->getSuperclassBound(paramTy);
     if (superclass)
-      return superclass->getClassOrBoundGenericClass();
+      return superclass->getClassDecl();
   }
 
   return nullptr;
@@ -1768,7 +1768,7 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
       // Foreign reference types
-      if (substTy->getClassOrBoundGenericClass()) {
+      if (substTy->getClassDecl()) {
         return false;
       }
     }
@@ -1807,7 +1807,7 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
   // as indirect.
   if (origType.isClangType()) {
     if (auto *classDecl = substType->lookThroughAllOptionalTypes()
-                              ->getClassOrBoundGenericClass()) {
+                              ->getClassDecl()) {
       if (!classDecl->isForeignReferenceType()) {
         if (origType.getClangType()
                 ->getUnqualifiedDesugaredType()
@@ -2204,7 +2204,7 @@ private:
       assert(isIndirectFormalParameter(convention));
     } else if (substTL.isTrivial() ||
                // Foreign reference types are passed trivially.
-               (substType->getClassOrBoundGenericClass() &&
+               (substType->getClassDecl() &&
                 substType->isForeignReferenceType())) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
@@ -3543,7 +3543,7 @@ struct DefaultBlockConventions : Conventions {
   }
 };
 
-/// The default conventions for `@called(atMostOnce)` closures.
+/// The default conventions for at-most-once closures.
 ///
 /// Calling such a value is itself the consuming use that enforces
 /// call-at-most-once, so its context must be owned rather than guaranteed.
@@ -3603,17 +3603,19 @@ static CanSILFunctionType getNativeSILFunctionType(
       return getSILFunctionTypeForConventions(DefaultAllocatorConventions());
     case SILDeclRef::Kind::Func:
     case SILDeclRef::Kind::DistributedThunk: {
-      // If we have a setter, use the special setter convention. This ensures
-      // that we take normal parameters at +1.
-      if (constant) {
-        if (constant->isSetter()) {
-          return getSILFunctionTypeForConventions(DefaultSetterConventions());
-        }
+      // A setter or an init accessor takes its normal parameters at +1, which
+      // must agree with the ownership that the AST assigns to them.
+      auto *accessor = constant ? constant->getAccessorDecl() : nullptr;
+      if (accessor &&
+          getLoweredOwnership(ValueOwnership::Default, accessor,
+                              /*isSelf=*/false) == LoweredOwnership::Owned) {
         if (constant->isInitAccessor()) {
           return getSILFunctionTypeForInitAccessor(
               TC, context, origType, substInterfaceType, extInfoBuilder,
               DefaultSetterConventions(), *constant);
         }
+        ASSERT(constant->isSetter());
+        return getSILFunctionTypeForConventions(DefaultSetterConventions());
       }
 
       if (substInterfaceType->hasCalledAtMostOnceSemantics())
@@ -3741,7 +3743,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
-  // The thunk itself cannot be `@called(atMostOnce)` just like a closure cannot
+  // The thunk itself cannot be at-most-once just like a closure cannot
   // be since the constraint is about the value and is expressed on
   // `partial_apply` instruction that forms the value of the thunk.
   if (extInfoBuilder.hasCalledAtMostOnceSemantics())
@@ -3827,7 +3829,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   // Add the formal parameters of the expected type to the thunk.
   //
-  // A `@called(atMostOnce)` source function is applied inside the thunk body,
+  // An at-most-once source function is applied inside the thunk body,
   // which is itself the consuming use that enforces call-at-most-once, so
   // it must be captured as `Direct_Owned`.
   auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
@@ -4193,7 +4195,7 @@ public:
         auto t = substTL.getLoweredType().getASTType();
         if (auto *classDecl = t.getPointer()
                                   ->lookThroughAllOptionalTypes()
-                                  ->getClassOrBoundGenericClass()) {
+                                  ->getClassDecl()) {
           if (!classDecl->isForeignReferenceType()) {
             assert(!classDecl->hasClangNode() &&
                    "unexpected imported class type in C function");
@@ -4875,7 +4877,7 @@ static bool isObjCMethod(ValueDecl *vd) {
   if (!contextType)
     return false;
 
-  bool isRefCountedClass = contextType->getClassOrBoundGenericClass() &&
+  bool isRefCountedClass = contextType->getClassDecl() &&
                            !contextType->isForeignReferenceType();
   return isRefCountedClass || contextType->isClassExistentialType();
 }
@@ -5167,7 +5169,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
     base = copyOptionalityFromDerivedToBase(tc, derived, base);
 
     auto optDecl = tc.Context.getOptionalDecl();
-    return CanType(BoundGenericEnumType::get(optDecl, Type(), base));
+    return CanType(EnumType::get(optDecl, Type(), base, tc.Context));
   }
 
   // (T1, T2, ...) +> (S1, S2, ...) = (T1 +> S1, T2 +> S2, ...)
@@ -5193,7 +5195,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       SmallVector<FunctionType::Param, 8> params;
       for (auto [baseParam, derivedParam] :
            llvm::zip_equal(baseFunc.getParams(), derivedFunc.getParams())) {
-        assert(derivedParam.getParameterFlags() ==
+        ASSERT(derivedParam.getParameterFlags() ==
                baseParam.getParameterFlags());
         params.emplace_back(
             copyOptionalityFromDerivedToBase(tc, derivedParam.getPlainType(),

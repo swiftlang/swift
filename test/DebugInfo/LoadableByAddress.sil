@@ -174,3 +174,33 @@ bb0(%0 : $(@callee_guaranteed (@guaranteed X) -> (), Int)):
   %t = tuple ()
   return %t : $()
 }
+
+// Wide's explosion is 16 * 5 + 1 = 81 elements, which is higher than our limit.
+struct Wide {
+  var a: (X, X, X, X, X)
+  var n: Int
+}
+
+// The variable is a (large, constant) tuple. Killing the oversized operand
+// leaves the constant half of the reconstruction block intact.
+// CHECK-LABEL: sil @test_wide_tuple_constant_half :
+// CHECK:   debug_value undef : $Wide, let, name "pair", type $(Wide, Int64), transform {
+// CHECK:   bb0(%0 : $Wide):
+// CHECK:     %1 = integer_literal $Builtin.Int64, 42
+// CHECK:     %2 = struct $Int64 (%1 : $Builtin.Int64)
+// CHECK:     %3 = tuple (undef : $Wide, %2 : $Int64)
+// CHECK:     return %3 : $(Wide, Int64)
+// CHECK:   }
+// CHECK-LABEL: } // end sil function 'test_wide_tuple_constant_half'
+sil @test_wide_tuple_constant_half : $@convention(thin) (@guaranteed Wide) -> () {
+bb0(%0 : $Wide):
+  debug_value %0 : $Wide, let, name "pair", type $(Wide, Int64), transform {
+  bb0(%d0 : $Wide):
+    %d1 = integer_literal $Builtin.Int64, 42
+    %d2 = struct $Int64 (%d1 : $Builtin.Int64)
+    %d3 = tuple (%d0 : $Wide, %d2 : $Int64)
+    return %d3 : $(Wide, Int64)
+  }
+  %t = tuple ()
+  return %t : $()
+}

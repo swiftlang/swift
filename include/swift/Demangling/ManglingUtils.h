@@ -123,8 +123,11 @@ std::optional<StringRef> getStandardTypeSubst(StringRef TypeName,
 /// *) Buffer: A stream where the mangled identifier is written to.
 /// *) getBufferStr(): Returns a StringRef of the current content of Buffer.
 /// *) UsePunycode: A flag indicating if punycode encoding should be done.
+///
+/// Returns false, without writing anything, if \p ident needs punycode
+/// encoding and is not valid UTF-8.
 template <typename Mangler>
-void mangleIdentifier(Mangler &M, StringRef ident) {
+[[nodiscard]] bool mangleIdentifier(Mangler &M, StringRef ident) {
 
   size_t WordsInBuffer = M.Words.size();
   assert(M.SubstWordsInIdent.empty());
@@ -132,14 +135,15 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
     // If the identifier contains non-ASCII character, we mangle
     // with an initial '00' and Punycode the identifier string.
     std::string punycodeBuf;
-    Punycode::encodePunycodeUTF8(ident, punycodeBuf,
-                                 /*mapNonSymbolChars*/ true);
+    if (!Punycode::encodePunycodeUTF8(ident, punycodeBuf,
+                                      /*mapNonSymbolChars*/ true))
+      return false;
     StringRef pcIdent = punycodeBuf;
     M.Buffer << "00" << pcIdent.size();
     if (isDigit(pcIdent[0]) || pcIdent[0] == '_')
       M.Buffer << '_';
     M.Buffer << pcIdent;
-    return;
+    return true;
   }
   // Search for word substitutions and for new words.
   const size_t NotInsideWord = ~0;
@@ -241,6 +245,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
     }
   }
   M.SubstWordsInIdent.clear();
+  return true;
 }
 
 /// Utility class for mangling merged substitutions.

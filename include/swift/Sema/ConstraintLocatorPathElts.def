@@ -153,6 +153,9 @@ CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 /// type at the base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
 
+/// The optional payload in an optional-to-optional, ie a T? -> U? conversion.
+SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
+
 /// The optional payload in an optional injection, ie a T -> T? conversion.
 SIMPLE_LOCATOR_PATH_ELT(OptionalInjection)
 

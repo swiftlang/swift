@@ -901,8 +901,10 @@ public struct Builder {
     return notifyNew(endApply.getAs(AbortApplyInst.self))
   }
 
-  public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {
-    let convertFunction = bridged.createConvertFunction(originalFunction.bridged, resultType.bridged, withoutActuallyEscaping)
+  public func createConvertFunction(originalFunction: Value, resultType: Type,
+                                    kind: ConvertFunctionInst.Kind = .ordinary) -> ConvertFunctionInst {
+    let convertFunction = bridged.createConvertFunction(originalFunction.bridged, resultType.bridged,
+                                                        kind.rawValue)
     return notifyNew(convertFunction.getAs(ConvertFunctionInst.self))
   }
 

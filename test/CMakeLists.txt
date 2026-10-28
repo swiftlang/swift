@@ -341,12 +341,19 @@ normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
 normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+normalize_boolean_spelling(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
 normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 # Allow callers to pin the host SDK used by lit.site.cfg.in.
 if(NOT SWIFT_HOST_SDKROOT)
   set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+endif()
+
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  file(TO_CMAKE_PATH
+       "${WindowsSdkDir}/Include/${WindowsSDKVersion}/module.modulemap"
+       SWIFT_WINDOWS_MODULE_MAP)
 endif()
 
 set(profdata_merge_worker

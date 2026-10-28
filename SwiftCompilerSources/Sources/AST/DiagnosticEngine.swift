@@ -33,6 +33,11 @@ extension Int: DiagnosticArgument {
     fn(BridgedDiagnosticArgument(self))
   }
 }
+extension ValueDecl: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(bridged.Value_asDiagnosticArgument())
+  }
+}
 extension Type: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
     fn(bridged.asDiagnosticArgument())
@@ -44,7 +49,7 @@ public struct DiagnosticFixIt {
   let byteLength: Int
   let text: String
 
-  init(start: SourceLoc, byteLength: Int, replacement text: String) {
+  public init(start: SourceLoc, byteLength: Int, replacement text: String) {
     self.start = start
     self.byteLength = byteLength
     self.text = text

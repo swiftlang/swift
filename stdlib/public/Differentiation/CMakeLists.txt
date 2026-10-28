@@ -16,6 +16,13 @@ else()
 set(swiftDifferentiationSIMDFiles)
 endif()
 
+set(concurrency)
+set(additional_sources)
+if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+  set(concurrency _Concurrency)
+  list(APPEND additional_sources DifferentialOperators+Async.swift)
+endif()
+
 add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   Differentiable.swift
   DifferentialOperators.swift
@@ -25,6 +32,7 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
   OptionalDifferentiation.swift
   AdditiveArithmeticDifferentiation.swift
   NumericDifferentiation.swift
+  ${additional_sources}
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
@@ -32,6 +40,8 @@ add_swift_target_library(swift_Differentiation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPE
     FloatingPointDifferentiation.swift.gyb
     TgmathDerivatives.swift.gyb
     ${swiftDifferentiationSIMDFiles}
+
+  SWIFT_MODULE_DEPENDS ${concurrency}
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc

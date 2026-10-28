@@ -276,16 +276,22 @@ print("test0=\(test0())")
 // CHECK:         unconditional_checked_cast_addr
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastPProtocolToPType
-// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
-// CHECK-NEXT: return %0
+// CHECK: bb0
+// CHECK-NEXT: debug_value undef
+// CHECK-NEXT: %1 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %1
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastObjCPProtocolTo{{.*}}PType
-// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
-// CHECK-NEXT: return %0
+// CHECK: bb0
+// CHECK-NEXT: debug_value undef
+// CHECK-NEXT: %1 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %1
 
 // CHECK-LABEL: sil [noinline] {{.*}}@{{.*}}testCastProtocolComposition{{.*}}Type
-// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
-// CHECK-NEXT: return %0
+// CHECK: bb0
+// CHECK-NEXT: debug_value undef
+// CHECK-NEXT: %1 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %1
 
 // Check that compiler understands that this cast always succeeds.
 // Since it is can be statically proven that NSString is bridgeable to String,

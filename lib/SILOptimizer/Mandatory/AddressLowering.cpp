@@ -140,6 +140,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -182,6 +183,13 @@ static SILFunctionConventions getLoweredCallConv(ApplySite call) {
   return SILFunctionConventions(
       call.getSubstCalleeType(),
       SILAddressConventions::forFullyLoweredModule(call.getModule()));
+}
+
+/// Moving a trivial value is a copy. A trivial address-only value has no
+/// copy_value to give it its own storage, so it may project out of borrowed
+/// storage, which a [take] would illegally consume.
+static IsTake_t getMoveKind(SILType type, SILFunction *function) {
+  return type.isTrivial(*function) ? IsNotTake : IsTake;
 }
 
 //===----------------------------------------------------------------------===//
@@ -560,6 +568,9 @@ struct AddressLoweringState {
   // checked_cast_br instructions to loadable type which need to be rewritten.
   SmallVector<CheckedCastBranchInst *, 2> nonopaqueResultCCBs;
 
+  // debug_value operands that are an address-only undef.
+  SmallVector<Operand *, 2> undefDebugValueOperands;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
   
@@ -577,6 +588,9 @@ struct AddressLoweringState {
   // Not all use projections are recorded in the valueStorageMap.  It's not
   // legal to reuse use projections for non-canonical users or for phis.
   SmallVector<SILValue, 16> useProjections;
+
+  // Scratch operands of unchecked_borrow_enum_data_addr.
+  SmallVector<AllocStackInst *, 4> enumScratchAllocs;
 
   SILLoopAnalysis *SLA;
 
@@ -754,6 +768,7 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
         ParamDecl(SourceLoc(), SourceLoc(), astCtx.getIdentifier(internalName),
                   SourceLoc(), astCtx.getIdentifier(internalName), declCtx);
     var->setSpecifier(ParamSpecifier::InOut);
+    var->setImplicit();
 
     SILFunctionArgument *funcArg =
         pass.function->begin()->insertFunctionArgument(
@@ -775,11 +790,18 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
   // This must happen after all indirect result types have been added, to match
   // the convention.
   if (auto errorTy = pass.loweredFnConv.getIndirectErrorResultType(typeCtx))
-    createIndirectResult(errorTy, "$error", argIdx++);
+    createIndirectResult(errorTy, SILDebugVariable::ErrorVariableName,
+                         argIdx++);
 
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults() +
                        pass.loweredFnConv.getNumIndirectSILErrorResults());
   return argIdx;
+}
+
+/// Whether `value` is an undef of address-only type in OV-form.
+static bool isAddressOnlyUndef(SILValue value, AddressLoweringState &pass) {
+  return isa<SILUndef>(value) && value->getType().isObject() &&
+         value->getType().isAddressOnly(*pass.function);
 }
 
 namespace {
@@ -830,6 +852,18 @@ void OpaqueValueVisitor::mapValueStorage() {
 
       if (auto *yieldInst = dyn_cast<YieldInst>(&inst)) {
         pass.yieldInsts.push_back(yieldInst);
+      }
+
+      // The verifier allows an object-typed undef for the `$error` variable,
+      // so leave those alone.
+      if (auto *debugInst = dyn_cast<DebugValueInst>(&inst)) {
+        auto varInfo = debugInst->getVarInfo();
+        if (!varInfo || !varInfo->isErrorVariable()) {
+          for (Operand &use : debugInst->getAllOperands()) {
+            if (isAddressOnlyUndef(use.get(), pass))
+              pass.undefDebugValueOperands.push_back(&use);
+          }
+        }
       }
 
       for (auto result : inst.getResults()) {
@@ -1215,7 +1249,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (userValue->getType().getEnumOrBoundGenericEnum() ||
+  if (userValue->getType().getEnumDecl() ||
       userValue->getType().isExistentialType()) {
     storage.initializes = true;
   }
@@ -1709,6 +1743,9 @@ SinkResult OpaqueStorageAllocation::sinkToUses(SingleValueInstruction *svi,
 }
 
 void OpaqueStorageAllocation::finalizeOpaqueStorage() {
+  for (auto *scratch : pass.enumScratchAllocs)
+    allocs.insert(scratch);
+
   SmallVector<SILBasicBlock *, 4> boundary;
   for (auto maybeAlloc : allocs) {
     // An allocation may be erased when coalescing block arguments.
@@ -1888,7 +1925,8 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
     auto destAddr =
         materializeProjectionIntoUse(operand, /*intoPhiOperand*/ false);
     moveBuilder.createCopyAddr(operand->getUser()->getLoc(),
-                               storage.storageAddress, destAddr, IsTake,
+                               storage.storageAddress, destAddr,
+                               getMoveKind(def->getType(), pass.function),
                                IsInitialization);
     return;
   }
@@ -2017,7 +2055,7 @@ SILValue AddressMaterialization::materializeStructExtract(
     SILInstruction *extractInst, SILValue elementValue, unsigned fieldIdx) {
   auto structVal = extractInst->getOperand(0);
   SILValue srcAddr = pass.getMaterializedAddress(structVal);
-  auto *structType = structVal->getType().getStructOrBoundGenericStruct();
+  auto *structType = structVal->getType().getStructDecl();
   auto *varDecl = structType->getStoredProperties()[fieldIdx];
   return projectionBuilder.createStructElementAddr(
       pass.genLoc(), srcAddr, varDecl,
@@ -2213,8 +2251,9 @@ protected:
   PhiRewriter &operator=(const PhiRewriter &) = delete;
 
   CopyAddrInst *createPhiMove(SILBuilder &builder, SILValue from, SILValue to) {
-    auto *move = builder.createCopyAddr(pass.genLoc(), from, to, IsTake,
-                                        IsInitialization);
+    auto *move = builder.createCopyAddr(
+        pass.genLoc(), from, to,
+        getMoveKind(from->getType(), pass.function), IsInitialization);
     phiMoves.insert(move);
     return move;
   }
@@ -2379,6 +2418,18 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(argValue);
     assert(storage.isRewritten && "arg source should be rewritten");
     operand->set(storage.storageAddress);
+    // An on-stack closure now captures the argument's storage. Mark the closure
+    // dependent on it, as ClosureLifetimeFixup does for address captures.
+    auto *pai = dyn_cast<PartialApplyInst>(apply.getInstruction());
+    if (pai && pai->isOnStack()) {
+      SmallVector<Operand *, 4> closureUses(pai->getUses());
+      auto *mdi = pass.getBuilder(std::next(pai->getIterator()))
+                      .createMarkDependence(callLoc, pai,
+                                            storage.storageAddress,
+                                            MarkDependenceKind::NonEscaping);
+      for (auto *use : closureUses)
+        use->set(mdi);
+    }
     return;
   }
   // Allocate temporary storage for a loadable operand.
@@ -3486,7 +3537,8 @@ void ReturnRewriter::rewriteElement(SILValue oldResult,
     if (resultAddr != newResultArg) {
       // Copy the result from local storage into the result argument.
       returnBuilder.createCopyAddr(pass.genLoc(), resultAddr, newResultArg,
-                                   IsTake, IsInitialization);
+                                   getMoveKind(resultTy, pass.function),
+                                   IsInitialization);
     }
   } else {
     // Store the result into the result argument.
@@ -3740,7 +3792,9 @@ protected:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::AddTaskLocalValue:
     case BuiltinValueKind::TaskLocalValuePush:
-    case BuiltinValueKind::GetEnumTag: {
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::AddressOfRawLayout:
+    case BuiltinValueKind::TaskPushDeadline: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
@@ -3776,6 +3830,13 @@ protected:
   }
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
+
+  // In Raw SIL, extend_lifetime marks the end of a variable's scope for values
+  // that have no destroy_value. There is no address form of the instruction:
+  // the value's storage is already scoped by its alloc_stack.
+  void visitExtendLifetimeInst(ExtendLifetimeInst *eli) {
+    pass.deleter.forceDelete(eli);
+  }
 
   void visitFixLifetimeInst(FixLifetimeInst *fli) {
     SILValue value = fli->getOperand();
@@ -3847,6 +3908,22 @@ protected:
       builder.createCopyAddr(copyInst->getLoc(), srcAddr, destAddr, IsNotTake,
                              IsInitialization);
     }
+    markRewritten(copyInst, destAddr);
+  }
+
+  // Explicitly copy from an opaque source operand.
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *copyInst) {
+    SILValue srcVal = copyInst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    AddressMaterialization addrMat(pass, copyInst, builder);
+    SILValue destAddr = addrMat.materializeAddress(copyInst);
+    // Unlike copy_value, explicit_copy_value is never a def-projection of its
+    // operand, and the operand stays live across it, so they can't share
+    // storage.
+    assert(destAddr != srcAddr && "explicit_copy_value must not alias source");
+    builder.createExplicitCopyAddr(copyInst->getLoc(), srcAddr, destAddr,
+                                   IsNotTake, IsInitialization);
     markRewritten(copyInst, destAddr);
   }
 
@@ -4167,7 +4244,7 @@ void UseRewriter::rewriteStore(SILValue srcVal, SILValue destAddr,
   ValueStorage &storage = pass.valueStorageMap.getStorage(srcVal);
   SILValue srcAddr = storage.storageAddress;
 
-  IsTake_t isTake = IsTake;
+  IsTake_t isTake = getMoveKind(srcVal->getType(), pass.function);
   if (auto *copy = dyn_cast<CopyValueInst>(srcVal)) {
     if (storage.isDefProjection) {
       SILValue copySrcAddr =
@@ -4332,6 +4409,79 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
 
   SILValue enumAddr = pass.getMaterializedAddress(enumVal);
   auto loc = switchEnum->getLoc();
+  bool borrowed = enumVal->getOwnershipKind() == OwnershipKind::Guaranteed;
+  bool borrowIntoScratch =
+      borrowed && UncheckedEnumDataAddrInstBase::isDestructive(
+                      enumVal->getType().getEnumDecl(),
+                      pass.function);
+
+  BeginAccessInst *access = nullptr;
+  if (borrowed && enumVal->getType().isMoveOnly()) {
+    access = pass.getBuilder(switchEnum->getIterator())
+                 .createBeginAccess(loc, enumAddr, SILAccessKind::Read,
+                                    SILAccessEnforcement::Static,
+                                    /*noNestedConflict=*/true,
+                                    /*fromBuiltin=*/false);
+    enumAddr = access;
+  }
+
+  auto createCaseLoad = [&](SILBuilder &caseBuilder, SILValue addr) {
+    if (borrowed && !addr->getType().isTrivial(*pass.function))
+      return caseBuilder.emitLoadBorrowOperation(loc, addr);
+    return SILValue(caseBuilder.createTrivialLoadOr(
+        loc, addr, LoadOwnershipQualifier::Take));
+  };
+
+  SmallPtrSet<SILInstruction *, 8> enumScopeEnds;
+  if (borrowed) {
+    visitBorrowIntroducers(enumVal, [&](SILValue introducer) {
+      auto borrow = BorrowedValue(introducer);
+      if (borrow.isLocalScope()) {
+        borrow.visitLocalScopeEndingUses([&](Operand *scopeEnd) {
+          enumScopeEnds.insert(scopeEnd->getUser());
+          return true;
+        });
+      }
+      return true;
+    });
+  }
+
+  // Visit each point where the enum's borrow ends within a case, or where
+  // control leaves the case.
+  auto visitCaseExits = [&](SILBasicBlock *caseBB,
+                            llvm::function_ref<void(SILBuilder &)> visit) {
+    BasicBlockWorklist worklist(caseBB);
+    while (SILBasicBlock *block = worklist.pop()) {
+      auto scopeEnd = llvm::find_if(*block, [&](SILInstruction &inst) {
+        return enumScopeEnds.contains(&inst);
+      });
+      if (scopeEnd != block->end()) {
+        SILBuilder builder = pass.getBuilder(scopeEnd);
+        visit(builder);
+        continue;
+      }
+      SILBasicBlock *succ = block->getSingleSuccessorBlock();
+      if (block->getNumSuccessors() == 0 ||
+          (succ && !pass.domInfo->properlyDominates(caseBB, succ))) {
+        SILBuilder builder = pass.getBuilder(block->back().getIterator());
+        visit(builder);
+        continue;
+      }
+      for (SILBasicBlock *next : block->getSuccessorBlocks())
+        worklist.pushIfNotVisited(next);
+    }
+  };
+
+  // The move-only checker relies on a payload's borrow ending at the case
+  // exits when it removes copies of the payload.
+  auto endCaseBorrow = [&](SILValue caseBorrow) {
+    if (!borrowed)
+      return;
+    visitCaseExits(caseBorrow->getParentBlock(), [&](SILBuilder &builder) {
+      builder.createEndBorrow(pass.genLoc(), caseBorrow);
+    });
+  };
+
   auto rewriteCase = [&](EnumElementDecl *caseDecl, SILBasicBlock *caseBB) {
     // Nothing to do for unused case payloads.
     if (caseBB->getArguments().size() == 0)
@@ -4344,16 +4494,29 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
     assert(caseDecl->hasAssociatedValues() && "caseBB has a payload argument");
 
     SILBuilder caseBuilder = pass.getBuilder(caseBB->begin());
-    auto *caseAddr =
-        caseBuilder.createUncheckedEnumDataAddrForTake(loc, enumAddr, caseDecl);
-    auto *caseLoad = caseBuilder.createTrivialLoadOr(
-        loc, caseAddr, LoadOwnershipQualifier::Take);
+    SILValue caseAddr;
+    if (borrowIntoScratch) {
+      auto *scratch = caseBuilder.createAllocStack(
+          pass.genLoc(), enumAddr->getType().getObjectType());
+      pass.enumScratchAllocs.push_back(scratch);
+      caseAddr = caseBuilder.createUncheckedBorrowEnumDataAddr(
+          loc, enumAddr, scratch, caseDecl);
+    } else {
+      caseAddr = caseBuilder.createUncheckedEnumDataAddrForTake(loc, enumAddr,
+                                                                caseDecl);
+    }
+    SILValue caseLoad = createCaseLoad(caseBuilder, caseAddr);
     caseArg->replaceAllUsesWith(caseLoad);
     if (caseArg->getType().isAddressOnly(*pass.function)) {
       // Remap caseArg to the new dummy load which will be deleted during
       // deleteRewrittenInstructions.
       pass.valueStorageMap.replaceValue(caseArg, caseLoad);
       markRewritten(caseLoad, caseAddr);
+      // emitEndBorrowsAtEnclosingGuaranteedBoundary ends borrows of
+      // destructured payload elements where the dummy load's borrow ends.
+      endCaseBorrow(caseLoad);
+    } else if (isa<LoadBorrowInst>(caseLoad)) {
+      endCaseBorrow(caseLoad);
     }
     caseBB->eraseArgument(0);
   };
@@ -4386,14 +4549,24 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
       assert(arg->getType().isAddressOnly(*pass.function));
       auto builder = pass.getBuilder(defaultBB->begin());
       auto addr = enumAddr;
-      auto *load = builder.createTrivialLoadOr(switchEnum->getLoc(), addr,
-                                               LoadOwnershipQualifier::Take);
+      SILValue load = createCaseLoad(builder, addr);
       // Remap arg to the new dummy load which will be deleted during
       // deleteRewrittenInstructions.
       arg->replaceAllUsesWith(load);
       pass.valueStorageMap.replaceValue(arg, load);
       markRewritten(load, addr);
+      endCaseBorrow(load);
       defaultBB->eraseArgument(0);
+    }
+  }
+  if (access) {
+    SmallPtrSet<SILBasicBlock *, 8> caseBlocks;
+    for (SILBasicBlock *caseBB : switchEnum->getSuccessorBlocks()) {
+      if (!caseBlocks.insert(caseBB).second)
+        continue;
+      visitCaseExits(caseBB, [&](SILBuilder &builder) {
+        builder.createEndAccess(pass.genLoc(), access, /*aborted=*/false);
+      });
     }
   }
   auto builder = pass.getTermBuilder(switchEnum);
@@ -4421,6 +4594,13 @@ void UseRewriter::visitUncheckedEnumDataInst(
   auto *enumAddrInst =
       builder.createUncheckedEnumDataAddrForTake(loc, srcAddr, elt, destTy);
 
+  if (!enumDataInst->getType().isAddressOnly(*pass.function)) {
+    auto *load = builder.createTrivialLoadOr(loc, enumAddrInst,
+                                             LoadOwnershipQualifier::Take);
+    enumDataInst->replaceAllUsesWith(load);
+    pass.deleter.forceDelete(enumDataInst);
+    return;
+  }
   markRewritten(enumDataInst, enumAddrInst);
 }
 
@@ -4829,6 +5009,15 @@ static void rewriteFunction(AddressLoweringState &pass) {
     CheckedCastBrRewriter(ccbi, pass).rewrite();
   }
 
+  // Rewrite `debug_value undef : $T` into the form the address pipeline
+  // produces for the same code: `debug_value undef : $*T, ..., expr op_deref`.
+  for (Operand *use : pass.undefDebugValueOperands) {
+    auto *debugInst = cast<DebugValueInst>(use->getUser());
+    SILType addrType = use->get()->getType().getAddressType();
+    use->set(SILUndef::get(pass.function, addrType));
+    debugInst->prependDeref(use->getOperandNumber());
+  }
+
   // Rewrite this function's return value now that all opaque values within the
   // function are rewritten. This still depends on a valid ValueStorage
   // projection operands.
@@ -4916,7 +5105,10 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
     // If the storage was unused, e.g. because all uses were projected into
     // users, then delete the allocation.
     if (auto *allocInst = storage.storageAddress->getDefiningInstruction()) {
-      pass.deleter.deleteIfDead(allocInst);
+      // Two entries can share a storage address, so this instruction
+      // may already have been deleted.
+      if (!allocInst->isDeleted())
+        pass.deleter.deleteIfDead(allocInst);
     }
     auto *deadInst = val->getDefiningInstruction();
     if (!deadInst || deadInst->isDeleted())

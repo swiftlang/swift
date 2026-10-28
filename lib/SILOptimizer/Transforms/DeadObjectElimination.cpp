@@ -88,7 +88,7 @@ static SILFunction *getDestructor(AllocRefInstBase *ARI) {
     return nullptr;
 
   // We only support classes.
-  ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
+  ClassDecl *ClsDecl = ARI->getType().getClassDecl();
   if (!ClsDecl)
     return nullptr;
 

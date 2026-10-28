@@ -25,7 +25,9 @@ func foo(x: Int32) {
   // CHECK: cond_br {{.*}} !true_count(3) !false_count(7), loc {{.*}}:[[@LINE-1]]:19
 
   if case is String = ty {} else {}
-  // CHECK: switch_enum {{.*}}, case #Optional.some!enumelt: {{.*}} !case_count(3), case #Optional.none!enumelt: {{.*}} !case_count(7), loc {{.*}}:[[@LINE-1]]:3
+  // A type test needs no payload, so it lowers to a direct branch on the cast
+  // rather than a switch over an intermediate Optional.
+  // CHECK: checked_cast_addr_br test_only Any in {{.*}} to String, {{.*}} !true_count(3) !false_count(7), loc {{.*}}:[[@LINE-3]]:3
 
   if case true = x < 4 {} else {}
   // CHECK: cond_br {{.*}} !true_count(4) !false_count(6), loc {{.*}}:[[@LINE-1]]:20

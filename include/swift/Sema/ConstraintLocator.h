@@ -665,7 +665,7 @@ class LocatorPathElt::GenericType : public StoredPointerElement<TypeBase> {
 public:
   GenericType(Type type)
       : StoredPointerElement(PathElementKind::GenericType, type.getPointer()) {
-    assert(type->getDesugaredType()->is<BoundGenericType>());
+    assert(type->getDesugaredType()->is<NominalType>());
   }
 
   Type getType() const { return getStoredPointer(); }
@@ -1257,6 +1257,7 @@ public:
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
           return elt.getKind() != ConstraintLocator::OptionalInjection &&
+                 elt.getKind() != ConstraintLocator::OptionalPayload &&
                  elt.getKind() != ConstraintLocator::GenericArgument;
         });
 

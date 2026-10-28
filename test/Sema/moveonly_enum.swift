@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 enum Foo: ~Copyable {
-    deinit {} // expected-error {{deinitializers are not yet supported on noncopyable enums}}
+    deinit {} // expected-error {{deinitializers are not yet supported on non-'Copyable' enums}}
 }
 
 enum Foo2: ~Copyable {

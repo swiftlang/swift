@@ -220,7 +220,7 @@ deriveComparable_lt(
   if (parentDC->getParentModule()->isResilient()) {
     generatedIdentifier = C.Id_LessThanOperator;
   } else {
-    assert(selfIfaceTy->getEnumOrBoundGenericEnum());
+    assert(selfIfaceTy->getEnumDecl());
     generatedIdentifier = C.Id_derived_enum_less_than;
   }
 

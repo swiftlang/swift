@@ -238,7 +238,7 @@ static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   if (silType.is<BuiltinIntegerType>()) {
     return true;
   }
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = silType.getNominalDecl();
   return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
 }
 
@@ -633,7 +633,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
   case SymbolicValue::Aggregate: {
     // Support only stdlib integer or bool structs.
-    StructDecl *structDecl = expectedType->getStructOrBoundGenericStruct();
+    StructDecl *structDecl = expectedType->getStructDecl();
     assert(structDecl);
     assert(isStdlibIntegerOrBoolDecl(structDecl, astContext));
     assert(symVal.getAggregateType()->isEqual(expectedType) &&
@@ -737,8 +737,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
       // Convert to the expected type if necessary.
       if (expectedFnType != resultType) {
         auto convert = builder.createConvertFunction(
-            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType),
-            false);
+            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType));
         return convert;
       }
     }
@@ -989,7 +988,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   // Check if every property of the OSLogInterpolation instance has a constant
   // value.
   SILType osLogMessageType = osLogMessage->getType();
-  StructDecl *structDecl = osLogMessageType.getStructOrBoundGenericStruct();
+  StructDecl *structDecl = osLogMessageType.getStructDecl();
   assert(structDecl);
 
   auto typeExpansionContext =
@@ -998,7 +997,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   SILType osLogInterpolationType = osLogMessageType.getFieldType(
       interpolationPropDecl, module, typeExpansionContext);
   StructDecl *interpolationStruct =
-      osLogInterpolationType.getStructOrBoundGenericStruct();
+      osLogInterpolationType.getStructDecl();
   assert(interpolationStruct);
 
   auto propertyDecls = interpolationStruct->getStoredProperties();

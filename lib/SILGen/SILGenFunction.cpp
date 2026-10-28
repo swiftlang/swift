@@ -710,7 +710,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
-    auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
+    auto getAddressValue = [&](SILValue entryValue, bool callerTakesOwnership,
                                bool forLValue) -> SILValue {
       if (SGM.M.usesOpaqueValues() && !forLValue && !isPack) {
         // In opaque values mode, addresses aren't used except by lvalues.
@@ -722,10 +722,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                 B, loc, entryValue, LoadOwnershipQualifier::Trivial);
             return result;
           }
-          if (forceCopy) {
+          if (callerTakesOwnership) {
             SILValue result =
                 lowering.emitLoadOfCopy(B, loc, entryValue, IsNotTake);
-            enterDestroyCleanup(result);
             return result;
           } else {
             auto load = B.createLoadBorrow(
@@ -735,7 +734,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           }
         } else {
           // Otherwise, just return it, copying if needed.
-          if (forceCopy && !lowering.isTrivial(&F)) {
+          if (callerTakesOwnership && !lowering.isTrivial(&F)) {
             auto result = B.emitCopyValueOperation(loc, entryValue);
             return result;
           }
@@ -760,7 +759,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);
 
-        if (!forceCopy)
+        if (!callerTakesOwnership)
           enterDestroyCleanup(addr);
         return addr;
 
@@ -773,10 +772,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
             .getInducedPackType();
         copyPackElementsToTuple(loc, addr, entryValue, formalPackType);
 
-        if (!forceCopy)
+        if (!callerTakesOwnership)
           enterDestroyCleanup(addr);
         return addr;
-      } else if (forceCopy) {
+      } else if (callerTakesOwnership) {
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
         auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
@@ -852,7 +851,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Consuming: {
       assert(!isPack);
       assert(val->getType().isAddress() &&
-             "@called(atMostOnce) values are bound as local boxed storage");
+             "at-most-once values are bound as local boxed storage");
 
       auto &tl = getTypeLowering(valueType);
 
@@ -875,15 +874,15 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
         // address of the value.
-        auto addr =
-            getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/false);
+        auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
+                                    /*forLValue=*/false);
         capturedArgs.push_back(
             addr->getOwnershipKind() == OwnershipKind::Owned
                 ? ManagedValue::forOwnedRValue(addr, CleanupHandle::invalid())
                 : ManagedValue::forBorrowedRValue(addr));
       } else {
-        auto addr =
-            getAddressValue(val, /*forceCopy=*/true, /*forLValue=*/false);
+        auto addr = getAddressValue(val, /*callerTakesOwnership=*/true,
+                                    /*forLValue=*/false);
         if (!useLoweredAddresses()) {
           auto &lowering = getTypeLowering(addr->getType());
           auto rvalue =
@@ -906,7 +905,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::StorageAddress: {
       assert(!isPack);
 
-      auto addr = getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/true);
+      auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
+                                  /*forLValue=*/true);
 
       // No-escaping stored declarations are captured as the
       // address of the value.
@@ -1117,11 +1117,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
-    // A `@called(atMostOnce)` closure value's callee convention must be
+    // An at-most-once closure value's callee convention must be
     // `Direct_Owned` to match DefaultCalledAtMostOnceSemanticsConventions, or
     // the ABI-difference check treats it as needing a reabstraction thunk
-    // (which then fails: thunks are always Thin, and Thin + `@called` is an
-    // invalid combination).
+    // (which then fails: thunks are always Thin, and a Thin function can't
+    // have execution semantics).
     auto calleeConvention =
         typeContext.ExpectedLoweredType->hasCalledAtMostOnceSemantics()
             ? ParameterConvention::Direct_Owned
@@ -1876,7 +1876,7 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
   // This is a loop because we want to handle types that wrap integer types,
   // like ObjCBool (which may be Bool or Int8).
   while (!value->getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    auto structDecl = value->getType().getStructDecl();
     assert(structDecl && "value for error result wasn't of struct type!");
     assert(structDecl->getStoredProperties().size() == 1);
     auto property = structDecl->getStoredProperties()[0];
@@ -1896,7 +1896,7 @@ SILValue SILGenFunction::emitWrapIntegerLiteral(SILLocation loc,
   
   // Or wrap a value in a struct, potentially multiple times to handle types
   // that wrap integer types like ObjCBool (which may be Bool or Int8).
-  auto structDecl = ty.getStructOrBoundGenericStruct();
+  auto structDecl = ty.getStructDecl();
   assert(structDecl && "value for error result wasn't of struct type!");
   assert(structDecl->getStoredProperties().size() == 1);
   auto property = structDecl->getStoredProperties()[0];
@@ -2013,7 +2013,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   auto metatypeTy = MetatypeType::get(selfTy);
 
   SILValue selfMetatype;
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     selfMetatype = B.createValueMetatype(loc, getLoweredType(metatypeTy),
                                          selfValue).getValue();
   } else {

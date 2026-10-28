@@ -574,6 +574,9 @@ public:
   /// The file dependencies
   const std::vector<std::string> fileDependencies;
 
+  /// The directory dependencies
+  const std::vector<std::string> directoryDependencies;
+
   /// CASID for the Root of ClangIncludeTree. Empty if not used.
   std::string CASClangIncludeTreeRootID;
 
@@ -584,6 +587,7 @@ public:
                                StringRef moduleMapFile, StringRef contextHash,
                                ArrayRef<std::string> buildCommandLine,
                                ArrayRef<std::string> fileDependencies,
+                               ArrayRef<std::string> directoryDependencies,
                                ArrayRef<LinkLibrary> linkLibraries,
                                StringRef clangIncludeTreeRoot,
                                StringRef moduleCacheKey, bool IsSystem)
@@ -593,6 +597,7 @@ public:
         pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
         moduleMapFile(moduleMapFile), contextHash(contextHash),
         buildCommandLine(buildCommandLine), fileDependencies(fileDependencies),
+        directoryDependencies(directoryDependencies),
         CASClangIncludeTreeRootID(clangIncludeTreeRoot), IsSystem(IsSystem) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -703,12 +708,13 @@ public:
       StringRef pcmOutputPath, StringRef mappedPCMPath, StringRef moduleMapFile,
       StringRef contextHash, ArrayRef<std::string> nonPathCommandLine,
       ArrayRef<std::string> fileDependencies,
+      ArrayRef<std::string> directoryDependencies,
       ArrayRef<LinkLibrary> linkLibraries, StringRef clangIncludeTreeRoot,
       StringRef moduleCacheKey, bool IsSystem) {
     return ModuleDependencyInfo(std::make_unique<ClangModuleDependencyStorage>(
         pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
-        nonPathCommandLine, fileDependencies, linkLibraries,
-        clangIncludeTreeRoot, moduleCacheKey, IsSystem));
+        nonPathCommandLine, fileDependencies, directoryDependencies,
+        linkLibraries, clangIncludeTreeRoot, moduleCacheKey, IsSystem));
   }
 
   /// Retrieve the module-level imports.
@@ -1072,12 +1078,18 @@ class SwiftDependencyScanningService {
   /// The CAS configuration created the Scanning Service if used.
   std::optional<llvm::cas::CASConfiguration> CASConfig;
 
+  /// Escape paths used for the Scanning Service.
+  std::vector<std::string> CASFSEscapePaths;
+
   /// The persistent Clang dependency scanner service.
   ///
   /// Created by the first scan (see \c setupDependencyScanningService), which
   /// is also what lets this double as the "already configured" flag.
   std::optional<clang::dependencies::DependencyScanningService>
       ClangScanningService;
+
+  /// Paths reported before \c ClangScanningService was created.
+  std::vector<std::string> PendingInvalidatedPaths;
 
   /// Shared state mutual-exclusivity lock
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
@@ -1126,6 +1138,13 @@ public:
   bool hasClangScanningService() const {
     return ClangScanningService.has_value();
   }
+
+  /// Report that \p Path changed since the previous build. Must be called
+  /// before the first scan.
+  void addInvalidatedPath(StringRef Path);
+
+  /// Whether \p Directory was reported via \c addInvalidatedPath.
+  bool isDirectoryInvalidated(StringRef Directory);
 
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be

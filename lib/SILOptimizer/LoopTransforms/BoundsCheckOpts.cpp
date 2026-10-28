@@ -60,6 +60,11 @@ using ArraySet = llvm::SmallPtrSet<SILValue, 16>;
 using ArrayAccessDesc = llvm::PointerIntPair<ValueBase *, 1, bool>;
 using IndexedArraySet = llvm::DenseSet<std::pair<ValueBase *, ArrayAccessDesc>>;
 using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 16>;
+/// Identifies a fixed storage bounds check: its kind, its self value and the
+/// (up to two) checked values. The kind is part of the key because checks of
+/// different kinds with identical operands have different semantics.
+using FixedStorageCheckKey =
+    std::tuple<FixedStorageSemanticsCallKind, SILValue, SILValue, SILValue>;
 
 /// The effect an instruction can have on array bounds.
 enum class ArrayBoundsEffect {
@@ -1084,8 +1089,7 @@ private:
 
   bool removeRedundantFixedStorageBoundsChecksInLoop(
       SILLoop *loop, DominanceInfoNode *currentNode,
-      llvm::DenseSet<std::pair<SILValue, std::pair<SILValue, SILValue>>>
-          &dominatingSafeChecks,
+      llvm::DenseSet<FixedStorageCheckKey> &dominatingSafeChecks,
       int recursionDepth);
 
   /// Clone an index value and its operands, inserting them in correct order
@@ -1591,8 +1595,7 @@ bool BoundsCheckOpts::optimizeFixedStorageBoundsCheckInLoop(
   LLVM_DEBUG(llvm::dbgs() << "Attempting to eliminate redundant bounds checks "
                              "for Span and InlineArray in "
                           << *loop);
-  llvm::DenseSet<std::pair<SILValue, std::pair<SILValue, SILValue>>>
-      dominatingSafeFixedStorageChecks;
+  llvm::DenseSet<FixedStorageCheckKey> dominatingSafeFixedStorageChecks;
   bool changed = removeRedundantFixedStorageBoundsChecksInLoop(
       loop, DT->getNode(loop->getHeader()), dominatingSafeFixedStorageChecks,
       /*recursionDepth*/ 0);
@@ -1882,8 +1885,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
 
 bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
     SILLoop *loop, DominanceInfoNode *currentNode,
-    llvm::DenseSet<std::pair<SILValue, std::pair<SILValue, SILValue>>>
-        &dominatingSafeChecks,
+    llvm::DenseSet<FixedStorageCheckKey> &dominatingSafeChecks,
     int recursionDepth) {
   auto *currentBlock = currentNode->getBlock();
   if (!loop->contains(currentBlock)) {
@@ -1898,8 +1900,7 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
 
   // When we come back from the dominator tree recursion we need to remove
   // checks that we have seen for the first time.
-  SmallVector<std::pair<SILValue, std::pair<SILValue, SILValue>>, 8>
-      safeChecksToPop;
+  SmallVector<FixedStorageCheckKey, 8> safeChecksToPop;
 
   for (auto iter = currentBlock->begin(); iter != currentBlock->end();) {
     auto inst = &*iter;
@@ -1928,28 +1929,23 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
       continue;
     }
 
-    // Identify a check by its self value together with the bound(s) it checks.
+    // Identify a check by its kind, its self value and the bound(s) it checks.
     // "check_index" has a single index; "check_range" has a lower and upper
     // bound; "check_range_offset" has a starting offset and a length.
-    std::pair<SILValue, std::pair<SILValue, SILValue>> selfAndIndex;
-    if (fixedStorageSemantics.getKind() ==
-        FixedStorageSemanticsCallKind::CheckRange) {
+    FixedStorageCheckKey selfAndIndex;
+    auto kind = fixedStorageSemantics.getKind();
+    if (kind == FixedStorageSemanticsCallKind::CheckRange) {
       auto lowerValue = fixedStorageSemantics.getLowerBoundOperand().get();
       auto upperValue = fixedStorageSemantics.getUpperBoundOperand().get();
-      selfAndIndex =
-          std::make_pair(selfValue, std::make_pair(lowerValue, upperValue));
-    } else if (fixedStorageSemantics.getKind() ==
-               FixedStorageSemanticsCallKind::CheckRangeOffset) {
+      selfAndIndex = std::make_tuple(kind, selfValue, lowerValue, upperValue);
+    } else if (kind == FixedStorageSemanticsCallKind::CheckRangeOffset) {
       auto offsetValue = fixedStorageSemantics.getOffsetOperand().get();
       auto lengthValue = fixedStorageSemantics.getLengthOperand().get();
-      selfAndIndex =
-          std::make_pair(selfValue, std::make_pair(offsetValue, lengthValue));
+      selfAndIndex = std::make_tuple(kind, selfValue, offsetValue, lengthValue);
     } else {
-      assert(fixedStorageSemantics.getKind() ==
-             FixedStorageSemanticsCallKind::CheckIndex);
-      selfAndIndex = std::make_pair(
-          selfValue,
-          std::make_pair(fixedStorageSemantics.getIndex(), SILValue()));
+      assert(kind == FixedStorageSemanticsCallKind::CheckIndex);
+      selfAndIndex = std::make_tuple(
+          kind, selfValue, fixedStorageSemantics.getIndex(), SILValue());
     }
     if (!dominatingSafeChecks.count(selfAndIndex)) {
       LLVM_DEBUG(llvm::dbgs()
@@ -1972,10 +1968,9 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
   }
 
   // Remove checks we have seen for the first time.
-  std::for_each(safeChecksToPop.begin(), safeChecksToPop.end(),
-                [&](std::pair<SILValue, std::pair<SILValue, SILValue>> &value) {
-                  dominatingSafeChecks.erase(value);
-                });
+  std::for_each(
+      safeChecksToPop.begin(), safeChecksToPop.end(),
+      [&](FixedStorageCheckKey &value) { dominatingSafeChecks.erase(value); });
 
   return changed;
 }

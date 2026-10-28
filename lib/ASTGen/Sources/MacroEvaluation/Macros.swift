@@ -518,7 +518,7 @@ func expandFreestandingMacroImpl(
         pluginProtocolVersion: pluginProtocolVersion
       )!,
       lexicalContext: pluginLexicalContext(of: expansionSyntax, pluginProtocolVersion: pluginProtocolVersion),
-      staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
+      staticBuildConfiguration: try cContext.staticBuildConfigurationJSON
     )
     let result = try macro.plugin.sendMessageAndWait(message)
     let expandedSource: String?
@@ -748,7 +748,7 @@ func expandAttachedMacroImpl(
         of: declarationNode,
         pluginProtocolVersion: pluginProtocolVersion
       ),
-      staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
+      staticBuildConfiguration: try cContext.staticBuildConfigurationJSON
     )
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
@@ -804,14 +804,5 @@ func expandAttachedMacroImpl(
       messageSuffix: " (from macro '\(macroName)')"
     )
     return nil
-  }
-}
-
-extension StaticBuildConfiguration {
-  /// Form the JSON representation of this static build configuration.
-  var asJSON: String {
-    get throws {
-      try String(decoding: JSON.encode(self), as: UTF8.self)
-    }
   }
 }

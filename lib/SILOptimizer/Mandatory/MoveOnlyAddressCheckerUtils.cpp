@@ -1841,6 +1841,12 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
         if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
+          // A borrow accessor's callsite consists of copy_value +
+          // mark_unresolved_non_copyable_value instructions, which the object
+          // checker handles. If it emitted a diagnostic, the copy remains but
+          // does not copy the loaded value.
+          if (cvi->getOperand()->isBorrowAccessorResult())
+            continue;
           if (!isCopyableValue(cvi->getOperand())) {
             shouldConvertToLoadCopy = true;
             break;
@@ -2005,7 +2011,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
-        && !targetType.getEnumOrBoundGenericEnum()) {
+        && !targetType.getEnumDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
 
@@ -2035,7 +2041,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // deinit. We know that it must be non-copyable since copyable types
     // cannot contain non-copyable types and that our parent root type must be
     // an enum, tuple, or struct.
-    if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
+    if (auto *nom = iterType.getNominalDecl()) {
       if (auto error = shouldEmitPartialMutationErrorForType(
               iterType, nom, user->getFunction())) {
         return error;
@@ -2047,7 +2053,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
       auto isAllowedPartialConsume =
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
-           useState.address->getType().getNominalOrBoundGenericNominal());
+           useState.address->getType().getNominalDecl());
       if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
@@ -2726,53 +2732,69 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
   }
 
-  // For TakeOnSuccess, only a successful cast consumes Src.  A failed cast
-  // leaves Src in place. Model this by recording the take at the entry of the
-  // success block rather than at the branch itself, so liveness treats Src as
-  // consumed starting there while still live from the branch to the failure
-  // edge. CopyOnSuccess never consumes Src, so it is only a liveness use.
-  // Both casts write to Dest, which must not be mistaken for a write to Src.
-  if (auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user)) {
-    auto consumption = ccabi->getConsumptionKind();
-    if (ccabi->getSrc() == op->get() &&
-        (consumption == CastConsumptionKind::TakeOnSuccess ||
-         consumption == CastConsumptionKind::CopyOnSuccess)) {
-      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: " << *user);
-      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
-      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
-      if (!leafRanges.size()) {
-        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
-        return false;
+  auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user);
+  if (ccabi && ccabi->getSrc() == op->get()) {
+    LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: "
+                            << *user);
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+      return false;
+    }
+
+    switch (ccabi->getConsumptionKind()) {
+
+    case CastConsumptionKind::TakeOnSuccess: {
+      // For TakeOnSuccess, a successful cast consumes Src.  A failed cast
+      // leaves Src in place.
+
+      // Diagnose storage that may not be consumed: a class property, a global,
+      // a capture of an escaping closure.
+      using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
+      if (markedValue->getCheckKind() != CheckKind::ConsumableAndAssignable) {
+        auto *fArg = dyn_cast<SILFunctionArgument>(
+            stripAccessMarkers(markedValue->getOperand()));
+        if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+          moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
+              markedValue, fArg);
+        } else if (!moveChecker.diagnosticEmitter
+                        .emitGlobalOrClassFieldLoadedAndConsumed(markedValue)) {
+          moveChecker.diagnosticEmitter
+              .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+        }
+        return true;
       }
 
+      // Record the take at the entry of the success block rather than at the
+      // branch itself, so liveness treats Src as consumed starting there while
+      // still live from the branch to the failure edge.
       for (auto leafRange : leafRanges) {
-        if (consumption == CastConsumptionKind::TakeOnSuccess)
-          useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
+        useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
         useState.recordLivenessUse(user, leafRange);
       }
       return true;
     }
 
-    // A test_only cast only reads Src -- it neither takes nor copies it, and
-    // writes nothing (it has no dest). That makes it a plain liveness use.  It
-    // can't fall through to the generic liveness path below, because other
-    // checked_cast_addr_br forms do write and that path asserts against any
-    // user whose memory behavior admits a write.
-    if (ccabi->getSrc() == op->get() &&
-        ccabi->getConsumptionKind() == CastConsumptionKind::TestOnly) {
-      LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br test_only Src: "
-                              << *user);
-      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
-      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
-      if (!leafRanges.size()) {
-        LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
-        return false;
-      }
-
+    case CastConsumptionKind::CopyOnSuccess:
+    case CastConsumptionKind::TestOnly: {
+      // Neither CopyOnSuccess nor TestOnly consume Src.
+      // They are just liveness uses.
       for (auto leafRange : leafRanges) {
         useState.recordLivenessUse(user, leafRange);
       }
       return true;
+    }
+
+    case CastConsumptionKind::TakeAlways:
+      // Handled by general consumption code below.
+      break;
+
+    case CastConsumptionKind::BorrowAlways:
+      // BorrowAlways is never used on this instruction
+      // and is rejected by the SIL verifier.
+      ASSERT(false && "checked_cast_addr_br borrow_always is impossible");
+      break;
     }
   }
 

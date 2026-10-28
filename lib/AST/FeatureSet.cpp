@@ -180,6 +180,7 @@ UNINTERESTING_FEATURE(TypedAllocation)
 UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
 UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
+UNINTERESTING_FEATURE(Cells)
 
 static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
   auto *SD = dyn_cast<SubscriptDecl>(decl);
@@ -226,6 +227,13 @@ static bool usesFeatureCAttribute(Decl *decl) {
 
 static bool usesFeatureTargetAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<TargetAttr>();
+}
+
+static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
+    if (attr->isExported())
+      return true;
+  return false;
 }
 
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
@@ -508,9 +516,9 @@ UNINTERESTING_FEATURE(GenerateBindingsForNoncopyableTypesInCXX)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
-UNINTERESTING_FEATURE(EmbeddedDistributed)
 
-// FIXME: Detect `_scope` and `@_scoped()`.
+// TODO: Detect scope arguments anywhere in the declaration's interface type,
+// which are printed even when elided, and explicit scope parameters.
 static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
@@ -617,10 +625,6 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   }
 
   return false;
-}
-
-static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
-  return isa<FileDefaultDecl>(D);
 }
 
 UNINTERESTING_FEATURE(BuiltinSelect)
@@ -781,9 +785,9 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
 
-static bool usesFeatureCalledAttribute(Decl *D) {
+static bool usesFeatureOnceFunctions(Decl *D) {
   auto &ctx = D->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+  if (!ctx.LangOpts.hasFeature(Feature::OnceFunctions))
     return false;
 
   std::function<bool(Type)> hasCalled = [](Type T) {
@@ -807,7 +811,7 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
       bool usesCalled = false;
       P->forEachVariable([&usesCalled](auto *V) {
-        usesCalled |= usesFeatureCalledAttribute(V);
+        usesCalled |= usesFeatureOnceFunctions(V);
       });
 
       if (usesCalled)

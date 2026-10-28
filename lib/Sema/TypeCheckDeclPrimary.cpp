@@ -459,7 +459,7 @@ static void checkInheritanceClause(
     // If this is a class type, it may be the superclass. We end up here when
     // the inherited type is either itself a class, or when it is a subclass
     // existential via the existential type path above.
-    if (inheritedTy->getClassOrBoundGenericClass()) {
+    if (inheritedTy->getClassDecl()) {
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
@@ -500,7 +500,7 @@ static void checkInheritanceClause(
           if (auto behavior = shouldDiagnoseEmbeddedLimitations(
                   classDecl, inherited.getSourceRange().Start,
                   /*wasAlwaysEmbeddedError=*/true)) {
-            if (auto superBGT = inheritedTy->getAs<BoundGenericClassType>()) {
+            if (auto superBGT = inheritedTy->getAs<ClassType>()) {
               for (auto arg : superBGT->getGenericArgs()) {
                 if (auto *nominal = arg->getAnyNominal()) {
                   if (nominal == classDecl) {
@@ -838,6 +838,19 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 flags, otherDefinitions);
+
+    // A unique macro name is only visible inside the macro expansion that
+    // introduced it, so it can only conflict with declarations there.
+    if (MacroDecl::isUniqueMacroName(current->getBaseName())) {
+      SmallVector<ValueDecl *, 1> expansionDefinitions;
+      currentFile->getParentModule()
+          ->lookupUniqueMacroNameInEnclosingExpansions(
+              current->getBaseName(), current->getLoc(), expansionDefinitions);
+      for (auto *other : expansionDefinitions) {
+        if (ABIRoleInfo(other).matchesOptions(flags))
+          otherDefinitions.push_back(other);
+      }
+    }
   }
 
   // Compare this signature against the signature of other
@@ -2329,11 +2342,14 @@ public:
       (void) VD->isDynamic();
 
       // Check for actor isolation of top-level and local declarations, and
-      // protocol requirements.g
+      // protocol requirements.
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
-      if (!VD->getDeclContext()->isTypeContext() ||
-          isa<ProtocolDecl>(VD->getDeclContext()))
+      // The isolation of a defer in a closure is that of the closure, which is
+      // not determined yet
+      if ((!VD->getDeclContext()->isTypeContext() ||
+           isa<ProtocolDecl>(VD->getDeclContext())) &&
+          !isDeferInClosureContext(VD))
         (void) getActorIsolation(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
@@ -2726,7 +2742,7 @@ public:
     // completely type checked at that point.
     auto &DE = Ctx.Diags;
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = VD->getInterfaceType()->getNominalDecl()) {
         if (!nom->canBeCopyable()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
@@ -2736,7 +2752,7 @@ public:
     }
 
     // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
-    if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = VD->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>()) {
         auto isProtocolContext = isa<ProtocolDecl>(DC);
 
@@ -3280,6 +3296,10 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
+    // Expand member macros so the members they add are checked below.
+    (void)evaluateOrDefault(Ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{ED}, {});
+
     for (Decl *member : ED->getMembers())
       visit(member);
 
@@ -3580,7 +3600,7 @@ public:
       });
 
     if (auto superclassTy = CD->getSuperclass()) {
-      ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+      ClassDecl *Super = superclassTy->getClassDecl();
       bool isInvalidSuperclass = false;
 
       if (Super->isFinal()) {
@@ -4185,6 +4205,10 @@ public:
 
     TypeChecker::checkDeclAttributes(ED);
 
+    // Expand member macros so the members they add are checked below.
+    (void)evaluateOrDefault(Ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{ED}, {});
+
     // If this is an @_objcImplementation of a class, set up some aspects of the
     // class.
     if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
@@ -4538,7 +4562,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // If we have a noimplicitcopy parameter, make sure that the underlying type
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
-      if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+      if (auto *nom = param->getInterfaceType()->getNominalDecl()) {
         if (!nom->canBeCopyable()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
@@ -4548,7 +4572,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     // @_staticExclusiveOnly types cannot be passed as 'inout', only as either
     // a borrow or as consuming.
-    if (auto SD = param->getInterfaceType()->getStructOrBoundGenericStruct()) {
+    if (auto SD = param->getInterfaceType()->getStructDecl()) {
       if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           param->isInOut()) {
         SD->getASTContext().Diags.diagnoseWithNotes(

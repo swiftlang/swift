@@ -228,10 +228,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
   // A noncopyable type is exposed as a move-only C++ class. Because Swift's
   // moves are destructive and C++'s are not, such a class carries a flag that
   // records whether it was moved from, so that its destructor can be a no-op.
+  // A class with an opaque layout needs no flag, as a moved-from object has no
+  // allocation.
   bool isNoncopyable =
       cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
-  assert((!isNoncopyable || !isOpaqueLayout) &&
-         "noncopyable types with an opaque layout are not exposed to C++");
+  bool hasMovedFromFlag = isNoncopyable && !isOpaqueLayout;
+
+  bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
+                   interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
@@ -311,18 +315,28 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
-    os << '~' << baseName << "() noexcept {\n";
-    if (isNoncopyable)
-      os << "    if (_isMovedFrom) return;\n";
-    printVWTable(os);
-    os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
-    os << "  }\n";
+    os << '~' << baseName << "() noexcept";
+    if (isTrivial) {
+      os << " = default;\n";
+    } else {
+      os << " {\n";
+      if (hasMovedFromFlag)
+        os << "    if (_isMovedFrom) return;\n";
+      // A moved-from object with an opaque layout has no allocation.
+      if (isOpaqueLayout)
+        os << "    if (!_storage.isAllocated()) return;\n";
+      printVWTable(os);
+      os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "  }\n";
+    }
 
     if (isNoncopyable) {
       os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
       os << "  " << baseName << " &operator =(const " << baseName
          << " &) = delete;\n";
+    }
 
+    if (hasMovedFromFlag) {
       // move constructor.
       os << "  ";
       printer.printInlineForThunk();
@@ -361,37 +375,89 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "    other._isMovedFrom = true;\n";
       os << "  return *this;\n";
       os << "  }\n";
-    } else {
+    }
+
+    if (!isNoncopyable) {
       // copy constructor.
       os << "  ";
       printer.printInlineForThunk();
-      os << baseName << "(const " << baseName << " &other) noexcept {\n";
-      printVWTable(os);
-      if (isOpaqueLayout) {
-        os << "    _storage = ";
-        printer.printSwiftImplQualifier();
-        os << cxx_synthesis::getCxxOpaqueStorageClassName()
-           << "(vwTable->size, vwTable->getAlignment());\n";
+      os << baseName << "(const " << baseName << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        // A copy of a moved-from object is moved from too.
+        if (isOpaqueLayout)
+          os << "    if (!other._storage.isAllocated()) return;\n";
+        printVWTable(os);
+        if (isOpaqueLayout) {
+          os << "    _storage = ";
+          printer.printSwiftImplQualifier();
+          os << cxx_synthesis::getCxxOpaqueStorageClassName()
+             << "(vwTable->size, vwTable->getAlignment());\n";
+        }
+        os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  }\n";
       }
-      os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-            "const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
-      os << "  }\n";
 
       // copy assignment.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << " &operator =(const " << baseName
-         << " &other) noexcept {\n";
+         << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
+        // source into a new object and move that in.
+        if (isOpaqueLayout) {
+          os << "    if (!_storage.isAllocated() || "
+                "!other._storage.isAllocated()) {\n";
+          os << "      *this = " << baseName << "(other);\n";
+          os << "      return *this;\n";
+          os << "    }\n";
+        }
+        printVWTable(os);
+        os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
+              "const_cast<char "
+              "*>(other._getOpaquePointer()), metadata._0);\n";
+        os << "  return *this;\n";
+        os << "  }\n";
+      }
+    }
+
+    if (isOpaqueLayout) {
+      // move constructor. The Swift value stays in its allocation.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(" << baseName << " &&other) noexcept : _storage("
+         << "static_cast<";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << " &&>(other._storage)) {}\n";
+
+      // move assignment.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(" << baseName << " &&other) noexcept {\n";
+      os << "    if (this == &other) return *this;\n";
+      os << "    if (_storage.isAllocated()) {\n";
       printVWTable(os);
-      os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
-            "*>(other._getOpaquePointer()), metadata._0);\n";
+      os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "    }\n";
+      // This also frees the old allocation.
+      os << "    _storage = static_cast<";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << " &&>(other._storage);\n";
       os << "  return *this;\n";
       os << "  }\n";
-
-      // FIXME: implement the move assignment.
-      // FIXME: implement the move constructor.
     }
+    // FIXME: implement the move operations for a copyable type with an inline
+    // layout.
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
@@ -409,6 +475,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
             "_storage(vwTable->size, "
             "vwTable->getAlignment()) {}\n";
+    } else if (isTrivial) {
+      // A user-provided default constructor would make the C++ type nontrivial.
+      os << "() noexcept = default;\n";
     } else {
       os << "() noexcept {}\n";
     }
@@ -432,8 +501,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the private accessors to the underlying Swift value storage.
     // Every use of a value by Swift goes through these, so they are where a
     // moved-from noncopyable value, which holds no Swift value, is caught.
+    // 'OpaqueStorage' checks its own allocation.
     StringRef movedFromCheck =
-        isNoncopyable ? "if (_isMovedFrom) abort(); " : "";
+        hasMovedFromFlag ? "if (_isMovedFrom) abort(); " : "";
     os << "  ";
     printer.printInlineForThunk();
     os << "const char * _Nonnull _getOpaquePointer() const noexcept { "
@@ -486,7 +556,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
     // The moved-from flag has to come after the Swift value, so that the
     // address of this class stays the address of the value itself.
-    if (isNoncopyable)
+    if (hasMovedFromFlag)
       os << "  bool _isMovedFrom = false;\n";
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
@@ -546,9 +616,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
-          printVWTable(os);
-          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
-                "metadata._0);\n";
+          if (isTrivial) {
+            os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
+               << ");\n";
+          } else {
+            printVWTable(os);
+            os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+                  "metadata._0);\n";
+          }
           os << "  }\n";
           os << "};\n";
         });

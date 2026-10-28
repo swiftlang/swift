@@ -64,7 +64,7 @@ OptionalTraps.test("UnwrapNone/Ounchecked")
     { !_isFastAssertConfiguration() },
     reason: "unwrapping nil should trap unless we are in -Ounchecked mode"))
   .code {
-  var a: AnyObject? = returnNil()
+  let a: AnyObject? = returnNil()
   expectEqual(0, unsafeBitCast(a!, to: Int.self))
 }
 
@@ -72,12 +72,9 @@ OptionalTraps.test("UnwrapNone/Message")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .skip(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "this trap may not have an error message may not be printed in -O"))
   .code {
   var a: AnyObject? = returnNil()
-  expectCrashLater(withMessage:
+  expectCrashLater(withDebugMessage:
       "Unexpectedly found nil while unwrapping an Optional value")
   let unwrapped: AnyObject = a!
   _blackHole(unwrapped)
@@ -87,12 +84,9 @@ OptionalTraps.test("UnwrapNone/Message/Implicit")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .skip(.custom(
-    { !_isDebugAssertConfiguration() },
-    reason: "this trap may not have an error message may not be printed in -O"))
   .code {
   var a: AnyObject! = returnNil()
-  expectCrashLater(withMessage:
+  expectCrashLater(withDebugMessage:
       "Unexpectedly found nil while implicitly unwrapping an Optional value")
   let unwrapped: AnyObject = a
   _blackHole(unwrapped)

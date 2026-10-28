@@ -1045,18 +1045,21 @@ static bool parseDeclSILOptional(
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    } else if (options.SpecAttrs && SP.P.Tok.getText() == "_specialize") {
+    } else if (options.SpecAttrs && (SP.P.Tok.getText() == "_specialize" ||
+                                     SP.P.Tok.getText() == "specialized")) {
       SourceLoc AtLoc = SP.P.Tok.getLoc();
       SourceLoc Loc(AtLoc);
 
-      // Parse a _specialized attribute, building a parsed substitution list
-      // and pushing a new ParsedSpecAttr on the SpecAttrs list. Conformances
-      // cannot be generated until the function declaration is fully parsed so
-      // that the function's generic signature can be consulted.
+      // Parse a _specialize or specialized attribute, building a parsed
+      // substitution list and pushing a new ParsedSpecAttr on the SpecAttrs
+      // list. Conformances cannot be generated until the function declaration
+      // is fully parsed so that the function's generic signature can be
+      // consulted.
       ParsedSpecAttr SpecAttr;
       SpecAttr.requirements = {};
       SpecAttr.exported = false;
       SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
+      SpecAttr.specializedSpelling = SP.P.Tok.getText() == "specialized";
       AbstractSpecializeAttr *Attr;
       StringRef targetFunctionName;
       ModuleDecl *module = nullptr;
@@ -4039,6 +4042,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     DiagnoseKind Kind = llvm::StringSwitch<DiagnoseKind>(AttrName)
                             .Case("unpermitted_copy",
                                   DiagnoseKind::UnpermittedCopy)
+                            .Case("let_reinit", DiagnoseKind::LetReinit)
                             .Default(DiagnoseKind::Invalid);
 
     if (Kind == DiagnoseKind::Invalid) {
@@ -4585,7 +4589,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     Identifier ToToken;
     SourceLoc ToLoc;
     bool not_guaranteed = false;
-    bool without_actually_escaping = false;
+    auto convertKind = ConvertFunctionInst::Kind::Ordinary;
     bool needsStackProtection = false;
     bool isImmortal = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
@@ -4617,7 +4621,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
         if (attrName == "without_actually_escaping")
-          without_actually_escaping = true;
+          convertKind = ConvertFunctionInst::Kind::WithoutActuallyEscaping;
+        else if (attrName == "without_actually_discarding")
+          convertKind = ConvertFunctionInst::Kind::WithoutActuallyDiscarding;
         else
           return true;
       }
@@ -4659,8 +4665,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createUpcast(InstLoc, Val, Ty, forwardingOwnership);
       break;
     case SILInstructionKind::ConvertFunctionInst:
-      ResultVal = B.createConvertFunction(
-          InstLoc, Val, Ty, without_actually_escaping, forwardingOwnership);
+      ResultVal = B.createConvertFunction(InstLoc, Val, Ty, convertKind,
+                                          forwardingOwnership);
       break;
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
       ResultVal =
@@ -4805,7 +4811,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
+    // The printer emits !true_count/!false_count, so read them back; without
+    // this the weights are silently dropped on a SIL round trip.
+    ProfileCounter trueCount, falseCount;
     if (parseConditionalBranchDestinations() ||
+        parseSILCondBranchProfileCounters(*this, trueCount, falseCount) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
@@ -4813,7 +4823,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         InstLoc, options, consumptionKind, SourceAddr, SourceType,
         DestAddr, TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
-        getBBForReference(FailureBBName, FailureBBLoc));
+        getBBForReference(FailureBBName, FailureBBLoc), trueCount, falseCount);
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst:
@@ -7366,9 +7376,15 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       continue;
     }
 
-    if (AttrName == "called_once") {
+    if (AttrName == "called_at_most_once") {
       assert(!bool(AttrValue));
       PartialApplySemantics = ExecutionSemantics::AtMostOnce;
+      continue;
+    }
+
+    if (AttrName == "called_once") {
+      assert(!bool(AttrValue));
+      PartialApplySemantics = ExecutionSemantics::Once;
       continue;
     }
 
@@ -7980,7 +7996,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
                                                     DefaultRequirementOptions());
             FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
                 FunctionState.F->getModule(), genericSig, typeErasedParams, Attr.exported,
-                Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
+                Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability,
+                Attr.specializedSpelling));
           }
         }
 
@@ -8304,7 +8321,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
   } else {
     if (SILParser(P).parseSILType(specializedClassTy))
       return true;
-    theClass = specializedClassTy.getClassOrBoundGenericClass();
+    theClass = specializedClassTy.getClassDecl();
     if (!theClass) {
       return true;
     }
@@ -8425,7 +8442,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
   if (parser.Tok.is(tok::sil_dollar)) {
     if (SILParser(parser).parseSILType(specializedNominalTy))
       return true;
-    theNominalDecl = specializedNominalTy.getNominalOrBoundGenericNominal();
+    theNominalDecl = specializedNominalTy.getNominalDecl();
     if (!theNominalDecl)
       return true;
   } else {
@@ -8600,7 +8617,7 @@ parseRootProtocolConformance(Parser &P, SILParser &SP, Type ConformingTy,
   // conformance. We pass getDeclaredInterfaceType() to find the normal
   // conformance.
   Type lookupTy = ConformingTy;
-  if (auto bound = lookupTy->getAs<BoundGenericType>())
+  if (auto bound = lookupTy->getAs<NominalType>())
     lookupTy = bound->getDecl()->getDeclaredInterfaceType();
   auto lookup = lookupConformance(lookupTy, proto);
   if (lookup.isInvalid()) {

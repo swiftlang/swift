@@ -923,6 +923,14 @@ public:
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
 
+  /// The address of the context that every captureless exactly-once closure in
+  /// this module shares. See getAddrOfExactlyOnceSharedContext().
+  llvm::Constant *ExactlyOnceSharedContext = nullptr;
+
+  /// The destructor of every exactly-once closure context in this module. See
+  /// getExactlyOnceClosureDestructor().
+  llvm::Function *ExactlyOnceClosureDestructor = nullptr;
+
   llvm::StructType *
   createTransientStructType(StringRef name,
                             std::initializer_list<llvm::Type *> types,
@@ -1526,6 +1534,11 @@ private:
   SmallVector<llvm::MDNode *> UsedConditionals;
   void emitUsedConditionals();
 
+  /// The static initializers to add to the global constructors in
+  /// emitGlobalLists(). See addStaticInitializer().
+  SmallVector<llvm::Function *, 2> StaticInitializers;
+  bool EmittedStaticInitializers = false;
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
@@ -1586,6 +1599,14 @@ public:
       llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
 
   llvm::Constant *getAddrOfFieldName(StringRef Name);
+
+  /// Returns the context that every captureless exactly-once closure shares.
+  llvm::Constant *getAddrOfExactlyOnceSharedContext();
+
+  /// Returns the destructor that terminates the program, which every
+  /// exactly-once closure context in this module has.
+  llvm::Function *getExactlyOnceClosureDestructor();
+
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
@@ -1747,6 +1768,14 @@ public:
   /// This can fail, in which it will return false and the module will be
   /// invalid.
   bool finalize();
+
+  /// Adds \p fn to the module's static initializers. They run before the C++
+  /// global constructors that Clang emits into the same module.
+  void addStaticInitializer(llvm::Function *fn) {
+    assert(!EmittedStaticInitializers &&
+           "static initializer added after emitting global constructors");
+    StaticInitializers.push_back(fn);
+  }
 
   void constructInitialFnAttributes(
       llvm::AttrBuilder &Attrs,

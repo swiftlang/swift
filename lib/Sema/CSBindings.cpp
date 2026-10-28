@@ -16,7 +16,9 @@
 #include "swift/Sema/CSBindings.h"
 #include "TypeChecker.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -74,8 +76,8 @@ static bool isDirectRequirement(ConstraintSystem &cs,
 ///
 /// $T1 bind (x: Int, y: String)
 static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
-  auto *boundTy = containerTy->getAs<BoundGenericStructType>();
-  if (!boundTy)
+  auto *boundTy = containerTy->getAs<StructType>();
+  if (!boundTy || !boundTy->hasGenericArgs())
     return containerTy;
 
   // We should never form a type like Array<@noescape () -> ()>, because
@@ -90,7 +92,7 @@ static Type applyElementTypeToBinding(Type containerTy, Type elementTy) {
   if (decl == ctx.getArrayDecl())
     return ArraySliceType::get(elementTy);
   else if (decl == ctx.getSetDecl())
-    return BoundGenericType::get(decl, /*parent=*/Type(), {elementTy});
+    return NominalType::get(decl, /*parent=*/Type(), {elementTy}, ctx);
 
   return containerTy;
 }
@@ -274,9 +276,11 @@ void BindingSet::computeJoinsAndMeets() {
   MergedBinding subtypes;
   std::optional<unsigned> firstSubtype;
 
+  auto &ctx = CS.getASTContext();
+
   // FIXME: Remove this.
-  bool allowTypeVariableJoins =
-      CS.getASTContext().TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool allowTypeVariableJoins = ctx.TypeCheckerOpts.SolverEnableTypeVariableJoins;
+  bool enableShortConversions = ctx.TypeCheckerOpts.SolverEnableShortConversions;
 
   for (unsigned i : indices(Bindings)) {
     auto binding = Bindings[i];
@@ -337,14 +341,16 @@ void BindingSet::computeJoinsAndMeets() {
       return;
     }
 
-    // Don't allow this for now, because it leads to infinite recursion
-    // in constraint simplification. Once optional conversions are no
-    // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSupertype->getOptionalObjectType()) {
-      if (objectType->is<JoinType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
-                                << commonSupertype << "\n");
-        return;
+    if (!enableShortConversions) {
+      // Don't allow this for now, because it leads to infinite recursion
+      // in constraint simplification. Once optional conversions are no
+      // longer presented as a disjunction, this case be removed.
+      if (auto objectType = commonSupertype->getOptionalObjectType()) {
+        if (objectType->is<JoinType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping join type: "
+                                  << commonSupertype << "\n");
+          return;
+        }
       }
     }
 
@@ -403,15 +409,16 @@ void BindingSet::computeJoinsAndMeets() {
       newBindings.clear();
 
       // Add an exact binding. It should always fail when attempted.
-      newBindings.emplace_back(commonSubtype, AllowedBindingKind::Exact,
+      newBindings.emplace_back(subtypes.types[0], AllowedBindingKind::Exact,
                                subtypes.bindingSource,
                                subtypes.originator);
 
       // Drop all other bindings.
       std::swap(newBindings, Bindings);
 
+      // TODO: Make a new kind of Conflict flag
       // Mark the binding set in conflict so that it can be attempted next.
-      markConflicting();
+      markConflicting(ConflictReason(ConflictFlag::Exact));
       return;
     }
 
@@ -426,11 +433,13 @@ void BindingSet::computeJoinsAndMeets() {
     // Don't allow this for now, because it leads to infinite recursion
     // in constraint simplification. Once optional conversions are no
     // longer presented as a disjunction, this case be removed.
-    if (auto objectType = commonSubtype->getOptionalObjectType()) {
-      if (objectType->is<MeetType>()) {
-        LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
-                                << commonSubtype << "\n");
-        return;
+    if (!enableShortConversions) {
+      if (auto objectType = commonSubtype->getOptionalObjectType()) {
+        if (objectType->is<MeetType>()) {
+          LLVM_DEBUG(llvm::dbgs() << "Dropping meet type: "
+                                  << commonSubtype << "\n");
+          return;
+        }
       }
     }
 
@@ -465,8 +474,8 @@ void BindingSet::computeJoinsAndMeets() {
     // binding. Check if the joined supertype is in conflict with the
     // first subtype binding.
     if (!foundCommonSubtype && firstSubtype.has_value()) {
-      if (subsumeBinding(newBindings[0], Bindings[*firstSubtype])
-            == SubsumeBindingResult::Conflict) {
+      if (subsumeBinding(newBindings[0], Bindings[*firstSubtype]).kind ==
+          SubsumeBindingResult::BindingResultKind::Conflict) {
         LLVM_DEBUG(llvm::dbgs() << "Join is too general: "
                                 << commonSupertype << "\n");
         newBindings.erase(newBindings.begin());
@@ -475,8 +484,8 @@ void BindingSet::computeJoinsAndMeets() {
     // Case 2: We computed a meet. Check if the join type is in conflict
     // with the meet.
     } else if (foundCommonSubtype) {
-      if (subsumeBinding(newBindings[0], newBindings[1])
-            == SubsumeBindingResult::Conflict) {
+      if (subsumeBinding(newBindings[0], newBindings[1]).kind ==
+          SubsumeBindingResult::BindingResultKind::Conflict) {
         LLVM_DEBUG(llvm::dbgs() << "Join is too general: "
                                 << commonSupertype << "\n");
         newBindings.erase(newBindings.begin());
@@ -702,10 +711,10 @@ bool BindingSet::isDelayed() const {
       return true;
 
     // When inferring the type of a variable in a pattern, delay its resolution
-    // so that we resolve type variables inside the expression as placeholders
-    // instead of marking the type of the variable itself as a placeholder. This
+    // so that we resolve type variables inside the expression as holes
+    // instead of marking the type of the variable itself as a hole. This
     // allows us to produce more specific errors because the type variable in
-    // the expression that introduced the placeholder might be diagnosable using
+    // the expression that introduced the hole might be diagnosable using
     // fixForHole.
     if (locator->isLastElement<LocatorPathElt::PatternDecl>()) {
       return true;
@@ -1044,7 +1053,7 @@ void BindingSet::inferTransitiveKeyPathBindingFrom(
     if (bindingTy->isAnyKeyPath())
       return;
 
-    auto *BGT = bindingTy->castTo<BoundGenericType>();
+    auto *BGT = bindingTy->castTo<NominalType>();
     inferredRootTy = BGT->getGenericArgs()[0];
 
     // The generic argument of a keypath type is invariant.
@@ -1276,7 +1285,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       auto type = binding.BindingType;
 
-      if (type->isPlaceholder())
+      if (type->is<HoleType>())
         continue;
 
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
@@ -1368,18 +1377,21 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   Type keyPathTy;
   switch (mutability) {
   case KeyPathMutability::ReadOnly:
-    keyPathTy = BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
-                                      {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
 
   case KeyPathMutability::Writable:
-    keyPathTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                      /*parent=*/Type(), {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getWritableKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
 
   case KeyPathMutability::ReferenceWritable:
-    keyPathTy = BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
-                                      /*parent=*/Type(), {rootType, valueType});
+    keyPathTy = NominalType::get(ctx.getReferenceWritableKeyPathDecl(),
+                                 /*parent=*/Type(),
+                                 {rootType, valueType}, ctx);
     break;
   }
 
@@ -1472,7 +1484,7 @@ bool BindingSet::finalizeKeyPathBindings() {
           // If key path is structurally correct and has a resolved root
           // type, let's promote the fallback type into a binding because
           // root would have been inferred from explicit type already and
-          // it's benefitial for diagnostics to assign a non-placeholder
+          // it's benefitial for diagnostics to assign a non-hole
           // type to key path literal to propagate root/value to the context.
           if (!keyPath->hasSingleInvalidComponent() &&
               (keyPath->getParsedRoot() ||
@@ -1538,6 +1550,16 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
   }
 }
 
+void BindingSet::markConflicting(ConflictReason reason) {
+  IsConflicting = true;
+  if (CS.inSalvageMode())
+    for (auto binding : Info.Bindings) {
+      auto *locator = binding.getLocator();
+      CS.recordConflictedType(TypeVar, binding.BindingType->getCanonicalType(),
+                              locator, reason);
+    }
+}
+
 /// Decide if the new binding subsumes the existing binding, or vice versa.
 SubsumeBindingResult
 BindingSet::subsumeBinding(const PotentialBinding &binding,
@@ -1562,9 +1584,9 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       }
 
       if (lhsUnwrap->isDouble() && rhsUnwrap->isCGFloat())
-        return SubsumeBindingResult::ExistingIsBetter;
+        return SubsumeBindingResult::ExistingIsBetter();
       else if (lhsUnwrap->isCGFloat() && rhsUnwrap->isDouble())
-        return SubsumeBindingResult::NewIsBetter;
+        return SubsumeBindingResult::NewIsBetter();
     }
 
     return std::nullopt;
@@ -1578,7 +1600,8 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
   // (Exact, Exact)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Exact) {
-    auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+    std::optional<bool> result =
+        isLikelyExactMatch(binding.BindingType, existing.BindingType);
 
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
@@ -1587,20 +1610,22 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       // attempt it next and fail as soon as possible.
       if (result.has_value() && !*result) {
         SUBSUME_DEBUG("Exact vs exact conflict");
-        return SubsumeBindingResult::Conflict;
+        ConflictReason reason(ConflictFlag::Exact);
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict, reason);
       }
 
       // In any case, drop all Exact bindings but the first one, because it
       // doesn't matter which one we attempt.
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
     }
 
     // FIXME: Remove this.
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+        return SubsumeBindingResult::ExistingIsBetter();
 
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
   }
 
@@ -1610,18 +1635,22 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a supertype of the new lower bound.
-      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType)) {
+      auto conversionFailure =
+          checkConversion(CS.CC, binding.BindingType, existing.BindingType);
+      if (conversionFailure) {
         SUBSUME_DEBUG("Exact vs supertype conflict");
-        return SubsumeBindingResult::Conflict;
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict,
+            conversionFailure);
       }
 
       // Once we have an Exact binding, we don't need anything else.
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
     }
 
     // FIXME: Remove this.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
   }
 
   // (Exact, Subtypes)
@@ -1630,25 +1659,29 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Existing exact binding must be a subtype of the new upper bound.
-      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType)) {
+      auto conversionFailure =
+          checkConversion(CS.CC, existing.BindingType, binding.BindingType);
+      if (conversionFailure) {
         SUBSUME_DEBUG("Exact vs subtype conflict");
-        return SubsumeBindingResult::Conflict;
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict,
+            conversionFailure);
       }
 
       // Once we have an Exact binding, we don't need anything else.
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
     }
 
     // FIXME: Remove this.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
   }
 
   // (Exact, Fallback)
   if (existing.Kind == AllowedBindingKind::Exact &&
       binding.Kind == AllowedBindingKind::Fallback) {
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
   }
 
   // (Supertypes, Exact)
@@ -1657,25 +1690,29 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // Exact binding must be a supertype of the existing lower bound.
-      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType)) {
+      auto conversionFailure =
+          checkConversion(CS.CC, existing.BindingType, binding.BindingType);
+      if (conversionFailure) {
         SUBSUME_DEBUG("Supertype vs exact conflict");
-        return SubsumeBindingResult::Conflict;
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict,
+            conversionFailure);
       }
 
       // Exact bindings replace Supertype bindings.
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
 
     // FIXME: Remove the rest.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+        return SubsumeBindingResult::ExistingIsBetter();
 
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
   }
 
@@ -1684,7 +1721,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Supertypes) {
     // Drop duplicate supertype bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
 
     // Joins are handled in computeJoinsAndMeets().
 
@@ -1695,10 +1732,10 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
       if (result.has_value() && *result) {
         if (binding.BindingType->hasTypeVariable())
-          return SubsumeBindingResult::ExistingIsBetter;
+          return SubsumeBindingResult::ExistingIsBetter();
 
         if (existing.BindingType->hasTypeVariable())
-          return SubsumeBindingResult::NewIsBetter;
+          return SubsumeBindingResult::NewIsBetter();
 
         // If neither one has a type variable, we have the 'Any' vs
         // 'any Sendable' situation. We leave both bindings in place
@@ -1713,9 +1750,13 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The existing lower bound should be a subtype of the new upper bound.
-      if (!canConvertTo(CS.CC, existing.BindingType, binding.BindingType)) {
+      auto conversionFailure =
+          checkConversion(CS.CC, existing.BindingType, binding.BindingType);
+      if (conversionFailure) {
         SUBSUME_DEBUG("Supertype vs subtype conflict");
-        return SubsumeBindingResult::Conflict;
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict,
+            conversionFailure);
       }
     }
 
@@ -1723,15 +1764,16 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePromoteSupertypes ||
         CS.shouldAttemptFixes()) {
       if (binding.BindingType->isEqual(existing.BindingType))
-        return SubsumeBindingResult::NewIsBetter;
+        return SubsumeBindingResult::NewIsBetter();
 
-      auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
+      auto result =
+          isLikelyExactMatch(binding.BindingType, existing.BindingType);
       if (result.has_value() && *result) {
         if (binding.BindingType->hasTypeVariable())
-          return SubsumeBindingResult::ExistingIsBetter;
+          return SubsumeBindingResult::ExistingIsBetter();
 
         if (existing.BindingType->hasTypeVariable())
-          return SubsumeBindingResult::NewIsBetter;
+          return SubsumeBindingResult::NewIsBetter();
       }
 
       if (auto result = dedupCGFloatDoubleHack())
@@ -1744,15 +1786,15 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // If both have the same type, prefer the supertype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+        return SubsumeBindingResult::ExistingIsBetter();
 
       ASSERT(existing.BindingType->hasTypeVariable());
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
   }
 
@@ -1762,24 +1804,27 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new exact binding should be a subtype of the existing upper bound.
-      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType)) {
-        SUBSUME_DEBUG("Subtype vs exact conflict");
-        return SubsumeBindingResult::Conflict;
+      auto conversionFailure =
+          checkConversion(CS.CC, binding.BindingType, existing.BindingType);
+      if (conversionFailure) {
+        SUBSUME_DEBUG("Subtype vs Exact conflict");
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict,
+            conversionFailure);
       }
-
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
 
     // FIXME: Remove the rest.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+        return SubsumeBindingResult::ExistingIsBetter();
 
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
   }
 
@@ -1789,9 +1834,13 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     // FIXME: Do this in diagnostic mode also
     if (!CS.shouldAttemptFixes()) {
       // The new lower bound should be a subtype of the existing upper bound.
-      if (!canConvertTo(CS.CC, binding.BindingType, existing.BindingType)) {
+      auto conversionFailure =
+          checkConversion(CS.CC, binding.BindingType, existing.BindingType);
+      if (conversionFailure) {
         SUBSUME_DEBUG("Subtype vs supertype conflict");
-        return SubsumeBindingResult::Conflict;
+        return SubsumeBindingResult(
+            SubsumeBindingResult::BindingResultKind::Conflict,
+            conversionFailure);
       }
     }
 
@@ -1799,8 +1848,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
     if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePromoteSupertypes ||
         CS.shouldAttemptFixes()) {
       if (binding.BindingType->isEqual(existing.BindingType))
-        return SubsumeBindingResult::ExistingIsBetter;
-
+        return SubsumeBindingResult::ExistingIsBetter();
       if (auto result = dedupCGFloatDoubleHack())
         return *result;
     }
@@ -1811,7 +1859,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Subtypes) {
     // Drop duplicate subtype bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
   }
 
   // (Subtypes, Fallback)
@@ -1819,7 +1867,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // If both have the same type, prefer the subtype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::ExistingIsBetter;
+      return SubsumeBindingResult::ExistingIsBetter();
   }
 
   // (Fallback, Exact)
@@ -1827,14 +1875,14 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Exact) {
     // If both have the same type, prefer the exact binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
 
     auto result = isLikelyExactMatch(binding.BindingType, existing.BindingType);
     if (result.has_value() && *result) {
       if (binding.BindingType->hasTypeVariable())
-        return SubsumeBindingResult::ExistingIsBetter;
+        return SubsumeBindingResult::ExistingIsBetter();
 
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
     }
   }
 
@@ -1843,7 +1891,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Supertypes) {
     // If both have the same type, prefer the supertype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
   }
 
   // (Fallback, Subtypes)
@@ -1851,7 +1899,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Subtypes) {
     // If both have the same type, prefer the subtype binding.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
   }
 
   // (Fallback, Fallback)
@@ -1859,10 +1907,10 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       binding.Kind == AllowedBindingKind::Fallback) {
     // Drop duplicate Fallback bindings.
     if (binding.BindingType->isEqual(existing.BindingType))
-      return SubsumeBindingResult::NewIsBetter;
+      return SubsumeBindingResult::NewIsBetter();
   }
 
-  return SubsumeBindingResult::KeepBoth;
+  return SubsumeBindingResult::KeepBoth();
 
 #undef SUBSUME_DEBUG
 }
@@ -1892,7 +1940,7 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
       // binding to attempt immediately.
       LLVM_DEBUG(llvm::dbgs() << "Exact binding doesn't conform: "
                               << type.getString() << "\n");
-      markConflicting();
+      markConflicting(ConflictReason(ConflictFlag::Exact));
 
       // Preserve the binding kind, which is Exact.
       break;
@@ -1911,7 +1959,7 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
         // binding to attempt immediately.
         LLVM_DEBUG(llvm::dbgs() << "Conflict from bad closure subtype: "
                                 << binding.BindingType.getString() << "\n");
-        markConflicting();
+        markConflicting(ConflictReason(ConflictFlag::Conformance));
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
@@ -1976,7 +2024,7 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
         // binding to attempt immediately.
         LLVM_DEBUG(llvm::dbgs() << "Subtype binding doesn't conform: "
                                 << binding.BindingType.getString() << "\n");
-        markConflicting();
+        markConflicting(ConflictReason(ConflictFlag::Conformance));
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
@@ -2036,7 +2084,7 @@ void BindingSet::reduceBinding(PotentialBinding &binding) {
         // binding to attempt immediately.
         LLVM_DEBUG(llvm::dbgs() << "Supertype doesn't conform: "
                                 << binding.BindingType.getString() << "\n");
-        markConflicting();
+        markConflicting(ConflictReason(ConflictFlag::Conformance));
         binding.Kind = AllowedBindingKind::Exact;
         break;
       }
@@ -2098,9 +2146,9 @@ void BindingSet::addBinding(PotentialBinding binding) {
   auto existing = Bindings.begin();
   while (existing != Bindings.end()) {
     auto result = subsumeBinding(binding, *existing);
-    switch (result) {
-    case SubsumeBindingResult::Conflict:
-      markConflicting();
+    switch (result.kind) {
+    case SubsumeBindingResult::BindingResultKind::Conflict:
+      markConflicting(result.reason);
 
       // Promote the new binding to exact and drop everything else.
       binding.Kind = AllowedBindingKind::Exact;
@@ -2108,10 +2156,10 @@ void BindingSet::addBinding(PotentialBinding binding) {
       Bindings.clear();
       existing = Bindings.end();  // Exit the loop.
       break;
-    case SubsumeBindingResult::ExistingIsBetter:
+    case SubsumeBindingResult::BindingResultKind::ExistingIsBetter:
       // Drop the new binding.
       return;
-    case SubsumeBindingResult::NewIsBetter:
+    case SubsumeBindingResult::BindingResultKind::NewIsBetter:
       // First, remove all of the adjacent type variables associated
       // with the existing binding.
       //
@@ -2128,7 +2176,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       // Remove the existing binding.
       existing = Bindings.erase(existing);
       break;
-    case SubsumeBindingResult::KeepBoth:
+    case SubsumeBindingResult::BindingResultKind::KeepBoth:
       // Nothing to do so far, keep the existing binding and move on.
       ++existing;
       break;
@@ -2219,7 +2267,7 @@ static bool isSupertypeEligibleForPromotionWhenHacksAreOn(Type t) {
     if (archetypeTy->getSuperclass())
       return false;
 
-  auto *classDecl = t->getClassOrBoundGenericClass();
+  auto *classDecl = t->getClassDecl();
   if (classDecl && classDecl->getSuperclassDecl())
     return false;
 
@@ -2261,15 +2309,26 @@ void BindingSet::promoteBindings() {
   if (!considerSupertypes && !considerSubtypes)
     return;
 
+  auto conformsToAll = [&](const PotentialBinding &binding) {
+    return llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
+      // The function type could be not yet fully resolved to determine
+      // whether it conforms to the given protocol or not.
+      if (auto *fnType = binding.BindingType->getAs<FunctionType>()) {
+        if (fnType->hasTypeDependencyFor(proto))
+          return false;
+      }
+
+      return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
+    });
+  };
+
   for (const auto binding : Bindings) {
     switch (binding.Kind) {
     case AllowedBindingKind::Supertypes:
       if (considerSupertypes) {
         // FIXME: Also check if Optional<T> conforms to all protocols
         // and satisfies the subtype binding
-        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
-          return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
-        })) {
+        if (conformsToAll(binding)) {
           if (beConservativeWithSuperclassBindings &&
               !isSupertypeEligibleForPromotionWhenHacksAreOn(binding.BindingType)) {
             LLVM_DEBUG(llvm::dbgs() << "Binding not eligible for promotion "
@@ -2287,9 +2346,7 @@ void BindingSet::promoteBindings() {
       if (considerSubtypes) {
         // FIXME: If T = Optional<U>, check if U conforms to all protocols
         // and satisfies the supertype binding
-        if (llvm::all_of(Protocols, [&](ProtocolDecl *proto) -> bool {
-          return !CS.lookupConformance(binding.BindingType, proto).isInvalid();
-        })) {
+        if (conformsToAll(binding)) {
           ++subtypeCount;
           promotedSubtype = binding;
         }
@@ -2317,7 +2374,7 @@ void BindingSet::promoteBindings() {
     // introducing Void will just cause local solution ambiguities.
     auto *locator = TypeVar->getImpl().getLocator();
     if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
-        !binding.BindingType->isPlaceholder()) {
+        !binding.BindingType->is<HoleType>()) {
       auto voidType = CS.getASTContext().TheEmptyTupleType;
       addBinding(binding.withSameSource(
           voidType, AllowedBindingKind::Fallback));
@@ -2919,7 +2976,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   do {
     // Conformance check on type variable would always return true,
     // but type variable can't cover anything until it's bound.
-    if (type->isTypeVariableOrMember() || type->isPlaceholder())
+    if (type->isTypeVariableOrMember() || type->is<HoleType>())
       return std::make_pair(false, Type());
 
     if (isCoveredBy(binding.Kind, type, CS)) {
@@ -3614,12 +3671,19 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   }
 
   // We allow a funny function conversion (...) -> T conv (...) -> Void
-  // in certain positions. To handle this correctly, we must not attempt
-  // a Void binding too soon in this situation. Handle it like a fallback
-  // instead of a real subtype relationship, since it isn't one.
+  // in locations with single expression closures (SEC), regardless of the
+  // declared type. To handle this correctly, we must avoid binding to Void too
+  // soon, and thus produce a Fallback binding when the constraint locator has
+  // result conversion kind indicating (SEC), or if TypeVar or any member of its
+  // equivalence class has a locator with the same property.
+  // The constraint locator check identifies cases with a concrete result type but a
+  // type variable inside the closure
+  // The type variable locator check handles the other cases, including where equivalence
+  // class merging has made the closure result non-representative.
   if (kind == AllowedBindingKind::Subtypes && type->isVoid()) {
-    auto subkind = CS.getImpliedResultConversionKind(constraint->getLocator());
-    if (subkind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+    auto conRKind = CS.getImpliedResultConversionKind(constraint->getLocator());
+    if (conRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid ||
+        isToVoidTypeVar(TypeVar, &CS)) {
       kind = AllowedBindingKind::Fallback;
     }
   }
@@ -3628,6 +3692,23 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 }
 
 #undef DEBUG_BAILOUT
+
+bool PotentialBindings::isToVoidTypeVar(TypeVariableType *typeVar,
+                                        ConstraintSystem *CS) {
+  if (CS->getImpliedResultConversionKind(typeVar->getImpl().getLocator()) ==
+      ConstraintSystem::ImpliedResultConversionKind::ToVoid)
+    return true;
+  auto &typeNode = CS->getConstraintGraph()[typeVar];
+  auto equivalenceClass = typeNode.getEquivalenceClass();
+  for (auto tv : equivalenceClass) {
+    auto tvRKind =
+        CS->getImpliedResultConversionKind(tv->getImpl().getLocator());
+    if (tvRKind == ConstraintSystem::ImpliedResultConversionKind::ToVoid) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
@@ -3697,6 +3778,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::DiscardableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
   case ConstraintKind::SyntacticElement:

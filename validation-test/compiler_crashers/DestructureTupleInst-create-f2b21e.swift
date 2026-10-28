@@ -1,5 +1,6 @@
 // {"kind":"emit-silgen","original":"bc3658dc","signature":"swift::DestructureTupleInst::create(swift::SILFunction const&, swift::SILDebugLocation, swift::SILValue, swift::ValueOwnershipKind)","signatureAssert":"Assertion failed: (Operand->getType().is<TupleType>() && \"Expected a tuple typed operand?!\"), function create","signatureNext":"PatternMatchEmission::emitDestructiveCaseBlocks::ConsumingPatternBindingVisitor::visitEnumProjection"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
+
 enum a<b: ~Copyable> {
   case c
   indirect case d(b, a)

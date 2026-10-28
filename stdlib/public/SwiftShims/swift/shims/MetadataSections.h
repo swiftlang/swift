@@ -86,6 +86,11 @@ struct MetadataSections {
   MetadataSectionRange swift5_replac2;
   MetadataSectionRange swift5_builtin;
   MetadataSectionRange swift5_capture;
+
+  /// Unused. Formerly \c swift5_mpenum. The slot stays in place so the layout
+  /// of the fields after it doesn't change; set it to zeroes.
+  MetadataSectionRange unused_mpenum;
+
   MetadataSectionRange swift5_accessible_functions;
   MetadataSectionRange swift5_runtime_attributes;
   MetadataSectionRange swift5_tests;

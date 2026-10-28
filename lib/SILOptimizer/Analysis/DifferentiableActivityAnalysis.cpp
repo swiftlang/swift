@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Type.h"
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
@@ -226,6 +228,23 @@ void DifferentiableActivityInfo::propagateVaried(
           for (auto *arg : succBB->getArguments())
             setVariedAndPropagateToUsers(arg, i);
   }
+  // startAsyncLetWithLocalBuffer takes its last argument as a result buffer:
+  // startAsyncLetWithLocalBuffer: <T> (
+  //     _ taskOptions: Optional<Builtin.RawPointer>,
+  //     __owned @escaping () async throws -> sending T,
+  //     _ resultBuf: Builtin.RawPointer
+  // ) -> Builtin.RawPointer
+  // We treat it similar to full apply site to allow further diffefentiation.
+  else if (auto *bi = dyn_cast<BuiltinInst>(inst);
+           bi && bi->getBuiltinKind() ==
+                     BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+    if (isVaried(operand->get(), i)) {
+      auto resultBuf = bi->getArguments().back();
+      propagateVariedInwardsThroughProjections(resultBuf, i);
+      // Do not mark result as varied, we do not want task context to end
+      // being active
+    }
+  }
   // Handle everything else.
   else {
     for (auto &op : inst->getAllOperands()) {
@@ -305,7 +324,7 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
   if (isUseful(value, dependentVariableIndex))
     return;
   if (value->getType().isAddress() ||
-      value->getType().getClassOrBoundGenericClass()) {
+      value->getType().getClassDecl()) {
     propagateUsefulThroughAddress(value, dependentVariableIndex);
     return;
   }
@@ -395,10 +414,28 @@ void DifferentiableActivityInfo::propagateUseful(
   }
 }
 
+// Given a pointer_to_address instruction, return corresponding
+// startAsyncLetWithLocalBuffer provided that input instruction
+// is the address of the async let result buffer (so, the last operand)
+static BuiltinInst *getAsyncLetStart(const PointerToAddressInst *pta) {
+  for (auto use : pta->getOperand()->getUses()) {
+    auto *bi = dyn_cast<BuiltinInst>(use->getUser());
+    if (!bi)
+      continue;
+
+    if (bi->getBuiltinKind() ==
+            BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
+        use->getOperandNumber() == bi->getNumOperands() - 1)
+      return bi;
+  }
+
+  return nullptr;
+}
+
 void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     SILValue value, unsigned dependentVariableIndex) {
   assert(value->getType().isAddress() ||
-         value->getType().getClassOrBoundGenericClass());
+         value->getType().getClassDecl());
   // Skip already-useful values to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;
@@ -422,6 +459,16 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
       if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
           isa<BeginBorrowInst>(res) || isa<InitEnumDataAddrInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
+    }
+  }
+  if (auto *pta = dyn_cast_or_null<PointerToAddressInst>(
+          value->getDefiningInstruction())) {
+    if (auto *bi = getAsyncLetStart(pta)) {
+      // Mark the second operand (async let closure) as useful
+      auto closure = bi->getArguments()[1];
+      assert(closure->getType().isAsyncFunction() && "expected async closure");
+      propagateUseful(closure->getDefiningInstruction(),
+                      dependentVariableIndex);
     }
   }
 }

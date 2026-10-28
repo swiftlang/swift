@@ -163,20 +163,31 @@ print("if case all failed:", allPatternsFail(
 // CHECK: canary deinit count after failed patterns: 2
 print("canary deinit count after failed patterns:", Canary.deinitCount)
 
-// MARK: - `as?` consumes unconditionally, unlike a cast pattern
+// MARK: - `as?` as a value consumes unconditionally; `if let x = y as? T` does not
 //
 // Same invariant as the plain existential test, through the extended-existential
-// runtime path: forming an Optional with `as?` consumes the subject even when
-// the cast fails, while a cast pattern leaves it intact on the failure edge.
+// runtime path: forming an Optional with `as?` as a plain value consumes the
+// subject even when the cast fails, while a cast pattern -- and `if let` over
+// `as?` -- leaves it intact on the failure edge.
 
 func optionalFormConsumesOnFailure() -> Int {
   let box: any P<Int> & ~Copyable =
     BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
-  if let u = box as? Unrelated { _ = u; return -1 }
+  _ = box as? Unrelated
   return Canary.deinitCount
 }
 // CHECK: as? consumed on failure (3 => yes): 3
 print("as? consumed on failure (3 => yes):", optionalFormConsumesOnFailure())
+
+func ifLetLeavesSubjectOnFailure() -> Int {
+  let before = Canary.deinitCount
+  let box: any P<Int> & ~Copyable =
+    BigWithCanary(canary: Canary(), pad0: 0, pad1: 0, pad2: 0, pad3: 0, pad4: 0, pad5: 0)
+  if let u = box as? Unrelated { _ = u; return -1 }
+  return Canary.deinitCount - before
+}
+// CHECK: if let left subject alive on failure (0 => yes): 0
+print("if let left subject alive on failure (0 => yes):", ifLetLeavesSubjectOnFailure())
 
 func patternFormDoesNotConsumeOnFailure() -> Int {
   let before = Canary.deinitCount

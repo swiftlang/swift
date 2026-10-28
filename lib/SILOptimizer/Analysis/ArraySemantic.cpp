@@ -656,7 +656,7 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
   auto Ty = getSelf()->getType();
-  if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
+  if (auto BGT = Ty.getAs<StructType>()) {
     // Check the array element type parameter.
     bool isClass = true;
     for (auto EltTy : BGT->getGenericArgs()) {

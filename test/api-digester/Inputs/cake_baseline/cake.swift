@@ -236,3 +236,30 @@ open class AddingNewDesignatedInit {
 public func addingAnInverse<T>(_ t: borrowing T) {}
 
 public func addingAnInversePreInverse<T>(_ t: borrowing T) {}
+
+public struct TypedThrowsError: Error {}
+public struct OtherTypedThrowsError: Error {}
+
+public func untypedToTypedThrows() throws {}
+public func typedToUntypedThrows() throws(TypedThrowsError) {}
+public func typedThrowsErrorChanged() throws(TypedThrowsError) {}
+public func untypedToAnyErrorThrows() throws {}
+public func untypedToNeverThrows() throws {}
+public func genericTypedToUntypedThrows<E: Error>(_ e: E) throws(E) {}
+public var typedThrowsGetter: Int { get throws(TypedThrowsError) { 0 } }
+public var nonThrowingToThrowingGetter: Int { get { 0 } }
+
+public protocol TypedThrowsProto {
+  func untypedToTypedThrowsReq() throws
+}
+
+open class TypedThrowsOpenClass {
+  public init() {}
+  open func untypedToTypedThrowsOpen() throws {}
+}
+
+open class TypedThrowsOpenClassInits {
+  public required init() throws {}
+  public init(x: Int) throws {}
+  public convenience init(y: Int) throws { try self.init(x: y) }
+}

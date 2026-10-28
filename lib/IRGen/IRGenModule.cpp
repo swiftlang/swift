@@ -926,6 +926,16 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  OnceClosureDestroyedErrorAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getOnceClosureDestroyedErrorAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
@@ -1057,6 +1067,15 @@ namespace RuntimeConstants {
   TaskPriorityEscalationHandlersAvailability(ASTContext &Context) {
     auto featureAvailability =
         Context.getTaskPriorityEscalationHandlersAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  TaskCancellationShieldAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskCancellationShieldAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -2503,7 +2522,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (!Triple.isOSDarwin() && !Context.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  auto *clDecl = objectType.getClassDecl();
   if (!clDecl)
     return false;
 

@@ -439,3 +439,116 @@ bb3:
   %r = tuple ()
   return %r : $()
 }
+
+// The debug_value of %box in bb3 is before the consume in bb2, so it can use
+// the phi created for that destroy_value. This is independent of the order of
+// the basic blocks or instructions in textual SIL.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_parsed_after_consume :
+// CHECK:       bb{{[0-9]+}}([[PHI:%[0-9]+]] : @owned $BoxStruct):
+// CHECK-NEXT:    debug_value [[PHI]], let, name "self"
+// CHECK-LABEL: } // end sil function 'debug_use_parsed_after_consume'
+sil [ossa] @debug_use_parsed_after_consume : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @getBox : $@convention(thin) () -> @owned BoxStruct
+  %box = apply %f() : $@convention(thin) () -> @owned BoxStruct
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb3, bb4
+
+// bb2 is written before bb3 so that the debug_value is parsed after the
+// destroy_value.
+bb2:
+  destroy_value %box : $BoxStruct
+  br bb1
+
+bb3:
+  debug_value %box : $BoxStruct, let, name "self"
+  br bb2
+
+bb4:
+  destroy_value %box : $BoxStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// %guts is a projection of a guaranteed argument, so it is valid for the whole
+// function, including at the debug_value in bb4. After rotation, %guts is
+// replaced by a phi in the loop. bb4 is reached from the block that uses the
+// phi only through a chain of single-predecessor blocks, so the debug_value can
+// refer to the phi without any further phis, and it must not be killed.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_of_guaranteed_in_successor_block :
+// CHECK:       bb{{[0-9]+}}([[PHI:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    [[BORROWED:%[0-9]+]] = borrowed [[PHI]] from
+// CHECK:         debug_value [[BORROWED]], let, name "guts"
+// CHECK-LABEL: } // end sil function 'debug_use_of_guaranteed_in_successor_block'
+sil [ossa] @debug_use_of_guaranteed_in_successor_block : $@convention(thin) (@guaranteed BoxStruct) -> () {
+bb0(%0 : @guaranteed $BoxStruct):
+  br bb1
+
+bb1:
+  %guts = struct_extract %0 : $BoxStruct, #BoxStruct.guts
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb2, bb5
+
+bb2:
+  %u = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %1 = apply %u(%guts) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  debug_value %guts : $Klass, let, name "guts"
+  br bb1
+
+bb5:
+  %r = tuple ()
+  return %r : $()
+}
+
+// bb2 consumes %box, and bb4 is reached from bb2 only through a chain of
+// single-predecessor blocks. So the debug_value in bb4 is after the consume.
+// After rotation, %box is replaced by a phi in the loop. The debug_value can
+// refer to that phi without any further phis, so it keeps referring to the
+// value even though the value has been consumed by then; this is allowed for
+// debug uses.
+//
+// CHECK-LABEL: sil [ossa] @debug_use_after_consume_in_predecessor_block :
+// CHECK:       bb{{[0-9]+}}([[PHI:%[0-9]+]] : @owned $BoxStruct):
+// CHECK-NEXT:    destroy_value [[PHI]]
+// CHECK:         debug_value [[PHI]], let, name "self"
+// CHECK-LABEL: } // end sil function 'debug_use_after_consume_in_predecessor_block'
+sil [ossa] @debug_use_after_consume_in_predecessor_block : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @getBox : $@convention(thin) () -> @owned BoxStruct
+  %box = apply %f() : $@convention(thin) () -> @owned BoxStruct
+  %c = function_ref @cond : $@convention(thin) () -> Builtin.Int1
+  %b = apply %c() : $@convention(thin) () -> Builtin.Int1
+  cond_br %b, bb2, bb5
+
+bb2:
+  destroy_value %box : $BoxStruct
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  debug_value %box : $BoxStruct, let, name "self"
+  br bb1
+
+bb5:
+  destroy_value %box : $BoxStruct
+  %r = tuple ()
+  return %r : $()
+}

@@ -13,6 +13,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
@@ -519,20 +520,17 @@ SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   // If the cache is out-of-date, update it now.
   unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
   if (numBuffers != LocCache.numBuffersOriginal) {
-    LocCache.sortedBuffers.assign(std::begin(range(1, numBuffers + 1)),
-                                  std::end(range(1, numBuffers + 1)));
+    // Sort the buffers added since the cache was last updated by source range,
+    // and merge them into the cache. Remove lower-numbered buffers with the
+    // same source ranges as higher-numbered buffers; we want later alias
+    // buffers to be found first.
+    BufferIDRangeComparison rangeLess{this};
+    auto addedIDs = range(LocCache.numBuffersOriginal + 1, numBuffers + 1);
+    SmallVector<unsigned, 4> addedBuffers(addedIDs.begin(), addedIDs.end());
+    std::sort(addedBuffers.begin(), addedBuffers.end(), rangeLess);
+    mergeUnique(LocCache.sortedBuffers, addedBuffers, rangeLess,
+                BufferIDSameRange{this});
     LocCache.numBuffersOriginal = numBuffers;
-
-    // Sort the buffer IDs by source range.
-    std::sort(LocCache.sortedBuffers.begin(), LocCache.sortedBuffers.end(),
-              BufferIDRangeComparison{this});
-
-    // Remove lower-numbered buffers with the same source ranges as higher-
-    // numbered buffers. We want later alias buffers to be found first.
-    auto newEnd =
-        std::unique(LocCache.sortedBuffers.begin(),
-                    LocCache.sortedBuffers.end(), BufferIDSameRange{this});
-    LocCache.sortedBuffers.erase(newEnd, LocCache.sortedBuffers.end());
 
     // Forget the last buffer we looked at; it might have been replaced.
     LocCache.lastBufferID = std::nullopt;

@@ -29,15 +29,20 @@ func takesNullableNode(_ n: Node?) -> Int32 { return n?.value ?? -1 }
 @cxx @implementation
 func takesNodeByRef(_ n: Node) -> Int32 { return n.value }
 
+// A const one is borrowed for the call, so it must be `borrowing`.
+// expected-error@+2{{global function 'consumesConstNodeRef' cannot implement C++ function 'consumesConstNodeRef' because parameter 'n' must be 'borrowing' to match a C++ 'const' reference}}{{32-41=borrowing}}
+@cxx @implementation
+func consumesConstNodeRef(_ n: consuming Node) -> Int32 { return n.value }
+
 // A C++ reference to a pointer to a foreign reference type is implemented by
-// an `inout` parameter of the reference type, a const one by a plain
+// an `inout` parameter of the reference type, a const one by a `borrowing`
 // parameter. The referent is the pointer, so the implementation must be
 // `@unsafe` as for any other reference parameter.
 @unsafe @cxx @implementation
 func reseatNode(_ p: inout Node, _ to: Node) { p = to }
 
 @unsafe @cxx @implementation
-func readNodePtr(_ p: Node) -> Int32 { return p.value }
+func readNodePtr(_ p: borrowing Node) -> Int32 { return p.value }
 
 // expected-error@+2{{global function 'mismatchedNodePtrSpelling' of type '(UnsafeMutablePointer<Node>) -> ()' does not match type '(inout Node) -> Void' declared by the header}}
 @unsafe @cxx @implementation
@@ -46,7 +51,7 @@ func mismatchedNodePtrSpelling(_ p: UnsafeMutablePointer<Node>) {}
 // expected-error@+2{{global function 'missingUnsafeNodePtr' must be marked '@unsafe' to implement C++ function 'missingUnsafeNodePtr'}}{{-1:1-1=@unsafe }}
 @cxx @implementation
 func missingUnsafeNodePtr(
-  _ p: Node // expected-note{{C++ callers may modify parameter 'p' through another reference during the call}}
+  _ p: borrowing Node // expected-note{{C++ callers may modify parameter 'p' through another reference during the call}}
 ) -> Int32 { return p.value }
 
 @cxx @implementation
@@ -162,20 +167,20 @@ extension Polymorphic {
 // reference-counted parameters and receiver, so the operation would call
 // itself.
 
-// expected-error@+2{{@cxx function implementing the retain operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@+2{{'@cxx' function implementing the retain operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 @cxx @implementation
 func retainNode(_ n: Node) { }
 
-// expected-error@+2{{@cxx function implementing the release operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@+2{{'@cxx' function implementing the release operation of foreign reference type 'Node' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 @cxx @implementation
 func releaseNode(_ n: Node) { }
 
 extension Counted {
-  // expected-error@+2{{@cxx instance method implementing the retain operation of foreign reference type 'Counted' will cause infinite recursion}}
+  // expected-error@+2{{'@cxx' instance method implementing the retain operation of foreign reference type 'Counted' will cause infinite recursion}}
   @cxx @implementation
   func retainMethod() { }
 
-  // expected-error@+2{{@cxx instance method implementing the release operation of foreign reference type 'Counted' will cause infinite recursion}}
+  // expected-error@+2{{'@cxx' instance method implementing the release operation of foreign reference type 'Counted' will cause infinite recursion}}
   @cxx @implementation
   func releaseMethod() { }
 

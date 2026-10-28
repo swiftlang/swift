@@ -365,9 +365,12 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
         emitConstantValue(IGM, T2TFI->getCallee()).claimNextConstant(),
         sTy->getTypeAtIndex((unsigned)0));
 
+    llvm::Constant *contextPtr =
+        type.castTo<SILFunctionType>()->isCalledOnce()
+            ? IGM.getAddrOfExactlyOnceSharedContext()
+            : llvm::ConstantPointerNull::get(IGM.OpaquePtrTy);
     auto *context = llvm::ConstantExpr::getBitCast(
-        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy),
-        sTy->getTypeAtIndex((unsigned)1));
+        contextPtr, sTy->getTypeAtIndex((unsigned)1));
 
     if (flatten) {
       Explosion out;

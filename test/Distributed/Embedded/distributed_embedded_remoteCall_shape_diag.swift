@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
 // Missing remoteCall implementation should diagnose the right "Embedded shape" that users must implement.

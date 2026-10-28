@@ -122,6 +122,7 @@ class Parser {
   bool IsInputIncomplete = false;
   bool EnableParameterizedNonisolated = true; // HACK: for closures
   std::vector<Token> SplitTokens;
+  std::optional<DiagnosticQueue> SuppressedDiagQueue;
 
 public:
   SourceManager &SourceMgr;
@@ -1152,6 +1153,10 @@ public:
   /// type modifier.
   ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc,
                                                  bool allowIndices);
+
+  /// Parse the arguments of the `@_scopeParams` decl and type attributes.
+  ParserStatus parseScopeParamsAttrArgs(SourceRange &parens,
+                                        ScopeParamListRepr *&result);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,

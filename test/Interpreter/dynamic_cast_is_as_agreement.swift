@@ -45,10 +45,6 @@ func note(_ label: String, _ viaIs: Bool, _ viaAs: Bool) {
 
 /// Generic source and target: the address-only path, which is what `test_only`
 /// now covers.
-
-// Without this, generic specialization asserts in Opaque Values mode
-// TODO: Root-cause the bug and remove this workaround
-@_semantics("optimize.sil.specialize.generic.never")
 func check<S, T>(_ x: S, _: T.Type, _ label: String) {
   note(label, x is T, (x as? T) != nil)
 }
@@ -83,6 +79,7 @@ sweep(CS(), "CS");                     sweep(CR(), "CR")
 sweep(C(), "C");                       sweep(D(), "D")
 sweep(42, "Int");                      sweep("hi", "String")
 sweep([1, 2, 3], "IntArr");            sweep([1, "a"] as [Any], "AnyArr")
+sweep([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, "a"] as [Any], "LongerAnyArr")
 sweep((1, 2), "tuple");                sweep(E.a, "E")
 sweep(Gen(t: 1), "GenInt");            sweep(Gen(t: "s" as Any), "GenAny")
 sweep(Optional<Int>.some(3), "SomeInt"); sweep(Optional<Int>.none, "NoneInt")

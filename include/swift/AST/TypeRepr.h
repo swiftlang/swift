@@ -798,7 +798,7 @@ public:
   static bool classof(const VarargTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Element->getEndLoc(); }
+  SourceLoc getStartLocImpl() const { return Element->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return EllipsisLoc; }
   SourceLoc getLocImpl() const { return EllipsisLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &opts,

@@ -4498,19 +4498,20 @@ public:
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind;
+    std::optional<uint8_t> rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
-    unsigned numNameComponentsBiased;
+    unsigned numNameComponentsBiased = 0;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
     bool isIUO;
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool overriddenAffectsABI, needsNewTableEntry, isTransparent;
+    bool overriddenAffectsABI, needsNewTableEntry;
+    bool isTransparent = false;
     DeclID opaqueReturnTypeID;
-    bool isUserAccessible;
+    bool isUserAccessible = false;
     bool isDistributedThunk;
     bool hasSendingResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
@@ -4559,7 +4560,7 @@ public:
 
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
-    AccessorKind accessorKind;
+    std::optional<AccessorKind> accessorKind;
     if (isAccessor) {
       auto storageResult = MF.getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -4571,7 +4572,8 @@ public:
             errorFlags, numTableEntries);
       }
 
-      if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind))
+      if (auto accessorKindResult =
+              getActualAccessorKind(rawAccessorKind.value()))
         accessorKind = *accessorKindResult;
       else
         return MF.diagnoseFatal();
@@ -4580,7 +4582,7 @@ public:
       // into this code.  When we come out, don't create the accessor twice.
       // TODO: find some better way of breaking this cycle, like lazily
       // deserializing the accessors.
-      if (auto accessor = storage->getAccessor(accessorKind))
+      if (auto accessor = storage->getAccessor(accessorKind.value()))
         return accessor;
     }
 
@@ -4670,9 +4672,9 @@ public:
                                         async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
-      auto *accessor =
-          AccessorDecl::createDeserialized(ctx, accessorKind, storage, async,
-                                           throws, thrownType, resultType, DC);
+      auto *accessor = AccessorDecl::createDeserialized(
+          ctx, accessorKind.value(), storage, async, throws, thrownType,
+          resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -5174,11 +5176,20 @@ public:
     auto inheritedIDs = rawIDs.slice(0, numInheritedTypes);
     auto dependencyIDs = rawIDs.slice(numInheritedTypes);
 
-    for (TypeID dependencyID : dependencyIDs) {
-      auto dependency = MF.getTypeChecked(dependencyID);
-      if (!dependency) {
-        return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
+    // A dependency can lead back to this class (`class A: Base<B>` and
+    // `class B: Base<A>`). If we're re-entered while checking this class's
+    // dependencies, skip the checks to avoid infinite recursion. The class is
+    // then created before all of its dependencies are known to be readable;
+    // if one is missing, the class stays cached but incomplete, and later
+    // lookups can find it.
+    if (MF.ClassesResolvingDependencies.insert(thisDeclID).second) {
+      SWIFT_DEFER { MF.ClassesResolvingDependencies.erase(thisDeclID); };
+      for (TypeID dependencyID : dependencyIDs) {
+        auto dependency = MF.getTypeChecked(dependencyID);
+        if (!dependency) {
+          return llvm::make_error<TypeError>(
+              name, takeErrorInfo(dependency.takeError()));
+        }
       }
     }
 
@@ -5198,7 +5209,13 @@ public:
         genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
-    theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
+    // The dependency checks above may have been skipped to break a cycle, so
+    // the signature isn't guaranteed to be readable. Report an error instead
+    // of aborting.
+    GenericSignature genericSig;
+    SET_OR_RETURN_ERROR(genericSig,
+                        MF.getGenericSignatureChecked(genericSigID));
+    theClass->setGenericSignature(genericSig);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       theClass->setAccess(*accessLevel);
@@ -8580,10 +8597,12 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
     genericArgs.push_back(argTy.get());
   }
 
+  auto &ctx = MF.getContext();
+
   if (auto clangDecl = nominal->getClangDecl()) {
     if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
       auto clangImporter = static_cast<ClangImporter *>(
-          nominal->getASTContext().getClangModuleLoader());
+          ctx.getClangModuleLoader());
 
       SmallVector<Type, 2> typesOfGenericArgs;
       for (auto arg : genericArgs) {
@@ -8592,7 +8611,7 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
 
       SmallVector<clang::TemplateArgument, 2> templateArguments;
       std::unique_ptr<TemplateInstantiationError> error =
-          MF.getContext().getClangTemplateArguments(
+          ctx.getClangTemplateArguments(
               ctd->getTemplateParameters(), typesOfGenericArgs,
               templateArguments);
 
@@ -8600,12 +8619,12 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
           const_cast<clang::ClassTemplateDecl *>(ctd), templateArguments);
 
       instantiation->setTemplateInstantiationType(
-          BoundGenericType::get(nominal, parentTy, genericArgs));
+          NominalType::get(nominal, parentTy, genericArgs, ctx));
       return instantiation->getDeclaredInterfaceType();
     }
   }
 
-  return BoundGenericType::get(nominal, parentTy, genericArgs);
+  return NominalType::get(nominal, parentTy, genericArgs, ctx);
 }
 
 Expected<Type> DESERIALIZE_TYPE(SIL_BLOCK_STORAGE_TYPE)(

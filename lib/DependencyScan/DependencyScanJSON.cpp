@@ -647,16 +647,25 @@ void writeJSON(llvm::raw_ostream &out,
       writeJSONSingleField(out, "contextHash", clangDeps->context_hash, 5,
                            /*trailingComma=*/true);
 
+      bool hasDirectoryDeps =
+          clangDeps->directory_deps && clangDeps->directory_deps->count != 0;
+      bool hasIncludeTree = clangDeps->clang_include_tree.length != 0;
+      bool hasCacheKey = clangDeps->module_cache_key.length != 0;
+
       // Command line.
       writeJSONSingleField(out, "commandLine", clangDeps->command_line, 5,
-                           clangDeps->clang_include_tree.length != 0 ||
-                           clangDeps->module_cache_key.length != 0);
+                           hasDirectoryDeps || hasIncludeTree || hasCacheKey);
 
-      if (clangDeps->clang_include_tree.length != 0)
+      // Directory dependencies.
+      if (hasDirectoryDeps)
+        writeJSONSingleField(out, "directoryDependencies",
+                             clangDeps->directory_deps, 5,
+                             hasIncludeTree || hasCacheKey);
+
+      if (hasIncludeTree)
         writeJSONSingleField(out, "clangIncludeTree",
-                             clangDeps->clang_include_tree, 5,
-                             clangDeps->module_cache_key.length != 0);
-      if (clangDeps->module_cache_key.length != 0)
+                             clangDeps->clang_include_tree, 5, hasCacheKey);
+      if (hasCacheKey)
         writeJSONSingleField(out, "moduleCacheKey", clangDeps->module_cache_key,
                              5,
                              /*trailingComma=*/false);

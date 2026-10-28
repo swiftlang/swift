@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
 // The CxxSet and CxxDictionary conformances are only synthesized where the
 // standard library declares the members they are derived from -- MSVC's STL,

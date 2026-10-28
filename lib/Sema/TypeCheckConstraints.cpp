@@ -890,10 +890,10 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
                                          bool openArchetypes,
                                          ConstraintKind kind, DeclContext *dc) {
   // Don't allow any type variables to leak into the nested ConstraintSystem
-  // (including as originator types for placeholders). This also ensure that we
+  // (including as originator types for holes). This also ensure that we
   // avoid lifetime issues for e.g cases where we lazily populate the
-  // `ContextSubMap` on `NominalOrBoundGenericNominalType` in the nested arena,
-  // since it will be destroyed on leaving.
+  // `ContextSubMap` on `NominalType` in the nested arena, since it will
+  // be destroyed on leaving.
   ASSERT(!type1->getRecursiveProperties().isSolverAllocated() &&
          !type2->getRecursiveProperties().isSolverAllocated() &&
          "Cannot escape solver-allocated types into a nested ConstraintSystem");
@@ -1210,6 +1210,9 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
     }
     out << "\n";
   }
+
+  out.indent(indent) << "Ambiguous bindings:\n";
+  ambiguousBindings.print(out);
 
   if (!overloadChoices.empty()) {
     out << "\n";
@@ -1598,6 +1601,23 @@ void ConstraintSystem::print(raw_ostream &out) const {
 }
 
 /// Determine the semantics of a checked cast operation.
+
+static bool isConcreteNoncopyable(Type type) {
+  type = type->getWithoutSpecifierType();
+  return type->isNoncopyable() && !type->getOptionalObjectType() &&
+         !type->isAnyExistentialType() && !type->hasArchetype() &&
+         !type->hasTypeParameter() && !type->hasOpenedExistential() &&
+         !type->hasError();
+}
+
+bool TypeChecker::isStaticallyImpossibleNoncopyableCast(Type fromType,
+                                                        Type toType) {
+  // A concrete non-`Copyable` value can't become a `Copyable` one, and a
+  // `Copyable` value (or container) can't hold a concrete non-`Copyable` one.
+  return (isConcreteNoncopyable(fromType) && toType->isCopyable()) ||
+         (fromType->isCopyable() && isConcreteNoncopyable(toType));
+}
+
 CheckedCastKind
 TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,
@@ -1608,35 +1628,28 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     return CheckedCastKind::Coercion;
   }
 
-  // Since move-only types currently cannot conform to protocols, nor be a class
-  // type, the subtyping hierarchy looks a bit like this:
-  //
-  //                  ~Copyable
-  //                    /  \
-  //                   /    \
-  //       +--------- Any    noncopyable structs/enums
-  //       |           |
-  //   AnyObject    protocol
-  //       |       existentials
-  //       |            |   \
-  //       +---------+  |    +-- structs/enums
-  //                 |  |
-  //                classes
-  //           (and their subtyping)
-  //
-  //
-  // Thus, right now, a move-only type is only a subtype of itself.
-  // We also want to prevent conversions of a move-only type's metatype.
+  // Everything remaining is some form of dynamic cast.
+  bool noncopyableCastingEnabled =
+      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting);
+  bool involvesMetatype =
+      fromType->is<AnyMetatypeType>() || toType->is<AnyMetatypeType>();
+  bool involvesNoncopyable =
+      fromType->getMetatypeInstanceType()->isNoncopyable() ||
+      toType->getMetatypeInstanceType()->isNoncopyable();
 
-  // Certain `~Copyable` casts are supported under `NoncopyableCasting`
-  bool isSupportedNoncopyableExistentialCast =
-      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
-      fromType->isNoncopyable() && fromType->isExistentialType() &&
-      !toType->isExistentialType() && !toType->is<ArchetypeType>();
+  if (involvesNoncopyable && !noncopyableCastingEnabled) {
+    // A noncopyable cast got here without being enabled...
+    return CheckedCastKind::Unresolved;
+  }
+  if (involvesMetatype && involvesNoncopyable) {
+    // Noncopyable metatypes and casts between noncopyables and metatypes
+    return CheckedCastKind::Unresolved;
+  }
 
-  if (!isSupportedNoncopyableExistentialCast &&
-      (fromType->getMetatypeInstanceType()->isNoncopyable()
-       || toType->getMetatypeInstanceType()->isNoncopyable()))
+  // A cast the runtime would always answer "no" is reported as such, so the
+  // caller warns that it always fails.
+  if (involvesNoncopyable &&
+      isStaticallyImpossibleNoncopyableCast(fromType, toType))
     return CheckedCastKind::Unresolved;
 
   // Anything bridges to AnyObject
@@ -1644,6 +1657,16 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     if (!fromType->isEscapable()) {
       // ... except some ~Escapable values that can't be boxed at all.
       return CheckedCastKind::Unresolved;
+    }
+    // ... and ~Copyable values that cannot be copied into a box
+    if (fromType->isNoncopyable()) {
+      if (fromType->isExistentialType()) {
+        // `~Copyable` existential might hold a `Copyable` payload
+        return CheckedCastKind::ValueCast;
+      } else {
+        // Otherwise, a value cannot be boxed without copying
+        return CheckedCastKind::Unresolved;
+      }
     }
     return CheckedCastKind::BridgingCoercion;
   }
@@ -1715,7 +1738,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // ISwiftObject can recover a native object that does not itself conform to
   // the source interface. Its class, including a final class, is determined
   // by the runtime query rather than by a Swift protocol conformance.
-  if (fromType->isCOMExistentialType() && toType->getClassOrBoundGenericClass())
+  if (fromType->isCOMExistentialType() && toType->getClassDecl())
     return CheckedCastKind::ValueCast;
 
   auto checkElementCast = [&](Type fromElt, Type toElt,
@@ -2079,13 +2102,13 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
       // Ok, we are casting between class-like things. Let's see if we have
       // explicit superclass bounds.
       Type toSuperclass;
-      if (toType->getClassOrBoundGenericClass())
+      if (toType->getClassDecl())
         toSuperclass = toType;
       else
         toSuperclass = toType->getSuperclass();
 
       Type fromSuperclass;
-      if (fromType->getClassOrBoundGenericClass())
+      if (fromType->getClassDecl())
         fromSuperclass = fromType;
       else
         fromSuperclass = fromType->getSuperclass();
@@ -2175,7 +2198,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // The runtime doesn't support casts to CF types and always lets them succeed.
   // This "always fails" diagnosis makes no sense when paired with the CF
   // one.
-  auto clazz = toType->getClassOrBoundGenericClass();
+  auto clazz = toType->getClassDecl();
   if (clazz && clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
   
@@ -2184,7 +2207,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // covariance, or for APIs where the generic parameter annotations in the
   // ObjC headers are inaccurate.
   if (clazz && clazz->isTypeErasedGenericClass()) {
-    if (fromType->getClassOrBoundGenericClass() == clazz)
+    if (fromType->getClassDecl() == clazz)
       return CheckedCastKind::ValueCast;
   }
 

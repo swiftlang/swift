@@ -517,7 +517,9 @@ void IRGenThunk::emit() {
           }
           IGF.emitAllExtractValues(expandedResult, structTy, resultArgValues);
         } else {
-          resultArgValues = convertForDirectError(IGF, result.claimNext(),
+          auto nativeResult =
+              schema.mapIntoNative(IGM, IGF, result, directResultType, false);
+          resultArgValues = convertForDirectError(IGF, nativeResult.claimNext(),
                                                   combined.combinedTy,
                                                   /*forExtraction*/ false);
         }
@@ -584,11 +586,14 @@ void IRGenThunk::emit() {
 
   auto resultTy = conv.getSILResultType(expansionContext);
   resultTy = resultTy.subst(IGF.getSILModule(), subMap);
+  SILType directErrorType;
+  if (errorValue) {
+    directErrorType = conv.getSILErrorType(expansionContext);
+  }
   IGF.emitScalarReturn(resultTy, resultTy, result,
-                       /*swiftCCReturn=*/false,
+                       /*swiftCCReturn=*/true,
                        /*isOutlined=*/false,
-                       /*mayPeepholeLoad=*/false,
-                       /*errorType=*/SILType());
+                       /*mayPeepholeLoad=*/false, directErrorType);
 }
 
 void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {

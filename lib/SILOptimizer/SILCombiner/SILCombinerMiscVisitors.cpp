@@ -795,7 +795,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   SILType elemType = IEAI->getOperand()->getType().getEnumElementType(
       IEAI->getElement(), IEAI->getFunction());
-  auto *structDecl = elemType.getStructOrBoundGenericStruct();
+  auto *structDecl = elemType.getStructDecl();
 
   // We cannot create a struct when it has unreferenceable storage.
   if (elemType.isEmpty(*IEAI->getFunction()) && structDecl &&
@@ -912,15 +912,11 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
 
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
     // destroys with a destroy of its operand.
+    salvageDebugInfo(tedai);
     while (!tedai->use_empty()) {
       Operand *use = *tedai->use_begin();
-      SILInstruction *user = use->getUser();
-      if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
-        dai->setOperand(tedai->getEnum());
-      } else {
-        assert(user->isDebugInstruction());
-        eraseInstFromFunction(*user);
-      }
+      auto *dai = cast<DestroyAddrInst>(use->getUser());
+      dai->setOperand(tedai->getEnum());
     }
     return eraseInstFromFunction(*tedai);
   }
@@ -951,15 +947,10 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
   // loads. Perform the transformation on each load at the load's use site. The
   // reason that we have to do this is that otherwise we would be hoisting the
   // loads causing us to need to consider additional ARC issues.
+  salvageDebugInfo(tedai);
   while (!tedai->use_empty()) {
     auto *use = *tedai->use_begin();
     auto *user = use->getUser();
-
-    // Delete debug insts.
-    if (user->isDebugInstruction()) {
-      eraseInstFromFunction(*user);
-      continue;
-    }
 
     // Insert a new Load of the enum and extract the data from that.
     //
@@ -1270,7 +1261,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
   if (!storageTy->is_ContiguousArrayStorage())
     return std::nullopt;
 
-  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  auto boundGenericTy = dyn_cast<NominalType>(storageTy);
   if (!boundGenericTy)
     return std::nullopt;
 
@@ -1285,7 +1276,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
     return std::nullopt;
 
   auto ty = genericArgs[0]->getCanonicalType();
-  if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
+  if (!ty->getClassDecl() && !ty->isObjCExistentialType())
     return std::nullopt;
   // C++ foreign reference types have custom release/retain operations and are
   // not AnyObjects.
@@ -1294,8 +1285,8 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
 
   auto anyObjectTy = ctxt.getAnyObjectType();
   auto arrayStorageTy =
-      BoundGenericClassType::get(ctxt.get_ContiguousArrayStorageDecl(), nullptr,
-                                 {anyObjectTy})
+      ClassType::get(ctxt.get_ContiguousArrayStorageDecl(), nullptr,
+                     {anyObjectTy}, ctxt)
           ->getCanonicalType();
   return F.getTypeLowering(arrayStorageTy).getLoweredType();
 }
@@ -1333,7 +1324,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
       InstanceTy = SelfTy.getSelfType();
     auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
-    if (!SILInstanceTy.getClassOrBoundGenericClass())
+    if (!SILInstanceTy.getClassDecl())
       return nullptr;
 
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
@@ -1361,7 +1352,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
         InstanceTy = SelfTy.getSelfType();
       auto SILInstanceTy = SILType::getPrimitiveObjectType(InstanceTy);
-      if (!SILInstanceTy.getClassOrBoundGenericClass())
+      if (!SILInstanceTy.getClassDecl())
         return nullptr;
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), ARDI->canAllocOnStack(),

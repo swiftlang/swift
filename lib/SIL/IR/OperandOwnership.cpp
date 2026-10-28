@@ -283,7 +283,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // later), so treat the conversion conservatively as a non-consuming pointer
 // escape.
 //
-// A `@called(atMostOnce)` function value is single-owner and move-only-checked,
+// An at-most-once function value is single-owner and move-only-checked,
 // so pre-conversion value doesn't survive to be used again -- any further
 // use would already be diagnosed as a double consumption by the move-only
 // checker. Treat the conversion as an ordinary forwarding consume in that
@@ -1173,9 +1173,16 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
 
-// TaskPushDeadline takes two borrowed generic operands passed by
-// address; at the SIL level address operands are trivial.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
+// TaskPushDeadline's two generic operands are addresses except under opaque
+// values, where the builtin is an instantaneous use of each.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
+                                                         StringRef attr) {
+  if (op.get()->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::InstantaneousUse;
+}
+
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 

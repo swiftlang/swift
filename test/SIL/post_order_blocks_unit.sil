@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Successors come before their predecessors regardless of block layout,
+// ignoring the back-edge bb3 -> bb1.
+
+// CHECK-LABEL: begin running test 1 of 1 on loop: post_order_blocks
+// CHECK:       post-order: [4, 2, 3, 1, 0]
+// CHECK:       reverse post-order: [0, 1, 3, 2, 4]
+// CHECK:       first: 4
+// CHECK:       end running test 1 of 1 on loop: post_order_blocks
+sil [ossa] @loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "post_order_blocks"
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+bb2:
+  br bb4
+bb3:
+  br bb1
+bb4:
+  return undef : $()
+}
+
+// Blocks which are not reachable from the entry block are not visited.
+
+// CHECK-LABEL: begin running test 1 of 1 on unreachable_block: post_order_blocks
+// CHECK:       post-order: [2, 0]
+// CHECK:       reverse post-order: [0, 2]
+// CHECK:       first: 2
+// CHECK:       end running test 1 of 1 on unreachable_block: post_order_blocks
+sil @unreachable_block : $@convention(thin) () -> () {
+bb0:
+  specify_test "post_order_blocks"
+  br bb2
+bb1:
+  br bb2
+bb2:
+  return undef : $()
+}

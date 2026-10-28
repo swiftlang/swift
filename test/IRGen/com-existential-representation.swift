@@ -16,8 +16,8 @@ public let kExistentialSize = MemoryLayout<any IWidget>.size
 public let kOptionalExistentialSize = MemoryLayout<(any IWidget)?>.size
 
 // The marked spelling has a separate cache, but both resolve the same type.
-// CHECK: [[REFINED_METADATA:@"[^"]*IRefinedWidget_pMD"]] = {{.*}}ptr [[REFINED_TYPEREF:@"symbolic [^"]*IRefinedWidgetP"]] to
-// CHECK: [[MARKED_METADATA:@"[^"]*IRefinedWidget_s8SendablepMD"]] = {{.*}}ptr [[REFINED_TYPEREF]] to
+// CHECK: [[REFINED_METADATA:@"[^"]*IRefinedWidget_pM[DR]"]] = {{.*}}ptr [[REFINED_TYPEREF:@"symbolic [^"]*IRefinedWidgetP"]] to
+// CHECK: [[MARKED_METADATA:@"[^"]*IRefinedWidget_s8SendablepM[DR]"]] = {{.*}}ptr [[REFINED_TYPEREF]] to
 
 // The protocol descriptor marks the interface as the COM special protocol so
 // dynamically-created existential metadata selects the same representation.
@@ -78,25 +78,25 @@ public protocol IRefinedWidget: IWidget { }
 // Inherited interfaces and marker protocols do not add descriptors to the
 // existential metadata. Each spelling uses the most-derived interface alone.
 // CHECK-LABEL: define{{.*}} @"$s{{.*}}refinedMetadata{{.*}}"
-// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr [[REFINED_METADATA]])
+// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName{{(V2)?}}({{.*}}ptr [[REFINED_METADATA]])
 public func refinedMetadata() -> Any.Type {
   (any IRefinedWidget).self
 }
 
 // CHECK-LABEL: define{{.*}} @"$s{{.*}}compositionMetadata{{.*}}"
-// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr [[REFINED_METADATA]])
+// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName{{(V2)?}}({{.*}}ptr [[REFINED_METADATA]])
 public func compositionMetadata() -> Any.Type {
   (any IRefinedWidget & IWidget).self
 }
 
 // CHECK-LABEL: define{{.*}} @"$s{{.*}}reversedMetadata{{.*}}"
-// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr [[REFINED_METADATA]])
+// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName{{(V2)?}}({{.*}}ptr [[REFINED_METADATA]])
 public func reversedMetadata() -> Any.Type {
   (any IWidget & IRefinedWidget).self
 }
 
 // CHECK-LABEL: define{{.*}} @"$s{{.*}}markedMetadata{{.*}}"
-// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr [[MARKED_METADATA]])
+// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName{{(V2)?}}({{.*}}ptr [[MARKED_METADATA]])
 public func markedMetadata() -> Any.Type {
   (any IRefinedWidget & IWidget & Sendable).self
 }

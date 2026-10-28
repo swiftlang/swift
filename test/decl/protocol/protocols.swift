@@ -4,7 +4,7 @@ protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
   init() {} // expected-error {{protocol initializers must not have bodies}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 // Protocol decl.

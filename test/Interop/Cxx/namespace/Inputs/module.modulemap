@@ -87,6 +87,11 @@ module MembersTransitive {
   requires cplusplus
 }
 
+module MembersUnrelated {
+  header "members-unrelated.h"
+  requires cplusplus
+}
+
 module UsingFromNamespace {
   header "using-from-namespace.h"
   requires cplusplus

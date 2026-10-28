@@ -3367,10 +3367,20 @@ public:
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
 class FunctionConversionExpr : public ImplicitConversionExpr {
+  bool WithoutActuallyDiscarding = false;
+
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
     : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+
+  /// Whether this conversion deliberately drops the exactly-once guarantee of
+  /// the operand. Sema only forms such a conversion for a call to
+  /// \c withoutActuallyDiscarding(_:do:).
+  bool isWithoutActuallyDiscarding() const { return WithoutActuallyDiscarding; }
+  void setWithoutActuallyDiscarding(bool value = true) {
+    WithoutActuallyDiscarding = value;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
@@ -4160,7 +4170,7 @@ public:
   bool isSendable() const;
 
   /// Whether this closure can be called at most once, which is true for both
-  /// `@called(atMostOnce)` and `@called(exactlyOnce)` closures.
+  /// at-most-once and exactly-once closures.
   bool hasCalledAtMostOnceSemantics() const;
 
   /// Whether this closure consists of a single expression.
@@ -6481,7 +6491,7 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   Type getRootType() const;
   Type getValueType() const;

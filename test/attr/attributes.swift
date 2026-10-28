@@ -37,18 +37,18 @@ class Inspect {
   @IBInspectable var value : Int = 0 // okay
   @GKInspectable var value2: Int = 0 // okay
 
-  @IBInspectable func foo() {} // expected-error {{@IBInspectable may only be used on 'var' declarations}} {{3-18=}}
-  @GKInspectable func foo2() {} // expected-error {{@GKInspectable may only be used on 'var' declarations}} {{3-18=}}
+  @IBInspectable func foo() {} // expected-error {{'@IBInspectable' may only be used on 'var' declarations}} {{3-18=}}
+  @GKInspectable func foo2() {} // expected-error {{'@GKInspectable' may only be used on 'var' declarations}} {{3-18=}}
 
-  @IBInspectable class var cval: Int { return 0 } // expected-error {{only class instance properties can be declared @IBInspectable}} {{3-18=}}
-  @GKInspectable class var cval2: Int { return 0 } // expected-error {{only class instance properties can be declared @GKInspectable}} {{3-18=}}
+  @IBInspectable class var cval: Int { return 0 } // expected-error {{only class instance properties can be declared '@IBInspectable'}} {{3-18=}}
+  @GKInspectable class var cval2: Int { return 0 } // expected-error {{only class instance properties can be declared '@GKInspectable'}} {{3-18=}}
 }
-@IBInspectable var ibinspectable_global : Int // expected-error {{only class instance properties can be declared @IBInspectable}} {{1-16=}}
-@GKInspectable var gkinspectable_global : Int // expected-error {{only class instance properties can be declared @GKInspectable}} {{1-16=}}
+@IBInspectable var ibinspectable_global : Int // expected-error {{only class instance properties can be declared '@IBInspectable'}} {{1-16=}}
+@GKInspectable var gkinspectable_global : Int // expected-error {{only class instance properties can be declared '@GKInspectable'}} {{1-16=}}
 
 struct inspectableWithStruct {
-  @IBInspectable var IBInspectableInStruct: Int // expected-error {{only class instance properties can be declared @IBInspectable}} {{3-18=}}
-  @GKInspectable var GKInspectableInStruct: Int // expected-error {{only class instance properties can be declared @GKInspectable}} {{3-18=}}
+  @IBInspectable var IBInspectableInStruct: Int // expected-error {{only class instance properties can be declared '@IBInspectable'}} {{3-18=}}
+  @GKInspectable var GKInspectableInStruct: Int // expected-error {{only class instance properties can be declared '@GKInspectable'}} {{3-18=}}
 }
 
 func foo(x: @convention(block) Int) {} // expected-error {{'@convention' only applies to function types}}
@@ -198,9 +198,9 @@ _ = {
   weak var x: SomeClass & SomeProtocol // expected-error {{'weak' variable should have optional type '(any SomeClass & SomeProtocol)?'}} {{15-15=(}} {{39-39=)?}}
 }
 
-@_exported var exportVar: Int // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
-@_exported func exportFunc() {} // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
-@_exported struct ExportStruct {} // expected-error {{@_exported may only be used on 'import' declarations}}{{1-12=}}
+@_exported var exportVar: Int // expected-error {{'@_exported' may only be used on 'import' declarations}}{{1-12=}}
+@_exported func exportFunc() {} // expected-error {{'@_exported' may only be used on 'import' declarations}}{{1-12=}}
+@_exported struct ExportStruct {} // expected-error {{'@_exported' may only be used on 'import' declarations}}{{1-12=}}
 
 
 // Function result type attributes.
@@ -340,7 +340,7 @@ struct S1<T> {
   func quux(@_nonEphemeral _ x: UnsafeMutablePointer<Int>?) {}
 }
 
-@_nonEphemeral struct S2 {} // expected-error {{@_nonEphemeral may only be used on 'parameter' declarations}}
+@_nonEphemeral struct S2 {} // expected-error {{'@_nonEphemeral' may only be used on 'parameter' declarations}}
 
 protocol P {}
 extension P {
@@ -369,7 +369,7 @@ struct I65705 {
   func f2(_: @discardableResult Int) {} // expected-error {{attribute can only be applied to declarations, not types}} {{14-33=}} {{3-3=@discardableResult }} {{none}}
 
   func stmt(_ a: Int?) {
-    if let _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}} 
+    if let _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}
     }
     if var _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}
     }

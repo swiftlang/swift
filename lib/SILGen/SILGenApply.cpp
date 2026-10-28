@@ -1230,14 +1230,12 @@ public:
     }
 
     // A call to `@backDeployed` function may need to go through a thunk.
+    auto declRef = SGF.SGM.getBackDeploymentEntryPoint(
+        SILDeclRef(afd), SGF.F.getResilienceExpansion());
+    if (declRef.isBackDeploymentThunk())
+      return declRef;
 
-    if (SGF.SGM.requiresBackDeploymentThunk(afd,
-                                            SGF.F.getResilienceExpansion())) {
-      return SILDeclRef(afd).asBackDeploymentKind(
-          SILDeclRef::BackDeploymentKind::Thunk);
-    }
-
-    return SILDeclRef(afd).asForeign(
+    return declRef.asForeign(
         !isConstructorWithGeneratedAllocatorThunk(afd) &&
         requiresForeignEntryPoint(afd));
   }
@@ -3425,7 +3423,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // referenced is a move-only type.
 
   AbstractStorageDecl *storage = nullptr;
-  AccessSemantics accessSemantics;
+  AccessSemantics accessSemantics = AccessSemantics::Ordinary;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
     storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());
@@ -4156,14 +4154,13 @@ private:
   emitNativeToCppBridgedSmartPtr(ArgumentSource &&argSrc,
                                  const clang::CXXRecordDecl *rd,
                                  SILType destType, SILGenFunction &SGF) {
-    auto decl = cast<StructDecl>(
-        SGF.getASTContext().getClangModuleLoader()->lookupImportedDecl(rd));
-    auto result = importer::getClangRefCountedSmartPointer(decl);
+    auto *clangLoader = SGF.getASTContext().getClangModuleLoader();
+    auto decl = cast<StructDecl>(clangLoader->lookupImportedDecl(rd));
 
-    // We always have a RefCountedPtrInfo here as this is validated when the
-    // type is imported.
-    ConstructorDecl *selected =
-        std::get<importer::RefCountedPtrInfo>(result.result).toSmartPtr;
+    // The bridging constructor is always found here, since the smart pointer
+    // is validated when it is imported.
+    ConstructorDecl *selected = clangLoader->getRefCountedPtrBridgingCtor(decl);
+    ASSERT(selected && "BridgedSmartPtr should have bridging constructor");
     SILLocation loc = argSrc.getLocation();
     SILDeclRef c(selected, SILDeclRef::Kind::Allocator, true);
     SILValue bridgingFn = SGF.emitGlobalFunctionRef(loc, c);
@@ -5466,7 +5463,15 @@ public:
 
   /// Is this call dispatched through a distributed thunk?
   bool callsDistributedThunk() const {
-    return callee.getMethodName().isDistributedThunk();
+    if (callee.getMethodName().isDistributedThunk())
+      return true;
+    // A witness method callee still names the requirement; it is redirected
+    // to the requirement's distributed thunk only when the callee value is
+    // emitted (see Callee::getFnValue).
+    if (callee.kind == Callee::Kind::WitnessMethod)
+      if (auto *func = callee.getMethodName().getFuncDecl())
+        return SGF.shouldReplaceConstantForApplyWithDistributedThunk(func);
+    return false;
   }
 
   /// Sets a flag that indicates whether this call be treated as being 
@@ -7266,14 +7271,11 @@ void SILGenFunction::emitApplyOfUnavailableCodeReached() {
     return;
   }
 
-  auto declRef = SILDeclRef(fd);
-  if (SGM.requiresBackDeploymentThunk(fd, F.getResilienceExpansion())) {
-    // The standard library entry point for the diagnostic function was
-    // introduced in Swift 5.9 so we call the back deployment thunk in case this
-    // code will execute on an older runtime.
-    declRef =
-        declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
-  }
+  // The standard library entry point for the diagnostic function was
+  // introduced in Swift 5.9 so we call the back deployment thunk in case this
+  // code will execute on an older runtime.
+  auto declRef = SGM.getBackDeploymentEntryPoint(SILDeclRef(fd),
+                                                 F.getResilienceExpansion());
 
   emitApplyOfLibraryIntrinsic(loc, declRef, SubstitutionMap(), {},
                               SGFContext());
@@ -8078,10 +8080,10 @@ PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
 
 SILDeclRef SILGenModule::getFuncDeclRef(FuncDecl *funcDecl,
                                         ResilienceExpansion expansion) {
-  auto declRef = SILDeclRef(funcDecl, SILDeclRef::Kind::Func);
-
-  if (requiresBackDeploymentThunk(funcDecl, expansion))
-    return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
+  auto declRef = getBackDeploymentEntryPoint(
+      SILDeclRef(funcDecl, SILDeclRef::Kind::Func), expansion);
+  if (declRef.isBackDeploymentThunk())
+    return declRef;
 
   return declRef.asForeign(requiresForeignEntryPoint(funcDecl));
 }
@@ -8289,7 +8291,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
-    result->getType().castTo<BoundGenericStructType>()->getDecl();
+    result->getType().castTo<StructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
   assert(props.size() == 1);
   VarDecl *rawPointerField = props[0];

@@ -23,7 +23,6 @@ function(includeSARIF)
   # Add unique ABI prefix to the SARIF libraries so that compiler libraries can
   # be used from tools that have their own copy as a SwiftPM dependency.
   set(SWIFT_MODULE_ABI_NAME_PREFIX "_Compiler")
-  set(SARIF_TARGET_NAMESPACE "_Compiler")
 
   # swift-toolchain-sarif needs 'OrderedCollections' from swift-collections. We
   # hand it the checkout that update-checkout produced so that configuration
@@ -45,17 +44,22 @@ includeSARIF()
 # 'SARIFMerge' is omitted because merging SARIF logs is a job for downstream
 # tooling, not the compiler.
 set(compiler_sarif_libs
-  _CompilerImmutableJSON
-  _CompilerSARIFRecords
-  _CompilerSARIF
+  ImmutableJSON
+  SARIFRecords
+  SARIF
 )
 
 foreach(lib ${compiler_sarif_libs})
-  target_compile_options(${lib} PRIVATE "SHELL:-module-link-name ${lib}")
+  # Keep the '_Compiler' prefix on the library file names, like the swift-syntax
+  # libraries in lib/CompilerSwiftSyntax, so that they cannot clash with another
+  # copy of the SARIF libraries in the same process.
+  set_target_properties(${lib} PROPERTIES OUTPUT_NAME "_Compiler${lib}")
+  target_compile_options(${lib} PRIVATE
+    "SHELL:-module-link-name _Compiler${lib}")
   _add_swift_caching_compile_options(${lib})
 endforeach()
 
-# The SARIF libraries record a dependency on swift-collections' libraries.The
+# The SARIF libraries record a dependency on swift-collections' libraries. The
 # SARIF package co-locates them in the build tree.
 set(compiler_sarif_install_libs ${compiler_sarif_libs})
 foreach(lib ${SARIF_SWIFT_COLLECTIONS_TARGETS})

@@ -2258,11 +2258,21 @@ FUNCTION(DeletedMethodError, Swift, swift_deletedMethodError, C_CC, AlwaysAvaila
         EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_deletedAsyncMethodError();
+// void swift_onceClosureDestroyedError(HeapObject *context);
+FUNCTION(OnceClosureDestroyedError, Swift,
+         swift_onceClosureDestroyedError, C_CC,
+         OnceClosureDestroyedErrorAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoReturn, NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_deletedAsyncMethodError(AsyncContext *context);
 FUNCTION(DeletedAsyncMethodError, _Concurrency, swift_deletedAsyncMethodError, SwiftAsyncCC,
         ConcurrencyAvailability,
         RETURNS(VoidTy),
-        ARGS(),
+        ARGS(SwiftContextPtrTy),
         ATTRS(NoUnwind),
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
@@ -2989,7 +2999,7 @@ FUNCTION(TaskLocalValuePop,
 // void swift_task_cancellationShieldPush();
 FUNCTION(TaskCancellationShieldPush,
          _Concurrency, swift_task_cancellationShieldPush, SwiftCC,
-         ConcurrencyAvailability,
+         TaskCancellationShieldAvailability,
          RETURNS(Int1Ty),
          ARGS(),
          ATTRS(NoUnwind),
@@ -2999,7 +3009,7 @@ FUNCTION(TaskCancellationShieldPush,
 // void swift_task_cancellationShieldPop();
 FUNCTION(TaskCancellationShieldPop,
          _Concurrency, swift_task_cancellationShieldPop, SwiftCC,
-         ConcurrencyAvailability,
+         TaskCancellationShieldAvailability,
          RETURNS(),
          ARGS(),
          ATTRS(NoUnwind),

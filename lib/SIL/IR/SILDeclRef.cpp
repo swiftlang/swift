@@ -855,6 +855,13 @@ FuncDecl *SILDeclRef::getFuncDecl() const {
   return dyn_cast_or_null<FuncDecl>(getDecl());
 }
 
+FuncDecl *SILDeclRef::getDeferBodyFuncDecl() const {
+  if (kind != Kind::Func || !hasFuncDecl())
+    return nullptr;
+  auto *FD = getFuncDecl();
+  return FD->isDeferBody() ? FD : nullptr;
+}
+
 ModuleDecl *SILDeclRef::getModuleContext() const {
   if (hasDecl()) {
     return getDecl()->getModuleContext();

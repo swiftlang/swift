@@ -37,9 +37,9 @@ import CDeclFRT
 // reference type it takes as a parameter, because the entry point retains and
 // releases that parameter and would therefore call itself.
 @c(retainShared) func swiftRetainShared(_ x: Shared) { }
-// expected-error@-1 {{@c function implementing the retain operation of foreign reference type 'Shared' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@-1 {{'@c' function implementing the retain operation of foreign reference type 'Shared' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 @c(releaseShared) func swiftReleaseShared(_ x: Shared?) { }
-// expected-error@-1 {{@c function implementing the release operation of foreign reference type 'Shared' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@-1 {{'@c' function implementing the release operation of foreign reference type 'Shared' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 
 // Taking the value as a raw pointer sidesteps the reference counting, so it is
 // a workable way to write the operation.
@@ -72,11 +72,11 @@ func CImplGetOpaqueValue(_ o: Opaque) -> Int32 { opaqueValue(o) }
 // C declaration.
 @implementation @c
 func retainOpaque(_ o: Opaque) { }
-// expected-error@-1 {{@c function implementing the retain operation of foreign reference type 'Opaque' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@-1 {{'@c' function implementing the retain operation of foreign reference type 'Opaque' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 
 @implementation @c
 func releaseOpaque(_ o: Opaque) { }
-// expected-error@-1 {{@c function implementing the release operation of foreign reference type 'Opaque' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
+// expected-error@-1 {{'@c' function implementing the release operation of foreign reference type 'Opaque' will cause infinite recursion; use `Unmanaged` or a pointer type like `UnsafeMutableRawPointer`}}
 
 // A reference-counted foreign reference type can be returned only where the C
 // declaration returns it retained (+1): the Swift body always produces a

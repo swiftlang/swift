@@ -759,7 +759,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
           auto *newCFI = Builder.createConvertFunction(
               CFI->getLoc(), TTTFI->getOperand(),
               SILType::getPrimitiveObjectType(convertedThinType),
-              CFI->withoutActuallyEscaping());
+              CFI->getConversionKind());
           auto *newTTTFI = Builder.createThinToThickFunction(
             TTTFI->getLoc(), newCFI, CFI->getType());
           replaceInstUsesWith(*CFI, newTTTFI);
@@ -908,8 +908,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
             pa->getLoc(), cfi->getOperand(), pa->getSubstitutionMap(), args,
             pa->getFunctionType()->getCalleeConvention(),
             pa->getResultIsolation());
-        auto newConvert = Builder.createConvertFunction(pa->getLoc(), newPA,
-                                                        partialApplyTy, false);
+        auto newConvert =
+            Builder.createConvertFunction(pa->getLoc(), newPA, partialApplyTy);
         replaceInstUsesWith(*pa, newConvert);
         eraseInstFromFunction(*pa);
         continue;
@@ -934,8 +934,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       if (!use->isLifetimeEnding()) {
         localBuilder.emitDestroyValueOperation(pa->getLoc(), newValue);
       }
-      auto *newConvert = localBuilder.createConvertFunction(
-          pa->getLoc(), newPA, partialApplyTy, false);
+      auto *newConvert = localBuilder.createConvertFunction(pa->getLoc(), newPA,
+                                                            partialApplyTy);
       // We need to end the lifetime of the convert_function/partial_apply since
       // the helper assumes that ossa is correct upon input.
       localBuilder.emitDestroyValueOperation(pa->getLoc(), newConvert);
@@ -950,7 +950,11 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   }
 
   // (convert_function (convert_function x)) => (convert_function x)
-  if (auto *subCFI = dyn_cast<ConvertFunctionInst>(cfi->getOperand())) {
+  //
+  // Don't bypass a conversion that discards. The converted value's execution
+  // semantics would no longer be a valid conversion of x without the flag.
+  if (auto *subCFI = dyn_cast<ConvertFunctionInst>(cfi->getOperand());
+      subCFI && !subCFI->withoutActuallyDiscarding()) {
     // We handle the case of an identity conversion in inst simplify, so if we
     // see this pattern then we know that we don't have a round trip and thus
     // should just bypass the intermediate conversion.
@@ -999,9 +1003,11 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
                 extractee, Builder.getModule());
         auto convertedComponentType =
         SILType::getPrimitiveObjectType(convertedComponentFnType);
-        return Builder.createConvertFunction(
-            operand.getLoc(), operand, convertedComponentType,
-            cfi->withoutActuallyEscaping())->getResult(0);
+        return Builder
+            .createConvertFunction(operand.getLoc(), operand,
+                                   convertedComponentType,
+                                   cfi->getConversionKind())
+            ->getResult(0);
       };
       SILValue convertedOriginal = createConvertFunctionOfComponent(
           NormalDifferentiableFunctionTypeComponent::Original);

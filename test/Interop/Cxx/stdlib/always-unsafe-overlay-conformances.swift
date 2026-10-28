@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
 // This fails only for 32-bit Android for some reason.
 // XFAIL: OS=linux-androideabi

@@ -1,24 +1,23 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -module-name M %t/script_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -module-name M %t/script_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -module-name M %t/script_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -module-name M %t/script_mainactor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -module-name M %t/script_mainactor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -module-name M %t/script_mainactor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -parse-as-library -module-name M %t/library_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -module-name M %t/library_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -parse-as-library -module-name M %t/library_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -parse-as-library -module-name M %t/library_mainactor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -module-name M %t/library_mainactor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -parse-as-library -module-name M %t/library_mainactor.swift | %FileCheck --check-prefix=MAIN %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 5 -verify %t/script_nonisolated_mutable.swift
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 5 -strict-concurrency=complete -verify -verify-additional-prefix complete- %t/script_nonisolated_mutable.swift
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify -verify-additional-prefix swift6- %t/script_nonisolated_mutable.swift
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -module-name M %t/script_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -module-name M %t/script_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -module-name M %t/script_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -module-name M %t/script_mainactor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -module-name M %t/script_mainactor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -module-name M %t/script_mainactor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -parse-as-library -module-name M %t/library_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -module-name M %t/library_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -parse-as-library -module-name M %t/library_nonisolated.swift | %FileCheck --check-prefix=NONISO %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -parse-as-library -module-name M %t/library_mainactor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library -module-name M %t/library_mainactor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -parse-as-library -module-name M %t/library_mainactor.swift | %FileCheck --check-prefix=MAIN %s
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -verify %t/script_nonisolated_mutable.swift
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -strict-concurrency=complete -verify -verify-additional-prefix complete- %t/script_nonisolated_mutable.swift
+// RUN: %target-swift-frontend -typecheck -swift-version 6 -verify -verify-additional-prefix swift6- %t/script_nonisolated_mutable.swift
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 //--- script_nonisolated.swift
 default nonisolated

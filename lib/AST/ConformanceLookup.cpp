@@ -36,6 +36,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -333,6 +334,15 @@ static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
   return true;
 }
 
+/// Whether the given function type conforms to Deinitable.
+static bool isDeinitableFunctionType(EitherFunctionType eitherFnTy) {
+  // An exactly-once value must be called, so it can't be destroyed implicitly.
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
+    return !fnTy->isCalledOnce();
+
+  return !cast<const SILFunctionType *>(eitherFnTy)->isCalledOnce();
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -410,8 +420,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
         return synthesizeConformance();
       break;
     case KnownProtocolKind::Deinitable:
-      // All function types can be destroyed implicitly.
-      return synthesizeConformance();
+      if (isDeinitableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     case KnownProtocolKind::BitwiseCopyable:
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();
@@ -665,6 +676,10 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
   if (type->is<PlaceholderType>())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
+  // Same goes for HoleType.
+  if (type->is<HoleType>())
+    return ProtocolConformanceRef::forAbstract(type, protocol);
+
   // Pack types can conform to protocols.
   if (auto packType = type->getAs<PackType>()) {
     return getPackTypeConformance(packType, protocol);
@@ -848,7 +863,7 @@ LookupConformanceRequest::evaluate(Evaluator &evaluator,
     // Dig out the conforming nominal type.
     auto rootConformance = inherited->getRootConformance();
     auto conformingClass
-      = rootConformance->getType()->getClassOrBoundGenericClass();
+      = rootConformance->getType()->getClassDecl();
 
     // Map up to our superclass's type.
     auto superclassTy = type->getSuperclassForDecl(conformingClass);
@@ -1011,6 +1026,14 @@ void TypeBase::computeInvertibleConformances() {
       canType, InvertibleProtocolKind::Copyable);
   Bits.TypeBase.IsEscapable = conformsToInvertible(
       canType, InvertibleProtocolKind::Escapable);
+
+  // A Copyable type is Deinitable if the Copyable protocol inherits from
+  // Deinitable, so only look for the conformance of other types.
+  Bits.TypeBase.IsDeinitable =
+      (Bits.TypeBase.IsCopyable &&
+       InverseRequirement::copyableImpliesDeinitable(
+           canType->getASTContext())) ||
+      conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
@@ -1032,14 +1055,11 @@ bool TypeBase::isEscapable() {
   return Bits.TypeBase.IsEscapable;
 }
 
+/// \returns true iff this type conforms to Deinitable.
 bool TypeBase::isDeinitable() {
-  Type type(this);
-  if (auto *pet = type->getAs<PackExpansionType>())
-    type = pet->getPatternType();
-  auto canType = type->getReferenceStorageReferent()
-                     ->getWithoutSpecifierType()
-                     ->getCanonicalType();
-  return conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return Bits.TypeBase.IsDeinitable;
 }
 
 bool TypeBase::isEscapable(GenericSignature sig) {

@@ -1241,7 +1241,7 @@ static ValueDecl *getCursorInfoDeclForLiteral(Expr *E) {
     if (!Ty) {
       return nullptr;
     }
-    auto NominalTy = Ty->getAs<NominalOrBoundGenericNominalType>();
+    auto NominalTy = Ty->getAs<NominalType>();
     if (!NominalTy) {
       return nullptr;
     }

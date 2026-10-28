@@ -1298,7 +1298,7 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
                                                Protocol * const *protocols,
                                                const char *filename,
                                                unsigned line, unsigned column) {
-  Class classObject;
+  Class classObject = nullptr;
 
   switch (type->getKind()) {
   case MetadataKind::Class:
@@ -1335,7 +1335,7 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
                                                 const Metadata *type,
                                                 size_t numProtocols,
                                                 Protocol * const *protocols) {
-  Class classObject;
+  Class classObject = nullptr;
 
   switch (type->getKind()) {
   case MetadataKind::Class:

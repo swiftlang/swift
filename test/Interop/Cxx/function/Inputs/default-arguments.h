@@ -108,9 +108,9 @@ struct HasCtorWithDefaultArg {
   HasCtorWithDefaultArg(int a, int b = 456, int c = 123) : value(a + b + c) {}
 };
 
-// An unsafe projection of a self-contained type: with
-// ImportUnsafeCxxMethodsAsAlwaysUnsafe this is imported twice, and the two
-// imports have to share one default argument generator.
+// An unsafe projection of a self-contained type: this is imported twice, as
+// the method and its migration stub, and the two imports have to share one
+// default argument generator.
 struct SelfContainedHasMethodWithDefaultArg {
   int x;
   SelfContainedHasMethodWithDefaultArg(

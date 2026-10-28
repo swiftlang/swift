@@ -13,7 +13,7 @@ func duplicateAsmName() {}
 func somethingThatShouldParseFine() {}
 
 func func_with_nested__silgen_name() {
-   @_silgen_name("exit") // expected-error {{attribute '_silgen_name' can only be used in a non-local scope}}
+   @_silgen_name("exit") // expected-error {{'@_silgen_name' can only be used in a non-local scope}}
    func exit(_ code : UInt32) -> Void
    exit(0)
 }

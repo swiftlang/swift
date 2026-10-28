@@ -154,16 +154,16 @@ func testLoadableConsumingCallMethodSelfMutating(_ x: consuming NonTrivialStruct
 func testLoadableConsumingEscapingClosure(_ x: consuming NonTrivialStruct) {
     var f: () -> () = {}
     f = {
-        consume(x) // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+        consume(x) // expected-error{{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
     }
     _ = f
 }
 
 func testLoadableConsumingEscapingClosure2(_ x: consuming NonTrivialStruct) {
-    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
     var f: () -> () = {}
     f = {
-        consume(x) // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+        consume(x) // expected-error{{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
     }
     _ = f
 }
@@ -171,10 +171,10 @@ func testLoadableConsumingEscapingClosure2(_ x: consuming NonTrivialStruct) {
 func testLoadableConsumingEscapingClosure3(_ x: consuming NonTrivialStruct) {
     var f: () -> () = {}
     f = {
-        consume(x) // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+        consume(x) // expected-error{{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
     }
     _ = f
-    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
 }
 
 func testLoadableConsumingNonEscapingClosure(_ x: consuming NonTrivialStruct) { // expected-error{{}}
@@ -318,7 +318,7 @@ func testTrivialConsumingEscapingClosure(_ x: consuming TrivialStruct) {
 }
 
 func testTrivialConsumingEscapingClosure2(_ x: consuming TrivialStruct) {
-    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
     var f: () -> () = {}
     f = {
         consume(x)
@@ -332,7 +332,7 @@ func testTrivialConsumingEscapingClosure3(_ x: consuming TrivialStruct) {
         consume(x)
     }
     _ = f
-    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
 }
 
 func testTrivialConsumingNonEscapingClosure(_ x: consuming TrivialStruct) {
@@ -455,7 +455,7 @@ func testAddressOnlyConsumingEscapingClosure<T : P>(_ x: consuming GenericNonTri
 }
 
 func testAddressOnlyConsumingEscapingClosure2<T : P>(_ x: consuming GenericNonTrivialStruct<T>) {
-    let _ = x // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    let _ = x // expected-error {{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
     var f: () -> () = {}
     f = {
         _ = copy x
@@ -469,7 +469,7 @@ func testAddressOnlyConsumingEscapingClosure3<T : P>(_ x: consuming GenericNonTr
         _ = copy x
     }
     _ = f
-    let _ = x // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    let _ = x // expected-error {{non-'Copyable' 'x' cannot be consumed when captured by an escaping closure}}
 }
 
 func testAddressOnlyConsumingNonEscapingClosure<T : P>(_ x: consuming GenericNonTrivialStruct<T>) {
@@ -663,7 +663,7 @@ struct LoadableSelfTest {
     }
 
     consuming func testCallEscapingClosure2() {
-        consume(self) // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        consume(self) // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
         var f: () -> () = {}
         f = {
             let _ = copy self
@@ -677,7 +677,7 @@ struct LoadableSelfTest {
             let _ = copy self
         }
         f()
-        consume(self) // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        consume(self) // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
     }
 
     consuming func testCallNonEscapingClosure() {
@@ -821,7 +821,7 @@ struct AddressOnlySelfTest<T> {
     }
 
     consuming func testCallEscapingClosure2() {
-        let _ = self // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        let _ = self // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
         var f: () -> () = {}
         f = {
             let _ = copy self
@@ -835,7 +835,7 @@ struct AddressOnlySelfTest<T> {
             let _ = copy self
         }
         f()
-        let _ = self // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        let _ = self // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
     }
 
     consuming func testCallEscapingClosure4() {
@@ -847,7 +847,7 @@ struct AddressOnlySelfTest<T> {
         f = {
             let _ = copy self
         }
-        let _ = self // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        let _ = self // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
     }
 
     consuming func testCallNonEscapingClosure() {
@@ -970,7 +970,7 @@ struct TrivialSelfTest {
     }
 
     consuming func testCallEscapingClosure2() {
-        consume(self) // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        consume(self) // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
         var f: () -> () = {}
         f = {
             let _ = self

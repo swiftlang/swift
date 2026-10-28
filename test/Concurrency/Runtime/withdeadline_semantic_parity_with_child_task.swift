@@ -257,10 +257,7 @@ func scenario_6_ambient_task_cancel_propagates_into_scope() async {
     let childObserved: Bool = await withTaskGroup(of: Bool.self) { group in
       group.addTask {
         // Wait until parent's whole-task cancel reaches us.
-        for _ in 0..<1000 {
-          if Task.isCancelled { return true }
-          await Task.yield()
-        }
+        try? await Task.sleep(for: .seconds(60))
         return Task.isCancelled
       }
       withUnsafeCurrentTask { $0?.cancel() }

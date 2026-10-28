@@ -826,7 +826,7 @@ Type GenericSignatureImpl::getExistentialType(Type paramTy) const {
                                   /*includeParameterizedProtocols=*/true);
   if (upperBound->isConstraintType())
     return ExistentialType::get(upperBound);
-  assert(upperBound->getClassOrBoundGenericClass());
+  assert(upperBound->getClassDecl());
   return upperBound;
 }
 

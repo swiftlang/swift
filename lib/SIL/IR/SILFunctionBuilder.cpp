@@ -103,12 +103,14 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, targetFunction, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       } else {
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, nullptr, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       }
     }
   }
@@ -184,6 +186,9 @@ void SILFunctionBuilder::addFunctionAttributes(
       // thunk function.
       shouldExportDecl = constant.isNativeToForeignThunk() || constant.isForeign;
     }
+    // A variable's storage is exported by IRGen, not its accessors.
+    if (constant.isNull() || isa_and_nonnull<VarDecl>(constant.getDecl()))
+      shouldExportDecl = false;
     if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
       // A wasm-level exported function must be retained if it appears in a
       // compilation unit.

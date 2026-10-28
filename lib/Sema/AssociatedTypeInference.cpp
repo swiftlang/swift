@@ -121,7 +121,7 @@ public:
   }
 
   static CheckTypeWitnessResult forSuperclass(Type reqt) {
-    assert(reqt->getClassOrBoundGenericClass());
+    assert(reqt->getClassDecl());
     return CheckTypeWitnessResult(Superclass, reqt);
   }
 
@@ -228,7 +228,7 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     // If the superclass bound is generic, we may not have resolved all of
     // the type witnesses that appear in generic arguments yet, and doing so
     // here might run into a request cycle.
-    auto superclassDecl = superclass->getClassOrBoundGenericClass();
+    auto superclassDecl = superclass->getClassDecl();
     assert(superclassDecl);
 
     // Fish a class declaration out of the type witness.
@@ -236,15 +236,15 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
 
     if (auto archetype = type->getAs<ArchetypeType>()) {
       if (auto superclassType = archetype->getSuperclass())
-          classDecl = superclassType->getClassOrBoundGenericClass();
+          classDecl = superclassType->getClassDecl();
     } else if (type->isObjCExistentialType()) {
       // For self-conforming Objective-C existentials, the exact check is
       // implemented in TypeBase::isExactSuperclassOf(). Here, we just always
       // look through into a superclass of a composition.
       if (auto superclassType = type->getSuperclass())
-        classDecl = superclassType->getClassOrBoundGenericClass();
+        classDecl = superclassType->getClassDecl();
     } else {
-      classDecl = type->getClassOrBoundGenericClass();
+      classDecl = type->getClassDecl();
     }
 
     if (!classDecl || !superclassDecl->isSuperclassOf(classDecl))
@@ -4139,7 +4139,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                            failed.Result.getRequirement());
             continue;
           }
-          if (!failed.TypeWitness->getClassOrBoundGenericClass() &&
+          if (!failed.TypeWitness->getClassDecl() &&
               failed.Result.getKind() == CheckTypeWitnessResult::Superclass) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_inherit_impossible,

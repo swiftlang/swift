@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline -pack-type-elimination | %FileCheck %s
 
 import Swift
 import Builtin
@@ -192,3 +192,234 @@ bb0:
   return %ret : $()
 }
 
+// MARK: Pack Type Elimination in-place, without inlining
+
+// CHECK-LABEL: sil [ossa] @constant_dpi : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK-NOT:     open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int32
+// CHECK-LABEL: } // end sil function 'constant_dpi'
+sil [ossa] @constant_dpi : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %zero = integer_literal $Builtin.Word, 0
+  %dpi0 = dynamic_pack_index %zero of $Pack{Int32, Int64}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32, Int64}>, shape $each T, id 5
+  %addr = pointer_to_address %0 to $*@pack_element(5) each T
+
+  %res = tuple ()
+  return %res
+}
+
+// CHECK-LABEL: sil [ossa] @dynamic_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+// CHECK:         open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*@pack_element
+// CHECK-LABEL: } // end sil function 'dynamic_dpi'
+sil [ossa] @dynamic_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %1 of $Pack{Int32, Int64}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32, Int64}>, shape $each T, id 6
+  %addr = pointer_to_address %0 to $*@pack_element(6) each T
+
+  %res = tuple ()
+  return %res
+}
+
+// CHECK-LABEL: sil [ossa] @homogeneous_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+// CHECK-NOT:     open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int32
+// CHECK-LABEL: } // end sil function 'homogeneous_dpi'
+sil [ossa] @homogeneous_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %1 of $Pack{Int32, Int32}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32, Int32}>, shape $each T, id 7
+  %addr = pointer_to_address %0 to $*@pack_element(7) each T
+
+  %res = tuple ()
+  return %res
+}
+
+// CHECK-LABEL: sil [ossa] @constant_ppi : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK-NOT:     open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int32
+// CHECK-LABEL: } // end sil function 'constant_ppi'
+sil [ossa] @constant_ppi : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %zero = integer_literal $Builtin.Word, 0
+  %dpi0 = dynamic_pack_index %zero of $Pack{Int32, Int64}
+  %ppi0 = pack_pack_index 0, %dpi0 of $Pack{Int32, Int64}
+  %ope0 = open_pack_element %ppi0 of <each T> at <Pack{Int32, Int64}>, shape $each T, id 8
+  %addr = pointer_to_address %0 to $*@pack_element(8) each T
+
+  %res = tuple ()
+  return %res
+}
+
+// CHECK-LABEL: sil [ossa] @rolled_homogeneous_loop : $@convention(thin) (@pack_guaranteed Pack{Int32, Int32}) -> () {
+// CHECK:       bb1([[I:%[0-9]+]] : $Builtin.Word):
+// CHECK:         [[DPI:%[0-9]+]] = dynamic_pack_index [[I]] of $Pack{Int32, Int32}
+// CHECK:         pack_element_get [[DPI]] of %0 : $*Pack{Int32, Int32} as $*Int32
+// CHECK-LABEL: } // end sil function 'rolled_homogeneous_loop'
+sil [ossa] @rolled_homogeneous_loop : $@convention(thin) (@pack_guaranteed Pack{Int32, Int32}) -> () {
+bb0(%0 : $*Pack{Int32, Int32}):
+  %zero = integer_literal $Builtin.Word, 0
+  br bb1(%zero)
+
+bb1(%i : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %i of $Pack{Int32, Int32}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32, Int32}>, shape $each T, id 9
+  %addr = pack_element_get %dpi0 of %0 as $*@pack_element(9) each T
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%i)
+
+bb3:
+  %res = tuple ()
+  return %res
+}
+
+// Test handling of block terminator instructions that use pack types. We
+// rewrite any instructions that use substitutable @pack_element types, but not
+// basic block phi arguments. This is sufficient, since a @pack_element type
+// cannot be passed by value.
+sil [ossa] @try_use : $@convention(thin) <T> (@in_guaranteed T) -> (@error any Error)
+
+// CHECK-LABEL: sil [ossa] @test_try_apply_pack : $@convention(thin) (@pack_guaranteed Pack{Int32, Int32}) -> () {
+// CHECK:         [[TRY_USE:%[0-9]+]] = function_ref @try_use
+// CHECK-NEXT:    try_apply [[TRY_USE]]<Int32>
+// CHECK-LABEL: } // end sil function 'test_try_apply_pack'
+sil [ossa] @test_try_apply_pack : $@convention(thin) (@pack_guaranteed Pack{Int32, Int32}) -> () {
+bb0(%0 : $*Pack{Int32, Int32}):
+  %zero = integer_literal $Builtin.Word, 0
+  br bb1(%zero)
+
+bb1(%i : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %i of $Pack{Int32, Int32}
+  %ope0 = open_pack_element %dpi0 of <each T> at <Pack{Int32, Int32}>, shape $each T, id 10
+  %addr = pack_element_get %dpi0 of %0 as $*@pack_element(10) each T
+  %try_use = function_ref @try_use : $@convention(thin) <T> (@in_guaranteed T) -> (@error any Error)
+  try_apply %try_use<@pack_element(10) each T>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> (@error any Error), normal bb2, error bb3
+
+bb2(%try_res : $()):
+  br bb4
+
+bb3(%err : @owned $any Error):
+  destroy_value %err
+  br bb4
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1(%i)
+
+bb6:
+  %res = tuple ()
+  return %res
+}
+
+
+// Each opened pack is homogeneous, with a different element type.
+// CHECK-LABEL: sil [ossa] @homogeneous_dpi_multiple_packs : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+// CHECK-NOT:     open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int32
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int64
+// CHECK-LABEL: } // end sil function 'homogeneous_dpi_multiple_packs'
+sil [ossa] @homogeneous_dpi_multiple_packs : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %1 of $Pack{Int32, Int32}
+  %ope0 = open_pack_element %dpi0 of <each T, each U where (repeat (each T, each U)): Any> at <Pack{Int32, Int32}, Pack{Int64, Int64}>, shape $each T, id 11
+  %addr0 = pointer_to_address %0 to $*@pack_element(11) each T
+  %addr1 = pointer_to_address %0 to $*@pack_element(11) each U
+
+  %res = tuple ()
+  return %res
+}
+
+// Only the first opened pack is homogeneous, so the element archetype for the
+// second pack cannot be resolved without a static index.
+// CHECK-LABEL: sil [ossa] @heterogeneous_dpi_second_pack : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+// CHECK:         open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*@pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*@pack_element
+// CHECK-LABEL: } // end sil function 'heterogeneous_dpi_second_pack'
+sil [ossa] @heterogeneous_dpi_second_pack : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %dpi0 = dynamic_pack_index %1 of $Pack{Int32, Int32}
+  %ope0 = open_pack_element %dpi0 of <each T, each U where (repeat (each T, each U)): Any> at <Pack{Int32, Int32}, Pack{Int32, Int64}>, shape $each T, id 12
+  %addr0 = pointer_to_address %0 to $*@pack_element(12) each T
+  %addr1 = pointer_to_address %0 to $*@pack_element(12) each U
+
+  %res = tuple ()
+  return %res
+}
+
+// MARK: Simultaneous dynamic index rewriting.
+
+// The verifier checks for potential type errors when using pack_element_get/set
+// without an opened element archetype type. For non-homogeneous packs, it can
+// only do this when scalar_pack_index is used, so non-scalar index instructions
+// must be rewritten.
+//
+// CHECK-LABEL: sil [ossa] @pack_element_set : $@convention(thin) (@in_guaranteed Int) -> () {
+// CHECK:       bb0(%0 : $*Int):
+// CHECK:         [[APK:%[0-9]+]] = alloc_pack $Pack{Int, String, Bool}
+// CHECK:         [[SPI0:%[0-9]+]] = scalar_pack_index 0 of $Pack{Int, String, Bool}
+// CHECK:         [[PE:%[0-9]+]] = unchecked_addr_cast %0 : $*Int to $*Int
+// CHECK:         pack_element_set [[PE]] : $*Int into [[SPI0]] of [[APK]]
+// CHECK-LABEL: } // end sil function 'pack_element_set'
+sil [ossa] @pack_element_set : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%0 : $*Int):
+  %apk = alloc_pack $Pack{Int, String, Bool}
+  %zero = integer_literal $Builtin.Word, 0
+  %dpi0 = dynamic_pack_index %zero of $Pack{Int, String, Bool}
+  %ope = open_pack_element %dpi0 of <each T> at <Pack{Int, String, Bool}>, shape $each T, id 13
+  %pe = unchecked_addr_cast %0 to $*@pack_element(13) each T
+  pack_element_set %pe into %dpi0 of %apk
+  dealloc_pack %apk
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @pack_element_get : $@convention(thin) () -> () {
+// CHECK:         [[APK:%[0-9]+]] = alloc_pack $Pack{Int, String, Bool}
+// CHECK:         [[SPI0:%[0-9]+]] = scalar_pack_index 0 of $Pack{Int, String, Bool}
+// CHECK:         pack_element_get [[SPI0]] of [[APK]] : $*Pack{Int, String, Bool} as $*Int
+// CHECK-LABEL: } // end sil function 'pack_element_get'
+sil [ossa] @pack_element_get : $@convention(thin) () -> () {
+bb0:
+  %apk = alloc_pack $Pack{Int, String, Bool}
+  %zero = integer_literal $Builtin.Word, 0
+  %dpi0 = dynamic_pack_index %zero of $Pack{Int, String, Bool}
+  %ope = open_pack_element %dpi0 of <each T> at <Pack{Int, String, Bool}>, shape $each T, id 14
+  %pe = pack_element_get %dpi0 of %apk as $*@pack_element(14) each T
+  dealloc_pack %apk
+
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @multi_open : $@convention(thin) () -> () {
+// CHECK:         [[APK1:%[0-9]+]] = alloc_pack $Pack{Int, String, Bool}
+// CHECK:         [[APK2:%[0-9]+]] = alloc_pack $Pack{Float, String, Bool}
+// CHECK:         [[SPI0:%[0-9]+]] = scalar_pack_index 0 of $Pack{Int, String, Bool}
+// CHECK-NOT:     open_pack_element
+// CHECK:         pack_element_get [[SPI0]] of [[APK1]] : $*Pack{Int, String, Bool} as $*Int
+// CHECK:         pack_element_get [[SPI0]] of [[APK2]] : $*Pack{Float, String, Bool} as $*Float
+// CHECK-LABEL: } // end sil function 'multi_open'
+sil [ossa] @multi_open : $@convention(thin) () -> () {
+bb0:
+  %apk = alloc_pack $Pack{Int, String, Bool}
+  %apk2 = alloc_pack $Pack{Float, String, Bool}
+  %zero = integer_literal $Builtin.Word, 0
+  %dpi0 = dynamic_pack_index %zero of $Pack{Int, String, Bool}
+  %ope = open_pack_element %dpi0 of <each T> at <Pack{Int, String, Bool}>, shape $each T, id 15
+  %ope2 = open_pack_element %dpi0 of <each T> at <Pack{Float, String, Bool}>, shape $each T, id 16
+  %pe = pack_element_get %dpi0 of %apk as $*@pack_element(15) each T
+  %pe2 = pack_element_get %dpi0 of %apk2 as $*@pack_element(16) each T
+  dealloc_pack %apk2
+  dealloc_pack %apk
+
+  %result = tuple ()
+  return %result
+}

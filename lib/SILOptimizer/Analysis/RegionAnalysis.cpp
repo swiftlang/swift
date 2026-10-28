@@ -702,7 +702,7 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
       if (declRef.isAsyncLetClosure)
         return true;
 
-      // All of the non-Sendable captures of non-escaping @called(atMostOnce)
+      // All of the non-Sendable captures of non-escaping at-most-once
       // closures that aren't explicitly `sending` can be sent.
       if (auto *closure = declRef.getClosureExpr();
           closure && closure->hasCalledAtMostOnceSemantics()) {
@@ -2358,7 +2358,7 @@ class PartitionOpTranslator {
     partialApplyReachabilityDataflow.propagateReachability();
   }
 
-  /// The argument is a non-escaping `@called(atMostOnce)` value,
+  /// The argument is a non-escaping at-most-once value,
   /// if it's a closure, attempt to undo send of it's implicitly
   /// sending captures if the values weren't actually sent in the
   /// body of the closure.
@@ -2821,7 +2821,7 @@ public:
   void translateSILNoEscapeCalledAtMostOncePartialApply(PartialApplyInst *pai) {
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
-        << "Translating non-escaping `@called(atMostOnce)` Partial Apply!\n");
+        << "Translating non-escaping at-most-once Partial Apply!\n");
 
     for (auto &op : ApplySite(pai).getArgumentOperands()) {
       // All of the non-Sendable captures are sent by default. This would
@@ -2840,8 +2840,8 @@ public:
 
   void translateSILCalledAtMostOncePartialApply(PartialApplyInst *pai) {
     ApplySite applySite(pai);
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "Translating `@called(atMostOnce)` Partial Apply!\n");
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "Translating at-most-once Partial Apply!\n");
 
     SmallVector<Operand *> operandsToMerge;
     for (auto &op : applySite.getArgumentOperands()) {
@@ -2942,7 +2942,7 @@ public:
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
-    // `@called(atMostOnce)` closures are allowed to have `sending` captures
+    // at-most-once closures are allowed to have `sending` captures
     // which need special handling.
     if (pai->hasCalledAtMostOnceSemantics()) {
       // no-escaping closures treat non-Sendable captures that aren't explicitly
@@ -2998,7 +2998,7 @@ public:
     // For non-self parameters, gather all of the sending parameters and
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
-    // Non-escaping `@called(atMostOnce)` closures require a post-call undo
+    // Non-escaping at-most-once closures require a post-call undo
     // of their un-sent captures.
     SmallVector<Operand *, 2> nonescapingCalledAtMostOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
@@ -3022,7 +3022,7 @@ public:
       if (!fas.isSending(op)) {
         auto argumentType = op.get()->getType();
 
-        // Non-escaping @called(atMostOnce) closures require special
+        // Non-escaping at-most-once closures require special
         // handling to undo send of non-Sendable captures that
         // weren't sent in the body.
         if (argumentType.hasCalledAtMostOnceSemantics() &&
@@ -3059,7 +3059,7 @@ public:
       }
 
       // Attempt to undo send of captures that weren't sent in the body of
-      // a non-escaping `@called(atMostOnce)` closure.
+      // a non-escaping at-most-once closure.
       for (Operand *op : nonescapingCalledAtMostOnceArguments) {
         tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(op);
       }
@@ -4082,8 +4082,8 @@ CONSTANT_TRANSLATION(DereferenceBorrowAddrInst, LookThrough)
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 // `assign` is ordinarily lowered away by DI before this pass but
-// non-escaping `@called(atMostOnce)` and `async let` bodies require analysis
-// as part of the use (calls for `@called(atMostOnce)` and `await` for
+// non-escaping at-most-once and `async let` bodies require analysis
+// as part of the use (calls for at-most-once and `await` for
 // `async let`) to determine whether sends of captures have to be undone
 // and that can happen before DI run on the closure and so `assign` has
 // to be treated as a `store`.
@@ -4397,10 +4397,29 @@ PartitionOpTranslator::visitProjection(SingleValueInstruction *proj) {
 EMIT_PROJECTION(StructElementAddrInst)
 EMIT_PROJECTION(TupleElementAddrInst)
 EMIT_PROJECTION(UncheckedTakeEnumDataAddrInst)
-EMIT_PROJECTION(UncheckedBorrowEnumDataAddrInst)
 EMIT_PROJECTION(UncheckedInPlaceEnumDataAddrInst)
 
 #undef EMIT_PROJECTION
+
+TranslationSemantics
+PartitionOpTranslator::visitUncheckedBorrowEnumDataAddrInst(
+    UncheckedBorrowEnumDataAddrInst *proj) {
+  // The scratch operand is reachable only through the result.
+  // That's why we only check the enum operand.
+  SILValue enumAddr = proj->getEnum();
+
+  // If the payload is Sendable but the enum is not, require the enum.
+  if (SILIsolationInfo::isNonSendable(enumAddr) &&
+      !SILIsolationInfo::isNonSendable(proj)) {
+    translateSILRequire(proj);
+    return TranslationSemantics::Special;
+  }
+
+  // Otherwise, look through to the enum. If the enum is Sendable, the payload
+  // gets a fresh region.
+  translateSILLookThrough(SILValue(proj), enumAddr);
+  return TranslationSemantics::Special;
+}
 
 //===---
 // Custom Handling

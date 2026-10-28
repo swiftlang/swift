@@ -57,6 +57,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SandboxingFileSystem.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
@@ -158,6 +159,11 @@ std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.LLVMBitcodeDiagnosticsPath;
+}
+std::string
+CompilerInvocation::getSARIFDiagnosticsPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.SARIFDiagnosticsPath;
 }
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
@@ -493,7 +499,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
+bool CompilerInstance::setupCASIfNeeded() {
   if (!getInvocation().requiresCAS())
     return false;
 
@@ -512,6 +518,13 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     }
     std::tie(CAS, ResultCache) = *MaybeDB;
   }
+  return false;
+}
+
+bool CompilerInstance::setupCompileJobBaseKeyIfNeeded(
+    ArrayRef<const char *> Args) {
+  if (!getInvocation().requiresCAS())
+    return false;
 
   // create baseline key.
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
@@ -590,13 +603,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
 
-  if (setupCASIfNeeded(Args)) {
+  if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
     return true;
   }
 
   setupDependencyTrackerIfNeeded();
-  setupOutputBackend();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -604,6 +616,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     Error = "Setting up virtual file system overlays failed";
     return true;
   }
+
+  // Compute the cache key after the CAS file system is set up so that a
+  // missing include tree is diagnosed with a better error message first.
+  if (setupCompileJobBaseKeyIfNeeded(Args)) {
+    Error = "Setting up compile job cache key failed";
+    return true;
+  }
+  setupOutputBackend();
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -665,8 +685,13 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
   Invocation = Invoke;
 
   setSharedCASInstances(CAS, Cache);
-  if (setupCASIfNeeded(Args)) {
+  if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
+    return true;
+  }
+
+  if (setupCompileJobBaseKeyIfNeeded(Args)) {
+    Error = "Setting up compile job cache key failed";
     return true;
   }
 
@@ -682,6 +707,51 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
           Invocation.getFrontendOptions().RequestedAction)) {
     Diagnostics.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
     return true;
+  }
+
+  if (!CASOpts.DepscanCASFileSystemRootID.empty() &&
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::ScanDependencies) {
+    if (CASOpts.requireCASFS()) {
+      Diagnostics.diagnose(
+          SourceLoc(), diag::error_option_incompatible, "-scanner-cas-fs",
+          "-clang-include-tree-root | -clang-include-tree-filelist | "
+          "-input-file-key | -bridging-header-pch-key");
+      return true;
+    }
+
+    auto reportError = [&](llvm::Error E) -> bool {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                           toString(std::move(E)));
+      return true;
+    };
+
+    auto ID = CAS->parseID(CASOpts.DepscanCASFileSystemRootID);
+    if (!ID)
+      return reportError(ID.takeError());
+    auto CASFS = llvm::cas::createCASFileSystem(CAS, *ID);
+    if (!CASFS)
+      return reportError(CASFS.takeError());
+
+    if (!CASOpts.CASFSEscapePaths.empty()) {
+      SmallVector<StringRef, 4> EscapePaths;
+      for (const auto &Path : CASOpts.CASFSEscapePaths) {
+        EscapePaths.push_back(Path);
+      }
+      auto SandboxFS = llvm::vfs::createSandboxingFileSystem(
+          SourceMgr.getFileSystem(), EscapePaths);
+      if (!SandboxFS) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                             toString(SandboxFS.takeError()));
+        return true;
+      }
+      auto OverlayFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+          std::move(*CASFS));
+      OverlayFS->pushOverlay(std::move(*SandboxFS));
+      SourceMgr.setFileSystem(std::move(OverlayFS));
+    } else {
+      SourceMgr.setFileSystem(std::move(*CASFS));
+    }
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {
@@ -1852,6 +1922,11 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     // Suppress parse warnings for non-primaries, as they'll get parsed multiple
     // times.
     opts |= ParsingFlags::SuppressWarnings;
+  }
+
+  if (action == ActionType::ScanDependencies) {
+    // Leave source-file parse diagnostics to the compile job.
+    opts |= ParsingFlags::SuppressParserDiagnostics;
   }
 
   // Turn off new parser round-trip and diagnostics checking for

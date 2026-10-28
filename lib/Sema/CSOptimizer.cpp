@@ -1036,10 +1036,35 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
         });
       };
 
-      recordReferencesGenericParams(requirement.getFirstType());
+      switch (requirement.getKind()) {
+      case RequirementKind::Layout:
+        // RHS of a layout requirement is not a type.
+        break;
 
-      if (requirement.getKind() != RequirementKind::Layout)
+      case RequirementKind::Conformance:
+        // The introduction of the Deinitable protocol, which almost
+        // everything conforms to, changed the favoring computation.
+        // Ignore Deinitable to get the old behavior back for now.
+        //
+        // FIXME: Get rid of this, obviously.
+        if (requirement.getProtocolDecl()->isSpecificProtocol(
+            KnownProtocolKind::Deinitable)) {
+          continue;
+        }
+
+        // Desugared conformance requirements don't have type parameters
+        // on the RHS.
+        break;
+
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType:
+      case RequirementKind::SameShape:
+        // Consider the RHS type.
         recordReferencesGenericParams(requirement.getSecondType());
+        break;
+      }
+
+      recordReferencesGenericParams(requirement.getFirstType());
 
       if (llvm::any_of(toExamine, [&](GenericTypeParamType *GP) {
             return paramType->isEqual(GP);

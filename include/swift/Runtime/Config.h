@@ -188,6 +188,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #endif
 #define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
+// Debuggers find these variables by name, and a linked wasm module names a data
+// symbol only if it is exported.
+#if defined(__wasm__)
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name) __attribute__((export_name(#name)))
+#else
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name)
+#endif
+
 // Define mappings for calling conventions.
 
 // Annotation for specifying a calling convention of
@@ -351,6 +359,10 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
+// This must match __ptrauth_objc_isa_pointer, and EmbeddedHeapObject in
+// EmbeddedShims.h
+#define __ptrauth_swift_heap_object_metadata                                   \
+  __ptrauth(ptrauth_key_process_independent_data, 1, 0x6AE1)
 #define __ptrauth_swift_nonunique_extended_existential_type_shape              \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape)
@@ -417,6 +429,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dispatch_invoke_function
 #define __ptrauth_swift_accessible_function_record
 #define __ptrauth_swift_objc_superclass
+#define __ptrauth_swift_heap_object_metadata
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)

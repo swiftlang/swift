@@ -182,6 +182,27 @@ extension MutableRawSpan {
   ) {
     self = unsafe Self.init(unsafeElements: elements)
   }
+
+  /// Create a mutable span over the bytes of a single value.
+  ///
+  /// The span has a `byteCount` of `MemoryLayout<Element>.size`. Writes
+  /// through the span modify `value`, which is exclusively accessed while
+  /// the span exists.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be mutated through the span
+  @export(implementation)
+  @_lifetime(&value)
+  public init<Element: ConvertibleToBytes & ConvertibleFromBytes>(
+    bytesOf value: inout Element
+  ) {
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
+      start: .init(Builtin.unprotectedAddressOf(&value)),
+      count: MemoryLayout<Element>.size
+    )
+    let span = unsafe MutableRawSpan(_unsafeBytes: buffer)
+    self = unsafe _overrideLifetime(span, mutating: &value)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)

@@ -17,12 +17,12 @@ sil_vtable C {}
 
 sil @x_get : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out NSString
 
-// CHECK: [[KEYPATH_A:@keypath(\..*)?]] = private global
+// CHECK: [[KEYPATH_A:@keypath(\..*)?]] = private constant
 // --             computed, get-only, function-instantiated identifier
 // CHECK-SAME: <i32 0x0200_0001>,
 // CHECK-SAME: ptr [[SELECTOR_FN:@[A-Za-z0-9_.]+]] to
 
-// CHECK: [[KEYPATH_B:@keypath(\..*)?]] = private global
+// CHECK: [[KEYPATH_B:@keypath(\..*)?]] = private constant
 // --             class mutable stored property with indirect offset
 // CHECK-SAME: <i32 0x03fffffd>,
 // CHECK-SAME: @"$s13keypaths_objc1CC6storedSivpWvd"

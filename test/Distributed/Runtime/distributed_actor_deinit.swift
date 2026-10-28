@@ -2,6 +2,9 @@
 // RUN: %target-build-swift -target %target-future-triple %import-libdispatch -parse-stdlib -parse-as-library -module-name=main %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -target %target-future-triple %import-libdispatch -parse-stdlib -parse-as-library -module-name=main %s -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a-opaque-values.out | %FileCheck %s
 
 // REQUIRES: libdispatch
 // REQUIRES: executable_test

@@ -304,6 +304,7 @@ private enum DwarfError: Error {
   case badRangeListEntry(Dwarf_Byte)
   case missingRngListsSection
   case missingRngListsBase
+  case badReference(UInt64)
 }
 
 // .. Dwarf utilities for ImageSource ..........................................
@@ -1743,6 +1744,66 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     }
   }
 
+  /// Find the unit whose DIEs contain the given `.debug_info` offset.
+  private func unit(containing offset: Address) -> Unit? {
+    var lo = 0
+    var hi = units.count
+    while lo < hi {
+      let mid = lo + (hi - lo) / 2
+      if units[mid].baseOffset <= offset {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
+    }
+    guard lo > 0 else {
+      return nil
+    }
+    let candidate = units[lo - 1]
+    return offset >= candidate.dieBounds.base && offset < candidate.dieBounds.end
+      ? candidate : nil
+  }
+
+  /// Read the attributes of a subprogram DIE that is referenced from
+  /// another DIE.
+  ///
+  /// The referenced DIE may live in a different unit from the referring
+  /// one (for example in a partial unit produced by `dwz`), so we need to
+  /// use that unit's abbreviations and base offset to decode it.
+  ///
+  /// - Parameter offset: The `.debug_info` offset of the referenced DIE.
+  ///
+  /// - Returns: The attributes of the DIE, or `nil` if it is a null entry
+  ///   or is not a subprogram.
+  private func readReferencedSubprogram(
+    at offset: Address
+  ) throws -> [Dwarf_Attribute:DwarfValue]? {
+    guard let target = unit(containing: offset) else {
+      throw DwarfError.badReference(offset)
+    }
+
+    var cursor = ImageSourceCursor(source: infoSection, offset: offset)
+    let abbrev = try cursor.readULEB128()
+    if abbrev == 0 {
+      return nil
+    }
+
+    guard let abbrevInfo = target.abbrevs[abbrev] else {
+      throw DwarfError.missingAbbrev(abbrev)
+    }
+
+    if abbrevInfo.tag != .DW_TAG_subprogram {
+      return nil
+    }
+
+    return try readDieAttributes(
+      at: &cursor,
+      unit: target,
+      abbrevInfo: abbrevInfo,
+      shouldFetchIndirect: true
+    )
+  }
+
   struct CallSiteInfo {
     var depth: Int
     var rawName: String?
@@ -1768,54 +1829,17 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       return
     }
 
-    var cursor = ImageSourceCursor(source: infoSection,
-                                   offset: abstractOrigin)
-    var abbrev = try cursor.readULEB128()
-    if abbrev == 0 {
+    guard var refAttrs = try readReferencedSubprogram(at: abstractOrigin) else {
       return
     }
-
-    guard let abbrevInfo = unit.abbrevs[abbrev] else {
-      throw DwarfError.missingAbbrev(abbrev)
-    }
-
-    let tag = abbrevInfo.tag
-
-    if tag != .DW_TAG_subprogram {
-      return
-    }
-
-    var refAttrs = try readDieAttributes(
-      at: &cursor,
-      unit: unit,
-      abbrevInfo: abbrevInfo,
-      shouldFetchIndirect: true
-    )
 
     if let specificationVal = refAttrs[.DW_AT_specification],
        case let .reference(specification) = specificationVal {
-      cursor = ImageSourceCursor(source: infoSection,
-                                 offset: specification)
-      abbrev = try cursor.readULEB128()
-      if abbrev == 0 {
+      guard let specAttrs = try readReferencedSubprogram(at: specification)
+      else {
         return
       }
-
-      guard let abbrevInfo = unit.abbrevs[abbrev] else {
-        throw DwarfError.missingAbbrev(abbrev)
-      }
-
-      let tag = abbrevInfo.tag
-      if tag != .DW_TAG_subprogram {
-        return
-      }
-
-      refAttrs = try readDieAttributes(
-        at: &cursor,
-        unit: unit,
-        abbrevInfo: abbrevInfo,
-        shouldFetchIndirect: true
-      )
+      refAttrs = specAttrs
     }
 
     var name: String? = nil
@@ -1899,28 +1923,11 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
     if let specificationVal = refAttrs[.DW_AT_specification],
        case let .reference(specification) = specificationVal {
-      var cursor = ImageSourceCursor(source: infoSection,
-                                     offset: specification)
-      let abbrev = try cursor.readULEB128()
-      if abbrev == 0 {
+      guard let specAttrs = try readReferencedSubprogram(at: specification)
+      else {
         return
       }
-
-      guard let abbrevInfo = unit.abbrevs[abbrev] else {
-        throw DwarfError.missingAbbrev(abbrev)
-      }
-
-      let tag = abbrevInfo.tag
-      if tag != .DW_TAG_subprogram {
-        return
-      }
-
-      refAttrs = try readDieAttributes(
-        at: &cursor,
-        unit: unit,
-        abbrevInfo: abbrevInfo,
-        shouldFetchIndirect: true
-      )
+      refAttrs = specAttrs
     }
 
     if let nameVal = refAttrs[.DW_AT_name],

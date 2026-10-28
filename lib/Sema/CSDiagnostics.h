@@ -911,8 +911,10 @@ public:
                                   ConstraintLocator *locator)
       : ContextualFailure(solution, actualType, requiredType, locator),
         Mismatches(mismatches) {
-    assert(actualType->is<BoundGenericType>());
-    assert(requiredType->is<BoundGenericType>());
+    assert(actualType->is<NominalType>() &&
+           actualType->castTo<NominalType>()->hasGenericArgs());
+    assert(requiredType->is<NominalType>() &&
+           requiredType->castTo<NominalType>()->hasGenericArgs());
   }
 
   bool diagnoseAsError() override;
@@ -930,13 +932,13 @@ private:
   getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
-  BoundGenericType *getActual() const {
-    return getFromType()->castTo<BoundGenericType>();
+  NominalType *getActual() const {
+    return getFromType()->castTo<NominalType>();
   }
 
   /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const {
-    return getToType()->castTo<BoundGenericType>();
+  NominalType *getRequired() const {
+    return getToType()->castTo<NominalType>();
   }
 };
 
@@ -1009,11 +1011,11 @@ public:
 };
 
 /// Diagnose failures related to conversion between two types with different
-/// execution semantics i.e. '@called(atMostOnce)' function and regular one:
+/// execution semantics, such as an at-most-once function and a regular one:
 ///
 /// ```swift
 /// func test(_: () -> Void) {}
-/// let fn: @called(atMostOnce) () -> Void = {}
+/// let fn: @callable(once) () -> Void = {}
 /// test(fn) // error due to widening
 /// ```
 class ConversionBetweenFunctionsWithDifferentExecutionSemantics final
@@ -3392,6 +3394,19 @@ public:
   OutOfPlaceThenStmtFailure(const Solution &solution,
                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an argument to \c withoutActuallyDiscarding(_:do:) that isn't an
+/// exactly-once function.
+class NonExactlyOnceDiscardArgumentFailure final : public FailureDiagnostic {
+  Type ArgType;
+
+public:
+  NonExactlyOnceDiscardArgumentFailure(const Solution &solution, Type argType,
+                                       ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
 
   bool diagnoseAsError() override;
 };

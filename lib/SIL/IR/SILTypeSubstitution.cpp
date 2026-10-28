@@ -404,7 +404,7 @@ public:
   }
 
   /// Optionals need to have their object types substituted by these rules.
-  CanType visitBoundGenericEnumType(CanBoundGenericEnumType origType) {
+  CanType visitEnumType(CanEnumType origType) {
     // Only use a special rule if it's Optional.
     if (!origType->getDecl()->isOptionalDecl()) {
       return visitType(origType);
@@ -412,8 +412,8 @@ public:
 
     CanType origObjectType = origType.getGenericArgs()[0];
     CanType substObjectType = visit(origObjectType);
-    return CanType(BoundGenericType::get(origType->getDecl(), Type(),
-                                         substObjectType));
+    return CanType(EnumType::get(origType->getDecl(), Type(),
+                                 substObjectType, TC.Context));
   }
 
   /// MoveOnlyWrappedTypes need to have their inner types substituted
