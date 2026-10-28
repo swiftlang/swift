@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature SingleYieldFunctions -disable-experimental-parser-round-trip
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature SingleYieldFunctions
 // RUN: not %target-swift-frontend -typecheck %s -disable-experimental-parser-round-trip 2>&1 | %FileCheck %s --check-prefix=NOFLAG
 
 // REQUIRES: swift_feature_SingleYieldFunctions

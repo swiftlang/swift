@@ -97,6 +97,7 @@ extension Parser.LanguageFeatures {
     mapFeature(.OnceFunctions, to: .onceFunctions)
     mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
     mapFeature(.ExtendedSpecializedAttribute, to: .extendedSpecializedAttribute)
+    mapFeature(.SingleYieldFunctions, to: .singleYieldFunctions)
   }
 }
 
