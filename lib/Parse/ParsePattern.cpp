@@ -847,6 +847,46 @@ ParserStatus Parser::parseFunctionSignature(
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows,
                            thrownType);
 
+    // A single-yield function: `-> yield [borrow|inout] T`.
+    if (isStartOfSingleYieldResult()) {
+      SourceLoc yieldLoc;
+      ParamSpecifier specifier;
+      ParserResult<TypeRepr> yieldType =
+          parseSingleYieldResult(yieldLoc, specifier);
+      Status |= yieldType;
+      retType = nullptr;
+      if (Status.isErrorOrHasCompletion()) {
+        return Status;
+      }
+
+      if (!Context.LangOpts.hasFeature(Feature::SingleYieldFunctions)) {
+        diagnose(yieldLoc, diag::single_yield_requires_feature);
+        retType = yieldType.get();
+      } else if (paramContext == ParameterContextKind::Initializer) {
+        diagnose(yieldLoc, diag::single_yield_invalid_decl, "initializers");
+      } else if (paramContext == ParameterContextKind::Operator) {
+        diagnose(yieldLoc, diag::single_yield_invalid_decl,
+                 "operator functions");
+        retType = yieldType.get();
+      } else {
+        if (asyncLoc.isValid()) {
+          diagnose(asyncLoc, diag::single_yield_async_unsupported,
+                   reasync ? "reasync" : "async");
+        }
+        if (throwsLoc.isValid()) {
+          diagnose(throwsLoc, diag::single_yield_throws_unsupported);
+        }
+        bodyYields = YieldList::create(
+            Context, Yield(yieldType.get(), YieldTypeFlags(specifier)),
+            YieldListKind::YieldResult, yieldLoc);
+      }
+
+      // Check for effect specifiers after the type and correct it.
+      parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows,
+                             thrownType);
+      return Status;
+    }
+
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
     retType = ResultType.getPtrOrNull();

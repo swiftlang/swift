@@ -2278,5 +2278,21 @@ ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
 ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
       "attribute cannot be attached to a file-level default", ())
 
+//------------------------------------------------------------------------------
+// MARK: single-yield functions
+//------------------------------------------------------------------------------
+
+ERROR(single_yield_requires_feature,none,
+      "'-> yield' requires '-enable-experimental-feature SingleYieldFunctions'",
+      ())
+ERROR(single_yield_invalid_decl,none,
+      "%0 cannot be single-yield functions", (StringRef))
+ERROR(single_yield_throws_unsupported,none,
+      "throwing single-yield functions are not yet supported", ())
+ERROR(single_yield_async_unsupported,none,
+      "single-yield functions cannot be '%0'", (StringRef))
+ERROR(single_yield_function_type_unsupported,none,
+      "single-yield function types are not yet supported", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
