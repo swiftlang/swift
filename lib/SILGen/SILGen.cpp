@@ -2029,6 +2029,11 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
 
   // FIXME: Add proper location.
   auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+
+  // Don't emit a thunk for a setter that won't be emitted itself.
+  if (shouldSkipDecl(setter))
+    return;
+
   auto setterRef = SILDeclRef(setter, SILDeclRef::Kind::Func).asForeign();
   emitNativeToForeignThunk(setterRef);
 }
