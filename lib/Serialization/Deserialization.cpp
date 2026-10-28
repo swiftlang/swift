@@ -2255,35 +2255,6 @@ findNestedTypeDeclInModule(ModuleDecl *extensionModule,
   return findNestedTypeDeclInModule(nullptr, extensionModule, name, parent);
 }
 
-void ModuleFile::consumeHiddenTypeXRefPathPieces(
-    llvm::BitstreamCursor &cursor, uint32_t pathLen,
-    SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces) {
-  using namespace decls_block;
-  for (uint32_t index = 0; index < pathLen; ++index) {
-    auto entry = fatalIfUnexpected(
-        cursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      fatal(diagnoseFatal());
-
-    SmallVector<uint64_t, 8> scratch;
-    StringRef blobData;
-    unsigned recordID = fatalIfUnexpected(
-        cursor.readRecord(entry.ID, scratch, &blobData));
-    if (recordID != XREF_TYPE_PATH_PIECE)
-      fatal(diagnoseFatal());
-
-    IdentifierID nameID, privateDiscriminator;
-    bool inProtocolExtension, importedFromClang;
-    XRefTypePathPieceLayout::readRecord(
-        scratch, nameID, privateDiscriminator, inProtocolExtension,
-        importedFromClang);
-    if (privateDiscriminator)
-      fatal(diagnoseFatal());
-    pieces.push_back({getIdentifier(nameID), inProtocolExtension,
-                      importedFromClang});
-  }
-}
-
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -6429,23 +6400,6 @@ ModuleFile::deserializeHiddenTypeLayoutInfo(BitOffset offset) {
 }
 
 llvm::Expected<HiddenTypeLayoutInfoDecl *>
-ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
-  if (!DID)
-    return nullptr;
-
-  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
-         "invalid hidden type layout decl ID");
-  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
-  if (declOrOffset.isComplete())
-    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
-
-  auto decl = deserializeHiddenTypeLayoutInfo(declOrOffset);
-  if (decl)
-    declOrOffset = decl.get();
-  return decl;
-}
-
-llvm::Expected<HiddenTypeLayoutInfoDecl *>
 ModuleFile::getAbstractMemberTypeLayout(AbstractMemberTypeLayoutID ID) {
   if (!ID)
     return nullptr;
@@ -7690,44 +7644,6 @@ DeclDeserializer::getDeclCheckedImpl(
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
-
-    auto fallback = MF.HiddenTypeFallbackMap.find(thisDeclID);
-    bool canUseHiddenTypeFallback =
-        fallback != MF.HiddenTypeFallbackMap.end() &&
-        MF.getContext().LangOpts.hasFeature(
-            Feature::SerializeAbstractTypeLayoutForHiddenTypes);
-    if (canUseHiddenTypeFallback) {
-      SmallVector<HiddenTypeLayoutInfoDecl::XRefPathPiece, 2> originalPath;
-      auto pathCursor = MF.DeclTypeCursor;
-      MF.consumeHiddenTypeXRefPathPieces(pathCursor, pathLen, originalPath);
-
-      auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-      if (resolved) {
-        declOrOffset = resolved.get();
-        break;
-      }
-
-      auto hidden = MF.getHiddenTypeLayoutInfoDecl(fallback->second);
-      if (!hidden) {
-        llvm::consumeError(resolved.takeError());
-        return hidden.takeError();
-      }
-      if (!hidden.get())
-        return resolved;
-
-      if (baseModuleID == OBJC_HEADER_MODULE_ID) {
-        hidden.get()->OriginalModuleIsObjCHeader = true;
-      } else {
-        assert(baseModuleID >= NUM_SPECIAL_IDS &&
-               "unexpected special module in hidden type XREF");
-        hidden.get()->OriginalModuleName = MF.getIdentifier(baseModuleID);
-      }
-      hidden.get()->OriginalXRefPath =
-          MF.getContext().AllocateCopy(originalPath);
-      declOrOffset = hidden.get();
-      llvm::consumeError(resolved.takeError());
-      break;
-    }
 
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
     if (!resolved)

@@ -894,20 +894,22 @@ REMARK(serialization_skipped_invalid_type,none,
 REMARK(serialization_skipped_invalid_type_unknown_name,none,
        "serialization skipped for invalid type",
        ())
-REMARK(serialization_scheduled_implementation_only_hidden_type_layout,none,
-       "serializing abstract layout for hidden type %0 because its defining "
-       "module was imported with '@_implementationOnly' and it contributes "
-       "to the ABI-exposed layout of %kind1 through %kind2",
+REMARK(serialization_scheduled_implementation_only_member_layout_fallback,none,
+       "serializing an abstract layout fallback for %kind2 because its type "
+       "references hidden type %0 whose defining module was imported with "
+       "'@_implementationOnly' and %kind2 contributes to the ABI-exposed "
+       "layout of %kind1",
        (Type, const ValueDecl *, const ValueDecl *))
-REMARK(serialization_scheduled_internal_bridging_header_hidden_type_layout,none,
-       "serializing abstract layout for hidden type %0 because it was "
-       "imported through '-internal-import-bridging-header' and contributes "
-       "to the ABI-exposed layout of %kind1 through %kind2",
+REMARK(serialization_scheduled_internal_bridging_header_member_layout_fallback,none,
+       "serializing an abstract layout fallback for %kind2 because its type "
+       "references hidden type %0 imported through "
+       "'-internal-import-bridging-header' and %kind2 contributes to the "
+       "ABI-exposed layout of %kind1",
        (Type, const ValueDecl *, const ValueDecl *))
-REMARK(serialization_scheduled_recovered_hidden_type_layout,none,
-       "serializing abstract layout for hidden type %0 because it was "
-       "recovered from a hidden type representation and contributes to the "
-       "ABI-exposed layout of %kind1 through %kind2",
+REMARK(serialization_scheduled_recovered_hidden_member_layout_fallback,none,
+       "serializing an abstract layout fallback for %kind2 because its type "
+       "references hidden type %0 recovered from a hidden type representation "
+       "and %kind2 contributes to the ABI-exposed layout of %kind1",
        (Type, const ValueDecl *, const ValueDecl *))
 NOTE(serialization_hidden_type_layout_abi_exposure,none,
      "layout of %kind0 is ABI-exposed through %kind1",

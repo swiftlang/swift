@@ -22,7 +22,7 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/FlagDisabled.swiftmodule %t/PublicStructIOIField.swift -I %t/InternalModule -parse-as-library -module-name FlagDisabled -Rhidden-type-layout-serialization -suppress-warnings -verify
 
-// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/TupleLeak.swiftmodule %t/TupleLeak.swift -I %t/InternalModule -parse-as-library -module-name TupleLeak -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -skip-writing-abstract-type-layouts -emit-module -emit-module-path %t/TupleLeak.swiftmodule %t/TupleLeak.swift -I %t/InternalModule -parse-as-library -module-name TupleLeak -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/SiblingStructLeak.swiftmodule %t/SiblingStructLeak.swift -I %t/InternalModule -parse-as-library -module-name SiblingStructLeak -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
@@ -34,15 +34,19 @@
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/GenericParentSpecialization.swiftmodule %t/GenericParentSpecialization.swift -I %t/InternalModule -parse-as-library -module-name GenericParentSpecialization -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
-// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/GenericPhantomIOI.swiftmodule %t/GenericPhantomIOI.swift -I %t/InternalModule -parse-as-library -module-name GenericPhantomIOI -Rhidden-type-layout-serialization -verify
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -skip-writing-abstract-type-layouts -emit-module -emit-module-path %t/GenericPhantomIOI.swiftmodule %t/GenericPhantomIOI.swift -I %t/InternalModule -parse-as-library -module-name GenericPhantomIOI -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-reference-
+
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -skip-writing-abstract-type-layouts -emit-module -emit-module-path %t/ClosureTypeReference.swiftmodule %t/ClosureTypeReference.swift -I %t/InternalModule -parse-as-library -module-name ClosureTypeReference -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-reference-
+
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -skip-writing-abstract-type-layouts -emit-module -emit-module-path %t/GenericRequirementReference.swiftmodule %t/GenericRequirementReference.swift -I %t/InternalModule -parse-as-library -module-name GenericRequirementReference -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-reference-
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/PublicNestedType.swiftmodule %t/PublicNestedType.swift -I %t/InternalModule -parse-as-library -module-name PublicNestedType -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
-// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/GenericEnumHiddenPayload.swiftmodule %t/GenericEnumHiddenPayload.swift -I %t/InternalModule -parse-as-library -module-name GenericEnumHiddenPayload -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -skip-writing-abstract-type-layouts -emit-module -emit-module-path %t/GenericEnumHiddenPayload.swiftmodule %t/GenericEnumHiddenPayload.swift -I %t/InternalModule -parse-as-library -module-name GenericEnumHiddenPayload -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/PrivateEnumIOIPayload.swiftmodule %t/PrivateEnumIOIPayload.swift -I %t/InternalModule -parse-as-library -module-name PrivateEnumIOIPayload -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-layout-
 
-// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/IndirectEnumIOIPayload.swiftmodule %t/IndirectEnumIOIPayload.swift -I %t/InternalModule -parse-as-library -module-name IndirectEnumIOIPayload -Rhidden-type-layout-serialization -verify
+// RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -skip-writing-abstract-type-layouts -emit-module -emit-module-path %t/IndirectEnumIOIPayload.swiftmodule %t/IndirectEnumIOIPayload.swift -I %t/InternalModule -parse-as-library -module-name IndirectEnumIOIPayload -Rhidden-type-layout-serialization -verify -verify-additional-prefix hidden-reference-
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -internal-import-bridging-header %t/HiddenTypes.h -emit-module -emit-module-path %t/PublicStructInternalBridgingHeaderField.swiftmodule %t/PublicStructInternalBridgingHeaderField.swift -parse-as-library -module-name PublicStructInternalBridgingHeaderField -Rhidden-type-layout-serialization -verify -verify-additional-prefix internal-bridging-header-
 // RUN: %llvm-bcanalyzer -dump %t/PublicStructInternalBridgingHeaderField.swiftmodule | %FileCheck %s --check-prefix HIDDEN-CLANG-RECORD
@@ -56,6 +60,8 @@ public struct InternalType {
   public var y: Int64 = 2
   public init() {}
 }
+
+public protocol InternalProtocol {}
 
 //--- HiddenTypes.h
 typedef struct {
@@ -78,7 +84,7 @@ typedef struct {
 @_implementationOnly import Internal
 
 public struct PublicWrapper {
-  // expected-implementation-only-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'PublicWrapper' through property 'hidden'}}
+  // expected-implementation-only-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of struct 'PublicWrapper'}}
   private var hidden: InternalType
   public var visible: Int64 = 1
   public init() { self.hidden = InternalType() }
@@ -88,7 +94,7 @@ public struct PublicWrapper {
 @_implementationOnly import Internal
 
 public class PublicClassWrapper {
-  // expected-implementation-only-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of class 'PublicClassWrapper' through property 'hidden'}}
+  // expected-implementation-only-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of class 'PublicClassWrapper'}}
   private var hidden: InternalType
   public init() { self.hidden = InternalType() }
 }
@@ -117,7 +123,7 @@ struct InternalWrapper {
 // expected-hidden-layout-note@+1 {{layout of struct 'B' is ABI-exposed through struct 'A'}}
 public struct A {
   private struct B {
-    // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'B' through property 'ioi'}}
+    // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'ioi' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'ioi' contributes to the ABI-exposed layout of struct 'B'}}
     var ioi: InternalType
     init() { self.ioi = InternalType() }
   }
@@ -130,7 +136,7 @@ public struct A {
 @_implementationOnly import Internal
 
 public struct TupleWrapper {
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'TupleWrapper' through property 'hidden'}}
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of struct 'TupleWrapper'}}
   private var hidden: (InternalType, Int64)
   public var visible: Int64 = 1
   public init() { self.hidden = (InternalType(), 0) }
@@ -140,7 +146,7 @@ public struct TupleWrapper {
 @_implementationOnly import Internal
 
 struct InternalHelper {
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'InternalHelper' through property 'ioi'}}
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'ioi' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'ioi' contributes to the ABI-exposed layout of struct 'InternalHelper'}}
   var ioi: InternalType
   init() { self.ioi = InternalType() }
 }
@@ -157,7 +163,7 @@ public struct PublicUser {
 
 struct GenericWithHardcoded<T> {
   var value: T
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of generic struct 'GenericWithHardcoded' through property 'ioi'}}
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'ioi' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'ioi' contributes to the ABI-exposed layout of generic struct 'GenericWithHardcoded'}}
   var ioi: InternalType
   init(value: T) {
     self.value = value
@@ -176,13 +182,12 @@ public struct UsesGenericHardcoded {
 @_implementationOnly import Internal
 
 struct GenericWrapper<T> {
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of generic struct 'GenericWrapper' through property 'value'}}
   var value: T
   init(value: T) { self.value = value }
 }
 
-// expected-hidden-layout-note@+1 {{layout of generic struct 'GenericWrapper' is ABI-exposed through struct 'UsesGenericSpecialized'}}
 public struct UsesGenericSpecialized {
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'g' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'g' contributes to the ABI-exposed layout of struct 'UsesGenericSpecialized'}}
   private var g: GenericWrapper<InternalType>
   public var visible: Int64 = 1
   public init() { self.g = GenericWrapper(value: InternalType()) }
@@ -192,13 +197,12 @@ public struct UsesGenericSpecialized {
 @_implementationOnly import Internal
 
 struct OrderDependentGeneric<T> {
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of generic struct 'OrderDependentGeneric' through property 'value'}}
   var value: T
 }
 
-// expected-hidden-layout-note@+1 {{layout of generic struct 'OrderDependentGeneric' is ABI-exposed through struct 'UsesMultipleSpecializations'}}
 public struct UsesMultipleSpecializations {
   private var visible: OrderDependentGeneric<Int64>
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of struct 'UsesMultipleSpecializations'}}
   private var hidden: OrderDependentGeneric<InternalType>
 
   public init() {
@@ -212,14 +216,13 @@ public struct UsesMultipleSpecializations {
 
 struct GenericParent<T> {
   struct Nested {
-    // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'Nested' through property 'value'}}
     var value: T
   }
 }
 
-// expected-hidden-layout-note@+1 {{layout of struct 'Nested' is ABI-exposed through struct 'UsesMultipleParentSpecializations'}}
 public struct UsesMultipleParentSpecializations {
   private var visible: GenericParent<Int64>.Nested
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of struct 'UsesMultipleParentSpecializations'}}
   private var hidden: GenericParent<InternalType>.Nested
 
   public init() {
@@ -237,9 +240,34 @@ struct GenericStructParameterDoesNotDefinedStorage<Tag> {
 }
 
 public struct PublicStructUsingInternalGeneric {
+  // expected-hidden-reference-remark@+1 {{serializing an abstract layout fallback for property 'g' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'g' contributes to the ABI-exposed layout of struct 'PublicStructUsingInternalGeneric'}}
   private var g: GenericStructParameterDoesNotDefinedStorage<InternalType>
   public var visible: Int64 = 1
   public init() { self.g = GenericStructParameterDoesNotDefinedStorage<InternalType>(data: 0) }
+}
+
+//--- ClosureTypeReference.swift
+@_implementationOnly import Internal
+
+public struct PublicStructWithClosure {
+  // expected-hidden-reference-remark@+1 {{serializing an abstract layout fallback for property 'callback' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'callback' contributes to the ABI-exposed layout of struct 'PublicStructWithClosure'}}
+  private var callback: (InternalType) -> Void
+  public init() { self.callback = { _ in } }
+}
+
+//--- GenericRequirementReference.swift
+@_implementationOnly import Internal
+
+private struct LocalValue: InternalProtocol {}
+
+private struct GenericStorage<Value: InternalProtocol> {
+  var data: Int64
+}
+
+public struct PublicStructWithGenericRequirement {
+  // expected-hidden-reference-remark@+1 {{serializing an abstract layout fallback for property 'storage' because its type references hidden type 'InternalProtocol' whose defining module was imported with '@_implementationOnly' and property 'storage' contributes to the ABI-exposed layout of struct 'PublicStructWithGenericRequirement'}}
+  private var storage: GenericStorage<LocalValue>
+  public init() { self.storage = GenericStorage(data: 0) }
 }
 
 //--- PublicNestedType.swift
@@ -247,7 +275,7 @@ public struct PublicStructUsingInternalGeneric {
 
 public struct PublicOuter {
   public struct PublicNested {
-    // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of struct 'PublicNested' through property 'hidden'}}
+    // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of struct 'PublicNested'}}
     private var hidden: InternalType
     public init() { self.hidden = InternalType() }
   }
@@ -259,12 +287,11 @@ public struct PublicOuter {
 @_implementationOnly import Internal
 
 private enum GenericPayload<T> {
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of generic enum 'GenericPayload' through enum case 'value'}}
   case value(T)
 }
 
-// expected-hidden-layout-note@+1 {{layout of generic enum 'GenericPayload' is ABI-exposed through struct 'UsesGenericEnumHiddenPayload'}}
 public struct UsesGenericEnumHiddenPayload {
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and property 'hidden' contributes to the ABI-exposed layout of struct 'UsesGenericEnumHiddenPayload'}}
   private var hidden: GenericPayload<InternalType>
   public init() { self.hidden = .value(InternalType()) }
 }
@@ -273,7 +300,7 @@ public struct UsesGenericEnumHiddenPayload {
 @_implementationOnly import Internal
 
 private enum PrivateEnum {
-  // expected-hidden-layout-remark@+1 {{serializing abstract layout for hidden type 'InternalType' because its defining module was imported with '@_implementationOnly' and it contributes to the ABI-exposed layout of enum 'PrivateEnum' through enum case 'a'}}
+  // expected-hidden-layout-remark@+1 {{serializing an abstract layout fallback for enum case 'a' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and enum case 'a' contributes to the ABI-exposed layout of enum 'PrivateEnum'}}
   case a(InternalType)
   case b(Int64)
 }
@@ -289,6 +316,7 @@ public struct PublicWithEnum {
 @_implementationOnly import Internal
 
 private indirect enum PrivateIndirectEnum {
+  // expected-hidden-reference-remark@+1 {{serializing an abstract layout fallback for enum case 'hidden' because its type references hidden type 'InternalType' whose defining module was imported with '@_implementationOnly' and enum case 'hidden' contributes to the ABI-exposed layout of enum 'PrivateIndirectEnum'}}
   case hidden(InternalType)
   case empty
 }
@@ -298,6 +326,7 @@ private enum PrivateEnumWithIndirectCase {
   case empty
 }
 
+// expected-hidden-reference-note@+1 {{layout of enum 'PrivateIndirectEnum' is ABI-exposed through struct 'PublicWithIndirectEnums'}}
 public struct PublicWithIndirectEnums {
   private var indirectEnum: PrivateIndirectEnum
   private var indirectCase: PrivateEnumWithIndirectCase
@@ -310,7 +339,7 @@ public struct PublicWithIndirectEnums {
 
 //--- PublicStructInternalBridgingHeaderField.swift
 public struct PublicInternalBridgingHeaderWrapper {
-  // expected-internal-bridging-header-remark@+1 {{serializing abstract layout for hidden type 'HiddenCStruct' because it was imported through '-internal-import-bridging-header' and contributes to the ABI-exposed layout of struct 'PublicInternalBridgingHeaderWrapper' through property 'hidden'}}
+  // expected-internal-bridging-header-remark@+1 {{serializing an abstract layout fallback for property 'hidden' because its type references hidden type 'HiddenCStruct' imported through '-internal-import-bridging-header' and property 'hidden' contributes to the ABI-exposed layout of struct 'PublicInternalBridgingHeaderWrapper'}}
   private var hidden: HiddenCStruct
   public var visible: Int64 = 1
   public init() { self.hidden = HiddenCStruct(value: 0) }

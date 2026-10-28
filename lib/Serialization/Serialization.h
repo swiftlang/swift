@@ -27,6 +27,7 @@
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <array>
 #include <map>
 #include <memory>
@@ -245,17 +246,11 @@ class Serializer : public SerializerBase {
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
 
-  /// Declarations whose layout must be serialized because they contribute to
-  /// the ABI of a client-visible type but may not be available to clients.
-  ASTBlockRecordKeeper<const Decl *, DeclID,
-                       index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
-      HiddenTypeLayoutsToSerialize;
-
   ASTBlockRecordKeeper<const Decl *, AbstractMemberTypeLayoutID,
                        index_block::ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS>
       AbstractMemberTypeLayoutsToSerialize;
 
-  SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
+  llvm::SmallPtrSet<const Decl *, 16> RemarkedHiddenTypeLayouts;
 
   ASTBlockRecordKeeper<TypeToSerialize, TypeID,
                        index_block::TYPE_OFFSETS>
@@ -397,8 +392,6 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
-  void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
-
   TypeID addTranscribedTypeRef(ModuleFile &source, TypeID sourceID);
   DeclID addTranscribedDeclRef(ModuleFile &source, DeclID sourceID);
   ClangTypeID addTranscribedClangTypeRef(ModuleFile &source,
@@ -491,7 +484,6 @@ private:
   template <typename SpecificASTBlockRecordKeeper>
   bool writeASTBlockEntitiesIfNeeded(SpecificASTBlockRecordKeeper &entities);
 
-  bool scheduleHiddenTypeLayoutSerialization(const Decl *decl);
   bool scheduleAbstractMemberTypeLayoutSerialization(const Decl *decl);
   IRABIDetailsProvider &getLayoutProvider();
   void writeSerializableLLVMType(
@@ -511,7 +503,6 @@ private:
       const SerializableHiddenTypeInfoRepresentation &representation);
   void writeAbstractTypeLayout(StringRef mangledName, DeclID parentDeclID,
                                const AbstractTypeLayout &layout);
-  void writeHiddenTypeLayout(const Decl *decl);
   void writeAbstractMemberTypeLayout(const Decl *decl);
 
   /// Writes all decls and types in the DeclsToWrite queue.
@@ -520,8 +511,6 @@ private:
   /// in the queue trigger the serialization of additional decls and/or types.
   void writeAllDeclsAndTypes();
 
-  /// Writes placeholder records for scheduled hidden type layouts.
-  bool writeHiddenTypeLayoutInformationIfNeeded();
   bool writeAbstractMemberTypeLayoutsIfNeeded();
 
   /// Writes all identifiers in the IdentifiersToWrite queue.
