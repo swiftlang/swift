@@ -45,8 +45,6 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     Beginning,
     ResolvingType,
     ResolvingProperty,
-    ResolvingArray,
-    ResolvingSet,
     ResolvingDictionary,
   } state = Beginning;
   
@@ -58,8 +56,6 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
       return false;
 
     case ResolvingProperty:
-    case ResolvingArray:
-    case ResolvingSet:
     case ResolvingDictionary:
       return true;
     }
@@ -90,18 +86,9 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     // We're updating to a property. Determine whether we're looking
     // into a bridged Swift collection of some sort.
     if (auto boundGeneric = newType->getAs<NominalType>()) {
-      // Array<T>
-      if (boundGeneric->isArray()) {
+      if (boundGeneric->isArray() || boundGeneric->isSet()) {
         // Further lookups into the element type.
-        state = ResolvingArray;
-        currentType = boundGeneric->getGenericArgs()[0];
-        return;
-      }
-
-      // Set<T>
-      if (boundGeneric->isSet()) {
-        // Further lookups into the element type.
-        state = ResolvingSet;
+        state = ResolvingProperty;
         currentType = boundGeneric->getGenericArgs()[0];
         return;
       }
@@ -122,18 +109,9 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
         SmallString<32> scratch;
         StringRef objcClassName = classDecl->getObjCRuntimeName(scratch);
 
-        // NSArray
-        if (objcClassName == "NSArray") {
+        if (objcClassName == "NSArray" || objcClassName == "NSSet") {
           // The element type is unknown, so use AnyObject.
-          state = ResolvingArray;
-          currentType = anyObjectType;
-          return;
-        }
-
-        // NSSet
-        if (objcClassName == "NSSet") {
-          // The element type is unknown, so use AnyObject.
-          state = ResolvingSet;
+          state = ResolvingProperty;
           currentType = anyObjectType;
           return;
         }
@@ -193,40 +171,17 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
   SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
   
   for (auto &component : expr->getComponents()) {
-    auto componentNameLoc = component.getLoc();
-    
-    // ObjC keypaths only support named segments.
-    // TODO: Perhaps we can map subscript components to dictionary keys.
-    switch (auto kind = component.getKind()) {
-    case KeyPathExpr::Component::Kind::Invalid:
-    case KeyPathExpr::Component::Kind::Identity:
-    case KeyPathExpr::Component::Kind::CodeCompletion:
-      continue;
+    ASSERT(component.getKind() ==
+               KeyPathExpr::Component::Kind::UnresolvedMember &&
+           "#keyPath is parsed as a sequence of names");
 
-    case KeyPathExpr::Component::Kind::UnresolvedMember:
-    case KeyPathExpr::Component::Kind::UnresolvedApply:
-      break;
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-    case KeyPathExpr::Component::Kind::OptionalChain:
-    case KeyPathExpr::Component::Kind::OptionalForce:
-    case KeyPathExpr::Component::Kind::TupleElement:
-      diags.diagnose(componentNameLoc,
-                     diag::expr_unsupported_objc_key_path_component,
-                     (unsigned)kind);
-      continue;
-    case KeyPathExpr::Component::Kind::OptionalWrap:
-    case KeyPathExpr::Component::Kind::Member:
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::Apply:
-    case KeyPathExpr::Component::Kind::DictionaryKey:
-      llvm_unreachable("already resolved!");
-    }
-    
+    auto componentNameLoc = component.getLoc();
     auto componentName = component.getUnresolvedDeclName();
     if (!componentName.isSimpleName()) {
       diags.diagnose(componentNameLoc,
                      diag::expr_unsupported_objc_key_path_compound_name);
-      continue;
+      isInvalid = true;
+      break;
     }
 
     // If we are resolving into a dictionary, any component is
