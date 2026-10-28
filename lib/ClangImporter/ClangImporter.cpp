@@ -7746,8 +7746,15 @@ ClangImporter::Implementation::loadNamedMembers(
       SmallVector<Decl *, 4> ctors;
       importInheritedConstructors(cast<clang::ObjCInterfaceDecl>(CD),
                                   classDecl, ctors);
-      for (auto ctor : ctors)
+      for (auto ctor : ctors) {
         Members.push_back(cast<ValueDecl>(ctor));
+
+        // An initializer with C arrays also has a legacy projection.
+        for (auto *alternate : getAlternateDecls(ctor))
+          if (isa<ConstructorDecl>(alternate) &&
+              alternate->getDeclContext() == classDecl)
+            Members.push_back(alternate);
+      }
     }
   }
 

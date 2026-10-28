@@ -9333,6 +9333,13 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (member->isUnavailableInCurrentSwiftVersion())
         return;
 
+      // Ignore legacy projections for now; `importMirroredDecl()` will create a
+      // legacy projection for the modern mirror.
+      if (auto *cArrayAttr =
+              member->getAttrs().getAttribute<CArrayProjectionAttr>())
+        if (cArrayAttr->getProjection() != CArrayProjection::Modern)
+          return;
+
       if (auto prop = dyn_cast<VarDecl>(member)) {
         auto objcProp =
             dyn_cast_or_null<clang::ObjCPropertyDecl>(prop->getClangDecl());
@@ -9369,6 +9376,10 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         if (auto imported =
                 Impl.importMirroredDecl(objcProp, dc, getVersion(), proto)) {
           members.push_back(imported);
+          if (auto *legacy =
+                  importer::getDeclForCounterpartCArrayProjection(imported))
+            if (legacy->getDeclContext() == dc)
+              members.push_back(legacy);
           // FIXME: We should mirror properties of the root class onto the
           // metatype.
         }
@@ -9658,6 +9669,13 @@ void SwiftDeclConverter::importInheritedConstructors(
     // Don't inherit compatibility stubs.
     if (ctor->isUnavailableInCurrentSwiftVersion())
       continue;
+
+    // Ignore legacy projections for now; we will create a legacy projection out
+    // of the modern inherited constructor later in the function.
+    if (auto *cArrayAttr =
+            ctor->getAttrs().getAttribute<CArrayProjectionAttr>())
+      if (cArrayAttr->getProjection() != CArrayProjection::Modern)
+        continue;
 
     // Don't inherit (non-convenience) factory initializers.
     // Note that convenience factories return instancetype and can be

@@ -2,9 +2,6 @@
 
 // REQUIRES: objc_interop
 
-// Temporarily fails in this commit
-// XFAIL: *
-
 import Foundation
 
 // Check that an ObjC subclass which inherits an init with an InlineArray from
