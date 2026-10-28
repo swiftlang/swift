@@ -35,6 +35,9 @@ public class Class: NSObject {
   @available(*, unavailable)
   @objc public subscript(unavailableSubscript: Int) -> Int { 0 }
 
+  // CHECK: define {{.*}} @"$s4Test5ClassC29propertyWithUnavailableSetterSivgTo"
+  // CHECK-NO-STRIP: define {{.*}} @"$s4Test5ClassC29propertyWithUnavailableSetterSivsTo"
+  // CHECK-STRIP-NOT: define {{.*}} @"$s4Test5ClassC29propertyWithUnavailableSetterSivsTo"
   @objc public final var propertyWithUnavailableSetter: Int {
     get { 0 }
     @available(*, unavailable)
