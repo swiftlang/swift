@@ -1,0 +1,100 @@
+## A hand-crafted ELF object holding a DWARF v5 compile unit whose
+## DW_AT_low_pc uses DW_FORM_addrx, as emitted by compilers using
+## -gdwarf-5 with split addresses (or by ld/lld's debug address pooling).  An
+## inlined subroutine's range list is a DW_RLE_offset_pair, which is relative
+## to the unit's base address, i.e. its DW_AT_low_pc -- see
+## DwarfReaderLookups.swift.
+##
+## Layout:
+##   CU: DW_AT_low_pc -> .debug_addr[0] = 0x4000
+##   DIE @ 0x16: DW_TAG_subprogram "callee"
+##   DIE: DW_TAG_subprogram "outer", [0x4000, 0x4100)
+##     DIE: inlined "callee", ranges -> rangelist 0
+##          (DW_RLE_offset_pair 0x10, 0x20, i.e. [0x4010, 0x4020))
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addrx
+            - Attribute: DW_AT_addr_base
+              Form:      DW_FORM_sec_offset
+            - Attribute: DW_AT_rnglists_base
+              Form:      DW_FORM_sec_offset
+        - Code:     0x02
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+        - Code:     0x03
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x04
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_ranges
+              Form:      DW_FORM_rnglistx
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x00            # DW_AT_low_pc (index 0)
+            - Value: 0x08            # DW_AT_addr_base
+            - Value: 0x0c            # DW_AT_rnglists_base
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "callee"
+        - AbbrCode: 0x03
+          Values:
+            - CStr: "outer"
+            - Value: 0x4000
+            - Value: 0x100
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x16            # DW_AT_abstract_origin -> "callee"
+            - Value: 0x00            # DW_AT_ranges (rangelist 0)
+            - Value: 0x01            # DW_AT_call_file
+            - Value: 0x0a            # DW_AT_call_line = 10
+            - Value: 0x01            # DW_AT_call_column
+        - AbbrCode: 0x00
+        - AbbrCode: 0x00
+  debug_addr:
+    - Version: 5
+      Entries:
+        - Address: 0x4000
+  debug_rnglists:
+    - Lists:
+        - Entries:
+            - Operator: DW_RLE_offset_pair
+              Values:   [ 0x10, 0x20 ]
+            - Operator: DW_RLE_end_of_list
