@@ -15,8 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
@@ -46,6 +48,7 @@
 #include "GenMeta.h"
 #include "GenPoly.h"
 #include "GenProto.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -130,6 +133,7 @@ static std::unique_ptr<SerializableLLVMType> serializeLLVMTypeImpl(
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
+  case llvm::Type::ByteTyID:
     llvm::report_fatal_error("unsupported LLVM storage type");
   }
 
@@ -189,6 +193,7 @@ deserializeLLVMTypeImpl(llvm::LLVMContext &ctx,
   case llvm::Type::ScalableVectorTyID:
   case llvm::Type::TypedPointerTyID:
   case llvm::Type::TargetExtTyID:
+  case llvm::Type::ByteTyID:
     llvm::report_fatal_error("unsupported serialized LLVM storage type");
   }
 
@@ -257,6 +262,157 @@ TypeInfo::~TypeInfo() {
     delete nativeParameterSchema;
 }
 
+static StringRef getSpecialTypeInfoKindName(SpecialTypeInfoKind kind) {
+  switch (kind) {
+  case SpecialTypeInfoKind::Unimplemented:
+    return "unimplemented";
+  case SpecialTypeInfoKind::None:
+    return "none";
+  case SpecialTypeInfoKind::Fixed:
+    return "fixed";
+  case SpecialTypeInfoKind::Weak:
+    return "weak";
+  case SpecialTypeInfoKind::Loadable:
+    return "loadable";
+  case SpecialTypeInfoKind::Reference:
+    return "reference";
+  }
+  llvm_unreachable("unhandled special TypeInfo kind");
+}
+
+static StringRef getReferenceCountingName(ReferenceCounting kind) {
+  switch (kind) {
+  case ReferenceCounting::Native:
+    return "native";
+  case ReferenceCounting::ObjC:
+    return "objc";
+  case ReferenceCounting::None:
+    return "none";
+  case ReferenceCounting::Custom:
+    return "custom";
+  case ReferenceCounting::Block:
+    return "block";
+  case ReferenceCounting::Unknown:
+    return "unknown";
+  case ReferenceCounting::Bridge:
+    return "bridge";
+  case ReferenceCounting::Error:
+    return "error";
+  }
+  llvm_unreachable("unhandled reference-counting kind");
+}
+
+static void printLLVMType(llvm::raw_ostream &OS, llvm::Type *type) {
+  type->print(OS, /*IsForDebug=*/false, /*NoDetails=*/false);
+}
+
+static void printExplosionSchema(llvm::raw_ostream &OS,
+                                 const ExplosionSchema &schema,
+                                 unsigned indentation) {
+  OS.indent(indentation) << "explosionSchema:\n";
+  for (const auto &[index, element] : llvm::enumerate(schema)) {
+    OS.indent(indentation + 2) << "- index: " << index << "\n";
+    OS.indent(indentation + 4)
+        << "kind: " << (element.isScalar() ? "scalar" : "aggregate") << "\n";
+    OS.indent(indentation + 4) << "type: ";
+    printLLVMType(OS, element.isScalar() ? element.getScalarType()
+                                         : element.getAggregateType());
+    OS << "\n";
+    if (element.isAggregate())
+      OS.indent(indentation + 4)
+          << "alignment: " << element.getAggregateAlignment().getValue()
+          << "\n";
+  }
+}
+
+static void printNativeConventionSchema(llvm::raw_ostream &OS, StringRef name,
+                                        const NativeConventionSchema &schema,
+                                        unsigned indentation) {
+  OS.indent(indentation) << name << ":\n";
+  OS.indent(indentation + 2)
+      << "requiresIndirect: "
+      << (schema.requiresIndirect() ? "true" : "false") << "\n";
+  OS.indent(indentation + 2) << "components:\n";
+  unsigned index = 0;
+  schema.enumerateComponents(
+      [&](clang::CharUnits begin, clang::CharUnits end, llvm::Type *type) {
+        OS.indent(indentation + 4) << "- index: " << index++ << "\n";
+        OS.indent(indentation + 6) << "begin: " << begin.getQuantity() << "\n";
+        OS.indent(indentation + 6) << "end: " << end.getQuantity() << "\n";
+        OS.indent(indentation + 6) << "type: ";
+        printLLVMType(OS, type);
+        OS << "\n";
+      });
+}
+
+void TypeInfo::printForAbstractTypeLayoutInfoBaseImpl(
+    IRGenModule &IGM, llvm::raw_ostream &OS, unsigned indentation,
+    StringRef concreteTypeName) const {
+  auto printFlag = [&](StringRef name, bool value) {
+    OS.indent(indentation + 2)
+        << name << ": " << (value ? "true" : "false") << "\n";
+  };
+
+  OS.indent(indentation) << "TypeInfo:\n";
+  OS.indent(indentation + 2) << "class: " << concreteTypeName << "\n";
+  OS.indent(indentation + 2) << "storageType: ";
+  printLLVMType(OS, getStorageType());
+  OS << "\n";
+  OS.indent(indentation + 2)
+      << "kind: " << getSpecialTypeInfoKindName(getSpecialTypeInfoKind())
+      << "\n";
+  OS.indent(indentation + 2)
+      << "bestKnownAlignment: " << getBestKnownAlignment().getValue() << "\n";
+  printFlag("abiAccessible", isABIAccessible() == IsABIAccessible);
+  printFlag("triviallyDestroyable",
+            isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+                IsTriviallyDestroyable);
+  printFlag("copyable", isCopyable(ResilienceExpansion::Maximal) == IsCopyable);
+  printFlag("bitwiseTakable",
+            isBitwiseTakable(ResilienceExpansion::Maximal));
+  printFlag("bitwiseBorrowable",
+            isBitwiseBorrowable(ResilienceExpansion::Maximal));
+  printFlag("fixedSizeMinimal",
+            isFixedSize(ResilienceExpansion::Minimal) == IsFixedSize);
+  printFlag("fixedSizeMaximal",
+            isFixedSize(ResilienceExpansion::Maximal) == IsFixedSize);
+  printFlag("loadable", isLoadable() == IsLoadable);
+
+  ReferenceCounting referenceCounting;
+  bool singleRetainablePointer = isSingleRetainablePointer(
+      ResilienceExpansion::Maximal, &referenceCounting);
+  printFlag("singleRetainablePointer", singleRetainablePointer);
+  if (singleRetainablePointer)
+    OS.indent(indentation + 2)
+        << "referenceCounting: " << getReferenceCountingName(referenceCounting)
+        << "\n";
+
+  if (auto *fixed = dyn_cast<FixedTypeInfo>(this)) {
+    OS.indent(indentation + 2)
+        << "fixedSize: " << fixed->getFixedSize().getValue() << "\n";
+    OS.indent(indentation + 2)
+        << "fixedAlignment: " << fixed->getFixedAlignment().getValue() << "\n";
+    OS.indent(indentation + 2)
+        << "fixedStride: " << fixed->getFixedStride().getValue() << "\n";
+    auto spareBits = fixed->getSpareBits().asAPInt();
+    OS.indent(indentation + 2) << "spareBits: ";
+    spareBits.print(OS, /*isSigned=*/false);
+    OS << "\n";
+    OS.indent(indentation + 2)
+        << "extraInhabitantCount: "
+        << fixed->getFixedExtraInhabitantCount(IGM) << "\n";
+    OS.indent(indentation + 2) << "extraInhabitantMask: ";
+    fixed->getFixedExtraInhabitantMask(IGM).print(OS, /*isSigned=*/false);
+    OS << "\n";
+  }
+
+  printExplosionSchema(OS, getSchema(), indentation + 2);
+  printNativeConventionSchema(OS, "nativeParameterSchema",
+                              nativeParameterValueSchema(IGM), indentation + 2);
+  printNativeConventionSchema(OS, "nativeReturnSchema",
+                              nativeReturnValueSchema(IGM), indentation + 2);
+}
+
 TypeInfo::TypeInfo(
     IRGenModule &IGM,
     const SerializableHiddenTypeInfoRepresentation &representation)
@@ -272,13 +428,9 @@ void TypeInfo::assertNotDeserialized(const char *operation) const {
         " requires AST information unavailable to a reconstructed TypeInfo");
 }
 
-std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-TypeInfo::createSerializableHiddenTypeInfoRepresentation(
-    IRGenModule &IGM) const {
-  auto representation =
-      std::make_unique<SerializableHiddenTypeInfoRepresentation>();
-  populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
-  return representation;
+void TypeInfo::unsupportedSerializableHiddenTypeInfoRepresentation() const {
+  llvm::report_fatal_error(
+      "serializing this TypeInfo is not implemented yet");
 }
 
 void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
@@ -294,9 +446,7 @@ FixedTypeInfo::FixedTypeInfo(
     : TypeInfo(IGM, representation),
       SpareBits(representation.spareBits) {
   setSpecialTypeInfoKind(SpecialTypeInfoKind::Fixed);
-  assert(SpareBits.size() == representation.size * uint32_t(8));
-  Bits.FixedTypeInfo.Size = representation.size;
-  assert(Bits.FixedTypeInfo.Size == representation.size && "truncation");
+  assert(SpareBits.size() == getFixedSize().getValue() * uint32_t(8));
 }
 
 void FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
@@ -304,17 +454,7 @@ void FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     SerializableFixedTypeInfoRepresentation &representation) const {
   TypeInfo::populateSerializableHiddenTypeInfoRepresentation(IGM,
                                                               representation);
-  representation.size = getFixedSize().getValue();
   representation.spareBits = getSpareBits();
-}
-
-std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-FixedTypeInfo::createSerializableHiddenTypeInfoRepresentation(
-    IRGenModule &IGM) const {
-  auto representation =
-      std::make_unique<SerializableFixedTypeInfoRepresentation>();
-  populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
-  return representation;
 }
 
 LoadableTypeInfo::LoadableTypeInfo(
@@ -335,15 +475,20 @@ void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
     SerializableLoadableTypeInfoRepresentation &representation) const {
   FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
       IGM, representation);
-}
-
-std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-LoadableTypeInfo::createSerializableHiddenTypeInfoRepresentation(
-    IRGenModule &IGM) const {
-  auto representation =
-      std::make_unique<SerializableLoadableTypeInfoRepresentation>();
-  populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
-  return representation;
+  ExplosionSchema schema;
+  getSchema(schema);
+  representation.schema.clear();
+  for (const auto &element : schema) {
+    SerializableExplosionSchemaElement serializedElement;
+    if (element.isScalar()) {
+      serializedElement.type = serializeLLVMType(element.getScalarType());
+    } else {
+      serializedElement.type = serializeLLVMType(element.getAggregateType());
+      serializedElement.aggregateAlignment =
+          element.getAggregateAlignment().getValue();
+    }
+    representation.schema.push_back(std::move(serializedElement));
+  }
 }
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
@@ -1215,6 +1360,19 @@ namespace {
                        IsTriviallyDestroyable,
                        IsCopyable,
                        IsFixedSize, IsABIAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     unsigned getExplosionSize() const override { return 0; }
     void getSchema(ExplosionSchema &schema) const override {}
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -1259,6 +1417,33 @@ namespace {
                       SpareBitVector &&spareBits,
                       Alignment align)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align) {}
+
+    PrimitiveTypeInfo(
+        IRGenModule &IGM,
+        const SerializablePrimitiveTypeInfoRepresentation &representation)
+        : PODSingleScalarTypeInfo(IGM, representation) {
+      if (representation.schema.size() != 1 ||
+          representation.schema.front().aggregateAlignment != 0 ||
+          deserializeLLVMType(IGM, representation.schema.front().type) !=
+              getStorageType())
+        llvm::report_fatal_error(
+            "serialized PrimitiveTypeInfo has an invalid explosion schema");
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializablePrimitiveTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
   };
 
   /// A TypeInfo implementation for pointers that are:
@@ -1278,6 +1463,18 @@ namespace {
                               Alignment align, Alignment pointeeAlign)
       : PODSingleScalarTypeInfo(storage, size, std::move(spareBits), align),
         PointeeAlign(pointeeAlign) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1327,6 +1524,18 @@ namespace {
           storage, size,
           SpareBitVector::getConstant(size.getValueInBits(), false),
           align) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -1386,6 +1595,39 @@ namespace {
                        IsABIAccessible),
         ScalarTypes(std::move(scalarTypes))
     {}
+
+    OpaqueStorageTypeInfo(
+        IRGenModule &IGM,
+        const SerializableOpaqueStorageTypeInfoRepresentation &representation)
+        : ScalarTypeInfo(IGM, representation) {
+      ScalarTypes.reserve(representation.schema.size());
+      for (const auto &element : representation.schema) {
+        if (element.aggregateAlignment != 0)
+          llvm::report_fatal_error(
+              "cannot reconstruct an aggregate explosion element");
+        auto *scalarType = dyn_cast<llvm::IntegerType>(
+            deserializeLLVMType(IGM, element.type));
+        if (!scalarType)
+          llvm::report_fatal_error(
+              "opaque storage explosion element is not an integer");
+        ScalarTypes.push_back(scalarType);
+      }
+    }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation =
+          std::make_unique<SerializableOpaqueStorageTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
     
     llvm::ArrayType *getStorageType() const {
       return cast<llvm::ArrayType>(ScalarTypeInfo::getStorageType());
@@ -1575,6 +1817,18 @@ namespace {
                               IsNotBitwiseTakable,
                               IsNotCopyable,
                               IsFixedSize, IsABIAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// A TypeInfo implementation for address-only types which can never
@@ -1589,6 +1843,18 @@ namespace {
                               IsNotFixedSize,
                               IsNotABIAccessible,
                               SpecialTypeInfoKind::None) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1662,55 +1928,61 @@ namespace {
     }
   };
 
-  /// A TypeInfo for a HiddenType placeholder. The placeholder stands in for a
-  /// real C-imported type whose identity has been elided from the importing
-  /// Layout is recovered from the defining module's HiddenTypeLayouts table.
-  ///
-  /// Address-only: clients lack the clang::RecordDecl required to derive a
-  /// correct register-passing schema for the hidden field, so values are
-  /// always passed indirectly. 
-  class TrivialHiddenTypeInfo final
-      : public IndirectTypeInfo<TrivialHiddenTypeInfo, FixedTypeInfo> {
-  public:
-    TrivialHiddenTypeInfo(llvm::Type *storage, Size size, Alignment align)
-      : IndirectTypeInfo(storage, size,
-                         SpareBitVector::getConstant(size.getValueInBits(),
-                                                     false),
-                         align,
-                         IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
-                         IsCopyable,
-                         IsFixedSize, IsABIAccessible) {}
-
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void destroy(IRGenFunction &IGF, Address addr, SILType T,
-                 bool isOutlined) const override {
-      // Trivial destructor under the plain-C assumption.
-    }
-
-    TypeLayoutEntry *
-    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
-                         bool useStructLayouts) const override {
-      if (!useStructLayouts)
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(
-          *this, T, ScalarKind::TriviallyDestroyable);
-    }
-
-    unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
-      return 0;
-    }
-    bool mayHaveExtraInhabitants(IRGenModule &) const override {
-      return false;
-    }
-  };
 } // end anonymous namespace
+
+static std::unique_ptr<TypeInfo>
+createPrimitiveTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializablePrimitiveTypeInfoRepresentation &representation) {
+  return std::make_unique<PrimitiveTypeInfo>(IGM, representation);
+}
+
+static std::unique_ptr<TypeInfo>
+createOpaqueStorageTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableOpaqueStorageTypeInfoRepresentation &representation) {
+  return std::make_unique<OpaqueStorageTypeInfo>(IGM, representation);
+}
+
+std::unique_ptr<TypeInfo>
+swift::irgen::createTypeInfoFromSerializableRepresentation(
+    IRGenModule &IGM,
+    const SerializableHiddenTypeInfoRepresentation &representation) {
+  switch (representation.getKind()) {
+  case SerializableHiddenTypeInfoKind::Primitive:
+    return createPrimitiveTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializablePrimitiveTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::OpaqueStorage:
+    return createOpaqueStorageTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializableOpaqueStorageTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::LoadableStruct:
+    return createLoadableStructTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<const SerializableLoadableStructTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::LoadableClangRecord:
+    return createLoadableClangRecordTypeInfoFromSerializableRepresentation(
+        IGM,
+        static_cast<
+            const SerializableLoadableClangRecordTypeInfoRepresentation &>(
+            representation));
+
+  case SerializableHiddenTypeInfoKind::TypeInfo:
+  case SerializableHiddenTypeInfoKind::Fixed:
+  case SerializableHiddenTypeInfoKind::Loadable:
+  case SerializableHiddenTypeInfoKind::LoadableRecord:
+    llvm::report_fatal_error(
+        "unsupported serialized hidden TypeInfo representation");
+  }
+  llvm_unreachable("invalid serialized hidden TypeInfo kind");
+}
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -1898,6 +2170,21 @@ TypeConverter::~TypeConverter() {
     I = Cur->NextConverted;
     delete Cur;
   }
+}
+
+const TypeInfo &
+TypeConverter::adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo) {
+  assert(typeInfo && "cannot adopt a null TypeInfo");
+  assert(!typeInfo->NextConverted && "TypeInfo is already owned");
+  auto *result = typeInfo.release();
+  result->NextConverted = FirstType;
+  FirstType = result;
+  return *result;
+}
+
+const TypeInfo &
+IRGenModule::adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo) {
+  return Types.adoptTypeInfo(std::move(typeInfo));
 }
 
 void TypeConverter::setGenericContext(CanGenericSignature signature) {
@@ -2271,6 +2558,36 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
   return Types.getCompleteTypeInfo(T);
 }
 
+void IRGenModule::dumpAbstractTypeLayoutInfo(CanType type,
+                                             StringRef mangledName,
+                                             StringRef origin) {
+  auto dumpKind = getOptions().DumpAbstractTypeLayoutInfo;
+  auto shouldDump =
+      [dumpKind](IRGenOptions::AbstractTypeLayoutInfoDumpKind kind) {
+        return dumpKind ==
+                   IRGenOptions::AbstractTypeLayoutInfoDumpKind::All ||
+               dumpKind == kind;
+      };
+
+  auto &OS = llvm::outs();
+  OS << "=== Abstract type layout information ===\n"
+     << "mangledName: " << mangledName << "\n"
+     << "origin: " << origin << "\n";
+
+  auto &minimalLowering = getSILTypes().getTypeLowering(
+      AbstractionPattern(type), type, TypeExpansionContext::minimal());
+  if (shouldDump(
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeLowering))
+    minimalLowering.printForAbstractTypeLayoutInfo(getSILTypes(), OS);
+
+  auto loweredType = minimalLowering.getLoweredType();
+  if (shouldDump(IRGenOptions::AbstractTypeLayoutInfoDumpKind::SILType))
+    loweredType.printForAbstractTypeLayoutInfo(
+        OS, getSILModule(), minimalLowering.getExpansionContext());
+  if (shouldDump(IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeInfo))
+    getTypeInfo(loweredType).printForAbstractTypeLayoutInfo(*this, OS);
+}
+
 /// 
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   return *getTypeEntry(T);
@@ -2635,10 +2952,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::Enum:
   case TypeKind::Struct:
     return convertAnyNominalType(ty, cast<NominalType>(ty)->getDecl());
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-    return convertAnyNominalType(ty, cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::SILMoveOnlyWrapped:
     llvm_unreachable("implement this");
   case TypeKind::InOut:
@@ -2684,16 +2997,13 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
-    auto *defining = hidden->getDefiningModule();
-    assert(defining &&
-           "HiddenType must carry a defining module after deserialization");
-    auto layout = defining->lookupHiddenTypeLayout(hidden->getMangledName());
-    assert(layout &&
-           "no HIDDEN_TYPE_LAYOUTS_BLOCK entry for this mangled name");
-
-    auto *storage = llvm::ArrayType::get(IGM.Int8Ty, layout->size);
-    return new TrivialHiddenTypeInfo(storage, Size(layout->size),
-                              Alignment(layout->alignment));
+    auto *layoutInfo = hidden->getLayoutInfoDecl();
+    assert(layoutInfo && layoutInfo->Layout &&
+           layoutInfo->Layout->typeInfoRepresentation &&
+           "HiddenType must carry a serialized TypeInfo representation");
+    return createTypeInfoFromSerializableRepresentation(
+               IGM, *layoutInfo->Layout->typeInfoRepresentation)
+        .release();
   }
   }
   }
@@ -2717,19 +3027,23 @@ const TypeInfo *TypeConverter::convertPackType(SILPackType *pack) {
 
 /// Convert a reference storage type. The implementation here depends on the
 /// underlying reference type. The type may be optional.
-#define REF_STORAGE(Name, ...) \
-const TypeInfo * \
-TypeConverter::convert##Name##StorageType(Name##StorageType *refType) { \
-  CanType referent(refType->getReferentType()); \
-  bool isOptional = false; \
-  if (auto referentObj = referent.getOptionalObjectType()) { \
-    referent = referentObj; \
-    isOptional = true; \
-  } \
-  assert(referent->allowsOwnership()); \
-  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent)); \
-  return referentTI.create##Name##StorageType(*this, isOptional); \
-}
+#define REF_STORAGE(Name, ...)                                                 \
+  const TypeInfo *TypeConverter::convert##Name##StorageType(                   \
+      Name##StorageType *refType) {                                            \
+    CanType referent(refType->getReferentType());                              \
+    bool isOptional = false;                                                   \
+    if (auto referentObj = referent.getOptionalObjectType()) {                 \
+      referent = referentObj;                                                  \
+      isOptional = true;                                                       \
+    }                                                                          \
+    if (refType->getOwnership() == ReferenceOwnership::Unmanaged &&            \
+        referent.isCOMExistentialType())                                       \
+      return createUnmanagedStorageType(IGM.Int8PtrTy,                         \
+                                        ReferenceCounting::None, isOptional);  \
+    assert(referent->allowsOwnership());                                       \
+    auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent)); \
+    return referentTI.create##Name##StorageType(*this, isOptional);            \
+  }
 #include "swift/AST/ReferenceStorage.def"
 
 static void overwriteForwardDecl(llvm::DenseMap<TypeBase *, const TypeInfo *> &cache,
@@ -2866,6 +3180,18 @@ public:
                     IsFixedSize /* irrelevant */,
                     IsABIAccessible),
       NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   TypeLayoutEntry
   *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -3052,14 +3378,14 @@ TypeConverter::getMetatypeTypeInfo(MetatypeRepresentation representation) {
 
 /// createNominalType - Create a new nominal type.
 llvm::StructType *IRGenModule::createNominalType(CanType type) {
-  assert(type.getNominalOrBoundGenericNominal());
+  assert(type.getNominalDecl());
 
   // We share type infos for different instantiations of a generic type
   // when the archetypes have the same exemplars.  We cannot mangle
   // archetypes, and the mangling does not have to be unique, so we just
   // mangle the unbound generic form of the type.
   if (type->hasArchetype())
-    type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
+    type = type.getNominalDecl()->getDeclaredType()
                                                  ->getCanonicalType();
 
   IRGenMangler Mangler(Context);
@@ -3126,7 +3452,7 @@ void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
                                            IRGenFunction::DynamicSelfKind kind) {
   assert(!SelfValue && "already have local self metadata");
   SelfValue = value;
-  assert(selfClass->getClassOrBoundGenericClass()
+  assert(selfClass->getClassDecl()
          && "self type not a class?");
   SelfTypeIsExact = isExactSelfClass;
   SelfType = selfClass;
@@ -3157,7 +3483,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     if (tuple->getNumElements() == 1)
       return t.getTupleElementType(0);
 
-  if (auto structDecl = t.getStructOrBoundGenericStruct()) {
+  if (auto structDecl = t.getStructDecl()) {
     // If the struct has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (IGM.isResilient(structDecl, expansion))
@@ -3193,7 +3519,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     return SILType();
   }
 
-  if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
+  if (auto enumDecl = t.getEnumDecl()) {
     // If the enum has to be accessed resiliently from this resilience domain,
     // we can't assume anything about its layout.
     if (IGM.isResilient(enumDecl, expansion))
@@ -3244,6 +3570,10 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
   // If we do not have a deinit table already deserialized, call the value
   // witness instead.
   if (!deinitTable) {
+    // In embedded Swift calling the value witness would recurse infinitely,
+    // therefore it's required to have the deinitTable.
+    ASSERT(!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+           "no deinit available for non-copyable type in embedded Swift");
     irgen::emitDestroyCall(IGF, T, indirect());
     indirectCleanup();
     return true;

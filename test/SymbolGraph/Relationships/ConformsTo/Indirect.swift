@@ -6,6 +6,15 @@
 // RUN: %FileCheck %s --input-file %t/Indirect.symbols.json
 // RUN: %FileCheck %s --input-file %t/ExternalIndirect.symbols.json --check-prefix EXTERNAL
 // RUN: %FileCheck %s --input-file %t/Indirect@ExternalIndirect.symbols.json --check-prefix EXTENSION
+// RUN: %FileCheck %s --input-file %t/Indirect.symbols.json --check-prefix NO-INVERTIBLE
+// RUN: %FileCheck %s --input-file %t/Indirect@ExternalIndirect.symbols.json --check-prefix NO-INVERTIBLE
+
+// Like the type's own conformances, an extension's conformances don't record
+// conformsTo edges to the invertible protocols, whether they're inherited or
+// stated directly.
+// NO-INVERTIBLE-NOT: "target": "s:s8CopyableP"
+// NO-INVERTIBLE-NOT: "target": "s:s9EscapableP"
+// NO-INVERTIBLE-NOT: "target": "s:s10DeinitableP"
 
 public protocol P {
   func foo()
@@ -49,3 +58,6 @@ extension ES: EQ {
 
 // extension ES -> ES
 // EXTENSION-DAG: "kind": "extensionTo",{{[[:space:]]*}}"source": "s:e:s:16ExternalIndirect2ESV0B0E3fooyyF",{{[[:space:]]*}}"target": "s:16ExternalIndirect2ESV"
+
+public struct ConditionallyCopyable<T: ~Copyable>: ~Copyable {}
+extension ConditionallyCopyable: Copyable where T: Copyable {}

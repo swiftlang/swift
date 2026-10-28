@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P {
-  @differentiable(reverse) // expected-error {{@differentiable attribute used without importing module '_Differentiation'}}
+  @differentiable(reverse) // expected-error {{'@differentiable' attribute used without importing module '_Differentiation'}}
   func req()
 }
 

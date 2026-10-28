@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/IVAnalysis.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"

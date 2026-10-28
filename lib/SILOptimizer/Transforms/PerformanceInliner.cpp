@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -389,7 +388,7 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
   // We now need to check if this argument is an enum and named like an autodiff
   // branch tracing enum.
   if (auto *arg = dyn_cast<SILFunctionArgument>(val)) {
-    if (auto *enumDecl = arg->getType().getEnumOrBoundGenericEnum()) {
+    if (auto *enumDecl = arg->getType().getEnumDecl()) {
       return enumDecl->getName().str().starts_with(
           LinearMapBranchTracingEnumPrefix);
     }

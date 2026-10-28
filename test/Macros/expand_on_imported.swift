@@ -13,6 +13,8 @@
 // Emit IR to ensure that we are handling the created body end-to-end.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -swift-version 5 -g -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t -validate-tbd-against-ir=none | %FileCheck %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import CompletionHandlerGlobals
 import macro_library
 

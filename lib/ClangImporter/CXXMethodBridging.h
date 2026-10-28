@@ -149,12 +149,6 @@ struct CXXMethodBridging {
     return output;
   }
 
-  std::string importNameAsTitleCaseName() {
-    auto output = importNameAsCamelCaseName();
-    output.front() = std::toupper(output.front());
-    return output;
-  }
-
 private:
   const clang::CXXMethodDecl *method = nullptr;
 

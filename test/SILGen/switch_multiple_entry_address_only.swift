@@ -24,6 +24,7 @@ func multipleLabelsLet(e: E) {
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -34,6 +35,7 @@ func multipleLabelsLet(e: E) {
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -42,6 +44,7 @@ func multipleLabelsLet(e: E) {
   // CHECK:      bb3:
   // CHECK:      [[FN:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN]]([[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[X_PHI]]
   // CHECK-NEXT: br bb5
 
@@ -52,6 +55,7 @@ func multipleLabelsLet(e: E) {
 
   // CHECK:      bb5:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
 
@@ -76,6 +80,7 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -86,6 +91,7 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -105,8 +111,10 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: apply [[FN]]([[ANY_STACK]]
   // CHECK-NEXT: destroy_addr [[ANY_STACK]]
   // CHECK-NEXT: dealloc_stack [[ANY_STACK]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: end_borrow [[ANY_BOX_LIFETIME]]
   // CHECK-NEXT: destroy_value [[ANY_BOX]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: br bb5
 
   // CHECK:      bb4:
@@ -116,6 +124,7 @@ func multipleLabelsVar(e: E) {
 
   // CHECK:      bb5:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
 
@@ -142,6 +151,7 @@ func fallthroughWithValue(e: E) {
   // CHECK:      [[FN1:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN1]]([[ORIGINAL_ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ORIGINAL_ANY_BOX]] to [init] [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[ORIGINAL_ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ORIGINAL_ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -152,6 +162,7 @@ func fallthroughWithValue(e: E) {
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
   // CHECK-NEXT: copy_addr [take] [[E_PAYLOAD]] to [init] [[ANY_BOX]]
   // CHECK-NEXT: copy_addr [[ANY_BOX]] to [init] [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
@@ -160,6 +171,7 @@ func fallthroughWithValue(e: E) {
   // CHECK:      bb3:
   // CHECK:      [[FN2:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN2]]([[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: destroy_addr [[X_PHI]]
   // CHECK-NEXT: br bb5
   
@@ -170,6 +182,7 @@ func fallthroughWithValue(e: E) {
   
   // CHECK:      bb5:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
   

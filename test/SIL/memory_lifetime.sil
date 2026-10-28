@@ -974,6 +974,28 @@ bb0(%0 : $Int):
   return %9
 }
 
+// The callee only has escape effects, but no computed side effects. In this case
+// the verifier must not assume the worst case - that the callee reads the
+// uninitialized `Inner.b` - because the escape effects can be inherited from a
+// generic function when specializing it, without any side effects being computed.
+sil [ossa] @only_escape_effects : $@convention(thin) (@inout Inner) -> () {
+[%0: noescape **]
+}
+
+sil [ossa] @callee_without_computed_side_effects : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Inner
+  %2 = struct_element_addr %1, #Inner.a
+  %3 = struct_element_addr %1, #Inner.b
+  store %0 to [init] %2
+  %5 = function_ref @only_escape_effects : $@convention(thin) (@inout Inner) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@inout Inner) -> ()
+  destroy_addr %2
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9
+}
+
 sil @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
 
 sil [ossa] @no_read_from_inout : $@convention(thin) (Bool) -> () {

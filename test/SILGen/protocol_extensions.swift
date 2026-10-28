@@ -707,7 +707,9 @@ extension InitRequirement {
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_BOX_LIFETIME]]
     // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
     // CHECK:      return
@@ -730,7 +732,9 @@ extension InitRequirement {
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
     // CHECK: } // end sil function '$s19protocol_extensions15InitRequirementPAAE2d2xAA1DC_tcfC'
@@ -756,7 +760,9 @@ extension InitRequirement {
     // CHECK-NEXT: end_access [[ACCESS]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [init] [[OUT]]
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: destroy_value [[ARG]]
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[UNINIT_SELF]]
     // CHECK:      return

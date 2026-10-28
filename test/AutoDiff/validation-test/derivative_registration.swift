@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import DifferentiationUnittest
@@ -253,6 +252,50 @@ struct StructConformingToHasADefaultImplementation : HasADefaultImplementation {
 DerivativeRegistrationTests.testWithLeakChecking("DerivativeOfDefaultImplementation") {
   let dx = gradient(at: Tracked<Float>(0)) { StructConformingToHasADefaultImplementation().req($0) }
   expectEqual(Tracked<Float>(10), dx)
+}
+
+private struct MutatingMethod: Differentiable {
+  var value: Float = 0
+
+  mutating func foo(_ x: Float, _ y: Double) {
+    value += x + 2 * Float(y)
+  }
+
+  @derivative(of: foo, wrt: (self, x, y))
+  mutating func vjpFoo(_ x: Float, _ y: Double)
+    -> (value: Void, pullback: (inout TangentVector) -> (Float, Double)) {
+    foo(x, y)
+    return ((), { dSelf in (dSelf.value, Double(2 * dSelf.value)) })
+  }
+
+  mutating func bar(_ x: Float, _ y: Float) {
+    value += x + 2 * y
+  }
+
+  @derivative(of: bar, wrt: (self, x, y))
+  mutating func vjpBar(_ x: Float, _ y: Float)
+    -> (value: Void, pullback: (inout TangentVector) -> (Float, Float)) {
+    bar(x, y)
+    return ((), { dSelf in (dSelf.value, 2 * dSelf.value) })
+  }
+}
+
+DerivativeRegistrationTests.testWithLeakChecking("MutatingMethodPullback") {
+  let result1 = gradient(at: Float(0), Double(0)) { x, y in
+    var m = MutatingMethod()
+    m.foo(x, y)
+    return m.value
+  }
+  expectEqual(1, result1.0)
+  expectEqual(2, result1.1)
+
+  let result2 = gradient(at: Float(0), Float(0)) { x, y in
+    var m = MutatingMethod()
+    m.bar(x, y)
+    return m.value
+  }
+  expectEqual(1, result2.0)
+  expectEqual(2, result2.1)
 }
 
 runAllTests()

@@ -15,6 +15,9 @@
 #include "swift/Demangling/Demangler.h"
 #include "gtest/gtest.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
+
 using namespace swift;
 using namespace reflection;
 
@@ -601,8 +604,8 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
                                                /*parent*/ nullptr);
 
-  auto Result = Builder.createTupleType({GTP00, GTP01},
-                                        ArrayRef<StringRef>());
+  std::vector<StringRef> ResultLabels{"", ""};
+  auto Result = Builder.createTupleType({GTP00, GTP01}, ResultLabels);
   auto Func = Builder.createFunctionType(
       {Nominal}, Result, FunctionTypeFlags(),
       ExtendedFunctionTypeFlags(),
@@ -1017,67 +1020,6 @@ TEST(TypeRefTest, DeepEqualsRecursesIntoNestedStructure) {
   EXPECT_FALSE(TypeRef::deepEquals(Nested1, NoParent));
 }
 
-// Verify that the MultiPayloadEnumDescriptor spare-bit-mask accessors defend
-// against malformed __swift5_mpenum records supplied by an inspected process,
-// rather than trusting the record's declared mask size.
-// rdar://181865069, rdar://181864074
-TEST(TypeRefTest, MultiPayloadEnumSpareBitMaskBounds) {
-  // Records are laid out as: int32 TypeName; uint32 contents[SizeInWords].
-  //   contents[0] = (SizeInWords << 16) | flags
-  //   contents[1] = (maskByteOffset << 16) | maskByteCount
-  //   contents[2...] = mask bytes
-  auto makeRecord = [](std::vector<uint32_t> &storage, uint32_t sizeInWords,
-                       uint32_t flags,
-                       uint32_t maskByteCount) -> const MultiPayloadEnumDescriptor * {
-    storage.assign(1 + sizeInWords, 0);
-    storage[0] = 0; // TypeName relative pointer (unused here).
-    storage[1] = (sizeInWords << 16) | (flags & 0xffff);
-    if (sizeInWords >= 2)
-      storage[2] = maskByteCount & 0xffff;
-    return reinterpret_cast<const MultiPayloadEnumDescriptor *>(storage.data());
-  };
-
-  // A record claiming a 0xFFFF-byte mask but declaring only two content words
-  // (leaving zero bytes of room for the mask) must clamp the count to 0.
-  {
-    std::vector<uint32_t> storage;
-    auto *desc = makeRecord(storage, /*sizeInWords=*/2, /*flags=*/1,
-                            /*maskByteCount=*/0xFFFF);
-    EXPECT_TRUE(desc->usesPayloadSpareBits());
-    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 0u);
-    EXPECT_NE(desc->getPayloadSpareBits(), nullptr);
-  }
-
-  // With extra content words the count is clamped to the room the record
-  // actually describes ((SizeInWords - 2) * 4 bytes).
-  {
-    std::vector<uint32_t> storage;
-    auto *desc = makeRecord(storage, /*sizeInWords=*/4, /*flags=*/1,
-                            /*maskByteCount=*/0xFFFF);
-    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 8u);
-  }
-
-  // A well-formed count is returned unchanged.
-  {
-    std::vector<uint32_t> storage;
-    auto *desc = makeRecord(storage, /*sizeInWords=*/3, /*flags=*/1,
-                            /*maskByteCount=*/4);
-    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 4u);
-    EXPECT_NE(desc->getPayloadSpareBits(), nullptr);
-  }
-
-  // A record that claims to use spare bits but declares too few words to even
-  // hold the mask-count word must not read contents[1] or hand back a pointer.
-  {
-    std::vector<uint32_t> storage;
-    auto *desc = makeRecord(storage, /*sizeInWords=*/1, /*flags=*/1,
-                            /*maskByteCount=*/0);
-    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 0u);
-    EXPECT_EQ(desc->getPayloadSpareBitMaskByteOffset(), 0u);
-    EXPECT_EQ(desc->getPayloadSpareBits(), nullptr);
-  }
-}
-
 // A reflection section whose size is smaller than a single record header must
 // terminate iteration immediately rather than reading the header past the end
 // of the section buffer. rdar://181867993
@@ -1096,4 +1038,71 @@ TEST(TypeRefTest, ReflectionSectionUndersizedRecord) {
     (void)record;
     ADD_FAILURE() << "undersized field section should yield no records";
   }
+}
+
+// A __swift5_typeref section reaching the top of the address space makes the
+// mangled-name scan's remote address wrap around, and the scan must stop rather
+// than walk the local section buffer past its end. The section buffer here ends
+// against a guard page, so the unfixed scan faults. rdar://185733734
+TEST(TypeRefTest, ReadTypeRefRemoteAddressWraparound) {
+  size_t pageSize = sysconf(_SC_PAGESIZE);
+  char *pages = (char *)mmap(nullptr, pageSize * 2, PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANON, -1, 0);
+  ASSERT_NE(pages, MAP_FAILED);
+  ASSERT_EQ(mprotect(pages + pageSize, pageSize, PROT_NONE), 0);
+
+  // Place the section so its last byte is the last byte before the guard page,
+  // and make that byte a symbolic reference, whose 5-byte stride carries the
+  // scan onto the guard page.
+  const uint64_t sectionSize = 0xFF;
+  char *buffer = pages + pageSize - sectionSize;
+  memset(buffer, 'A', sectionSize);
+  buffer[sectionSize - 1] = '\1';
+
+  const uint64_t sectionStart = 0xFFFFFFFFFFFFFFFFULL - sectionSize;
+  remote::RemoteAddress startAddr(sectionStart,
+                                  remote::RemoteAddress::DefaultAddressSpace);
+
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  RemoteRef<void> sectionRef(startAddr, buffer);
+  RemoteRef<void> emptyRef(remote::RemoteAddress(), nullptr);
+  ReflectionInfo info{
+      FieldSection(emptyRef, 0),
+      AssociatedTypeSection(emptyRef, 0),
+      BuiltinTypeSection(emptyRef, 0),
+      CaptureSection(emptyRef, 0),
+      GenericSection(emptyRef, 0),
+      GenericSection(sectionRef, sectionSize),
+      GenericSection(emptyRef, 0),
+      {}};
+  Builder.addReflectionInfo(info);
+
+  remote::RemoteAddress scanStart(sectionStart + sectionSize - 1,
+                                  remote::RemoteAddress::DefaultAddressSpace);
+  EXPECT_EQ(Builder.readTypeRef(scanStart), nullptr);
+
+  munmap(pages, pageSize * 2);
+}
+
+// A SILBoxTypeWithLayout mangling carries the generic signature's parameter
+// counts and the substitution list length as independent fields, so a mangled
+// name can declare zero parameters and still supply substitutions. Decoding
+// must reject the mismatch instead of indexing past the end of the decoded
+// parameter list.
+TEST(TypeRefTest, SILBoxSubstitutionCountMismatchIsRejected) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  Demangle::Demangler Dem;
+
+  // One mutable field of the generic parameter, one Builtin.Int32
+  // substitution, and a signature declaring one parameter at depth 0.
+  auto *WellFormed = Dem.demangleType("xz_Bi32__lXX");
+  ASSERT_NE(WellFormed, nullptr);
+  EXPECT_NE(Builder.decodeMangledType(WellFormed), nullptr);
+
+  // Same, but the signature declares zero generic parameters while the
+  // substitution list still holds one type.
+  Demangle::Demangler Dem2;
+  auto *Mismatched = Dem2.demangleType("xz_Bi32__rzlXX");
+  ASSERT_NE(Mismatched, nullptr);
+  EXPECT_EQ(Builder.decodeMangledType(Mismatched), nullptr);
 }

@@ -19,7 +19,6 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/Unreachable.h"
 
 namespace swift {
 

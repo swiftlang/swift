@@ -14,7 +14,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
 
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Program.h"
@@ -22,7 +21,6 @@
 #include "llvm/Support/Windows/WindowsSupport.h"
 #endif
 
-#include <memory>
 #include <system_error>
 
 #if HAVE_POSIX_SPAWN

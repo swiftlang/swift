@@ -26,6 +26,27 @@ public protocol ISwiftObject {
   var metadata: UnsafeRawPointer { get }
 }
 
+#if !MISSING_ISWIFTOBJECT_DEFAULTS
+extension ISwiftObject {
+  public var object: UnsafeMutableRawPointer { fatalError() }
+  public var metadata: UnsafeRawPointer { fatalError() }
+}
+#endif
+
 public protocol COMInterface {
   var IID: IID { get }
 }
+
+public protocol COMActivatable {
+#if $_MicrosoftCOM
+  var CLSID: CLSID { get }
+#endif
+}
+
+#if $_MicrosoftCOM
+
+public protocol COMAggregatable: AnyObject {
+  var controller: (any IUnknown)? { get }
+}
+
+#endif

@@ -35,10 +35,16 @@ void * __sized_by(n) foo(void *__sized_by(n) dst, const void *__sized_by(n) src,
 @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload public func foo(_ dst: UnsafeMutableRawBufferPointer, _ src: UnsafeRawBufferPointer) -> UnsafeMutableRawBufferPointer {
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func foo(_ dst: UnsafeMutableRawBufferPointer, _ src: UnsafeRawBufferPointer) -> UnsafeMutableRawBufferPointer {
     let n = src.count
     if dst.count != n {
-      fatalError("bounds check failure in foo: expected \(n) but got \(dst.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("foo", expected, actual)
+      }
+      _boundsCheckFailure(n, dst.count)
     }
     return unsafe UnsafeMutableRawBufferPointer(start: unsafe foo(dst.baseAddress, src.baseAddress, n), count: Int(n))
 }

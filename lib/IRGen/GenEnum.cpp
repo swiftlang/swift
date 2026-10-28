@@ -107,9 +107,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/CFG.h"
@@ -135,7 +133,6 @@
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "SwitchBuilder.h"
-#include "ClassTypeInfo.h"
 #include "NativeConventionSchema.h"
 
 using namespace swift;
@@ -6735,6 +6732,14 @@ namespace {
   template<typename BaseTypeInfo>
   class EnumTypeInfoBase : public BaseTypeInfo {
   public:
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override = 0;
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override = 0;
+
     EnumImplStrategy &Strategy;
 
     template<typename...AA>
@@ -6875,6 +6880,18 @@ namespace {
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, isBT, copyable,
                               alwaysFixedSize, isABIAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// TypeInfo for loadable enum types.
@@ -6891,6 +6908,18 @@ namespace {
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, copyable,
                               alwaysFixedSize, isABIAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
@@ -6963,6 +6992,18 @@ namespace {
                          IsCopyable_t copy,
                          IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, align, pod, bt, copy, abiAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   /// TypeInfo for dynamically-sized enum types.
@@ -6975,6 +7016,18 @@ namespace {
                           IsCopyable_t copyable,
                           IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 
   class BitwiseCopyableEnumTypeInfo
@@ -6983,12 +7036,24 @@ namespace {
     BitwiseCopyableEnumTypeInfo(EnumImplStrategy &strategy, llvm::Type *irTy,
                                 IsABIAccessible_t abiAccessible)
         : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
   };
 } // end anonymous namespace
 
 const EnumImplStrategy &
 irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
-  assert(ty.getEnumOrBoundGenericEnum() && "not an enum");
+  assert(ty.getEnumDecl() && "not an enum");
   auto *ti = &IGM.getTypeInfo(ty);
   if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
     return loadableTI->as<LoadableEnumTypeInfo>().Strategy;
@@ -7137,7 +7202,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
          && "c-compatible enum didn't come from clang!");
   assert(theEnum->hasRawType()
          && "c-compatible enum doesn't have raw type!");
-  assert(!theEnum->getDeclaredTypeInContext()->is<BoundGenericType>()
+  assert(!theEnum->isGenericContext()
          && "c-compatible enum is generic!");
 
   // The raw type should be a C integer type, which should have a single

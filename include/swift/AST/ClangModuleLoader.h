@@ -37,8 +37,10 @@ namespace swift {
 class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
+class ConstructorDecl;
 class Decl;
 class FuncDecl;
+class NominalTypeDecl;
 class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
@@ -249,6 +251,15 @@ public:
   /// reference type, returns the originally-imported (un-thunked) method.
   virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
 
+  /// If \param decl is an imported C++ method that overrides a method of a C++
+  /// class imported as one of its Swift superclasses, returns the imported
+  /// member for the overridden method.
+  virtual ValueDecl *getOverriddenSuperclassMember(const ValueDecl *decl) = 0;
+
+  /// If \param decl is an accessor or operator function the importer
+  /// synthesized around an imported function, returns that function.
+  virtual ValueDecl *getForwardingSource(const ValueDecl *decl) = 0;
+
   /// Returns the forwarding method in the derived class that calls the base
   /// method.
   virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;
@@ -354,7 +365,25 @@ public:
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
+  /// Emit a note explaining why \p decl or \p type was imported as unsafe,
+  /// located at the responsible C++ declaration.
+  ///
+  /// Emits nothing when the entity did not come from C++, when the unsafety
+  /// was spelled out in the header, or when no reason can be attributed with
+  /// confidence: a missing explanation is preferable to a wrong one.
+  ///
+  /// \param decl The unsafe declaration, or null when only a type is known.
+  /// \param type The unsafe type, or null when only a declaration is known.
+  /// \param useLoc Fallback location, used if the C++ location is invalid.
+  virtual void diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
+                                         SourceLoc useLoc) = 0;
+
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
+  /// Constructor that converts a foreign reference to the SWIFT_REFCOUNTED_PTR
+  /// \p smartPtr, or null if \p smartPtr is not a valid SWIFT_REFCOUNTED_PTR.
+  virtual ConstructorDecl *
+  getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) = 0;
 
   /// Determine whether this is a functional C++ type, e.g. std::function, for
   /// which Swift provides a synthesized constructor that takes a Swift closure

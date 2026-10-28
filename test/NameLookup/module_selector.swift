@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ParserASTGen
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // REQUIRES: swift_feature_ParserASTGen
 
 // FIXME: This test doesn't really cover:

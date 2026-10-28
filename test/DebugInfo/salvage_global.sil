@@ -1,0 +1,103 @@
+// RUN: %target-sil-opt %s -sil-combine -dead-access-scope-elimination -sil-combine | %FileCheck %s
+
+// Test that a dead global_addr, function_ref, or thin_to_thick_function of a
+// function_ref is salvaged into a debug reconstruction block.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_global @plain_global : $Int64
+sil_global @lazy_global : $Int64
+sil_global private @lazy_global_token : $Builtin.Word
+
+sil @lazy_global_init : $@convention(c) (Builtin.RawPointer) -> ()
+sil @callee : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @test_salvage_global_addr
+// CHECK:         debug_value (), let, name "g", transform {
+// CHECK:           bb0:
+// CHECK:             %0 = global_addr @plain_global : $*Int64
+// CHECK:             %1 = load %0
+// CHECK:             return %1
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'test_salvage_global_addr'
+sil @test_salvage_global_addr : $@convention(thin) () -> () {
+bb0:
+  %1 = global_addr @plain_global : $*Int64
+  debug_value %1 : $*Int64, let, name "g", expr op_deref
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_global_addr_with_token
+// CHECK:         builtin "once"
+// CHECK-NEXT:    debug_value undef : $Int64, let, name "g"
+// CHECK-NOT:     global_addr
+// CHECK-LABEL: } // end sil function 'test_global_addr_with_token'
+sil @test_global_addr_with_token : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @lazy_global_token : $*Builtin.Word
+  %1 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %2 = function_ref @lazy_global_init : $@convention(c) (Builtin.RawPointer) -> ()
+  %3 = builtin "once"(%1 : $Builtin.RawPointer, %2 : $@convention(c) (Builtin.RawPointer) -> ()) : $Builtin.SILToken
+  %4 = global_addr @lazy_global : $*Int64 depends_on %3
+  debug_value %4 : $*Int64, let, name "g", expr op_deref
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_function_ref
+// CHECK:         debug_value (), let, name "f", transform {
+// CHECK:           bb0:
+// CHECK:             %0 = function_ref @callee : $@convention(thin) () -> ()
+// CHECK:             return %0
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'test_salvage_function_ref'
+sil @test_salvage_function_ref : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @callee : $@convention(thin) () -> ()
+  debug_value %0 : $@convention(thin) () -> (), let, name "f"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_salvage_thin_to_thick_function
+// CHECK:         debug_value (), let, name "f", transform {
+// CHECK:           bb0:
+// CHECK:             %0 = function_ref @callee : $@convention(thin) () -> ()
+// CHECK:             %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> ()
+// CHECK:             return %1
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'test_salvage_thin_to_thick_function'
+sil @test_salvage_thin_to_thick_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @callee : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+  debug_value %1 : $@callee_guaranteed () -> (), let, name "f"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A dead begin_access is salvaged to the address it accesses.
+
+// CHECK-LABEL: sil @test_salvage_begin_access
+// CHECK-NOT:     begin_access
+// CHECK:         debug_value (), let, name "p", transform {
+// CHECK:           bb0:
+// CHECK:             %0 = global_addr @plain_global : $*Int64
+// CHECK:             %1 = address_to_pointer %0 to $Builtin.RawPointer
+// CHECK:             return %1
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'test_salvage_begin_access'
+sil @test_salvage_begin_access : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @plain_global : $*Int64
+  %1 = begin_access [read] [dynamic] %0 : $*Int64
+  %2 = address_to_pointer %1 : $*Int64 to $Builtin.RawPointer
+  debug_value %2 : $Builtin.RawPointer, let, name "p"
+  end_access %1 : $*Int64
+  %r = tuple ()
+  return %r : $()
+}

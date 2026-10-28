@@ -30,8 +30,8 @@
 #include "MetadataPath.h"
 #include "MetadataRequest.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/STLExtras.h"
 #include <utility>
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
   class TypeBase;

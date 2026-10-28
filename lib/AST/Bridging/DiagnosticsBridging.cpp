@@ -14,7 +14,6 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/WarningGroupBehaviorRule.h"
 
@@ -42,9 +41,9 @@ const swift::DiagnosticInfo::FixIt &unbridge(const BridgedDiagnosticFixIt &fixit
 
 BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(SourceLoc start, uint32_t length,
                                                BridgedStringRef text) {
-  DiagnosticInfo::FixIt fixit(CharSourceRange(start, length), text.unbridged(),
-                              llvm::ArrayRef<DiagnosticArgument>());
-  *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
+  new (&storage) DiagnosticInfo::FixIt(CharSourceRange(start, length),
+                                       text.unbridged(),
+                                       llvm::ArrayRef<DiagnosticArgument>());
 }
 
 void BridgedDiagnosticEngine_diagnose(

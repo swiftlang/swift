@@ -15,10 +15,10 @@ func bar(@_noEagerMove _ s: S) {} // okay
 
 func baz(@_eagerMove _ c: C) {} // okay
 
-@_eagerMove // expected-error {{@_eagerMove is only valid on methods}}
+@_eagerMove // expected-error {{'@_eagerMove' is only valid on methods}}
 func bazzoo(_ c: C) {}
 
-@_noEagerMove // expected-error {{@_noEagerMove is only valid on methods}}
+@_noEagerMove // expected-error {{'@_noEagerMove' is only valid on methods}}
 func bazzoozoo(_ c: C) {}
 
 extension C {
@@ -46,13 +46,13 @@ func foo() {
 
 struct MoveOnly : ~Copyable {}
 
-@_eagerMove struct MoveOnlyEagerly : ~Copyable {} // expected-error {{'@_eagerMove' cannot be applied to NonCopyable types}}
+@_eagerMove struct MoveOnlyEagerly : ~Copyable {} // expected-error {{'@_eagerMove' cannot be applied to non-'Copyable' types}}
 
-func zoo(@_eagerMove _ : consuming MoveOnly) {} // expected-error {{'@_eagerMove' cannot be applied to NonCopyable types}}
+func zoo(@_eagerMove _ : consuming MoveOnly) {} // expected-error {{'@_eagerMove' cannot be applied to non-'Copyable' types}}
 
 func zooo(@_noEagerMove  _ : consuming C) {} // ok, only way to spell this behavior
 
 extension MoveOnly {
-  @_eagerMove // expected-error {{'@_eagerMove' cannot be applied to NonCopyable types}}
+  @_eagerMove // expected-error {{'@_eagerMove' cannot be applied to non-'Copyable' types}}
   func zoo() {}
 }

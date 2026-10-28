@@ -44,3 +44,7 @@ target_link_libraries(swiftSILGen PRIVATE
   swiftSIL)
 
 set_swift_llvm_is_available(swiftSILGen)
+
+# Make the SILGen-only access controls (see swift/Basic/AccessControls.h) active
+# for every translation unit in this library. Please do not remove this.
+target_compile_definitions(swiftSILGen PRIVATE SWIFT_INCLUDED_IN_SILGEN_SOURCES)

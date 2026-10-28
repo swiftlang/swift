@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
@@ -282,15 +285,26 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       // composed protocol type alias) with `getInheritedProtocols`. Each new
       // protocol is added to `UnexpandedProtocols` until there are no new
       // protocols to add. At that point, all direct and indirect conformances
-      // are stored in `Protocols`.
+      // are stored in `Protocols`, except for those to the invertible
+      // protocols, which SymbolGraph leaves out of conformance relationships.
 
       SmallPtrSet<const ProtocolDecl *, 4> Protocols;
       SmallVector<const ProtocolDecl *, 4> UnexpandedProtocols;
 
+      auto addUnexpanded = [&](const ProtocolDecl *Proto) {
+        // FIXME(noncopyable_generics): Figure out what we want here. This
+        // matches behavior in `SymbolGraph::recordConformanceRelationships`
+        // that ignores invertible protocol conformances.
+        if (Proto->getInvertibleProtocolKind())
+          return;
+
+        UnexpandedProtocols.push_back(Proto);
+      };
+
       // Start the process with the conformances stated
       // explicitly on the extension.
       for (const auto *Conformance : Extension->getLocalConformances()) {
-        UnexpandedProtocols.push_back(Conformance->getProtocol());
+        addUnexpanded(Conformance->getProtocol());
       }
 
       // "Recursively" expand the unexpanded list and populate
@@ -299,7 +313,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
         const auto *Proto = UnexpandedProtocols.pop_back_val();
         if (!Protocols.contains(Proto)) {
           for (const auto *InheritedProtocol : Proto->getInheritedProtocols()) {
-            UnexpandedProtocols.push_back(InheritedProtocol);
+            addUnexpanded(InheritedProtocol);
           }
           Protocols.insert(Proto);
         }
@@ -342,6 +356,15 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
   if (!BaseDecl && !SG->canIncludeDeclAsNode(VD)) {
     return false;
+  }
+
+  // An implicit Objective-C protocol requirement that is inherited onto a
+  // conforming type keeps the protocol requirement's own USR, regardless of
+  // the type it appears on. That requirement is already explicitly documented
+  // under the protocol itself. Skip the inherited copies.
+  if (VD->isImplicit() && VD->getClangDecl() &&
+      isa<clang::ObjCProtocolDecl>(VD->getClangDecl()->getDeclContext())) {
+    return true;
   }
 
   // If this symbol extends a type from another module, record it in that

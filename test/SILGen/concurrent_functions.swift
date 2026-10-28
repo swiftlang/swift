@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-flow-sensitive-concurrent-captures | %FileCheck %s
 // REQUIRES: concurrency
 
 func acceptsConcurrent(_: @escaping @Sendable () -> Int) { }

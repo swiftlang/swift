@@ -21,9 +21,8 @@
 
 #include "swift/AST/Type.h"
 #include "swift/IRGen/GenericRequirement.h"
-#include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace llvm {
 class Value;

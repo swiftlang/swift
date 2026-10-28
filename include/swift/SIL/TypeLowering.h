@@ -16,6 +16,7 @@
 #include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILInstruction.h"
@@ -115,7 +116,13 @@ private:
   /// The first lowering is always for ResilientExpansion::Minimal.
   mutable const TypeLowering *NextExpansion = nullptr;
 
+  void printProperties(llvm::raw_ostream &os, unsigned indentation) const;
+
 protected:
+  void printForAbstractTypeLayoutInfoBase(llvm::raw_ostream &os,
+                                       unsigned indentation,
+                                       llvm::StringRef concreteTypeName) const;
+
   TypeLowering(SILType type, SILTypeProperties properties,
                IsReferenceCounted_t isRefCounted,
                TypeExpansionContext expansionContext)
@@ -131,6 +138,11 @@ public:
   /// Print out the internal state of this type lowering into \p os.
   void print(llvm::raw_ostream &os) const;
 
+  /// Print the SIL-level properties that affect abstract type lowering.
+  virtual void printForAbstractTypeLayoutInfo(TypeConverter &TC,
+                                           llvm::raw_ostream &os,
+                                           unsigned indentation = 0) const = 0;
+
   /// Dump out the internal state of this type lowering to llvm::dbgs().
   SWIFT_DEBUG_DUMP;
 
@@ -142,9 +154,21 @@ public:
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG(
+      "use `!isLoadableOrOpaque(F)` or `isAddress()` depending on your needs")
   bool isAddressOnly() const {
     return Properties.isAddressOnly();
   }
+  /// isLoadableOrOpaque - Returns true if values of this type can be handled as
+  /// direct, loaded SSA values.
+  ///
+  /// The SIL pass AddressLowering transforms a function so that types with
+  /// opaque layouts, i.e., "address-only", are no longer used as a loadable
+  /// type. That's why this query is dependent on the current function F.
+  ///  
+  /// Mirrors SILType::isLoadableOrOpaque.
+  bool isLoadableOrOpaque(const SILFunction &F) const;
+
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
   /// isAddressOnly.
@@ -161,9 +185,12 @@ public:
   
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
+  SWIFT_DEPRECATED_IN_SILGEN_MSG("should check whether function being emitted has ownership for trivial values enabled")
   bool isTrivial() const {
     return Properties.isTrivial();
   }
+  
+  bool isTrivial(SILFunction *inFunction) const;
   
   bool isOrContainsRawPointer() const {
     return Properties.isOrContainsRawPointer();
@@ -187,7 +214,7 @@ public:
   /// Address-only types are by address (\c $*T) when \p loweredAddresses is
   /// true and opaque SSA values (\c $T) otherwise.
   SILType getLoweredType(bool loweredAddresses) const {
-    return LoweredType.getCategoryType((loweredAddresses && isAddressOnly())
+    return LoweredType.getCategoryType((loweredAddresses && Properties.isAddressOnly())
                                            ? SILValueCategory::Address
                                            : SILValueCategory::Object);
   }
@@ -502,9 +529,9 @@ enum class CaptureKind {
   /// A let constant captured as a pointer to storage
   Immutable,
   /// A local value captured directly, moved (not boxed or copied) into the
-  /// closure's context. This is only used for `@called(once)` closures that
-  /// capture `@called(once)` values at the moment because such closures
-  /// cannot be copied or called multiple times.
+  /// closure's context. This is only used for at-most-once closures
+  /// that capture at-most-once values at the moment because such
+  /// closures cannot be copied or called multiple times.
   Consuming,
 };
 
@@ -683,6 +710,9 @@ class TypeConverter {
   /// Second element is a ResilienceExpansion.
   llvm::DenseMap<std::pair<SILType, unsigned>, unsigned> TypeFields;
 
+  /// Cache for TypeSubElementCount.
+  llvm::DenseMap<std::pair<SILType, TypeExpansionContext>, unsigned> TypeSubElementCache;
+
   llvm::DenseMap<AbstractClosureExpr *, FunctionTypeInfo> ClosureInfos;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
     CaptureTypeExpansionContexts;
@@ -814,8 +844,13 @@ public:
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
-  /// Count the total number of fields inside the given SIL Type
+  /// Count the total number of fields inside the given SILType.
   unsigned countNumberOfFields(SILType Ty, TypeExpansionContext expansion);
+
+  /// Count number of sub-elements inside the given SILType.
+  ///
+  /// FIXME: This is going away soon.
+  uint32_t getTypeSubElementCount(SILType type, TypeExpansionContext context);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
@@ -1286,15 +1321,6 @@ namespace llvm {
 
     using CanTypeInfo = DenseMapInfo<swift::CanType>;
 
-    // Use the second field because the first field can validly be null.
-    static CachingTypeKey getEmptyKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
-    static CachingTypeKey getTombstoneKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(),
-              swift::TypeExpansionContext::minimal()};
-    }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
         DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
@@ -1317,12 +1343,6 @@ namespace llvm {
 
     using SILDeclRefInfo = DenseMapInfo<swift::SILDeclRef>;
 
-    static OverrideKey getEmptyKey() {
-      return {SILDeclRefInfo::getEmptyKey(), SILDeclRefInfo::getEmptyKey()};
-    }
-    static OverrideKey getTombstoneKey() {
-      return {SILDeclRefInfo::getTombstoneKey(), SILDeclRefInfo::getTombstoneKey()};
-    }
     static unsigned getHashValue(OverrideKey val) {
       return hash_combine(SILDeclRefInfo::getHashValue(val.base),
                           SILDeclRefInfo::getHashValue(val.derived));

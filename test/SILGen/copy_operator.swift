@@ -12,6 +12,7 @@ class Klass {}
 // CHECK:       bb0([[ARG:%.*]] :
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[ARG]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[EXPLICIT_COPY]]
 // CHECK-LABEL: } // end sil function '$s8moveonly7useCopyyAA5KlassCADF'
 
@@ -36,6 +37,7 @@ public func useCopy(_ k: Klass) -> Klass {
 // CHECK:       bb0([[ARG:%.*]] :
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[EXPLICIT_COPY:%[^,]+]] = explicit_copy_value [[ARG]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[EXPLICIT_COPY]]
 // CHECK-LABEL: } // end sil function '$s8moveonly7useCopyyxxRlzClF'
 

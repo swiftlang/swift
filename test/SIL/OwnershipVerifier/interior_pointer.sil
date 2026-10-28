@@ -152,3 +152,28 @@ bb0(%0 : @owned $Error):
   %result = apply %m<@opened(1, Error) Self>(%2) : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
   return %result : $Int
 }
+
+// A non-debug use of a value load_borrow'd from an interior pointer must still
+// be diagnosed if it is outside of the base's borrow scope. Only debug uses are
+// exempt.
+sil @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'load_borrow_use_outside_of_interior_pointer_lifetime'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $KlassUser               // users: %5, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $KlassUser                      // id: %5
+// CHECK-NEXT: Non Consuming User:   %7 = apply %6(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK-NEXT: Block: bb0
+sil [ossa] @load_borrow_use_outside_of_interior_pointer_lifetime : $@convention(thin) (@owned KlassUser) -> () {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0 : $KlassUser
+  %2 = ref_element_addr %1 : $KlassUser, #KlassUser.field
+  %3 = load_borrow %2 : $*Klass
+  end_borrow %3 : $Klass
+  end_borrow %1 : $KlassUser
+  %func = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %func(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %0 : $KlassUser
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -24,18 +24,15 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
@@ -48,12 +45,9 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "swift/Basic/Compiler.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -194,6 +188,17 @@ class swift::SourceLookupCache {
   /// Top-level macros that produce arbitrary names.
   SmallVector<MissingDecl *, 4> TopLevelArbitraryMacros;
 
+  /// The module-scope declarations with unique macro names introduced by the
+  /// first NumIndexedMacroExpansionFiles macro expansion files of the module,
+  /// paired with the files that introduced them, indexed by base name.
+  llvm::DenseMap<DeclBaseName,
+                 SmallVector<std::pair<const SourceFile *, ValueDecl *>, 1>>
+      UniqueMacroNameDecls;
+
+  /// The number of macro expansion files of the module whose declarations have
+  /// been added to UniqueMacroNameDecls.
+  unsigned NumIndexedMacroExpansionFiles = 0;
+
   SmallVector<llvm::PointerUnion<Decl *, MacroExpansionExpr *>, 4>
       MayHaveAuxiliaryDecls;
   void populateAuxiliaryDeclCache();
@@ -206,6 +211,12 @@ public:
   void lookupValue(DeclName Name, NLKind LookupKind,
                    OptionSet<ModuleLookupFlags> Flags,
                    SmallVectorImpl<ValueDecl*> &Result);
+
+  /// Returns the module-scope declarations with the unique macro name \p name
+  /// introduced by the macro expansion files of \p module, paired with the
+  /// files that introduced them.
+  ArrayRef<std::pair<const SourceFile *, ValueDecl *>>
+  getUniqueMacroNameDecls(const ModuleDecl &module, DeclBaseName name);
 
   /// Retrieves all the operator decls. The order of the results is not
   /// guaranteed to be meaningful.
@@ -509,6 +520,11 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     for (auto macroNames : introducedNames) {
       auto macroRef = macroNames.getFirst();
       for (auto name : macroNames.getSecond()) {
+        // Unique names are only visible inside the macro expansion that
+        // introduced them, not at module scope.
+        if (name == UniqueMacroNamePlaceholder)
+          continue;
+
         auto *placeholder = MissingDecl::forUnexpandedMacro(macroRef, anchorDecl);
         name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
       }
@@ -567,10 +583,7 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   // FIXME: We need to not consider auxiliary decls if we're doing lookup
   // from inside a macro argument at module scope.
   populateAuxiliaryDeclCache();
-  DeclName keyName = MacroDecl::isUniqueMacroName(Name.getBaseName())
-    ? UniqueMacroNamePlaceholder
-    : Name;
-  auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
+  auto auxDecls = TopLevelAuxiliaryDecls.find(Name);
 
   // Check macro expansions that could produce this name.
   SmallVector<MissingDecl *, 4> unexpandedDecls;
@@ -598,6 +611,41 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
           }
         });
   }
+}
+
+ArrayRef<std::pair<const SourceFile *, ValueDecl *>>
+SourceLookupCache::getUniqueMacroNameDecls(const ModuleDecl &module,
+                                           DeclBaseName name) {
+  // Only peer, declaration, and code item macros can introduce module-scope
+  // declarations.
+  const MacroRoles moduleScopeDeclRoles = MacroRoles(MacroRole::Peer) |
+                                          MacroRole::Declaration |
+                                          MacroRole::CodeItem;
+
+  // Index the macro expansion files created since the last lookup. Re-read the
+  // list on each iteration instead of holding on to it, so that files created
+  // while indexing are handled safely.
+  while (NumIndexedMacroExpansionFiles <
+         module.getMacroExpansionFiles().size()) {
+    auto *sourceFile =
+        module.getMacroExpansionFiles()[NumIndexedMacroExpansionFiles++];
+    auto role = sourceFile->getFulfilledMacroRole();
+    if (!role || !moduleScopeDeclRoles.contains(*role))
+      continue;
+
+    for (auto *decl : sourceFile->getTopLevelDecls()) {
+      auto *value = dyn_cast<ValueDecl>(decl);
+      if (value && value->getDeclContext()->isModuleScopeContext() &&
+          MacroDecl::isUniqueMacroName(value->getBaseName()))
+        UniqueMacroNameDecls[value->getBaseName()].push_back(
+            {sourceFile, value});
+    }
+  }
+
+  auto found = UniqueMacroNameDecls.find(name);
+  if (found == UniqueMacroNameDecls.end())
+    return {};
+  return found->second;
 }
 
 void SourceLookupCache::getPrecedenceGroups(
@@ -666,12 +714,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
 
   populateAuxiliaryDeclCache();
   SmallVector<MissingDecl *, 4> unexpandedDecls;
-  for (auto &entry : TopLevelAuxiliaryDecls) {
-    for (auto &decl : entry.second) {
-      (void) decl;
-      unexpandedDecls.append(entry.second.begin(), entry.second.end());
-    }
-  }
+  for (auto &entry : TopLevelAuxiliaryDecls)
+    unexpandedDecls.append(entry.second.begin(), entry.second.end());
 
   // Store macro expanded decls in a 'SmallSetVector' because different
   // MissingDecls might be created by a single macro expansion. (e.g. multiple
@@ -955,6 +999,29 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
   FORWARD(lookupValue, (Name, LookupKind, Flags, Result));
 }
 
+void ModuleDecl::lookupUniqueMacroNameInEnclosingExpansions(
+    DeclName name, SourceLoc loc, SmallVectorImpl<ValueDecl *> &results) {
+  ASSERT(MacroDecl::isUniqueMacroName(name.getBaseName()));
+  if (!isParsedModule(this))
+    return;
+
+  SmallVector<const SourceFile *, 2> expansionFiles;
+  for (auto *sourceFile = getSourceFileContainingLocation(loc);
+       sourceFile && sourceFile->Kind == SourceFileKind::MacroExpansion;
+       sourceFile = sourceFile->getEnclosingSourceFile())
+    expansionFiles.push_back(sourceFile);
+  if (expansionFiles.empty())
+    return;
+
+  for (auto &entry :
+       getSourceLookupCache().getUniqueMacroNameDecls(*this,
+                                                      name.getBaseName())) {
+    if (llvm::is_contained(expansionFiles, entry.first) &&
+        entry.second->getName().matchesRef(name))
+      results.push_back(entry.second);
+  }
+}
+
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
   for (auto file : getFiles()) {
     auto TD = file->lookupLocalType(MangledName);
@@ -1000,6 +1067,20 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (isa<ModuleDecl>(containerDecl)) {
     assert(container == this);
     this->lookupValue(name, NLKind::QualifiedLookup, results);
+
+    // Unique macro names aren't visible at module scope, but a lookup by
+    // mangled name can still refer to one introduced by an expanded macro.
+    // FIXME: lookupValue() doesn't find these. Clients looking up by mangled
+    // name should either provide a source location or use a dedicated entry
+    // point.
+    if (MacroDecl::isUniqueMacroName(name.getBaseName()) &&
+        isParsedModule(this)) {
+      for (auto &entry : getSourceLookupCache().getUniqueMacroNameDecls(
+               *this, name.getBaseName())) {
+        if (entry.second->getName().matchesRef(name))
+          results.push_back(entry.second);
+      }
+    }
   } else if (!isa<GenericTypeDecl>(containerDecl)) {
     // If ExtensionDecl, then use ExtensionDecl::lookupDirect instead.
     llvm_unreachable("This context does not support lookup.");
@@ -1198,6 +1279,18 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
+bool swift::isFromSyntheticMacroExpansion(ModuleDecl *module, SourceLoc loc) {
+  if (loc.isInvalid())
+    return false;
+  auto *sf = module->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return false;
+  auto *enclosing = sf->getEnclosingSourceFile();
+  if (!enclosing)
+    return false;
+  return enclosing->Kind == SourceFileKind::SyntheticMacro;
+}
+
 ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
       Kind != SourceFileKind::DefaultArgument &&
@@ -1265,8 +1358,8 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
 }
 
 void ModuleDecl::getTopLevelDeclsWithAuxiliaryDecls(
-    SmallVectorImpl<Decl *> &Results) const {
-  FORWARD(getTopLevelDeclsWithAuxiliaryDecls, (Results));
+    SmallVectorImpl<Decl *> &Results, bool visitFreestanding) const {
+  FORWARD(getTopLevelDeclsWithAuxiliaryDecls, (Results, visitFreestanding));
 }
 
 void ModuleDecl::dumpDisplayDecls() const {
@@ -1820,8 +1913,8 @@ void SourceFile::getImplicitImportsForModuleInterface(
 
 void SourceFile::dumpSeparatelyImportedOverlays() const {
   for (auto &pair : separatelyImportedOverlays) {
-    auto &underlying = std::get<0>(pair);
-    auto &overlays = std::get<1>(pair);
+    auto &underlying = pair.first;
+    auto &overlays = pair.second;
 
     llvm::errs() << (void*)underlying << " ";
     underlying->dump(llvm::errs());
@@ -2312,43 +2405,6 @@ bool ModuleDecl::isExternallyConsumed() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Hidden-Type Layouts
-//===----------------------------------------------------------------------===//
-
-void ModuleDecl::recordHiddenTypeLayout(StringRef mangledName,
-                                        const AbstractTypeLayout &layout) {
-  auto result = HiddenTypeLayouts.try_emplace(mangledName, layout);
-  if (!result.second) {
-    ASSERT(result.first->second.size == layout.size &&
-           result.first->second.alignment == layout.alignment &&
-           result.first->second.stride == layout.stride &&
-           result.first->second.bitwiseCopyable == layout.bitwiseCopyable &&
-           result.first->second.isOpaque == layout.isOpaque &&
-           "conflicting hidden-type layouts for the same mangled name");
-  }
-}
-
-std::optional<AbstractTypeLayout>
-ModuleDecl::lookupHiddenTypeLayout(StringRef mangledName) const {
-  auto it = HiddenTypeLayouts.find(mangledName);
-  if (it == HiddenTypeLayouts.end())
-    return std::nullopt;
-  return it->second;
-}
-
-SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
-ModuleDecl::getSortedHiddenTypeLayouts() const {
-  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4> result;
-  result.reserve(HiddenTypeLayouts.size());
-  for (auto &entry : HiddenTypeLayouts)
-    result.emplace_back(entry.getKey(), entry.getValue());
-  llvm::sort(result, [](const auto &a, const auto &b) {
-    return a.first < b.first;
-  });
-  return result;
-}
-
-//===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
 
@@ -2445,7 +2501,7 @@ findDeclaredCrossImportOverlays(Identifier bystanderName,
 void ModuleDecl::getDeclaredCrossImportBystanders(
     SmallVectorImpl<Identifier> &otherModules) {
   for (auto &pair : declaredCrossImports)
-    otherModules.push_back(std::get<0>(pair));
+    otherModules.push_back(pair.first);
 }
 
 void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
@@ -2488,8 +2544,8 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
     }
 
     for (auto &pair: current->declaredCrossImports) {
-      Identifier &bystander = std::get<0>(pair);
-      for (auto *file: std::get<1>(pair)) {
+      Identifier &bystander = pair.first;
+      for (auto *file: pair.second) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
           addOverlay(overlay);
@@ -2508,9 +2564,9 @@ namespace {
                                      CrossImportMap modCrossImports) {
     auto ret = std::find_if(modCrossImports.begin(), modCrossImports.end(),
                             [&](CrossImportMap::iterator::value_type &pair) {
-      for (OverlayFile *file: std::get<1>(pair)) {
+      for (OverlayFile *file: pair.second) {
         ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
-            mod, SourceLoc(), std::get<0>(pair));
+            mod, SourceLoc(), pair.first);
         if (std::find(overlays.begin(), overlays.end(),
                       overlay->getName()) != overlays.end())
           return true;
@@ -3590,6 +3646,9 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
 
+  if (Kind == SourceFileKind::MacroExpansion)
+    M.addMacroExpansionFile(this);
+
   M.getASTContext().SourceMgr.recordSourceFile(bufferID, this);
 }
 
@@ -3708,7 +3767,12 @@ void *SourceFile::getExportedSourceFile() const {
 
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;
-  getTopLevelDecls(Decls);
+  if (walker.shouldWalkTopLevelAuxiliaryDecls()) {
+    // Ignore freestanding expansions since the ASTWalker visits those.
+    getTopLevelDeclsWithAuxiliaryDecls(Decls, /*visitFreestanding*/ false);
+  } else {
+    getTopLevelDecls(Decls);
+  }
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
 
@@ -3757,7 +3821,13 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (auto Item : getTopLevelItems()) {
+  SmallVector<ASTNode, 64> scratch;
+  // Ignore freestanding expansions since the ASTWalker visits those.
+  auto Items = walker.shouldWalkTopLevelAuxiliaryDecls()
+                   ? getTopLevelItemsWithAuxiliaryDecls(scratch,
+                                                        /*freestanding*/ false)
+                   : getTopLevelItems();
+  for (auto Item : Items) {
     if (auto D = Item.dyn_cast<Decl *>()) {
       if (D->walk(walker))
         return true;
@@ -4080,20 +4150,103 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
   Results.erase(newEnd, Results.end());
 }
 
-void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
-    SmallVectorImpl<Decl*> &results) const {
+/// Recursively visit all the auxiliary extensions for any top-level and nested
+/// types.
+static void
+visitAllAuxiliaryExtensions(Decl *D,
+                            llvm::function_ref<void(Decl *)> addResult) {
+  // Only needs to be done for source files and Clang decls.
+  // FIXME: Should Clang be handling this in ClangModuleUnit::getTopLevelDecls?
+  if (!D->getDeclContext()->isInSwiftSourceFile() && !D->hasClangNode())
+    return;
 
-  std::function<void(Decl *)> addResult;
-  addResult = [&](Decl *decl) {
-    results.push_back(decl);
-    decl->visitAuxiliaryDecls(addResult);
+  class Visitor final : public DeclVisitor<Visitor> {
+    llvm::function_ref<void(Decl *)> AddResult;
+
+  public:
+    Visitor(llvm::function_ref<void(Decl *)> addResult)
+        : AddResult(addResult) {}
+
+    void visitDecl(Decl *D) {
+      // Make sure to visit any peer macros. See the comment in
+      // `getTopLevelItemsWithAuxiliaryDecls` for why this is done separately.
+      D->visitAuxiliaryDecls([&](Decl *D) { visit(D); });
+    }
+
+    void visitMembers(IterableDeclContext *IDC) {
+      auto *D = const_cast<Decl *>(IDC->getDecl());
+      visitDecl(D);
+
+      // Make sure to expand any member macros. Note we intentionally don't use
+      // `getABIMembers` here since that unnecessarily synthesizes a bunch of
+      // implicit decls that don't have extension macros, causing unnecessary
+      // work for lazy type-checking.
+      auto &eval = D->getASTContext().evaluator;
+      (void)evaluateOrDefault(eval, ExpandSynthesizedMemberMacroRequest{D}, {});
+      for (auto *member : IDC->getMembers())
+        visit(member);
+    }
+
+    void visitExtensionDecl(ExtensionDecl *ED) { visitMembers(ED); }
+
+    void visitNominalTypeDecl(NominalTypeDecl *NTD) {
+      NTD->visitAuxiliaryExtensions([&](Decl *D) {
+        visit(D);
+        AddResult(D);
+      });
+      visitMembers(NTD);
+    }
   };
+  Visitor visitor(addResult);
+  visitor.visit(D);
+}
 
+ArrayRef<ASTNode>
+FileUnit::getTopLevelItemsWithAuxiliaryDecls(SmallVectorImpl<ASTNode> &scratch,
+                                             bool visitFreestanding) const {
+  std::function<void(Decl *)> addDecl;
+  addDecl = [&](Decl *decl) {
+    scratch.push_back(decl);
+    decl->visitAuxiliaryDecls(addDecl, visitFreestanding);
+  };
+  // Currently only SourceFiles have top-level code items.
+  if (auto *SF = dyn_cast<SourceFile>(this)) {
+    for (auto item : SF->getTopLevelItems()) {
+      if (auto *D = dyn_cast<Decl *>(item)) {
+        addDecl(D);
+        // Note this isn't in `addDecl` since when `visitFreestanding` is
+        // `false` we don't want to collect freestanding expansions for the
+        // result, but we *do* still want to walk them to find auxiliary
+        // extensions.
+        visitAllAuxiliaryExtensions(D, addDecl);
+      } else {
+        scratch.push_back(item);
+      }
+    }
+  } else {
+    SmallVector<Decl *, 32> decls;
+    getTopLevelDeclsWithAuxiliaryDecls(decls, visitFreestanding);
+    for (auto *D : decls)
+      scratch.push_back(D);
+  }
+  return scratch;
+}
+
+void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
+    SmallVectorImpl<Decl *> &results, bool visitFreestanding) const {
+  std::function<void(Decl *)> addDecl;
+  addDecl = [&](Decl *decl) {
+    results.push_back(decl);
+    decl->visitAuxiliaryDecls(addDecl, visitFreestanding);
+  };
   SmallVector<Decl *, 32> nonExpandedDecls;
-  nonExpandedDecls.reserve(results.capacity());
   getTopLevelDecls(nonExpandedDecls);
-  for (auto *decl : nonExpandedDecls) {
-    addResult(decl);
+  for (auto *D : nonExpandedDecls) {
+    addDecl(D);
+    // Note this isn't in `addDecl` since when `visitFreestanding` is `false`
+    // we don't want to collect freestanding expansions for the result, but
+    // we *do* still want to walk them to find auxiliary extensions.
+    visitAllAuxiliaryExtensions(D, addDecl);
   }
 }
 

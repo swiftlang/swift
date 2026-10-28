@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -Xcc -DINCORRECT -I %S%{fs-sep}Inputs -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}refcounting-methods.h -cxx-interoperability-mode=upcoming-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -Xcc -DINCORRECT -I %S%{fs-sep}Inputs -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}refcounting-methods.h -cxx-interoperability-mode=upcoming-swift -target %target-swift-5.8-abi-triple
 
 import RefCountingMethods
 

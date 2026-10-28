@@ -55,6 +55,14 @@ extension NominalTypeDecl {
   }
 }
 
+extension EnumDecl {
+  /// True if all cases of this enum are known in `function`, i.e. it cannot gain cases in a future
+  /// version of its module.
+  public func isEffectivelyExhaustive(in function: Function) -> Bool {
+    function.bridged.isEffectivelyExhaustiveEnumDecl(bridged)
+  }
+}
+
 extension ClassDecl {
   public var superClassType: Type? {
     self.superClass?.canonical.silType!
@@ -75,6 +83,13 @@ extension SubstitutionMap {
   public func getMethodSubstitutions(for method: Function, selfType: CanonicalType? = nil) -> SubstitutionMap {
     return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged,
                                                                           selfType?.bridged ?? BridgedCanType()))
+  }
+
+  /// Returns true if at least one replacement type of this substitution map (partially)
+  /// contains the corresponding replacement type of `other`.
+  /// Both substitution maps must have the same generic signature.
+  public func isGrowing(comparedTo other: SubstitutionMap) -> Bool {
+    return SubstitutionMap_isGrowing(bridged, other.bridged)
   }
 }
 

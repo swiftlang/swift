@@ -13,11 +13,16 @@ class C {
 ) -> Int { get {} }
 }
 
+func variadicTuple(_ x: (Int,
+String)...) {}
+
 // RUN: %sourcekitd-test -req=format -line=3 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=10 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=13 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=17 -length=1 %s >>%t.response
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: ") -> PathShape {"
 // CHECK: key.sourcetext: "    ) {}"
 // CHECK: key.sourcetext: "    ) -> Int { get {} }"
+// CHECK: key.sourcetext: "                         String)...) {}"

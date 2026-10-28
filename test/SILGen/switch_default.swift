@@ -44,6 +44,7 @@ enum Enum {
 // CHECK:    br [[EXIT_BB]]
 //
 // CHECK: [[EXIT_BB]]:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // } // end sil function '$s14switch_default33testAddressOnlySubjectDefaultCaseyyAA4EnumOSgF'

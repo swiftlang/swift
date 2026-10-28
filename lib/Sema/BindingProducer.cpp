@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/BindingProducer.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/Subtyping.h"
@@ -45,7 +46,7 @@ static Type getOptionalSuperclass(Type type) {
       // This is especially important for Sendable key paths because
       // to reserve sendability of the original type.
       for (auto member : compositionTy->getMembers()) {
-        if (member->getClassOrBoundGenericClass()) {
+        if (member->getClassDecl()) {
           member = member->getSuperclass();
           if (!member)
             return Type();
@@ -322,7 +323,10 @@ bool TypeVarBindingProducer::computeNext() {
         // attempt conversions as part of the join between results rather than
         // between the expression and its context.
         auto *loc = TypeVar->getImpl().getLocator();
-        if (!(TypeVar->getImpl().isClosureResultType() && !objTy->isVoid() &&
+        if (!objTy->is<JoinType>() &&
+            !objTy->is<MeetType>() &&
+            !(TypeVar->getImpl().isClosureResultType() &&
+              !objTy->isVoid() &&
               !objTy->isTypeVariableOrMember()) &&
             !loc->directlyAt<SingleValueStmtExpr>()) {
           // If T is a type variable, only attempt this if both the
@@ -352,7 +356,7 @@ bool TypeVarBindingProducer::computeNext() {
       // using temporary type variables substituted for element
       // types, that's going to ensure that subtype relationship is
       // always preserved.
-      auto *BGT = type->castTo<BoundGenericType>();
+      auto *BGT = type->castTo<StructType>();
       auto dstLocator = TypeVar->getImpl().getLocator();
       auto newType =
           CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
@@ -371,7 +375,7 @@ bool TypeVarBindingProducer::computeNext() {
       // introducing Void will just cause local solution ambiguities.
       if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
           binding.Kind == AllowedBindingKind::Supertypes &&
-          !binding.BindingType->isPlaceholder()) {
+          !binding.BindingType->is<HoleType>()) {
         auto voidType = CS.getASTContext().TheEmptyTupleType;
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }
@@ -685,7 +689,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       return false;
     
     // Reflect in the score that this type variable couldn't be
-    // resolved and had to be bound to a placeholder "hole" type.
+    // resolved and had to be bound to a hole type.
     cs.increaseScore(SK_Hole, srcLocator);
 
     if (auto fix = fixForHole(cs)) {
@@ -700,7 +704,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     cs.recordDefaultedConstraint(srcLocator);
 
     // Fail if hole reporting fails.
-    if (type->isPlaceholder() && reportHole())
+    if (type->is<HoleType>() && reportHole())
       return false;
   }
 
@@ -725,12 +729,12 @@ class TypeVariableRefFinder : public ASTWalker {
   ConstraintSystem &CS;
   ASTNode Parent;
 
-  llvm::SmallPtrSetImpl<TypeVariableType *> &ReferencedVars;
+  SmallPtrSetVector<TypeVariableType *, 4> &ReferencedVars;
 
 public:
   TypeVariableRefFinder(
       ConstraintSystem &cs, ASTNode parent, ContextualTypeInfo context,
-      llvm::SmallPtrSetImpl<TypeVariableType *> &referencedVars)
+      SmallPtrSetVector<TypeVariableType *, 4> &referencedVars)
       : CS(cs), Parent(parent), ReferencedVars(referencedVars) {
     if (auto ty = context.getType())
       inferVariables(ty);
@@ -894,7 +898,7 @@ private:
       return;
 
     if (type->hasTypeVariable()) {
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      SmallPtrSetVector<TypeVariableType *, 4> typeVars;
       type->getTypeVariables(typeVars);
 
       // Some of the type variables could be non-representative, so
@@ -909,7 +913,8 @@ private:
 }
 
 void ConjunctionElement::findReferencedVariables(
-    ConstraintSystem &cs, SmallPtrSetImpl<TypeVariableType *> &typeVars) const {
+    ConstraintSystem &cs,
+    SmallPtrSetVector<TypeVariableType *, 4> &typeVars) const {
   auto referencedVars = Element->getTypeVariables();
   typeVars.insert(referencedVars.begin(), referencedVars.end());
 

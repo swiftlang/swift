@@ -4,6 +4,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -module-cache-path %t/clang-module-cache -I %S/Inputs %s
 // RUN: ls -lR %t/clang-module-cache | %FileCheck %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // CHECK: cfuncs{{.*}}.pcm
 
 import cfuncs

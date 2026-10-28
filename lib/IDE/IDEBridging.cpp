@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/IDEBridging.h"
-#include "llvm/Support/raw_ostream.h"
 #include <climits>
 
 ResolvedLoc::ResolvedLoc(swift::CharSourceRange range,

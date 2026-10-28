@@ -43,7 +43,7 @@ unwind:
   // CHECK:       coro.end:
   // CHECK: [[RESULT:%.*]] = phi i64 [ 2000, [[RESUME_BB]] ], [ undef, [[UNWIND_BB]] ]
   // CHECK: [[TOKEN:%.*]] = call token (...) @llvm.coro.end.results(i64 [[RESULT]])
-  // CHECK:         call i1 @llvm.coro.end(ptr [[BEGIN]], i1 false, token [[TOKEN]])
+  // CHECK:         call void @llvm.coro.end(ptr [[BEGIN]], i1 false, token [[TOKEN]])
   // CHECK-NEXT:    unreachable
 }
 

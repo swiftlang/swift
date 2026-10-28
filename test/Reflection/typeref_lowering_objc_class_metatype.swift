@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %S/Inputs/cmodules/testModA.m -c -o %t/testModA.o
-// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLoweringObjCClassMetatype.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -I %S/Inputs/cmodules -o %t/%target-library-name(TypesToReflect) %t/testModA.o
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/TypeLoweringObjCClassMetatype.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -I %S/Inputs/cmodules -o %t/%target-library-name(TypesToReflect) %t/testModA.o
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s
 
 // REQUIRES: objc_interop

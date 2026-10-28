@@ -19,7 +19,6 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Subsystems.h"
-#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 

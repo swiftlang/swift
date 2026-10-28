@@ -18,7 +18,6 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 

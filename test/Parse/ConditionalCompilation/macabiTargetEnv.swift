@@ -3,6 +3,8 @@
 
 // REQUIRES: OS=macosx || OS=maccatalyst
 
+// expected-error@<unknown> {{invalid version number in '-target }}
+
 #if targetEnvironment(macabi) // expected-warning {{'macabi' has been renamed to 'macCatalyst'}}
 // expected-note@-1{{replace with 'macCatalyst'}}{{23-29=macCatalyst}}
 func underMacABI() {

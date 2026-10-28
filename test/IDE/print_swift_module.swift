@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/print_swift_module.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_swift_module.swiftdoc %s
+// RUN: %target-swift-frontend -parse-as-library -emit-module-path %t/print_swift_module.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_swift_module.swiftdoc %s
 // RUN: %target-swift-ide-test -print-module -print-interface -no-empty-line-between-members -module-to-print=print_swift_module -I %t -source-filename=%s > %t.syn.txt
 // RUN: %target-swift-ide-test -print-module -access-filter-internal -no-empty-line-between-members -module-to-print=print_swift_module -I %t -source-filename=%s > %t.syn.internal.txt
 // RUN: %FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
@@ -36,6 +36,11 @@ public struct City {
   public init(@BridgeBuilder builder: () -> ()) {}
 }
 
+public var globalVar: Int = 0
+public let globalLet: String = ""
+public var globalComputed: Int { 1 }
+public var globalVarPairFirst = 1, globalVarPairSecond = 2
+
 // CHECK1:      /// Alias comment
 // CHECK1-NEXT: typealias Alias<T> = (T, T)
 
@@ -54,6 +59,13 @@ public struct City {
 // CHECK1-NEXT:   /// foo2 comment from P1
 // CHECK1-NEXT:   func foo2()
 // CHECK1-NEXT: }
+
+// CHECK1-NEXT: public var globalComputed: Int { get }
+// CHECK1-NEXT: public let globalLet: String
+// CHECK1-NEXT: public var globalVar: Int
+// CHECK1-NEXT: public var globalVarPairFirst: Int
+// CHECK1-NEXT: public var globalVarPairSecond: Int
+// CHECK1-NOT:  global
 
 // CHECK1:      /// returnsAlias() comment
 // CHECK1-NEXT: func returnsAlias() -> print_swift_module.Alias<Int>

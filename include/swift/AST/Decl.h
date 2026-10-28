@@ -44,6 +44,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
@@ -65,6 +66,7 @@ class PointerAuthQualifier;
 } // end namespace clang
 
 namespace swift {
+  struct AbstractTypeLayout;
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
@@ -218,7 +220,7 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType,
   Macro,
   MacroExpansion,
-  Using,
+  FileDefault,
   BorrowAccessor,
   MutateAccessor,
   YieldingBorrowAccessor,
@@ -1050,6 +1052,13 @@ public:
   LLVM_READONLY
   ModuleDecl *getModuleContextForNameLookup() const;
 
+  /// Retrieve every module in which this declaration would be found by name
+  /// lookup queries. A Cxx `namespace` can be declared in more than one Clang
+  /// module and is found through each of them. For any other declaration, the
+  /// only result is `getModuleContextForNameLookup()`.
+  void
+  getModuleContextsForNameLookup(SmallVectorImpl<ModuleDecl *> &modules) const;
+
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
   ASTContext &getASTContext() const {
@@ -1173,10 +1182,14 @@ public:
   ///
   /// When \p visitFreestandingExpanded is true (the default), this will also
   /// visit the declarations produced by a freestanding macro expansion.
-  void visitAuxiliaryDecls(
-      AuxiliaryDeclCallback callback,
-      bool visitFreestandingExpanded = true
-  ) const;
+  ///
+  /// When \p visitExtensions is true (currently `false` by default), this
+  /// will also visit the top-level extensions for any expanded extension
+  /// macros. Use this with care since in an ASTWalker it would cause a
+  /// non-source-order walk.
+  void visitAuxiliaryDecls(AuxiliaryDeclCallback callback,
+                           bool visitFreestandingExpanded = true,
+                           bool visitExtensions = false) const;
 
   using MacroCallback = llvm::function_ref<void(CustomAttr *, MacroDecl *)>;
 
@@ -1261,6 +1274,9 @@ public:
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
 
+  /// Returns whether this declaration comes from expanding a synthetic macro.
+  bool isFromSyntheticMacroExpansion() const;
+
   /// Whether this declaration is within a macro expansion relative to
   /// its decl context, and the macro was attached to a node imported from clang.
   bool isInMacroExpansionFromClangHeader() const;
@@ -1327,7 +1343,16 @@ public:
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
   /// Whether this declaration predates the introduction of concurrency.
+  ///
+  /// An inferred `@preconcurrency` is only seen if the actor isolation has
+  /// already been computed; use \c preconcurrencyIncludingInferred() when the
+  /// answer must not depend on that.
   bool preconcurrency() const;
+
+  /// Like \c preconcurrency(), but computes the actor isolation first, so an
+  /// inferred `@preconcurrency` is always seen. This can be cyclic if called
+  /// while computing the isolation or interface type of this declaration.
+  bool preconcurrencyIncludingInferred() const;
 
   /// Query whether this declaration was explicitly declared to be safe or
   /// unsafe.
@@ -1435,7 +1460,10 @@ public:
 
   /// If this is the Swift implementation of a declaration imported from ObjC,
   /// returns the imported declarations. (There may be several for a main class
-  /// body; if so, the first will be the class itself.) Otherwise return an empty list.
+  /// body; if so, the first will be the class itself. There may also be
+  /// several for an `@implementation` function whose foreign name resolves to
+  /// overloads it could equally implement; that is diagnosed as ambiguous.)
+  /// Otherwise return an empty list.
   ///
   /// \seeAlso ExtensionDecl::isObjCInterface()
   llvm::TinyPtrVector<Decl *> getAllImplementedObjCDecls() const;
@@ -4909,6 +4937,10 @@ public:
   /// with placeholders for unimportable stored properties.
   ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
 
+  /// Visit the auxiliary extensions for the given nominal. This includes both
+  /// those expanded by macros as well as others synthesized by the compiler.
+  void visitAuxiliaryExtensions(llvm::function_ref<void(Decl *)> visit) const;
+
   /// Whether this nominal type qualifies as an actor, meaning that it is
   /// either an actor type or a protocol whose `Self` type conforms to the
   /// `Actor` protocol.
@@ -5291,7 +5323,7 @@ class StructDecl final : public NominalTypeDecl {
   //
   // What we need is to serialize enough information to be
   // able to instantiate C++ class template on deserialization. It turns out
-  // that all that information is conveniently covered by the BoundGenericType,
+  // that all that information is conveniently covered by the NominalType,
   // which we store in this field. The field is set during the typechecking at
   // the time when we instantiate the C++ class template.
   //
@@ -5505,6 +5537,10 @@ public:
   /// otherwise.
   bool walkSuperclasses(
       llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const;
+
+  /// Whether an inverse of the given invertible protocol in this class's
+  /// inheritance clause suppresses the implicit conformance.
+  bool canSuppressInvertible(InvertibleProtocolKind ip) const;
 
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
@@ -5724,6 +5760,11 @@ public:
   /// record.
   bool isForeignReferenceType() const;
 
+  /// If this class is a C++ foreign reference type, or a Swift class that
+  /// inherits from one, returns the foreign reference type in its hierarchy
+  /// (which may be this class).
+  ClassDecl *getForeignReferenceSuperclassOrSelf() const;
+
   bool hasRefCountingAnnotations() const;
 };
 
@@ -5901,6 +5942,12 @@ public:
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
+
+  /// Whether this is a compiler-managed COM identity protocol.
+  bool isCOMIdentity() const {
+    return isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+           isSpecificProtocol(KnownProtocolKind::COMActivatable);
+  }
 
   /// Whether this protocol declares a COM interface.
   bool isCOMInterface() const {
@@ -7782,6 +7829,12 @@ public:
     return getValueOwnershipForSpecifier(getSpecifier());
   }
 
+  /// Returns the ownership that this parameter has after lowering. An
+  /// unannotated parameter of a closure has the ownership of the corresponding
+  /// parameter of the closure's type, which may be inferred. See
+  /// swift::getLoweredOwnership().
+  LoweredOwnership getLoweredOwnership() const;
+
   static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
     switch (specifier) {
     case ParamSpecifier::InOut:
@@ -7916,10 +7969,10 @@ private:
     setIndices(Indices);
   }
 
-  /// Returns the given type as a `BoundGenericType` if it is a
+  /// Returns the given type as a `NominalType` if it is a
   /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
   /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
-  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
+  static NominalType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -7994,7 +8047,7 @@ public:
   /// If `useDC` is provided (where the decl is being used), validates that
   /// access control is being used consistently and that `decl` is appropriately
   /// accessible, returning `nullptr` if inaccessible.
-  BoundGenericType *getDynamicMemberLookupKeyPathType() const;
+  NominalType *getDynamicMemberLookupKeyPathType() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(
@@ -8152,7 +8205,10 @@ public:
   };
 
 private:
-  ParameterList *Params;
+  ParameterList *Params = nullptr;
+  // Yield list is nullable: it is non-null only for coroutines (functions and
+  // coroutine accessors) and then cannot be empty.
+  YieldList *Yields = nullptr;
 
 private:
   /// The generation at which we last loaded derivative function configurations.
@@ -8279,6 +8335,8 @@ public:
   /// Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
+
+  bool isCoroutine() const;
 
   // Expose our import as member status
   ImportAsMemberStatus getImportAsMemberStatus() const {
@@ -8701,6 +8759,13 @@ public:
 
   void setParameters(ParameterList *Params);
 
+  /// Retrieve the function's explicit (as spelled in the source code) yield
+  /// list
+  YieldList *getYields() { return Yields; }
+  const YieldList *getYields() const { return Yields; }
+
+  void setYields(YieldList *Yields);
+
   bool hasImplicitSelfDecl() const {
     return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
   }
@@ -8835,6 +8900,7 @@ class FuncDecl : public AbstractFunctionDecl {
   friend class SelfAccessKindRequest;
   friend class IsStaticRequest;
   friend class ResultTypeRequest;
+  friend class YieldsTypeRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -8912,10 +8978,9 @@ public:
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc, bool Async,
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                          TypeRepr *ThrownTyR,
-                          GenericParamList *GenericParams,
-                          ParameterList *BodyParams, TypeRepr *ResultTyR,
-                          DeclContext *Parent);
+                          TypeRepr *ThrownTyR, GenericParamList *GenericParams,
+                          ParameterList *BodyParams, YieldList *BodyYields,
+                          TypeRepr *ResultTyR, DeclContext *Parent);
 
   static FuncDecl *
   createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
@@ -8974,8 +9039,12 @@ public:
     return FnRetType.getSourceRange();
   }
 
-  /// Retrieve the result interface type of this function.
+  /// Retrieve the result interface type of this function
   Type getResultInterfaceType() const;
+
+  /// Same as above, but only yields
+  void
+  getYieldInterfaceTypes(SmallVectorImpl<AnyFunctionType::Yield> &yields) const;
 
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.
@@ -9094,6 +9163,8 @@ class AccessorDecl final : public FuncDecl {
       return Bits.AccessorDecl.IsTransparent;
     return std::nullopt;
   }
+
+  void inferYieldType();
 
   friend class IsAccessorTransparentRequest;
 
@@ -10322,40 +10393,76 @@ public:
   }
 };
 
-/// UsingDecl - This represents a single `using` declaration, e.g.:
-///   using @MainActor
-class UsingDecl : public Decl {
+/// Represents a type whose definition could not be resolved, but for which
+/// serialized layout information is available.
+class HiddenTypeLayoutInfoDecl final : public TypeDecl {
+  explicit HiddenTypeLayoutInfoDecl(DeclContext *DC)
+      : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(),
+                 {}) {
+    setImplicit();
+  }
+
+public:
+  AbstractTypeLayout *Layout = nullptr;
+  TypeDecl *ParentDecl = nullptr;
+
+  struct XRefPathPiece {
+    Identifier Name;
+    bool InProtocolExtension;
+    bool ImportedFromClang;
+  };
+  StringRef MangledName;
+  Identifier OriginalModuleName;
+  bool OriginalModuleIsObjCHeader = false;
+  ArrayRef<XRefPathPiece> OriginalXRefPath;
+
+  SourceLoc getLocFromSource() const { return SourceLoc(); }
+
+  static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
+
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::HiddenTypeLayoutInfo;
+  }
+};
+
+/// FileDefaultDecl - This represents a single `default` declaration, e.g.:
+///   default @MainActor
+class FileDefaultDecl : public Decl {
   friend class Decl;
 
 private:
-  SourceLoc UsingLoc;
+  SourceLoc DefaultLoc;
 
   DeclAttributes SpecifiedAttributes;
 
-  UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
-            DeclContext *parent);
+  FileDefaultDecl(SourceLoc defaultLoc, DeclAttributes specifiedAttributes,
+                  DeclContext *parent);
 
 public:
   DeclAttributes getSpecifiedAttributes() const { return SpecifiedAttributes; }
 
-  SourceLoc getLocFromSource() const { return UsingLoc; }
+  SourceLoc getLocFromSource() const { return DefaultLoc; }
   SourceRange getSourceRange() const {
     if (SpecifiedAttributes.isEmpty())
-      return UsingLoc;
+      return DefaultLoc;
     // Head is most recently inserted, last in source order, and there
     // should only be one except for @available where each synthetic
     // attribute should point to the same attribute.
     auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
     if (endLoc.isInvalid())
-      return UsingLoc;
-    return {UsingLoc, endLoc};
+      return DefaultLoc;
+    return {DefaultLoc, endLoc};
   }
 
-  static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
-                           DeclAttributes specifiedAttributes,
-                           DeclContext *parent);
+  static FileDefaultDecl *create(ASTContext &ctx, SourceLoc defaultLoc,
+                                 DeclAttributes specifiedAttributes,
+                                 DeclContext *parent);
 
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::FileDefault;
+  }
 };
 
 inline void

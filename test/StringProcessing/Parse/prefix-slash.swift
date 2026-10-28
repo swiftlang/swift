@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex
 // REQUIRES: swift_swift_parser
 
 // Test the behavior of prefix '/' with regex literals enabled.

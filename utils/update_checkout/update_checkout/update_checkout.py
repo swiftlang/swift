@@ -468,10 +468,13 @@ def update_single_repository(pool_args: UpdateArguments):
 
         # It's important that we checkout, fetch, and rebase, in order.
         # .git/FETCH_HEAD updates the not-for-merge attributes based on
-        # which branch was checked out during the fetch.
+        # which branch was checked out during the fetch. Without history, the
+        # tags are not needed, and fetching each of them at depth 1 takes
+        # minutes in the larger repositories.
+        fetch_tags = [] if pool_args.skip_history else ["--tags"]
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
+            ["fetch", "--recurse-submodules=yes"] + fetch_tags + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -730,9 +733,12 @@ def update_all_repositories(
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
+    retried_update = exponential_retry(max_retries=args.max_retries)(
+        update_single_repository
+    )
     return (
         skipped_repositories,
-        ParallelRunner(update_single_repository, pool_args, args.n_processes).run(),
+        ParallelRunner(retried_update, pool_args, args.n_processes).run(),
     )
 
 
@@ -897,6 +903,9 @@ def obtain_all_additional_swift_sources(
 ):
     skipped_repositories = []
     pool_args = []
+    retried_obtain = exponential_retry(max_retries=args.max_retries)(
+        obtain_additional_swift_sources
+    )
     for repo_name, repo_info in config["repos"].items():
         repo_path = args.source_root.joinpath(repo_name)
         if repo_name in skip_repository_list:
@@ -915,7 +924,7 @@ def obtain_all_additional_swift_sources(
                         break
 
         else:
-            repo_exists = repo_path.joinpath(".git").is_dir()
+            repo_exists = repo_path.joinpath(".git").exists()
 
         if repo_exists:
             skipped_repositories.append(
@@ -961,7 +970,7 @@ def obtain_all_additional_swift_sources(
         )
 
         if args.use_submodules:
-            obtain_additional_swift_sources(new_args)
+            retried_obtain(new_args)
         else:
             pool_args.append(new_args)
 
@@ -976,9 +985,7 @@ def obtain_all_additional_swift_sources(
     _move_llvm_project_to_first_index(pool_args)
     return (
         skipped_repositories,
-        ParallelRunner(
-            obtain_additional_swift_sources, pool_args, args.n_processes
-        ).run(),
+        ParallelRunner(retried_obtain, pool_args, args.n_processes).run(),
     )
 
 

@@ -24,7 +24,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/Config.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
@@ -38,7 +37,6 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
 #include <optional>
@@ -311,20 +309,36 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
   }
 }
 
-static void addIndirectValueParameterAttributes(IRGenModule &IGM,
-                                                llvm::AttributeList &attrs,
-                                                const TypeInfo &ti,
-                                                unsigned argIndex,
-                                                bool addressable) {
+static void addAlignmentAttributeToBuilder(IRGenModule &IGM,
+                                           llvm::AttrBuilder &b,
+                                           const TypeInfo &ti) {
+  // If we know the type to have a fixed alignment, then the pointer is
+  // guaranteed to be aligned to at least that alignment.
+  auto fixedTI = dyn_cast<FixedTypeInfo>(&ti);
+  if (!fixedTI) {
+    return;
+  }
+  auto align = fixedTI->getFixedAlignment().getValue();
+  if (align != 1) {
+    b.addAlignmentAttr(align);
+  }
+}
+
+static void addIndirectValueParameterAttributes(
+    IRGenModule &IGM, llvm::AttributeList &attrs, const TypeInfo &ti,
+    unsigned argIndex, bool addressable, bool aliasable = false) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
-  // Value parameter pointers can't alias or be captured.
-  b.addAttribute(llvm::Attribute::NoAlias);
+  // Value parameter pointers can't alias or be captured. Values with interior
+  // mutability may be aliased while borrowed, though.
+  if (!aliasable)
+    b.addAttribute(llvm::Attribute::NoAlias);
   // Bitwise takable value types are guaranteed not to capture
   // a pointer into itself.
   if (!addressable && ti.isBitwiseTakable(ResilienceExpansion::Maximal))
     b.addCapturesAttr(llvm::CaptureInfo::none());
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+  addAlignmentAttributeToBuilder(IGM, b, ti);
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
@@ -363,6 +377,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
     b.addCapturesAttr(llvm::CaptureInfo::none());
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
+  addAlignmentAttributeToBuilder(IGM, b, ti);
 
   attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
@@ -379,6 +394,13 @@ irgen::expandCallingConv(IRGenModule &IGM,
                          SILFunctionTypeRepresentation convention, bool isAsync,
                          bool isCalleeAllocatedCoro) {
   switch (convention) {
+  case SILFunctionTypeRepresentation::COMMethod:
+    if (IGM.Context.LangOpts.COMModel ==
+            LangOptions::COMInteropModel::Microsoft &&
+        IGM.Triple.getArch() == llvm::Triple::x86)
+      return llvm::CallingConv::X86_StdCall;
+    return IGM.getOptions().PlatformCCallingConvention;
+
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
@@ -615,6 +637,7 @@ namespace {
     llvm::Type *addIndirectResult(SILType resultType, bool useInReg = false);
 
     bool isAddressableParam(unsigned paramIdx);
+    bool hasInteriorMutability(SILType paramSILType);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.silConv);
@@ -1229,7 +1252,8 @@ namespace {
       case clang::Type::HLSLAttributedResource:
       case clang::Type::HLSLInlineSpirv:
         llvm_unreachable("HLSL type in ABI lowering");
-
+      case clang::Type::OverflowBehavior:
+        llvm_unreachable("OverflowBehavior type in ABI lowering");
 
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
@@ -1322,6 +1346,10 @@ namespace {
       case clang::BuiltinType::Void:
         llvm_unreachable("bare void type in ABI lowering");
 
+      // std::meta::info is a consteval-only type and is never imported.
+      case clang::BuiltinType::MetaInfo:
+        llvm_unreachable("consteval-only type in ABI lowering");
+
       // We should never see the OpenCL builtin types at all.
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLEvent:
@@ -1362,6 +1390,16 @@ namespace {
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
         llvm_unreachable("HLSL intangible type in ABI lowering");
+
+      // We should never see HLSL packed types at all.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+        llvm_unreachable("HLSL packed type in ABI lowering");
+
+      // We should never see SPIRV opaque types at all.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
+        llvm_unreachable("SPIRV type in ABI lowering");
 
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
@@ -1543,6 +1581,41 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
   return true;
 }
 
+static std::optional<clang::CallingConv>
+getNonDefaultClangCallingConvention(IRGenModule &IGM,
+                                    CanSILFunctionType fnType) {
+  auto representation = fnType->getRepresentation();
+  if (representation != SILFunctionTypeRepresentation::CFunctionPointer &&
+      representation != SILFunctionTypeRepresentation::CXXMethod)
+    return std::nullopt;
+
+  auto *clangType = fnType->getClangTypeInfo().getType();
+  if (!clangType)
+    return std::nullopt;
+
+  const clang::FunctionType *functionType = nullptr;
+  if (auto *pointer = clangType->getAs<clang::PointerType>())
+    functionType = pointer->getPointeeType()->getAs<clang::FunctionType>();
+  else if (auto *reference = clangType->getAs<clang::ReferenceType>())
+    functionType =
+        reference->getPointeeType()->getAs<clang::FunctionType>();
+  else
+    functionType = clangType->getAs<clang::FunctionType>();
+
+  ASSERT(functionType && "unexpected Clang function type");
+  auto callingConv = functionType->getCallConv();
+  // Both representations otherwise use the platform C convention. Compare
+  // against the free-function default so that a method's default thiscall
+  // convention is still preserved on 32-bit Windows.
+  auto defaultCallingConv =
+      IGM.getClangASTContext().getDefaultCallingConvention(
+          /*IsVariadic=*/false, /*IsCXXMethod=*/false);
+  if (callingConv == defaultCallingConv)
+    return std::nullopt;
+
+  return callingConv;
+}
+
 /// Expand the result and parameter types to the appropriate LLVM IR
 /// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
@@ -1590,6 +1663,17 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
+  case SILFunctionTypeRepresentation::COMMethod: {
+    // COM methods take their interface pointer first.
+
+    // The SIL self parameter is an archetype opened from the interface
+    // existential. It has no corresponding Clang type; its foreign ABI is the
+    // opaque interface pointer carried by that existential.
+    paramTys.push_back(clangCtx.VoidPtrTy);
+    params = params.drop_back();
+    break;
+  }
+
   case SILFunctionTypeRepresentation::CXXMethod: {
     // Cxx methods take their 'self' argument first.
     auto &self = params.back();
@@ -1630,18 +1714,22 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangTy);
   }
 
-  // Generate function info for this signature.
+  // Generate function info for this signature. Preserve the calling
+  // convention carried by an imported C or C++ function type rather than
+  // rebuilding every function as the platform-default C convention.
   auto extInfo = clang::FunctionType::ExtInfo();
+  if (auto callingConv = getNonDefaultClangCallingConvention(IGM, FnType))
+    extInfo = extInfo.withCallingConv(*callingConv);
 
   bool isCXXMethod =
       FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
   auto &FI = isCXXMethod ?
       clang::CodeGen::arrangeCXXMethodCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All) :
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr) :
       clang::CodeGen::arrangeFreeFunctionCall(IGM.ClangCodeGen->CGM(),
           clangResultTy, paramTys, extInfo, {},
-          clang::CodeGen::RequiredArgs::All);
+          clang::CodeGen::RequiredArgs::All, /*CallerFD=*/nullptr);
   ForeignInfo.ClangInfo = &FI;
 
   assert(FI.arg_size() == paramTys.size() &&
@@ -1820,18 +1908,21 @@ const TypeInfo &SignatureExpansion::expand(unsigned paramIdx) {
   switch (auto conv = param.getConvention()) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Indirect_In_CXX:
+  case ParameterConvention::Indirect_In_CXX: {
+    bool interiorMutable = hasInteriorMutability(paramSILType);
     addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size(),
-                                        isAddressableParam(paramIdx));
+                                        isAddressableParam(paramIdx),
+                                        interiorMutable);
     addOpaquePointerParameter();
     return ti;
+  }
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     addInoutParameterAttributes(
-      IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
-      conv == ParameterConvention::Indirect_InoutAliasable,
-      isAddressableParam(paramIdx));
+        IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
+        conv == ParameterConvention::Indirect_InoutAliasable,
+        isAddressableParam(paramIdx));
     addOpaquePointerParameter();
     return ti;
 
@@ -1882,6 +1973,18 @@ bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
                                IGM.getMaximalTypeExpansionContext());
 }
 
+/// Raw-layout storage (e.g. `_Cell`, `Atomic`, `Mutex`) may be mutated through
+/// pointers derived from its address while it is borrowed, so a borrowed
+/// raw-layout parameter must not be `noalias`. Inout parameters are still
+/// exclusive and can remain `noalias`.
+bool SignatureExpansion::hasInteriorMutability(SILType paramSILType) {
+  return IGM.getSILTypes()
+      .getTypeLowering(paramSILType, IGM.getMaximalTypeExpansionContext(),
+                       FnType->getInvocationGenericSignature())
+      .getRecursiveProperties()
+      .definitelyIsOrContainsRawLayout();
+}
+
 /// Does the given function type have a self parameter that should be
 /// given the special treatment for self parameters?
 ///
@@ -1890,6 +1993,9 @@ bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
 bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
   if (!fnType->hasSelfParam())
     return false;
+
+  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod)
+    return true;
 
   SILParameterInfo param = fnType->getSelfParameter();
 
@@ -1968,6 +2074,7 @@ void SignatureExpansion::expandKeyPathAccessorParameters() {
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     llvm_unreachable("non keypath accessor convention");
   }
@@ -2062,6 +2169,8 @@ void SignatureExpansion::expandParameters(
   } else {
     auto needsContext = [=]() -> bool {
       switch (FnType->getRepresentation()) {
+      case SILFunctionType::Representation::COMMethod:
+        llvm_unreachable("calling COM method in Swift CC expansion?");
       case SILFunctionType::Representation::Block:
         llvm_unreachable("adding block parameter in Swift CC expansion?");
 
@@ -2340,6 +2449,8 @@ void SignatureExpansion::expandAsyncEntryType() {
   } else {
     auto needsContext = [=]() -> bool {
       switch (FnType->getRepresentation()) {
+      case SILFunctionType::Representation::COMMethod:
+        llvm_unreachable("calling COM method in Swift CC expansion?");
       case SILFunctionType::Representation::Block:
         llvm_unreachable("adding block parameter in Swift CC expansion?");
 
@@ -2458,6 +2569,9 @@ Signature SignatureExpansion::getSignature() {
   auto callingConv =
       expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync(),
                         FnType->isCalleeAllocatedCoroutine());
+  if (getNonDefaultClangCallingConvention(IGM, FnType))
+    callingConv = static_cast<llvm::CallingConv::ID>(
+        ForeignInfo.ClangInfo->getEffectiveCallingConvention());
 
   Signature result;
   result.Type = llvmType;
@@ -2966,6 +3080,12 @@ public:
                            isOutlined);
       break;
 
+    case SILFunctionTypeRepresentation::COMMethod:
+      adjusted.add(getCallee().getCOMMethodSelf());
+      externalizeArguments(IGF, getCallee(), original, adjusted, Temporaries,
+                           isOutlined);
+      break;
+
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::CXXMethod:
       if (getCallee().getRepresentation() == SILFunctionTypeRepresentation::Block) {
@@ -3242,8 +3362,13 @@ public:
       contextPtr = nullptr;
     };
 
-    // Add the indirect typed error result if we have one.
-    SILFunctionConventions fnConv(fnType, IGF.IGM.silConv);
+    // Add the indirect typed error result if we have one. Use the substituted
+    // type, like SyncCallEmission does: the error edge of the try_apply reads
+    // the error back out of the slot for the substituted error type, and
+    // getCalleeTypedErrorResultSlot only reuses a slot of the same storage
+    // type.
+    auto substFnType = CurCallee.getSubstFunctionType();
+    SILFunctionConventions fnConv(substFnType, IGF.IGM.silConv);
     if (fnType->hasErrorResult() && fnConv.isTypedError()) {
       // The invariant is that this is always zero-initialized, so we
       // don't need to do anything extra here.
@@ -3346,6 +3471,7 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -4188,6 +4314,7 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     assert(!FirstData && !SecondData);
     break;
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     assert(FirstData && !SecondData);
     break;
@@ -4203,6 +4330,7 @@ llvm::Value *Callee::getSwiftContext() const {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -4227,6 +4355,14 @@ llvm::Value *Callee::getBlockObject() const {
            SILFunctionTypeRepresentation::Block &&
          "not a block");
   assert(FirstData && "no block object set on callee");
+  return FirstData;
+}
+
+llvm::Value *Callee::getCOMMethodSelf() const {
+  assert(Info.OrigFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::COMMethod &&
+         "not a COM method");
+  assert(FirstData && "no interface pointer set on callee");
   return FirstData;
 }
 
@@ -4579,23 +4715,28 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
   unsigned firstParam = 0;
   unsigned paramEnd = FI.arg_size();
 
-  // Handle the ObjC prefix.
-  if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
+  switch (callee.getRepresentation()) {
+  case SILFunctionTypeRepresentation::ObjCMethod:
     // Ignore both the logical and the physical parameters associated
     // with self and (if not objc_direct) _cmd.
     firstParam += callee.isDirectObjCMethod() ? 1 :  2;
     params = params.drop_back();
+    break;
 
-  // Or the block prefix.
-  } else if (fnType->getRepresentation()
-                == SILFunctionTypeRepresentation::Block) {
+  case SILFunctionTypeRepresentation::Block:
     // Ignore the physical block-object parameter.
     firstParam += 1;
-  } else if (callee.getRepresentation() ==
-             SILFunctionTypeRepresentation::CXXMethod) {
-    // Skip the "self" param.
+    break;
+
+  case SILFunctionTypeRepresentation::CXXMethod:
+  case SILFunctionTypeRepresentation::COMMethod:
+    // Skip the physical and logical "self" parameters.
     firstParam += 1;
     params = params.drop_back();
+    break;
+
+  default:
+    break;
   }
 
   bool formalIndirectResult = fnType->getNumResults() > 0 &&
@@ -5196,8 +5337,13 @@ void irgen::emitYieldOnceCoroutineEntry(
   if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
-    // Use swift_coroFrameAllocStub to emit our allocator.
-    allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
+    if (IGF.IGM.isTypedAllocationAvailable()) {
+      allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocTypedFn());
+      deallocFn = IGF.IGM.getOpaquePtr(getCoroFrameDeallocTypedStubFn(IGF));
+    } else {
+      // Use swift_coroFrameAllocStub to emit our allocator.
+      allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
+    }
   } else {
     // Use malloc as our allocator.
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
@@ -5661,8 +5807,7 @@ bool IRGenFunction::emitBranchToReturnBB() {
     // it into its predecessor.
   } else if (ReturnBB->hasOneUse()) {
     // return statements are never emitted as conditional branches.
-    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
-    assert(Br->isUnconditional());
+    auto *Br = cast<llvm::UncondBrInst>(*ReturnBB->use_begin());
     Builder.SetInsertPoint(Br->getParent());
     Br->eraseFromParent();
     ReturnBB->eraseFromParent();

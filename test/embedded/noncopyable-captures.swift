@@ -1,24 +1,28 @@
-// RUN: %target-swift-emit-ir %s -DIGNORE_FAILS -enable-experimental-feature Embedded -wmo -o /dev/null
-// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -verify
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -verify -o /dev/null
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -Osize -o /dev/null
 
 // REQUIRES: swift_feature_Embedded
 
 struct MyStruct<Item> : ~Copyable {
-    var member = "42"
+    var p: UnsafeMutablePointer<Int>
 
-    init() {}
-    deinit {}
-    mutating func foo() {}
+    init() { p = .allocate(capacity: 1) }
+    // A non-trivial deinit, so that destroying the box really does reference it.
+    deinit { p.deallocate() }
+    mutating func foo() { p.pointee += 1 }
 }
 
-var escape: (()->())?
+// Escaping into a class property, so that the box survives to IRGen rather than
+// being promoted to the stack.
+public final class Keeper {
+    public var run: (() -> ())?
+    public init() {}
+}
 
-#if !IGNORE_FAILS
-
-public func test() {
-    var s = MyStruct<Int>() // expected-error {{capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift}}
+public func test(_ k: Keeper) {
+    var s = MyStruct<Int>()
     s.foo()
-    escape = {
+    k.run = {
         s.foo()
     }
 }
@@ -29,10 +33,10 @@ struct Outer: ~Copyable {
   var inner: MyStruct<Int>
 }
 
-public func testNested() {
-    var s = Outer(inner: MyStruct<Int>()) // expected-error {{capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift}}
+public func testNested(_ k: Keeper) {
+    var s = Outer(inner: MyStruct<Int>())
     s.inner.foo()
-    escape = {
+    k.run = {
         s.inner.foo()
     }
 }
@@ -46,17 +50,37 @@ enum E: ~Copyable {
   mutating func foo() {}
 }
 
-public func testEnum() {
-    var s = E.A(MyStruct<Int>()) // expected-error {{capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift}}
+public func testEnum(_ k: Keeper) {
+    var s = E.A(MyStruct<Int>())
     s.foo()
-    escape = {
+    k.run = {
         s.foo()
     }
 }
 
-#endif
+//
+
+// A generic non-copyable type with a deinit that is *only* ever boxed: no
+// non-generic non-copyable type has it as a field or payload, so the `alloc_box`
+// is the only thing that makes IRGen emit metadata for it.
+struct OnlyBoxed<Item>: ~Copyable {
+    var p: UnsafeMutablePointer<Int>
+    init() { p = .allocate(capacity: 1) }
+    deinit { p.deallocate() }
+    mutating func foo() { p.pointee += 1 }
+}
+
+public func testOnlyBoxed(_ k: Keeper) {
+    var s = OnlyBoxed<Int>()
+    s.foo()
+    k.run = {
+        s.foo()
+    }
+}
 
 //
+
+var escape: (()->())?
 
 struct StructWithoutDeinit<Item> {
     var member = "42"

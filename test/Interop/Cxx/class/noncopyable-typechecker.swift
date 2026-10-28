@@ -210,6 +210,18 @@ struct HasConstSubscript {
     NonCopyable nc;
 };
 
+template<typename T>
+struct SWIFT_COPYABLE_IF() EmptyCopyableIf {};  // expected-warning {{empty SWIFT_COPYABLE_IF annotations are ignored}}
+using EmptyCopyableIfWithInt = EmptyCopyableIf<int>;
+
+#define MY_COPYABLE_IF(...) __attribute__((swift_attr("copyable_if:" __VA_ARGS__)))
+
+template<typename T>
+struct MY_COPYABLE_IF("T") EmptyMyCopyableIf {}; 
+// no warning expected
+// 'T' used to be ignored here
+using EmptyMyCopyableIfWithInt = EmptyMyCopyableIf<int>;
+
 //--- test.swift
 import Test
 import CxxStdlib
@@ -306,4 +318,9 @@ func useConstSubscript() {
   var obj = HasConstSubscript(nc: NonCopyable(5))
   _ = obj[42]
   obj[42] = NonCopyable(7) // expected-error {{cannot assign through subscript: subscript is get-only}}
+}
+
+func useStructWithEmptyCopyableIf() {
+  _ = EmptyCopyableIfWithInt()
+  _ = EmptyMyCopyableIfWithInt()
 }

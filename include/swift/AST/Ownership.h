@@ -126,6 +126,17 @@ enum class ValueOwnership : uint8_t {
 enum : unsigned { NumValueOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ValueOwnership::Last_Kind)) };
 
+/// The ownership of a parameter after lowering. Unlike \c ValueOwnership, this
+/// is never the context-dependent default. See getLoweredOwnership().
+enum class LoweredOwnership : uint8_t {
+  /// a nonexclusive, usually nonmutating borrow
+  Shared,
+  /// an exclusive, mutating borrow
+  InOut,
+  /// an ownership transfer
+  Owned,
+};
+
 enum class ParameterOwnership : uint8_t;
 
 /// Map a `ValueOwnership` to the corresponding ABI-stable constant used by
@@ -136,6 +147,23 @@ ValueOwnership asValueOwnership(ParameterOwnership o);
 
 // Defined out-of-line in lib/AST/Ownership.cpp.
 llvm::StringRef getOwnershipSpelling(ValueOwnership ownership);
+llvm::StringRef getOwnershipSpelling(LoweredOwnership ownership);
+
+ValueOwnership asValueOwnership(LoweredOwnership ownership);
+
+class AbstractFunctionDecl;
+
+/// Determine the ownership a parameter has / will have after lowering.
+///
+/// \p fn is the function declaring the parameter, or null for a parameter of a
+/// function type, whose default doesn't depend on any declaration. \p isSelf is
+/// whether it's \p fn's `self`.
+///
+/// SIL type lowering chooses the conventions of a declaration's parameters
+/// accordingly, so the two must agree.
+LoweredOwnership getLoweredOwnership(ValueOwnership written,
+                                     const AbstractFunctionDecl *fn,
+                                     bool isSelf);
 
 } // end namespace swift
 

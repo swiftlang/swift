@@ -138,6 +138,35 @@ bb0(%0 : $*P):
   return %8 : $Int32
 }
 
+protocol ClassP : AnyObject {}
+class ClassC : ClassP {}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @borrow_existential :
+// CHECK:       bb0(%0 : @guaranteed $any ClassP):
+// CHECK-NOT:     copy_value
+// CHECK:         [[O:%.*]] = open_existential_ref %0
+// CHECK:         [[R:%.*]] = apply {{%.*}}<@opened{{.*}}>([[O]])
+// CHECK-NOT:     destroy_value
+// CHECK:         return [[R]]
+// CHECK-LABEL: } // end sil function 'borrow_existential'
+sil [ossa] [noinline] @borrow_existential : $@convention(thin) (@guaranteed any ClassP) -> @guaranteed any ClassP {
+bb0(%0 : @guaranteed $any ClassP):
+  return %0 : $any ClassP
+}
+
+sil [ossa] @borrow_existential_caller : $@convention(thin) (@guaranteed ClassC) -> () {
+bb0(%0 : @guaranteed $ClassC):
+  %1 = init_existential_ref %0 : $ClassC : $ClassC, $any ClassP
+  %f = function_ref @borrow_existential : $@convention(thin) (@guaranteed any ClassP) -> @guaranteed any ClassP
+  %r = apply %f(%1) : $@convention(thin) (@guaranteed any ClassP) -> @guaranteed any ClassP
+  %c = copy_value %r : $any ClassP
+  destroy_value %c : $any ClassP
+  %t = tuple ()
+  return %t : $()
+}
+
+sil_witness_table ClassC: ClassP module main {}
+
 sil [ossa] @global_addr_init: $@convention(thin) (Builtin.Int1) -> Int32 {
 bb0(%0 : $Builtin.Int1):
   alloc_global @$global_var

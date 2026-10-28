@@ -63,7 +63,7 @@ func asyncFunc() async {
 // main
 // CHECK-SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 
-// CHECK-SIL:       // function_ref async_Main
+// CHECK-SIL:       // function_ref async main entry point
 // CHECK-SIL-NEXT:  [[ASYNC_MAIN_FN:%.*]] = function_ref @async_Main : $@convention(thin) @async () -> ()
 // CHECK-SIL-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Int64, 2048
 // CHECK-SIL-NEXT:  [[FLAGS:%.*]] = struct $Int ([[T0]] : $Builtin.Int64)

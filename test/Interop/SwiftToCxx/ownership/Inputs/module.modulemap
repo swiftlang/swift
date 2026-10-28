@@ -1,0 +1,5 @@
+module CxxMoveOnly {
+  header "cxx-move-only.h"
+  requires cplusplus
+  export *
+}

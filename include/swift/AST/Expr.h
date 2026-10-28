@@ -600,6 +600,9 @@ public:
   /// Whether this expression is a valid parent for a given TypeExpr.
   bool isValidParentOfTypeExpr(Expr *typeExpr) const;
 
+  /// Returns whether this expression comes from expanding a synthetic macro.
+  bool isFromSyntheticMacroExpansion(const DeclContext *DC) const;
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getType,
@@ -3364,10 +3367,20 @@ public:
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
 class FunctionConversionExpr : public ImplicitConversionExpr {
+  bool WithoutActuallyDiscarding = false;
+
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
     : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+
+  /// Whether this conversion deliberately drops the exactly-once guarantee of
+  /// the operand. Sema only forms such a conversion for a call to
+  /// \c withoutActuallyDiscarding(_:do:).
+  bool isWithoutActuallyDiscarding() const { return WithoutActuallyDiscarding; }
+  void setWithoutActuallyDiscarding(bool value = true) {
+    WithoutActuallyDiscarding = value;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
@@ -4156,8 +4169,9 @@ public:
   /// Whether this closure is Sendable.
   bool isSendable() const;
 
-  /// Whether this closure could be called at most once.
-  bool isCalledOnce() const;
+  /// Whether this closure can be called at most once, which is true for both
+  /// at-most-once and exactly-once closures.
+  bool hasCalledAtMostOnceSemantics() const;
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
@@ -5574,26 +5588,27 @@ class ArrowExpr : public Expr {
   SourceLoc ThrowsLoc;
   SourceLoc ArrowLoc;
   Expr *Args;
+  Expr *Yields;
   Expr *Result;
   Expr *ThrownType;
 
 public:
   ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
-            Expr *ThrownType, SourceLoc ArrowLoc, Expr *Result)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
-      Result(Result), ThrownType(ThrownType)
-  { }
+            Expr *ThrownType, Expr *Yields, SourceLoc ArrowLoc, Expr *Result)
+      : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args), Yields(Yields),
+        Result(Result), ThrownType(ThrownType) {}
 
   ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, Expr *ThrownType,
             SourceLoc ArrowLoc)
-    : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
-      AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
-      Args(nullptr), Result(nullptr), ThrownType(ThrownType)
-  { }
+      : Expr(ExprKind::Arrow, /*implicit=*/false, Type()), AsyncLoc(AsyncLoc),
+        ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(nullptr),
+        Yields(nullptr), Result(nullptr), ThrownType(ThrownType) {}
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
+  Expr *getYieldsExpr() const { return Yields; }
+  void setYieldsExpr(Expr *E) { Yields = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
   Expr *getThrownTypeExpr() const { return ThrownType; }
@@ -6476,7 +6491,7 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   Type getRootType() const;
   Type getValueType() const;

@@ -22,6 +22,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -33,14 +34,13 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -48,7 +48,6 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -307,6 +306,8 @@ static StringRef getDumpString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::Thick: return "thick";
   case SILFunctionType::Representation::Block: return "block";
   case SILFunctionType::Representation::CFunctionPointer: return "c";
+  case SILFunctionType::Representation::COMMethod:
+    return "com_method";
   case SILFunctionType::Representation::CXXMethod:
     return "cxx_method";
   case SILFunctionType::Representation::Thin: return "thin";
@@ -683,8 +684,10 @@ static StringRef getDumpString(ExplicitSafety safety) {
 }
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
+  case ExecutionSemantics::AtMostOnce:
+    return "at_most_once";
   case ExecutionSemantics::Once:
-    return "once";
+    return "exactly_once";
   }
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {
@@ -1307,6 +1310,34 @@ namespace {
       printList(*params, [&](auto P, Label label) {
         printRec(const_cast<ParamDecl *>(P), label);
       }, Label::optional("params"));
+
+      printFoot();
+    }
+
+    /// Print a yield list as a child node.
+    void printRec(const YieldList *yields, const FuncDecl *parent, Label label,
+                  const ASTContext *ctx = nullptr) {
+      if (!yields) {
+        printHead("<<NULL yields>>", ParameterColor, label);
+      } else {
+        printRecArbitrary(
+            [&](Label label) { visitYieldList(yields, parent, label, ctx); }, label);
+      }
+    }
+
+    /// Print a yield list node.
+    void visitYieldList(const YieldList *yields, const FuncDecl *parent, Label label,
+                        const ASTContext *ctx = nullptr) {
+      printHead("yield_list", ParameterColor, label);
+
+      printSourceRange(yields->getSourceRange(), ctx);
+
+      printList(
+          *yields,
+          [&](auto &Y, Label label) {
+            printTypeOrTypeRepr(Y.getCachedInterfaceType(parent), Y.getTypeRepr(), label);
+          },
+          Label::optional("yields"));
 
       printFoot();
     }
@@ -2221,13 +2252,13 @@ namespace {
       printFoot();
     }
 
-    void visitUsingDecl(UsingDecl *UD, Label label) {
-      printCommon(UD, "using_decl", label);
+    void visitFileDefaultDecl(FileDefaultDecl *FDD, Label label) {
+      printCommon(FDD, "file_default_decl", label);
 
-      ASTContext *Ctx = &UD->getASTContext();
-      DeclContext *DC = UD->getDeclContext();
+      ASTContext *Ctx = &FDD->getASTContext();
+      DeclContext *DC = FDD->getDeclContext();
       printList(
-          UD->getSpecifiedAttributes(),
+          FDD->getSpecifiedAttributes(),
           [&](auto *attr, Label label) { printRec(attr, Ctx, DC, label); },
           Label::optional("specified_attrs"));
       printFoot();
@@ -2886,6 +2917,11 @@ namespace {
             opaque && *opaque != nullptr) {
           printRec(*opaque, Label::always("opaque_result_decl"));
         }
+
+        if (FD->isCoroutine()) {
+          printRec(D->getYields(), FD, Label::optional("yields"),
+                   &D->getASTContext());
+        }
       }
 
       printTypeOrTypeRepr(D->getCachedThrownInterfaceType(),
@@ -2938,6 +2974,7 @@ namespace {
     void printCommonFD(FuncDecl *FD, const char *type, Label label) {
       printCommonAFD(FD, type, label);
       printFlag(FD->isStatic(), "static", DeclModifierColor);
+      printFlag(FD->isCoroutine(), "@yield_once", DeclModifierColor);
     }
 
     void visitFuncDecl(FuncDecl *FD, Label label) {
@@ -3078,6 +3115,12 @@ namespace {
         printName(MED->getMacroName().getFullName(), Label::optional("name"));
       }
       printRec(MED->getArgs(), Label::optional("args"));
+      printFoot();
+    }
+
+    void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *D,
+                                       Label label) {
+      printCommon(D, "hidden_type_layout_info_decl", label);
       printFoot();
     }
   };
@@ -3248,7 +3291,7 @@ void SourceFile::dump(llvm::raw_ostream &OS,
                       ASTDumpMemberLoading memberLoading) const {
   DefaultWriter writer(OS, /*indent*/ 0);
   PrintDecl(writer, memberLoading).visitSourceFile(*this);
-  llvm::errs() << '\n';
+  OS << '\n';
 }
 
 void SourceFile::dumpJSON(llvm::raw_ostream &OS,
@@ -3940,6 +3983,8 @@ public:
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *E, Label label) {
     printCommon(E, "function_conversion_expr", label);
+    if (E->isWithoutActuallyDiscarding())
+      printFlag(true, "without_actually_discarding", ExprModifierColor);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
@@ -4236,7 +4281,8 @@ public:
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         printFlag(!fType->getExtInfo().isNoEscape(), "escaping",
                   ClosureModifierColor);
-        if (auto sendableTy = fType->getSendableDependentType()) {
+        if (auto sendableTy =
+                fType->getTypeDependencyFor(TypeDependenceKind::Sendable)) {
           printFieldQuoted(sendableTy.getString(),
                            Label::always("sendable_dep"),
                            ClosureModifierColor);
@@ -5087,12 +5133,14 @@ public:
   TRIVIAL_ATTR_PRINTER(AtRethrows, at_rethrows)
   TRIVIAL_ATTR_PRINTER(Borrowed, borrowed)
   TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
+  TRIVIAL_ATTR_PRINTER(Callable, callable)
   TRIVIAL_ATTR_PRINTER(CompileTimeLiteral, compile_time_literal)
   TRIVIAL_ATTR_PRINTER(ConstVal, compile_time_value)
   TRIVIAL_ATTR_PRINTER(ConstInitialized, const_initialized)
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
+  TRIVIAL_ATTR_PRINTER(Coroutine, coroutine)
   TRIVIAL_ATTR_PRINTER(DiscardableResult, discardable_result)
   TRIVIAL_ATTR_PRINTER(DisfavoredOverload, disfavored_overload)
   TRIVIAL_ATTR_PRINTER(DistributedActor, distributed_actor)
@@ -5110,8 +5158,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Frozen, frozen)
   TRIVIAL_ATTR_PRINTER(GKInspectable, gk_inspectable)
   TRIVIAL_ATTR_PRINTER(GlobalActor, global_actor)
-  TRIVIAL_ATTR_PRINTER(HasHiddenStoredProperties,
-                       has_hidden_stored_properties)
   TRIVIAL_ATTR_PRINTER(HasInitialValue, has_initial_value)
   TRIVIAL_ATTR_PRINTER(HasMissingDesignatedInitializers,
                        has_missing_designated_initializers)
@@ -5158,6 +5204,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NonObjC, non_objc)
   TRIVIAL_ATTR_PRINTER(NonOverride, non_override)
   TRIVIAL_ATTR_PRINTER(ObjCMembers, objc_members)
+  TRIVIAL_ATTR_PRINTER(Once, once)
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
@@ -5275,6 +5322,11 @@ public:
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
     printCommon(Attr, "cdecl_attr", label);
+    printFieldQuoted(Attr->Name, Label::always("name"));
+    printFoot();
+  }
+  void visitCxxDeclAttr(CxxDeclAttr *Attr, Label label) {
+    printCommon(Attr, "cxx_decl_attr", label);
     printFieldQuoted(Attr->Name, Label::always("name"));
     printFoot();
   }
@@ -5592,6 +5644,11 @@ public:
     printFieldQuoted(Attr->Value, Label::always("value"));
     printFoot();
   }
+  void visitTargetAttr(TargetAttr *Attr, Label label) {
+    printCommon(Attr, "target_attr", label);
+    printFieldQuoted(Attr->Value, Label::always("value"));
+    printFoot();
+  }
   void visitSetterAccessAttr(SetterAccessAttr *Attr, Label label) {
     printCommon(Attr, "setter_access_attr", label);
     printField(Attr->getAccess(), Label::always("access"));
@@ -5733,9 +5790,12 @@ public:
     printFoot();
   }
 
-  void visitCalledAttr(CalledAttr *Attr, Label label) {
-    printCommon(Attr, "called_attr", label);
-    printField(Attr->getSemantics(), Label::always("semantics"));
+  void visitScopeParamsAttr(ScopeParamsAttr *Attr, Label label) {
+    printCommon(Attr, "scope_params_attr", label);
+    printStringListField(
+        Attr->getParamList()->getParams(),
+        [&](auto param) { return param.Item.getIdentifier().str(); },
+        Label::always("params"));
     printFoot();
   }
 };
@@ -6288,25 +6348,12 @@ namespace {
 
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
-      auto originator = T->getOriginator();
-      if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
-        printRec(typeVar, Label::always("type_variable"));
-      } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
-                            Label::optional("originating_var"), DeclColor);
-      } else if (isa<ErrorExpr *>(originator)) {
-        printFlag("error_expr");
-      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
-        printRec(errTy, Label::always("error_type"));
-      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
-        printRec(DMT, Label::always("dependent_member_type"));
-      } else if (isa<TypeRepr *>(originator)) {
-        printFlag("type_repr");
-      } else if (isa<Pattern *>(originator)) {
-        printFlag("pattern");
-      } else {
-        assert(false && "unknown originator");
-      }
+      printFoot();
+    }
+
+    void visitHoleType(HoleType *T, Label label) {
+      printCommon("hole_type", label);
+      printRec(T->getOriginator(), Label::always("originator"));
       printFoot();
     }
 
@@ -6479,31 +6526,24 @@ namespace {
                                                            \
       if (T->getParent())                                  \
         printRec(T->getParent(), Label::always("parent")); \
+      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
+        printRec(arg, label);                              \
+      }, Label::optional("generic_args"));                 \
+      printStringListField(T->getScopeArgs(), [&](ScopeRef scope) { \
+        std::string value;                                 \
+        llvm::raw_string_ostream os(value);                \
+        scope.print(os);                                   \
+        return value;                                      \
+      }, Label::always("scope_args"), /*delimiter=*/", "); \
                                                            \
       printFoot();                                         \
     }
 
-#define VISIT_BINDABLE_NOMINAL_TYPE(TypeClass, Name)       \
-    VISIT_NOMINAL_TYPE(TypeClass, Name)                    \
-    void visitBoundGeneric##TypeClass(                     \
-        BoundGeneric##TypeClass *T, Label label) {         \
-      printCommon("bound_generic_" #Name, label);          \
-      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
-      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
-      if (T->getParent())                                  \
-        printRec(T->getParent(), Label::always("parent")); \
-      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
-        printRec(arg, label);                              \
-      }, Label::optional("generic_args"));                 \
-      printFoot();                                         \
-    }
-
-    VISIT_BINDABLE_NOMINAL_TYPE(EnumType, enum_type)
-    VISIT_BINDABLE_NOMINAL_TYPE(StructType, struct_type)
-    VISIT_BINDABLE_NOMINAL_TYPE(ClassType, class_type)
+    VISIT_NOMINAL_TYPE(EnumType, enum_type)
+    VISIT_NOMINAL_TYPE(StructType, struct_type)
+    VISIT_NOMINAL_TYPE(ClassType, class_type)
     VISIT_NOMINAL_TYPE(ProtocolType, protocol_type)
 
-#undef VISIT_BINDABLE_NOMINAL_TYPE
 #undef VISIT_NOMINAL_TYPE
 
     void visitBuiltinTupleType(BuiltinTupleType *T, Label label) {
@@ -6685,6 +6725,32 @@ namespace {
       }, label);
     }
 
+    void printAnyFunctionYieldsRec(ArrayRef<AnyFunctionType::Yield> yields,
+                                   Label label) {
+      printRecArbitrary(
+          [&](Label label) {
+            printHead("coroutine_yields", FieldLabelColor, label);
+            printField(yields.size(), Label::always("num_yields"));
+            printList(
+                yields,
+                [&](const auto &yield, Label label) {
+                  printRecArbitrary(
+                      [&](Label label) {
+                        printHead("yield", FieldLabelColor, label);
+
+                        printFlag(yield.isInOut(), "inout");
+                        printRec(yield.getType(),
+                                 Label::optional("yield_type"));
+                        printFoot();
+                      },
+                      label);
+                },
+                Label::optional("yields"));
+            printFoot();
+          },
+          label);
+    }
+
     void printClangTypeRec(const ClangTypeInfo &info, const ASTContext &ctx,
                            Label label) {
       // [TODO: Improve-Clang-type-printing]
@@ -6712,12 +6778,16 @@ namespace {
           printField(representation, Label::always("representation"));
         }
         printFlag(!T->isNoEscape(), "escaping");
-        if (!T->getSendableDependentType())
+        if (!T->hasTypeDependencyFor(TypeDependenceKind::Sendable))
           printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
-        printFlag(T->isCalledOnce(), "called_once");
+        if (!T->hasTypeDependencyFor(TypeDependenceKind::ExecutionSemantics)) {
+          if (auto semantics = T->getExecutionSemantics())
+            printField(*semantics, Label::always("execution_semantics"));
+        }
+        printFlag(T->isCoroutine(), "@yield_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:
@@ -6757,8 +6827,17 @@ namespace {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
       }
 
-      if (auto sendableTy = T->getSendableDependentType())
-        printRec(sendableTy, Label::always("sendable_dep"));
+      for (auto dependentType : T->getTypeDependencies()) {
+        switch (dependentType.getInt()) {
+        case TypeDependenceKind::Sendable:
+          printRec(dependentType.getPointer(), Label::always("sendable_dep"));
+          break;
+        case TypeDependenceKind::ExecutionSemantics:
+          printRec(dependentType.getPointer(),
+                   Label::always("execution_semantics_dep"));
+          break;
+        }
+      }
 
       if (T->hasLifetimeDependencies()) {
         for (auto &dep : T->getLifetimeDependencies()) {
@@ -6774,6 +6853,8 @@ namespace {
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));
       printAnyFunctionParamsRec(T->getParams(), Label::always("input"));
+      if (T->isCoroutine())
+        printAnyFunctionYieldsRec(T->getYields(), Label::always("yields"));
       printRec(T->getResult(), Label::always("output"));
       if (Type thrownError = T->getThrownError()) {
         printRec(thrownError, Label::always("thrown_error"));
@@ -6889,6 +6970,9 @@ namespace {
           break;
         case InvertibleProtocolKind::Escapable:
           printFlag("inverse_escapable");
+          break;
+        case InvertibleProtocolKind::Deinitable:
+          printFlag("inverse_deinitable");
           break;
         }
       }

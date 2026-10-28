@@ -35,7 +35,8 @@ sil_vtable BigClass {}
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
 // CHECK-NEXT: call {{.*}} @swift_release(ptr %reference.new)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
+//   No lifetime marker: the operand is the result of swift_initStackObject,
+//   not a static alloca, and lifetime markers are only valid on allocas.
 // CHECK-NEXT: ret void
 sil @simple_promote : $@convention(thin) () -> () {
 bb0:
@@ -85,7 +86,8 @@ bb0:
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating(ptr %reference.new)
 // CHECK-NEXT: call swiftcc void @not_inlined_destructor(ptr %reference.new)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
+//   No lifetime marker: the operand is the result of swift_initStackObject,
+//   not a static alloca, and lifetime markers are only valid on allocas.
 // CHECK-NEXT: ret void
 sil @promoted_with_devirtualized_release : $@convention(thin) () -> () {
 bb0:
@@ -101,7 +103,7 @@ bb0:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bare_alloc_ref
 // CHECK:         %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.raw)
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr %reference.raw)
 // CHECK-NEXT:    ret void
 sil @bare_alloc_ref : $@convention(thin) () -> () {
 bb0:
@@ -118,8 +120,9 @@ bb0:
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
 // CHECK-NOT: call
-// CHECK: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
-// CHECK-NEXT: ret void
+//   No lifetime marker: the operand is the result of swift_initStackObject,
+//   not a static alloca, and lifetime markers are only valid on allocas.
+// CHECK: ret void
 sil @promoted_with_inlined_devirtualized_release : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [stack] $TestClass

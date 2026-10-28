@@ -59,7 +59,6 @@ public struct UnsafeValue<Element: AnyObject> {
   // OPT-NEXT: debug_value
   // OPT-NEXT: [[UNMANAGED_ELEMENT:%.*]] = ref_to_unmanaged [[INPUT_ELEMENT]]
   // OPT-NEXT: debug_value
-  // OPT-NEXT: debug_value
   // OPT-NEXT: [[RESULT:%.*]] = struct $UnsafeValue<Element> ([[UNMANAGED_ELEMENT]] : $@sil_unmanaged Element)
   // OPT-NEXT: return [[RESULT]]
   // OPT: } // end sil function '$s11unsafevalue11UnsafeValueV14unsafelyAssignACyxGxh_tcfC'

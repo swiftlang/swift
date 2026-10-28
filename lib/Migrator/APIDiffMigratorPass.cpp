@@ -12,7 +12,6 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
@@ -21,16 +20,11 @@
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
-#include "swift/Migrator/Migrator.h"
 #include "swift/Migrator/RewriteBufferEditsReceiver.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/Diagnostic.h"
-#include "clang/Basic/FileManager.h"
-#include "clang/Basic/SourceManager.h"
-#include "clang/Edit/EditedSource.h"
 #include "llvm/ADT/RewriteBuffer.h"
-#include "llvm/Support/FileSystem.h"
 
 using namespace swift;
 using namespace swift::migrator;
@@ -977,36 +971,42 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   void handleStringRepresentableArg(ValueDecl *FD, ArgumentList *Args,
                                     Expr *Call) {
-    NodeAnnotation Kind;
-    StringRef RawType;
-    StringRef NewAttributeType;
-    uint8_t ArgIdx;
+    struct Change {
+      NodeAnnotation Kind;
+      StringRef RawType;
+      StringRef NewAttributeType;
+      uint8_t ArgIdx;
+    };
+
+    std::optional<Change> OptionalChange;
     for (auto Item: getRelatedDiffItems(FD)) {
       if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isStringRepresentableChange()) {
-          Kind = CI->DiffKind;
-          RawType = CI->LeftComment;
-          NewAttributeType = CI->RightComment;
           assert(CI->getChildIndices().size() == 1);
-          ArgIdx = CI->getChildIndices().front();
+          OptionalChange =
+              Change{CI->DiffKind, CI->LeftComment, CI->RightComment,
+                     CI->getChildIndices().front()};
           break;
         }
       }
     }
-    if (NewAttributeType.empty())
+    if (!OptionalChange)
       return;
+
+    auto &Change = OptionalChange.value();
     Expr *WrapTarget = Call;
     bool FromString = false;
-    if (ArgIdx) {
-      ArgIdx --;
+    if (Change.ArgIdx > 0) {
+      --Change.ArgIdx;
       FromString = true;
       auto AllArgs = getCallArgInfo(SM, Args, LabelRangeEndAt::LabelNameOnly);
-      if (AllArgs.size() <= ArgIdx)
+      if (AllArgs.size() <= Change.ArgIdx)
         return;
-      WrapTarget = AllArgs[ArgIdx].ArgExp;
+      WrapTarget = AllArgs[Change.ArgIdx].ArgExp;
     }
     assert(WrapTarget);
-    insertHelperFunction(Kind, RawType, NewAttributeType, FromString, WrapTarget);
+    insertHelperFunction(Change.Kind, Change.RawType, Change.NewAttributeType,
+                         FromString, WrapTarget);
   }
 
   bool hasRevertRawRepresentableChange(ValueDecl *VD) {

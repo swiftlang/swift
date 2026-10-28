@@ -154,6 +154,7 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
 /// bridged.
 enum class ForeignLanguage : uint8_t {
   C,
+  Cxx,
   ObjectiveC,
 };
 
@@ -381,6 +382,7 @@ class CanType : public Type {
   static bool isConstraintTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
+  static bool isCOMExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
   static bool isTypeErasedGenericClassTypeImpl(CanType type);
   static CanType getOptionalObjectTypeImpl(CanType type);
@@ -429,12 +431,10 @@ public:
   ///   - class types, generic or not
   ///   - archetypes with class or class protocol bounds
   ///   - existentials with class or class protocol bounds
+  ///   - COM interface existentials
   /// But not:
   ///   - function types
-  bool allowsOwnership(const GenericSignatureImpl *sig) const {
-    return isReferenceTypeImpl(*this, sig,
-                               /*functions count*/ false);
-  }
+  bool allowsOwnership(const GenericSignatureImpl *sig) const;
 
   /// Are values of this type essentially just class references,
   /// possibly with some extra metadata?
@@ -472,6 +472,10 @@ public:
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
+  /// Is this an existential type represented by a single COM interface?
+  /// Does not look through optional types or existential metatypes.
+  bool isCOMExistentialType() const { return isCOMExistentialTypeImpl(*this); }
+
   /// Is this an ObjC-compatible existential type?
   bool isObjCExistentialType() const {
     return isObjCExistentialTypeImpl(*this);
@@ -482,10 +486,10 @@ public:
     return isTypeErasedGenericClassTypeImpl(*this);
   }
 
-  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
-  StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
-  EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
-  NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  ClassDecl *getClassDecl() const; // in Types.h
+  StructDecl *getStructDecl() const; // in Types.h
+  EnumDecl *getEnumDecl() const; // in Types.h
+  NominalTypeDecl *getNominalDecl() const; // in Types.h
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
@@ -620,12 +624,6 @@ namespace llvm {
 
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
-    static swift::Type getEmptyKey() {
-      return llvm::DenseMapInfo<swift::TypeBase*>::getEmptyKey();
-    }
-    static swift::Type getTombstoneKey() {
-      return llvm::DenseMapInfo<swift::TypeBase*>::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::Type Val) {
       return DenseMapInfo<swift::TypeBase*>::getHashValue(Val.getPointer());
     }
@@ -635,14 +633,6 @@ namespace llvm {
   };
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
-    static swift::CanType getEmptyKey() {
-      return swift::CanType(llvm::DenseMapInfo<swift::
-                              TypeBase*>::getEmptyKey());
-    }
-    static swift::CanType getTombstoneKey() {
-      return swift::CanType(llvm::DenseMapInfo<swift::
-                              TypeBase*>::getTombstoneKey());
-    }
   };
 
   // A Type is "pointer like".

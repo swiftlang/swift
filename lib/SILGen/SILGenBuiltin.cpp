@@ -12,13 +12,16 @@
 
 #include "SpecializedEmitter.h"
 
+#include "ArgumentScope.h"
 #include "ArgumentSource.h"
+#include "Callee.h"
 #include "Cleanup.h"
 #include "ExecutorBreadcrumb.h"
 #include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "ResultPlan.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
@@ -188,7 +191,7 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &SGF,
   auto &ti = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   
   // Destroy is a no-op for trivial types.
-  if (ti.isTrivial())
+  if (ti.isTrivial(&SGF.F))
     return ManagedValue::forObjectRValueWithoutOwnership(
         SGF.emitEmptyTuple(loc));
 
@@ -397,6 +400,15 @@ static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &SGF,
   return emitCastFromReferenceType(SGF, loc, substitutions, args, C);
 }
 
+// A COM-constrained archetype has an object or interface pointer
+// representation, even when its generic ABI passes it indirectly. The
+// pointer need not refer to a particular COM interface.
+static bool isCOMConstrainedArchetype(SILType type) {
+  if (auto *archetype = type.getASTType()->getAs<ArchetypeType>())
+    return archetype->hasCOMInterfaceConstraint();
+  return false;
+}
+
 /// Specialized emitter for Builtin.bridgeToRawPointer.
 static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
                                         SILLocation loc,
@@ -409,9 +421,57 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
+  if (!SGF.getTypeLowering(args[0].getType()).isLoadable()) {
+    if (!isCOMConstrainedArchetype(args[0].getType())) {
+      SGF.SGM.diagnose(
+          loc, diag::invalid_sil_builtin,
+          "bridgeToRawPointer operand must have an object or interface "
+          "pointer representation");
+      return SGF.emitUndef(rawPointerType);
+    }
+    if (args[0].getType().isAddress()) {
+      auto address = SGF.B.createUncheckedAddrCast(
+          loc, args[0].getValue(), rawPointerType.getAddressType());
+      auto result =
+          SGF.B.createLoad(loc, address, LoadOwnershipQualifier::Trivial);
+      return ManagedValue::forObjectRValueWithoutOwnership(result);
+    }
+  }
+
+  if (args[0].getType().getASTType().isCOMExistentialType() ||
+      isCOMConstrainedArchetype(args[0].getType())) {
+    auto value = args[0];
+    if (value.getType().isMoveOnlyWrapped()) {
+      if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
+        value = value.borrow(SGF, loc);
+      value = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value);
+    }
+    auto result = SGF.B.createUncheckedTrivialBitCast(loc, value.getValue(),
+                                                      rawPointerType);
+    return ManagedValue::forObjectRValueWithoutOwnership(result);
+  }
+
   SILValue result = SGF.B.createRefToRawPointer(loc, args[0].getValue(),
                                                 rawPointerType);
   return ManagedValue::forObjectRValueWithoutOwnership(result);
+}
+
+static ManagedValue emitAddressOnlyFromRawPointer(
+    SILGenFunction &SGF, SILLocation loc, const TypeLowering &lowering,
+    ManagedValue pointer, SGFContext C, IsTake_t isTake) {
+  auto source = pointer.materialize(SGF, loc);
+  auto address = SGF.B.createUncheckedAddrCast(
+      loc, source.getValue(), lowering.getLoweredType().getAddressType());
+  if (lowering.isLoadableOrOpaque(SGF.F)) {
+    auto ownership =
+        isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+    auto value = SGF.B.emitLoadValueOperation(loc, address, ownership);
+    return SGF.emitManagedRValueWithCleanup(value, lowering);
+  }
+  return SGF.B.bufferForExpr(
+      loc, lowering.getLoweredType(), lowering, C, [&](SILValue buffer) {
+        SGF.B.createCopyAddr(loc, address, buffer, isTake, IsInitialization);
+      });
 }
 
 /// Specialized emitter for Builtin.bridgeFromRawPointer.
@@ -425,17 +485,71 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   assert(args.size() == 1 && "bridge should have a single argument");
   
   // The substitution determines the destination type.
-  // FIXME: Archetype destination type?
   auto &destLowering =
     SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (!destLowering.isLoadable()) {
+    if (!isCOMConstrainedArchetype(destLowering.getLoweredType())) {
+      SGF.SGM.diagnose(
+          loc, diag::invalid_sil_builtin,
+          "bridgeFromRawPointer result must have an object or interface "
+          "pointer representation");
+      return SGF.emitUndef(destLowering.getLoweredType());
+    }
+    return emitAddressOnlyFromRawPointer(SGF, loc, destLowering, args[0], C,
+                                         IsNotTake);
+  }
+
   assert(destLowering.isLoadable());
   SILType destType = destLowering.getLoweredType();
 
   // Take the raw pointer argument and cast it to the destination type.
+  if (destType.getASTType().isCOMExistentialType()) {
+    SILValue result = SGF.B.createUncheckedBitwiseCast(
+        loc, args[0].getUnmanagedValue(), destType);
+    return SGF.emitManagedCopy(loc, result, destLowering);
+  }
+
+  // The instruction is not marked `immortal`, i.e. it produces an owned value.
+  // The `immortal` flag is set later by the optimizer if the Swift 5.1 runtime
+  // is available on the deployment target.
   SILValue result = SGF.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
-                                                destType);
-  // The result has ownership semantics, so retain it with a cleanup.
-  return SGF.emitManagedCopy(loc, result, destLowering);
+                                                destType, /*isImmortal=*/false);
+  // The result has ownership semantics, so it owns a reference.
+  return SGF.emitManagedRValueWithCleanup(result, destLowering);
+}
+
+/// Specialized emitter for Builtin.takeFromRawPointer.
+static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  SubstitutionMap substitutions,
+                                                  ArrayRef<ManagedValue> args,
+                                                  SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "take should have a single substitution");
+  assert(args.size() == 1 && "take should have a single argument");
+
+  auto &lowering = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  auto type = lowering.getLoweredType();
+  if (!lowering.isLoadable() && isCOMConstrainedArchetype(type))
+    return emitAddressOnlyFromRawPointer(SGF, loc, lowering, args[0], C,
+                                         IsTake);
+
+  if (!lowering.isLoadable() ||
+      (!type.getASTType().isCOMExistentialType() &&
+       !type.isBridgeableObjectType() && !type.is<BuiltinNativeObjectType>())) {
+    SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                     "takeFromRawPointer result must have an object or interface "
+                     "pointer representation");
+    return SGF.emitUndef(type);
+  }
+
+  // Adopt the existing reference without the retain implied by
+  // raw_pointer_to_ref.
+  SILValue result =
+      SGF.B.createUncheckedBitwiseCast(loc, args[0].getUnmanagedValue(), type);
+  result = SGF.B.createUncheckedOwnershipConversion(loc, result,
+                                                    OwnershipKind::Owned);
+  return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
 static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,
@@ -578,7 +692,8 @@ static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
                                        SILLocation loc,
                                        SubstitutionMap substitutions,
                                        ArrayRef<ManagedValue> args,
-                                       bool isProjection) {
+                                       bool isProjection,
+                                       bool stackProtected) {
   SILType ElemTy = SGF.getLoweredType(substitutions.getReplacementTypes()[0]);
   SILType RawPtrType = args[0].getUnmanagedValue()->getType();
   SILValue addr = SGF.B.createPointerToAddress(loc,
@@ -587,10 +702,10 @@ static ManagedValue emitBuiltinGepImpl(SILGenFunction &SGF,
                                                /*strict*/ true,
                                                /*invariant*/ false);
   addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
-                               /*needsStackProtection=*/ true,
+                               /*needsStackProtection=*/ stackProtected,
                                isProjection);
   addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
-                                      /*needsStackProtection=*/ true);
+                                      /*needsStackProtection=*/ stackProtected);
   return ManagedValue::forObjectRValueWithoutOwnership(addr);
 }
 
@@ -603,7 +718,8 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gep should have two substitutions");
   assert(args.size() == 3 && "gep should be given three arguments");
-  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ false);
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ false, /*stackProtected=*/ true);
 }
 
 /// Specialized emitter for Builtin.gepProjection.
@@ -615,7 +731,22 @@ static ManagedValue emitBuiltinGepProjection(SILGenFunction &SGF,
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "gepProjection should have two substitutions");
   assert(args.size() == 3 && "gepProjection should be given three arguments");
-  return emitBuiltinGepImpl(SGF, loc, substitutions, args, /*isProjection=*/ true);
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ true, /*stackProtected=*/ true);
+}
+
+/// Specialized emitter for Builtin.unprotectedGepProjection.
+static ManagedValue emitBuiltinUnprotectedGepProjection(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(substitutions.getReplacementTypes().size() == 1 &&
+         "unprotectedGepProjection should have two substitutions");
+  assert(args.size() == 3 &&
+         "unprotectedGepProjection should be given three arguments");
+  return emitBuiltinGepImpl(SGF, loc, substitutions, args,
+                            /*isProjection=*/ true, /*stackProtected=*/ false);
 }
 
 /// Specialized emitter for Builtin.getTailAddr.
@@ -770,7 +901,8 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto toTy = substitutions.getReplacementTypes()[1];
   auto &fromTL = SGF.getTypeLowering(fromTy);
   auto &toTL = SGF.getTypeLowering(toTy);
-  assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
+  assert(!fromTL.isTrivial(&SGF.F) && !toTL.isTrivial(&SGF.F)
+         && "expected ref type");
 
   auto arg = args[0];
 
@@ -853,7 +985,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
       return SGF.emitManagedLoadCopy(loc, toAddr, toTL);
     }
     // Leave the cleanup on the original value.
-    if (toTL.isTrivial())
+    if (toTL.isTrivial(&SGF.F))
       return ManagedValue::forTrivialAddressRValue(toAddr);
 
     // Initialize the +1 result buffer without taking the incoming value. The
@@ -1228,8 +1360,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
   if (origFnType != origFnUnsubstType) {
     origFnVal = SGF.B.createConvertFunction(
-        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType));
   }
 
   // Get the derivative function.
@@ -1246,8 +1377,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   if (derivativeFnType != derivativeFnUnsubstType) {
     derivativeFn = SGF.B.createConvertFunction(
         loc, derivativeFn,
-        SILType::getPrimitiveObjectType(derivativeFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(derivativeFnUnsubstType));
   }
 
   // We don't need to destroy the original function or retain the
@@ -1312,8 +1442,7 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   if (transposeFnType != transposeFnUnsubstType) {
     transposeFn = SGF.B.createConvertFunction(
         loc, transposeFn,
-        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType));
     transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
   }
 
@@ -1344,15 +1473,17 @@ static ManagedValue emitBuiltinApplyDerivative(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
     ArrayRef<ManagedValue> args, SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
-  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
-      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
-          ->getDecl());
+
+  // Peel off function conversions (e.g. implicitly added @Sendable conversion)
+  auto *directCallee = callExpr->getCalledValue(/*skipFunctionConversions=*/ true);
+  auto builtinDecl = cast<FuncDecl>(directCallee);
+
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
-  bool throws;
+  bool throws, async;
   auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
-      builtinName, kind, arity, throws);
+      builtinName, kind, arity, throws, async);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyDerivativeFunction(kind, arity, SGF, loc,
                                                     substitutions, args, C);
@@ -1367,9 +1498,9 @@ static ManagedValue emitBuiltinApplyTranspose(
           ->getDecl());
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   unsigned arity;
-  bool throws;
+  bool throws, async;
   auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
-      builtinName, arity, throws);
+      builtinName, arity, throws, async);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyTransposeFunction(
       arity, throws, SGF, loc, substitutions, args, C);
@@ -1556,6 +1687,18 @@ static ManagedValue emitBuiltinAlignof(
       loc, BuiltinNames::Alignof, SILType::getBuiltinWordType(ctx), subs, {}));
 }
 
+// Emit SIL for typedAllocationID.
+// This formally takes a metatype argument that's never actually used,
+// so we ignore it.
+static ManagedValue emitBuiltinTypedAllocationID(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
+      loc, BuiltinNames::TypedAllocationID,
+      SILType::getBuiltinIntegerType(64, ctx), subs, {}));
+}
+
 /// Emit SIL for allocRawTyped/deallocRawTyped. These formally take a trailing
 /// T.Type argument that's only used at compile time, to recover the pointee
 /// type for the typed-malloc descriptor computed in IRGen.
@@ -1722,7 +1865,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
     // <T> () async throws -> T
     CanType functionTy =
-        GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+        GenericFunctionType::get(genericSig, {}, {}, genericResult, extInfo)
             ->getCanonicalType();
     AbstractionPattern origParamType(genericSig, functionTy);
     CanType substParamType = fnArg.getSubstRValueType();
@@ -1864,7 +2007,7 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
   bool hasSending = ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
   CanType functionType =
       FunctionType::get(
-          {}, ctx.TheEmptyTupleType,
+          {}, {}, ctx.TheEmptyTupleType,
           ASTExtInfo().withAsync().withThrows().withSendable(!hasSending))
           ->getCanonicalType();
 
@@ -2259,6 +2402,59 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   return SGF.B.createLoadTake(loc, result);
 }
 
+/// Apply the non-escaping closure argument of a builtin, ignoring the
+/// closure's isolation -- effectively assuming that we are in the right isolation context already.
+static ManagedValue emitApplyIgnoringIsolation(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               ManagedValue fn,
+                                               ArrayRef<ManagedValue> fnArgs,
+                                               SubstitutionMap subs,
+                                               SGFContext C) {
+  // The result is the builtin's second generic parameter, `T`. The closure
+  // was emitted at the builtin's generic abstraction, so its result is opaque
+  auto substResultType =
+      subs.getReplacementTypes()[1]->getCanonicalType();
+
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern::getOpaque(),
+                                substResultType);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, C);
+  ArgumentScope argScope(SGF, loc);
+
+  // The builtin throws the closure's error type; if there is nowhere to throw
+  // to, the closure argument is known not to throw
+  ApplyOptions options;
+  if (!SGF.ThrowDest.isValid())
+    options |= ApplyFlags::DoesNotThrow;
+
+  return SGF
+      .emitApply(std::move(resultPlan), std::move(argScope), loc, fn,
+                 SubstitutionMap(), fnArgs, calleeTypeInfo, options, C,
+                 std::nullopt)
+      .getAsSingleValue(SGF, loc);
+}
+
+static ManagedValue
+emitBuiltinApplyActorIsolatedUnchecked(SILGenFunction &SGF, SILLocation loc,
+                                       SubstitutionMap subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
+  assert(args.size() == 2 && "expected (fn, actor)");
+  return emitApplyIgnoringIsolation(SGF, loc, args[0], args.drop_front(), subs,
+                                    C);
+}
+
+static ManagedValue
+emitBuiltinApplyGlobalActorIsolatedUnchecked(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap subs,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  assert(args.size() == 1 && "expected (fn)");
+  return emitApplyIgnoringIsolation(SGF, loc, args[0], {}, subs, C);
+}
+
 static ManagedValue emitBuiltinTaskAddCancellationHandler(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
@@ -2304,7 +2500,7 @@ static ManagedValue emitBorrowObject(
   ArgumentSource &&arg) {
 
   // Loadable referent (therefore loadable borrow).
-  assert(loweredBorrowTy.isLoadable(SGF.F)
+  assert(loweredBorrowTy.isLoadableOrOpaque(SGF.F)
          && "borrow must be loadable if referent is");
 
   auto referent = std::move(arg).getAsSingleValue(

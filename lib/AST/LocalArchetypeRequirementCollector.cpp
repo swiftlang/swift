@@ -33,7 +33,7 @@ void LocalArchetypeRequirementCollector::addOpenedExistential(Type constraint) {
     constraint = existential->getConstraintType();
 
   assert(constraint->isConstraintType() ||
-         constraint->getClassOrBoundGenericClass());
+         constraint->getClassDecl());
   assert(OuterSig || !constraint->hasTypeParameter() &&
          "Interface type here requires a parent signature");
 

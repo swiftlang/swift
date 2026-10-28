@@ -22,15 +22,14 @@
 #include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ContextualTypeInfo.h"
 #include "swift/Sema/OverloadChoice.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
 
@@ -136,6 +135,9 @@ enum class ConstraintKind : char {
   /// The first type is the same function type as the second type, but
   /// made @escaping.
   EscapableFunctionOf,
+  /// The first type is the same function type as the second type, but
+  /// converted from exactly-once to at-most-once execution semantics.
+  DiscardableFunctionOf,
   /// The first type is an opened type from the second type (which is
   /// an existential).
   OpenedExistentialOf,
@@ -469,48 +471,42 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
              bool isIsolated, ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second, Type third,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
              DeclContext *useDC, FunctionRefInfo functionRefInfo,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
   Constraint(Type type, OverloadChoice choice, Type effectiveOverloadType,
              DeclContext *useDC, ConstraintFix *fix, ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
              Type first, Type second, ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a closure body element constraint.
   Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   Constraint(FunctionType *appliedFn, Type calleeType,
              unsigned trailingClosureMatching, DeclContext *useDC,
-             ConstraintLocator *locator,
-             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
@@ -717,6 +713,7 @@ public:
 
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::DiscardableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:

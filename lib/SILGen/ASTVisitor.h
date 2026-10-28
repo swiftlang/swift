@@ -17,6 +17,10 @@
 #ifndef SWIFT_LOWERING_ASTVISITOR_H
 #define SWIFT_LOWERING_ASTVISITOR_H
 
+#ifndef SWIFT_INCLUDED_IN_SILGEN_SOURCES
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES 1
+#endif
+
 #include "swift/AST/ASTVisitor.h"
 
 namespace swift {

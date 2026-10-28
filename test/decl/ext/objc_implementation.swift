@@ -703,6 +703,15 @@ func CImplFuncAvailable1(_: Int32) { }
 @implementation @_cdecl("CImplFuncAvailable2")
 func CImplFuncAvailable2(_: Int32) { }
 
+// When the '@objc' (not '@_cdecl') spelling is used, there is no C name to
+// mention, so the diagnostic should fall back to the Swift name rather than
+// printing an empty '' name.
+class SwiftSubclassWithImplMethod: ObjCClass {
+  @objc @implementation
+  func unimplementedMethod(_: CInt) {}
+  // expected-error@-2 {{could not find imported function 'unimplementedMethod' matching instance method 'unimplementedMethod'; make sure you import the module or header that declares it}}
+}
+
 //
 // TODO: @_cdecl for global functions imported as computed vars
 //
@@ -729,7 +738,7 @@ extension CImplStruct {
   @implementation @_cdecl("CImplStructStaticFunc1")
   static func staticFunc1(_: Int32) {
     // FIXME: Add underlying support for this
-    // expected-error@-3 {{@_cdecl can only be applied to global functions}}
+    // expected-error@-3 {{'@_cdecl' can only be applied to global functions}}
     // FIXME: Lookup in an enclosing type is not working yet
     // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure you import the module or header that declares it}}
   }

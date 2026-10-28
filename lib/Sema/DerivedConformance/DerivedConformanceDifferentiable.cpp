@@ -31,8 +31,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 
@@ -522,7 +520,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       // to update these properties.
       if (!originalProperty->isSettable(DC)) {
         auto *wrapperDecl =
-            vd->getInterfaceType()->getNominalOrBoundGenericNominal();
+            vd->getInterfaceType()->getNominalDecl();
         auto loc =
             originalProperty->getAttributeInsertionLoc(/*forModifier*/ false);
         Context.Diags
@@ -626,23 +624,15 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
-  // Start an error diagnostic before attempting derivation.
-  // If derivation succeeds, cancel the diagnostic.
-  DiagnosticTransaction diagnosticTransaction(Context.Diags);
+  if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement))
+    return deriveDifferentiable_move(*this);
+
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses,
                         getProtocolRequirementKind(requirement), requirement,
                         getProtocolType());
 
-  // If derivation is possible, cancel the diagnostic and perform derivation.
-  if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement)) {
-    diagnosticTransaction.abort();
-    if (requirement->getBaseName() == Context.Id_move)
-      return deriveDifferentiable_move(*this);
-  }
-
-  // Otherwise, return nullptr.
   return nullptr;
 }
 
@@ -655,19 +645,12 @@ DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
     return std::make_pair(nullptr, nullptr);
   }
 
-  // Start an error diagnostic before attempting derivation.
-  // If derivation succeeds, cancel the diagnostic.
-  DiagnosticTransaction diagnosticTransaction(Context.Diags);
+  if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement))
+    return deriveDifferentiable_TangentVectorStruct(*this);
+
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses_type, requirement);
 
-  // If derivation is possible, cancel the diagnostic and perform derivation.
-  if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement)) {
-    diagnosticTransaction.abort();
-    return deriveDifferentiable_TangentVectorStruct(*this);
-  }
-
-  // Otherwise, return nullptr.
   return std::make_pair(nullptr, nullptr);
 }

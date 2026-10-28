@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple %s | %FileCheck %s
 
 struct VerySmallSlab<T> {
   var inline: InlineArray<16, T?>

@@ -6,8 +6,8 @@
 // RUN:   -module-name Preconcurrency -swift-version 5 -enable-library-evolution \
 // RUN:   -emit-module-path %t/Preconcurrency.swiftmodule
 
-// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types -swift-version 6 -disable-availability-checking -I %t %t/src/test.swift -o - -verify
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 6 -disable-availability-checking -I %t %t/src/test.swift -o - -verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values -Xllvm -sil-print-types -swift-version 6 -target %target-swift-5.1-abi-triple -I %t %t/src/test.swift -o - -verify
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 6 -target %target-swift-5.1-abi-triple -I %t %t/src/test.swift -o - -verify | %FileCheck %s
 
 // REQUIRES: concurrency
 

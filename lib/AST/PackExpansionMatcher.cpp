@@ -19,9 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "llvm/ADT/SmallVector.h"
-#include <algorithm>
 
 using namespace swift;
 

@@ -212,7 +212,8 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
           return nil
         }
 
-        if next <= fp || pc == 0 {
+        let strippedNext = stripPtrAuth(next)
+        if strippedNext <= strippedFp || pc == 0 {
           done = true
           return nil
         }

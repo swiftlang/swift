@@ -1,4 +1,4 @@
-//===--- AsyncLet.h - async let object management -00------------*- C++ -*-===//
+ //===--- AsyncLet.h - async let object management -00------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -25,10 +25,10 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/Casting.h"
+#include "swift/Basic/PointerIntPair.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
-#include "llvm/ADT/PointerIntPair.h"
 
 #if !defined(_WIN32) && !defined(__wasi__) && __has_include(<dlfcn.h>)
 #include <dlfcn.h>
@@ -68,7 +68,12 @@ private:
 
   /// The task that was kicked off to initialize this `async let`,
   /// and flags.
-  llvm::PointerIntPair<AsyncTask *, 2, unsigned> taskAndFlags;
+  swift::PointerIntPair<
+    AsyncTask *, 2, unsigned,
+    llvm::PointerLikeTypeTraits<AsyncTask *>,
+    swift::AddressDiversifiedPointerAuth<
+      SpecialPointerAuthDiscriminators::AsyncLetTaskPointer
+    >> taskAndFlags;
 
   /// Reserved space for a future_wait context frame, used during suspensions
   /// on the child task future.
@@ -166,11 +171,16 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 
   // ok, now that the async let task actually is initialized: attach it to the
   // current task
-  bool addedRecord = addStatusRecordToSelf(record,
-      [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
-    updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
-    return true;
-  });
+  //
+  // The child starts out cancelled if the code that creates it observes a
+  // cancellation of the task or of a scope.
+  bool addedRecord = addStatusRecordObservingCancellation(
+      swift_task_getCurrent(), record,
+      [&](std::optional<size_t> cancellationReason,
+          ActiveTaskStatus &newStatus) {
+        updateNewChildWithParentState(task, newStatus, cancellationReason);
+        return true;
+      });
   (void)addedRecord;
   assert(addedRecord);
 }

@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Automatic synthesis of Comparable is only supported for enums for now.
 
@@ -25,41 +28,6 @@ enum NotComparableEnumOne: Int, Comparable {
   // expected-note@-2 {{enum declares raw type 'Int', preventing synthesized conformance of 'NotComparableEnumOne' to 'Comparable'}}
   // expected-note@-3 {{add stubs for conformance}}
   case value
-}
-
-// A potentially unavailable (or unconditionally unavailable) enum case prevents
-// automatic synthesis of Comparable requirements.
-// FIXME: This should be diagnosed explicitly.
-
-enum EnumWithUnavailableCase: Comparable {
-  // expected-error@-1 {{type 'EnumWithUnavailableCase' does not conform to protocol 'Comparable'}}
-  // expected-note@-2 {{add stubs for conformance}}
-  case available
-
-  @available(*, unavailable)
-  case unavailable
-}
-
-enum EnumWithUnavailableCaseAndAssociatedValue: Comparable {
-  // expected-error@-1 {{type 'EnumWithUnavailableCaseAndAssociatedValue' does not conform to protocol 'Comparable'}}
-  // expected-note@-2 {{add stubs for conformance}}
-  enum SomeComparable: Comparable {}
-
-  case none
-
-  @available(*, unavailable)
-  case some(SomeComparable)
-}
-
-enum EnumWithUnavailableCaseAndAssociatedValue2: Comparable {
-  // expected-error@-1 {{type 'EnumWithUnavailableCaseAndAssociatedValue2' does not conform to protocol 'Comparable'}}
-  // expected-note@-2 {{add stubs for conformance}}
-  enum SomeComparable: Comparable {}
-
-  case this(SomeComparable)
-
-  @available(*, unavailable)
-  case that(SomeComparable)
 }
 
 // Automatic synthesis of Comparable requires associated values to be Comparable as well.

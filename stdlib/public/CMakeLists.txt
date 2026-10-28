@@ -149,7 +149,7 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
 
 option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
        "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
-       FALSE)
+       TRUE)
 
 set(SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX "" CACHE STRING
     "If non-empty, embedded Swift target triples matching this regex are
@@ -165,7 +165,9 @@ set(SWIFT_EMBEDDED_STDLIB_INTERFACE_CGM_TRIPLE_REGEX "" CACHE STRING
     built using the Interface code-generation model. Their libraries' object
     files contain real code (rather than the empty/stub objects produced for
     the default Inlinable model), and clients reference the library's strong
-    external symbols instead of re-emitting `linkonce_odr` copies.")
+    external symbols instead of re-emitting `linkonce_odr` copies. Because
+    those archives are what clients link against, they are installed into
+    lib/swift/embedded/<triple>/ alongside the swiftmodules.")
 
 set(SWIFT_EMBEDDED_STDLIB_LTO_TRIPLE_REGEX "" CACHE STRING
     "If non-empty, embedded Swift target triples matching this regex are

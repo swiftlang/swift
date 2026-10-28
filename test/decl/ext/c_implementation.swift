@@ -104,7 +104,7 @@ extension CImplStruct {
   @implementation @c(CImplStructStaticFunc1)
   static func staticFunc1(_: Int32) {
     // FIXME: Add underlying support for this
-    // expected-error@-3 {{@c can only be applied to global functions}}
+    // expected-error@-3 {{'@c' can only be applied to global functions}}
     // FIXME: Lookup in an enclosing type is not working yet
     // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure you import the module or header that declares it}}
   }
@@ -118,4 +118,29 @@ func CImplDuplicate(_: CInt) {
 @implementation @c
 func CImplDuplicate(_: CInt) {
 // expected-error@-2 {{duplicate implementation of imported global function 'CImplDuplicate'}}
+}
+
+//
+// __attribute__((overloadable)) C functions are selected by parameter type,
+// like C++ overloads
+//
+
+@implementation @c
+func CImplOverloaded(_: CInt) {
+  // OK
+}
+
+@implementation @c
+func CImplOverloaded(_: Float) {
+  // OK
+}
+
+@implementation @c
+func CImplOverloaded(_: Double) {
+  // expected-error@-2 {{could not find imported function 'CImplOverloaded' matching global function 'CImplOverloaded'; make sure you import the module or header that declares it}}
+}
+
+@implementation @c
+func CImplOverloadedMixed(_: CInt) {
+  // OK -- the one unmarked overload of an overloadable set
 }

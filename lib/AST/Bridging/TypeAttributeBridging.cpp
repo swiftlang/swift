@@ -14,8 +14,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -102,17 +100,63 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
       {static_cast<unsigned int>(index), indexLoc});
 }
 
-BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
-    SourceRange parensRange, BridgedCalledTypeAttrSemantics bridgedSemantics,
-    SourceLoc semanticsLoc) {
-  auto semantics = [=] {
-    switch (bridgedSemantics) {
-    case BridgedCalledTypeAttrSemantics_Once:
-      return CalledTypeAttr::Semantics::Once;
-    }
-    llvm_unreachable("bad kind");
-  }();
+BridgedCallableTypeAttr
+BridgedCallableTypeAttr_createParsed(BridgedASTContext cContext,
+                                     SourceLoc atLoc, SourceLoc nameLoc,
+                                     SourceRange parensRange) {
   return new (cContext.unbridged())
-      CalledTypeAttr(atLoc, nameLoc, parensRange, {semantics, semanticsLoc});
+      CallableTypeAttr(atLoc, nameLoc, parensRange);
+}
+
+ScopeRepr BridgedScopeRepr::unbridged() const {
+  switch (kind) {
+  case Kind::ScopeName:
+    return ScopeRepr::forScopeName({ScopeName(name), loc});
+  case Kind::AccessedValue:
+    return ScopeRepr::forAccessedValue({name, loc});
+  case Kind::Self:
+    return ScopeRepr::forSelf(loc, /*isAccess=*/false);
+  case Kind::AccessedSelf:
+    return ScopeRepr::forSelf(loc, /*isAccess=*/true);
+  case Kind::Immortal:
+    return ScopeRepr::forImmortal(loc);
+  }
+  llvm_unreachable("bad kind");
+}
+
+ScopeRestrictionRepr BridgedScopeRestrictionRepr::unbridged() const {
+  std::optional<Located<ScopeName>> unbridgedLabel;
+  if (!label.empty())
+    unbridgedLabel = {ScopeName(label), labelLoc};
+  return ScopeRestrictionRepr(unbridgedLabel, scope.unbridged());
+}
+
+BridgedScopedTypeAttr
+BridgedScopedTypeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                                   SourceLoc nameLoc, SourceRange parensRange,
+                                   BridgedArrayRef cRestrictions) {
+  SmallVector<ScopeRestrictionRepr, 2> restrictions;
+  for (auto cRestriction :
+       cRestrictions.unbridged<BridgedScopeRestrictionRepr>())
+    restrictions.push_back(cRestriction.unbridged());
+  return ScopedTypeAttr::create(cContext.unbridged(), atLoc, nameLoc,
+                                parensRange, restrictions);
+}
+
+BridgedAccessScopeTypeAttr BridgedAccessScopeTypeAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedScopeRepr scope) {
+  return new (cContext.unbridged())
+      AccessScopeTypeAttr(atLoc, nameLoc, parensRange, scope.unbridged());
+}
+
+BridgedScopeParamsTypeAttr BridgedScopeParamsTypeAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedArrayRef cParams) {
+  SmallVector<Located<ScopeName>, 2> params;
+  for (auto cParam : cParams.unbridged<BridgedLocatedIdentifier>())
+    params.push_back({ScopeName(cParam.Name), cParam.NameLoc});
+  auto &ctx = cContext.unbridged();
+  return new (ctx) ScopeParamsTypeAttr(atLoc, nameLoc, parensRange,
+                                       ScopeParamListRepr::create(ctx, params));
 }

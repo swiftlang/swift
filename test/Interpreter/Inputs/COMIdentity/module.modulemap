@@ -1,0 +1,4 @@
+module COMIdentity {
+  header "COMIdentity.h"
+  export *
+}

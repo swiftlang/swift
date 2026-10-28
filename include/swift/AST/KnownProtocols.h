@@ -92,12 +92,6 @@ template <>
 struct DenseMapInfo<swift::RepressibleProtocolKind> {
   using RepressibleProtocolKind = swift::RepressibleProtocolKind;
   using Impl = DenseMapInfo<uint8_t>;
-  static inline RepressibleProtocolKind getEmptyKey() {
-    return (RepressibleProtocolKind)Impl::getEmptyKey();
-  }
-  static inline RepressibleProtocolKind getTombstoneKey() {
-    return (RepressibleProtocolKind)Impl::getTombstoneKey();
-  }
   static unsigned getHashValue(const RepressibleProtocolKind &Val) {
     return Impl::getHashValue((uint8_t)Val);
   }

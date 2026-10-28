@@ -20,12 +20,13 @@
 
 #include "Visibility.h"
 
-#if defined(__OpenBSD__) || defined(__linux__) || defined(__wasi__)
+#if defined(__OpenBSD__) || defined(__wasi__)
 #include <stdio.h>
 #endif
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <errno.h>
 #include <io.h>
+#include <stdio.h>
 typedef int mode_t;
 #else
 #include <semaphore.h>
@@ -120,7 +121,7 @@ int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
 }
 #endif
 
-#if defined(__OpenBSD__) || defined(__linux__) || defined(__wasi__)
+#if defined(__OpenBSD__) || defined(__wasi__)
 static inline void *_swift_stdlib_stdin(void) {
   return stdin;
 }

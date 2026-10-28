@@ -1,0 +1,29 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol ISource: AnyObject {}
+@com(interface: "10000000-0000-0000-0000-000000000002")
+public protocol ITarget: AnyObject {}
+
+// A guaranteed scalar cast cannot release its source or retain its result.
+// QueryInterface does not satisfy that contract, even for class-bound types.
+// CHECK: Non directly forwarding instructions can not forward guaranteed
+sil [ossa] @invalid_borrow : $@convention(thin) (@guaranteed any ISource) -> @owned Optional<any ITarget> {
+bb0(%source : @guaranteed $any ISource):
+  checked_cast_br any ISource in %source : $any ISource to any ITarget, bb1, bb2
+bb1(%target : @guaranteed $any ITarget):
+  %copy = copy_value %target : $any ITarget
+  %some = enum $Optional<any ITarget>, #Optional.some!enumelt, %copy : $any ITarget
+  br bb3(%some : $Optional<any ITarget>)
+bb2(%failed : @guaranteed $any ISource):
+  %none = enum $Optional<any ITarget>, #Optional.none!enumelt
+  br bb3(%none : $Optional<any ITarget>)
+bb3(%result : @owned $Optional<any ITarget>):
+  return %result : $Optional<any ITarget>
+}

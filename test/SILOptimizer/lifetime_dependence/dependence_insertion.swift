@@ -4,7 +4,6 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
-// RUN:   -enable-address-dependencies \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
 // RUN:   -enable-experimental-feature AddressableTypes \

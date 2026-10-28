@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/SILFunction.h"
 
@@ -35,9 +34,6 @@ bool ForwardingOperation::preservesOwnership() {
 // See ForwardingInstruction.swift preservesRepresentation().
 bool ForwardingOperation::hasSameRepresentation() const {
   switch (forwardingInst->getKind()) {
-  // Explicitly list instructions which definitely involve a representation
-  // change.
-  case SILInstructionKind::SwitchEnumInst:
   default:
     // Conservatively assume that a conversion changes representation.
     // Operations can be added as needed to participate in SIL opaque values.
@@ -51,11 +47,13 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
@@ -105,7 +103,9 @@ bool ForwardingOperation::visitForwardedValues(
 bool swift::isFixedStorageSemanticsCallKind(SILFunction *function) {
   for (auto &attr : function->getSemanticsAttrs()) {
     if (attr == "fixed_storage.check_index" ||
-        attr == "fixed_storage.get_count") {
+        attr == "fixed_storage.get_count" ||
+        attr == "fixed_storage.check_range" ||
+        attr == "fixed_storage.check_range_offset") {
       return true;
     }
   }

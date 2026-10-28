@@ -13,7 +13,6 @@
 #ifndef SWIFT_IDE_UNRESOLVEDMEMBERCOMPLETION_H
 #define SWIFT_IDE_UNRESOLVEDMEMBERCOMPLETION_H
 
-#include "swift/IDE/CodeCompletionConsumer.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 
@@ -35,7 +34,7 @@ class UnresolvedMemberTypeCheckCompletionCallback
 
     /// Attempts to merge this result with \p Other, returning \c true if
     /// successful, else \c false.
-    bool tryMerge(const Result &Other, DeclContext *DC);
+    bool tryMerge(const Result &Other);
   };
 
   CodeCompletionExpr *CompletionExpr;

@@ -14,15 +14,12 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/CompileJobCacheResult.h"
-#include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Option/Options.h"
@@ -92,19 +89,10 @@ Error cas::CachedResultLoader::replay(CallbackTy Callback) {
     }
   }
   {
-    // clang 23 replaced the public CompileJobResultSchema(ObjectStore &)
-    // constructor with a fallible create() factory, so that a CAS store
-    // failure surfaces as an Error instead of an invalid cantFail. Wrap the
-    // older constructor in an optional so the code below is spelled the same
-    // either way.
-#if LLVM_VERSION_MAJOR >= 23
     auto Schema = clang::cas::CompileJobResultSchema::create(CAS);
     if (!Schema)
       return Schema.takeError();
-#else
-    std::optional<clang::cas::CompileJobResultSchema> Schema(std::in_place,
-                                                             CAS);
-#endif
+
     if (Schema->isRootNode(*ResultProxy)) {
       auto Result = Schema->load(OutputRef);
       if (!Result)
@@ -178,7 +166,7 @@ static llvm::vfs::OutputConfig getOutputConfig(file_types::ID Type) {
 static bool replayCachedCompilerOutputsImpl(
     ArrayRef<CacheInputEntry> Inputs, ObjectStore &CAS, DiagnosticEngine &Diag,
     const FrontendOptions &Opts, CachingDiagnosticsProcessor &CDP,
-    DiagnosticHelper *DiagHelper, OutputBackend &Backend, bool CacheRemarks,
+    OutputBackend &Backend, bool CacheRemarks,
     bool UseCASBackend, bool WriteOutputHashXAttr) {
   bool CanReplayAllOutput = true;
   struct OutputEntry {
@@ -295,23 +283,14 @@ static bool replayCachedCompilerOutputsImpl(
   if (!CanReplayAllOutput)
     return false;
 
-  auto failedReplay = [DiagHelper]() {
-    if (DiagHelper)
-      DiagHelper->endMessage(/*retCode=*/1);
-    return false;
-  };
-
   // Replay Diagnostics first so the output failures comes after.
   // Also if the diagnostics replay failed, proceed to re-compile.
   if (DiagnosticsOutput) {
-    // Only starts message if there are diagnostics.
-    if (DiagHelper)
-      DiagHelper->beginMessage();
     if (auto E =
             CDP.replayCachedDiagnostics(DiagnosticsOutput->Proxy.getData())) {
       Diag.diagnose(SourceLoc(), diag::error_replay_cached_diag,
                     toString(std::move(E)));
-      return failedReplay();
+      return false;
     }
 
     if (CacheRemarks)
@@ -332,21 +311,21 @@ static bool replayCachedCompilerOutputsImpl(
       auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
       if (auto E = Schema->serializeObjectFile(Output.Proxy, *File)) {
         Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
-        return failedReplay();
+        return false;
       }
     } else if (Output.Kind == file_types::ID::TY_Dependencies) {
       if (emitMakeDependenciesFromSerializedBuffer(
             Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
         Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
                       "failed to emit dependency file");
-        return failedReplay();
+        return false;
       }
     } else if (Output.Kind == file_types::ID::TY_ConstValues) {
       if (remapConstValuesJSON(Output.Proxy.getData(), *File,
                                Opts.CacheReplayPrefixMap)) {
         Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
                       "failed to remap const values file");
-        return failedReplay();
+        return false;
       }
     } else
       *File << Output.Proxy.getData();
@@ -367,8 +346,6 @@ static bool replayCachedCompilerOutputsImpl(
                     Output.Proxy.getID().toString());
   }
 
-  if (DiagHelper)
-    DiagHelper->endMessage(/*retCode=*/0);
   return true;
 }
 
@@ -434,21 +411,20 @@ bool replayCachedCompilerOutputs(
 
   // Use on disk output backend directly here to write to disk.
   llvm::vfs::OnDiskOutputBackend Backend;
-  return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
-                                         /*DiagHelper=*/nullptr, Backend,
+  return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP, Backend,
                                          CacheRemarks, UseCASBackend,
                                          WriteOutputHashXAttr);
 }
 
 bool replayCachedCompilerOutputsForInput(
     ObjectStore &CAS, ObjectRef OutputRef, const InputFile &Input,
-    unsigned InputIndex, DiagnosticEngine &Diag, DiagnosticHelper &DiagHelper,
+    unsigned InputIndex, DiagnosticEngine &Diag,
     OutputBackend &OutBackend, const FrontendOptions &Opts,
     CachingDiagnosticsProcessor &CDP, bool CacheRemarks, bool UseCASBackend,
     bool WriteOutputHashXAttr) {
   llvm::SmallVector<CacheInputEntry> Inputs = {{Input, InputIndex, OutputRef}};
   return replayCachedCompilerOutputsImpl(Inputs, CAS, Diag, Opts, CDP,
-                                         &DiagHelper, OutBackend, CacheRemarks,
+                                         OutBackend, CacheRemarks,
                                          UseCASBackend, WriteOutputHashXAttr);
 }
 
@@ -595,6 +571,43 @@ createCASFileSystem(ObjectStore &CAS, const std::string &IncludeTree,
   }
 
   return nullptr;
+}
+
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+createCASFileSystemFromCacheKey(ObjectStore &CAS, ObjectRef CacheKey) {
+  auto Key = CAS.getProxy(CacheKey);
+  if (!Key)
+    return Key.takeError();
+  if (Key->getNumReferences() != 1)
+    return createStringError("invalid cache key");
+  auto Base = CAS.getProxy(Key->getReference(0));
+  if (!Base)
+    return Base.takeError();
+  if (Base->getNumReferences() <
+      static_cast<unsigned>(CompileJobBaseKeyRef::NumFixedRefs))
+    return createStringError("invalid base cache key");
+
+  // The include tree that is not used is an empty blob.
+  auto getIncludeTree =
+      [&](CompileJobBaseKeyRef Ref) -> llvm::Expected<std::string> {
+    auto IncludeTree =
+        CAS.getProxy(Base->getReference(static_cast<unsigned>(Ref)));
+    if (!IncludeTree)
+      return IncludeTree.takeError();
+    if (!IncludeTree->getNumReferences() && IncludeTree->getData().empty())
+      return std::string();
+    return IncludeTree->getID().toString();
+  };
+  auto IncludeTreeRoot = getIncludeTree(CompileJobBaseKeyRef::IncludeTreeRoot);
+  if (!IncludeTreeRoot)
+    return IncludeTreeRoot.takeError();
+  auto IncludeTreeFileList =
+      getIncludeTree(CompileJobBaseKeyRef::IncludeTreeFileList);
+  if (!IncludeTreeFileList)
+    return IncludeTreeFileList.takeError();
+  if (IncludeTreeRoot->empty() && IncludeTreeFileList->empty())
+    return createStringError("no clang include tree in cache key");
+  return createCASFileSystem(CAS, *IncludeTreeRoot, *IncludeTreeFileList);
 }
 
 std::vector<std::string> remapPathsFromCommandLine(

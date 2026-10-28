@@ -1,11 +1,10 @@
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -default-isolation MainActor -emit-sil -swift-version 5 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -default-isolation MainActor -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -default-isolation MainActor -emit-sil -swift-version 6 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -default-isolation MainActor -emit-sil -swift-version 5 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -default-isolation MainActor -emit-sil -swift-version 5 -strict-concurrency=complete -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -default-isolation MainActor -emit-sil -swift-version 6 -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
-using nonisolated
+default nonisolated
 
 // CHECK: nonisolated struct S
 // CHECK: nonisolated class C

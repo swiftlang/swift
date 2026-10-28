@@ -24,9 +24,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
-#include <functional>
 
 using namespace swift;
 
@@ -828,7 +826,7 @@ Type GenericSignatureImpl::getExistentialType(Type paramTy) const {
                                   /*includeParameterizedProtocols=*/true);
   if (upperBound->isConstraintType())
     return ExistentialType::get(upperBound);
-  assert(upperBound->getClassOrBoundGenericClass());
+  assert(upperBound->getClassDecl());
   return upperBound;
 }
 

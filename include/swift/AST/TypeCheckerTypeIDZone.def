@@ -402,6 +402,8 @@ SWIFT_REQUEST(TypeChecker, ExplicitCaughtTypeRequest,
               Type(ASTContext *, CatchNode), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, YieldsTypeRequest,
+              Type(FuncDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
@@ -588,8 +590,8 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckCDeclFunctionRequest,
-              evaluator::SideEffect(FunctionDecl *, CDeclAttr *),
+SWIFT_REQUEST(TypeChecker, TypeCheckForeignFunctionRequest,
+              evaluator::SideEffect(FunctionDecl *, DeclAttribute *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckCDeclEnumRequest,
               evaluator::SideEffect(EnumDecl *, CDeclAttr *),

@@ -12,7 +12,6 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_DESTRUCTORANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_DESTRUCTORANALYSIS_H
 
-#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/DenseMap.h"
 

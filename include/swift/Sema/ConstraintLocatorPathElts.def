@@ -84,6 +84,9 @@ SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
 /// The argument type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionArgument)
 
+/// The yielded type of a function.
+SIMPLE_LOCATOR_PATH_ELT(FunctionYield)
+
 /// The result type of a function.
 SIMPLE_LOCATOR_PATH_ELT(FunctionResult)
 
@@ -149,6 +152,9 @@ CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 /// This is referring to a type produced by opening an opaque type archetype
 /// type at the base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
+
+/// The optional payload in an optional-to-optional, ie a T? -> U? conversion.
+SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
 
 /// The optional payload in an optional injection, ie a T -> T? conversion.
 SIMPLE_LOCATOR_PATH_ELT(OptionalInjection)
@@ -277,6 +283,9 @@ SIMPLE_LOCATOR_PATH_ELT(ThrownErrorType)
 
 /// The sendable dependence of a function type.
 SIMPLE_LOCATOR_PATH_ELT(FunctionSendability)
+
+/// The execution semantics dependence of a function type.
+SIMPLE_LOCATOR_PATH_ELT(FunctionExecutionSemantics)
 
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)

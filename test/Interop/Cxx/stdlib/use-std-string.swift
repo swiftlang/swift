@@ -1,12 +1,13 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API -Xcc -std=c++14)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API -Xcc -std=c++17)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -D USE_CUSTOM_STRING_API)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -D USE_CUSTOM_STRING_API -Xcc -std=c++14)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -D USE_CUSTOM_STRING_API -Xcc -std=c++17)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -D USE_CUSTOM_STRING_API -Xcc -std=c++20)
 //
 // REQUIRES: executable_test
+
+// Blocked by rdar://181604244 (opaque values borrow accessors)
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import CxxStdlib

@@ -547,7 +547,7 @@ class TestGithubIssue70089 {
       doVoidStuff { [weak self] in
         guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
         doVoidStuff { [self] in
-          guard let self else { return } // expected-error{{initializer for conditional binding must have Optional type, not 'TestGithubIssue70089'}}
+          guard let self else { return } // expected-warning {{initializer for conditional binding has non-optional type 'TestGithubIssue70089'}}
           x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
         }
       }

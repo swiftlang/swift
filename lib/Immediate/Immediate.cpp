@@ -26,7 +26,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
@@ -35,15 +34,8 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
-#include "llvm/ExecutionEngine/Orc/DebugUtils.h"
-#include "llvm/ExecutionEngine/Orc/EPCIndirectionUtils.h"
-#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/ExecutionEngine/Orc/ObjectTransformLayer.h"
-#include "llvm/ExecutionEngine/Orc/TargetProcess/TargetExecutionUtils.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Transforms/IPO.h"
 
 // TODO: Replace pass manager
 //       Removed in: d623b2f95fd559901f008a0588dddd0949a8db01

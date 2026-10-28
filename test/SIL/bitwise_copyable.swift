@@ -3,7 +3,7 @@
 // RUN:     -emit-sil                                  \
 // RUN:     -enable-experimental-feature ValueGenerics \
 // RUN:     -enable-builtin-module \
-// RUN:     -disable-availability-checking \
+// RUN:     -target %target-swift-6.2-abi-triple \
 // RUN:     -O
 
 // REQUIRES: swift_feature_ValueGenerics

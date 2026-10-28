@@ -8,6 +8,8 @@
 // RUN: %target-swift-frontend -emit-pch -o %t/c-bridging-header.pch %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %t/c-bridging-header.pch -sdk %clang-importer-sdk
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 
 // Overrides the internal import that comes through the bridging header.
 public import macros

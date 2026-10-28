@@ -24,6 +24,10 @@ __attribute__((availability(macosx,unavailable)))
 @interface MacOSUnavailableClass3 : NSObject
 @end
 
+__attribute__((availability(macosx,unavailable)))
+@interface MacOSUnavailableClass4 : NSObject
+@end
+
 __attribute__((availability(macosx,introduced=99.0)))
 @interface MacOS99Class4 : NSObject
 @end

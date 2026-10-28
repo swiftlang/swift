@@ -16,13 +16,11 @@
 
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>
-#include <functional>
 #include <optional>
 #include <vector>
 

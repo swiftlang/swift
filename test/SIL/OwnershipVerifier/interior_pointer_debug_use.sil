@@ -1,0 +1,79 @@
+// RUN: %target-sil-opt -enable-sil-verify-all=0 -o /dev/null %s 2>&1
+
+// REQUIRES: asserts
+
+// A debug_value does not require its operand to be alive. So debug uses which
+// are reached through an interior pointer must not be treated as implicit
+// regular users of the enclosing borrow scope. This file has patterns in it
+// that should not trigger the ownership verifier.
+
+import Builtin
+
+class Klass {}
+
+struct KlassWrapper {
+  var k: Klass
+}
+
+class KlassUser {
+  var field: Klass
+  var wrapper: KlassWrapper
+}
+
+// A debug_value of the interior pointer itself.
+sil [ossa] @debug_use_of_interior_pointer_after_end_borrow : $@convention(thin) (@owned KlassUser) -> () {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #KlassUser.field
+  end_borrow %1
+  debug_value %2, let, name "x", expr op_deref
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A debug_value of a value load_borrow'd from an interior pointer.
+sil [ossa] @debug_use_of_load_borrow_after_end_borrow : $@convention(thin) (@owned KlassUser) -> () {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #KlassUser.wrapper
+  %3 = load_borrow %2
+  end_borrow %3
+  end_borrow %1
+  debug_value %3, let, name "x"
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A debug_value of a guaranteed value forwarded from a load_borrow of an
+// interior pointer.
+sil [ossa] @debug_use_of_forwarded_load_borrow_after_end_borrow : $@convention(thin) (@owned KlassUser) -> () {
+bb0(%0 : @owned $KlassUser):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #KlassUser.wrapper
+  %3 = load_borrow %2
+  %4 = struct_extract %3, #KlassWrapper.k
+  end_borrow %3
+  end_borrow %1
+  debug_value %4, let, name "x"
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A debug_value of a store_borrow destination, checked by the store_borrow
+// scope verification rather than by the ownership verifier.
+sil [ossa] @debug_use_of_store_borrow_after_end_borrow : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = alloc_stack $Klass
+  %3 = store_borrow %1 to %2
+  end_borrow %3
+  debug_value %3, let, name "x", expr op_deref
+  dealloc_stack %2
+  end_borrow %1
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}

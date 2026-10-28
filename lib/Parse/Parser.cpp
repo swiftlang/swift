@@ -22,20 +22,13 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/ParseDeclName.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/Basic/DarwinSDKInfo.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -341,7 +334,11 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState)
-    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
+    : Parser(BufferID, SF,
+             SF.shouldSuppressParserDiagnostics()
+                 ? nullptr
+                 : &SF.getASTContext().Diags,
+             SIL, PersistentState) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
@@ -479,7 +476,13 @@ public:
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
-    : SourceMgr(SF.getASTContext().SourceMgr), Diags(SF.getASTContext().Diags),
+    : SourceMgr(SF.getASTContext().SourceMgr),
+      Diags(SF.shouldSuppressParserDiagnostics()
+                ? SuppressedDiagQueue
+                      .emplace(SF.getASTContext().Diags,
+                               /*emitOnDestruction=*/false)
+                      .getDiags()
+                : SF.getASTContext().Diags),
       SF(SF), L(Lex.release()), SIL(SIL), CurDeclContext(&SF),
       Context(SF.getASTContext()),
       TokReceiver(SF.shouldCollectTokens()

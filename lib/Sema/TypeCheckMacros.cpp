@@ -17,16 +17,15 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/InternalMacro.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PluginLoader.h"
@@ -50,7 +49,6 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
-#include "llvm/Config/config.h"
 
 #define DEBUG_TYPE "macros"
 
@@ -620,7 +618,7 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
       isa<ExtensionDecl>(decl) ||
-      isa<UsingDecl>(decl)) {
+      isa<FileDefaultDecl>(decl)) {
     decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 
@@ -1172,6 +1170,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     // Already diagnosed as an error elsewhere.
     return nullptr;
 
+  case MacroDefinition::Kind::Internal:
+    // Internal macros are only ever attached; they are never freestanding.
+    return nullptr;
+
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
@@ -1297,6 +1299,7 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   switch (auto definition = macro->getDefinition()) {
   case MacroDefinition::Kind::Expanded:
   case MacroDefinition::Kind::External:
+  case MacroDefinition::Kind::Internal:
   case MacroDefinition::Kind::Invalid:
   case MacroDefinition::Kind::Undefined:
     break;
@@ -1402,10 +1405,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   if (role == MacroRole::Peer) {
     dc = attachedTo->getDeclContext();
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
-    // Conformance macros always expand to extensions at file-scope.
+    // Conformance macros always expand to extensions at top-level file-scope.
     dc = attachedTo->getDeclContext();
     if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
-      dc = dc->getParentSourceFile();
+      dc = dc->getOutermostParentSourceFile();
     else
       ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc) && "decls imported from Clang should not have a SourceFile");
   } else {
@@ -1536,6 +1539,17 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
       // FIXME: Error here.
       return nullptr;
     }
+  }
+
+  case MacroDefinition::Kind::Internal: {
+    // Internal macros are implemented directly in the compiler and have
+    // direct access to the AST. They still produce source text that we parse
+    // into a macro-expansion buffer below.
+    std::string result =
+        macroDef.getInternalMacro()->expandAttached(ctx, attachedTo);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
+    break;
   }
 
   case MacroDefinition::Kind::Expanded: {
@@ -1691,6 +1705,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
+    return nullptr;
+
+  case MacroDefinition::Kind::Internal:
+    // Internal macros attach to declarations, not closures.
     return nullptr;
 
   case MacroDefinition::Kind::Builtin: {
@@ -2180,17 +2198,6 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     // Bind the extension to the original nominal type.
     extension->setExtendedNominal(nominal);
     nominal->addExtension(extension);
-
-    // Most other macro-generated declarations are visited through calling
-    // 'visitAuxiliaryDecls' on the original declaration the macro is attached
-    // to. We don't do this for macro-generated extensions, because the
-    // extension is not a peer of the original declaration. Instead of
-    // requiring all callers of 'visitAuxiliaryDecls' to understand the
-    // hoisting behavior of macro-generated extensions, we make the
-    // extension accessible through 'getTopLevelDecls()'.
-    if (auto file = dyn_cast<FileUnit>(
-            decl->getDeclContext()->getModuleScopeContext()))
-      file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
 
     // Don't validate documented conformances for the 'conformance' role.
     if (role == MacroRole::Conformance)

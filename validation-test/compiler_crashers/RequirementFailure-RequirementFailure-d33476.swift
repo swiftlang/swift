@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"74453967","signature":"swift::constraints::RequirementFailure::RequirementFailure(swift::constraints::Solution const&, swift::Type, swift::Type, swift::constraints::ConstraintLocator*)","signatureAssert":"Assertion failed: (getRequirementDC() && \"Couldn't find where the requirement came from?\"), function RequirementFailure","signatureNext":"SkipSameTypeRequirement::diagnose"}
+// {"kind":"typecheck","original":"74453967","signature":"swift::constraints::RequirementFailure::RequirementFailure(swift::constraints::Solution const&, swift::Type, swift::Type, swift::constraints::ConstraintLocator*)","signatureAssert":"Assertion failed: (getRequirementDC() && \"Couldn't find where the requirement came from?\"), function RequirementFailure","signatureNext":"SameTypeRequirementFailure::SameTypeRequirementFailure"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b where c == d

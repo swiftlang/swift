@@ -1,5 +1,4 @@
 #include "swift/AST/ASTMangler.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -178,6 +177,7 @@ SDKNodeDeclMacro::SDKNodeDeclMacro(SDKNodeInitInfo Info):
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
+                     ThrownType(Info.ThrownType),
                      ReqNewWitnessTableEntry(Info.ReqNewWitnessTableEntry),
                      SelfIndex(Info.SelfIndex) {}
 
@@ -508,6 +508,24 @@ bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
     DeclAttributes.end();
 }
 
+// Whether clients can witness or override this decl.
+bool SDKNodeDecl::isOverridable() const {
+  if (isProtocolRequirement())
+    return true;
+  // Accessors are never open themselves; check their storage.
+  if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(this))
+    return Acc->getStorage()->isOpen();
+  // Initializers are never open, but subclasses of an open class can
+  // override its required and designated initializers.
+  if (auto *CD = dyn_cast<SDKNodeDeclConstructor>(this)) {
+    auto *TD = dyn_cast<SDKNodeDeclType>(getParent());
+    return TD && TD->isOpen() &&
+           (hasDeclAttribute(DeclAttrKind::Required) ||
+            CD->getInitKind() == CtorInitializerKind::Designated);
+  }
+  return isOpen();
+}
+
 ArrayRef<DeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
   return llvm::ArrayRef(DeclAttributes.data(), DeclAttributes.size());
 }
@@ -652,7 +670,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     assert(txt.starts_with("false") || txt.starts_with("true"));
     return txt.starts_with("true");
   };
-  SDKNodeKind Kind;
+  std::optional<SDKNodeKind> Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
   NodeVector Conformances;
@@ -788,7 +806,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   };
   if (Result)
     return Result;
-  Result = Info.createSDKNode(Kind);
+  Result = Info.createSDKNode(Kind.value());
   for (auto C : Children) {
     Result->addChild(C);
   }
@@ -857,12 +875,21 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
   return true;
 }
 
+// Return whether the typed-throws error type of a function has changed.
+static bool isThrownTypeChanged(SDKContext &Ctx,
+                                const SDKNodeDeclAbstractFunc *L,
+                                const SDKNodeDeclAbstractFunc *R) {
+  if (!Ctx.commonVersionAtLeast(DIGESTER_JSON_VERSION_THROWN_TYPE))
+    return false;
+  return L->getThrownType() != R->getThrownType();
+}
+
 // Return whether a decl has been moved in/out to an extension
 static std::optional<bool> isFromExtensionChanged(const SDKNode &L,
                                                   const SDKNode &R) {
   assert(L.getKind() == R.getKind());
-  // Version 8 starts to include whether a decl is from an extension.
-  if (L.getJsonFormatVersion() + R.getJsonFormatVersion() < 2 * 8) {
+  if (!L.versionAtLeast(DIGESTER_JSON_VERSION_FROM_EXTENSION) ||
+      !R.versionAtLeast(DIGESTER_JSON_VERSION_FROM_EXTENSION)) {
     return std::nullopt;
   }
   auto *Left = dyn_cast<SDKNodeDecl>(&L);
@@ -930,13 +957,17 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     case SDKNodeKind::DeclConstructor: {
       auto Left = L.getAs<SDKNodeDeclAbstractFunc>();
       auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
-      if (Left->isThrowing() ^ Right->isThrowing())
-        return false;
       if (Left->reqNewWitnessTableEntry() != Right->reqNewWitnessTableEntry())
         return false;
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclAccessor: {
+      auto Left = L.getAs<SDKNodeDeclAbstractFunc>();
+      auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
+      if (Left->isThrowing() ^ Right->isThrowing())
+        return false;
+      if (isThrownTypeChanged(Ctx, Left, Right))
+        return false;
       if (auto *LA = dyn_cast<SDKNodeDeclAccessor>(&L)) {
         if (auto *RA = dyn_cast<SDKNodeDeclAccessor>(&R)) {
           if (LA->getAccessorKind() != RA->getAccessorKind())
@@ -1192,6 +1223,19 @@ static bool isFuncThrowing(ValueDecl *VD) {
     return AF->hasThrows();
   }
   return false;
+}
+
+// The thrown error type of a typed-throws function. Empty for non-throwing
+// functions and for untyped `throws`, which is the same as `throws(any Error)`.
+// `throws(Never)` is kept since it is mangled differently from `throws`.
+static StringRef getFuncThrownType(SDKContext &Ctx, ValueDecl *VD) {
+  auto *AF = dyn_cast<AbstractFunctionDecl>(VD);
+  if (!AF || !AF->hasThrows())
+    return StringRef();
+  Type T = AF->getThrownInterfaceType();
+  if (!T || T->isEqual(VD->getASTContext().getErrorExistentialType()))
+    return StringRef();
+  return getPrintedName(Ctx, T->getCanonicalType());
 }
 
 static std::optional<uint8_t> getSelfIndex(ValueDecl *VD) {
@@ -1527,6 +1571,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   Usr = calculateUsr(Ctx, VD);
   MangledName = calculateMangledName(Ctx, VD);
   IsThrowing = isFuncThrowing(VD);
+  ThrownType = getFuncThrownType(Ctx, VD);
   IsStatic = VD->isStatic();
   IsOverriding = VD->getOverriddenDecl();
   IsProtocolReq = isProtocolRequirement(VD);
@@ -1572,9 +1617,14 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
-    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr);
+    // An enum marked `@nonexhaustive` cannot be switched over exhaustively
+    // from another module, even when it's defined in a module that isn't
+    // built with library evolution. Adding a case to such an enum is
+    // therefore not a source-breaking change.
+    IsEnumExhaustive = ED->isFormallyExhaustive(nullptr) &&
+                       !ED->getAttrs().hasAttribute<NonexhaustiveAttr>();
     if (auto RT = ED->getRawType()) {
-      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+      if (auto *D = RT->getNominalDecl()) {
         EnumRawTypeName = D->getName().str();
       }
     }
@@ -1647,8 +1697,9 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   // Handle the case where Type has sub-types.
-  if (auto BGT = T->getAs<BoundGenericType>()) {
-    for (auto Arg : BGT->getGenericArgs()) {
+  if (auto NT = T->getAs<NominalType>()) {
+    // FIXME: parent type?
+    for (auto Arg : NT->getGenericArgs()) {
       Root->addChild(constructTypeNode(Arg));
     }
   } else if (auto Tup = T->getAs<TupleType>()) {
@@ -2158,6 +2209,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_throwing, IsThrowing);
+  output(out, KeyKind::KK_thrownType, ThrownType);
   output(out, KeyKind::KK_reqNewWitnessTableEntry, ReqNewWitnessTableEntry);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(), SelfIndex);
 }
@@ -2729,6 +2781,18 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
   auto Loc = R->getLoc();
   if (!isThrowing() && R->isThrowing()) {
     emitDiag(Loc, diag::decl_new_attr, Ctx.buffer("throwing"));
+  }
+  // Any thrown error type change breaks ABI. For API, narrowing untyped
+  // `throws` to a specific error type is compatible for callers, but not for
+  // clients that conform to or override the decl with an untyped `throws`.
+  if (isThrowing() && R->isThrowing() && isThrownTypeChanged(Ctx, this, R)) {
+    if (Ctx.checkingABI() || !getThrownType().empty() || isOverridable()) {
+      auto Print = [](StringRef T) {
+        return T.empty() ? StringRef("any Swift.Error") : T;
+      };
+      emitDiag(Loc, diag::func_thrown_type_change, Print(getThrownType()),
+               Print(R->getThrownType()));
+    }
   }
   if (Ctx.checkingABI()) {
     if (reqNewWitnessTableEntry() != R->reqNewWitnessTableEntry()) {

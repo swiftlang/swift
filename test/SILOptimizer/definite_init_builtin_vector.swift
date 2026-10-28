@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature BuiltinModule %s
+// RUN: %target-swift-frontend -emit-sil -disable-experimental-parser-round-trip -target %target-swift-6.2-abi-triple -enable-experimental-feature BuiltinModule %s
 
 // REQUIRES: swift_feature_BuiltinModule
 

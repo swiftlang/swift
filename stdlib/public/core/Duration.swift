@@ -249,7 +249,7 @@ extension Duration {
   ///       let d: Duration = .nanoseconds(382.9)
   ///
   /// - Returns: A `Duration` representing a given number of nanoseconds.
-  @available(SwiftStdlib 6.2, *)
+  @available(StdlibDeploymentTarget 6.2, *)
   public static func nanoseconds(_ nanoseconds: Double) -> Duration {
     Duration(nanoseconds, scale: 1_000_000_000)
   }

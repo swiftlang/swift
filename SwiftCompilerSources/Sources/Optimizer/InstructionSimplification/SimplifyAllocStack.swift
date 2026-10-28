@@ -424,17 +424,27 @@ private extension AllocStackInst {
         builder.createUnconditionalCheckedCastAddr(
           options: ucca.checkedCastOptions,
           source: newAlloc, sourceFormalType: concreteFormalType,
-          destination: ucca.destination, targetFormalType: ucca.targetFormalType)
+          destination: ucca.destination, targetFormalType: ucca.targetFormalType,
+          isCopy: ucca.isCopy)
         context.erase(instruction: ucca)
       case let dv as DebugValueInst:
-        if dv.location.isInlined {
-          // We cannot change the type of an inlined instance of a variable
+        if self.type.isExistential || dv.location.isInlined || dv.debugReconstructionBlock != nil {
+          // We cannot retype the debug_value of an existential: all debug_values of a variable
+          // must have the same type, and there may be other debug_values of the variable in the
+          // function, e.g. an `undef` marker which SILGen emits when a variable is consumed.
+          // Finding them would require iterating over the whole function.
+          //
+          // We also cannot change the type of an inlined instance of a variable
           // without renaming the inlined function to get a unique
           // specialization suffix (prior art exists in
           // SILCloner::remapFunction()).
-          // For now, just remove affected inlined variables.
-          use.set(to: Undef.get(type: type, context), context)
+          // For now, just remove affected variables.
+          dv.killOperand(index: use.index)
         } else {
+          // An existential archetype cannot be the type of a source variable. Therefore there
+          // are no SILGen'd debug_values of other types for the variable.
+          // Also, we must not keep the existential archetype in the debug_value, because it
+          // doesn't keep the defining instruction of the archetype alive.
           use.set(to: newAlloc, context)
         }
       default:

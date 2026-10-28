@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
-// RUN: %target-swift-frontend -strict-concurrency=minimal -disable-availability-checking -I %t -verify %s -o /dev/null -emit-sil
-// RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -I %t -verify %s -o /dev/null -emit-sil -verify-additional-prefix targeted-complete-
-// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking -I %t -verify %s -o /dev/null -emit-sil -verify-additional-prefix complete- -verify-additional-prefix targeted-complete- -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=minimal -I %t -verify %s -o /dev/null -emit-sil
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=targeted -I %t -verify %s -o /dev/null -emit-sil -verify-additional-prefix targeted-complete-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -I %t -verify %s -o /dev/null -emit-sil -verify-additional-prefix complete- -verify-additional-prefix targeted-complete- -verify-additional-prefix tns-
 
 // REQUIRES: concurrency
 

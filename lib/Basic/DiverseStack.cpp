@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/DiverseList.h"
 #include "swift/Basic/DiverseStack.h"
 using namespace swift;

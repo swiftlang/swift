@@ -104,6 +104,9 @@ enum class PrintStructureKind {
   FunctionParameterList,
   /// '@attribute ParamTy...' in parameter declarations.
   FunctionParameterType,
+  CoroutineYield,
+  /// 'yields Tys...`
+  CoroutineYieldsTypes,
 };
 
 /// ---------------------------------
@@ -436,6 +439,17 @@ void printEnumElementsAsCases(
 void getInheritedForPrinting(
   const Decl *decl, const PrintOptions &options,
   llvm::SmallVectorImpl<InheritedEntry> &Results);
+
+/// Returns the most restrictive interface that \p D can be printed in, based
+/// on its formal access and whether it is SPI. `@usableFromInline` decls are
+/// treated as public. Decls that are unavailable at runtime in an
+/// availability domain that is `@_spiOnly` imported are treated as SPI in a
+/// -library-level=api module.
+InterfaceVisibility getInterfaceVisibility(const Decl *D);
+
+/// Returns the most restrictive visibility among all of the decls that \p ty
+/// references. A type that references no decls is public.
+InterfaceVisibility getInterfaceVisibility(Type ty);
 
 StringRef getAccessorKindString(AccessorKind value);
 

@@ -22,8 +22,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 using namespace LiteralExprFolding;
 
@@ -188,7 +186,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
                             baseType->getMetatypeInstanceType();
                         if (auto nominal =
                                 instanceType
-                                    ->getNominalOrBoundGenericNominal()) {
+                                    ->getNominalDecl()) {
                           if (!nominal->hasGenericParamList() &&
                               !nominal->getDeclContext()->isGenericContext() &&
                               !nominal->isResilient()) {
@@ -218,7 +216,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
         auto baseType = typeExpr->getType();
         if (baseType && baseType->is<MetatypeType>()) {
           auto instanceType = baseType->getMetatypeInstanceType();
-          if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
+          if (auto nominal = instanceType->getNominalDecl()) {
             // Allow non-generic, non-resilient types
             if (!nominal->hasGenericParamList() && !nominal->isResilient()) {
               continue;

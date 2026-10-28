@@ -210,7 +210,7 @@ void SuperclassTypeRequest::writeDependencySink(
 
   // FIXME: This is compatible with the existing name tracking scheme, but
   // ignoring this name when we fail to look up a class is bogus.
-  ClassDecl *Super = value->getClassOrBoundGenericClass();
+  ClassDecl *Super = value->getClassDecl();
   if (!Super)
     return;
   tracker.addPotentialMember(Super);
@@ -564,6 +564,31 @@ bool WhereClauseOwner::visitRequirements(
   }
 
   return false;
+}
+
+void WhereClauseOwner::forAllRequirementTypes(
+    llvm::function_ref<void(Type, TypeRepr *)> callback) const && {
+  std::move(*this).visitRequirements(
+      TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::SameShape:
+        case RequirementKind::Conformance:
+        case RequirementKind::SameType:
+        case RequirementKind::Superclass:
+          callback(req.getFirstType(),
+                   RequirementRepr::getFirstTypeRepr(reqRepr));
+          callback(req.getSecondType(),
+                   RequirementRepr::getSecondTypeRepr(reqRepr));
+          break;
+
+        case RequirementKind::Layout:
+          callback(req.getFirstType(),
+                   RequirementRepr::getFirstTypeRepr(reqRepr));
+          break;
+        }
+        return false;
+      });
 }
 
 RequirementRepr &RequirementRequest::getRequirement() const {
@@ -1126,6 +1151,46 @@ void ResultTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
+// YieldTypeRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<Type> YieldsTypeRequest::getCachedResult() const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  unsigned idx = std::get<1>(getStorage());
+
+  auto *bodyYields = funcDecl->getYields();
+  ASSERT(bodyYields && idx < bodyYields->size());
+
+  const auto &yield = bodyYields->get(idx);
+  Type type = yield.typeAndFlags.getPointer();
+
+  if (type.isNull())
+    return std::nullopt;
+
+  YieldTypeFlags flags = yield.getFlags();
+  if (flags.isInOut())
+    type = InOutType::get(type);
+
+  return type;
+}
+
+void YieldsTypeRequest::cacheResult(Type type) const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  unsigned idx = std::get<1>(getStorage());
+
+  auto *bodyYields = funcDecl->getYields();
+  ASSERT(bodyYields && idx < bodyYields->size());
+
+  auto &yield = bodyYields->get(idx);
+  YieldTypeFlags flags = yield.getFlags();
+  if (auto inoutType = type->getAs<InOutType>()) {
+    flags = flags.withInOut(true);
+    type = inoutType->getObjectType();
+  }
+
+  yield.setType(type, flags);
+}
+
+//----------------------------------------------------------------------------//
 // PatternBindingEntryRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1218,7 +1283,8 @@ std::optional<Type> InterfaceTypeRequest::getCachedResult() const {
 void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
-    ASSERT(!type->hasTypeVariable() && "Type variable in interface type");
+    ASSERT(!type->hasTypeVariableOrHole() &&
+           "Type variable or hole in interface type");
     ASSERT(!type->is<InOutType>() && "Interface type must be materializable");
     ASSERT(!type->hasPrimaryArchetype() && "Archetype in interface type");
     ASSERT(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
@@ -2643,7 +2709,7 @@ DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
     (void)asd->hasStorage();
   }
 
-  // Materialize file-level `using ...` attributes onto top-level decls.
+  // Materialize file-level `default ...` attributes onto top-level decls.
   mutableDecl->applyFileDefaults();
 
   return decl->getAttrs();

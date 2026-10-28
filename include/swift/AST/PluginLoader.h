@@ -14,10 +14,10 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/PrefixMapper.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 
@@ -32,6 +32,11 @@ public:
   struct PluginEntry {
     StringRef libraryPath;
     StringRef executablePath;
+
+    /// The paths as passed to the frontend, before the loader unmapped them to
+    /// load the plugin from disk. Empty if no prefix mapping is in effect.
+    StringRef prefixMappedLibraryPath;
+    StringRef prefixMappedExecutablePath;
   };
 
 private:
@@ -53,17 +58,16 @@ private:
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
   /// Resolved plugin path remappings.
-  std::vector<std::pair<std::string, std::string>> PathRemap;
+  std::optional<llvm::PrefixMapper> PathRemapper;
+
+  /// Map a prefix mapped plugin path back to the local path.
+  std::string remapPath(StringRef path);
 
 public:
   PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker,
                std::optional<std::vector<std::pair<std::string, std::string>>>
                    Remap = std::nullopt,
-               bool disableSandbox = false)
-      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {
-    if (Remap)
-      PathRemap = std::move(*Remap);
-  }
+               bool disableSandbox = false);
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();

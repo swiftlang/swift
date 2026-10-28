@@ -133,6 +133,22 @@ SWIFT_CLASS("BOGUS")
 
 # pragma clang attribute pop
 
+// A generated_declaration marker whose defined_in names a module other than the one
+// that owns the decl models the marker leaking in via clang merging an unrelated
+// module's generated-header forward-declaration; the importer must not treat such a
+// decl as a missing native Swift type (see import-mixed-framework.swift).
+#pragma clang attribute push( \
+  __attribute__((external_source_symbol(language="Swift", \
+                 defined_in="NotMixed",generated_declaration))), \
+  apply_to=any(function,enum,objc_interface,objc_category,objc_protocol))
+
+SWIFT_CLASS("LeakedMarkerClass")
+__attribute__((objc_root_class))
+@interface LeakedMarkerClass
+@end
+
+# pragma clang attribute pop
+
 @interface SwiftClass (Category)
 - (void)categoryMethod:(struct PureClangType)arg;
 @end

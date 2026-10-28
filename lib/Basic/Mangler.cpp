@@ -12,10 +12,8 @@
 
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CommandLine.h"
@@ -200,13 +198,16 @@ void Mangler::appendIdentifier(StringRef ident, bool allowRawIdentifiers) {
   size_t OldPos = Storage.size();
   addSubstitution(ident);
 
+  bool mangled;
   if (allowRawIdentifiers && Lexer::identifierMustAlwaysBeEscaped(ident)) {
     llvm::SmallString<256> escaped;
     appendRawIdentifierForRuntime(ident, escaped);
-    mangleIdentifier(*this, escaped);
+    mangled = mangleIdentifier(*this, escaped);
   } else {
-    mangleIdentifier(*this, ident);
+    mangled = mangleIdentifier(*this, ident);
   }
+  assert(mangled && "identifier is not valid UTF-8");
+  (void)mangled;
 
   recordOpStat("<identifier>", OldPos);
 }

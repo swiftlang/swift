@@ -325,8 +325,8 @@ extension UncheckedRefCastInst : ConversionInstruction {
 }
 
 extension UnconditionalCheckedCastInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
-  public var canForwardGuaranteedValues: Bool { true }
+  public var preservesRepresentation: Bool { preservesReferenceCounts }
+  public var canForwardGuaranteedValues: Bool { preservesReferenceCounts }
   public var canForwardOwnedValues: Bool { true }
 }
 
@@ -391,6 +391,13 @@ extension InitExistentialRefInst : ForwardingInstruction {
 }
 
 extension OpenExistentialRefInst : ForwardingInstruction {
+  public var preservesIdentity: Bool { false }
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
+extension OpenCOMExistentialInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
   public var preservesRepresentation: Bool { true }
   public var canForwardGuaranteedValues: Bool { true }

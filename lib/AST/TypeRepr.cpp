@@ -17,7 +17,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
@@ -27,7 +26,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -77,17 +75,25 @@ SourceRange TypeRepr::getSourceRange() const {
   llvm_unreachable("unknown kind!");
 }
 
-bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
+bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred,
+                      bool walkIntoGenericArgumentExprs) {
   struct Walker : ASTWalker {
     llvm::function_ref<bool(TypeRepr *)> Pred;
+    bool WalkIntoGenericArgumentExprs;
     bool FoundIt;
 
-    explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred)
-        : Pred(pred), FoundIt(false) {}
+    explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred,
+                    bool walkIntoGenericArgumentExprs)
+        : Pred(pred), WalkIntoGenericArgumentExprs(walkIntoGenericArgumentExprs),
+          FoundIt(false) {}
 
     /// Walk everything in a macro
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
+    }
+
+    bool shouldWalkIntoGenericArgumentExprTypeRepr() const override {
+      return WalkIntoGenericArgumentExprs;
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *ty) override {
@@ -99,7 +105,7 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
     }
   };
 
-  Walker walker(pred);
+  Walker walker(pred, walkIntoGenericArgumentExprs);
   walk(walker);
   return walker.FoundIt;
 }
@@ -108,7 +114,8 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
 // `RecursiveProperties` to track this instead of computing it.
 bool TypeRepr::hasOpaque() {
   return isa<NamedOpaqueReturnTypeRepr>(this) ||
-    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
+    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); },
+           /*walkIntoGenericArgumentExprs=*/true);
 }
 
 bool TypeRepr::isParenType() const {
@@ -470,6 +477,13 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
       Printer << ")";
     }
   }
+  if (isCoroutine()) {
+    Printer << " ";
+    Printer.printKeyword("yields", Opts);
+    // FIXME: Do we need a PrintStructureKind for this?
+    printTypeRepr(YieldsTy, Printer, Opts);
+  }
+
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
@@ -707,6 +721,10 @@ SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
   auto mem = C.Allocate(size, alignof(SILBoxTypeRepr));
   return new (mem) SILBoxTypeRepr(GenericParams, LBraceLoc, Fields, RBraceLoc,
                                   ArgLAngleLoc, GenericArgs, ArgRAngleLoc);
+}
+
+bool FunctionTypeRepr::isCoroutine() const {
+  return YieldsTy && YieldsTy->getParens().isValid();
 }
 
 SourceLoc FunctionTypeRepr::getStartLocImpl() const {

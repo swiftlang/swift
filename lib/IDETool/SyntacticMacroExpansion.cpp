@@ -15,7 +15,6 @@
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
@@ -112,6 +111,7 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
     break;
   }
   case MacroDefinition::Kind::Builtin:
+  case MacroDefinition::Kind::Internal:
   case MacroDefinition::Kind::Invalid:
   case MacroDefinition::Kind::Undefined:
     assert(false && "invalid macro definition for syntactic expansion");

@@ -1,0 +1,752 @@
+//===--- WinSDK_UM.modulemap ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module WinSDK.UM [system] {
+  module WinSock2 {
+    export *
+
+    module Core {
+      header "um/WinSock2.h"
+      export *
+    }
+
+    module TCPIP {
+      header "um/WS2tcpip.h"
+      export *
+    }
+
+    module Extensions {
+      header "um/MSWSock.h"
+      export *
+    }
+
+    link "WS2_32.Lib"
+  }
+
+  module WinSock {
+    header "um/winsock.h"
+  }
+
+  module core {
+    module acl {
+      header "um/AclAPI.h"
+      export *
+    }
+
+    module com {
+      header "um/combaseapi.h"
+      export *
+    }
+
+    module compress {
+      header "um/compressapi.h"
+      export *
+    }
+
+    module console {
+      export *
+
+      module Base {
+        header "um/consoleapi.h"
+        export *
+      }
+
+      module V2 {
+        header "um/consoleapi2.h"
+        export *
+      }
+
+      module V3 {
+        header "um/consoleapi3.h"
+        export *
+      }
+    }
+
+    // api-ms-win-appmodel-runtime-l1
+    module appmodel {
+      header "um/appmodel.h"
+      export *
+    }
+
+    // api-ms-win-core-errhandling-l1-1-0.dll
+    module errhandling {
+      header "um/errhandlingapi.h"
+      export *
+    }
+
+    // api-ms-win-core-file-l1-1-0.dll
+    module file {
+      header "um/fileapi.h"
+      export *
+    }
+
+    // api-ms-win-core-handle-l1-1-0.dll
+    module handle {
+      header "um/handleapi.h"
+      export *
+    }
+
+    // api-ms-win-heapapi-l1-1-0.dll
+    module heap {
+      header "um/heapapi.h"
+      export *
+    }
+
+    // api-ms-win-core-interlocked-l1-1-0.dll
+    module interlocked {
+      header "um/interlockedapi.h"
+      export *
+    }
+
+    // iphlpapi.dll
+    module iphlp {
+      header "um/iphlpapi.h"
+      export *
+
+      link "iphlpapi.lib"
+    }
+
+    // api-ms-win-core-libloader-l1-1-0.dll
+    module libloader {
+      header "um/libloaderapi.h"
+      export *
+    }
+
+    // api-ms-win-core-memory-l1-1-0.dll
+    module memory {
+      header "um/memoryapi.h"
+      export *
+
+      link "OneCore.Lib"
+    }
+
+    // api-ms-win-core-namedpipe-l1-1-2-0.dll
+    module namedpipe {
+      header "um/namedpipeapi.h"
+      export *
+    }
+
+    // api-ms-win-core-Path-l1-0.dll
+    module path {
+      header "um/PathCch.h"
+      export *
+
+      link "pathcch.lib"
+    }
+
+    // api-ms-win-core-processthreads-l1-1-2.dll
+    module processthreads {
+      header "um/processthreadsapi.h"
+      export *
+    }
+
+    // api-ms-win-core-synch-l1-2-0.dll
+    module synch {
+      header "um/synchapi.h"
+      export *
+    }
+
+    // api-ms-win-core-sysinfo-l1-1-0.dll
+    module sysinfo {
+      header "um/sysinfoapi.h"
+      export *
+    }
+
+    // api-ms-win-core-timezone-l1-1-0.dll
+    module timezone {
+      header "um/timezoneapi.h"
+      export *
+    }
+
+    // api-ms-win-core-version-l1-1-0.dll
+    module version {
+      header "um/winver.h"
+      export *
+
+      link "Version.Lib"
+    }
+  }
+
+  module ActiveX {
+    header "um/OCIdl.h"
+    export *
+  }
+
+  module Controls {
+    module CommCtrl {
+      header "um/CommCtrl.h"
+      export *
+
+      link "ComCtl32.Lib"
+    }
+
+    module CommDlg {
+      header "um/commdlg.h"
+      export *
+
+      link "ComDlg32.Lib"
+    }
+  }
+
+  explicit module DirectX {
+    module Direct3D11 {
+      export *
+
+      module Base {
+        header "um/d3d11.h"
+        export *
+      }
+
+      module V1 {
+        header "um/d3d11_1.h"
+        export *
+      }
+
+      module V2 {
+        header "um/d3d11_2.h"
+        export *
+      }
+
+      module V3 {
+        header "um/d3d11_3.h"
+        export *
+      }
+
+      module V4 {
+        header "um/d3d11_4.h"
+        export *
+      }
+
+      link "d3d11.lib"
+      link "dxgi.lib"
+    }
+
+    module Direct3D12 {
+      header "um/d3d12.h"
+      export *
+
+      link "d3d12.lib"
+      link "dxgi.lib"
+    }
+
+    module Direct2D {
+      export *
+
+      module Base {
+        header "um/d2d1.h"
+        export *
+      }
+
+      module V1 {
+        header "um/d2d1_1.h"
+        export *
+      }
+
+      module V2 {
+        header "um/d2d1_2.h"
+        export *
+      }
+
+      module V3 {
+        header "um/d2d1_3.h"
+        export *
+      }
+
+      link "d2d1.lib"
+      link "dxgi.lib"
+    }
+
+    // FIXME(compnerd) DXGI is part of the Direct3D interfaces currently; we
+    // should split it out, but because it is part of the D3D11 interfaces, this
+    // separate module is meant to augment the uncovered portions only.
+    module _DXGI {
+      header "um/dxgidebug.h"
+      export *
+
+      link "dxgi.lib"
+    }
+
+    module D3DCompiler {
+      header "um/d3dcompiler.h"
+      export *
+
+      link "d3dcompiler.lib"
+    }
+
+    module XAudio29 {
+      module Core {
+        header "um/xaudio2.h"
+        export *
+      }
+
+      module Effects {
+        header "um/xaudio2fx.h"
+        export *
+      }
+
+      link "xaudio2.lib"
+
+      requires cplusplus
+    }
+
+    // XInput 1.4 (Windows 10, XBox) is newer than the XInput 9.1.0 which was
+    // part of Vista.
+    module XInput14 {
+      header "um/Xinput.h"
+      export *
+
+      link "xinput.lib"
+    }
+
+    module DirectInput8 {
+      header "um/dinput.h"
+      export *
+
+      link "dinput8.lib"
+    }
+
+    link "dxguid.lib"
+  }
+
+  // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
+  module __DirectX {
+    header "um/directmanipulation.h"
+    export *
+  }
+
+  module DDE {
+    export *
+
+    module Core {
+      header "um/dde.h"
+      export *
+    }
+
+    module Management {
+      header "um/ddeml.h"
+      export *
+    }
+  }
+
+  module DFS {
+    export *
+
+    module DFS {
+      header "um/LMDFS.h"
+      export *
+    }
+
+    module Management {
+      header "um/LM.h"
+      export *
+    }
+
+    link "NetAPI32.Lib"
+  }
+
+  module DWM {
+    header "um/dwmapi.h"
+    export *
+
+    link "dwmapi.lib"
+  }
+
+  module FCI {
+    header "um/fci.h"
+    export *
+
+    link "Cabinet.Lib"
+  }
+
+  explicit module GDIPlus {
+    header "um/gdiplus.h"
+    export *
+
+    link "gdiplus.lib"
+
+    requires cplusplus
+  }
+
+  module Internationalization {
+    module WinNLS {
+      header "um/winnls.h"
+      export *
+    }
+
+    module IMM {
+      export *
+
+      module Device {
+        header "um/immdev.h"
+        export *
+      }
+
+      module Core {
+        header "um/imm.h"
+        export *
+      }
+
+      link "Imm32.lib"
+    }
+  }
+
+  module LZ32 {
+    header "um/LZExpand.h"
+    export *
+
+    link "Lz32.Lib"
+  }
+
+  module Multimedia {
+    module DigitalVideo {
+      header "um/Digitalv.h"
+      export *
+    }
+
+    module Video {
+      header "um/Vfw.h"
+      export *
+
+      link "Vfw32.Lib"
+    }
+
+    module MME {
+      header "um/mmeapi.h"
+      export *
+    }
+
+    module DDK {
+      header "um/mmddk.h"
+      export *
+    }
+
+    module System {
+      header "um/mmsystem.h"
+      export *
+    }
+
+    module Misc {
+      header "um/mmiscapi.h"
+      export *
+    }
+
+    module Time {
+      header "um/timeapi.h"
+      export *
+    }
+
+    module Joystick {
+      header "um/joystickapi.h"
+      export *
+    }
+    export *
+
+    link "WinMM.Lib"
+  }
+
+  module Networking {
+    header "um/winnetwk.h"
+    export *
+
+    link "Mpr.Lib"
+  }
+
+  module NTAPI {
+    header "um/winternl.h"
+    export *
+  }
+
+  module Security {
+    module AuthZ {
+      header "um/AuthZ.h"
+      export *
+
+      link "AuthZ.Lib"
+    }
+
+    module SmartCard {
+      header "um/winscard.h"
+      export *
+
+      link "winscard.lib"
+    }
+
+    module WinCrypt {
+      header "um/wincrypt.h"
+      export *
+
+      link "Crypt32.Lib"
+    }
+  }
+
+  module Shell {
+    header "um/ShlObj.h"
+    export *
+  }
+
+  module AppNotify {
+    header "um/appnotify.h"
+    export *
+
+    link "appnotify.lib"
+  }
+
+  module ShellAPI {
+    export *
+
+    module Shell {
+      header "um/shellapi.h"
+      export *
+    }
+
+    module Lightweight {
+      header "um/Shlwapi.h"
+      export *
+    }
+
+    link "shell32.lib"
+    link "ShLwApi.Lib"
+  }
+
+  module ShellCore {
+    header "um/ShellScalingApi.h"
+    export *
+
+    link "shcore.lib"
+  }
+
+  module System {
+    module DbgHelp {
+      header "um/DbgHelp.h"
+      export *
+
+      link "DbgHelp.Lib"
+    }
+
+    module IOCTL {
+      header "um/winioctl.h"
+      export *
+    }
+
+    module MCX {
+      header "um/mcx.h"
+      export *
+    }
+  }
+
+  module OLE {
+    header "um/ole2.h"
+    export *
+
+    link "Ole32.Lib"
+  }
+
+  module OLE32 {
+    export *
+
+    module AutomationInterface {
+      header "um/oaidl.h"
+      export *
+    }
+
+    module Automation {
+      header "um/oleauto.h"
+      export *
+    }
+
+    link "OleAut32.Lib"
+  }
+
+  module Performance {
+    module PerfLib {
+      header "um/perflib.h"
+      export *
+
+      link "AdvAPI32.Lib"
+    }
+
+    module PDH {
+      header "um/Pdh.h"
+      export *
+
+      link "Pdh.Lib"
+    }
+
+    module Core {
+      header "um/winperf.h"
+      export *
+    }
+    export *
+  }
+
+  module Printing {
+    header "um/winspool.h"
+    export *
+
+    link "WinSpool.Lib"
+  }
+
+  module PSAPI {
+    header "um/Psapi.h"
+    export *
+
+    link "psapi.lib"
+  }
+
+  module RichEdit {
+    header "um/Richedit.h"
+    export *
+  }
+
+  module Sensors {
+    export *
+
+    module Types {
+      header "um/sensors.h"
+      export *
+    }
+
+    module API {
+      header "um/SensorsApi.h"
+      export *
+    }
+
+    link "sensorsapi.lib"
+  }
+
+  module ToolHelp {
+    header "um/TlHelp32.h"
+    export *
+
+    link "kernel32.Lib"
+  }
+
+  module UI {
+    module XAML {
+      module Hosting {
+        header "um/windows.ui.xaml.hosting.desktopwindowxamlsource.h"
+        export *
+      }
+    }
+  }
+
+  module URLMonikers {
+    header "um/urlmon.h"
+    export *
+    link "Urlmon.Lib"
+  }
+
+  module User {
+    header "um/WinUser.h"
+    export *
+    link "User32.Lib"
+  }
+
+  module UserEnv {
+    header "um/UserEnv.h"
+    export *
+    link "UserEnv.Lib"
+  }
+
+  module WER {
+    header "um/WerApi.h"
+    export *
+  }
+
+  module WIC {
+    header "um/wincodec.h"
+    export *
+
+    link "windowscodecs.lib"
+  }
+
+  module WinBase {
+    header "um/winbase.h"
+    export *
+  }
+
+  module WinCred {
+    header "um/wincred.h"
+    export *
+
+    link "AdvAPI32.lib"
+  }
+
+  module WinDNS {
+    header "um/WinDNS.h"
+    export *
+
+    link "DnsAPI.Lib"
+  }
+
+  module WinGDI {
+    header "um/wingdi.h"
+    export *
+
+    link "Gdi32.Lib"
+  }
+
+  module WinNT {
+    header "um/winnt.h"
+    export *
+  }
+
+  module WinReg {
+    header "um/winreg.h"
+    export *
+
+    link "AdvAPI32.Lib"
+  }
+
+  module WinSVC {
+    header "um/winsvc.h"
+    export *
+
+    link "AdvAPI32.Lib"
+  }
+
+  module WinSafer {
+    header "um/winsafer.h"
+    export *
+
+    link "AdvAPI32.Lib"
+  }
+
+  module WinUSB {
+    header "um/winusb.h"
+    export *
+
+    link "winusb.lib"
+  }
+
+  // TODO(compnerd) does it make sense to implicitly export this API surface?
+  // It seems to be meant for device drivers.
+  module WLANAPI {
+    module API {
+      header "um/wlanapi.h"
+      export *
+    }
+
+    module IHV {
+      header "um/wlanihv.h"
+      export *
+    }
+
+    module Client {
+      header "um/wlclient.h"
+      export *
+    }
+
+    link "wlanapi.lib"
+  }
+
+}

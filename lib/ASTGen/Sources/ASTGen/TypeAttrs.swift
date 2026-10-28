@@ -13,6 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
+@_spi(Diagnostics) import SwiftParser
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 extension ASTGenVisitor {
@@ -64,6 +65,7 @@ extension ASTGenVisitor {
         .Local,
         .NoMetadata,
         .Nonisolated,
+        .Once,
         .PackGuaranteed,
         .PackInout,
         .PackOut,
@@ -94,8 +96,18 @@ extension ASTGenVisitor {
       case .Isolated:
         return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
-      case .Called:
-        return (self.generateCalledTypeAttr(attribute: node)?.asTypeAttribute)
+      case .Callable:
+        return (self.generateCallableTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+
+      case .Scoped:
+        return (self.generateScopedTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .ScopeParams:
+        return (self.generateScopeParamsTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .AccessScope:
+        return (self.generateAccessScopeTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       // SIL type attributes are not supported.
@@ -296,20 +308,8 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCalledTypeAttr(attribute node: AttributeSyntax) -> BridgedCalledTypeAttr? {
-    let semanticsLoc = self.generateSourceLoc(node.arguments)
-    let semantics: BridgedCalledTypeAttrSemantics? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "once": return .once
-        default:
-          // TODO: Diagnose.
-          return nil
-        }
-      }
-    )
-    guard let semantics else {
+  func generateCallableTypeAttr(attribute node: AttributeSyntax) -> BridgedCallableTypeAttr? {
+    guard self.generateCallableAttrArgument(attribute: node) else {
       return nil
     }
 
@@ -317,10 +317,184 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateAttrParensRange(attribute: node),
-      semantics: semantics,
-      semanticsLoc: semanticsLoc
+      parensRange: self.generateAttrParensRange(attribute: node)
     )
+  }
+
+
+
+  /// E.g.
+  ///   ```
+  ///   @_scoped(a)
+  ///   @_scoped(left: &a, right: self)
+  ///   @_scoped(immortal)
+  ///   ```
+  // TODO: If this feature will be available in production compilers with this
+  // syntax, give '@_scoped' dedicated syntax in SwiftParser. This is icky.
+  func generateScopedTypeAttr(attribute node: AttributeSyntax) -> BridgedScopedTypeAttr? {
+    // SwiftParser has already diagnosed it.
+    if node.hasError {
+      return nil
+    }
+    guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return nil
+    }
+    if let trailingComma = args.last?.trailingComma {
+      self.diagnose(.invalidArgumentInAttribute(node, trailingComma))
+      return nil
+    }
+
+    var restrictions: [BridgedScopeRestrictionRepr] = []
+    for arg in args {
+      guard let restriction = self.generateScopeRestriction(arg) else {
+        self.diagnose(.invalidArgumentInAttribute(node, arg))
+        return nil
+      }
+      restrictions.append(restriction)
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      restrictions: restrictions.lazy.bridgedArray(in: self)
+    )
+  }
+
+  func generateScopeRestriction(_ arg: LabeledExprSyntax) -> BridgedScopeRestrictionRepr? {
+    var label: Identifier = nil
+    var labelLoc = SourceLoc()
+    if let labelToken = arg.label {
+      // SwiftParser remaps keyword labels to identifiers, but here they must be
+      // escaped.
+      let isKeyword = Keyword(labelToken.rawText).map { TokenKind.keyword($0).isLexerClassifiedKeyword } ?? false
+      guard labelToken.rawTokenKind == .identifier, !isKeyword else {
+        return nil
+      }
+      label = self.generateIdentifier(labelToken)
+      labelLoc = self.generateSourceLoc(labelToken)
+    }
+
+    guard let scope = self.generateScope(arg.expression) else {
+      return nil
+    }
+    return .create(label: label, labelLoc: labelLoc, scope: scope)
+  }
+
+  func generateScope(_ expr: ExprSyntax) -> BridgedScopeRepr? {
+    var expr = expr
+    var isAccess = false
+    if let inOutExpr = expr.as(InOutExprSyntax.self) {
+      isAccess = true
+      expr = inOutExpr.expression
+    }
+
+    guard
+      let declRefExpr = expr.as(DeclReferenceExprSyntax.self),
+      declRefExpr.argumentNames == nil,
+      declRefExpr.moduleSelector == nil
+    else {
+      return nil
+    }
+
+    let loc = self.generateSourceLoc(declRefExpr)
+    let scope: BridgedScopeRepr
+    switch declRefExpr.baseName.tokenKind {
+    case .keyword(.`self`):
+      scope = .forSelf(loc: loc, isAccess: isAccess)
+    case .identifier("immortal"):
+      guard !isAccess else {
+        return nil
+      }
+      scope = .forImmortal(loc: loc)
+    case .identifier:
+      let name = self.generateIdentifier(declRefExpr.baseName)
+      scope = isAccess ? .forAccessedValue(name, loc: loc) : .forScopeName(name, loc: loc)
+    default:
+      return nil
+    }
+    return scope
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @_accessScope(s)
+  ///   @_accessScope(&self)
+  ///   ```
+  func generateAccessScopeTypeAttr(attribute node: AttributeSyntax) -> BridgedAccessScopeTypeAttr? {
+    // SwiftParser has already diagnosed it.
+    if node.hasError {
+      return nil
+    }
+    guard case .argumentList(let args) = node.arguments, let arg = args.first else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return nil
+    }
+    guard args.count == 1, arg.label == nil, arg.trailingComma == nil,
+      let scope = self.generateScope(arg.expression)
+    else {
+      self.diagnose(.invalidArgumentInAttribute(node, arg))
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      scope: scope
+    )
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @_scopeParams(a, b) (@_scoped(a) Ref) -> @_scoped(a) Ref
+  ///   ```
+  func generateScopeParamsTypeAttr(attribute node: AttributeSyntax) -> BridgedScopeParamsTypeAttr? {
+    guard let params = self.generateScopeParams(attribute: node) else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      params: params.lazy.bridgedArray(in: self)
+    )
+  }
+
+  /// The arguments of the `@_scopeParams` decl and type attributes.
+  func generateScopeParams(attribute node: AttributeSyntax) -> [BridgedLocatedIdentifier]? {
+    // SwiftParser has already diagnosed it.
+    if node.hasError {
+      return nil
+    }
+    guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return nil
+    }
+    if let trailingComma = args.last?.trailingComma {
+      self.diagnose(.invalidArgumentInAttribute(node, trailingComma))
+      return nil
+    }
+
+    var params: [BridgedLocatedIdentifier] = []
+    for arg in args {
+      guard
+        arg.label == nil,
+        let declRefExpr = arg.expression.as(DeclReferenceExprSyntax.self),
+        declRefExpr.argumentNames == nil,
+        declRefExpr.moduleSelector == nil,
+        case .identifier(let text) = declRefExpr.baseName.tokenKind,
+        text != "immortal"
+      else {
+        self.diagnose(.invalidArgumentInAttribute(node, arg))
+        return nil
+      }
+      params.append(self.generateLocatedIdentifier(declRefExpr.baseName))
+    }
+    return params
   }
 
   /// E.g.

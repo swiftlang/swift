@@ -17,12 +17,9 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "clang/AST/DeclObjC.h"
 #include "swift/AST/TypeCheckRequests.h"
-
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 
@@ -180,7 +177,20 @@ UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
 UNINTERESTING_FEATURE(TypedAllocation)
+UNINTERESTING_FEATURE(BuiltinAllocRawTyped)
+UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
+UNINTERESTING_FEATURE(Cells)
+
+static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
+  auto *SD = dyn_cast<SubscriptDecl>(decl);
+  if (!SD)
+    return false;
+
+  return llvm::any_of(*SD->getIndices(), [](const ParamDecl *index) {
+    return index->getSpecifier() != ParamSpecifier::Default;
+  });
+}
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
@@ -212,6 +222,17 @@ static bool usesFeatureCAttribute(Decl *decl) {
         return true;
   }
 
+  return false;
+}
+
+static bool usesFeatureTargetAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TargetAttr>();
+}
+
+static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
+    if (attr->isExported())
+      return true;
   return false;
 }
 
@@ -489,8 +510,16 @@ UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
 UNINTERESTING_FEATURE(LibkernOwnershipConventions)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
+UNINTERESTING_FEATURE(ForeignReferenceTypeSubclassing)
+UNINTERESTING_FEATURE(CxxImplementation)
+UNINTERESTING_FEATURE(GenerateBindingsForNoncopyableTypesInCXX)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
+UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
+
+// TODO: Detect scope arguments anywhere in the declaration's interface type,
+// which are printed even when elided, and explicit scope parameters.
+static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
@@ -514,6 +543,13 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   default:
     return false;
   }
+}
+
+static bool usesFeatureCoroutineFunctions(Decl *decl) {
+  if (auto *FD = dyn_cast<FuncDecl>(decl))
+    return FD->isCoroutine() && !isa<AccessorDecl>(FD);
+  
+  return false;
 }
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
@@ -591,10 +627,6 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
-  return isa<UsingDecl>(D);
-}
-
 UNINTERESTING_FEATURE(BuiltinSelect)
 UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
@@ -635,6 +667,34 @@ static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
     return unsafeAttr->isAlways();
   }
   return false;
+}
+
+static bool usesFeatureDeinitableProtocol(Decl *decl) {
+  auto *proto = dyn_cast<ProtocolDecl>(decl);
+  if (!proto)
+    return false;
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+    return true;
+
+  // The printer never prints Sendable's inverses.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    return false;
+
+  // Copyable inherits Deinitable, and a protocol may suppress it.
+  InheritedTypes inherited(proto);
+  return llvm::any_of(inherited.getIndices(), [&](unsigned i) {
+    auto type = inherited.getResolvedType(i);
+    if (!type)
+      return false;
+    if (auto *inheritedProto = type->getAs<ProtocolType>())
+      if (inheritedProto->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::Deinitable))
+        return true;
+    if (auto *pct = type->getCanonicalType()->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(InvertibleProtocolKind::Deinitable);
+    return false;
+  });
 }
 
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
@@ -710,7 +770,6 @@ static bool usesFeatureReparenting(Decl *decl) {
 
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
-UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 
 UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
 
@@ -726,14 +785,14 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
 
-static bool usesFeatureCalledAttribute(Decl *D) {
+static bool usesFeatureOnceFunctions(Decl *D) {
   auto &ctx = D->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+  if (!ctx.LangOpts.hasFeature(Feature::OnceFunctions))
     return false;
 
   std::function<bool(Type)> hasCalled = [](Type T) {
     if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
-      return F->isCalledOnce();
+      return F->hasCalledAtMostOnceSemantics();
     return false;
   };
 
@@ -752,7 +811,7 @@ static bool usesFeatureCalledAttribute(Decl *D) {
 
       bool usesCalled = false;
       P->forEachVariable([&usesCalled](auto *V) {
-        usesCalled |= usesFeatureCalledAttribute(V);
+        usesCalled |= usesFeatureOnceFunctions(V);
       });
 
       if (usesCalled)
@@ -763,6 +822,54 @@ static bool usesFeatureCalledAttribute(Decl *D) {
   }
 
   return usesTypeMatching(D, hasCalled);
+}
+
+UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
+UNINTERESTING_FEATURE(BuiltinRelaxedFP)
+
+static bool usesFeatureNondeinitableTypes(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  // A struct or enum that suppresses Deinitable, or an extension of one.
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    nominal = ext->getExtendedNominal();
+  if (nominal) {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void)getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject);
+    if (inverses.contains(InvertibleProtocolKind::Deinitable))
+      return true;
+  }
+
+  // A generic signature that suppresses Deinitable.
+  if (auto *genericContext = decl->getAsGenericContext()) {
+    if (auto sig = genericContext->getGenericSignature()) {
+      SmallVector<Requirement, 2> reqs;
+      SmallVector<InverseRequirement, 2> inverses;
+      sig->getRequirementsWithInverses(reqs, inverses);
+      for (auto inverse : inverses) {
+        if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+          return true;
+      }
+    }
+  }
+
+  // A protocol with an associated type that suppresses Deinitable.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    proto->getRequirementSignature().getRequirementsWithInverses(proto, reqs,
+                                                                 inverses);
+    for (auto inverse : inverses) {
+      if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+        return true;
+    }
+  }
+
+  return false;
 }
 
 // ----------------------------------------------------------------------------
@@ -803,6 +910,13 @@ static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused"
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
+  // Compilers without the Deinitable protocol must not see it at all.
+  if (featureName == "DeinitableProtocol") {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+      if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+        return true;
+  }
+
   return hasFeatureSuppressionAttribute(decl, featureName, true);
 }
 

@@ -76,6 +76,83 @@
 // RUN:     2>&1                                                               \
 // RUN:     | %FileCheck %s --color --dump-input=always
 
+/// Build and run everything again with opaque values
+// RUN: %empty-directory(%t/opaque-values)
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/FakeDistributedActorSystems.swiftmodule \
+// RUN:     -module-name FakeDistributedActorSystems                           \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:      %S/../Inputs/FakeDistributedActorSystems.swift                    \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -O                                                                 \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -o %t/opaque-values/%target-library-name(FakeDistributedActorSystems)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/GreeterAPILib.swiftmodule       \
+// RUN:     -module-name GreeterAPILib                                         \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:     %t/src/GreeterAPILib.swift                                         \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -O                                                                 \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -o %t/opaque-values/%target-library-name(GreeterAPILib)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library -emit-library                                    \
+// RUN:     -emit-module-path %t/opaque-values/GreeterImplLib.swiftmodule      \
+// RUN:     -module-name GreeterImplLib                                        \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:     %t/src/GreeterImplLib.swift                                        \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -lGreeterAPILib                                                    \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -O                                                                 \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -o %t/opaque-values/%target-library-name(GreeterImplLib)
+
+// RUN: %target-build-swift                                                    \
+// RUN:     -Xfrontend -enable-sil-opaque-values                               \
+// RUN:     -target %target-swift-6.0-abi-triple                               \
+// RUN:     -parse-as-library                                                  \
+// RUN:     -lFakeDistributedActorSystems                                      \
+// RUN:     -lGreeterAPILib                                                    \
+// RUN:     -lGreeterImplLib                                                   \
+// RUN:     -module-name main                                                  \
+// RUN:     -I %t/opaque-values                                                \
+// RUN:     -L %t/opaque-values                                                \
+// RUN:     -plugin-path %swift-plugin-dir                                     \
+// RUN:     %t/src/Main.swift                                                  \
+// RUN:     -enable-library-evolution                                          \
+// RUN:     -O                                                                 \
+// RUN:     -Xfrontend -validate-tbd-against-ir=all                            \
+// RUN:     -o %t/opaque-values/a.out
+
+// RUN: %target-codesign %t/opaque-values/a.out
+// RUN: %target-codesign %t/opaque-values/%target-library-name(FakeDistributedActorSystems)
+// RUN: %target-codesign %t/opaque-values/%target-library-name(GreeterAPILib)
+// RUN: %target-codesign %t/opaque-values/%target-library-name(GreeterImplLib)
+
+// RUN: %target-run %t/opaque-values/a.out                                     \
+// RUN:     %t/opaque-values/%target-library-name(FakeDistributedActorSystems) \
+// RUN:     %t/opaque-values/%target-library-name(GreeterAPILib)               \
+// RUN:     %t/opaque-values/%target-library-name(GreeterImplLib)              \
+// RUN:     2>&1                                                               \
+// RUN:     | %FileCheck %s --color --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed

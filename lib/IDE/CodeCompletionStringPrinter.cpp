@@ -13,7 +13,6 @@
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "CodeCompletionStringBuilder.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::ide;

@@ -167,7 +167,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
                                              /*canBeCovariantResult=*/false);
   }
 
-  if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
+  if (auto *const nominal = type->getAs<NominalType>()) {
     auto info = GenericParameterReferenceInfo();
 
     // Don't forget to look in the parent.
@@ -178,22 +178,22 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
     }
 
     // Most bound generic types are invariant.
-    if (auto *const bgt = type->getAs<BoundGenericType>()) {
-      if (bgt->isArray()) {
+    if (nominal->hasGenericArgs()) {
+      if (nominal->isArray()) {
         // Swift.Array preserves variance in its 'Value' type.
         info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().front(),
+            genericSig, origParam, openedParam, nominal->getGenericArgs().front(),
             position, /*canBeCovariantResult=*/false);
-      } else if (bgt->isDictionary()) {
+      } else if (nominal->isDictionary()) {
         // Swift.Dictionary preserves variance in its 'Element' type.
         info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().front(),
+            genericSig, origParam, openedParam, nominal->getGenericArgs().front(),
             TypePosition::Invariant, /*canBeCovariantResult=*/false);
         info |= findGenericParameterReferencesRec(
-            genericSig, origParam, openedParam, bgt->getGenericArgs().back(),
+            genericSig, origParam, openedParam, nominal->getGenericArgs().back(),
             position, /*canBeCovariantResult=*/false);
       } else {
-        for (const auto &paramType : bgt->getGenericArgs()) {
+        for (const auto &paramType : nominal->getGenericArgs()) {
           info |= findGenericParameterReferencesRec(
               genericSig, origParam, openedParam, paramType,
               TypePosition::Invariant, /*canBeCovariantResult=*/false);
@@ -624,6 +624,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
 
   case DeclTypeCheckingSemantics::Normal:
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
+  case DeclTypeCheckingSemantics::WithoutActuallyDiscarding:
     break;
   }
 
@@ -695,6 +696,21 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   return std::pair(typeVar, bindingTy);
 }
 
+/// Whether `existentialTy` satisfies every protocol requirement that
+/// `genericSig` places on `genericParam`, in which case it can be bound to
+/// that generic parameter directly rather than being opened.
+static bool
+existentialSatisfiesRequirements(CanGenericSignature genericSig,
+                                 GenericTypeParamType *genericParam,
+                                 Type existentialTy) {
+  for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
+    if (lookupExistentialConformance(existentialTy, proto).isInvalid())
+      return false;
+  }
+
+  return true;
+}
+
 bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
                                  GenericTypeParamType *genericParam,
                                  Type existentialTy) {
@@ -713,26 +729,12 @@ bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
 
   auto &ctx = callee->getASTContext();
 
-  // If the existential argument conforms to all of protocol requirements on
-  // the formal parameter's type, don't open unless ImplicitOpenExistentials is
-  // enabled.
-
-  // If all of the conformance requirements on the formal parameter's type
-  // are self-conforming, don't open.
-  if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials)) {
-    bool containsNonSelfConformance = false;
-    for (auto proto : genericSig->getRequiredProtocols(genericParam)) {
-      auto conformance = lookupExistentialConformance(
-          existentialTy, proto);
-      if (conformance.isInvalid()) {
-        containsNonSelfConformance = true;
-        break;
-      }
-    }
-
-    if (!containsNonSelfConformance)
-      return false;
-  }
+  // If all of the conformance requirements on the formal parameter's type are
+  // self-conforming, the argument can be passed without opening it, so don't
+  // open unless ImplicitOpenExistentials is enabled.
+  if (!ctx.LangOpts.hasFeature(Feature::ImplicitOpenExistentials) &&
+      existentialSatisfiesRequirements(genericSig, genericParam, existentialTy))
+    return false;
 
   auto existentialSig = ctx.getOpenedExistentialSignature(existentialTy);
 
@@ -743,6 +745,35 @@ bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
       existentialSig.SelfType->castTo<GenericTypeParamType>(),
       /*skipParamIdx=*/paramIdx);
   return !referenceInfo.hasNonCovariantRef();
+}
+
+bool swift::canPassExistentialArgumentWithoutOpening(ValueDecl *callee,
+                                                     unsigned paramIdx,
+                                                     Type existentialTy) {
+  auto param = getParameterAt(callee, paramIdx);
+  if (!param)
+    return false;
+
+  // Find the generic parameter the argument binds to, looking through the same
+  // sugar that canOpenExistentialCallArgument looks through.
+  Type paramInterfaceTy = param->getInterfaceType()
+                              ->getInOutObjectType()
+                              ->lookThroughSingleOptionalType();
+  if (paramInterfaceTy->is<AnyMetatypeType>())
+    paramInterfaceTy = paramInterfaceTy->getMetatypeInstanceType();
+
+  auto genericParam = paramInterfaceTy->getAs<GenericTypeParamType>();
+  if (!genericParam)
+    return false;
+
+  auto genericSig = callee->getInnermostDeclContext()
+                        ->getGenericSignatureOfContext()
+                        .getCanonicalSignature();
+  if (!genericSig)
+    return false;
+
+  return existentialSatisfiesRequirements(
+      genericSig, genericParam, existentialTy->getMetatypeInstanceType());
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies

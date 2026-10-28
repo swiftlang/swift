@@ -19,10 +19,8 @@
 #include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
-#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/MC/MCTargetOptions.h"
 #include <optional>
 
 #include <set>
@@ -50,12 +48,6 @@ struct CompilerDebuggingOptions {
   /// upon termination.
   bool DumpClangLookupTables = false;
 
-  bool DumpAbstractLayout = false;
-
-  /// Dump every hidden-type layout known to this compilation: those recorded
-  /// during the local module's compilation plus those deserialized from any
-  /// imported Swift modules.
-  bool DumpHiddenTypeLayouts = false;
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -287,11 +279,6 @@ public:
   /// Profile changes to stats to files in StatsOutputDir, grouped by source
   /// entity.
   bool ProfileEntities = false;
-
-  /// Emit parseable-output directly from the frontend, instead of relying
-  /// the driver to emit it. This is used in context where frontend jobs are executed by
-  /// clients other than the driver.
-  bool FrontendParseableOutput = false;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -544,10 +531,14 @@ public:
   /// loaded before it is run.
   static bool doesActionRequireSwiftStandardLibrary(ActionType);
 
+  /// \return true if the given action runs full semantic analysis over the
+  /// whole module, providing a fully typechecked main module.
+  static bool doesActionTypeCheckWholeModule(ActionType);
+
   /// \return true if the given action requires input files to be provided.
   static bool doesActionRequireInputs(ActionType action);
 
-  /// \return true if the given action requires input files to be provided.
+  /// \return true if the given action performs end of pipeline actions.
   static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
   /// \return true if the given action supports caching.

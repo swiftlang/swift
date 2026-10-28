@@ -471,6 +471,15 @@ private extension AccessBase {
   }
 }
 
+private extension Value {
+  var lookThroughAddressCast: Value {
+    if let addrCast = self as? UncheckedAddrCastInst {
+      return addrCast.fromAddress.lookThroughAddressCast
+    }
+    return self
+  }
+}
+
 private extension Instruction {
   /// If the instruction needs stack protection, return the relevant access base and scope.
   var accessBaseToProtect: (AccessBase, scope: BeginAccessInst?)? {
@@ -493,7 +502,8 @@ private extension Instruction {
           return nil
         }
         var hasNoStores = NoStores()
-        if hasNoStores.walkDownUses(ofAddress: ia, path: SmallProjectionPath()) == .continueWalk {
+        if hasNoStores.walkDownUses(ofAddress: ia,
+                                    path: SmallProjectionPath(.anything)) == .continueWalk {
           return nil
         }
 
@@ -502,7 +512,7 @@ private extension Instruction {
       default:
         return nil
     }
-    let (accessPath, scope) = baseAddr.accessPathWithScope
+    let (accessPath, scope) = baseAddr.lookThroughAddressCast.accessPathWithScope
 
     if case .tail = accessPath.base, self is IndexAddrInst {
       // `index_addr` for tail-allocated elements is the usual case (most likely coming from
@@ -520,7 +530,9 @@ private struct NoStores : ValueDefUseWalker, AddressDefUseWalker {
   mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
     switch value.instruction {
     case let ptai as PointerToAddressInst:
-      return walkDownUses(ofAddress: ptai, path: path)
+      return walkDownUses(ofAddress: ptai, path: SmallProjectionPath(.anything))
+    case let irp as IndexRawPointerInst:
+      return walkDownUses(ofValue: irp, path: path)
     case let bi as BuiltinInst:
       switch bi.intrinsicID {
       case .memcpy, .memmove:
@@ -528,6 +540,8 @@ private struct NoStores : ValueDefUseWalker, AddressDefUseWalker {
       default:
         return .abortWalk
       }
+    case is DebugValueInst:
+      return .continueWalk
     default:
       return .abortWalk
     }
@@ -535,10 +549,12 @@ private struct NoStores : ValueDefUseWalker, AddressDefUseWalker {
 
   mutating func leafUse(address: Operand, path: SmallProjectionPath) -> WalkResult {
     switch address.instruction {
-    case is LoadInst:
+    case is LoadInst, is DebugValueInst:
       return .continueWalk
     case let cai as CopyAddrInst:
       return address == cai.sourceOperand ? .continueWalk : .abortWalk
+    case let ia as IndexAddrInst:
+      return walkDownUses(ofAddress: ia, path: path)
     default:
       return .abortWalk
     }

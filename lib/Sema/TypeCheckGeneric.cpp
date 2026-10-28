@@ -28,8 +28,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
@@ -193,7 +193,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       RequirementKind kind;
       if (constraintType->isConstraintType())
         kind = RequirementKind::Conformance;
-      else if (constraintType->getClassOrBoundGenericClass())
+      else if (constraintType->getClassDecl())
         kind = RequirementKind::Superclass;
       else {
         // Error out if the constraint type isn't a class or existential type.
@@ -783,14 +783,16 @@ static void collectAdditionalExtensionRequirements(
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
     type = typealias->getUnderlyingType();
-    nominal = type->getNominalOrBoundGenericNominal();
+    nominal = type->getNominalDecl();
     if (!nominal && type->is<TupleType>())
       nominal = type->getASTContext().getBuiltinTupleDecl();
   }
 
   // If we have a bound generic type, add same-type requirements for each of
-  // its generic arguments.
-  if (auto currentBoundType = type->getAs<BoundGenericType>()) {
+  // its generic arguments. Note that we do need to check for generic args
+  // here so that we don't get tripped up by protocol types.
+  if (auto currentBoundType = type->getAs<NominalType>();
+      currentBoundType && currentBoundType->hasGenericArgs()) {
     auto *genericParams = currentBoundType->getDecl()->getGenericParams();
     for (unsigned gpIndex : indices(genericParams->getParams())) {
       auto *gp = genericParams->getParams()[gpIndex];
@@ -947,8 +949,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
+        bool isCoroutine = func ? func->isCoroutine() : false;
+        TypeResolutionOptions resultOptions(TypeResolverContext::FunctionResult);
+        if (isCoroutine)
+          resultOptions |= TypeResolutionFlags::Coroutine;
         const auto resultType =
-            resolution.withOptions(TypeResolverContext::FunctionResult)
+            resolution.withOptions(resultOptions)
                 .resolveType(resultTypeRepr);
 
         inferenceSources.push_back(resultType.getPointer());
@@ -1203,9 +1209,7 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    SmallVector<ProtocolConformanceRef, 2> isolatedConformances;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
-                                      &isolatedConformances)) {
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1236,22 +1240,6 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
       break;
-    }
-
-    if (!isolatedConformances.empty() && signature) {
-      // Dig out the original type parameter for the requirement.
-      // FIXME: req might not be the right pre-substituted requirement,
-      // if this came from a conditional requirement.
-      for (const auto &isolatedConformance : isolatedConformances) {
-        (void)isolatedConformance;
-        if (auto failed =
-                signature->prohibitsIsolatedConformance(req.getFirstType())) {
-            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-              req, substReq,
-              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-              failed->second);
-        }
-      }
     }
   }
 
@@ -1301,7 +1289,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   case RequirementReprKind::TypeConstraint: {
     Type subject = resolution->resolveType(reqRepr.getSubjectRepr());
     Type constraint = resolution->resolveType(reqRepr.getConstraintRepr());
-    return Requirement(constraint->getClassOrBoundGenericClass()
+    return Requirement(constraint->getClassDecl()
                          ? RequirementKind::Superclass
                          : RequirementKind::Conformance,
                        subject, constraint);

@@ -70,10 +70,16 @@ public func escapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePoi
 @__swiftmacro_4test5plain15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func plain(_ ptr: UnsafeBufferPointer<CInt>) {
     if ptr.count != 37 {
-      fatalError("bounds check failure in plain: expected \(37) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("plain", expected, actual)
+      }
+      _boundsCheckFailure(37, ptr.count)
     }
     return unsafe plain(ptr.baseAddress!)
 }
@@ -81,10 +87,16 @@ public func plain(_ ptr: UnsafeBufferPointer<CInt>) {
 @__swiftmacro_4test3opt15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func opt(_ ptr: UnsafeBufferPointer<CInt>?) {
     if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
-      fatalError("bounds check failure in opt: expected \(37) but got \(_ptrCount)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("opt", expected, actual)
+      }
+      _boundsCheckFailure(37, _ptrCount)
     }
     return unsafe opt(ptr?.baseAddress)
 }
@@ -92,10 +104,16 @@ public func opt(_ ptr: UnsafeBufferPointer<CInt>?) {
 @__swiftmacro_4test3mut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func mut(_ ptr: UnsafeMutableBufferPointer<CInt>) {
     if ptr.count != 37 {
-      fatalError("bounds check failure in mut: expected \(37) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("mut", expected, actual)
+      }
+      _boundsCheckFailure(37, ptr.count)
     }
     return unsafe mut(ptr.baseAddress!)
 }
@@ -103,10 +121,16 @@ public func mut(_ ptr: UnsafeMutableBufferPointer<CInt>) {
 @__swiftmacro_4test6mutOpt15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func mutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) {
     if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
-      fatalError("bounds check failure in mutOpt: expected \(37) but got \(_ptrCount)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("mutOpt", expected, actual)
+      }
+      _boundsCheckFailure(37, _ptrCount)
     }
     return unsafe mutOpt(ptr?.baseAddress)
 }
@@ -114,10 +138,16 @@ public func mutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) {
 @__swiftmacro_4test8noescape15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func noescape(_ ptr: Span<CInt>) {
     if ptr.count != 37 {
-      fatalError("bounds check failure in noescape: expected \(37) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("noescape", expected, actual)
+      }
+      _boundsCheckFailure(37, ptr.count)
     }
     let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
@@ -131,10 +161,16 @@ public func noescape(_ ptr: Span<CInt>) {
 @__swiftmacro_4test11noescapeOpt15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func noescapeOpt(_ ptr: Span<CInt>?) {
     if let _ptrCount = ptr?.count, _ptrCount != 37 {
-      fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("noescapeOpt", expected, actual)
+      }
+      _boundsCheckFailure(37, _ptrCount)
     }
     let _ptrPtr = ptr?.withUnsafeBufferPointer {
         unsafe $0
@@ -148,10 +184,16 @@ public func noescapeOpt(_ ptr: Span<CInt>?) {
 @__swiftmacro_4test11noescapeMut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
     if ptr.count != 37 {
-      fatalError("bounds check failure in noescapeMut: expected \(37) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("noescapeMut", expected, actual)
+      }
+      _boundsCheckFailure(37, ptr.count)
     }
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -165,10 +207,16 @@ public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
 @__swiftmacro_4test14noescapeMutOpt15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
     if let _ptrCount = ptr?.count, _ptrCount != 37 {
-      fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("noescapeMutOpt", expected, actual)
+      }
+      _boundsCheckFailure(37, _ptrCount)
     }
     let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -182,7 +230,7 @@ public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
 @__swiftmacro_4test11plainReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func plainReturn() -> UnsafeBufferPointer<CInt> {
     return unsafe UnsafeBufferPointer<CInt> (start: unsafe plainReturn(), count: Int(37))
 }
@@ -190,7 +238,7 @@ public func plainReturn() -> UnsafeBufferPointer<CInt> {
 @__swiftmacro_4test9optReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func optReturn() -> UnsafeBufferPointer<CInt>? {
     let _resultValue = unsafe optReturn()
     if unsafe _resultValue == nil {
@@ -202,7 +250,7 @@ public func optReturn() -> UnsafeBufferPointer<CInt>? {
 @__swiftmacro_4test9mutReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func mutReturn() -> UnsafeMutableBufferPointer<CInt> {
     return unsafe UnsafeMutableBufferPointer<CInt> (start: unsafe mutReturn(), count: Int(37))
 }
@@ -210,7 +258,7 @@ public func mutReturn() -> UnsafeMutableBufferPointer<CInt> {
 @__swiftmacro_4test12mutOptReturn15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt>? {
     let _resultValue = unsafe mutOptReturn()
     if unsafe _resultValue == nil {
@@ -222,10 +270,16 @@ public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt>? {
 @__swiftmacro_4test6escape15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func escape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
     if ptr.count != 37 {
-      fatalError("bounds check failure in escape: expected \(37) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("escape", expected, actual)
+      }
+      _boundsCheckFailure(37, ptr.count)
     }
     return unsafe escape(ptr.baseAddress!)
 }
@@ -233,10 +287,16 @@ public func escape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
 @__swiftmacro_4test9escapeOpt15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func escapeOpt(_ ptr: UnsafeBufferPointer<CInt>?) -> UnsafePointer<CInt>? {
     if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
-      fatalError("bounds check failure in escapeOpt: expected \(37) but got \(_ptrCount)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("escapeOpt", expected, actual)
+      }
+      _boundsCheckFailure(37, _ptrCount)
     }
     return unsafe escapeOpt(ptr?.baseAddress)
 }
@@ -244,10 +304,16 @@ public func escapeOpt(_ ptr: UnsafeBufferPointer<CInt>?) -> UnsafePointer<CInt>?
 @__swiftmacro_4test9escapeMut15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func escapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<CInt> {
     if ptr.count != 37 {
-      fatalError("bounds check failure in escapeMut: expected \(37) but got \(ptr.count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("escapeMut", expected, actual)
+      }
+      _boundsCheckFailure(37, ptr.count)
     }
     return unsafe escapeMut(ptr.baseAddress!)
 }
@@ -255,10 +321,16 @@ public func escapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutableP
 @__swiftmacro_4test12escapeMutOpt15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func escapeMutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) -> UnsafeMutablePointer<CInt>? {
     if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
-      fatalError("bounds check failure in escapeMutOpt: expected \(37) but got \(_ptrCount)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("escapeMutOpt", expected, actual)
+      }
+      _boundsCheckFailure(37, _ptrCount)
     }
     return unsafe escapeMutOpt(ptr?.baseAddress)
 }

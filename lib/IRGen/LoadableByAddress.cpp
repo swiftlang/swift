@@ -21,8 +21,6 @@
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "loadable-address"
 #include "Explosion.h"
-#include "FixedTypeInfo.h"
-#include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "NativeConventionSchema.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -34,19 +32,14 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
-#include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -137,6 +130,32 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     return nativeSchemaOrigParam.requiresIndirect();
   }
   return false;
+}
+
+/// The explosion size above which a debug_value's operand is killed.
+///
+/// A load within a reconstruction block (created by prependDeref) will create
+/// a fragment for each of the aggregate's elements in IRGen. LLVM's
+/// calculateDbgEntityHistory (run from the AsmPrinter) is quadratic and
+/// can considerably increase compile time.
+static constexpr unsigned MaxDebugReconstructionExplosionSize = 64;
+
+/// Prepend a deref to operand \p idx of \p dbg.
+/// If the load would be too expensive, the operand is killed.
+static void tryPrependDerefToDebugValue(DebugValueInst *dbg, unsigned idx,
+                                        irgen::IRGenModule &Mod) {
+  if (dbg->getDebugReconstructionBlock()) {
+    SILType addrTy = dbg->getOperand(idx)->getType();
+    auto canType = addrTy.getObjectType().getASTType();
+    if (canType->hasTypeParameter())
+      canType = getSubstGenericEnvironment(dbg->getFunction())
+                    ->mapTypeIntoEnvironment(canType)
+                    ->getCanonicalType();
+    if (Mod.getTypeInfoForLowered(canType).getSchema().size() >
+        MaxDebugReconstructionExplosionSize)
+      return dbg->killOperand(idx);
+  }
+  dbg->prependDeref(idx);
 }
 
 /// Check if a type is a large loadable tuple type that requires indirect
@@ -721,6 +740,7 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::ClassMethodInst:
       case SILInstructionKind::SuperMethodInst:
       case SILInstructionKind::ObjCMethodInst:
+      case SILInstructionKind::COMMethodInst:
       case SILInstructionKind::ObjCSuperMethodInst:
       case SILInstructionKind::WitnessMethodInst: {
         // TODO Any more instructions to add here?
@@ -737,7 +757,9 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::EnumInst:
       case SILInstructionKind::MakeAddrBorrowInst:
       case SILInstructionKind::DereferenceAddrBorrowInst:
-      case SILInstructionKind::DereferenceBorrowAddrInst: {
+      case SILInstructionKind::DereferenceBorrowAddrInst:
+      case SILInstructionKind::UncheckedTrivialBitCastInst:
+      case SILInstructionKind::UncheckedBitwiseCastInst: {
         // TODO Any more instructions to add here?
         visitResultTyInst(cast<SingleValueInstruction>(currIns));
         break;
@@ -1021,6 +1043,19 @@ void LargeValueVisitor::visitReleaseInst(ReleaseValueInst *instr) {
 }
 
 void LargeValueVisitor::visitDebugValueInst(DebugValueInst *instr) {
+  // Kill any operand about to be retyped if the variable cannot follow.
+  // Plain debug values are retyped. Debug reconstruction block cannot have
+  // an operand of a different type than its argument.
+  if (instr->getDebugReconstructionBlock() || instr->getVarInfo()->Type) {
+    auto funcType = pass.F->getLoweredFunctionType();
+    for (Operand &operand : llvm::reverse(instr->getAllOperands())) {
+      // Only a changed function signature is unfollowable.
+      if (pass.containsDifferentFunctionSignature(funcType,
+                                                 operand.get()->getType()))
+        instr->killOperand(operand.getOperandNumber());
+    }
+  }
+
   for (Operand &operand : instr->getAllOperands()) {
     if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                   operand.get()) != pass.largeLoadableArgs.end()) {
@@ -1899,7 +1934,8 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       // Update the debug_value to point to the variable in the alloca.
       scalarUse->set(address);
-      dbgInst->prependDeref(scalarUse->getOperandNumber());
+      tryPrependDerefToDebugValue(dbgInst, scalarUse->getOperandNumber(),
+                                  pass.Mod);
     }
   }
 }
@@ -2419,7 +2455,7 @@ static void rewriteFunction(StructLoweringState &pass,
     } else {
       assert(currOperand->getType().isAddress() &&
              "Expected an address type");
-      instr->prependDeref(operand->getOperandNumber());
+      tryPrependDerefToDebugValue(instr, operand->getOperandNumber(), pass.Mod);
     }
   }
 
@@ -2433,22 +2469,6 @@ static void rewriteFunction(StructLoweringState &pass,
       destroyBuilder.createDestroyAddr(instr->getLoc(), currOperand);
       instr->getParent()->erase(instr);
     }
-  }
-
-  for (StoreInst *instr : pass.storeInstsToMod) {
-    SILValue src = instr->getSrc();
-    SILValue tgt = instr->getDest();
-    SILType srcType = src->getType();
-    SILType tgtType = tgt->getType();
-    assert(srcType && "Expected an address-type source");
-    assert(tgtType.isAddress() && "Expected an address-type target");
-    assert(srcType == tgtType && "Source and target type do not match");
-    (void)srcType;
-    (void)tgtType;
-
-    SILBuilderWithScope copyBuilder(instr);
-    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
-    instr->getParent()->erase(instr);
   }
 
   for (RetainValueInst *instr : pass.retainInstsToMod) {
@@ -2547,6 +2567,18 @@ static void rewriteFunction(StructLoweringState &pass,
           Loc, operand, convInstr->getElement(), newSILType.getObjectType());
       break;
     }
+    case SILInstructionKind::UncheckedTrivialBitCastInst: {
+      auto *convInstr = cast<UncheckedTrivialBitCastInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedTrivialBitCast(
+          Loc, convInstr->getOperand(), newSILType.getObjectType());
+      break;
+    }
+    case SILInstructionKind::UncheckedBitwiseCastInst: {
+      auto *convInstr = cast<UncheckedBitwiseCastInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedBitwiseCast(
+          Loc, convInstr->getOperand(), newSILType.getObjectType());
+      break;
+    }
     case SILInstructionKind::DereferenceBorrowAddrInst: {
       auto dbaInstr = cast<DereferenceBorrowAddrInst>(instr);
       newInstr = resultTyBuilder.createDereferenceBorrowAddr(
@@ -2558,6 +2590,24 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     instr->replaceAllUsesWith(newInstr);
     instr->eraseFromParent();
+  }
+
+  // Rewrite stores of large-loadable types after the aggregate-projection
+  // instructions above have been recreated with their new SIL types.
+  for (StoreInst *instr : pass.storeInstsToMod) {
+    SILValue src = instr->getSrc();
+    SILValue tgt = instr->getDest();
+    SILType srcType = src->getType();
+    SILType tgtType = tgt->getType();
+    assert(srcType && "Expected an address-type source");
+    assert(tgtType.isAddress() && "Expected an address-type target");
+    assert(srcType == tgtType && "Source and target type do not match");
+    (void)srcType;
+    (void)tgtType;
+
+    SILBuilderWithScope copyBuilder(instr);
+    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
+    instr->getParent()->erase(instr);
   }
 
   for (MethodInst *instr : pass.methodInstsToMod) {
@@ -2841,7 +2891,7 @@ void LoadableByAddress::recreateSingleApply(
   if ((isa<ApplyInst>(applyInst) || isa<TryApplyInst>(applyInst)) &&
       modNonFuncTypeResultType(genEnv, origSILFunctionType, *currIRMod) &&
       modifiableApply(applySite, *getIRGenModule()) &&
-      !origSILFunctionType->hasGuaranteedResult(true)) {
+      !origSILFunctionType->hasGuaranteedResult()) {
     assert(allApplyRetToAllocMap.find(applyInst) !=
            allApplyRetToAllocMap.end());
     auto newAlloc = allApplyRetToAllocMap.find(applyInst)->second;
@@ -2923,10 +2973,12 @@ void LoadableByAddress::recreateSingleApply(
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];
 
-      // For now, just replace the value with an immediate load if the old value
-      // was direct.
-      if (oldValue->getType() != newValue->getType() &&
-          !oldValue->getType().isAddress()) {
+      // For now, just replace the value with an immediate load if the
+      // old value was direct and the new value is indirect. Note the
+      // type may change while staying direct, e.g. a yielded closure
+      // type whose signature was rewritten from direct to indirect
+      // but the closure value stays direct.
+      if (!oldValue->getType().isAddress() && newValue->getType().isAddress()) {
         LoadOwnershipQualifier ownership;
         if (!F->hasOwnership()) {
           ownership = LoadOwnershipQualifier::Unqualified;
@@ -2960,13 +3012,14 @@ void LoadableByAddress::recreateSingleApply(
           callee->getType().castTo<SILFunctionType>(), *currIRMod,
           /*mustTransform*/ true);
       SILType newType = SILType::getPrimitiveObjectType(newFnType);
-      callee = applyBuilder.createConvertFunction(castedApply->getLoc(),
-                                                  callee, newType, false);
+      callee = applyBuilder.createConvertFunction(castedApply->getLoc(), callee,
+                                                  newType);
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isCalledOnce(),
-        castedApply->isOnStack(), castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation,
+        castedApply->getExecutionSemantics(), castedApply->isOnStack(),
+        castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -3022,11 +3075,19 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(
     newType = newType.getObjectType();
   }
   if (caseTy != newType) {
-    auto *takeEnum = enumBuilder.createUncheckedEnumData(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        caseTy);
-    newInstr = enumBuilder.createUncheckedReinterpretCast(enumInstr->getLoc(),
-                                                          takeEnum, newType);
+    // If the payload is a rewritten function type, extract the payload directly
+    // with the rewritten type instead of casting.
+    if (isFuncOrOptionalFuncType(newType)) {
+      newInstr = enumBuilder.createUncheckedEnumData(
+          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+          newType);
+    } else {
+      auto *takeEnum = enumBuilder.createUncheckedEnumData(
+          enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
+          caseTy);
+      newInstr = enumBuilder.createUncheckedReinterpretCast(enumInstr->getLoc(),
+                                                            takeEnum, newType);
+    }
   } else {
     newInstr = enumBuilder.createUncheckedEnumData(
         enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
@@ -3198,9 +3259,9 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   }
   case SILInstructionKind::ConvertFunctionInst: {
     auto instr = cast<ConvertFunctionInst>(convInstr);
-    newInstr = convBuilder.createConvertFunction(
-        instr->getLoc(), instr->getOperand(), newType,
-        instr->withoutActuallyEscaping());
+    newInstr =
+        convBuilder.createConvertFunction(instr->getLoc(), instr->getOperand(),
+                                          newType, instr->getConversionKind());
     break;
   }
   case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
@@ -3364,7 +3425,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
 void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
   // verification.
-  getModule()->setStage(SILStage::Lowered);
+  getModule()->commitStage(SILStage::Lowered);
 
   for (auto &F : *getModule())
     runOnFunction(&F);
@@ -4194,6 +4255,10 @@ public:
     return heuristic.isLargeLoadableType(ty);
   }
 
+  void tryPrependDerefToDebugValue(DebugValueInst *dbg, unsigned idx) {
+    ::tryPrependDerefToDebugValue(dbg, idx, *irgenModule);
+  }
+
   bool contains(SILValue v) {
     return valueToAddressMap.find(v) != valueToAddressMap.end();
   }
@@ -4844,7 +4909,7 @@ protected:
       }
       SILValue addr = assignment.getAddressForValue(operandVal);
       operand.set(addr);
-      dbg->prependDeref(operand.getOperandNumber());
+      assignment.tryPrependDerefToDebugValue(dbg, operand.getOperandNumber());
     }
   }
 

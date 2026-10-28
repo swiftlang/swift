@@ -86,18 +86,7 @@ private func isNotReferenceCounted(value: Value) -> Bool {
       // target.
       return gvi.parentFunction.isSwift51RuntimeAvailable
     case let rptr as RawPointerToRefInst:
-      // Like `global_value` but for the empty collection singletons from the
-      // stdlib, e.g. the empty Array singleton.
-      if rptr.parentFunction.isSwift51RuntimeAvailable {
-        // The pattern generated for empty collection singletons is:
-        //     %0 = global_addr @_swiftEmptyArrayStorage
-        //     %1 = address_to_pointer %0
-        //     %2 = raw_pointer_to_ref %1
-        if let atp = rptr.pointer as? AddressToPointerInst {
-          return atp.address is GlobalAddrInst
-        }
-      }
-      return false
+      return rptr.isImmortal
     case // Thin functions are not reference counted.
          is ThinToThickFunctionInst,
          // The same for meta types.

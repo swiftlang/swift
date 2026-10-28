@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift-frontend %s -target %target-cpu-apple-macosx15 -module-name main -emit-ir -o %t/new.ir
-// RUN: %swift-frontend %s -target %target-cpu-apple-macosx14 -module-name main -emit-ir -o %t/old.ir
+// RUN: %swift %s -target %target-cpu-apple-macosx15 -module-name main -emit-ir -o %t/new.ir
+// RUN: %swift %s -target %target-cpu-apple-macosx14 -module-name main -emit-ir -o %t/old.ir
 
 // RUN: %FileCheck %s --check-prefix=NEW < %t/new.ir
 // RUN: %FileCheck %s --check-prefix=OLD < %t/old.ir

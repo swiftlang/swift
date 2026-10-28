@@ -29,8 +29,6 @@
 
 namespace swift {
 
-class DiagnosticHelper;
-
 /// Create a swift caching output backend that stores the output from
 /// compiler into a CAS.
 llvm::IntrusiveRefCntPtr<cas::SwiftCASOutputBackend>
@@ -59,7 +57,6 @@ bool replayCachedCompilerOutputsForInput(llvm::cas::ObjectStore &CAS,
                                          const InputFile &Input,
                                          unsigned InputIndex,
                                          DiagnosticEngine &Diag,
-                                         DiagnosticHelper &DiagHelper,
                                          llvm::vfs::OutputBackend &OutBackend,
                                          const FrontendOptions &Opts,
                                          CachingDiagnosticsProcessor &CDP,
@@ -81,6 +78,12 @@ llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
 createCASFileSystem(llvm::cas::ObjectStore &CAS,
                     const std::string &IncludeTreeRoot,
                     const std::string &IncludeTreeFileList);
+
+/// Create the CAS file system from the clang include tree referenced by the
+/// compile job cache key for an output.
+llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+createCASFileSystemFromCacheKey(llvm::cas::ObjectStore &CAS,
+                                llvm::cas::ObjectRef CacheKey);
 
 std::vector<std::string> remapPathsFromCommandLine(
     ArrayRef<std::string> Args,

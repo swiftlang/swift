@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o
 
 sil_stage canonical
 
@@ -24,36 +24,6 @@ struct X {
   var x16: Int
 }
 
-sil @yield_nothing_take_x : $@convention(thin) @yield_once_2 (@owned X) -> (@yields @in_guaranteed ()) {
-entry(%x : $X):
-  %void_addr = alloc_stack $()
-  %void = tuple ()
-  store %void to %void_addr : $*()
-  yield %void_addr : $*(), resume bb1, unwind bb2
-
-bb1:
-  dealloc_stack %void_addr : $*()
-  return %void : $()
-
-bb2:
-  dealloc_stack %void_addr : $*()
-  unwind
-}
-
-// CHECK-LABEL: sil @begin_apply_x_yielder : {{.*}} {
-// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[ALLOCATION:%[^,]+]]) = begin_apply
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK-LABEL: } // end sil function 'begin_apply_x_yielder'
-sil @begin_apply_x_yielder : $@convention(thin) (@owned X) -> () {
-entry(%x : $X):
-  %fn = function_ref @yield_nothing_take_x : $@convention(thin) @yield_once_2 (@owned X) -> (@yields @in_guaranteed ())
-  (%void, %token, %allocation) = begin_apply %fn(%x) : $@convention(thin) @yield_once_2 (@owned X) -> (@yields @in_guaranteed ())
-  end_apply %token as $()
-  dealloc_stack %allocation : $*Builtin.SILToken
-  %retval = tuple ()
-  return %retval : $()
-}
-
 sil @branch_inst_f : $@convention(thin) (@owned X, UInt8) -> ()
 sil @branch_inst_f2 : $@convention(thin) (@owned X, UInt8) -> ()
 
@@ -76,4 +46,60 @@ bb2:
 
 bb3(%r : $@convention(thin) (@owned X, UInt8) -> ()):
   return %r : $@convention(thin) (@owned X, UInt8) -> ()
+}
+
+struct LargeExpr {
+  var a: Int, b: Int, c: Int, d: Int, e: Int, f: Int, g: Int, h: Int
+}
+
+enum Cond {
+  case expression((Int, Int) -> Optional<LargeExpr>)
+}
+
+sil private @thunk : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> Optional<LargeExpr>) -> Optional<LargeExpr> {
+bb0(%0 : $Int, %1 : $Int, %2 : $@callee_guaranteed (Int, Int) -> Optional<LargeExpr>):
+  %3 = apply %2(%1, %0) : $@callee_guaranteed (Int, Int) -> Optional<LargeExpr>
+  return %3 : $Optional<LargeExpr>
+}
+
+// CHECK-LABEL: sil @reversed
+// The closure is extracted directly with the rewritten @out return convention
+// and fed to the partial_apply with no intervening convert_function.
+// CHECK: [[CLOSURE:%.*]] = unchecked_enum_data %0, #Cond.expression!enumelt
+// CHECK-NOT: convert_function
+// CHECK: partial_apply [callee_guaranteed] {{%.*}}([[CLOSURE]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> @out Optional<LargeExpr>) -> @out Optional<LargeExpr>
+sil @reversed : $@convention(method) (@guaranteed Cond) -> @owned Cond {
+bb0(%0 : $Cond):
+  %2 = unchecked_enum_data %0 : $Cond, #Cond.expression!enumelt
+  %4 = function_ref @thunk : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> Optional<LargeExpr>) -> Optional<LargeExpr>
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (Int, Int) -> Optional<LargeExpr>) -> Optional<LargeExpr>
+  %6 = enum $Cond, #Cond.expression!enumelt, %5 : $@callee_guaranteed (Int, Int) -> Optional<LargeExpr>
+  retain_value %0 : $Cond
+  return %6 : $Cond
+}
+
+struct Region { var a: Int, b: Int, c: Int }
+
+struct Event { var a: Int, b: Int, c: Int, d: Int, e: Int }
+
+class Box {
+  var pending: (region: Region, handler: (Event) -> Bool)?
+  init()
+}
+
+sil_vtable Box {}
+
+// CHECK-LABEL: sil hidden [transparent] @box_pending_setter :
+// CHECK: bb0(%0 : $*Optional<(region: Region, handler: @callee_guaranteed (@in_guaranteed Event) -> Bool)>, %1 : $Box):
+// CHECK: [[REF:%.*]] = ref_element_addr %1, #Box.pending
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]
+// CHECK: copy_addr [take] %0 to [init] [[ACCESS]]
+sil hidden [transparent] @box_pending_setter : $@convention(method) (@owned Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>, @guaranteed Box) -> () {
+bb0(%0 : $Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>, %1 : $Box):
+  %2 = ref_element_addr %1 : $Box, #Box.pending
+  %3 = begin_access [modify] [dynamic] %2 : $*Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>
+  store %0 to %3 : $*Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>
+  end_access %3 : $*Optional<(region: Region, handler: @callee_guaranteed (Event) -> Bool)>
+  %5 = tuple ()
+  return %5 : $()
 }

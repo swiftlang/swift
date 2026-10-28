@@ -27,7 +27,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
@@ -566,9 +565,8 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
                                      VarDecl::Introducer introducer,
                                      Identifier identifier) {
   // Bind Keyed*Container to Keyed*Container<KeyType>
-  Type boundType[1] = {keyType};
-  auto containerType = BoundGenericType::get(keyedContainerDecl, Type(),
-                                             C.AllocateCopy(boundType));
+  auto containerType = NominalType::get(keyedContainerDecl, Type(),
+                                        {keyType}, C);
 
   // let container : Keyed*Container<KeyType>
   VarDecl *containerDecl = VarDeclBuilder(DC, identifier)

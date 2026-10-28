@@ -106,6 +106,7 @@ extension ASTGenVisitor {
         obsoletedRange: SourceRange(),
         isSPI: isSPI
       )
+      attr.setMacroLoc(spec.macroLoc)
       attr.setIsGroupMember()
       if containsWildCard {
         attr.setIsGroupedWithWildcard()

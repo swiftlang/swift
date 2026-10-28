@@ -214,6 +214,7 @@ public:
     std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
+    StoredPointer RegistryNext;
 
     std::string Name;
   };
@@ -364,8 +365,6 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
-    auto MPEnumMdSec = findMachOSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -373,8 +372,7 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr &&
-        MPEnumMdSec.first == nullptr)
+        ConformMdSec.first == nullptr)
       return {};
 
     ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
@@ -384,7 +382,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
 
     auto InfoID = this->addReflectionInfo(info);
@@ -492,8 +489,6 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
-    auto MPEnumMdSec = findCOFFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -501,8 +496,7 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr &&
-        MPEnumMdSec.first == nullptr)
+        ConformMdSec.first == nullptr)
       return {};
 
     ReflectionInfo Info = {{FieldMdSec.first, FieldMdSec.second},
@@ -512,7 +506,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
     return this->addReflectionInfo(Info);
   }
@@ -950,7 +943,6 @@ public:
     auto TypeRefMdSec = lookup("swift5_typeref");
     auto ReflStrMdSec = lookup("swift5_reflstr");
     auto ConformMdSec = lookup("swift5_protocol_conformances");
-    auto MPEnumMdSec = lookup("swift5_mpenum");
 
     ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
                            {AssocTySec.first, AssocTySec.second},
@@ -959,7 +951,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
     return addReflectionInfo(info);
   }
@@ -1029,7 +1020,8 @@ public:
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
         ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
-        ReflectionSectionKind::conform, ReflectionSectionKind::mpenum};
+        ReflectionSectionKind::conform
+    };
 
     llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
     for (auto Section : Sections) {
@@ -1055,7 +1047,6 @@ public:
                            {Pairs[4].first, Pairs[4].second},
                            {Pairs[5].first, Pairs[5].second},
                            {Pairs[6].first, Pairs[6].second},
-                           {Pairs[7].first, Pairs[7].second},
                            PotentialModuleNames};
     return addReflectionInfo(Info);
   }
@@ -1658,6 +1649,60 @@ public:
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
+  std::optional<std::string> iterateTaskRegistry(
+      std::function<void(StoredPointer)> Call) {
+    auto RegistryAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry");
+    if (!RegistryAddr) {
+      return "could not find _swift_concurrency_task_registry symbol";
+    }
+
+    auto EnabledAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry_enabled");
+    if (EnabledAddr) {
+      uint8_t Enabled = 0;
+      if (getReader().readInteger(EnabledAddr, 1, &Enabled) && !Enabled) {
+        return "task registry disabled by environment variable";
+      }
+    }
+
+    auto ShardSizeAddr = getReader().getSymbolAddress("_swift_concurrency_task_registry_shard_size");
+    if (!ShardSizeAddr) {
+      return "could not find _swift_concurrency_task_registry_shard_size symbol";
+    }
+    
+    uint8_t PointerSize = getReader().getPointerSize().value_or(sizeof(void*));
+    uint32_t ShardSize = 0;
+    if (!getReader().readInteger(ShardSizeAddr, PointerSize, &ShardSize)) {
+      return "could not read _swift_concurrency_task_registry_shard_size";
+    }
+
+    for (uint32_t i = 0; i < 64; ++i) {
+      // Each shard head is a pointer to the head of a linked list.
+      auto ShardAddr = RegistryAddr + (i * ShardSize);
+      
+      uint64_t TaskAddr = 0;
+      if (!getReader().readInteger(ShardAddr, PointerSize, &TaskAddr)) {
+         return "could not read TaskRegistryShard head";
+      }
+
+      int32_t nodes = 0;
+      int32_t max_registry_nodes = 10000;
+      while (TaskAddr && nodes++ < max_registry_nodes) {
+        Call(TaskAddr);
+        
+        // Find the next task using ReflectionContext's AsyncTaskObj out of process.
+        auto [Error, TaskInfo] = asyncTaskInfo(RemoteAddress(TaskAddr, RegistryAddr.getAddressSpace()), 0, 0);
+        if (Error) {
+          // If we can't read the task info (e.g. memory is corrupted), stop traversing this shard.
+          break;
+        }
+        
+        TaskAddr = TaskInfo.RegistryNext;
+      }
+    }
+
+    return std::nullopt;
+  }
+
   std::optional<std::string> iterateMetadataAllocations(
       std::function<void(MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
@@ -1791,12 +1836,24 @@ public:
       auto BacktraceAddrPtr =
           BacktraceListNext +
           sizeof(MetadataAllocationBacktraceHeader<Runtime>);
-      auto BacktraceBytes = getReader().readBytes(
-          BacktraceAddrPtr, HeaderPtr->Count * sizeof(StoredPointer));
+
+      // Limit how many frames we'll read from one backtrace, to avoid an
+      // enormous read when the count is bad data.
+      uint32_t FrameLimit = 1024;
+
+      uint32_t Count = HeaderPtr->Count;
+      MemoryReader::ReadBytesResult BacktraceBytes;
+      if (Count > 0 && Count <= FrameLimit)
+        BacktraceBytes = getReader().readBytes(BacktraceAddrPtr,
+                                               Count * sizeof(StoredPointer));
       auto BacktracePtr =
           reinterpret_cast<const StoredPointer *>(BacktraceBytes.get());
 
-      Call(HeaderPtr->Allocation, HeaderPtr->Count, BacktracePtr);
+      // Don't hand the callback a count that the pointer doesn't back.
+      if (!BacktracePtr)
+        Count = 0;
+
+      Call(HeaderPtr->Allocation, Count, BacktracePtr);
 
       BacktraceListNext =
           RemoteAddress(HeaderPtr->Next, RemoteAddress::DefaultAddressSpace);
@@ -2035,6 +2092,7 @@ private:
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
+    Info.RegistryNext = AsyncTaskObj->PrivateStorage.RegistryNext;
 
     Info.ParentTask = 0;
     if (Info.IsChildTask && asyncTaskSize != 0) {
@@ -2094,7 +2152,7 @@ private:
 
         Info.ChildTasks.push_back(ChildTask);
 
-        swift::JobFlags ChildJobFlags(AsyncTaskObj->Flags);
+        swift::JobFlags ChildJobFlags(ChildTaskObj->Flags);
         if (ChildJobFlags.task_isChildTask()) {
           if (asyncTaskSize == 0)
             return {std::string("target async task size unknown, unable to "
@@ -2129,22 +2187,35 @@ private:
         // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
         const StoredPointer statusMask = 0x03;
         StoredPointer WaitingTaskPtr =
-            FutureFragmentObj->WaitQueue & ~statusMask;
+            stripSignedPointer(
+                RemoteAddress(FutureFragmentObj->WaitQueue & ~statusMask,
+                              RemoteAddress::DefaultAddressSpace))
+                .getRawAddress();
 
         // Walk the singly linked list of waiting tasks.
         unsigned WaitQueueLoopCount = 0;
         while (WaitingTaskPtr && WaitQueueLoopCount++ < ChildTaskLimit) {
           Info.WaitingTasks.push_back(WaitingTaskPtr);
-          // The next waiting task is stored in SchedulerPrivate[0] of the
-          // waiting task.
-          // See Job::NextWaitingTaskIndex and AsyncTask::getNextWaitingTask()
-          // in include/swift/ABI/Task.h.
+          // The next waiting task is linked from the waiting task's dependency
+          // record. See AsyncTask::getNextWaitingTask() in
+          // stdlib/public/Concurrency/Task.cpp.
           RemoteAddress WaitingTaskAddress =
               RemoteAddress(WaitingTaskPtr, RemoteAddress::DefaultAddressSpace);
           auto WaitingTaskObj = readObj<AsyncTaskType>(WaitingTaskAddress);
           if (!WaitingTaskObj)
             break;
-          WaitingTaskPtr = WaitingTaskObj->SchedulerPrivate[0];
+          auto DependencyObj = readObj<TaskDependencyStatusRecord<Runtime>>(
+              RemoteAddress(WaitingTaskObj->PrivateStorage.DependencyRecord,
+                            RemoteAddress::DefaultAddressSpace));
+          if (!DependencyObj ||
+              DependencyObj->DependencyKind !=
+                  TaskDependencyStatusRecord<Runtime>::WaitingOnTask)
+            break;
+          WaitingTaskPtr =
+              stripSignedPointer(
+                  RemoteAddress(DependencyObj->NextWaitingTask,
+                                RemoteAddress::DefaultAddressSpace))
+                  .getRawAddress();
         }
       }
     }
@@ -2258,25 +2329,34 @@ private:
     if (setupTargetPointers)
       return;
 
-    auto getPointer = [&](const std::string &name) -> StoredPointer {
+    auto getPointerInProcessAddressSpace =
+        [&](const std::string &name) -> StoredPointer {
       auto Symbol = getReader().getSymbolAddress(name);
       if (!Symbol)
         return 0;
       auto Pointer = getReader().readPointer(Symbol, sizeof(StoredPointer));
       if (!Pointer)
         return 0;
-      return Pointer->getResolvedAddress().getRawAddress();
+      RemoteAddress Address = Pointer->getResolvedAddress();
+      if (Address.getAddressSpace() != RemoteAddress::DefaultAddressSpace) {
+        auto ProcessAddress = getReader().resolveRemoteAddress(Address);
+        if (!ProcessAddress)
+          return 0;
+        Address = *ProcessAddress;
+      }
+      return stripSignedPointer(Address).getRawAddress();
     };
-    target_asyncTaskMetadata =
-        getPointer("_swift_concurrency_debug_asyncTaskMetadata");
-    target_non_future_adapter =
-        getPointer("_swift_concurrency_debug_non_future_adapter");
-    target_future_adapter =
-        getPointer("_swift_concurrency_debug_future_adapter");
-    target_task_wait_throwing_resume_adapter = getPointer(
+    // These are compared against pointers in the address space of the process.
+    target_asyncTaskMetadata = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_asyncTaskMetadata");
+    target_non_future_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_non_future_adapter");
+    target_future_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_future_adapter");
+    target_task_wait_throwing_resume_adapter = getPointerInProcessAddressSpace(
         "_swift_concurrency_debug_task_wait_throwing_resume_adapter");
-    target_task_future_wait_resume_adapter =
-        getPointer("_swift_concurrency_debug_task_future_wait_resume_adapter");
+    target_task_future_wait_resume_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_task_future_wait_resume_adapter");
     auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
         "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {

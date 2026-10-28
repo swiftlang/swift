@@ -57,8 +57,20 @@ public:
   /// Cache key for imported bridging header.
   std::string BridgingHeaderPCHCacheKey;
 
+  /// CAS FS root to be used for dep-scanning.
+  std::string DepscanCASFileSystemRootID;
+
+  /// Paths for using the underlying file system instead of CASFS.
+  std::vector<std::string> CASFSEscapePaths;
+
   /// Has immutable file system input.
   bool HasImmutableFileSystem = false;
+
+  /// Read the input files from disk and overlay them on top of the CAS file
+  /// system, instead of expecting the CAS to provide them. This makes the
+  /// input files editable, and is incompatible with caching since their
+  /// content no longer contributes to the cache key.
+  bool CASFSInputOverlay = false;
 
   /// Get the CAS configuration flags.
   void enumerateCASConfigurationFlags(
@@ -66,7 +78,7 @@ public:
 
   /// Check to see if a CASFileSystem is required.
   bool requireCASFS() const {
-    return EnableCaching &&
+    return (EnableCaching || CASFSInputOverlay) &&
            (!ClangIncludeTree.empty() || !ClangIncludeTreeFileList.empty() ||
             !InputFileKey.empty() || !BridgingHeaderPCHCacheKey.empty());
   }

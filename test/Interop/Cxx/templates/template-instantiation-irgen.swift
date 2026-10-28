@@ -9,7 +9,7 @@
 //
 // With the following, we check the happy path, that we _can_ successfully emit
 // SIL for certain template instantiations:
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -cxx-interoperability-mode=default -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple | %FileCheck %s
 //
 // Some instantiations still cause Swift compiler crashes. These are documented
 // with "FIXME" comments.

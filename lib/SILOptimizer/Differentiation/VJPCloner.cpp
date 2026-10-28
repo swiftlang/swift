@@ -19,7 +19,6 @@
 
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
@@ -293,9 +292,8 @@ public:
       pullbackValue = pullbackPartialApply;
     } else if (pullbackSubstType->isABICompatibleWith(pullbackFnType, *vjp)
                    .isCompatible()) {
-      pullbackValue =
-          Builder.createConvertFunction(loc, pullbackPartialApply, pullbackType,
-                                        /*withoutActuallyEscaping*/ false);
+      pullbackValue = Builder.createConvertFunction(loc, pullbackPartialApply,
+                                                    pullbackType);
     } else {
       llvm::report_fatal_error("Pullback value type is not ABI-compatible "
                                "with the returned pullback type");
@@ -448,7 +446,8 @@ public:
         ccabi->getCheckedCastOptions(),
         ccabi->getConsumptionKind(),
         getOpValue(ccabi->getSrc()), getOpASTType(ccabi->getSourceFormalType()),
-        getOpValue(ccabi->getDest()),
+        // A test_only cast has no destination operand.
+        ccabi->hasDest() ? getOpValue(ccabi->getDest()) : SILValue(),
         getOpASTType(ccabi->getTargetFormalType()),
         createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getSuccessBB()),
         createTrampolineBasicBlock(ccabi, pbTupleVal, ccabi->getFailureBB()),
@@ -503,8 +502,7 @@ public:
       if (pullbackFnType != pullbackUnsubstFnType) {
         pullback = builder.createConvertFunction(
             loc, pullback,
-            SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
-            /*withoutActuallyEscaping*/ false);
+            SILType::getPrimitiveObjectType(pullbackUnsubstFnType));
       }
     }
 
@@ -614,6 +612,118 @@ public:
     return false;
   }
 
+  SILValue emitVJPValue(FullApplySite fai, AutoDiffConfig &config) {
+    auto loc = fai.getLoc();
+    auto &builder = getBuilder();
+
+    auto origCallee = getOpValue(fai.getCallee());
+    auto originalFnTy = origCallee->getType().castTo<SILFunctionType>();
+
+    // Emit the VJP.
+    SILValue vjpValue;
+    // If origCallee is a `@differentiable` function, just extract it.
+    if (originalFnTy->isDifferentiable()) {
+      auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
+      for (auto i : config.parameterIndices->getIndices()) {
+        if (!paramIndices->contains(i)) {
+          context.emitNondifferentiabilityError(
+              origCallee, invoker,
+              diag::
+                  autodiff_function_noderivative_parameter_not_differentiable);
+          errorOccurred = true;
+          return {};
+        }
+      }
+      builder.emitScopedBorrowOperation(
+          loc, origCallee, [&](SILValue borrowedDiffFunc) {
+            auto origFnType = origCallee->getType().castTo<SILFunctionType>();
+            auto origFnUnsubstType =
+                origFnType->getUnsubstitutedType(getModule());
+            if (origFnType != origFnUnsubstType) {
+              borrowedDiffFunc = builder.createConvertFunction(
+                  loc, borrowedDiffFunc,
+                  SILType::getPrimitiveObjectType(origFnUnsubstType));
+            }
+            vjpValue = builder.createDifferentiableFunctionExtract(
+                loc, NormalDifferentiableFunctionTypeComponent::VJP,
+                borrowedDiffFunc);
+            vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
+          });
+      auto vjpFnType = vjpValue->getType().castTo<SILFunctionType>();
+      auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
+      if (vjpFnType != vjpFnUnsubstType) {
+        vjpValue = builder.createConvertFunction(
+            loc, vjpValue, SILType::getPrimitiveObjectType(vjpFnUnsubstType));
+      }
+    }
+
+    if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy, fai,
+                                                      origCallee, config)) {
+      errorOccurred = true;
+      return {};
+    }
+
+    // If VJP has not yet been found, emit an `differentiable_function`
+    // instruction on the remapped original function operand and
+    // an `differentiable_function_extract` instruction to get the VJP.
+    // The `differentiable_function` instruction will be canonicalized during
+    // the transform main loop.
+    if (!vjpValue) {
+      // FIXME: Handle indirect differentiation invokers. This may require some
+      // redesign: currently, each original function + witness pair is mapped
+      // only to one invoker.
+      /*
+      DifferentiationInvoker indirect(ai, attr);
+      auto insertion =
+          context.getInvokers().try_emplace({original, attr}, indirect);
+      auto &invoker = insertion.first->getSecond();
+      invoker = indirect;
+      */
+
+      // If the original `apply` instruction has a substitution map, then the
+      // applied function is specialized.
+      // In the VJP, specialization is also necessary for parity. The original
+      // function operand is specialized with a remapped version of same
+      // substitution map using an argument-less `partial_apply`.
+      if (fai.getSubstitutionMap().empty()) {
+        origCallee = builder.emitCopyValueOperation(loc, origCallee);
+      } else {
+        auto substMap = getOpSubstitutionMap(fai.getSubstitutionMap());
+        auto vjpPartialApply = getBuilder().createPartialApply(
+            loc, origCallee, substMap, {},
+            ParameterConvention::Direct_Guaranteed);
+        origCallee = vjpPartialApply;
+        originalFnTy = origCallee->getType().castTo<SILFunctionType>();
+
+        // Diagnose if new original function type is non-differentiable.
+        if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy, fai,
+                                                          origCallee, config)) {
+          errorOccurred = true;
+          return {};
+        }
+      }
+
+      auto *diffFuncInst = context.createDifferentiableFunction(
+          getBuilder(), loc, config.parameterIndices, config.resultIndices,
+          origCallee);
+
+      // Record the `differentiable_function` instruction.
+      context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
+
+      builder.emitScopedBorrowOperation(
+          loc, diffFuncInst, [&](SILValue borrowedADFunc) {
+            auto extractedVJP =
+                getBuilder().createDifferentiableFunctionExtract(
+                    loc, NormalDifferentiableFunctionTypeComponent::VJP,
+                    borrowedADFunc);
+            vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
+          });
+      builder.emitDestroyValueOperation(loc, diffFuncInst);
+    }
+
+    return vjpValue;
+  }
+
   void visitBeginApplyInst(BeginApplyInst *bai) {
     // If callee should not be differentiated, do standard cloning.
     if (!pullbackInfo.shouldDifferentiateApplySite(bai)) {
@@ -634,12 +744,10 @@ public:
 
     Builder.setCurrentDebugScope(getOpScope(bai->getDebugScope()));
     auto loc = bai->getLoc();
-    auto &builder = getBuilder();
     auto origCallee = getOpValue(bai->getCallee());
     auto originalFnTy = origCallee->getType().castTo<SILFunctionType>();
 
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *bai << '\n');
-
 
     SmallVector<SILValue, 4> allResults;
     SmallVector<unsigned, 8> activeParamIndices;
@@ -674,49 +782,11 @@ public:
     }
 
     // Emit the VJP.
-    SILValue vjpValue;
-
-    // If the original `apply` instruction has a substitution map, then the
-    // applied function is specialized.
-    // In the VJP, specialization is also necessary for parity. The original
-    // function operand is specialized with a remapped version of same
-    // substitution map using an argument-less `partial_apply`.
-    if (bai->getSubstitutionMap().empty()) {
-        origCallee = builder.emitCopyValueOperation(loc, origCallee);
-    } else {
-      auto substMap = getOpSubstitutionMap(bai->getSubstitutionMap());
-      auto vjpPartialApply = getBuilder().createPartialApply(
-        bai->getLoc(), origCallee, substMap, {},
-        ParameterConvention::Direct_Guaranteed);
-      origCallee = vjpPartialApply;
-      originalFnTy = origCallee->getType().castTo<SILFunctionType>();
-
-      // Diagnose if new original function type is non-differentiable.
-      if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy,
-                                                        bai, origCallee, config)) {
-        errorOccurred = true;
-        return;
-      }
+    SILValue vjpValue = emitVJPValue(bai, config);
+    if (!vjpValue) {
+      errorOccurred = true;
+      return;
     }
-
-    auto *diffFuncInst =
-      context.createDifferentiableFunction(getBuilder(), loc,
-                                           config.parameterIndices, config.resultIndices,
-                                           origCallee);
-
-    // Record the `differentiable_function` instruction.
-    context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
-
-    builder.emitScopedBorrowOperation(
-      loc, diffFuncInst,
-      [&](SILValue borrowedADFunc) {
-        auto extractedVJP =
-          getBuilder().createDifferentiableFunctionExtract(
-            loc, NormalDifferentiableFunctionTypeComponent::VJP,
-            borrowedADFunc);
-        vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
-      });
-    builder.emitDestroyValueOperation(loc, diffFuncInst);
 
     // Record desired/actual VJP indices.
     // Temporarily set original pullback type to `None`.
@@ -795,8 +865,6 @@ public:
     Builder.setCurrentDebugScope(getOpScope(ai->getDebugScope()));
     auto loc = ai->getLoc();
     auto &builder = getBuilder();
-    auto origCallee = getOpValue(ai->getCallee());
-    auto originalFnTy = origCallee->getType().castTo<SILFunctionType>();
 
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
 
@@ -828,108 +896,11 @@ public:
                          ai->getSubstCalleeType()->getNumAutoDiffSemanticResults(),
                          activeResultIndices));
 
-    // Emit the VJP.
-    SILValue vjpValue;
-    // If functionSource is a `@differentiable` function, just extract it.
-    if (originalFnTy->isDifferentiable()) {
-      auto paramIndices = originalFnTy->getDifferentiabilityParameterIndices();
-      for (auto i : config.parameterIndices->getIndices()) {
-        if (!paramIndices->contains(i)) {
-          context.emitNondifferentiabilityError(
-              origCallee, invoker,
-              diag::
-                  autodiff_function_noderivative_parameter_not_differentiable);
-          errorOccurred = true;
-          return;
-        }
-      }
-      builder.emitScopedBorrowOperation(
-          loc, origCallee, [&](SILValue borrowedDiffFunc) {
-            auto origFnType = origCallee->getType().castTo<SILFunctionType>();
-            auto origFnUnsubstType =
-                origFnType->getUnsubstitutedType(getModule());
-            if (origFnType != origFnUnsubstType) {
-              borrowedDiffFunc = builder.createConvertFunction(
-                  loc, borrowedDiffFunc,
-                  SILType::getPrimitiveObjectType(origFnUnsubstType),
-                  /*withoutActuallyEscaping*/ false);
-            }
-            vjpValue = builder.createDifferentiableFunctionExtract(
-                loc, NormalDifferentiableFunctionTypeComponent::VJP,
-                borrowedDiffFunc);
-            vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
-          });
-      auto vjpFnType = vjpValue->getType().castTo<SILFunctionType>();
-      auto vjpFnUnsubstType = vjpFnType->getUnsubstitutedType(getModule());
-      if (vjpFnType != vjpFnUnsubstType) {
-        vjpValue = builder.createConvertFunction(
-            loc, vjpValue, SILType::getPrimitiveObjectType(vjpFnUnsubstType),
-            /*withoutActuallyEscaping*/ false);
-      }
-    }
-
-    if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy,
-                                                      ai, origCallee, config)) {
+    // Emit VJP
+    SILValue vjpValue = emitVJPValue(ai, config);
+    if (!vjpValue) {
       errorOccurred = true;
       return;
-    }
-
-    // If VJP has not yet been found, emit an `differentiable_function`
-    // instruction on the remapped original function operand and
-    // an `differentiable_function_extract` instruction to get the VJP.
-    // The `differentiable_function` instruction will be canonicalized during
-    // the transform main loop.
-    if (!vjpValue) {
-      // FIXME: Handle indirect differentiation invokers. This may require some
-      // redesign: currently, each original function + witness pair is mapped
-      // only to one invoker.
-      /*
-      DifferentiationInvoker indirect(ai, attr);
-      auto insertion =
-          context.getInvokers().try_emplace({original, attr}, indirect);
-      auto &invoker = insertion.first->getSecond();
-      invoker = indirect;
-      */
-
-      // If the original `apply` instruction has a substitution map, then the
-      // applied function is specialized.
-      // In the VJP, specialization is also necessary for parity. The original
-      // function operand is specialized with a remapped version of same
-      // substitution map using an argument-less `partial_apply`.
-      if (ai->getSubstitutionMap().empty()) {
-        origCallee = builder.emitCopyValueOperation(loc, origCallee);
-      } else {
-        auto substMap = getOpSubstitutionMap(ai->getSubstitutionMap());
-        auto vjpPartialApply = getBuilder().createPartialApply(
-            ai->getLoc(), origCallee, substMap, {},
-            ParameterConvention::Direct_Guaranteed);
-        origCallee = vjpPartialApply;
-        originalFnTy = origCallee->getType().castTo<SILFunctionType>();
-
-        // Diagnose if new original function type is non-differentiable.
-        if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy,
-                                                          ai, origCallee, config)) {
-          errorOccurred = true;
-          return;
-        }
-      }
-
-      auto *diffFuncInst = context.createDifferentiableFunction(
-          getBuilder(), loc, config.parameterIndices, config.resultIndices,
-          origCallee);
-
-      // Record the `differentiable_function` instruction.
-      context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
-
-      builder.emitScopedBorrowOperation(
-          loc, diffFuncInst, [&](SILValue borrowedADFunc) {
-            auto extractedVJP =
-                getBuilder().createDifferentiableFunctionExtract(
-                    loc, NormalDifferentiableFunctionTypeComponent::VJP,
-                    borrowedADFunc);
-            vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
-          });
-      builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
     // Record desired/actual VJP indices.
@@ -971,8 +942,7 @@ public:
       if (pullbackFnType != pullbackUnsubstFnType) {
         pullback = builder.createConvertFunction(
             loc, pullback,
-            SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
-            /*withoutActuallyEscaping*/ false);
+            SILType::getPrimitiveObjectType(pullbackUnsubstFnType));
       }
     }
 
@@ -1034,8 +1004,6 @@ public:
 
     auto loc = tai->getLoc();
     auto &builder = getBuilder();
-    auto origCallee = getOpValue(tai->getCallee());
-    auto originalFnTy = origCallee->getType().castTo<SILFunctionType>();
     auto *origBB = tai->getParent();
 
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *tai << '\n');
@@ -1070,52 +1038,11 @@ public:
             activeResultIndices));
 
     // Emit the VJP.
-    SILValue vjpValue;
-
-    if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy, tai,
-                                                      origCallee, config)) {
+    SILValue vjpValue = emitVJPValue(tai, config);
+    if (!vjpValue) {
       errorOccurred = true;
       return;
     }
-
-    // If the original `apply` instruction has a substitution map, then the
-    // applied function is specialized.
-    // In the VJP, specialization is also necessary for parity. The original
-    // function operand is specialized with a remapped version of same
-    // substitution map using an argument-less `partial_apply`.
-    if (tai->getSubstitutionMap().empty()) {
-      origCallee = builder.emitCopyValueOperation(loc, origCallee);
-    } else {
-      auto substMap = getOpSubstitutionMap(tai->getSubstitutionMap());
-      auto vjpPartialApply =
-          builder.createPartialApply(tai->getLoc(), origCallee, substMap, {},
-                                     ParameterConvention::Direct_Guaranteed);
-      origCallee = vjpPartialApply;
-      originalFnTy = origCallee->getType().castTo<SILFunctionType>();
-
-      // Diagnose if new original function type is non-differentiable.
-      if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy, tai,
-                                                        origCallee, config)) {
-        errorOccurred = true;
-        return;
-      }
-    }
-
-    auto *diffFuncInst = context.createDifferentiableFunction(
-        builder, loc, config.parameterIndices, config.resultIndices,
-        origCallee);
-
-    // Record the `differentiable_function` instruction.
-    context.getDifferentiableFunctionInstWorklist().push_back(diffFuncInst);
-
-    builder.emitScopedBorrowOperation(
-        loc, diffFuncInst, [&](SILValue borrowedADFunc) {
-          auto extractedVJP = builder.createDifferentiableFunctionExtract(
-              loc, NormalDifferentiableFunctionTypeComponent::VJP,
-              borrowedADFunc);
-          vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
-        });
-    builder.emitDestroyValueOperation(loc, diffFuncInst);
 
     // Record desired/actual VJP indices.
     // Temporarily set original pullback type to `None`.
@@ -1150,7 +1077,7 @@ public:
         vjpFnTy->getDirectFormalResultsType(getModule(),
                                             TypeExpansionContext::minimal(),
                                             vjp->hasLoweredAddresses()),
-        tai->getNormalBB()->getArgument(0)->getOwnershipKind());
+        OwnershipKind::Owned);
 
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
@@ -1218,8 +1145,7 @@ public:
         if (pullbackFnType != pullbackUnsubstFnType) {
           pullback = trampolineBuilder.createConvertFunction(
               loc, pullback,
-              SILType::getPrimitiveObjectType(pullbackUnsubstFnType),
-              /*withoutActuallyEscaping*/ false);
+              SILType::getPrimitiveObjectType(pullbackUnsubstFnType));
         }
       }
 
@@ -1595,7 +1521,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
-  pullback->setHasLoweredAddresses(original->hasLoweredAddresses());
+  pullback->inheritDerivedFrom(original);
 
   return pullback;
 }
@@ -1671,7 +1597,7 @@ EnumInst *VJPCloner::Implementation::buildPredecessorEnumValue(
     auto pbTupleMetatypeSILType =
         SILType::getPrimitiveObjectType(pbTupleMetatypeType);
     auto pbTupleMetatype =
-        Builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
+        builder.createMetatype(original->getLocation(), pbTupleMetatypeSILType);
 
     auto rawBufferValue = builder.createBuiltin(
         loc,
@@ -1727,9 +1653,9 @@ bool VJPCloner::Implementation::run() {
 
   // Generate pullback code.
   PullbackCloner PullbackCloner(cloner);
-  if (PullbackCloner.run()) {
+  if (PullbackCloner.run())
     errorOccurred = true;
-  }
+
   if (!errorOccurred) {
     auto *pm = &context.getPassManager();
     pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(vjp);

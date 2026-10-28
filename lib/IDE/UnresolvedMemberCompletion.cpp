@@ -11,10 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/UnresolvedMemberCompletion.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;
@@ -22,9 +20,9 @@ using namespace swift::constraints;
 using namespace swift::ide;
 
 bool UnresolvedMemberTypeCheckCompletionCallback::Result::tryMerge(
-    const Result &Other, DeclContext *DC) {
+    const Result &Other) {
   auto expectedTy = tryMergeBaseTypeForCompletionLookup(ExpectedTy,
-                                                        Other.ExpectedTy, DC);
+                                                        Other.ExpectedTy);
   if (!expectedTy)
     return false;
 
@@ -38,7 +36,7 @@ bool UnresolvedMemberTypeCheckCompletionCallback::Result::tryMerge(
 void UnresolvedMemberTypeCheckCompletionCallback::addExprResult(
     const Result &Res) {
   for (auto idx : indices(ExprResults)) {
-    if (ExprResults[idx].tryMerge(Res, DC))
+    if (ExprResults[idx].tryMerge(Res))
       return;
   }
   ExprResults.push_back(Res);

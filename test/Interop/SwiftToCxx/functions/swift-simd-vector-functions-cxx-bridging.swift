@@ -4,6 +4,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // CHECK:      SWIFT_INLINE_THUNK swift_double2 passThroughdouble2(swift_double2 x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughdouble2y4simd7double2VAEF(x);
 // CHECK-NEXT: }

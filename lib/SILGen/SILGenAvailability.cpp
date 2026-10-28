@@ -11,11 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenFunction.h"
-#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Platform.h"
 #include "swift/SIL/SILDeclRef.h"
 
 using namespace swift;
@@ -314,6 +312,11 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
     return B.createIntegerLiteral(loc, i1, !availability->isUnavailability());
 
   return emitAvailabilityCheck(*this, loc, *query);
+}
+
+SILValue SILGenFunction::emitAvailabilityQuery(SILLocation loc,
+                                               const AvailabilityQuery &query) {
+  return emitAvailabilityCheck(*this, loc, query);
 }
 
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,

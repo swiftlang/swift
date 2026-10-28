@@ -16,9 +16,7 @@
 
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
 
 namespace swift {
 class DominanceAnalysis;

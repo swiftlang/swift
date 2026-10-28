@@ -48,7 +48,7 @@ import Swift
 /// [concurrency]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency#Global-Actors
 /// [tspl]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/
 @available(SwiftStdlib 5.1, *)
-public protocol GlobalActor {
+public protocol GlobalActor: SendableMetatype {
   /// The type of the shared actor instance that will be used to provide
   /// mutually-exclusive access to declarations annotated with the given global
   /// actor type.

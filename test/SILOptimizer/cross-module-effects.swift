@@ -23,7 +23,7 @@ public final class X {
   public init() { }
 }
 
-// CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module17noInlineNoEffectsySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [canonical] [stage=canonical] @$s6Module17noInlineNoEffectsySiAA1XCF :
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
@@ -44,17 +44,17 @@ public func inlineNoEffects(_ x: X) -> Int {
   return internalCallee(x)
 }
 
-// CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-LABEL: sil [canonical] [stage=canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
-// CHECK-LE-MODULE-LABEL: sil [canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
+// CHECK-LE-MODULE-LABEL: sil [canonical] [stage=canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 @usableFromInline
 func internalCallee(_ x: X) -> Int {
   return x.i
 }
 
-// CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module19noInlineWithEffectsySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [canonical] [stage=canonical] @$s6Module19noInlineWithEffectsySiAA1XCF :
 // CHECK-FR-MODULE-NEXT:  [%0: noescape! **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
@@ -78,15 +78,15 @@ public func inlineWithEffects(_ x: X) -> Int {
   return internalCallee(x)
 }
 
-// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @loadWeakX_from : {{.*}} {
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [stage=canonical] [ossa] @loadWeakX_from : {{.*}} {
 // CHECK-LE-MODULE:       {{^[^[]}}
 // CHECK-LE-MODULE-LABEL: } // end sil function 'loadWeakX_from'
 
-// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [stage=canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
-// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [stage=canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MODULE-NEXT:  {{^[^[]}}
 @inlinable
 @inline(never)
@@ -99,7 +99,7 @@ public struct S {
   public weak var x: X?
 }
 
-// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @loadWeakX_from : {{.*}} {
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [stage=canonical] [ossa] @loadWeakX_from : {{.*}} {
 // CHECK-FR-MODULE:       [global: deinit_barrier]
 // CHECK-FR-MODULE-LABEL: } // end sil function 'loadWeakX_from'
 @inlinable

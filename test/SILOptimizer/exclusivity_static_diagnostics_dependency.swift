@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Lifetimes \
-// RUN:   -disable-availability-checking -primary-file %s -o /dev/null -verify
+// RUN: -primary-file %s -o /dev/null -verify
 
 // REQUIRES: swift_feature_Lifetimes
 

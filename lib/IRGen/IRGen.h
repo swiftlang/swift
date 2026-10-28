@@ -18,7 +18,6 @@
 #ifndef SWIFT_IRGEN_IRGEN_H
 #define SWIFT_IRGEN_IRGEN_H
 
-#include "llvm/Support/DataTypes.h"
 #include "clang/AST/CharUnits.h"
 #include "clang/CodeGen/ConstantInitFuture.h"
 #include "swift/AST/ResilienceExpansion.h"

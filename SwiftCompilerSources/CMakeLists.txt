@@ -111,6 +111,11 @@ function(add_swift_compiler_modules_library name)
     endif()
   endforeach()
 
+  # FIXME: forward the C++ targets' other MSVC definitions here too, not just this one.
+  if(MSVC AND NOT LLVM_ENABLE_EH)
+    list(APPEND swift_compile_options "-Xcc" "-D_HAS_EXCEPTIONS=0")
+  endif()
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
       list(APPEND swift_compile_options
@@ -150,7 +155,13 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
 
-  if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+  # need it.
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_CONDITIONS})
+    list(APPEND swift_compile_options "-D${condition}")
+  endforeach()
+
+  if(DEFINED SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT AND NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
 
@@ -219,6 +230,17 @@ function(add_swift_compiler_modules_library name)
 
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
+
+    # When LLVM is built as a DLL with clang-cl, its libraries are compiled with
+    # `/Zc:dllexportInlines-` (see `llvm_add_library` in AddLLVM.cmake). The
+    # C++ headers imported into Swift modules must be parsed with the same
+    # setting, otherwise the importer emits dllimport references to inline
+    # members that LLVM.dll does not export. `-fno-dllexport-inlines` is the
+    # cc1 spelling of that flag.
+    if(LLVM_BUILD_LLVM_DYLIB AND NOT LLVM_DYLIB_EXPORT_INLINES AND
+       MSVC AND CMAKE_CXX_COMPILER_ID MATCHES Clang)
+      list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fno-dllexport-inlines")
+    endif()
 
   elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
     # Detect and handle swiftly-managed hosts.
@@ -370,7 +392,7 @@ else()
         message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
       endif()
 
-      set(min_supported_swift_version 5.9)
+      set(min_supported_swift_version 6.2)
       if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
         message(FATAL_ERROR
             "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "

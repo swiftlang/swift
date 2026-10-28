@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
@@ -27,13 +26,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -512,6 +508,21 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   lookupInModule(moduleToLookIn, Name.getFullName(), Name.hasModuleSelector(),
                  CurModuleResults, NLKind::UnqualifiedLookup, resolutionKind,
                  dc, Loc, nlOptions);
+
+  // Unique macro names are only visible inside the macro expansion that
+  // introduced them, so only look into the macro expansions enclosing the
+  // lookup location.
+  if (MacroDecl::isUniqueMacroName(Name.getBaseName()) &&
+      !Name.hasModuleSelector() &&
+      !options.contains(Flags::ExcludeMacroExpansions)) {
+    SmallVector<ValueDecl *, 1> expansionResults;
+    dc->getParentModule()->lookupUniqueMacroNameInEnclosingExpansions(
+        Name.getFullName(), Loc, expansionResults);
+    for (auto *VD : expansionResults) {
+      if (isAcceptableLookupResult(VD, resolutionKind, nlOptions))
+        CurModuleResults.push_back(VD);
+    }
+  }
 
   if (dc->isInSwiftinterface() &&
       !dc->getASTContext().LangOpts.FormalCxxInteropMode) {

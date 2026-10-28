@@ -198,7 +198,7 @@ import _Concurrency
 public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   where ID == ActorSystem.ActorID,
         SerializationRequirement == ActorSystem.SerializationRequirement {
-  
+
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
 
@@ -277,6 +277,21 @@ public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   /// - Parameter system: `system` which should be used to resolve the `identity`, and be associated with the returned actor
   static func resolve(id: ID, using system: ActorSystem) throws -> Self
 
+  #if $Embedded
+  /// Receiver-side remote call target dispatch, synthesized by the compiler.
+  /// The static equivalent of the runtime accessible functions that
+  /// non-embedded Distributed uses to execute remote calls.
+  ///
+  /// Not intended to be called by user code; actor system implementations
+  /// should call ``DistributedActorSystem/executeDistributedTarget`` instead,
+  /// the same as a non-embedded implementation would.
+  @available(SwiftStdlib 6.5, *)
+  nonisolated(nonsending) func _executeDistributedTarget(
+    target: RemoteCallTarget,
+    invocationDecoder: inout Self.ActorSystem.InvocationDecoder,
+    resultHandler: Self.ActorSystem.ResultHandler
+  ) async throws
+  #endif // $Embedded
 }
 
 // ==== Hashable conformance ---------------------------------------------------
@@ -301,6 +316,7 @@ extension DistributedActor {
 
 // ==== Codable conformance ----------------------------------------------------
 
+#if !$Embedded
 extension CodingUserInfoKey {
 
   /// Key which is required to be set on a `Decoder`'s `userInfo` while attempting
@@ -312,7 +328,9 @@ extension CodingUserInfoKey {
   @available(SwiftStdlib 5.7, *)
   public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
 }
+#endif // !$Embedded
 
+#if !$Embedded
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable {
 
@@ -338,7 +356,9 @@ extension DistributedActor /*: implicitly Decodable */ where Self.ID: Decodable 
     self = try Self.resolve(id: id, using: system)
   }
 }
+#endif // !$Embedded
 
+#if !$Embedded
 @available(SwiftStdlib 5.7, *)
 extension DistributedActor /*: implicitly Encodable */ where Self.ID: Encodable {
 
@@ -348,6 +368,7 @@ extension DistributedActor /*: implicitly Encodable */ where Self.ID: Encodable 
     try container.encode(self.id)
   }
 }
+#endif // !$Embedded
 
 // ==== Local actor special handling -------------------------------------------
 
@@ -448,11 +469,6 @@ public func __isRemoteActor(_ actor: AnyObject) -> Bool
 public func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
-
-// ==== Proxy Actor lifecycle --------------------------------------------------
-
-@_silgen_name("swift_distributedActor_remote_initialize")
-func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
 
 // ==== Distributed Actor Stubs ------------------------------------------------
 

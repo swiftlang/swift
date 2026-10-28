@@ -18,25 +18,18 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeBits.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
-#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include <utility>
@@ -83,29 +76,8 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   return true;
 }
 
-SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *pai) {
-  // partial_apply without any substitutions or arguments is just a
-  // thin_to_thick_function. thin_to_thick_function supports only thin operands.
-  if (!pai->hasSubstitutions() && (pai->getNumArguments() == 0) &&
-      pai->getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::Thin) {
-    if (!pai->isOnStack())
-      return Builder.createThinToThickFunction(pai->getLoc(), pai->getCallee(),
-                                               pai->getType());
-
-    // Remove dealloc_stack of partial_apply [stack].
-    // Iterating while delete use a copy.
-    SmallVector<Operand *, 8> uses(pai->getUses());
-    for (auto *use : uses)
-      if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser()))
-        eraseInstFromFunction(*dealloc);
-    auto *thinToThick = Builder.createThinToThickFunction(
-        pai->getLoc(), pai->getCallee(), pai->getType());
-    replaceInstUsesWith(*pai, thinToThick);
-    eraseInstFromFunction(*pai);
-    return nullptr;
-  }
-
+SILInstruction *
+SILCombiner::legacyVisitPartialApplyInst(PartialApplyInst *pai) {
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
   // -> %closure_typeB
@@ -431,7 +403,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       if (propDecl->hasClangNode() && propDecl->getInterfaceType()->isVoid())
         return false;
 
-      if (!parentTy.getStructOrBoundGenericStruct())
+      if (!parentTy.getStructDecl())
         hasOffset = false;
       break;
     }
@@ -481,7 +453,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType intType = AI->getType().getOptionalObjectType();
     if (!intType)
       return false;
-    StructDecl *intDecl = intType.getStructOrBoundGenericStruct();
+    StructDecl *intDecl = intType.getStructDecl();
     if (!intDecl || intDecl->getStoredProperties().size() != 1)
       return false;
     VarDecl *member = intDecl->getStoredProperties()[0];
@@ -678,8 +650,11 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
 
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
+    // Debug uses are rewritten during salvage and shouldn't extend lifetimes.
+    if (isa<DebugValueInst>(Inst))
+      continue;
     if (isa<RefCountingInst>(Inst) || isa<DestroyValueInst>(Inst) ||
-        isa<DebugValueInst>(Inst) || isa<EndBorrowInst>(Inst)) {
+        isa<EndBorrowInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
     }
@@ -822,7 +797,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// If the argtype is an opened existential conforming to a protocol type
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
-    ArchetypeType *archetypeTy;
+    ArchetypeType *archetypeTy = nullptr;
     if (isa<ExistentialArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {
@@ -1648,7 +1623,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (!storageTy->is_ContiguousArrayStorage())
     return false;
 
-  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  auto boundGenericTy = dyn_cast<NominalType>(storageTy);
   if (!boundGenericTy)
     return false;
 
@@ -1656,7 +1631,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (genericArgs.size() != 1)
     return false;
   auto ty = genericArgs[0]->getCanonicalType();
-  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+  if (ty->getStructDecl() || ty->getEnumDecl() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
       isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||

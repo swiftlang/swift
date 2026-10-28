@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift %clang-importer-sdk
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ctypes
 
 func useStructWithBitfields(_ mrm: ModRM) -> ModRM {

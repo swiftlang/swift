@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend \
 // RUN:    -emit-ir %s -swift-version 5 \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.7-abi-triple \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:   -module-name existential_shape_metadata | %IRGenFileCheck %s
 

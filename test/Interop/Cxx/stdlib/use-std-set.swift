@@ -1,16 +1,12 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++14)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++17)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++14)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++17)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20)
 
 // Also test this with a bridging header instead of the StdSet module.
 // RUN: %empty-directory(%t2)
 // RUN: cp %S/Inputs/std-set.h %t2/std-set-bridging-header.h
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -cxx-interoperability-mode=default)
 
 // REQUIRES: executable_test
 //
@@ -19,6 +15,8 @@
 // UNSUPPORTED: LinuxDistribution=rhel-10.1
 // UNSUPPORTED: LinuxDistribution=rhel-10.2
 // UNSUPPORTED: LinuxDistribution=ubuntu-26.04
+
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -193,6 +191,64 @@ StdSetTestSuite.test("SetOfCIntWithCustomComparator") {
 //     expectFalse(s.contains(2))
 //     expectTrue(s.contains(3))
 //     expectTrue(s.contains(5))
+}
+
+StdSetTestSuite.test("SetOfCInt Borrowing Iterators").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let constSet = initSetOfCInt()
+    expectTrue(constSet.contains(1))
+    expectFalse(constSet.contains(2))
+    expectTrue(constSet.contains(3))
+
+    let arr : [Int32] = [1, 3, 5]
+    var counter = 0
+    for el in constSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+
+    var mutSet = initSetOfCInt()
+    expectTrue(mutSet.contains(1))
+    expectFalse(mutSet.contains(2))
+    expectTrue(mutSet.contains(3))
+
+    counter = 0
+    for el in mutSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 3)
+}
+
+StdSetTestSuite.test("MultisetOfCInt Borrowing Iterators").require(.stdlib_6_4).code {
+    guard #available(SwiftStdlib 6.4, *) else { return }
+
+    let constSet = initMultisetOfCInt()
+    expectTrue(constSet.contains(2))
+    expectFalse(constSet.contains(3))
+    expectTrue(constSet.contains(4))
+
+    let arr : [Int32] = [2, 2, 4, 6]
+    var counter = 0
+    for el in constSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
+
+    var mutSet = initMultisetOfCInt()
+    expectTrue(mutSet.contains(2))
+    expectFalse(mutSet.contains(3))
+    expectTrue(mutSet.contains(4))
+
+    counter = 0
+    for el in mutSet {
+        expectEqual(el, arr[counter])
+        counter += 1
+    }
+    expectEqual(counter, 4)
 }
 
 runAllTests()

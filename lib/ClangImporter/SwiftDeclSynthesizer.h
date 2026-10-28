@@ -44,7 +44,9 @@ inline MakeStructRawValuedOptions getDefaultMakeStructRawValuedOptions() {
 }
 
 inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
-  return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
+  auto *classDecl = dc->getSelfClassDecl();
+  return (classDecl && !classDecl->isFinal()) ? AccessLevel::Open
+                                              : AccessLevel::Public;
 }
 
 enum class ReferenceReturnTypeBehaviorForBaseMethodSynthesis {
@@ -78,6 +80,12 @@ public:
   /// Create a reinterpretCast from the `exprType`, to the `givenType`.
   static Expr *synthesizeReturnReinterpretCast(ASTContext &ctx, Type givenType,
                                                Type exprType, Expr *baseExpr);
+
+  /// Clone \p param for a synthesized declaration whose body forwards it.
+  /// SILGen doesn't bind unnamed parameters, so an unnamed one is named
+  /// \p nameIfUnnamed.
+  static ParamDecl *cloneParamForForwarding(ASTContext &ctx, ParamDecl *param,
+                                            const Twine &nameIfUnnamed);
 
   /// Create a new named constant with the given value.
   ///

@@ -80,6 +80,21 @@ extension MemoryLayout where T: ~Copyable & ~Escapable {
   public static var alignment: Int {
     return Int(Builtin.alignof(T.self))
   }
+
+#if $BuiltinTypedAllocationID && hasFeature(Embedded)
+  /// The typed-allocation type descriptor for `T`.
+  ///
+  /// Requires Embedded Swift with typed allocation enabled; using this
+  /// without typed allocation enabled is a compile-time error (IRGen errs
+  /// unless typed allocation is enabled).
+  /// We don't have a hasFeature(TypedAllocation) guard here to allow IRGen
+  /// testing without requiring an embedded stdlib built with typed allocation.
+  @export(implementation)
+  @inline(always)
+  public static var typedAllocationID: UInt64 {
+    return UInt64(Builtin.typedAllocationID(T.self))
+  }
+#endif
 }
 
 extension MemoryLayout where T: ~Copyable & ~Escapable {

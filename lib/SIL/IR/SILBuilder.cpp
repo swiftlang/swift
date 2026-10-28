@@ -57,7 +57,8 @@ SILType SILBuilder::getPartialApplyResultType(
     TypeExpansionContext context, SILType origTy, unsigned argCount,
     SILModule &M, SubstitutionMap subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation,
-    PartialApplyInst::OnStackKind onStack, bool isCalledOnce) {
+    PartialApplyInst::OnStackKind onStack,
+    std::optional<ExecutionSemantics> executionSemantics) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs, context);
@@ -79,8 +80,8 @@ SILType SILBuilder::getPartialApplyResultType(
               argCount));
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();
-  if (isCalledOnce)
-    extInfoBuilder = extInfoBuilder.withCalledOnce();
+  if (executionSemantics)
+    extInfoBuilder = extInfoBuilder.withExecutionSemantics(executionSemantics);
   auto extInfo = extInfoBuilder.build();
 
   // If the original method has an @unowned_inner_pointer return, the partial
@@ -176,7 +177,7 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
     if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
       if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
         if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
-          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+          return createConvertFunction(Loc, Op, Ty);
         }
       }
     }
@@ -210,7 +211,7 @@ SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
     if (auto OpFnTy = Op->getType().getAs<SILFunctionType>()) {
       if (auto DestFnTy = Ty.getAs<SILFunctionType>()) {
         if (OpFnTy->getRepresentation() == DestFnTy->getRepresentation()) {
-          return createConvertFunction(Loc, Op, Ty, /*withoutActuallyEscaping*/ false);
+          return createConvertFunction(Loc, Op, Ty);
         }
       }
     }
@@ -560,7 +561,7 @@ void SILBuilder::emitDestructureValueOperation(
 
   // If we do not have a tuple or a struct, add to our results list and return.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     results.emplace_back(v);
     return;
   }
@@ -590,7 +591,7 @@ void SILBuilder::emitDestructureAddressOperation(
 
   // If we do not have a tuple or a struct, add to our results list.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     results.emplace_back(v);
     return;
   }
@@ -610,7 +611,7 @@ void SILBuilder::emitDestructureAddressOperation(
 
   // If we do not have a tuple or a struct, add to our results list.
   SILType type = v->getType();
-  if (!(type.is<TupleType>() || type.getStructOrBoundGenericStruct())) {
+  if (!(type.is<TupleType>() || type.getStructDecl())) {
     return;
   }
 
@@ -670,6 +671,17 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc,
   return insert(DebugValueInst::create(DebugLoc, operands, getModule(),
                                        *substituteAnonymousArgs(Name, Var, Loc),
                                        moved, trace));
+}
+
+DebugValueInst *SILBuilder::createVoidVariableDebugValue(
+    SILLocation Loc, SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
+  SILType voidTy = SILType::getEmptyTupleType(getASTContext());
+  Var.Type = voidTy;
+  Var.DIExpr.clear();
+
+  return createDebugValue(Loc, SILUndef::get(&getFunction(), voidTy), Var,
+                          wasMoved, trace);
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

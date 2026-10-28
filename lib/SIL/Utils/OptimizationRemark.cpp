@@ -24,9 +24,6 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILRemarkStreamer.h"
@@ -140,7 +137,7 @@ static bool isMethodWithForceEmitSemanticAttrNominalType(SILFunction &fn) {
     return false;
 
   auto selfType = fn.getSelfArgument()->getType();
-  auto *nomType = selfType.getNominalOrBoundGenericNominal();
+  auto *nomType = selfType.getNominalDecl();
   if (!nomType)
     return false;
   return nomType->shouldEmitAssemblyVisionRemarksOnMethods();

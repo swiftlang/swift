@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 
 #include "ConstantBuilder.h"
@@ -36,12 +35,21 @@ void IRGenModule::emitSILDifferentiabilityWitness(
     return;
   ConstantInitBuilder builder(*this);
   auto diffWitnessContents = builder.beginStruct();
+  auto addDerivative = [&](SILFunction *derivative) {
+    if (derivative->isAsync())
+      diffWitnessContents.add(getAddrOfAsyncFunctionPointer(derivative));
+    else if (derivative->isCalleeAllocatedCoroutine())
+      diffWitnessContents.add(getAddrOfCoroFunctionPointer(derivative));
+    else
+      diffWitnessContents.add(
+          getAddrOfSILFunction(derivative, NotForDefinition));
+  };
   assert(dw->getJVP() &&
          "Differentiability witness definition should have JVP");
   assert(dw->getVJP() &&
          "Differentiability witness definition should have VJP");
-  diffWitnessContents.add(getAddrOfSILFunction(dw->getJVP(), NotForDefinition));
-  diffWitnessContents.add(getAddrOfSILFunction(dw->getVJP(), NotForDefinition));
+  addDerivative(dw->getJVP());
+  addDerivative(dw->getVJP());
   getAddrOfDifferentiabilityWitness(
       dw, diffWitnessContents.finishAndCreateFuture());
 }

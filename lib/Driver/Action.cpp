@@ -12,7 +12,6 @@
 
 #include "swift/Driver/Action.h"
 
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift::driver;

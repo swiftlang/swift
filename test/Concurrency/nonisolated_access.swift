@@ -40,7 +40,7 @@ actor A {
   func test() {
     var s = S()
     s.x += 0 // okay
-    // expected-error@+1 {{main actor-isolated property 'y' can not be mutated on a nonisolated actor instance}}
+    // expected-error@+1 {{main actor-isolated property 'y' can not be mutated on a different actor instance}}
     s.y += 1
     var sendable = ImplicitlySendable()
     sendable.prop = false // okay

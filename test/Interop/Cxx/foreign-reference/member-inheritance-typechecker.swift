@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=swift-5.9
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=swift-6
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default
 
 import MemberInheritance
 
@@ -173,3 +171,8 @@ func callsOverridesOfAbstractFRTMethods (_ frt: DerivedAbstractFRT, _ empty_frt:
   let _ = empty_frt.swiftPureRenameDerived() // expected-error {{value of type 'EmptyDerivedAbstractFRT' has no member 'swiftPureRenameDerived'}}
 }
 
+@available(SwiftStdlib 5.8, *)
+func constructsFromInheritedFactory() {
+  let _ = HasCreateMethodImportedAsInitializer(n: 5)
+  let _ = DerivedFromHasCreateMethodImportedAsInitializer(n: 5) // expected-error {{argument passed to call that takes no arguments}}
+}

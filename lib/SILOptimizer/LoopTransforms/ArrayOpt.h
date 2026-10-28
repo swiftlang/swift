@@ -17,7 +17,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
 

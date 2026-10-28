@@ -17,13 +17,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/FileSystem.h"

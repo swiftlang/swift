@@ -1,0 +1,33 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IValue: AnyObject {}
+
+// Class-bound COM interfaces permit reference storage, but their ownership
+// operations do not use Swift reference counting.
+// CHECK-LABEL: sil [ossa] @roundTrip
+// CHECK: ref_to_unmanaged
+// CHECK: unmanaged_to_ref
+sil [ossa] @roundTrip : $@convention(thin) (@guaranteed any IValue) -> () {
+bb0(%value : @guaranteed $any IValue):
+  %storage = ref_to_unmanaged %value : $any IValue to $@sil_unmanaged any IValue
+  %reference = unmanaged_to_ref %storage : $@sil_unmanaged any IValue to $any IValue
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @optionalRoundTrip
+// CHECK: ref_to_unmanaged
+// CHECK: unmanaged_to_ref
+sil [ossa] @optionalRoundTrip : $@convention(thin) (@guaranteed Optional<any IValue>) -> () {
+bb0(%value : @guaranteed $Optional<any IValue>):
+  %storage = ref_to_unmanaged %value : $Optional<any IValue> to $@sil_unmanaged Optional<any IValue>
+  %reference = unmanaged_to_ref %storage : $@sil_unmanaged Optional<any IValue> to $Optional<any IValue>
+  %result = tuple ()
+  return %result : $()
+}

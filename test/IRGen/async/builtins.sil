@@ -269,13 +269,13 @@ bb0(%out : $*Pair<T>):
 sil hidden [ossa] @task_group_create_destroy : $@async () -> () {
 bb0:
   // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x ptr], align 16
-  // CHECK: call void @llvm.lifetime.start.p0(i64 -1, ptr [[TASKGROUP]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[TASKGROUP]])
   // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(ptr [[TASKGROUP]], ptr {{.*}})
   %0 = metatype $@thin Builtin.Int32.Type
   %1 = builtin "createTaskGroup"<Builtin.Int32>(%0: $@thin Builtin.Int32.Type) : $Builtin.RawPointer
 
   // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(ptr [[TASKGROUP]])
-  // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr [[TASKGROUP]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0(ptr [[TASKGROUP]])
   builtin "destroyTaskGroup"(%1 : $Builtin.RawPointer) : $()
 
   %21 = tuple ()
@@ -286,7 +286,7 @@ bb0:
 sil hidden [ossa] @task_group_create_destroy_generic : $@async <T> () -> () {
 bb0:
   // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x ptr], align 16
-  // CHECK: call void @llvm.lifetime.start.p0(i64 -1, ptr [[TASKGROUP]])
+  // CHECK: call void @llvm.lifetime.start.p0(ptr [[TASKGROUP]])
 
   // We've set up a function that has no reason to request type metadata
   // for Pair<T> except to pass it to swift_taskGroup_initialize. Make sure
@@ -301,7 +301,7 @@ bb0:
   %1 = builtin "createTaskGroup"<Pair<T>>(%0: $@thin Pair<T>.Type) : $Builtin.RawPointer
 
   // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(ptr [[TASKGROUP]])
-  // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr [[TASKGROUP]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0(ptr [[TASKGROUP]])
   builtin "destroyTaskGroup"(%1 : $Builtin.RawPointer) : $()
 
   %21 = tuple ()

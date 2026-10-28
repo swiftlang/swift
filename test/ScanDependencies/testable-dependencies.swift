@@ -53,7 +53,7 @@
 // WARN: warning: module file '{{.*}}{{/|\\}}A.swiftmodule' is incompatible with this Swift compiler: module built without '-enable-testing'
 
 /// Testable import non-testable build enable testing, warning about the finding then error out.
-// RUN: %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/testable.swift \
+// RUN: not %target-swift-frontend -scan-dependencies -scanner-module-validation -module-load-mode prefer-interface -module-name Test %t/testable.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -enable-testing \
 // RUN:   -o %t/deps5.json -I %t/regular -swift-version 5 -Rmodule-loading 2>&1 | %FileCheck %s --check-prefix ERROR
 // ERROR: error: unable to resolve Swift module dependency to a compatible module: 'A'
@@ -81,4 +81,3 @@ internal import B
 
 //--- B.swift
 public func b() {}
-

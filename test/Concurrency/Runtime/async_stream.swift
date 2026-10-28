@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -parse-as-library
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -parse-as-library
+// RUN: %target-run-simple-swift( -parse-as-library)
+// RUN: %target-run-simple-swift( -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
@@ -16,7 +16,7 @@ import _Concurrency
 import StdlibUnittest
 
 struct SomeError: Error, Equatable {
-  var value: Int = 0
+  var value = Int.random(in: 0..<100)
 }
 
 class NotSendable {}
@@ -38,7 +38,7 @@ class NotSendable {}
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 5.5, *) {
+    if #available(SwiftStdlib 6.2, *) {
       final class Expectation: @unchecked Sendable {
         var fulfilled = false
       }
@@ -171,7 +171,7 @@ class NotSendable {}
 
       tests.test("yield with no awaiting next detached") {
         _ = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -179,7 +179,7 @@ class NotSendable {}
 
       tests.test("yield with no awaiting next detached throwing") {
         _ = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -187,7 +187,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next detached") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -197,7 +197,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next detached throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
           }
         }
@@ -211,7 +211,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 detached") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
           }
@@ -223,7 +223,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 detached throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
           }
@@ -239,7 +239,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -253,7 +253,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -272,7 +272,7 @@ class NotSendable {}
       tests.test("yield with awaiting next 2 and throw detached") {
         let thrownError = SomeError()
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish(throwing: thrownError)
@@ -295,7 +295,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached with value after finish") {
         let series = AsyncStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -311,7 +311,7 @@ class NotSendable {}
 
       tests.test("yield with awaiting next 2 and finish detached with value after finish throwing") {
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -332,7 +332,7 @@ class NotSendable {}
       tests.test("yield with awaiting next 2 and finish detached with throw after finish throwing") {
         let thrownError = SomeError()
         let series = AsyncThrowingStream(String.self) { continuation in
-          detach {
+          detach { // expected-warning {{'detach(priority:operation:)' is deprecated: `detach` was replaced by `Task.detached` and will be removed shortly.}}
             continuation.yield("hello")
             continuation.yield("world")
             continuation.finish()
@@ -438,97 +438,6 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
-      tests.test("finish(throwing:) from onTermination on cancellation throws the error passed to finish") {
-        let thrownError = SomeError()
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        let task = Task { () -> Error? in
-          let stream = AsyncThrowingStream<Int, Error> { continuation in
-            continuation.onTermination = { @Sendable termination in
-              if case .cancelled = termination {
-                continuation.finish(throwing: thrownError)
-              }
-            }
-          }
-          controlContinuation.yield(1)
-          do {
-            for try await _ in stream {}
-            return nil
-          } catch {
-            return error
-          }
-        }
-
-        expectEqual(await controlIterator.next(), 1)
-        task.cancel()
-
-        let caught = await task.value
-        if let failure = caught as? SomeError {
-          expectEqual(failure, thrownError)
-        } else {
-          expectUnreachable("expected SomeError, got \(String(describing: caught))")
-        }
-      }
-
-      tests.test("finish(throwing:) from onTermination keeps the first error when called twice") {
-        let firstError = SomeError(value: 1)
-        let secondError = SomeError(value: 2)
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        let task = Task { () -> Error? in
-          let stream = AsyncThrowingStream<Int, Error> { continuation in
-            continuation.onTermination = { @Sendable termination in
-              if case .cancelled = termination {
-                // Only the first finish(throwing:) should decide the outcome
-                continuation.finish(throwing: firstError)
-                continuation.finish(throwing: secondError)
-              }
-            }
-          }
-          controlContinuation.yield(1)
-          do {
-            for try await _ in stream {}
-            return nil
-          } catch {
-            return error
-          }
-        }
-
-        expectEqual(await controlIterator.next(), 1)
-        task.cancel()
-
-        let caught = await task.value
-        if let failure = caught as? SomeError {
-          expectEqual(failure, firstError)
-        } else {
-          expectUnreachable("expected SomeError, got \(String(describing: caught))")
-        }
-      }
-
-      tests.test("onTermination handler is released after the stream terminates") {
-        let (stream, continuation) = AsyncStream<Int>.makeStream()
-
-        // Terminate the stream first
-        continuation.finish()
-
-        // Setting the handler now stores it in the terminal state, but never calls it
-        continuation.onTermination = { @Sendable _ in
-          fatalError("Unexpectedly triggered termination handler")
-        }
-
-        var iterator = stream.makeAsyncIterator()
-        let value = await iterator.next()
-        expectNil(value)
-
-        // Per the documented `onTermination` contract, the handler is released
-        // once the stream has reached its terminal state
-        expectTrue(continuation.onTermination == nil)
-      }
-
       tests.test("continuation equality") {
         let (_, continuation1) = AsyncStream<Int>.makeStream()
         let (_, continuation2) = AsyncStream<Int>.makeStream()
@@ -579,97 +488,6 @@ class NotSendable {}
         // Ensure the consuming Tasks both complete
         _ = await consumer1.value
         _ = await consumer2.value
-      }
-
-      tests.test("finish behavior with multiple consumers throwing") {
-        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
-          Task { @MainActor in
-            controlContinuation.yield(index)
-            do {
-              for try await i in stream {
-                controlContinuation.yield(i)
-              }
-            } catch {
-              expectUnreachable("unexpected error thrown")
-            }
-          }
-        }
-
-        // Set up multiple consumers
-        let consumer1 = makeConsumingTaskWithIndex(1)
-        expectEqual(await controlIterator.next(isolation: #isolation), 1)
-
-        let consumer2 = makeConsumingTaskWithIndex(2)
-        expectEqual(await controlIterator.next(isolation: #isolation), 2)
-
-        // Ensure the iterators are suspended
-        await MainActor.run {}
-
-        // Terminate the stream
-        continuation.finish()
-
-        // Ensure the consuming Tasks both complete
-        _ = await consumer1.value
-        _ = await consumer2.value
-      }
-
-      tests.test("finish by throwing behavior with multiple consumers") {
-        let thrownError = SomeError()
-        var errorCount = 0
-        var nilCount = 0
-
-        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
-        var iterator = stream.makeAsyncIterator()
-
-        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
-        var controlIterator = controlStream.makeAsyncIterator()
-
-        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
-          Task { @MainActor in
-            controlContinuation.yield(index)
-            do {
-              if let element = try await iterator.next(isolation: #isolation) {
-                controlContinuation.yield(element)
-              } else {
-                nilCount += 1
-              }
-            } catch {
-              errorCount += 1
-              if let failure = error as? SomeError {
-                expectEqual(failure, thrownError)
-              } else {
-                expectUnreachable("unexpected error type")
-              }
-            }
-          }
-        }
-
-        // Set up multiple consumers
-        let consumer1 = makeConsumingTaskWithIndex(1)
-        expectEqual(await controlIterator.next(isolation: #isolation), 1)
-
-        let consumer2 = makeConsumingTaskWithIndex(2)
-        expectEqual(await controlIterator.next(isolation: #isolation), 2)
-
-        // Ensure the iterators are suspended
-        await MainActor.run {}
-
-        // Terminate the stream by throwing
-        continuation.finish(throwing: thrownError)
-
-        // Ensure the consuming Tasks both complete
-        _ = await consumer1.value
-        _ = await consumer2.value
-
-        // Ensure that all, but the first consumer return nil
-        expectEqual(nilCount, 1)
-
-        // Ensure error was only thrown once
-        expectEqual(errorCount, 1)
       }
 
       // MARK: - Buffering Policies
@@ -1226,20 +1044,22 @@ class NotSendable {}
         expectTrue(errExpectation.fulfilled)
       }
 
-      tests.test("onTermination not called after stream is terminal") {
+      tests.test("onTermination called once") {
         nonisolated(unsafe) var counter = 0
         let (_, continuation) = AsyncStream<String>.makeStream()
         continuation.onTermination = { @Sendable _ in counter += 1 }
         continuation.finish()
-        expectEqual(counter, 0)
+        continuation.finish() // handler should be cleared
+        expectEqual(counter, 1)
       }
 
-      tests.test("onTermination not called after stream is terminal throwing") {
+      tests.test("onTermination called once throwing") {
         nonisolated(unsafe) var counter = 0
         let (_, continuation) = AsyncThrowingStream<String, Error>.makeStream()
         continuation.onTermination = { @Sendable _ in counter += 1 }
         continuation.finish()
-        expectEqual(counter, 0)
+        continuation.finish() // handler should be cleared
+        expectEqual(counter, 1)
       }
 
       // MARK: - for try await

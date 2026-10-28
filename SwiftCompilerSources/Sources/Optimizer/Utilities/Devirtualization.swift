@@ -75,7 +75,7 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
   }
 
   if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
-    guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
+    guard var deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
     }
     // In mandatory mode, de-virtualization might create function references to functions with wrong linkage.
@@ -85,6 +85,15 @@ private func devirtualize(destroy: some DevirtualizableDestroy,
       let serialized = destroy.parentFunction.serializedKind
       guard serialized == .notSerialized || deinitFunc.hasValidLinkageForFragileRef(serialized) else {
         return false
+      }
+
+      // In Embedded Swift, go looking for an already-specialized deinit for a generic type.
+      // If there isn't one, we have to bail out.
+      if deinitFunc.isGeneric && context.options.enableEmbeddedSwift {
+        guard let specialized = context.lookupSpecializedDeinit(ofType: type) else {
+          return false
+        }
+        deinitFunc = specialized
       }
     }
 
@@ -153,7 +162,11 @@ private extension DevirtualizableDestroy {
   var type: Type { operand.value.type }
 
   func devirtualizeEnumPayloads(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
-    guard let cases = type.getEnumCases(in: parentFunction) else {
+    guard let cases = type.getEnumCases(in: parentFunction),
+          // We cannot destroy payloads which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          cases.allPayloadsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
     defer {
@@ -203,7 +216,11 @@ extension DestroyValueInst : DevirtualizableDestroy {
   }
 
   fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
-    guard let fields = type.getNominalFields(in: parentFunction) else {
+    guard let fields = type.getNominalFields(in: parentFunction),
+          // We cannot destroy fields which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          fields.allFieldsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
 
@@ -297,7 +314,9 @@ extension DestroyAddrInst : DevirtualizableDestroy {
 
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
-    let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
+    let subs = deinitializer.isGeneric
+        ? context.getContextSubstitutionMap(for: destroyedAddress.type)
+        : SubstitutionMap()
     let deinitRef = builder.createFunctionRef(deinitializer)
     if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
@@ -310,7 +329,11 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let builder = Builder(before: self, context)
 
-    guard let fields = type.getNominalFields(in: parentFunction) else {
+    guard let fields = type.getNominalFields(in: parentFunction),
+          // We cannot destroy fields which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          fields.allFieldsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
     defer {
@@ -465,10 +488,18 @@ private extension EnumCases {
   func allPayloadsAreTrivial(in function: Function) -> Bool {
     allSatisfy({ $0.payload?.isTrivial(in: function) ?? true })
   }
+
+  func allPayloadsAreABIAccessible(in function: Function) -> Bool {
+    allSatisfy({ $0.payload?.isABIAccessible(in: function) ?? true })
+  }
 }
 
 private extension NominalFieldsArray {
   func allFieldsAreTrivial(in function: Function) -> Bool {
     allSatisfy({ $0.isTrivial(in: function)})
+  }
+
+  func allFieldsAreABIAccessible(in function: Function) -> Bool {
+    allSatisfy({ $0.isABIAccessible(in: function) })
   }
 }

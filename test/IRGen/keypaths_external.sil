@@ -44,13 +44,13 @@ sil @s_equals : $@convention(keypath_accessor_equals) <A: Hashable, B: Hashable>
 sil @s_hash : $@convention(keypath_accessor_hash) <A: Hashable, B: Hashable> (@in_guaranteed Int) -> Int
 
 // -- %t
-// CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"{{got.|\\01__imp__?}}$s23keypaths_external_other1GV1xxvpMV"
+// CHECK: [[KP_T:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"{{got.|\\01__imp__?}}$s23keypaths_external_other1GV1xxvpMV"
 // CHECK-SAME:   @"symbolic x"
 //            -- computed get-only property, identified by indirect pointer
 // CHECK-SAME:   <i32 0x0208_0002>
 
 // -- %u
-// CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"{{got.|\\01__imp__?}}$s23keypaths_external_other1GVyxqd__cSHRd__luipMV"
+// CHECK: [[KP_U:@keypath(\..*)?]] = private constant <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"{{got.|\\01__imp__?}}$s23keypaths_external_other1GVyxqd__cSHRd__luipMV"
 // CHECK-SAME:   @"symbolic q_"
 // CHECK-SAME:   @"symbolic x"
 // CHECK-SAME:   @"get_witness_table

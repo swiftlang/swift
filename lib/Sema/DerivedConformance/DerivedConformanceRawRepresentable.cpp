@@ -26,10 +26,10 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "llvm/ADT/APInt.h"
+#include "swift/Basic/QuotedString.h"
 
 using namespace swift;
 
@@ -232,75 +232,6 @@ static Stmt *createAvailabilityGuardStmt(ASTContext &C,
   return guardStmt;
 }
 
-/// Checks whether the case may be reached at runtime. If it can never be
-/// reached, returns false. Otherwise, returns true and appends a query to
-/// \c availabilityQueries for each domain that the case must be checked in at
-/// runtime.
-static bool
-checkAvailability(const EnumElementDecl *elt,
-                  AvailabilityContext availabilityContext,
-                  SmallVectorImpl<AvailabilityQuery> &availabilityQueries) {
-  auto &C = elt->getASTContext();
-
-  // A case should not be emitted for an element that is unreachable at runtime
-  // since otherwise that unavailable element could be constructed illegally via
-  // instantiation from a specific raw value. Hand-written versions of
-  // init(rawValue:) would most likely handle this by wrapping the case in an
-  // appropriate `#if` condition, which we cannot do in code synthesis. Leaving
-  // the case out also keeps its raw value from appearing in the generated code,
-  // which matters for an element that is hidden behind a disabled domain.
-  //
-  // An element of an enum that is itself unreachable is exempt. Every element
-  // of such an enum inherits its unreachability, so honoring it here would
-  // leave init(rawValue:) with no cases at all.
-  if (elt->isUnreachableAtRuntime() &&
-      !elt->getParentEnum()->isUnreachableAtRuntime())
-    return false;
-
-  for (auto const &restriction :
-       availabilityContext.allRestrictionsForDecl(elt)) {
-    // Deprecation doesn't prevent the case from being reached.
-    if (restriction.isDeprecated())
-      continue;
-
-    auto domain = restriction.getDomain();
-
-    // Unavailability restrictions must be handled carefully. If there is no
-    // way to express an availability query that corresponds to the restriction
-    // then a case cannot be synthesized for this element.
-    if (restriction.isUnavailable() &&
-        (domain.isVersioned() || !domain.supportsQueries()))
-      return false;
-
-    // Some restrictions are active for type checking but can't translate to
-    // runtime restrictions.
-    if (!restriction.isActiveForRuntimeQueries(C))
-      continue;
-
-    // There is no query that can guard the case, so it can never be reached.
-    if (!domain.supportsQueries())
-      return false;
-
-    // Comparisons must be made in the canonical domain for the current
-    // compilation, which may differ from the domain that was written.
-    auto domainAndRange = restriction.getDomainAndRange(C);
-    domain = domainAndRange.getDomain();
-
-    // Only a versioned domain takes a version argument in a query.
-    std::optional<AvailabilityRange> range;
-    if (domain.isVersioned())
-      range.emplace(domainAndRange.getRange());
-
-    auto query = AvailabilityQuery::forDomain(domain, range,
-                                              /*variantRange=*/std::nullopt)
-                     .asUnavailable(restriction.isUnavailable());
-
-    availabilityQueries.push_back(query);
-  }
-
-  return true;
-}
-
 static std::pair<BraceStmt *, bool>
 deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum : SomeType {
@@ -347,7 +278,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // unavailable, skip it. If it might be unavailable at runtime, save the
     // queries it needs in availabilityQueries and keep processing this element.
     SmallVector<AvailabilityQuery, 1> availabilityQueries;
-    if (!checkAvailability(elt, availabilityContext, availabilityQueries))
+    if (!checkAvailabilityForElement(elt, availabilityContext,
+                                     availabilityQueries))
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
@@ -473,6 +405,29 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
+static ValueDecl *deriveRawRepresentableViaMacros(DerivedConformance &derived,
+                                                  ValueDecl *requirement) {
+  auto &C = requirement->getASTContext();
+  bool isStrictMemorySafety = C.LangOpts.hasFeature(
+      Feature::StrictMemorySafety, /*allowMigration=*/true);
+
+  std::string macro = "#_deriveRawRepresentable(";
+  auto os = llvm::raw_string_ostream(macro);
+  os << QuotedString(getNominalTypeInfoString(derived)) << ", ";
+
+  if (requirement->getBaseName() == C.Id_rawValue) {
+    os << QuotedString("varDef");
+  } else {
+    ASSERT(requirement->getBaseName().isConstructor());
+    os << QuotedString("initializer");
+  }
+  os << ", " << (isStrictMemorySafety ? "true" : "false") << ")";
+  os.flush();
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveRawRepresentable);
+}
+
 bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
                                                    NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
@@ -541,11 +496,31 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == Context.Id_rawValue)
-    return deriveRawRepresentable_raw(*this);
+  bool viaMacros =
+      Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros);
 
-  if (requirement->getBaseName().isConstructor())
-    return deriveRawRepresentable_init(*this);
+  if (requirement->getBaseName() == Context.Id_rawValue) {
+    if (!viaMacros)
+      return deriveRawRepresentable_raw(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(
+        *this, cast<VarDecl>(witness)->getAccessor(AccessorKind::Get));
+    return witness;
+  }
+
+  if (requirement->getBaseName().isConstructor()) {
+    if (!viaMacros)
+      return deriveRawRepresentable_init(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(*this, cast<AbstractFunctionDecl>(witness));
+    return witness;
+  }
 
   Context.Diags.diagnose(requirement->getLoc(),
                          diag::broken_raw_representable_requirement);

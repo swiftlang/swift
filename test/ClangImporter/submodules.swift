@@ -7,6 +7,8 @@
 // RUN: echo 'import submodules; let s = "\(x), \(y)"' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck - -I %t
 // RUN: echo 'import submodules; let s = "\(x), \(y)"' | not %target-swift-frontend -typecheck - -I %t 2>&1 | %FileCheck -check-prefix=MISSING %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 #if IMPORT_TOP_LEVEL
 import ctypes
 #endif

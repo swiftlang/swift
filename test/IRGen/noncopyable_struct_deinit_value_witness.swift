@@ -1,10 +1,16 @@
-// RUN: %swift-frontend -O -emit-ir -module-name foo %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir -module-name foo %s -o - | %FileCheck %s
 
 // CHECK-LABEL: define internal void @"$s3foo3FooVwxx"(ptr noalias %object, ptr {{(nofree )?}}readonly captures(none) %"Foo<T>")
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   tail call swiftcc void @"$s3foo3FooVfD"(ptr %"Foo<T>", ptr noalias swiftself %object)
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
+
+// assignWithTake overwrites an already-initialized destination, so it must run
+// the deinit on the value being overwritten before taking the new value.
+// CHECK-LABEL: define internal ptr @"$s3foo3FooVwta"(
+// CHECK:   call swiftcc void @"$s3foo3FooVfD"(
+// CHECK: }
 
 public struct Foo<T> : ~Copyable {
     var t: T

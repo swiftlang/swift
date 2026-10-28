@@ -44,6 +44,22 @@ nonisolated class CNonIsolated: P {
   @SomeGlobalActor func f() { } // expected-note{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
 }
 
+// Conformances to GlobalActor are never inferred as isolated.
+// expected-error@+4:8{{conformance of 'MainActorGlobalActor' to protocol 'GlobalActor' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3:8{{turn data races into runtime errors with '@preconcurrency'}}{{none}}
+@MainActor
+@globalActor
+struct MainActorGlobalActor {
+  static let shared = SomeGlobalActor.shared // expected-note@:14{{main actor-isolated static property 'shared' cannot satisfy nonisolated requirement}}
+  // expected-note@-1:14{{mark static property 'shared' 'nonisolated'}}{{3-3=nonisolated }}
+}
+
+@MainActor
+@globalActor
+struct MainActorGlobalActorNonisolatedShared {
+  nonisolated static let shared = SomeGlobalActor.shared
+}
+
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
@@ -96,3 +112,40 @@ class InferMeDefaults {
 protocol PDerived: P {}
 
 @MainActor struct ImpliedConformanceInference: PDerived { func f() {} }
+
+// Used to cause a cycle because Iterator typealias could be found through makeIterator while trying
+// determine `S: Sequence` isolation.
+
+@MainActor
+struct RecursiveCollection: RandomAccessCollection {
+  nonisolated var startIndex: Int { 0 }
+  nonisolated var endIndex: Int { 0 }
+  nonisolated subscript(position: Int) -> Int { 0 }
+
+  typealias Iterator = IndexingIterator<RecursiveCollection> // Ok
+  typealias SubSequence = Slice<RecursiveCollection>
+}
+
+struct MyIndexingIterator<T: Collection & Sendable>: IteratorProtocol { // expected-note 2 {{requirement specified as 'T' : 'Collection' [with T = RecursiveCollectionIsolated]}}
+  init(elements: T) { // expected-note {{'init(elements:)' declared here}}
+  }
+
+  mutating func next() -> T.Element? {
+    nil
+  }
+}
+
+@MainActor
+struct RecursiveCollectionIsolated: RandomAccessCollection {
+  nonisolated var startIndex: Int { 0 }
+  nonisolated var endIndex: Int { 0 }
+  nonisolated subscript(position: Int) -> Int { 0 }
+  func makeIterator() -> MyIndexingIterator<RecursiveCollectionIsolated> {
+    // expected-error@-1 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+    MyIndexingIterator(elements: self)
+    // expected-error@-1 2 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  }
+  typealias Iterator = MyIndexingIterator<RecursiveCollectionIsolated>
+  // expected-error@-1 {{main actor-isolated conformance of 'RecursiveCollectionIsolated' to 'Collection' cannot satisfy conformance requirement for a 'Sendable' type parameter 'T'}}
+  typealias SubSequence = Slice<RecursiveCollectionIsolated>
+}

@@ -87,7 +87,7 @@ module Instance {
 // CHECK:@__swiftmacro_{{.*}}basic{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public mutating func basic(_ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe basic(IntSpan(_pPtr))
@@ -97,7 +97,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}basic{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.basic(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.basic(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe basic(a, IntSpan(_pPtr))
@@ -107,7 +107,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}bar{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public mutating func bar(_ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe bar(IntSpan(_pPtr))
@@ -117,7 +117,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}renamed{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.bar(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.bar(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe renamed(a, IntSpan(_pPtr))
@@ -127,7 +127,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}constSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func constSelf(_ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe constSelf(IntSpan(_pPtr))
@@ -137,7 +137,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}constSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.constSelf(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.constSelf(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe constSelf(a, IntSpan(_pPtr))
@@ -147,7 +147,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}valSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func valSelf(_ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe valSelf(IntSpan(_pPtr))
@@ -157,7 +157,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}valSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.valSelf(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.valSelf(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func valSelf(_ a: A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe valSelf(a, IntSpan(_pPtr))
@@ -167,7 +167,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}refSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public mutating func refSelf(_ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe refSelf(IntSpan(_pPtr))
@@ -177,7 +177,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}refSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.refSelf(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.refSelf(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func refSelf(_ a: inout A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe refSelf(&a, IntSpan(_pPtr))
@@ -187,7 +187,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}namespaced{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public mutating func namespaced(_ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe namespaced(IntSpan(_pPtr))
@@ -197,7 +197,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}namespaced{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.namespaced(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.namespaced(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:  public static func namespaced(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe namespaced(a, IntSpan(_pPtr))
@@ -207,7 +207,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}Instance{{.*}}decapseman{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public mutating func decapseman(_ p: inout MutableSpan<CInt>)  {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe decapseman(IntSpan(_pPtr))
@@ -217,7 +217,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}decapseman{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "baz.B.decapseman(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "baz.B.decapseman(self:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func decapseman(_ b: UnsafeMutablePointer<baz.B>!, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe decapseman(b, IntSpan(_pPtr))
@@ -227,7 +227,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}Instance{{.*}}bar{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public static func bar(_ a: inout A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe bar(&a, IntSpan(_pPtr))
@@ -237,7 +237,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}renamed{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "baz.bar(_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "baz.bar(_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:  public static func renamed(_ a: inout A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe renamed(&a, IntSpan(_pPtr))
@@ -247,7 +247,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}this{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public static func this(_ a: inout A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe this(&a, IntSpan(_pPtr))
@@ -257,7 +257,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}that{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "this(_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "this(_:_:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:  public static func that(_ a: inout A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe that(&a, IntSpan(_pPtr))
@@ -267,7 +267,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}Instance{{.*}}spanSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT:public func spanSelf() -> MutableSpan<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe spanSelf()), copying: ())
 // CHECK-NEXT:}
@@ -275,7 +275,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_So8spanSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanSelf(self:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func spanSelf(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe spanSelf(IntSpan(_pPtr))
@@ -285,7 +285,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}Instance{{.*}}spanConstSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT:public func spanConstSelf() -> MutableSpan<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe spanConstSelf()), copying: ())
 // CHECK-NEXT:}
@@ -293,7 +293,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}spanConstSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanConstSelf(self:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanConstSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT:public func spanConstSelf(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe spanConstSelf(IntSpan(_pPtr))
@@ -303,7 +303,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}Instance{{.*}}constSpanSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT:public func constSpanSelf() -> Span<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe constSpanSelf()), copying: ())
 // CHECK-NEXT:}
@@ -311,7 +311,7 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}constSpanSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "ConstIntSpan.constSpanSelf(self:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "ConstIntSpan.constSpanSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload
 // CHECK-NEXT:public func constSpanSelf(_ p: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe constSpanSelf(ConstIntSpan(p))), copying: ())
 // CHECK-NEXT:}

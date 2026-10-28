@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-experimental-feature Lifetimes %s -temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-experimental-feature Lifetimes %s -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -55,6 +56,29 @@ struct NCWithDeinit : ~Copyable {
   deinit
 }
 
+struct PointerNCDeinit: ~Copyable {
+  var x: Builtin.RawPointer
+
+  deinit
+}
+
+struct PointerValueDeinit {
+  var x: Builtin.RawPointer
+  var k: Klass
+}
+
+struct PointerNE: ~Escapable {
+  var x: Builtin.RawPointer
+
+  @_lifetime(immortal)
+  init()
+}
+
+
+struct PointerNonTrivial {
+  var x: Builtin.RawPointer
+  var k: Klass
+}
 
 protocol P {
   func foo()
@@ -74,6 +98,8 @@ sil [ossa] @inguaranteed_user_without_result_MOS : $@convention(thin) (@in_guara
 
 sil [ossa] @consuming_indirect_arg : $@convention(thin) (@in Klass) -> ()
 sil @deinit_barrier : $@convention(thin) () -> ()
+
+sil @get_klass_pointer : $@convention(thin) (@guaranteed Klass) -> Builtin.RawPointer
 
 sil [ossa] @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -1944,3 +1970,131 @@ bb2:
   return %6
 }
 
+// CHECK-LABEL: sil [ossa] @destroy_no_deinit :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'destroy_no_deinit'
+sil [ossa] @destroy_no_deinit : $@convention(thin) (@owned Span<Int>) -> Int {
+bb0(%0 : @owned $Span<Int>):
+  %borrow = begin_borrow %0
+  %ptr = struct_extract %borrow, #Span._pointer
+  %data = unchecked_enum_data %ptr, #Optional.some!enumelt
+  %raw = struct_extract %data, #UnsafeRawPointer._rawValue
+  end_borrow %borrow
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  destroy_value %0
+  %stk = alloc_stack $Int
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_class :
+// CHECK: alloc_stack
+// CHECK-LABEL: } // end sil function 'destroy_class'
+sil [ossa] @destroy_class : $@convention(thin) (@owned Klass) -> Int {
+bb0(%0 : @owned $Klass):
+  %borrow = begin_borrow %0
+  %gkp = function_ref @get_klass_pointer : $@convention(thin) (@guaranteed Klass) -> Builtin.RawPointer
+  %raw = apply %gkp(%borrow) : $@convention(thin) (@guaranteed Klass) -> Builtin.RawPointer
+  end_borrow %borrow
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  destroy_value %0
+  %stk = alloc_stack $Int
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_custom_deinit :
+// CHECK: alloc_stack
+// CHECK-LABEL: } // end sil function 'destroy_custom_deinit'
+sil [ossa] @destroy_custom_deinit : $@convention(thin) (@owned PointerNCDeinit) -> Int {
+bb0(%0 : @owned $PointerNCDeinit):
+  %borrow = begin_borrow %0
+  %raw = struct_extract %borrow, #PointerNCDeinit.x
+  end_borrow %borrow
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  destroy_value %0
+  %stk = alloc_stack $Int
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_value_type_deinit :
+// CHECK: alloc_stack
+// CHECK-LABEL: } // end sil function 'destroy_value_type_deinit'
+sil [ossa] @destroy_value_type_deinit : $@convention(thin) (@owned PointerValueDeinit) -> Int {
+bb0(%0 : @owned $PointerValueDeinit):
+  %borrow = begin_borrow %0
+  %raw = struct_extract %borrow, #PointerValueDeinit.x
+  end_borrow %borrow
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  destroy_value %0
+  %stk = alloc_stack $Int
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}
+
+// CHECK-LABEL: sil [ossa] @end_borrow_trivial_except_non_escapable :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'end_borrow_trivial_except_non_escapable'
+sil [ossa] @end_borrow_trivial_except_non_escapable : $@convention(thin) (@guaranteed PointerNE) -> Int {
+bb0(%0 : @guaranteed $PointerNE):
+  %stk = alloc_stack $Int
+  %borrow = begin_borrow %0
+  %raw = struct_extract %borrow, #PointerNE.x
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  end_borrow %borrow
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}
+
+// CHECK-LABEL: sil [ossa] @end_borrow_non_trivial :
+// CHECK: alloc_stack
+// CHECK-LABEL: } // end sil function 'end_borrow_non_trivial'
+sil [ossa] @end_borrow_non_trivial : $@convention(thin) (@guaranteed PointerNonTrivial) -> Int {
+bb0(%0 : @guaranteed $PointerNonTrivial):
+  %stk = alloc_stack $Int
+  %borrow = begin_borrow %0
+  %raw = struct_extract %borrow, #PointerNonTrivial.x
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  end_borrow %borrow
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_value_and_end_borrow :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'destroy_value_and_end_borrow'
+sil [ossa] @destroy_value_and_end_borrow : $@convention(thin) (@owned Span<Int>) -> Int {
+bb0(%0 : @owned $Span<Int>):
+  %stk = alloc_stack $Int
+  %borrow = begin_borrow %0
+  %ptr = struct_extract %borrow, #Span._pointer
+  %data = unchecked_enum_data %ptr, #Optional.some!enumelt
+  %raw = struct_extract %data, #UnsafeRawPointer._rawValue
+  %addr = pointer_to_address %raw to [strict] $*Int
+  %int = load [trivial] %addr
+  end_borrow %borrow
+  destroy_value %0
+  store %int to [trivial] %stk
+  %val = load [trivial] %stk
+  dealloc_stack %stk
+  return %val
+}

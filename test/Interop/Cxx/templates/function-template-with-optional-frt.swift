@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -cxx-interoperability-mode=default -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple | %FileCheck %s
 
 import FunctionTemplateWithOptionalFrt
 
@@ -27,6 +27,11 @@ func testDowncast(x: FRTBase) -> FRTDerived? {
   return downcast(x)
 }
 
+// CHECK-LABEL: define {{.*}}@{{.*}}testNullableDowncast
+func testNullableDowncast(x: FRTBase) -> FRTDerived? {
+  return nullableDowncast(x)
+}
+
 // CHECK-LABEL: define {{.*}}@{{.*}}testPassThroughLet
 func testPassThroughLet(base: FRTBase) {
   let _: FRTBase = passThrough(base)
@@ -49,4 +54,10 @@ func testDynamicCastLet(base: FRTBase) {
 func testDowncastLet(base: FRTBase) {
   let _: FRTDerived = downcast(base)
   let _: FRTDerived? = downcast(base)
+}
+
+// CHECK-LABEL: define {{.*}}@{{.*}}testNullableDowncastLet
+func testNullableDowncastLet(base: FRTBase) {
+  let _: FRTDerived? = nullableDowncast(base)
+  let _: FRTDerived = nullableDowncast(base)!
 }

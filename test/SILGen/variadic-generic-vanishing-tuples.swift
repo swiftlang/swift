@@ -16,6 +16,7 @@ public struct Holder<each T> {
 
 // CHECK-LABEL: sil {{.*}}@$s4main21testInstanceVarAccessyAA1GVyxGAA6HolderVyx_QPGlF :
 // CHECK:       [[T0:%.*]] = struct_extract %0 : $Holder<X>, #Holder.values
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  return [[T0]] : $G<X>
 public func testInstanceVarAccess<X>(_ holder: Holder<X>) -> G<X> {
   return holder.values
@@ -131,4 +132,5 @@ public func passSingleStringClosure() {
 // CHECK-NEXT:    debug_value [[ARG]] : $String, let, name "str"
 // CHECK-NEXT:    [[ARGCOPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT:    store [[ARGCOPY]] to [init] %0
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    end_borrow [[ARG]]

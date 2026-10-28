@@ -2,18 +2,13 @@
 
 // RUN: %target-interop-build-clangxx -c %S/Inputs/objc-async-completion-handler-non-trivial.mm -o %t2/objc-async-impl.o -fobjc-arc
 
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -parse-as-library -Xlinker %t2/objc-async-impl.o) | %FileCheck %s
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -parse-as-library -O -Xlinker %t2/objc-async-impl.o) | %FileCheck %s
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -target %target-swift-5.1-abi-triple -parse-as-library -Xlinker %t2/objc-async-impl.o) | %FileCheck %s
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -target %target-swift-5.1-abi-triple -parse-as-library -O -Xlinker %t2/objc-async-impl.o) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-
-// The ObjC async completion handler thunk builds the continuation's resume
-// argument in an alloc_stack, which is not valid with opaque values, where an
-// @in parameter is lowered to a direct value. This is unrelated to what is
-// tested here and reproduces without the @in_cxx fix as well.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+// REQUIRES: concurrency_runtime
 
 // The argument of the completion handler block is passed with the Itanium C++
 // ABI convention: the caller destroys it.

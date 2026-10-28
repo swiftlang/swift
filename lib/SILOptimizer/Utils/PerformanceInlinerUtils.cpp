@@ -826,6 +826,11 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 
   SILFunction *Caller = AI.getFunction();
 
+  // @_target requires an exact match between caller and callee.
+  if (Caller->targetFeatures() != Callee->targetFeatures()) {
+    return nullptr;
+  }
+
   // We don't support inlining a function that binds dynamic self because we
   // have no mechanism to preserve the original function's local self metadata.
   if (mayBindDynamicSelf(Callee)) {

@@ -12,10 +12,8 @@
 
 #include "swift/SIL/SILConstants.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILBuilder.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
 using namespace swift;
 
@@ -1165,7 +1163,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
     eltType = arrayEltTy;
   } else {
     elt = aggregate.getAggregateMembers()[elementNo];
-    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    if (auto *decl = type->getStructDecl()) {
       eltType = decl->getStoredProperties()[elementNo]->getTypeInContext();
     } else if (auto tuple = type->getAs<TupleType>()) {
       assert(elementNo < tuple->getNumElements() && "invalid index");
@@ -1213,7 +1211,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   if (aggregate.getKind() == SymbolicValue::UninitMemory) {
     unsigned numMembers;
     // We need to have either a struct or a tuple type.
-    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    if (auto *decl = type->getStructDecl()) {
       numMembers = decl->getStoredProperties().size();
     } else if (auto tuple = type->getAs<TupleType>()) {
       numMembers = tuple->getNumElements();
@@ -1241,7 +1239,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
     eltType = arrayEltTy;
   } else {
     oldElts = aggregate.getAggregateMembers();
-    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    if (auto *decl = type->getStructDecl()) {
       eltType = decl->getStoredProperties()[elementNo]->getTypeInContext();
     } else if (auto tuple = type->getAs<TupleType>()) {
       assert(elementNo < tuple->getNumElements() && "invalid index");

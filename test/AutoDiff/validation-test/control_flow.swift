@@ -1,9 +1,9 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -solver-disable-diagnose-valid-salvage)
 // REQUIRES: executable_test
 
 // FIXME: Enable test for all platforms after debugging (https://github.com/apple/swift/issues/55186).
 // iphonesimulator-i386-specific failures.
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 // rdar://71642726 this test is crashing with optimizations.
 // REQUIRES: swift_test_mode_optimize_none

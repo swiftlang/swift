@@ -15,7 +15,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
-#include "llvm/ADT/SmallVector.h"
 #include <algorithm>
 
 using namespace swift;

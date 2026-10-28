@@ -25,6 +25,11 @@ ERROR(no_llvm_target,none,
 ERROR(error_codegen_init_fail,none,
       "cannot initialize code generation passes for target", ())
 
+ERROR(error_generating_object_file,none,
+      "could not emit object file '%0': the LLVM backend reported an error; "
+      SWIFT_BUG_REPORT_MESSAGE,
+      (StringRef))
+
 ERROR(irgen_unimplemented,none,
       "unimplemented IR generation feature %0", (StringRef))
 ERROR(irgen_failure,none, "IR generation failure: %0", (StringRef))
@@ -66,6 +71,16 @@ ERROR(temporary_allocation_alignment_not_power_of_2,none,
 
 ERROR(explosion_size_oveflow,none,
       "explosion size too large", ())
+
+ERROR(fixed_type_too_large,none,
+      "type %0 is too large to be represented; the size in bytes of a "
+      "fixed-layout type must be less than 4 GiB",
+      (Type))
+
+ERROR(fixed_type_too_large_unnamed,none,
+      "type is too large to be represented; the size in bytes of a "
+      "fixed-layout type must be less than 4 GiB",
+      ())
 
 NOTE(layout_strings_blocked,none,
      "Layout string value witnesses have been disabled for module '%0' "

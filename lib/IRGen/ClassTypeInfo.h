@@ -48,6 +48,18 @@ class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
                              bool forBackwardDeployment) const;
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
                 ReferenceCounting refcount, llvm::StructType *classLayoutType)

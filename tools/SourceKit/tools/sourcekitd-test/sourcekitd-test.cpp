@@ -14,7 +14,6 @@
 
 #include "TestOptions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1360,7 +1359,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_release(files);
   }
 
-  int64_t BeforeInstructions;
+  int64_t BeforeInstructions = 0;
   if (Opts.measureInstructions)
     BeforeInstructions = getSourceKitInstructionCount();
 

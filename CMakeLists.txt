@@ -87,6 +87,8 @@ set(CMAKE_CXX_STANDARD ${SWIFT_MIN_CXX_STANDARD} CACHE STRING "C++ standard to c
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
+define_property(TARGET PROPERTY PURE_SWIFT_LIB)
+
 # First include general CMake utilities.
 include(SwiftUtils)
 include(CheckSymbolExists)
@@ -251,6 +253,14 @@ option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
+
+option(SWIFT_BUILD_COMPILER_DYLIB
+  "Builds a swift compiler dylib for tools to link against"
+  FALSE)
+
+if (SWIFT_BUILD_COMPILER_DYLIB AND NOT APPLE)
+  message(FATAL_ERROR "SWIFT_BUILD_COMPILER_DYLIB is only supported on Darwin platforms currently.")
+endif()
 
 # The SDK overlay is provided by the SDK itself on Darwin platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -473,6 +483,26 @@ if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
     set(BRIDGING_MODE "INLINE")
   endif()
 endif()
+
+# LLVM_VERSION_MAJOR conditions for Swift sources in the compiler and Lit tests,
+# where (in)equality operations cannot be metaprogrammed.
+#
+# NB: Before you bump the below minimum, please make sure to audit all
+#     occurrences of LLVM_VERSION_MAJOR_AT_LEAST_<current minimum>.
+#
+set(SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR 23)
+if(LLVM_VERSION_MAJOR LESS ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR})
+  message(FATAL_ERROR
+    "LLVM_VERSION_MAJOR is ${LLVM_VERSION_MAJOR}, which is older than "
+    "SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR "
+    "(${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}).")
+endif()
+set(SWIFT_LLVM_VERSION_MAJOR_CONDITIONS)
+foreach(version RANGE ${SWIFT_MIN_SUPPORTED_LLVM_VERSION_MAJOR}
+                      ${LLVM_VERSION_MAJOR})
+  list(APPEND SWIFT_LLVM_VERSION_MAJOR_CONDITIONS
+    "LLVM_VERSION_MAJOR_AT_LEAST_${version}")
+endforeach()
 
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)
@@ -882,6 +912,24 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
 
+# Whether the compiler's own Swift sources are built.
+if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED TRUE)
+else()
+  set(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED FALSE)
+endif()
+
+# Turned off while swift-toolchain-sarif is not yet built in CI on every
+# host and the output is unexercised on Windows.
+option(SWIFT_BUILD_SARIF
+  "Enable SARIF diagnostic serialization support (requires swift-toolchain-sarif)"
+  FALSE)
+# SARIF serialization runs through DiagnosticBridge, so it needs those sources.
+if(SWIFT_BUILD_SARIF AND NOT SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
+  message(WARNING "Force setting SWIFT_BUILD_SARIF=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_SARIF OFF)
+endif()
+
 option(SWIFT_BUILD_IMMEDIATE_MODE
   "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
   TRUE)
@@ -1064,7 +1112,7 @@ if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
   endif()
 endif()
 
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SWIFT)
+if(SWIFT_COMPILER_SWIFT_SOURCES_ENABLED)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
@@ -1078,6 +1126,10 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
+endif()
+
+if(SWIFT_BUILD_SARIF)
+  add_definitions(-DSWIFT_BUILD_SARIF)
 endif()
 
 if(SWIFT_BUILD_IMMEDIATE_MODE)
@@ -1482,6 +1534,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
+  message(STATUS "  SARIF support:  ${SWIFT_BUILD_SARIF}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1747,7 +1800,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
 
       set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
       if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
-        string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+        get_versioned_target_triple(stdlib_target_triple ${sdk} ${arch} ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
@@ -1789,7 +1842,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
-        add_dependencies("${stdlib_target}-core" swift-frontend)
+        add_dependencies("${stdlib_target}-core" swift-frontend libSwiftScan)
       endif()
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
@@ -1819,6 +1872,10 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftOverlay_ENABLE_CXX_INTEROP=TRUE
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
+      set(runtimes_to_enable StringProcessing|Synchronization|Distributed|Observation)
+      if(sdk STREQUAL "OSX")
+        string(APPEND runtimes_to_enable |Runtime)
+      endif()
       ExternalProject_Add("${stdlib_target}-Supplemental"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
         DEPENDS "${stdlib_target}-core" "${stdlib_target}-Overlay"
@@ -1828,7 +1885,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation|Runtime
+          -DSwift_ENABLE_RUNTIMES=${runtimes_to_enable}
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

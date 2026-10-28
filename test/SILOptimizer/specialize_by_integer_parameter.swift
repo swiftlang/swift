@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -emit-sil -O %s | %FileCheck %s
 // 
 public struct Foo<let count: Int> {
 	// CHECK-LABEL: sil{{.*}} @$s{{.*}}3FooV3bar

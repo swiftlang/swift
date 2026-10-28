@@ -28,6 +28,7 @@ public func availableInPacific() { }
 public func unavailableInColorado() { }
 
 //--- client.swift
+// expected-warning@<unknown> * {{libc not found for }}
 
 import lib
 

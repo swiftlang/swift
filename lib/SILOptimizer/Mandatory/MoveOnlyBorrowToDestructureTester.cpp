@@ -25,18 +25,11 @@
 #include "MoveOnlyObjectCheckerUtils.h"
 #include "MoveOnlyUtils.h"
 
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/BlotSetVector.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/FrozenMultiMap.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 
 using namespace swift;
@@ -76,7 +69,7 @@ class MoveOnlyBorrowToDestructureTransformPass : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     LLVM_DEBUG(llvm::dbgs()

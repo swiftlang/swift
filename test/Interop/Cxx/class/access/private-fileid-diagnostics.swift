@@ -1,5 +1,5 @@
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -suppress-remarks %t%{fs-sep}some%{fs-sep}subdir%{fs-sep}file1.swift -verify-additional-file %t%{fs-sep}Cxx%{fs-sep}include%{fs-sep}cxx-header.h -I %t%{fs-sep}Cxx%{fs-sep}include -cxx-interoperability-mode=default -module-name main
+// RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}some%{fs-sep}subdir%{fs-sep}file1.swift -verify-additional-file %t%{fs-sep}Cxx%{fs-sep}include%{fs-sep}cxx-header.h -I %t%{fs-sep}Cxx%{fs-sep}include -cxx-interoperability-mode=default -module-name main
 
 //--- Cxx/include/module.modulemap
 module CxxModule {
@@ -25,13 +25,16 @@ __attribute__((__swift_attr__("private_fileid:main/file1.swift"))) // expected-n
 __attribute__((__swift_attr__("private_fileid:main/file1.swift"))) // expected-note {{SWIFT_PRIVATE_FILEID annotation found here}}
 RepeatedAnnotations {}; // expected-error {{multiple SWIFT_PRIVATE_FILEID annotations were found on 'RepeatedAnnotations'}}
 
-class
-__attribute__((__swift_attr__("private_fileid:main/some/subdir/file1.swift")))
-WithSubdir {}; // expected-warning@-1 {{SWIFT_PRIVATE_FILEID annotation on 'WithSubdir' does not have a valid file ID}}
+class WithSubdir {}
+__attribute__((__swift_attr__("private_fileid:main/some/subdir/file1.swift")));
+// expected-warning@-1 {{SWIFT_PRIVATE_FILEID annotation on 'WithSubdir' does not have a valid file ID}}
+// expected-note@-2 {{file IDs have the following format: 'ModuleName/FileName.swift'}}
+// expected-note@-3 {{did you mean 'main/file1.swift'?}}
 
-class
-__attribute__((__swift_attr__("private_fileid:main/file1")))
-MissingExtension {}; // expected-warning@-1 {{SWIFT_PRIVATE_FILEID annotation on 'MissingExtension' does not have a valid file ID}}
+class MissingExtension {}
+__attribute__((__swift_attr__("private_fileid:main/file1")));
+// expected-warning@-1 {{SWIFT_PRIVATE_FILEID annotation on 'MissingExtension' does not have a valid file ID}}
+// expected-note@-2 {{file IDs have the following format: 'ModuleName/FileName.swift'}}
 
 class
 __attribute__((__swift_attr__("private_fileid:main/file1.swift")))

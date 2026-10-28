@@ -133,11 +133,6 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
-
     let span = unsafe Span(
       _unchecked: UnsafeRawPointer(buffer.baseAddress),
       count: buffer.count
@@ -192,6 +187,20 @@ extension Span where Element: ~Copyable {
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: pointer)
+  }
+
+  /// Create a span over a single value.
+  ///
+  /// The span has a `count` of 1, and borrows `value`.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be borrowed by the span
+  @export(implementation)
+  @_lifetime(borrow value)
+  public init(ofOne value: borrowing @_addressable Element) {
+    let address = Builtin.unprotectedAddressOfBorrow(value)
+    let span = unsafe Span(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, borrowing: value)
   }
 }
 
@@ -472,6 +481,18 @@ extension Span where Element: ~Copyable {
     _precondition(indices.contains(position), "Index out of bounds")
   }
 
+  // SILOptimizer looks for fixed_storage.check_range semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_range")
+  @inline(__always)
+  @export(implementation)
+  internal func _checkRange(lowerBound: Index, upperBound: Index) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: upperBound) <= _assumeNonNegative(_count),
+      "Index range out of bounds"
+    )
+  }
+
   /// Accesses the element at the specified index in the `Span`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
@@ -517,43 +538,6 @@ extension Span where Element: ~Copyable {
     let elementOffset = position &* MemoryLayout<Element>.stride
     return unsafe _start().advanced(by: elementOffset)._rawValue
 #endif
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
-  /// Accesses the element at the specified index in the `Span`.
-  ///
-  /// - Parameter position: The offset of the element to access. `position`
-  ///     must be greater or equal to zero, and less than `count`.
-  ///
-  /// - Complexity: O(1)
-  @export(implementation)
-  public subscript(_ position: Index) -> Element {
-    @_transparent
-    get {
-      _checkIndex(position)
-      return unsafe self[unchecked: position]
-    }
-  }
-
-  /// Accesses the element at the specified index in the `Span`.
-  ///
-  /// This subscript does not validate `position`. Using this subscript
-  /// with an invalid `position` results in undefined behaviour.
-  ///
-  /// - Parameter position: The offset of the element to access. `position`
-  ///     must be greater or equal to zero, and less than `count`.
-  ///
-  /// - Complexity: O(1)
-  @unsafe
-  @export(implementation)
-  public subscript(unchecked position: Index) -> Element {
-    get {
-      let address = unsafe _unsafeAddressOfElement(unchecked: position)
-      return unsafe UnsafeRawPointer(address).loadUnaligned(as: Element.self)
-    }
   }
 }
 
@@ -612,11 +596,7 @@ extension Span where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   public func extracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe extracting(unchecked: bounds)
   }
 

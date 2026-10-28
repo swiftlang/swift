@@ -34,6 +34,12 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
+  class IRGenModule;
+  class TypeInfo;
+
+  /// Create the one-word, COM-owned type information shared by COM existentials
+  /// and archetypes opened from them.
+  const TypeInfo *createCOMInterfaceTypeInfo(IRGenModule &IGM);
 
   /// Emit the metadata and witness table initialization for an allocated
   /// opaque existential container.
@@ -162,6 +168,10 @@ namespace irgen {
   /// Emit the existential metatype of a metatype.
   void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
                               SILType existentialType, Explosion &out);
+
+  /// Bind the interface adjustments for an opened foreign COM value.
+  void bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                         CanArchetypeType archetype);
 
 } // end namespace irgen
 } // end namespace swift

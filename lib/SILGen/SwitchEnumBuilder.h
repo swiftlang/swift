@@ -14,7 +14,6 @@
 #define SWIFT_SILGEN_SWITCHENUMBUILDER_H
 
 #include "ArgumentScope.h"
-#include "Scope.h"
 
 namespace swift {
 namespace Lowering {

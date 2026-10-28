@@ -58,6 +58,7 @@ class Bar {
 // CHECK-NEXT:  [[SETTER:%.*]] = function_ref @$s26property_wrapper_observers3BarC9someArraySaySiGvs : $@convention(method) (@owned Array<Int>, @guaranteed Bar) -> ()
 // CHECK-NEXT:  [[RESULT:%.*]] = apply [[SETTER]]([[VALUE]], [[BAR]]) : $@convention(method) (@owned Array<Int>, @guaranteed Bar) -> ()
 // CHECK-NEXT:  dealloc_stack [[ALLOC_STACK]] : $*Array<Int>
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 
@@ -68,6 +69,7 @@ class Bar {
 // CHECK-NEXT:  [[RESULT:%.*]] = apply [[SETTER]]([[NEWVALUE]], [[BAR]]) : $@convention(method) (@owned Array<Int>, @guaranteed Bar) -> ()
 // CHECK-NEXT:  destroy_addr [[ALLOC_STACK]] : $*Array<Int>
 // CHECK-NEXT:  dealloc_stack [[ALLOC_STACK]] : $*Array<Int>
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  unwind
 // CHECK-END: }
 

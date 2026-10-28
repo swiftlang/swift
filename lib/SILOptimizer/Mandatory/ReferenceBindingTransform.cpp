@@ -13,10 +13,6 @@
 #define DEBUG_TYPE "sil-reference-binding-transform"
 
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
-#include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

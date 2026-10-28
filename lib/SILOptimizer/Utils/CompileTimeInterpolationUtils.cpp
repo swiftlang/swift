@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/SIL/SILFunction.h"
 
 using namespace swift;

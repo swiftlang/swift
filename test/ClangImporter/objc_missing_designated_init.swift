@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules %s -swift-version 4 -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import UnimportableMembers
 import UnimportableMembersUser
 

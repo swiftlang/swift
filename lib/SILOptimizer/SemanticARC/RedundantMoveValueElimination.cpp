@@ -23,7 +23,6 @@
 
 #include "SemanticARC/SemanticARCOpts.h"
 #include "SemanticARCOptVisitor.h"
-#include "swift/SIL/LinearLifetimeChecker.h"
 
 using namespace swift;
 using namespace semanticarc;

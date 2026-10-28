@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target arm64-apple-ios13.0
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 
 @available(iOS, unavailable) // expected-note 2{{'ios()' has been explicitly marked unavailable here}}

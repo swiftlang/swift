@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
+// RUN: %target-run-simple-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults) | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
@@ -42,7 +42,7 @@ class Mirrored {
 	}
 }
 
-// CHECK: noncopyableField (0 elements)
+// CHECK: noncopyableField{{:?}} (0 elements)
 if #available(SwiftStdlib 5.1, *) {
   dump(Mirrored())
 } else {

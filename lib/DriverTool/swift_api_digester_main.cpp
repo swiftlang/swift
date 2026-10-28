@@ -29,7 +29,6 @@
 #include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "swift/APIDigester/ModuleDiagsConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -37,10 +36,7 @@
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
-#include <functional>
 
 using namespace swift;
 using namespace ide;

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000
-// Succeeds in 125ms with 19934 scopes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=500 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=15000 -solver-disable-promote-supertypes
 
 // https://github.com/swiftlang/swift/issues/54466
 

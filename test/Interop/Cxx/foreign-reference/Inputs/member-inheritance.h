@@ -406,3 +406,6 @@ struct IMMORTAL_FRT HasCreateMethodImportedAsInitializer {
     return new HasCreateMethodImportedAsInitializer{v * 5};
   }
 };
+
+struct DerivedFromHasCreateMethodImportedAsInitializer
+    : HasCreateMethodImportedAsInitializer {};

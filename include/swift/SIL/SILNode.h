@@ -201,6 +201,7 @@ protected:
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
+    SHARED_FIELD(UnconditionalCheckedCastAddrInst, bool isCopy);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);
     SHARED_FIELD(RefCountingInst, bool atomicity);
     SHARED_FIELD(EndAccessInst, bool aborting);
@@ -214,9 +215,10 @@ protected:
     SHARED_FIELD(DestroyValueInst, uint8_t
         deadEnd : 1);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
-    SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
+    SHARED_FIELD(ConvertFunctionInst, uint8_t conversionKind);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
     SHARED_FIELD(GlobalValueInst, bool isBare);
+    SHARED_FIELD(RawPointerToRefInst, bool immortal);
 
     SHARED_FIELD(SILArgument, uint8_t
                  valueOwnershipKind : NumVOKindBits,

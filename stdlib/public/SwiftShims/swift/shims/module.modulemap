@@ -8,6 +8,7 @@ module SwiftShims {
   header "HeapObject.h"
   header "KeyPath.h"
   header "LibcShims.h"
+  header "Metadata.h"
   header "MetadataSections.h"
   header "Random.h"
   header "RefCount.h"
@@ -35,5 +36,10 @@ module SwiftOverlayShims {
 
 module _SynchronizationShims {
   header "_SynchronizationShims.h"
+  export *
+}
+
+module _SwiftCOMShims {
+  header "_SwiftCOMShims.h"
   export *
 }

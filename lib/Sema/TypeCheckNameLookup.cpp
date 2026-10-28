@@ -22,7 +22,6 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ImportCache.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -642,6 +641,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
         !baseTypeOrNull->isExistentialType())
       return;
 
+    // Never correct 'self', we have specialized diagnostics for it.
+    if (corrections.WrittenName.isSimpleName(Ctx.Id_self))
+      return;
+
     const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than
@@ -953,8 +956,11 @@ static void appendMissingImportFixIt(llvm::SmallString<64> &importText,
     importText += " ";
   }
 
+  // onlyIfImported below matches how modules are printed in
+  // `formatDiagnosticArgument`.
+  auto *mod = fixItInfo.moduleToImport;
   importText += "import ";
-  importText += fixItInfo.moduleToImport->getName().str();
+  importText += mod->getPublicModuleName(/*onlyIfImported*/ true).str();
   importText += "\n";
 }
 

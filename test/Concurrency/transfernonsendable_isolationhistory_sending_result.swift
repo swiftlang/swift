@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -parse-as-library -sil-region-isolation-emit-isolation-history -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -parse-as-library -sil-region-isolation-emit-isolation-history -verify %s -o /dev/null
 
 // REQUIRES: concurrency
 

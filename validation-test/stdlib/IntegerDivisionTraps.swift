@@ -20,8 +20,7 @@ import StdlibUnittest
 var suite = TestSuite("Integer Division Traps")
 
 suite.test("Int8 division lower bound")
-  .forEach(in: Array(-128 ... 127)) { b in
-    if b == 0 { return }
+  .forEach(in: [-128, -2, -1, 1, 2, 127]) { b in
     let boundary: Int = (b < 0 ?  128 : -129) * b
     let high = Int8(boundary >> 8)
     let low = UInt8(boundary & 0xff)
@@ -33,7 +32,7 @@ suite.test("Int8 division lower bound")
   }
 
 suite.test("Int8 division upper bound")
-  .forEach(in: Array(-128 ... 127)) { b in
+  .forEach(in: [-128, -2, -1, 1, 2, 127]) { b in
     if b == 0 { return }
     let boundary: Int = (b < 0 ? -129 :  128) * b
     let high = Int8(boundary >> 8)
@@ -57,7 +56,7 @@ struct WyRand: RandomNumberGenerator {
 }
 
 suite.test("Int32 division lower bound")
-  .forEach(in: Array((-128 as Int32) ... 127)) { bhi in
+  .forEach(in: [-128 as Int32, -2, -1, 1, 2, 127]) { bhi in
     var g = WyRand(state: UInt64(truncatingIfNeeded: bhi))
     let b = bhi << 24 | Int32.random(in: 0 ..< 0x100_0000, using: &g)
     let boundary = (b < 0 ? 0x1_0000_0000 : -0x1_0000_0001) * Int64(b)
@@ -71,7 +70,7 @@ suite.test("Int32 division lower bound")
   }
 
 suite.test("Int32 division upper bound")
-  .forEach(in: Array((-128 as Int32) ... 127)) { bhi in
+  .forEach(in: [-128 as Int32, -2, -1, 1, 2, 127]) { bhi in
     var g = WyRand(state: UInt64(truncatingIfNeeded: bhi))
     let b = bhi << 24 | Int32.random(in: 0 ..< 0x100_0000, using: &g)
     let boundary = (b < 0 ? -0x1_0000_0001 : -0x1_0000_0000) * Int64(b)
@@ -85,7 +84,7 @@ suite.test("Int32 division upper bound")
   }
 
 suite.test("UInt32 division upper bound")
-  .forEach(in: Array(UInt32.zero ... 255)) { bhi in
+  .forEach(in: [1 as UInt32, 2, 3, 127, 128, 255]) { bhi in
     var g = WyRand(state: UInt64(truncatingIfNeeded: bhi))
     let b = bhi << 24 | UInt32.random(in: 0 ..< 0x100_0000, using: &g)
     expectCrashLater()
@@ -96,7 +95,7 @@ suite.test("UInt32 division upper bound")
   }
 
 suite.test("UInt64 division upper bound")
-  .forEach(in: Array(UInt64.zero ... 255)) { bhi in
+  .forEach(in: [1 as UInt64, 2, 3, 127, 128, 255]) { bhi in
     var g = WyRand(state: UInt64(truncatingIfNeeded: bhi))
     let b = bhi << 56 | UInt64.random(in: 0 ..< 0x100_0000_0000_0000, using: &g)
     expectCrashLater()

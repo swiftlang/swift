@@ -100,15 +100,6 @@ namespace llvm {
 // Use the same DenseMapInfo for StorageAccessInfo as for AccessStorage. None
 // of the subclass bitfields participate in the Key.
 template <> struct DenseMapInfo<swift::StorageAccessInfo> {
-  static swift::StorageAccessInfo getEmptyKey() {
-    auto key = DenseMapInfo<swift::AccessStorage>::getEmptyKey();
-    return static_cast<swift::StorageAccessInfo &>(key);
-  }
-
-  static swift::StorageAccessInfo getTombstoneKey() {
-    auto key = DenseMapInfo<swift::AccessStorage>::getTombstoneKey();
-    return static_cast<swift::StorageAccessInfo &>(key);
-  }
   static unsigned getHashValue(swift::StorageAccessInfo storage) {
     return DenseMapInfo<swift::AccessStorage>::getHashValue(storage);
   }

@@ -370,12 +370,25 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
 }
 
 SolverTrail::Change
+SolverTrail::Change::AddedConflict(TypeVariableType *typeVar,
+                                   ConflictedType *conflict) {
+  Change result;
+  result.Kind = ChangeKind::AddedConflict;
+  result.Conflict.TypeVar = typeVar;
+  result.Conflict.ConflictType = conflict;
+
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::PrunedDisjunction(Constraint *disjunction,
-                                       FunctionType *argFuncType) {
+                                       FunctionType *argFuncType,
+                                       unsigned resultGenerationNumber) {
   Change result;
   result.Kind = ChangeKind::PrunedDisjunction;
   result.Disjunction.Disjunction = disjunction;
   result.Disjunction.ArgFuncType = argFuncType;
+  result.Disjunction.ResultGenerationNumber = resultGenerationNumber;
 
   return result;
 }
@@ -694,9 +707,21 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
   }
 
+  case ChangeKind::AddedConflict: {
+    auto stored = cs.ambiguousBindings.conflictMap.find(Conflict.TypeVar);
+    ASSERT(stored != cs.ambiguousBindings.conflictMap.end());
+
+    // Make sure we removed something that was in the set
+    ASSERT(stored->second.remove(Conflict.ConflictType));
+
+    if (stored->second.empty())
+      cs.ambiguousBindings.conflictMap.erase(TypeVar);
+    break;
+  }
+
   case ChangeKind::PrunedDisjunction: {
     cs.getRemainingDisjunction(Disjunction.Disjunction)
-        .undoArgFuncTypeChange(Disjunction.ArgFuncType);
+        .undoArgFuncTypeChange(Disjunction.ArgFuncType, Disjunction.ResultGenerationNumber);
     break;
   }
 }
@@ -944,12 +969,20 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << " and kind " << Options << ")\n";
     break;
 
+  case ChangeKind::AddedConflict:
+    out << "(AddedConflict ";
+    Conflict.TypeVar->print(out, PO);
+    out << " with conflicted type ";
+    Conflict.ConflictType->print(out);
+    out << ")\n";
+    break;
+
   case ChangeKind::PrunedDisjunction:
     out << "(PrunedDisjunction ";
     Disjunction.Disjunction->print(out, &cs.getASTContext().SourceMgr, indent + 2);
     out << " with type ";
     Disjunction.ArgFuncType->print(out, PO);
-    out << ")\n";
+    out << " and result generation number " << Disjunction.ResultGenerationNumber << ")\n";
     break;
   }
 }

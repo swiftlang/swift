@@ -35,6 +35,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -121,7 +122,8 @@ public:
 
 static SmallVector<const clang::NamedDecl *, 4>
 directRecordMemberLookup(ClangImporter &Importer,
-                         const clang::RecordDecl *whereDecl, DeclName name) {
+                         const clang::RecordDecl *whereDecl, DeclName name,
+                         UnifiedStatsReporter *stats) {
   SmallVector<const clang::NamedDecl *, 4> result;
 
   // Class template instances aren't in the lookup table.
@@ -134,6 +136,10 @@ directRecordMemberLookup(ClangImporter &Importer,
       auto *namedDecl = dyn_cast<clang::NamedDecl>(member);
       if (!namedDecl)
         continue;
+
+      if (stats)
+        ++stats->getFrontendCounters()
+              .ClangRecordMemberLookupTemplateMembersScanned;
 
       auto memberName = Importer.importName(namedDecl);
       if (!memberName)
@@ -169,11 +175,17 @@ directRecordMemberLookup(ClangImporter &Importer,
     if (!seen.insert(found).second)
       continue; // Already saw this Clang decl via a different context entry
 
+    if (stats)
+      ++stats->getFrontendCounters().ClangRecordMemberLookupCandidates;
+
     auto *foundCtx = found->getNonTransparentDeclContext();
     if (auto *foundCtxDecl = dyn_cast<clang::RecordDecl>(foundCtx)) {
       // Context of found decl is also a decl; compare canonical decl of each
-      if (foundCtxDecl->getCanonicalDecl() == whereCanonical)
+      if (foundCtxDecl->getCanonicalDecl() == whereCanonical) {
+        if (stats)
+          ++stats->getFrontendCounters().ClangRecordMemberLookupMatched;
         result.push_back(found);
+      }
     }
   }
 
@@ -202,6 +214,11 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     auto *foundDecl = foundEntry.dyn_cast<clang::NamedDecl *>();
     if (!foundDecl)
       continue; // What we found wasn't a NamedDecl
+    if (!seenDecls.insert(foundDecl).second)
+      continue; // We've already seen this; a re-declaration?
+
+    if (auto *stats = ctx.Stats)
+      ++stats->getFrontendCounters().ClangNamespaceMemberLookupCandidates;
 
     auto *foundCtx = foundDecl->getNonTransparentDeclContext();
 
@@ -223,8 +240,9 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     if (!wasFound)
       continue;
 
-    if (!seenDecls.insert(foundDecl).second)
-      continue; // We've already seen this; a re-declaration?
+    if (auto *stats = ctx.Stats)
+      ++stats->getFrontendCounters().ClangNamespaceMemberLookupMatched;
+
     if (auto *importedDecl =
             ctx.getClangModuleLoader()->importDeclDirectly(foundDecl))
       collector.add(cast<ValueDecl>(importedDecl));
@@ -340,7 +358,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
   auto directResults =
-      directRecordMemberLookup(Importer, clangRecordDecl, name);
+      directRecordMemberLookup(Importer, clangRecordDecl, name, ctx.Stats);
 
   // It's possible that there are entries in the lookup table that end up
   // getting mangled as unsafe, but were not added to the look up table as
@@ -356,8 +374,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (id.starts_with("__") && id.ends_with("Unsafe") && id != "__Unsafe") {
       auto unUnsafeId = id.drop_front(2).drop_back(6);
       DeclName unUnsafeName(ctx.getIdentifier(unUnsafeId));
-      auto moreResults =
-          directRecordMemberLookup(Importer, clangRecordDecl, unUnsafeName);
+      auto moreResults = directRecordMemberLookup(Importer, clangRecordDecl,
+                                                  unUnsafeName, ctx.Stats);
       directResults.append(moreResults.begin(), moreResults.end());
     }
   }
@@ -428,11 +446,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
     // If the derived class already has its own directly-synthesized
     // property with the looked-up name, don't clone a same-named
-    // synthesized property from the base on top of it. This is the case
-    // e.g. when SWIFT_REFCOUNTED_PTR is applied to both a base and a
-    // derived smart pointer: each gets its own `asReference` and
-    // surfacing the base's clone too would leave the derived with two
-    // copies.
+    // synthesized property from the base on top of it, which would leave
+    // the derived class with two copies.
     bool derivedHasOwnSynthesizedVar = false;
     for (auto m : inheritingDecl->getCurrentMembersWithoutLoading()) {
       auto ownVD = dyn_cast<VarDecl>(m);
@@ -481,8 +496,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     // from that base: they are reachable via the Swift superclass chain
     // instead.
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    if (!inheritance &&
-        ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeInheritance)) {
+    if (!inheritance) {
       auto derivedInfo = evaluateOrDefault(
           ctx.evaluator, ForeignReferenceTypeInfoRequest({cxxRecord}), {});
       if (auto primaryBase = derivedInfo.getPrimarySuperclass())
@@ -553,6 +567,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     } else if (name.getBaseName().isSubscript()) {
       for (auto *sub : Importer.Impl.lookupAndImportSubscripts(inheritingDecl))
         result.push_back(sub);
+    } else if (name.isSimpleName("asReference")) {
+      if (auto *asReference =
+              Importer.Impl.lookupAndImportAsReference(inheritingDecl))
+        result.push_back(asReference);
     }
   }
 
@@ -913,13 +931,9 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   // declaring class is that superclass (or a Clang base of it) are reachable
   // via the Swift superclass chain and should not be synthesized here again.
   const clang::CXXRecordDecl *superclassClangDecl = nullptr;
-  if (SwiftContext.LangOpts.hasFeature(
-          Feature::ForeignReferenceTypeInheritance)) {
-    auto frtInfo =
-        evaluateOrDefault(SwiftContext.evaluator,
-                          ForeignReferenceTypeInfoRequest({CXXRecord}), {});
-    superclassClangDecl = frtInfo.getPrimarySuperclass();
-  }
+  auto frtInfo = evaluateOrDefault(
+      SwiftContext.evaluator, ForeignReferenceTypeInfoRequest({CXXRecord}), {});
+  superclassClangDecl = frtInfo.getPrimarySuperclass();
 
   llvm::SmallMapVector<CXXOverloadArgTypes,
                        std::pair<CXXOverload, CXXOverload>, 1>

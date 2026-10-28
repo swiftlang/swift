@@ -18,25 +18,22 @@
 #ifndef SWIFT_AST_ABSTRACTLAYOUT_H
 #define SWIFT_AST_ABSTRACTLAYOUT_H
 
-#include <cstdint>
+#include <memory>
 #include <optional>
-#include <string>
+
+#include "swift/AST/ReferenceCounting.h"
+#include "swift/SIL/SILTypeProperties.h"
 
 namespace swift {
 
-class NominalTypeDecl;
+class SerializableHiddenTypeInfoRepresentation;
 
 struct AbstractTypeLayout {
-  std::string mangledName;
-  uint64_t size;
-  uint64_t alignment;
-  uint64_t stride;
-  bool bitwiseCopyable;
-  bool isOpaque;
+  SILTypeProperties typeProperties;
+  std::optional<ReferenceCounting> referenceCountingSystem;
+  std::shared_ptr<SerializableHiddenTypeInfoRepresentation>
+      typeInfoRepresentation;
 };
-
-std::optional<AbstractTypeLayout>
-computeClangAbstractLayout(const NominalTypeDecl *decl);
 
 } // namespace swift
 

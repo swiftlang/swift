@@ -56,7 +56,7 @@ public struct MutableSpan<Element: ~Copyable>
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(borrow start)
   @_transparent
   internal init(
@@ -92,10 +92,6 @@ extension MutableSpan where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
 
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
@@ -113,6 +109,21 @@ extension MutableSpan where Element: ~Copyable {
     let buffer = unsafe UnsafeMutableBufferPointer(start: start, count: count)
     let ms = unsafe MutableSpan(_unsafeElements: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: start)
+  }
+
+  /// Create a mutable span over a single value.
+  ///
+  /// The span has a `count` of 1. Writes through the span modify `value`,
+  /// which is exclusively accessed while the span exists.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be mutated through the span
+  @export(implementation)
+  @_lifetime(&value)
+  public init(ofOne value: inout Element) {
+    let address = Builtin.unprotectedAddressOf(&value)
+    let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, mutating: &value)
   }
 }
 
@@ -411,6 +422,19 @@ extension MutableSpan where Element: ~Copyable {
   internal func _checkIndex(_ position: Index) {
     _precondition(indices.contains(position), "index out of bounds")
   }
+
+  // SILOptimizer looks for fixed_storage.check_range semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_range")
+  @inline(__always)
+  @export(implementation)
+  internal func _checkRange(lowerBound: Index, upperBound: Index) {
+    _precondition(
+      UInt(bitPattern: lowerBound) <= _assumeNonNegative(_count) &&
+      UInt(bitPattern: upperBound) <= _assumeNonNegative(_count),
+      "Index range out of bounds"
+    )
+  }
+
   /// Accesses the element at the specified index in the `MutableSpan`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
@@ -664,11 +688,7 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _mutatingExtracting(unchecked: bounds)
   }
 
@@ -706,11 +726,7 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Index>) -> Self {
-    _precondition(
-      UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
-      UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
-      "Index range out of bounds"
-    )
+    _checkRange(lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
     return unsafe _consumingExtracting(unchecked: bounds)
   }
 

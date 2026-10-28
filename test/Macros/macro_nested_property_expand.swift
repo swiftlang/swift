@@ -72,7 +72,7 @@ public class C<T> {
 // SIL:      sil_vtable C {
 // SIL-NEXT:   #C._property!getter: <T> (C<T>) -> () -> T : @$s4main1CC9_propertyxvg
 // SIL-NEXT:   #C._property!setter: <T> (C<T>) -> (T) -> () : @$s4main1CC9_propertyxvs
-// SIL-NEXT:   #C._property!modify: <T> (C<T>) -> () -> () : @$s4main1CC9_propertyxvM
+// SIL-NEXT:   #C._property!modify: <T> (C<T>) -> @yield_once () yields (inout T) -> () : @$s4main1CC9_propertyxvM
 
 // PRINT-LABEL: struct TestMemberwise1<T>
 struct TestMemberwise1<T> {

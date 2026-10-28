@@ -43,6 +43,10 @@ bool DerivedConformance::canDeriveDistributedActorSystem(
     NominalTypeDecl *nominal, DeclContext *dc) {
   auto &C = nominal->getASTContext();
 
+  // A 'distributed actor' cannot implement the actor system itself
+  if (nominal->isDistributedActor())
+    return false;
+
   // Make sure ad-hoc requirements that we'll use in synthesis are present, before we try to use them.
   // This leads to better error reporting because we already have errors happening (missing witnesses).
   if (auto handlerType = getDistributedActorSystemResultHandlerType(nominal)) {
@@ -286,6 +290,10 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
   const SourceLoc sloc = SourceLoc();
   const DeclNameLoc dloc = DeclNameLoc();
 
+  // `invokeHandlerOnReturn` requirement is not present in Embedded Swift.
+  ASSERT(!C.LangOpts.hasFeature(Feature::Embedded) &&
+         "invokeHandlerOnReturn is unavailable in Embedded Swift; ");
+
   NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(DC);
   assert(nominal);
 
@@ -467,8 +475,20 @@ deriveDistributedActorType_ActorSystem(
   if (!defaultDistributedActorSystemTypeDecl)
     return nullptr;
 
+  auto defaultSystemTy =
+      defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
+
+  // A 'distributed actor' cannot double as the actor system it is using,
+  // so don't adopt such module-wide default. Doing so would make the actor
+  // its own actor system, and we'd crash looking for the system's
+  // associated types on a distributed actor
+  if (auto systemNominal = defaultSystemTy->getAnyNominal()) {
+    if (systemNominal->isDistributedActor())
+      return nullptr;
+  }
+
   // Return the default system type.
-  return defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
+  return defaultSystemTy;
 }
 
 static Type
@@ -488,8 +508,14 @@ deriveDistributedActorType_SerializationRequirement(
   if (!DAS)
     return nullptr;
 
-  if (auto systemNominal = systemTy->getAnyNominal())
+  if (auto systemNominal = systemTy->getAnyNominal()) {
+    // A 'distributed actor' cannot be its own actor system; this is diagnosed
+    // elsewhere, so just fail to synthesize here
+    if (systemNominal->isDistributedActor())
+      return nullptr;
+
     return getDistributedActorSystemSerializationType(systemNominal);
+  }
 
   return nullptr;
 }
@@ -583,11 +609,11 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   //   return buildDefaultDistributedRemoteActorExecutor(self)
   // }
   auto isLocalActorDecl = ctx.getIsLocalDistributedActor();
-  DeclRefExpr *isLocalActorExpr =
-      new (ctx) DeclRefExpr(ConcreteDeclRef(isLocalActorDecl), DeclNameLoc(), /*implicit=*/true,
-                            AccessSemantics::Ordinary,
-                            FunctionType::get({AnyFunctionType::Param(ctx.getAnyObjectType())},
-                                              ctx.getBoolType()));
+  DeclRefExpr *isLocalActorExpr = new (ctx) DeclRefExpr(
+      ConcreteDeclRef(isLocalActorDecl), DeclNameLoc(), /*implicit=*/true,
+      AccessSemantics::Ordinary,
+      FunctionType::get({AnyFunctionType::Param(ctx.getAnyObjectType())},
+                        /* yields */ {}, ctx.getBoolType()));
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
 
@@ -723,6 +749,26 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 }
 
 /******************************************************************************/
+/*********** EXECUTE-DISTRIBUTED-TARGET FUNCTION (EMBEDDED ONLY) **************/
+/******************************************************************************/
+
+/// Derive the witness for the Embedded-only
+/// `_executeDistributedTarget(target:invocationDecoder:resultHandler:)`
+/// requirement.
+static FuncDecl *
+deriveDistributedActor_executeDistributedTarget(DerivedConformance &derived) {
+  auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
+  assert(classDecl && classDecl->isDistributedActor());
+
+  auto *fn = createEmbeddedDistributedReceiveDispatch(classDecl);
+  if (!fn)
+    return nullptr;
+
+  derived.addMembersToConformanceContext({fn});
+  return fn;
+}
+
+/******************************************************************************/
 /**************************** ENTRY POINTS ************************************/
 /******************************************************************************/
 
@@ -733,21 +779,19 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
-    ValueDecl *derivedValue = nullptr;
     if (var->getName() == Context.Id_unownedExecutor)
-      derivedValue = deriveDistributedActor_unownedExecutor(*this);
+      return deriveDistributedActor_unownedExecutor(*this);
 
-    if (derivedValue) {
-      assertRequiredSynthesizedPropertyOrder(Context, Nominal);
-    }
-    return derivedValue;
+    return nullptr;
   }
 
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
-    // just a simple name check is enough here,
-    // if we are invoked here we know for sure it is for the "right" function
     if (func->getName().getBaseName() == Context.Id_resolve) {
       return deriveDistributedActor_resolve(*this);
+    }
+
+    if (func->getName().getBaseName() == Context.Id_executeDistributedTarget) {
+      return deriveDistributedActor_executeDistributedTarget(*this);
     }
   }
 

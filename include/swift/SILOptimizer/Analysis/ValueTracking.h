@@ -18,7 +18,6 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_VALUETRACKING_H
 
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {

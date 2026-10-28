@@ -44,6 +44,11 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
+// The option's argument is a combination of <key>=<path>, where
+// <path> is a file-system path that may be affected by the current
+// working directory.
+def ArgumentIsEqualKeyedPath: OptionFlag;
+
 // The option should be written into a .swiftinterface module interface file,
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
@@ -77,6 +82,11 @@ def ArgumentIsFileList : OptionFlag;
 // affects the location of the output file, or `-emit-module` which defines
 // which action is performed.
 def CacheInvariant : OptionFlag;
+
+// The option's argument is a CAS ID (or `<name>=<CAS ID>`) when compilation
+// caching is enabled. The referenced CAS object is added to the cache key as a
+// reference instead of the argument string.
+def ArgumentIsCASID : OptionFlag;
 
 /////////
 // Options
@@ -184,6 +194,11 @@ def no_strict_implicit_module_context :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable the strict forwarding of compilation context to downstream implicit module dependencies">;
 
+def swift_module_file_EQ :
+  Joined<["-"], "swift-module-file=">,
+  Flags<[FrontendOption, ArgumentIsEqualKeyedPath, ArgumentIsCASID, NewDriverOnlyOption]>,
+  HelpText<"Specify Swift module dependency input explicitly">, MetaVarName<"<name>=<path>">;
+
 def compiler_assertions :
   Flag<["-"], "compiler-assertions">,
   Group<internal_debug_Group>,
@@ -279,6 +294,11 @@ def o : JoinedOrSeparate<["-"], "o">,
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
+
+def experimental_use_gnu_jobserver :
+  Flag<["-"], "experimental-use-gnu-jobserver">,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild, NewDriverOnlyOption]>,
+  HelpText<"Participate in the GNU make jobserver advertised in MAKEFLAGS, letting its token pool (not -j) bound concurrency across the build">;
 
 def sdk : Separate<["-"], "sdk">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
@@ -494,6 +514,10 @@ def remark_module_serialization : Flag<["-"], "Rmodule-serialization">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about module serialization">;
 
+def remark_hidden_type_layout_serialization : Flag<["-"], "Rhidden-type-layout-serialization">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about hidden type layout serialization">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
@@ -513,6 +537,13 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
+def serialize_diagnostics_EQ
+    : Joined<["-"], "serialize-diagnostics=">,
+      Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput,
+             CacheInvariant]>,
+      HelpText<"Serialize diagnostics in a specific format: 'dia', a binary "
+               "format (the default), or 'sarif'">,
+      MetaVarName<"<format>">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
@@ -660,9 +691,10 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def debug_module_path : Separate<["-"], "debug-module-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, ArgumentIsCASID]>,
   HelpText<"Path or cache key to this module's binary swiftmodule artifact (required by debug info)">;
-def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption, ArgumentIsPath]>,
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">,
+  Flags<[FrontendOption, ArgumentIsPath, ArgumentIsCASID]>,
   Alias<debug_module_path>;
 def debug_module_self_key : Flag<["-"], "debug-module-self-key">,
   Flags<[FrontendOption]>,
@@ -2234,6 +2266,12 @@ def incremental_dependency_scan:
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Re-use/validate prior build dependency scan artifacts">;
 
+def incremental_dependency_scan_cache_path:
+  Separate<["-"], "incremental-dependency-scan-cache-path">,
+  Flags<[HelpHidden, NewDriverOnlyOption, ArgumentIsPath]>,
+  HelpText<"Specify the path to serialize/reuse the dependency scan cache">,
+  MetaVarName<"<path>">;
+
 def driver_experimental_explicit_module_build:
   Flag<["-"], "experimental-explicit-module-build">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,
@@ -2301,7 +2339,7 @@ def emit_module_dependencies_path:
 def use_frontend_parseable_output:
   Flag<["-"], "use-frontend-parseable-output">,
   Flags<[HelpHidden, NewDriverOnlyOption, CacheInvariant]>,
-  HelpText<"Emit parseable-output from swift-frontend jobs instead of from "
+  HelpText<"Deprecated: Emit parseable-output from swift-frontend jobs instead of from "
            "the driver">;
 
 def print_explicit_dependency_graph:
@@ -2409,11 +2447,11 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
 def scanner_cas_fs: Separate<["-"], "scanner-cas-fs">,
-  Flags<[NewDriverOnlyOption, CacheInvariant]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Configure the filesystem to read from the provided CAS tree during dep-scanning">;
 
 def cas_fs_escape: Separate<["-"], "cas-fs-escape">,
-  Flags<[NewDriverOnlyOption, CacheInvariant]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Path for using the underlying file system instead of CASFS">, MetaVarName<"<path>">;
 
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
@@ -2467,6 +2505,13 @@ def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
 
+def print_llvm_backend_diagnostics
+    : Flag<["-"], "print-llvm-backend-diagnostics">,
+      Flags<[FrontendOption, NoDriverOption]>,
+      HelpText<
+          "Print error-severity LLVM backend diagnostics (e.g. object-file "
+          "emission errors) instead of swallowing them">;
+
 def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Generate callsite information in debug info">;
@@ -2509,6 +2554,12 @@ def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,
 def in_process_plugin_server_path : Separate<["-"], "in-process-plugin-server-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Path to dynamic library plugin server">;
+
+def resolved_in_process_plugin_server_path
+  : Separate<["-"], "resolved-in-process-plugin-server-path">,
+  Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+  HelpText<"Path to dynamic library plugin server resolved by the dependency "
+           "scanner. Overrides '-in-process-plugin-server-path'">;
 
 def disable_sandbox:
   Flag<["-"], "disable-sandbox">,

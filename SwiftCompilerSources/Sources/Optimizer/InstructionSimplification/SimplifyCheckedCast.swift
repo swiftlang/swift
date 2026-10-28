@@ -20,9 +20,11 @@ extension CheckedCastAddrBranchInst : OnoneSimplifiable {
     }
     if castWillSucceed {
       // TODO: handle cases where the operand address types are different.
-      if source.type == destination.type {
-        replaceSuccess(context)
+      // A test_only cast has no destination, so there is no type to match.
+      if let destination, source.type != destination.type {
+        return
       }
+      replaceSuccess(context)
     } else {
       replaceFailure(context)
     }
@@ -34,9 +36,13 @@ private extension CheckedCastAddrBranchInst {
     let builder = Builder(before: self, context)
     switch consumptionKind {
     case .TakeAlways, .TakeOnSuccess:
-      builder.createCopyAddr(from: source, to: destination, takeSource: true, initializeDest: true)
+      builder.createCopyAddr(from: source, to: destination!, takeSource: true, initializeDest: true)
     case .CopyOnSuccess:
-      builder.createCopyAddr(from: source, to: destination, takeSource: false, initializeDest: true)
+      builder.createCopyAddr(from: source, to: destination!, takeSource: false, initializeDest: true)
+    case .TestOnly:
+      // Reports success without producing a value: there is no destination
+      // and nothing to move or copy.
+      break
     }
     builder.createBranch(to: successBlock)
     context.erase(instruction: self)
@@ -47,7 +53,7 @@ private extension CheckedCastAddrBranchInst {
     switch consumptionKind {
     case .TakeAlways:
       builder.createDestroyAddr(address: source)
-    case .CopyOnSuccess, .TakeOnSuccess:
+    case .CopyOnSuccess, .TakeOnSuccess, .TestOnly:
       break
     }
     builder.createBranch(to: failureBlock)
@@ -74,13 +80,16 @@ private extension UnconditionalCheckedCastInst {
       return
     }
     
-    let instanceTy = targetFormalType.instanceTypeOfMetatype
-    guard let nominal = instanceTy.nominal,
+    let targetInstanceType = targetFormalType.instanceTypeOfMetatype
+    let sourceInstanceType = sourceFormalType.instanceTypeOfMetatype
+
+    guard let nominal = targetInstanceType.nominal,
           let proto = nominal as? ProtocolDecl
     else {
       return
     }
-    let conformance = sourceFormalType.instanceTypeOfMetatype.checkConformance(to: proto)
+
+    let conformance = sourceInstanceType.checkConformance(to: proto)
     guard conformance.isValid,
           conformance.matchesActorIsolation(in: parentFunction)
     else {
@@ -88,7 +97,8 @@ private extension UnconditionalCheckedCastInst {
     }
     
     let builder = Builder(before: self, context)
-    let iemt = builder.createInitExistentialMetatype(metatype: operand.value, existentialType: self.type, conformances: [conformance])
+    let conformances = sourceInstanceType.collectExistentialConformances(existentialType: targetInstanceType)
+    let iemt = builder.createInitExistentialMetatype(metatype: operand.value, existentialType: self.type, conformances: conformances)
     self.replace(with: iemt, context)
   }   
 }

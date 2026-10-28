@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -verify-additional-prefix nonembedded-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -verify-additional-prefix embedded-
-// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK
+// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_CASTS
 // REQUIRES: swift_feature_Embedded
 
 // ---------------------------------------------------------------------------
@@ -34,28 +34,6 @@ struct SomeStruct {
       0
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// weak/unowned references
-// ---------------------------------------------------------------------------
-
-// Note: this have always been an error in Embedded Swift. Make sure they stay
-// that way, but are emitted as warnings when the restrictions are enabled.
-
-public class MyClass { }
-
-public struct MyStruct {
-  #if !SUPPRESS_WEAK
-  var normalVar: MyClass
-  weak var weakVar: MyClass? // expected-nonembedded-warning {{attribute 'weak' cannot be used in Embedded Swift}}
-  // expected-embedded-error@-1 {{attribute 'weak' cannot be used in Embedded Swift}}
-
-  unowned var unownedVar: MyClass // expected-nonembedded-warning {{attribute 'unowned' cannot be used in Embedded Swift}}
-  // expected-embedded-error @-1{{attribute 'unowned' cannot be used in Embedded Swift}}
-  #endif
-
-  unowned(unsafe) var unownedUnsafe: MyClass
 }
 
 // ---------------------------------------------------------------------------
@@ -117,20 +95,25 @@ class ConformsToQ: Q {
   func okay() { }
 }
 
+#if !SUPPRESS_CASTS
 func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if let q = object as? any AnyObject & Q {
     _ = q
   }
 
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if object is any AnyObject & Q { }
 
-  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-nonembedded-warning@+2{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   _ = object as! AnyObject & Q
 
   _ = cq as AnyObject & Q
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // #if handling to suppress diagnostics for non-Embedded-only code
@@ -138,12 +121,14 @@ func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
 
 #if $Embedded
 
+#if !SUPPRESS_CASTS
 func stillProblematic(object: AnyObject) {
-  // expected-embedded-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  // expected-embedded-error@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
   if let q = object as? any AnyObject & Q {
     _ = q
   }
 }
+#endif
 
 #else
 
@@ -177,6 +162,28 @@ func openme(p: any P) {
   _openExistential(p, do: generic)
 
   // implicit opening
-  // expected-warning@+1{{cannot use generic global function 'acceptP' on a value of type 'any P' in Embedded Swift}}
+  // Opening is the only way this call type checks -- 'any P' does not conform
+  // to 'P' -- so there is no coercion to suggest.
+  // expected-warning@+1{{cannot open existential type 'any P' when passing it as an argument to global function 'acceptP' in Embedded Swift}}
   acceptP(p)
 }
+
+// ---------------------------------------------------------------------------
+// 'dynamic' and dynamic replacement are ignored
+// ---------------------------------------------------------------------------
+
+dynamic func dynamicFunc() { } // expected-warning{{global function 'dynamicFunc()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{1-9=}}
+
+struct HasDynamicMembers {
+  dynamic var stored: Int = 0 // expected-warning{{property 'stored' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+  dynamic var computed: Int { 0 } // expected-warning{{property 'computed' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+  dynamic subscript(i: Int) -> Int { i } // expected-warning{{subscript 'subscript(_:)' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+  dynamic init() { } // expected-warning{{initializer 'init()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+}
+
+class HasDynamicMethod {
+  dynamic func method() { } // expected-warning{{instance method 'method()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+}
+
+@_dynamicReplacement(for: dynamicFunc()) // expected-warning{{global function 'replacementFunc()' cannot be a dynamic replacement in Embedded Swift; '@_dynamicReplacement' will be ignored}}{{1-42=}}
+func replacementFunc() { }

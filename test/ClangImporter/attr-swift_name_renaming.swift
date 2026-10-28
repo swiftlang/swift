@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck -verify -verify-ignore-unrelated %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import SwiftName
 
 func test() {

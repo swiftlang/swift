@@ -23,7 +23,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
@@ -347,7 +346,12 @@ void appendToVector(Bridged cNode, void *vecPtr) {
 
 SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   ASTContext &Ctx = SF.getASTContext();
-  DiagnosticEngine &Diags = Ctx.Diags;
+  std::optional<DiagnosticQueue> suppressedDiagQueue;
+  if (SF.shouldSuppressParserDiagnostics()) {
+    suppressedDiagQueue.emplace(Ctx.Diags, /*emitOnDestruction=*/false);
+  }
+  DiagnosticEngine &Diags =
+      suppressedDiagQueue ? suppressedDiagQueue->getDiags() : Ctx.Diags;
   SourceManager &SM = Ctx.SourceMgr;
   const LangOptions &langOpts = Ctx.LangOpts;
   const GeneratedSourceInfo *genInfo = SF.getGeneratedSourceFileInfo();
@@ -392,10 +396,12 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   swift_ASTGen_evaluateConfiguredRegionsForDiagnostics(Ctx, exportedSourceFile);
 
   // Emit parser diagnostics.
-  (void)swift_ASTGen_emitParserDiagnostics(
-      Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
-      /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
-          langOpts.WarnOnEditorPlaceholder);
+  if (!suppressedDiagQueue) {
+    (void)swift_ASTGen_emitParserDiagnostics(
+        Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
+        /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
+            langOpts.WarnOnEditorPlaceholder);
+  }
 
   // Generate AST nodes.
   SmallVector<ASTNode, 8> items;

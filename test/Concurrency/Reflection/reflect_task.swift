@@ -116,6 +116,32 @@ func testMultipleAsyncLet() async {
   // CHECK: }
 }
 
+func testTaskGroup() async {
+  reflectionLog(str: "testTaskGroup")
+  // CHECK: testTaskGroup
+
+  await withTaskGroup(of: Int.self) { group in
+    group.addTask { await sleepForever() }
+    group.addTask { await sleepForever() }
+    group.addTask { await sleepForever() }
+
+    await dodgeRaceCondition()
+
+    reflect(asyncTask: _getCurrentTaskShim())
+    // Every group child must be listed, not only the first one.
+    // CHECK: Async task {{0x[0-9a-fA-F]*}}
+    // CHECK: children = {
+    // CHECK-NEXT: {{^  }}Async task {{0x[0-9a-fA-F]*}}
+    // CHECK-NOT: {{^[}]$}}
+    // CHECK: {{^  }}Async task {{0x[0-9a-fA-F]*}}
+    // CHECK-NOT: {{^[}]$}}
+    // CHECK: {{^  }}Async task {{0x[0-9a-fA-F]*}}
+    // CHECK: {{^[}]$}}
+
+    group.cancelAll()
+  }
+}
+
 func testNamedTask() async {
   reflectionLog(str: "testNamedTask")
   // CHECK: testNamedTask
@@ -133,6 +159,7 @@ func testNamedTask() async {
     await testNestedCallsTask()
     await testOneAsyncLet()
     await testMultipleAsyncLet()
+    await testTaskGroup()
     await testNamedTask()
 
     doneReflecting()

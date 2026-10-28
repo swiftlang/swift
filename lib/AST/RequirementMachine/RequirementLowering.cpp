@@ -159,7 +159,6 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "Diagnostics.h"
@@ -580,7 +579,7 @@ void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Conformance,
                                   subjectType, constraintType),
                       loc});
-  } else if (constraintType->getClassOrBoundGenericClass()) {
+  } else if (constraintType->getClassDecl()) {
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
@@ -744,7 +743,7 @@ struct InferRequirementsWalker : public TypeWalker {
 
 }
 
-/// Infer requirements from applications of BoundGenericTypes to type
+/// Infer requirements from applications of generic types to type
 /// parameters. For example, given a function declaration
 ///
 ///     func union<T>(_ x: Set<T>, _ y: Set<T>)

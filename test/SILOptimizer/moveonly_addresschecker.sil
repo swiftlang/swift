@@ -1094,3 +1094,178 @@ bb0:
   %36 = tuple ()
   return %36 : $()
 } // end sil function 'reinitMutableSpanThroughModifyAccess'
+
+// Mutate accessor tests
+
+struct Token: ~Copyable {
+  let id: Int
+  deinit
+}
+
+struct Inner: ~Copyable {
+  var _t: Token
+}
+
+struct Outer: ~Copyable {
+  var inner: Inner
+}
+
+sil @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+sil @Outer_yielded_modify : $@yield_once_2 @convention(method) (@inout Outer) -> @yields @inout Inner
+sil @Outer_inner_mutate : $@convention(method) (@inout Outer) -> @inout Inner
+sil @Outer_reyield : $@yield_once_2 @convention(method) (@inout Outer) -> @yields @inout Outer
+
+// CHECK-LABEL: sil [ossa] @assign_through_mutate_under_access :
+// CHECK:         [[T:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         end_access
+// CHECK-LABEL: } // end sil function 'assign_through_mutate_under_access'
+sil [ossa] @assign_through_mutate_under_access : $@convention(thin) (@inout Outer, @owned Token) -> () {
+bb0(%0 : $*Outer, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = begin_access [modify] [static] %2
+  %4 = struct_element_addr %3, #Outer.inner
+  %5 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %6 = apply %5(%4) : $@convention(method) (@inout Inner) -> @inout Token
+  %7 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %6
+  store %1 to [assign] %7
+  end_access %3
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @assign_through_mutate_under_mutate :
+// CHECK:         [[T:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         end_access
+// CHECK-LABEL: } // end sil function 'assign_through_mutate_under_mutate'
+sil [ossa] @assign_through_mutate_under_mutate : $@convention(thin) (@inout Outer, @owned Token) -> () {
+bb0(%0 : $*Outer, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = begin_access [modify] [static] %2
+  %4 = function_ref @Outer_inner_mutate : $@convention(method) (@inout Outer) -> @inout Inner
+  %5 = apply %4(%3) : $@convention(method) (@inout Outer) -> @inout Inner
+  %6 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %5
+  %7 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %8 = apply %7(%6) : $@convention(method) (@inout Inner) -> @inout Token
+  %9 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %8
+  store %1 to [assign] %9
+  end_access %3
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @assign_through_mutate_under_yield :
+// CHECK:         [[T:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         end_apply
+// CHECK-LABEL: } // end sil function 'assign_through_mutate_under_yield'
+sil [ossa] @assign_through_mutate_under_yield : $@convention(thin) (@inout Outer, @owned Token) -> () {
+bb0(%0 : $*Outer, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = begin_access [modify] [static] %2
+  %4 = function_ref @Outer_yielded_modify : $@yield_once_2 @convention(method) (@inout Outer) -> @yields @inout Inner
+  (%5, %6, %7) = begin_apply %4(%3) : $@yield_once_2 @convention(method) (@inout Outer) -> @yields @inout Inner
+  %8 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5
+  %9 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %10 = apply %9(%8) : $@convention(method) (@inout Inner) -> @inout Token
+  %11 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %10
+  store %1 to [assign] %11
+  %13 = end_apply %6 as $()
+  end_access %3
+  dealloc_stack %7
+  %16 = tuple ()
+  return %16
+}
+
+// CHECK-LABEL: sil [ossa] @assign_through_mutate_under_inout_arg :
+// CHECK:         [[T:%.*]] = apply {{%.*}}(%0) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'assign_through_mutate_under_inout_arg'
+sil [ossa] @assign_through_mutate_under_inout_arg : $@convention(thin) (@inout Inner, @owned Token) -> () {
+bb0(%0 : $*Inner, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %4 = apply %3(%2) : $@convention(method) (@inout Inner) -> @inout Token
+  %5 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %4
+  store %1 to [assign] %5
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @assign_through_mutate_under_inout_arg_projection :
+// CHECK:         [[T:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'assign_through_mutate_under_inout_arg_projection'
+sil [ossa] @assign_through_mutate_under_inout_arg_projection : $@convention(thin) (@inout Outer, @owned Token) -> () {
+bb0(%0 : $*Outer, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = struct_element_addr %2, #Outer.inner
+  %4 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %5 = apply %4(%3) : $@convention(method) (@inout Inner) -> @inout Token
+  %6 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %5
+  store %1 to [assign] %6
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @assign_through_nested_mutate_under_yield :
+// CHECK:         [[T:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         end_apply
+// CHECK-LABEL: } // end sil function 'assign_through_nested_mutate_under_yield'
+sil [ossa] @assign_through_nested_mutate_under_yield : $@convention(thin) (@inout Outer, @owned Token) -> () {
+bb0(%0 : $*Outer, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = begin_access [modify] [static] %2
+  %4 = function_ref @Outer_reyield : $@yield_once_2 @convention(method) (@inout Outer) -> @yields @inout Outer
+  (%5, %6, %7) = begin_apply %4(%3) : $@yield_once_2 @convention(method) (@inout Outer) -> @yields @inout Outer
+  %8 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5
+  %9 = function_ref @Outer_inner_mutate : $@convention(method) (@inout Outer) -> @inout Inner
+  %10 = apply %9(%8) : $@convention(method) (@inout Outer) -> @inout Inner
+  %11 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %10
+  %12 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %13 = apply %12(%11) : $@convention(method) (@inout Inner) -> @inout Token
+  %14 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %13
+  store %1 to [assign] %14
+  %16 = end_apply %6 as $()
+  end_access %3
+  dealloc_stack %7
+  %19 = tuple ()
+  return %19
+}
+
+// CHECK-LABEL: sil [ossa] @assign_through_nested_mutate_under_inout_arg :
+// CHECK:         [[T:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@inout Inner) -> @inout Token
+// CHECK-NEXT:    destroy_addr [[T]]
+// CHECK-NEXT:    store %1 to [init] [[T]]
+// CHECK-NOT:     destroy_addr
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'assign_through_nested_mutate_under_inout_arg'
+sil [ossa] @assign_through_nested_mutate_under_inout_arg : $@convention(thin) (@inout Outer, @owned Token) -> () {
+bb0(%0 : $*Outer, %1 : @owned $Token):
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %3 = function_ref @Outer_inner_mutate : $@convention(method) (@inout Outer) -> @inout Inner
+  %4 = apply %3(%2) : $@convention(method) (@inout Outer) -> @inout Inner
+  %5 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %4
+  %6 = function_ref @Inner_t_mutate : $@convention(method) (@inout Inner) -> @inout Token
+  %7 = apply %6(%5) : $@convention(method) (@inout Inner) -> @inout Token
+  %8 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %7
+  store %1 to [assign] %8
+  %10 = tuple ()
+  return %10
+}

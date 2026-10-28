@@ -3,6 +3,14 @@
 
 // UNSUPPORTED: OS=xros
 
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
+// The Android NDK ships its own lld, older than the in-tree LLVM that builds
+// the compiler. During LTO it rejects an IR attribute value the newer LLVM
+// emits: "invalid value for 'frame-pointer' attribute: non-leaf-no-reserve".
+// This is a linker/LLVM version mismatch, not a bug in this test. Once we
+// have a new enough lld in the NDK, re-enable this.
+// See: oss-swift-rebranch-package-swift-sdk-for-android build 219.
+
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").

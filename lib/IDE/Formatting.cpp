@@ -14,9 +14,7 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
@@ -1028,19 +1026,6 @@ public:
     AllowsTrailingSeparator(false), ElementExpected(ElementExpected) {
       assert(ContextLoc.isValid() && IntroducerLoc.isValid());
     }
-
-  /// Update the alignment for a list element.
-  ///
-  /// \param Start
-  ///   The start location of the element.
-  /// \param End
-  ///   The end location of the element
-  /// \param WalkableParent
-  ///   An AST node that is, or contains the element, and is walkable.
-  template <typename T>
-  void updateAlignment(SourceLoc Start, SourceLoc End, T *WalkableParent) {
-    updateAlignment(SourceRange(Start, End), WalkableParent);
-  }
 
   /// Update the alignment for a list element.
   ///

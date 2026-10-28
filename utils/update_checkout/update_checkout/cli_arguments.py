@@ -28,7 +28,9 @@ class CliArguments(argparse.Namespace):
     use_submodules: bool
     verbose: bool
     command: Optional[Any]
-    max_retries: int
+    # Class-level default so partially-populated namespaces (e.g. built by
+    # add-worktree) still resolve max_retries; parse_args overrides it.
+    max_retries: int = 3
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -144,7 +146,7 @@ repositories.
             " cloning of any repository failed. 0 for no retries, -1 for"
             " unlimited retries.",
             type=int,
-            default=3,
+            default=CliArguments.max_retries,
         )
         parser.add_argument(
             "-j",

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern
 
 // REQUIRES: swift_feature_Extern
 // REQUIRES: objc_interop

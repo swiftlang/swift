@@ -1,5 +1,4 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=swift-6 %s -validate-tbd-against-ir=none | %FileCheck %s
-// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s -validate-tbd-against-ir=none | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %S/Inputs -cxx-interoperability-mode=default %s -validate-tbd-against-ir=none | %FileCheck %s
 
 import MoveOnlyCxxValueType
 
@@ -26,8 +25,8 @@ testSetX(2)
 
 // CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvlu : $@convention(method) (@{{(in_)?}}guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
 // CHECK: {{.*}}(%[[SELF_VAL:.*]] : ${{(\*)?}}NonCopyableHolderDerivedDerived):
-// CHECK: function_ref @$sSo024NonCopyableHolderDerivedD0V41____synthesizedBaseGetterAccessor_xUnsafeSPySo0aB0VGyFTo : $@convention(cxx_method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
+// CHECK: function_ref @$sSo024NonCopyableHolderDerivedD0V33__synthesizedBaseGetterAccessor_xSPySo0aB0VGyFTo : $@convention(cxx_method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
 // CHECK-NEXT: apply %{{.*}}
 
 // CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvau : $@convention(method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
-// CHECK: function_ref @$sSo024NonCopyableHolderDerivedD0V41____synthesizedBaseSetterAccessor_xUnsafeSpySo0aB0VGyFTo : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
+// CHECK: function_ref @$sSo024NonCopyableHolderDerivedD0V33__synthesizedBaseSetterAccessor_xSpySo0aB0VGyFTo : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>

@@ -112,6 +112,7 @@ func test8(_ g: Gizmo) -> Gizmo {
   // CHECK:      bb2([[RESULT:%.*]] : @owned $Gizmo):
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK-NOT: destroy_value [[G]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RESULT]]
 }
 // duplicate returns an autoreleased object at +0.
@@ -126,6 +127,7 @@ func test9(_ g: Gizmo) -> Gizmo {
   // CHECK: bb2([[RESULT:%.*]] : @owned $Gizmo):
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK-NOT: destroy_value [[G]]
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RESULT]]
 }
 
@@ -146,6 +148,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
   // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick any AnyObject.Type):
   // CHECK-NOT:      destroy_value [[G]] : $Gizmo
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RES]] : $@thick any AnyObject.Type
   return g.classProp
 }
@@ -169,6 +172,7 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
   // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK-NOT:      destroy_value [[G]] : $Gizmo
+  // CHECK-NEXT: end_formal_scope
   // CHECK-NEXT: return [[RES_ANY]] : $@thick any AnyObject.Type
   return g.qualifiedClassProp
 }

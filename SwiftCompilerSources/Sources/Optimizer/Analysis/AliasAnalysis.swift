@@ -246,6 +246,11 @@ struct AliasAnalysis {
       } else {
         return .noEffects
       }
+    case let loadBorrow as LoadBorrowInst:
+      // Like a `load`, a `load_borrow` physically only reads from its address. That the memory must not
+      // be modified until the end of the borrow scope is modelled by the effects of the `end_borrow`.
+      return memLoc.mayAlias(with: loadBorrow.address, self) ? .init(read: true) : .noEffects
+
     case let store as StoreInst:
       if memLoc.isLetValue && store.destination.accessBase != memLoc.address.accessBase {
         return .noEffects
@@ -317,6 +322,12 @@ struct AliasAnalysis {
       return getBuiltinEffect(of: builtin, on: memLoc)
 
     case let endBorrow as EndBorrowInst:
+      let type = endBorrow.borrow.type
+      if type.isNonTrivialOnlyBecauseNonEscapable(in: endBorrow.parentFunction) {
+        // Ending a borrow of a non-Escapable type that is otherwise trivial can
+        // be considered to have no effects.
+        return .noEffects
+      }
       switch endBorrow.borrow {
       case let storeBorrow as StoreBorrowInst:
         precondition(endBorrow.borrow.type.isAddress)
@@ -332,6 +343,13 @@ struct AliasAnalysis {
           return .worstEffects
         }
         return borrowEffects
+      case let borrowedFrom as BorrowedFromInst where borrowedFrom.borrowedPhi.isReborrow:
+        // A reborrow continues the borrow scope of the incoming borrow(s). If one of those is a
+        // `load_borrow`, the `end_borrow` has the same effects on the loaded memory location as an
+        // `end_borrow` of the `load_borrow` itself.
+        if isEndOfReborrowedLoadBorrow(borrowedFrom, aliasingWith: memLoc) {
+          return .worstEffects
+        }
       default:
         break
       }
@@ -347,12 +365,18 @@ struct AliasAnalysis {
       return .noEffects
 
     case let destroy as DestroyValueInst:
-      if destroy.destroyedValue.type.isNoEscapeFunction {
+      let type = destroy.destroyedValue.type
+      if type.isNoEscapeFunction {
         return .noEffects
       }
       if destroy.isDeadEnd {
         // We don't have to take deinit effects into account for a `destroy_value [dead_end]`.
         // Such destroys are lowered to no-ops and will not call any deinit.
+        return .noEffects
+      }
+      if type.isNonTrivialOnlyBecauseNonEscapable(in: destroy.parentFunction) {
+        // If the type is only non-trivial because it is ~Escapable,
+        // destroy_value is still a no-op.
         return .noEffects
       }
       return defaultEffects(of: destroy, on: memLoc)
@@ -383,6 +407,31 @@ struct AliasAnalysis {
       var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
+  }
+
+  /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow` whose
+  /// address may alias with `memLoc`.
+  private func isEndOfReborrowedLoadBorrow(_ borrowedFrom: BorrowedFromInst,
+                                           aliasingWith memLoc: MemoryLocation) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+    worklist.pushIfNotVisited(borrowedFrom.borrowedValue)
+
+    while let value = worklist.pop() {
+      switch value {
+      case let loadBorrow as LoadBorrowInst:
+        if memLoc.mayAlias(with: loadBorrow.address, self) {
+          return true
+        }
+      case let bf as BorrowedFromInst:
+        worklist.pushIfNotVisited(bf.borrowedValue)
+      default:
+        if let phi = Phi(value), phi.isReborrow {
+          worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+        }
+      }
+    }
+    return false
   }
 
   private func getAccessScopeEffect(of beginAccess: BeginAccessInst, on memLoc: MemoryLocation) -> SideEffects.Memory {
@@ -804,6 +853,13 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
         // Therefore assume that the called function will both, read and write, to the address.
         return .abort
       }
+      if path.addressIsStored {
+        // The address was converted to a pointer and stored to memory which is passed to the callee.
+        // The callee can load the pointer and access the address, e.g. via a `pointer_to_address`.
+        // Such accesses are not described by argument effects, but by the global effects of the callee.
+        result.merge(with: calleeAnalysis.getSideEffects(ofApply: apply))
+        return .continueWalk
+      }
       let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
       result.merge(with: e)
     }
@@ -954,7 +1010,7 @@ private extension Type {
     }
     // Only support the most important builtin types to be on the safe side.
     // Historically we assumed that Builtin.RawPointer can alias everything (but why?).
-    if isBuiltinInteger || isBuiltinFloat {
+    if isBuiltinInteger || isBuiltinFloat || isBuiltinBridgeObject {
       return true
     }
     return false

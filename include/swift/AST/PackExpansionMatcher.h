@@ -20,8 +20,8 @@
 
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 

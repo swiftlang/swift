@@ -74,13 +74,13 @@ struct MyStruct {
 
 // When a struct is removed and a debug_value with a reconstruction block
 // references it, salvageDebugInfo should prepend a struct reconstruction
-// into the debug BB using the first field + undefs for the rest.
+// into the debug BB, taking every field through an operand of its own.
 // CHECK-LABEL: sil @salvage_struct_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "field_x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
-// CHECK:     %[[S:[0-9]+]] = struct $MyStruct (%[[ARG]] : $Int64, undef : $Int64)
-// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $MyStruct, #MyStruct.x
-// CHECK:     return %[[E]] : $Int64
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = struct $MyStruct (%0 : $Int64, %1 : $Int64)
+// CHECK:     %3 = struct_extract %2 : $MyStruct, #MyStruct.x
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -115,13 +115,13 @@ bb0:
 
 // When a tuple is removed and a debug_value with a reconstruction block
 // references it, salvageDebugInfo should prepend a tuple reconstruction
-// into the debug BB using the first element + undefs for the rest.
+// into the debug BB, taking every element through an operand of its own.
 // CHECK-LABEL: sil @salvage_tuple_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
-// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
-// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
-// CHECK:     return %[[E]] : $Int64
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
+// CHECK:     %2 = tuple (%0 : $Int64, %1 : $Int64)
+// CHECK:     %3 = tuple_extract %2 : $(Int64, Int64), 0
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -162,13 +162,13 @@ struct NCPair: ~Copyable {
 }
 
 // CHECK-LABEL: sil @salvage_noncopyable_struct_with_debug_bb
-// CHECK: debug_value {{.*}} %0 : $Int64, let, name "field_x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
 // CHECK-NOT:   forwarding
-// CHECK:     %[[S:[0-9]+]] = struct $NCPair (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %2 = struct $NCPair (%0 : $Int64, %1 : $Int64)
 // CHECK-NOT:   forwarding
-// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $NCPair, #NCPair.x
-// CHECK:     return %[[E]] : $Int64
+// CHECK:     %3 = struct_extract %2 : $NCPair, #NCPair.x
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_noncopyable_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -187,13 +187,13 @@ bb0(%0 : $Int64, %1 : $Int64):
 // debug reconstruction block.
 
 // CHECK-LABEL: sil @salvage_noncopyable_tuple_with_debug_bb
-// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
-// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK: debug_value (%0 : $Int64, %1 : $Int64), let, name "x", type $Int64, transform {
+// CHECK:   bb0(%0 : $Int64, %1 : $Int64):
 // CHECK-NOT:   forwarding
-// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %2 = tuple (%0 : $Int64, %1 : $Int64)
 // CHECK-NOT:   forwarding
-// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
-// CHECK:     return %[[E]] : $Int64
+// CHECK:     %3 = tuple_extract %2 : $(Int64, Int64), 0
+// CHECK:     return %3 : $Int64
 // CHECK:   }
 // CHECK: return %0
 sil @salvage_noncopyable_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
@@ -218,11 +218,15 @@ struct KlassStruct {
 
 // When SimplifyStruct removes an owned struct with begin_borrow/struct_extract
 // uses via erase(instructionIncludingAllUsers:), debug uses must be salvaged.
+// The struct is rebuilt in the reconstruction block from both of its fields.
 //
 // CHECK-LABEL: sil [ossa] @salvage_struct_erase_including_all_users
 // CHECK-NOT:     struct $KlassStruct
-// CHECK:         debug_value %0 : $Klass, let, name "s", type $KlassStruct, expr op_fragment:#KlassStruct.k
-// CHECK:         debug_value %1 : $Int64, let, name "s", type $KlassStruct, expr op_fragment:#KlassStruct.x
+// CHECK:         debug_value (%0 : $Klass, %1 : $Int64), let, name "s", transform {
+// CHECK:           bb0(%0 : $Klass, %1 : $Int64):
+// CHECK:             %2 = struct $KlassStruct (%0 : $Klass, %1 : $Int64)
+// CHECK:             return %2 : $KlassStruct
+// CHECK:         }
 // CHECK:         destroy_value %0 : $Klass
 // CHECK:         return %1 : $Int64
 // CHECK:       } // end sil function 'salvage_struct_erase_including_all_users'
@@ -253,4 +257,94 @@ bb0(%0 : $*T):
   debug_value %1, let, name "var"
   %2 = struct_extract %1, #T.x
   return %2
+}
+
+sil [readonly] @makeKlass : $@convention(thin) () -> @owned Klass
+
+// This test verifies that two derived uses of an apply don't cause a crash
+// while trying to be deleted twice.
+// Undef debug_values are left behind.
+
+// CHECK-LABEL: sil [ossa] @multi_operand_apply
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value (undef : $Klass, undef : $Klass), let, name "pair", transform {
+// CHECK-NEXT:      bb0(%0 : $Klass, %1 : $Klass):
+// CHECK-NEXT:        %2 = tuple (undef : $Klass, undef : $Klass)
+// CHECK-NEXT:        return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[T:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[T]]
+// CHECK-NEXT:  } // end sil function 'multi_operand_apply'
+sil [ossa] @multi_operand_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @makeKlass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = copy_value %1 : $Klass
+  debug_value (%1, %2), let, name "pair", transform {
+  bb0(%0 : $Klass, %1 : $Klass):
+    %2 = tuple (%0, %1)
+    return %2
+  }
+  destroy_value %2 : $Klass
+  destroy_value %1 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @callee : $@convention(thin) (Int) -> Int
+
+// Deleting a dead closure kills its debug_values instead of deleting them.
+
+// CHECK-LABEL: sil @test_dead_heap_closure
+// CHECK:       bb0(
+// CHECK-NEXT:    debug_value undef : $@callee_guaranteed () -> Int, let, name "heap_fn"
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'test_dead_heap_closure'
+sil @test_dead_heap_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  debug_value %2 : $@callee_guaranteed () -> Int, let, name "heap_fn"
+  strong_release %2 : $@callee_guaranteed () -> Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_dead_stack_closure
+// CHECK:       bb0(
+// CHECK-NEXT:    debug_value undef : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'test_dead_stack_closure'
+sil @test_dead_stack_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = function_ref @callee : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (Int) -> Int
+  debug_value %2 : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+  dealloc_stack %2 : $@noescape @callee_guaranteed () -> Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// The destroy of the dead on-stack closure is on a forwarding mark_dependence.
+// The debug_values of both the closure and the mark_dependence are killed.
+
+// CHECK-LABEL: sil [ossa] @test_dead_stack_closure_with_mark_dependence
+// CHECK:       bb0([[MD_ARG:%[0-9]+]] : $Int, [[MD_BASE:%[0-9]+]] : @guaranteed $Klass):
+// CHECK-NEXT:    debug_value undef : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+// CHECK-NEXT:    debug_value undef : $@noescape @callee_guaranteed () -> Int, let, name "dependent_fn"
+// CHECK-NEXT:    [[MD_RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[MD_RESULT]]
+// CHECK-NEXT:  } // end sil function 'test_dead_stack_closure_with_mark_dependence'
+sil [ossa] @test_dead_stack_closure_with_mark_dependence : $@convention(thin) (Int, @guaranteed Klass) -> () {
+bb0(%0 : $Int, %1 : @guaranteed $Klass):
+  %2 = function_ref @callee : $@convention(thin) (Int) -> Int
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (Int) -> Int
+  debug_value %3 : $@noescape @callee_guaranteed () -> Int, let, name "stack_fn"
+  %4 = mark_dependence [nonescaping] %3 : $@noescape @callee_guaranteed () -> Int on %1 : $Klass
+  debug_value %4 : $@noescape @callee_guaranteed () -> Int, let, name "dependent_fn"
+  destroy_value %4 : $@noescape @callee_guaranteed () -> Int
+  %5 = tuple ()
+  return %5 : $()
 }

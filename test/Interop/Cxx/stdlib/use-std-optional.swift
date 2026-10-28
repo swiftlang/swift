@@ -1,8 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature AddressableParameters)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature AddressableParameters)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -Xcc -std=c++20)
 //
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_AddressableParameters
@@ -96,6 +94,13 @@ StdOptionalTestSuite.test("std::optional init(_:Wrapped)") {
 
   let optConstexprCtor = StdOptionalHasConstexprCtor(HasConstexprCtor(321))
   expectEqual(321, optConstexprCtor.pointee.value)
+}
+
+StdOptionalTestSuite.test("std::optional of move-only std::vector") {
+  let optVectorNonCopyable = getNonNilOptionalMoveOnlyVector()
+  expectEqual(2, optVectorNonCopyable.pointee.size())
+  expectEqual(789, optVectorNonCopyable.pointee[0].value)
+  expectEqual(987, optVectorNonCopyable.pointee[1].value)
 }
 
 runAllTests()

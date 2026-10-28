@@ -923,23 +923,49 @@ DECL_ATTR(diagnose, Diagnose,
   AllowMultipleAttributes | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   174)
 
-SIMPLE_DECL_ATTR(_hasHiddenStoredProperties, HasHiddenStoredProperties,
-  OnStruct,
-  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
-  175)
+// Unused '175': Used to be `@_hasHiddenStoredProperties`
 
 DECL_ATTR(com, COM,
   OnClass | OnProtocol,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   176)
 
-DECL_ATTR(called, Called,
+SIMPLE_DECL_ATTR(once, Once,
   /*Requirements=*/0,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | NotSerialized | UnconstrainedInABIAttr,
   177)
-DECL_ATTR_FEATURE_REQUIREMENT(Called, CalledAttribute)
+DECL_ATTR_FEATURE_REQUIREMENT(Once, OnceFunctions)
 
-LAST_DECL_ATTR(Called)
+DECL_ATTR(cxx, CxxDecl,
+  OnFunc,
+  LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  178)
+DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
+
+DECL_ATTR(_target, Target,
+  OnAbstractFunction,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  179)
+DECL_ATTR_FEATURE_REQUIREMENT(Target, TargetAttribute)
+
+SIMPLE_DECL_ATTR(yield_once, Coroutine,
+  OnFunc,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  180)
+
+DECL_ATTR(callable, Callable,
+  /*Requirements=*/0,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | NotSerialized | UnconstrainedInABIAttr,
+  181)
+DECL_ATTR_FEATURE_REQUIREMENT(Callable, OnceFunctions)
+
+DECL_ATTR(_scopeParams, ScopeParams,
+  OnFunc | OnConstructor | OnStruct | OnEnum,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | NotSerialized | ForbiddenInABIAttr,
+  182)
+DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
+
+LAST_DECL_ATTR(ScopeParams)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

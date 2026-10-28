@@ -262,3 +262,30 @@ public func addingAnInverse<T: ~Copyable>(_ t: borrowing T) {}
 
 @_preInverseGenerics
 public func addingAnInversePreInverse<T: ~Copyable>(_ t: borrowing T) {}
+
+public struct TypedThrowsError: Error {}
+public struct OtherTypedThrowsError: Error {}
+
+public func untypedToTypedThrows() throws(TypedThrowsError) {}
+public func typedToUntypedThrows() throws {}
+public func typedThrowsErrorChanged() throws(OtherTypedThrowsError) {}
+public func untypedToAnyErrorThrows() throws(any Error) {}
+public func untypedToNeverThrows() throws(Never) {}
+public func genericTypedToUntypedThrows<E: Error>(_ e: E) throws {}
+public var typedThrowsGetter: Int { get throws(OtherTypedThrowsError) { 0 } }
+public var nonThrowingToThrowingGetter: Int { get throws { 0 } }
+
+public protocol TypedThrowsProto {
+  func untypedToTypedThrowsReq() throws(TypedThrowsError)
+}
+
+open class TypedThrowsOpenClass {
+  public init() {}
+  open func untypedToTypedThrowsOpen() throws(TypedThrowsError) {}
+}
+
+open class TypedThrowsOpenClassInits {
+  public required init() throws(TypedThrowsError) {}
+  public init(x: Int) throws(TypedThrowsError) {}
+  public convenience init(y: Int) throws(TypedThrowsError) { try self.init(x: y) }
+}

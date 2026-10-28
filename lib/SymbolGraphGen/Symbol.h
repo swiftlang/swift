@@ -17,7 +17,6 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Markup/Markup.h"
 #include "swift/SymbolGraphGen/PathComponent.h"
 #include "swift/SymbolGraphGen/FragmentInfo.h"
 
@@ -174,22 +173,6 @@ using Symbol = swift::symbolgraphgen::Symbol;
 using SymbolGraph = swift::symbolgraphgen::SymbolGraph;
 
 template <> struct DenseMapInfo<Symbol> {
-  static inline Symbol getEmptyKey() {
-    return Symbol{
-        DenseMapInfo<SymbolGraph *>::getEmptyKey(),
-        DenseMapInfo<const swift::ValueDecl *>::getEmptyKey(),
-        DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
-        DenseMapInfo<swift::Type>::getEmptyKey(),
-    };
-  }
-  static inline Symbol getTombstoneKey() {
-    return Symbol{
-        DenseMapInfo<SymbolGraph *>::getTombstoneKey(),
-        DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
-        DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
-        DenseMapInfo<swift::Type>::getTombstoneKey(),
-    };
-  }
   static unsigned getHashValue(const Symbol S) {
     unsigned H = 0;
     H ^= DenseMapInfo<SymbolGraph *>::getHashValue(S.getGraph());

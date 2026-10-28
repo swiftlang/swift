@@ -28,10 +28,10 @@ void SILLoop::dump() const {
 #endif
 }
 
-SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
-  LI.analyze(*Dominance);
+SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
+  LI.analyze(*DT);
 }
 
 void SILLoopInfo::verify() const {
-  LI.verify(*Dominance);
+  LI.verify();
 }

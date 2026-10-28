@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -O -c -emit-ir -g -o - | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend %s -c -emit-ir -g -swift-version 5 -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -c -emit-ir -g -swift-version 5 -o - | %FileCheck %s --check-prefix=OPT
 class MyClass {}
 
 // CHECK-LABEL: define {{.*}} @"$s13uninitialized1fyyF"
@@ -24,4 +24,22 @@ public func g() {
   // CHECK-SAME:                    ), !Swift.isSwiftLLDBpreinit
   // OPT-NOT: @llvm.memset
   // OPT: ret
+}
+
+// In Swift 5 mode, 'self' in a convenience initializer of a non-final class
+// has dynamic Self type.
+public class Base {
+  public init() {}
+
+  // CHECK-LABEL: define {{.*}} @"$s13uninitialized4BaseC1xACSi_tcfC"
+  // OPT-LABEL: define {{.*}} @"$s13uninitialized4BaseC1xACSi_tcfC"
+  public convenience init(x: Int) {
+    // CHECK: %[[SELF:.*]] = alloca ptr, align
+    // CHECK: #dbg_declare(ptr %[[SELF]],
+    // CHECK: void @llvm.memset.{{.*}}(ptr align {{(4|8)}} %[[SELF]], i8 0,
+    // CHECK-SAME:                    ), !Swift.isSwiftLLDBpreinit
+    // OPT-NOT: @llvm.memset
+    // OPT: ret
+    self.init()
+  }
 }

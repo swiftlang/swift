@@ -63,11 +63,17 @@ public func spansAllOptional(_ p1: UnsafeRawPointer?, _ p2: UnsafeRawPointer?, _
 
 // Case 1: non-Optional sharer first.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func nonOptionalFirst(_ p1: UnsafeRawBufferPointer, _ p2: UnsafeRawBufferPointer?) {
     let size = CInt(exactly: p1.count)!
     if let _p2Count = unsafe p2?.count, _p2Count != size {
-      fatalError("bounds check failure in nonOptionalFirst: expected \(size) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("nonOptionalFirst", expected, actual)
+      }
+      _boundsCheckFailure(size, _p2Count)
     }
     return unsafe nonOptionalFirst(p1.baseAddress, p2?.baseAddress, size)
 }
@@ -76,11 +82,17 @@ public func nonOptionalFirst(_ p1: UnsafeRawBufferPointer, _ p2: UnsafeRawBuffer
 ------------------------------
 // Case 2: Optional sharer first.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func optionalFirst(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPointer) {
     let size = CInt(exactly: p2.count)!
     if let _p1Count = unsafe p1?.count, _p1Count != size {
-      fatalError("bounds check failure in optionalFirst: expected \(size) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("optionalFirst", expected, actual)
+      }
+      _boundsCheckFailure(size, _p1Count)
     }
     return unsafe optionalFirst(p1?.baseAddress, p2.baseAddress, size)
 }
@@ -89,11 +101,17 @@ public func optionalFirst(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPo
 ------------------------------
 // Case 3: all sharers Optional.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func allOptional(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPointer?) {
     let size = CInt(exactly: unsafe p2?.count ?? p1?.count ?? 0)!
     if let _p1Count = unsafe p1?.count, _p1Count != size {
-      fatalError("bounds check failure in allOptional: expected \(size) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("allOptional", expected, actual)
+      }
+      _boundsCheckFailure(size, _p1Count)
     }
     return unsafe allOptional(p1?.baseAddress, p2?.baseAddress, size)
 }
@@ -102,14 +120,26 @@ public func allOptional(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPoin
 ------------------------------
 // Case 4: three sharers, mixed.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func threeMixed(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPointer, _ p3: UnsafeRawBufferPointer?) {
     let size = CInt(exactly: p2.count)!
     if let _p1Count = unsafe p1?.count, _p1Count != size {
-      fatalError("bounds check failure in threeMixed: expected \(size) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeMixed", expected, actual)
+      }
+      _boundsCheckFailure(size, _p1Count)
     }
     if let _p3Count = unsafe p3?.count, _p3Count != size {
-      fatalError("bounds check failure in threeMixed: expected \(size) but got \(_p3Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeMixed", expected, actual)
+      }
+      _boundsCheckFailure(size, _p3Count)
     }
     return unsafe threeMixed(p1?.baseAddress, p2.baseAddress, p3?.baseAddress, size)
 }
@@ -118,14 +148,26 @@ public func threeMixed(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPoint
 ------------------------------
 // Case 5: three sharers, all Optional.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func threeAllOptional(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPointer?, _ p3: UnsafeRawBufferPointer?) {
     let size = CInt(exactly: unsafe p3?.count ?? p2?.count ?? p1?.count ?? 0)!
     if let _p1Count = unsafe p1?.count, _p1Count != size {
-      fatalError("bounds check failure in threeAllOptional: expected \(size) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeAllOptional", expected, actual)
+      }
+      _boundsCheckFailure(size, _p1Count)
     }
     if let _p2Count = unsafe p2?.count, _p2Count != size {
-      fatalError("bounds check failure in threeAllOptional: expected \(size) but got \(_p2Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("threeAllOptional", expected, actual)
+      }
+      _boundsCheckFailure(size, _p2Count)
     }
     return unsafe threeAllOptional(p1?.baseAddress, p2?.baseAddress, p3?.baseAddress, size)
 }
@@ -134,7 +176,7 @@ public func threeAllOptional(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBuffe
 ------------------------------
 // Case 6: parameter + return value sharing a size.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func paramOptionalReturn(_ p1: UnsafeRawBufferPointer?) -> UnsafeRawBufferPointer {
     let size = CInt(exactly: unsafe p1?.count ?? 0)!
     return unsafe UnsafeRawBufferPointer(start: unsafe paramOptionalReturn(p1?.baseAddress, size), count: Int(size))
@@ -144,11 +186,17 @@ public func paramOptionalReturn(_ p1: UnsafeRawBufferPointer?) -> UnsafeRawBuffe
 ------------------------------
 // Case 7: two parameters and a return sharing a size, mixed.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func twoParamsAndReturn(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer? {
     let size = CInt(exactly: p2.count)!
     if let _p1Count = unsafe p1?.count, _p1Count != size {
-      fatalError("bounds check failure in twoParamsAndReturn: expected \(size) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("twoParamsAndReturn", expected, actual)
+      }
+      _boundsCheckFailure(size, _p1Count)
     }
     let _resultValue = unsafe twoParamsAndReturn(p1?.baseAddress, p2.baseAddress, size)
     if unsafe _resultValue == nil {
@@ -162,11 +210,17 @@ public func twoParamsAndReturn(_ p1: UnsafeRawBufferPointer?, _ p2: UnsafeRawBuf
 // Case 8: nonescaping (RawSpan) variants — verifies unsafe-prefix handling
 // for Span vs UnsafeRawBufferPointer.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func spansAllOptional(_ p1: RawSpan?, _ p2: RawSpan?) {
     let size = CInt(exactly: p2?.byteCount ?? p1?.byteCount ?? 0)!
     if let _p1Count = p1?.byteCount, _p1Count != size {
-      fatalError("bounds check failure in spansAllOptional: expected \(size) but got \(_p1Count)")
+      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {
+        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {
+          fatalError("bounds check failure in \(function): expected \(expected) but got \(actual)")
+        }
+        _fail("spansAllOptional", expected, actual)
+      }
+      _boundsCheckFailure(size, _p1Count)
     }
     let _p1Ptr = p1?.withUnsafeBytes {
         unsafe $0

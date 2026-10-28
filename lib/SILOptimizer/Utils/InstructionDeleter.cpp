@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -442,15 +440,20 @@ void swift::eliminateDeadInstruction(SILInstruction *inst,
 void swift::recursivelyDeleteTriviallyDeadInstructions(
     ArrayRef<SILInstruction *> ia, bool force, InstModCallbacks callbacks) {
   // Delete these instruction and others that become dead after it's deleted.
-  llvm::SmallPtrSet<SILInstruction *, 8> deadInsts;
-  for (auto *inst : ia) {
+  llvm::SmallSetVector<SILInstruction *, 8> deadInsts;
+  // Salvage debug info needs deletion to be in reverse order.
+  for (auto *inst : llvm::reverse(ia)) {
     // If the instruction is not dead and force is false, do nothing.
     if (force || isInstructionTriviallyDead(inst))
       deadInsts.insert(inst);
   }
-  llvm::SmallPtrSet<SILInstruction *, 8> nextInsts;
+  llvm::SmallSetVector<SILInstruction *, 8> nextInsts;
   while (!deadInsts.empty()) {
     for (auto inst : deadInsts) {
+      // Salvaging debug info may delete and rewrite queued instructions.
+      if (inst->isDeleted())
+        continue;
+
       // Call the callback before we mutate the to be deleted instruction in any
       // way, and salvage debug info while it's meaningful.
       callbacks.notifyWillBeDeleted(inst);
@@ -482,6 +485,8 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
     }
 
     for (auto inst : deadInsts) {
+      if (inst->isDeleted())
+        continue;
       // This will remove this instruction and all its uses.
       eraseFromParentWithDebugInsts(inst, callbacks);
     }

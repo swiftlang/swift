@@ -10,3 +10,13 @@ func checks<T: ~Copyable, C>(
           _ b: KlassModern,
           _ c: Konditional<T>,
           _ d: Konditional<C>) {}
+
+do {
+  class KlassNonescapable: ~Escapable {} // expected-error {{classes cannot be '~Escapable'}}
+  class KlassNonescapableButEscapable: ~Escapable, Escapable {} // expected-error {{classes cannot be '~Escapable'}}
+
+  func requiresEscapable<T>(_: T.Type) {}
+  func checkEscapable() {
+    requiresEscapable(KlassNonescapable.self)
+  }
+}

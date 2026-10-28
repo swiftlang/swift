@@ -1,0 +1,140 @@
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+public protocol P {}
+
+// The cast writes the destination, but only reads the borrowed source.
+// CHECK-LABEL: sil [ossa] @borrowed_source
+// CHECK: [[WRAPPER:%[0-9]+]] = copyable_to_moveonlywrapper_addr
+// CHECK: [[SOURCE:%[0-9]+]] = moveonlywrapper_to_copyable_addr [[WRAPPER]]
+// CHECK: checked_cast_addr_br copy_on_success Any in [[SOURCE]] to any P in [[DEST:%[0-9]+]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK: [[SUCCESS]]:
+// CHECK: destroy_addr [[DEST]]
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: br [[CONT:bb[0-9]+]]
+// CHECK: [[FAILURE]]:
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: br [[CONT]]
+// CHECK: [[CONT]]:
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: return
+sil [ossa] @borrowed_source : $@convention(thin) (@in_guaranteed Any) -> () {
+bb0(%0 : $*Any):
+  %1 = copyable_to_moveonlywrapper_addr %0 : $*Any
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*@moveOnly Any
+  %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Any
+  %4 = alloc_stack $any P
+  checked_cast_addr_br copy_on_success Any in %3 : $*Any to any P in %4 : $*any P, bb1, bb2
+bb1:
+  destroy_addr %4 : $*any P
+  fix_lifetime %3 : $*Any
+  br bb3
+bb2:
+  fix_lifetime %3 : $*Any
+  br bb3
+bb3:
+  dealloc_stack %4 : $*any P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// An owned source remains live on both successors and is destroyed once.
+// CHECK-LABEL: sil [ossa] @owned_source
+// CHECK: [[WRAPPER:%[0-9]+]] = copyable_to_moveonlywrapper_addr
+// CHECK: [[SOURCE:%[0-9]+]] = moveonlywrapper_to_copyable_addr [[WRAPPER]]
+// CHECK: checked_cast_addr_br copy_on_success Any in [[SOURCE]] to any P in [[DEST:%[0-9]+]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK: [[SUCCESS]]:
+// CHECK: destroy_addr [[DEST]]
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK: br [[CONT:bb[0-9]+]]
+// CHECK: [[FAILURE]]:
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK: br [[CONT]]
+// CHECK: [[CONT]]:
+// CHECK: destroy_addr [[WRAPPER]]
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: return
+sil [ossa] @owned_source : $@convention(thin) (@in Any) -> () {
+bb0(%0 : $*Any):
+  %1 = copyable_to_moveonlywrapper_addr %0 : $*Any
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*@moveOnly Any
+  %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Any
+  %4 = alloc_stack $any P
+  checked_cast_addr_br copy_on_success Any in %3 : $*Any to any P in %4 : $*any P, bb1, bb2
+bb1:
+  destroy_addr %4 : $*any P
+  fix_lifetime %3 : $*Any
+  br bb3
+bb2:
+  fix_lifetime %3 : $*Any
+  br bb3
+bb3:
+  destroy_addr %2 : $*@moveOnly Any
+  dealloc_stack %4 : $*any P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// A taking cast still consumes its source only on the successful edge.
+// CHECK-LABEL: sil [ossa] @taking_source
+// CHECK: [[WRAPPER:%[0-9]+]] = copyable_to_moveonlywrapper_addr
+// CHECK: [[SOURCE:%[0-9]+]] = moveonlywrapper_to_copyable_addr [[WRAPPER]]
+// CHECK: checked_cast_addr_br take_on_success Any in [[SOURCE]] to any P in [[DEST:%[0-9]+]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK: [[SUCCESS]]:
+// CHECK: destroy_addr [[DEST]]
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: br [[CONT:bb[0-9]+]]
+// CHECK: [[FAILURE]]:
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK: destroy_addr [[WRAPPER]]
+// CHECK: br [[CONT]]
+// CHECK: [[CONT]]:
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: return
+sil [ossa] @taking_source : $@convention(thin) (@in Any) -> () {
+bb0(%0 : $*Any):
+  %1 = copyable_to_moveonlywrapper_addr %0 : $*Any
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*@moveOnly Any
+  %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Any
+  %4 = alloc_stack $any P
+  checked_cast_addr_br take_on_success Any in %3 : $*Any to any P in %4 : $*any P, bb1, bb2
+bb1:
+  destroy_addr %4 : $*any P
+  br bb3
+bb2:
+  fix_lifetime %3 : $*Any
+  destroy_addr %2 : $*@moveOnly Any
+  br bb3
+bb3:
+  dealloc_stack %4 : $*any P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// A copying forced cast also only reads its source, even though it writes Dest.
+// CHECK-LABEL: sil [ossa] @forced_borrowed_source
+// CHECK: [[WRAPPER:%[0-9]+]] = copyable_to_moveonlywrapper_addr
+// CHECK: [[SOURCE:%[0-9]+]] = moveonlywrapper_to_copyable_addr [[WRAPPER]]
+// CHECK: unconditional_checked_cast_addr [copy] Any in [[SOURCE]] to any P in [[DEST:%[0-9]+]]
+// CHECK: destroy_addr [[DEST]]
+// CHECK: fix_lifetime [[SOURCE]]
+// CHECK-NOT: destroy_addr [[WRAPPER]]
+// CHECK: return
+sil [ossa] @forced_borrowed_source : $@convention(thin) (@in_guaranteed Any) -> () {
+bb0(%0 : $*Any):
+  %1 = copyable_to_moveonlywrapper_addr %0 : $*Any
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*@moveOnly Any
+  %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Any
+  %4 = alloc_stack $any P
+  unconditional_checked_cast_addr [copy] Any in %3 : $*Any to any P in %4 : $*any P
+  destroy_addr %4 : $*any P
+  fix_lifetime %3 : $*Any
+  dealloc_stack %4 : $*any P
+  %5 = tuple ()
+  return %5 : $()
+}

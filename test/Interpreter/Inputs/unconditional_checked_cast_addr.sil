@@ -1,0 +1,9 @@
+sil_stage canonical
+import Swift
+
+sil [noinline] @copyCast : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
+  unconditional_checked_cast_addr [copy] T in %1 : $*T to U in %0 : $*U
+  %3 = tuple ()
+  return %3 : $()
+}

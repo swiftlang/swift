@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -verify -verify-ignore-unrelated %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -cxx-interoperability-mode=default -enable-objc-interop -typecheck -verify -verify-ignore-unrelated %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+// expected-warning@<unknown> * {{libstdc++ not found for }}
+
 @_exported import macros
 
 func circle_area(_ radius: CDouble) -> CDouble {

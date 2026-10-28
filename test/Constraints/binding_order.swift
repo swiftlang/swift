@@ -91,14 +91,21 @@ do {
   class A: Super, Command {}
   class B: Super, Command {}
 
+  // Some of these might be hard to resolve, but we should produce better diagnostics.
   func rdar38159133(a: A, b: B, aOpt: A?, bOpt: B?) {
     let _ = Array<any Command>([a, b])
     let _: [any Command] = [a, b]
     let _: [any Command] = Array([a, b])
     let _: [any Command] = [a, b].filter { _ in true }
-    let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
 
-    // Some of these might be hard to resolve, but we should produce better diagnostics.
+    let _: [any Command] = [a, b].compactMap { .some($0) }
+    // expected-error@-1 {{argument type 'Super' does not conform to expected type 'Command'}}
+    let _: [any Command] = [a, b].compactMap { Optional($0) }
+    // expected-error@-1 {{cannot convert value of type 'Optional<Super>' to closure result type '(any Command)?'}}
+
+    let _: [any Command] = [aOpt, bOpt].compactMap { $0 }
+    let _: [any Command] = [Optional(a), Optional(b)].compactMap { $0 }
+    let _: [any Command] = [.some(a), .some(b)].compactMap { $0 }
 
     let _: [any Command] = [aOpt, bOpt].filter { $0 != nil }
     // expected-error@-1 {{cannot convert value of type 'A?' to expected element type 'any Command'}}
@@ -171,6 +178,19 @@ do {
   s3.append(contentsOf: [(x, 3), (x, 4), (x, 4)])
 }
 
+// More tuple label weirdness
+do {
+  func g(_: [(a: Int, b: Int)]) {}
+
+  let x = 0
+  let y = 1
+
+  func f(b: Bool) {
+      g([(aa: x, bb: x), (y, y)])
+      g(b ? [(aa: x, bb: x), (y, y)] : [])
+  }
+}
+
 do {
   struct S {
     let a = 0.0
@@ -183,6 +203,57 @@ do {
              displayStyle: .struct,
              ancestorRepresentation: .suppressed)
     }
+  }
+}
+
+do {
+  func padded(_: [(before: Int, after: Int)]) {}
+
+  func forward(size: (left: Int, right: Int)) {
+    padded([(0, 0), (0, 0), size])
+  }
+}
+
+do {
+  class UIMenuElement {}
+  class UIMenu: UIMenuElement {}
+  class UIAction: UIMenuElement {}
+
+  func f(b: Bool, actions: [UIAction], action: UIAction?, menu: UIMenu) -> [UIMenuElement?] {
+    let x = b ? [action] + actions : [menu]
+    return x
+  }
+}
+
+do {
+  class NSObject {}
+  class NSAttributedString: NSObject {}
+
+  struct Foo {
+    func method() -> (NSAttributedString, Bar)? {
+      return nil
+    }
+  }
+
+  struct Bar {}
+
+  func f(text: Foo) {
+    let (_, _) = text.method().map { $0 } ?? (nil, .init())
+  }
+}
+
+// Here, the supertype binding for the ternary expression is a throwing
+// function type.
+do {
+  func rethrowsTest(
+      _: (() throws -> Void)? = nil
+  ) rethrows {}
+
+  func f(g: (() -> Bool)? = nil) {
+    rethrowsTest(g == nil ? nil : {
+      g!()
+      // expected-warning@-1 {{result of call to function returning 'Bool' is unused}}
+    })
   }
 }
 
@@ -357,44 +428,6 @@ do {
   }
 }
 
-// https://github.com/swiftlang/swift/issues/77003
-do {
-  struct Task<E> {
-    init(_: () -> ()) where E == Never {}
-    init(_: () throws -> ()) where E == Error {}
-  }
-
-  func f0<T, U>(_: T.Type, _ fn: (T) -> U, _: (U) -> ()) {}
-
-  func f1<T, U>(_: T.Type, _ fn: (T) -> U?, _: (U) -> ()) {}
-
-  func g1(x: Int?.Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f1(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f2<T, U>(_: T.Type, _ fn: (T) -> (U, U), _: (U) -> ()) {}
-
-  func g2(x: (Int, Int).Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f2(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f3<T, U>(_: T.Type, _ fn: (T) -> [U], _: (U) -> ()) {}
-
-  func g3(x: [Int].Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f3(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-
-  func f4<T, U>(_: T.Type, _ fn: (T) -> [U?], _: (U) -> ()) {}
-
-  func g4(x: [Int?].Type) {
-      f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f4(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-  }
-}
-
 // Regression tests for closure returns defaulting to Void.
 // Here, we want to make sure that we don't diagnose ambiguity
 // because there are two places where we can convert to Void
@@ -446,4 +479,24 @@ do {
       }
     }
   }
+}
+
+// rdar://problem/30271695
+do {
+  let x = "hi"
+  _ = [x].compactMap { $0.isEmpty ? nil : $0 }
+  _ = ["hi"].compactMap { $0.isEmpty ? nil : $0 }
+}
+
+// Generic argument matches involving 'any Sendable' are special-cased to
+// allow matching against 'Any' for backward compatibility with preconcurrency
+// code. Make sure this does the right thing here.
+do {
+  class G<T> {
+    init(_ t: T) {}
+  }
+
+  struct S {}  // note: not Sendable, but that's OK, we're in Swift 5 mode
+
+  let _: G<any Sendable> = G(S())
 }

@@ -11,18 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeCompletionOrganizer.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/FuzzyStringMatcher.h"
 #include "swift/IDE/ImportDepth.h"
-#include "swift/Markup/XMLUtils.h"
 #include "clang/Basic/CharInfo.h"
-#include "clang/Basic/Module.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/ADT/ilist_node.h"
 
 using namespace SourceKit;
 using namespace CodeCompletion;

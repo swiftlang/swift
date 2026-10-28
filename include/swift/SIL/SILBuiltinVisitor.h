@@ -21,7 +21,6 @@
 #define SWIFT_SIL_SILBUILTINVISITOR_H
 
 #include "swift/SIL/SILInstruction.h"
-#include <type_traits>
 
 namespace swift {
 

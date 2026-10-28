@@ -14,7 +14,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Compiler.h"
 
 #define DEBUG_TYPE "CalleeCache"
@@ -319,6 +318,7 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 
   case ValueKind::SuperMethodInst:
   case ValueKind::ObjCMethodInst:
+  case ValueKind::COMMethodInst:
   case ValueKind::ObjCSuperMethodInst:
     return CalleeList();
   }
@@ -338,7 +338,7 @@ CalleeList CalleeCache::getDestructors(SILType type, bool isExactType) const {
   while (auto payloadTy = type.getOptionalObjectType()) {
     type = payloadTy;
   }
-  ClassDecl *classDecl = type.getClassOrBoundGenericClass();
+  ClassDecl *classDecl = type.getClassDecl();
   if (!classDecl || classDecl->hasClangNode())
     return CalleeList();
 

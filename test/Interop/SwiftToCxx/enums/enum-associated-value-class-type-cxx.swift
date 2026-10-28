@@ -52,7 +52,7 @@ public enum G<T> {
 // CHECK-NEXT:   return swift::_impl::implClassFor<C>::type::makeRetained(*reinterpret_cast<void **>(payloadFromDestruction));
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK bool E::matchesIntValue(swift::Int value) const {
+// CHECK: SWIFT_INLINE_THUNK bool E::matchesIntValue(swift::Int value) const noexcept {
 // CHECK-NEXT: return Enums::_impl::$s5Enums1EO15matchesIntValueySbSiF(value, Enums::_impl::swift_interop_passDirect_Enums_{{.*}}(_getOpaquePointer()));
 
 // CHECK: SWIFT_INLINE_THUNK swift::Array<C> F::getB() const {

@@ -16,7 +16,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILModule.h"
-#include <functional>
 
 namespace swift {
 
@@ -103,7 +102,11 @@ public:
 
   /// Process the witnesstable of \p conformanceRef.
   /// Returns true if any deserialization was performed.
-  bool processConformance(ProtocolConformanceRef conformanceRef);
+  ///
+  /// \p referencedFromInitExistential has the same meaning as for
+  /// visitProtocolConformance.
+  bool processConformance(ProtocolConformanceRef conformanceRef,
+                          bool referencedFromInitExistential = false);
 
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
   /// transitively references.

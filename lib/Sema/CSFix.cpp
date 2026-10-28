@@ -23,8 +23,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -186,15 +184,28 @@ bool CoerceToCheckedCast::diagnose(const Solution &solution,
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   bool useConditionalCast,
-                                                  ConstraintLocator *locator) {
-  // If any of the types have type variables or placeholders, don't add the fix.
+                                                  ConstraintLocatorBuilder locator) {
+  // If any of the types have type variables or holes, don't add the fix.
   // `typeCheckCheckedCast` doesn't support checking such types.
-  if (fromType->hasTypeVariableOrPlaceholder() ||
-      toType->hasTypeVariableOrPlaceholder()) {
+  if (fromType->hasTypeVariableOrHole() || toType->hasTypeVariableOrHole()) {
     return nullptr;
   }
 
-  auto anchor = locator->getAnchor();
+  // FIXME: Is there a better way of doing this? trySimplifyToExpr() returns
+  // the operand, not the CoerceExpr itself.
+  SmallVector<LocatorPathElt, 4> pathBuffer;
+  auto anchor = locator.getLocatorParts(pathBuffer);
+
+  if (!pathBuffer.empty() &&
+      pathBuffer.back().is<LocatorPathElt::CoercionOperand>()) {
+    pathBuffer.pop_back();
+  }
+
+  ArrayRef<LocatorPathElt> path = pathBuffer;
+
+  SourceRange range;
+  simplifyLocator(anchor, path, range);
+
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();
   auto *coerceExpr = getAsExpr<CoerceExpr>(anchor);
@@ -209,7 +220,8 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
     return nullptr;
 
   return new (cs.getAllocator())
-      CoerceToCheckedCast(cs, fromType, toType, useConditionalCast, locator);
+      CoerceToCheckedCast(cs, fromType, toType, useConditionalCast,
+                          cs.getConstraintLocator(locator));
 }
 
 bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
@@ -1272,15 +1284,18 @@ AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
 
 bool AllowMultiArgFuncKeyPathMismatch::diagnose(const Solution &solution,
                                                 bool asNote) const {
-  MultiArgFuncKeyPathFailure failure(solution, functionType, getLocator());
+  MultiArgFuncKeyPathFailure failure(solution, functionType, expectedType,
+                                     getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowMultiArgFuncKeyPathMismatch *
-AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs, Type fnType,
+AllowMultiArgFuncKeyPathMismatch::create(ConstraintSystem &cs,
+                                         Type fnType,
+                                         Type expectedType,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator())
-  AllowMultiArgFuncKeyPathMismatch(cs, fnType, locator);
+      AllowMultiArgFuncKeyPathMismatch(cs, fnType, expectedType, locator);
 }
 
 bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
@@ -1291,7 +1306,8 @@ bool TreatKeyPathSubscriptIndexAsHashable::diagnose(const Solution &solution,
 }
 
 TreatKeyPathSubscriptIndexAsHashable *
-TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs,
+                                             Type type,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
@@ -2422,7 +2438,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();
-  if (!underlyingBaseType->getNominalOrBoundGenericNominal())
+  if (!underlyingBaseType->getNominalDecl())
     return nullptr;
 
   if (!underlyingBaseType->getOptionalObjectType())
@@ -2850,6 +2866,19 @@ IgnoreOutOfPlaceThenStmt *
 IgnoreOutOfPlaceThenStmt::create(ConstraintSystem &cs,
                                  ConstraintLocator *locator) {
   return new (cs.getAllocator()) IgnoreOutOfPlaceThenStmt(cs, locator);
+}
+
+bool AllowNonExactlyOnceDiscardArgument::diagnose(const Solution &solution,
+                                                  bool asNote) const {
+  NonExactlyOnceDiscardArgumentFailure failure(solution, ArgType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowNonExactlyOnceDiscardArgument *
+AllowNonExactlyOnceDiscardArgument::create(ConstraintSystem &cs, Type argType,
+                                           ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowNonExactlyOnceDiscardArgument(cs, argType, locator);
 }
 
 bool IgnoreGenericSpecializationArityMismatch::diagnose(

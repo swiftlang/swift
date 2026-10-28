@@ -1,22 +1,19 @@
-// RUN: not %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -verify-additional-file %S/Inputs%{fs-sep}function-templates.h -verify-ignore-unrelated -I %S/Inputs -enable-experimental-cxx-interop
+
 // README: If you just added support for protocol composition to the
 // ClangTypeConverter, please update this test to use a different type that we
 // don't support so the error messages here are still tested.
 
-
 import FunctionTemplates
 
 // Make sure we don't import non-type template parameters.
-// CHECK: error: unexpected error produced: cannot find 'hasNonTypeTemplateParameter' in scope
-// CHECK: error: unexpected error produced: cannot find 'hasDefaultedNonTypeTemplateParameter' in scope
 public func callIntegerTemplates() {
-  hasNonTypeTemplateParameter()
-  hasDefaultedNonTypeTemplateParameter()
+  hasNonTypeTemplateParameter()               // expected-error {{cannot find 'hasNonTypeTemplateParameter' in scope}}
+  hasDefaultedNonTypeTemplateParameter()      // expected-error {{cannot find 'hasDefaultedNonTypeTemplateParameter' in scope}}
 }
 
-// CHECK: error: unexpected error produced: cannot pass immutable value as inout argument: literals are not mutable
 public func callLvalueRef() {
-  lvalueReference(true)
+  lvalueReference(true)                       // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
 
 // Use protocol composition to create a type that we cannot (yet) turn into a clang::QualType.
@@ -24,20 +21,16 @@ public protocol A { }
 public protocol B { }
 public protocol C { }
 
-// CHECK: function-templates.h{{.*}}: error: diagnostic produced elsewhere: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'passThrough' could not be converted: any A & B
 public func caller1(x: A & B) -> A & B {
   return passThrough(x)
 }
 
-// CHECK: function-templates.h{{.*}}: error: diagnostic produced elsewhere: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'addMixedTypeParams' could not be converted: any A & B, any A & C
 public func caller2(x: A & B, y: A & C) -> A & B {
   return addMixedTypeParams(x, y)
 }
 
 // Make sure we emit an error and don't crash when failing to instantiate a function.
-// CHECK: error: diagnostic produced elsewhere: no matching function for call to 'takesString'
-// CHECK: note: diagnostic produced elsewhere: in instantiation of function template specialization 'expectsConstCharPtr<int>' requested here
-// CHECK: note: diagnostic produced elsewhere: candidate function not viable: no known conversion from 'int' to 'const char *' for 1st argument
 public func callexpectsConstCharPtr() {
+  // expected-note@<unknown> {{in instantiation of function template specialization 'expectsConstCharPtr<int>' requested here}}
   expectsConstCharPtr(0 as Int32)
 }

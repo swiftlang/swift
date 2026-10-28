@@ -27,15 +27,14 @@
 #include "../SILGen/SILGen.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/ParameterList.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
-#include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
 #include <optional>
@@ -94,7 +93,15 @@ public:
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 
   std::optional<IRABIDetailsProvider::SizeAndAlignment>
-  getTypeSizeAlignment(const NominalTypeDecl *TD) {
+  getTypeSizeAlignment(const NominalTypeDecl *TD,
+                       ResilienceExpansion expansion) {
+    // A layout known inside its defining module may still be opaque to clients.
+    if (expansion == ResilienceExpansion::Minimal &&
+        !typeConverter
+             .getTypeProperties(TD->getDeclaredTypeInContext(),
+                                TypeExpansionContext::minimal())
+             .isFixedABI())
+      return std::nullopt;
     auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
     auto *fixedTI = dyn_cast<FixedTypeInfo>(TI);
     if (!fixedTI)
@@ -102,6 +109,45 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  bool isTypeTrivial(const NominalTypeDecl *TD) {
+    auto type = TD->getDeclaredTypeInContext();
+    // The TypeInfo can use the defining module's layout. Do not expose those
+    // assumptions in a header if the type is nontrivial at minimal expansion.
+    if (!typeConverter.getTypeProperties(type, TypeExpansionContext::minimal())
+             .isTrivial())
+      return false;
+
+    auto &TI = IGM.getTypeInfoForUnlowered(type);
+    return TI.isFixedSize(ResilienceExpansion::Minimal) &&
+           TI.isTriviallyDestroyable(ResilienceExpansion::Minimal) &&
+           TI.isCopyable(ResilienceExpansion::Minimal) &&
+           TI.isBitwiseTakable(ResilienceExpansion::Minimal);
+  }
+
+  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
+    auto &typeInfo =
+        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+
+    if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
+        IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
+      auto type = TD->getDeclaredTypeInContext()->getCanonicalType();
+      auto mangledName =
+          Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
+      IGM.dumpAbstractTypeLayoutInfo(type, mangledName, "serialization");
+    }
+
+    AbstractTypeLayout layout;
+    auto type = TD->getDeclaredInterfaceType();
+    auto properties = typeConverter.getTypeProperties(
+        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+    layout.typeProperties = properties;
+    if (type->hasReferenceSemantics())
+      layout.referenceCountingSystem = type->getReferenceCounting();
+    layout.typeInfoRepresentation =
+        typeInfo.createSerializableHiddenTypeInfoRepresentation(IGM);
+    return layout;
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -471,8 +517,18 @@ IRABIDetailsProvider::IRABIDetailsProvider(ModuleDecl &mod,
 IRABIDetailsProvider::~IRABIDetailsProvider() {}
 
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
-IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
-  return impl->getTypeSizeAlignment(TD);
+IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD,
+                                           ResilienceExpansion expansion) {
+  return impl->getTypeSizeAlignment(TD, expansion);
+}
+
+bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
+  return impl->isTypeTrivial(TD);
+}
+
+AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
+    const NominalTypeDecl *TD) {
+  return impl->getAbstractTypeLayout(TD);
 }
 
 std::optional<LoweredFunctionSignature>

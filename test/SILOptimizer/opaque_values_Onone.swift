@@ -14,10 +14,13 @@ enum Maybe1<T : Equatable> {
   case nope
   case yep(T)
   // CHECK-LABEL: sil hidden @maybe1_compare {{.*}} {
-  // CHECK:         [[LHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe1
+  // CHECK:         [[TUPLE:%[^,]+]] = alloc_stack $(Maybe1<T>, Maybe1<T>)
+  // CHECK:         copy_addr {{%[^,]+}} to [init] {{%[^,]+}} : $*Maybe1<T>
+  // CHECK:         copy_addr {{%[^,]+}} to [init] {{%[^,]+}} : $*Maybe1<T>
+  // CHECK-NEXT:    [[RHS_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE]] : $*(Maybe1<T>, Maybe1<T>), 1
+  // CHECK-NEXT:    [[LHS_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE]] : $*(Maybe1<T>, Maybe1<T>), 0
   // CHECK:         switch_enum_addr [[LHS_ADDR]] : $*Maybe1<T>, case #Maybe1.yep!enumelt: [[L_YEP:bb[0-9]+]], case #Maybe1.nope!enumelt: {{bb[0-9]+}}
   // CHECK:       [[L_YEP]]:
-  // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe1
   // CHECK:         unchecked_inplace_enum_data_addr [[LHS_ADDR]] : $*Maybe1<T>, #Maybe1.yep!enumelt
   // CHECK:         switch_enum_addr [[RHS_ADDR]] : $*Maybe1<T>, case #Maybe1.yep!enumelt: [[L_AND_R_YEP:bb[0-9]+]], default {{bb[0-9]+}}
   // CHECK:       [[L_AND_R_YEP]]:
@@ -41,10 +44,13 @@ enum Maybe2<T : Equatable> {
   case yep(T, T)
 
   // CHECK-LABEL: sil hidden @maybe2_compare {{.*}} {
-  // CHECK:         [[LHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe2<T>
+  // CHECK:         [[TUPLE:%[^,]+]] = alloc_stack $(Maybe2<T>, Maybe2<T>)
+  // CHECK:         copy_addr {{%[^,]+}} to [init] {{%[^,]+}} : $*Maybe2<T>
+  // CHECK:         copy_addr {{%[^,]+}} to [init] {{%[^,]+}} : $*Maybe2<T>
+  // CHECK-NEXT:    [[RHS_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE]] : $*(Maybe2<T>, Maybe2<T>), 1
+  // CHECK-NEXT:    [[LHS_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE]] : $*(Maybe2<T>, Maybe2<T>), 0
   // CHECK:         switch_enum_addr [[LHS_ADDR]] : $*Maybe2<T>, case #Maybe2.yep!enumelt: [[L_YEP:bb[0-9]+]], case #Maybe2.nope!enumelt: {{bb[0-9]+}}
   // CHECK:       [[L_YEP]]:
-  // CHECK:         [[RHS_ADDR:%[^,]+]] = alloc_stack [lexical] $Maybe2<T>
   // CHECK:         unchecked_inplace_enum_data_addr [[LHS_ADDR]] : $*Maybe2<T>, #Maybe2.yep!enumelt
   // CHECK:         switch_enum_addr [[RHS_ADDR]] : $*Maybe2<T>, case #Maybe2.yep!enumelt: [[R_YEP:bb[0-9]+]], default {{bb[0-9]+}}
   // CHECK:       [[L_AND_R_YEP]]:
@@ -180,7 +186,7 @@ func get_a_generic_tuple<This>(ty: This.Type) {
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
 // CHECK:         store [[SRC]] to [[SRC_ADDR]]
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[SRC_ADDR]]
@@ -196,7 +202,7 @@ func castAnyObjectToMeta(_ ao: any AnyObject) -> AnyObject.Type {
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $T
 // CHECK:         copy_addr [[SRC]] to [init] [[SRC_ADDR]]
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[SRC_ADDR]]

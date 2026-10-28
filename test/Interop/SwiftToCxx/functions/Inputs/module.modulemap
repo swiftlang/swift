@@ -2,3 +2,9 @@ module CPointerTypes {
   header "c-pointer-types.h"
   export *
 }
+
+module CxxFunctions {
+  header "cxx-functions.h"
+  requires cplusplus
+  export *
+}

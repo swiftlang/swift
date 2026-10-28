@@ -138,6 +138,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~GenericOpt() noexcept {
+// CHECK-NEXT:   if (!_storage.isAllocated()) return;
 // CHECK-NEXT:   auto metadata = _impl::$s8Generics10GenericOptOMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -166,14 +167,14 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK void method() const SWIFT_SYMBOL("s:8Generics10GenericOptO6methodyyF");
-// CHECK-NEXT: SWIFT_INLINE_THUNK void reset() SWIFT_SYMBOL("s:8Generics10GenericOptO5resetyyF");
+// CHECK: SWIFT_INLINE_THUNK void method() const noexcept SWIFT_SYMBOL("s:8Generics10GenericOptO6methodyyF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK void reset() noexcept SWIFT_SYMBOL("s:8Generics10GenericOptO5resetyyF");
 // CHECK-NEXT: template<class T_1_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK T_1_0 genericMethod(const T_1_0& x) const SWIFT_SYMBOL("s:8Generics10GenericOptO13genericMethodyqd__qd__lF");
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getComputedProp() const SWIFT_SYMBOL("s:8Generics10GenericOptO12computedPropSivp");
+// CHECK-NEXT: SWIFT_INLINE_THUNK T_1_0 genericMethod(const T_1_0& x) const noexcept SWIFT_SYMBOL("s:8Generics10GenericOptO13genericMethodyqd__qd__lF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int getComputedProp() const noexcept SWIFT_SYMBOL("s:8Generics10GenericOptO12computedPropSivp");
 
 
 // CHECK: SWIFT_INLINE_THUNK void inoutConcreteOpt(GenericOpt<uint16_t>& x) noexcept SWIFT_SYMBOL("s:8Generics16inoutConcreteOptyyAA07GenericD0Oys6UInt16VGzF") {
@@ -310,7 +311,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericOpt<T_0_0>::method() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void GenericOpt<T_0_0>::method() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
@@ -331,13 +332,13 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK T_1_0 GenericOpt<T_0_0>::genericMethod(const T_1_0& x) const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK T_1_0 GenericOpt<T_0_0>::genericMethod(const T_1_0& x) const noexcept {
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
-// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int GenericOpt<T_0_0>::getComputedProp() const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int GenericOpt<T_0_0>::getComputedProp() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif

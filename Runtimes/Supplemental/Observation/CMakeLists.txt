@@ -71,6 +71,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature ExtensionMacros>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
@@ -105,7 +106,9 @@ target_include_directories(swiftObservation PRIVATE
   "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include"
   # For `swift/runtime/CMakeConfig.h`, which should be generated
   # by the Core build system.
-  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}")
+  "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}"
+  # For llvm/support headers
+  "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(swiftObservation PRIVATE
   swiftShims
   swiftCore

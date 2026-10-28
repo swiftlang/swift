@@ -28,9 +28,7 @@
 
 #define DEBUG_TYPE "pack-metadata-dealloc-inserter"
 
-#include "swift/AST/TypeWalker.h"
 #include "swift/IRGen/IRGenSILPasses.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -42,7 +40,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;

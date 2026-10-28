@@ -107,12 +107,17 @@ namespace swift {
   /// Computes the normalized target triple used as the most preferred name for
   /// module loading.
   ///
-  /// For platforms with fat binaries, this canonicalizes architecture,
-  /// vendor, and OS names, strips OS versions, and makes inferred environments
-  /// explicit. For other platforms, it returns the unmodified triple.
+  /// For Darwin platforms, this canonicalizes architecture synonyms (e.g.
+  /// "aarch64" -> "arm64", "amd64" -> "x86_64", "i686" -> "i386"), forces the
+  /// vendor to "apple", maps "macosx" and "darwin" to "macos", strips the OS
+  /// version, and drops an empty or "unknown" environment. For Android, it
+  /// drops the API level from the environment. For FreeBSD and OpenBSD, it
+  /// strips the OS version (and on OpenBSD maps "amd64" to "x86_64"). Other
+  /// platforms are returned unmodified.
   ///
-  /// The input triple should already be "normalized" in the sense that
-  /// llvm::Triple::normalize() would not affect it.
+  /// The input does not need to be fully normalized (an empty or non-standard
+  /// vendor is fine), but its components must be in arch-vendor-os[-env]
+  /// order, because they are read by position.
   llvm::Triple getTargetSpecificModuleTriple(const llvm::Triple &triple);
   
   /// Computes the target triple without version information.

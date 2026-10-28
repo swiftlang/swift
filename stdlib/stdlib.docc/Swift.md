@@ -39,11 +39,6 @@ and community, visit [Swift.org](https://swift.org).
 
 ### Standard Library
 
-- ``Swift/Int``
-- ``Swift/Double``
-- ``Swift/String``
-- ``Swift/Array``
-- ``Swift/Dictionary``
 - <doc:swift-standard-library>
 
 ### Observation

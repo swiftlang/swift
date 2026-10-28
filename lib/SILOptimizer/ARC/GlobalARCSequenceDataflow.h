@@ -15,10 +15,8 @@
 
 #include "RefCountState.h"
 #include "swift/Basic/BlotMapVector.h"
-#include "swift/Basic/NullablePtr.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
-#include "llvm/ADT/MapVector.h"
 #include <optional>
 
 namespace swift {

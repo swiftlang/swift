@@ -24,7 +24,6 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTBridging.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticSuppression.h"
@@ -40,21 +39,11 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include <algorithm>
 
@@ -305,7 +294,8 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // checking.
     (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
-    // Type check the top-level elements of the source file.
+    // Type check the top-level elements of the source file. The DeclChecker
+    // handles auxiliary decls.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
@@ -641,6 +631,8 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::TypeOf;
     if (semantics->Value == "typechecker.withoutActuallyEscaping(_:do:)")
       return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
+    if (semantics->Value == "typechecker.withoutActuallyDiscarding(_:do:)")
+      return DeclTypeCheckingSemantics::WithoutActuallyDiscarding;
     if (semantics->Value == "typechecker._openExistential(_:do:)")
       return DeclTypeCheckingSemantics::OpenExistential;
   }
@@ -696,8 +688,8 @@ bool TypeChecker::diagnoseInvalidFunctionType(
         : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
-      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getResult(),
-                                          extInfo2);
+      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getYields(),
+                                          fnTy->getResult(), extInfo2);
       ctx.Diags.diagnose(loc, diag::objc_convention_invalid,
                          simpleFnTy, strName);
       hadAnyError = true;
@@ -830,9 +822,16 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
   auto conditionCharRange = Lexer::getCharSourceRangeFromSourceRange(sourceMgr, conditionRange);
   StringRef conditionText = sourceMgr.extractText(conditionCharRange, bufferID);
 
+  std::optional<DiagnosticQueue> suppressedDiagQueue;
+  if (sourceFile->shouldSuppressParserDiagnostics()) {
+    suppressedDiagQueue.emplace(ctx.Diags, /*emitOnDestruction=*/false);
+  }
+  DiagnosticEngine &diags =
+      suppressedDiagQueue ? suppressedDiagQueue->getDiags() : ctx.Diags;
+
   // Evaluate the condition.
   intptr_t evalResult = swift_ASTGen_evaluatePoundIfCondition(
-      ctx, &ctx.Diags, sourceFileText, conditionText, shouldEvaluate
+      ctx, &diags, sourceFileText, conditionText, shouldEvaluate
   );
 
   bool isActive = (evalResult & 0x01) != 0;

@@ -268,7 +268,8 @@ ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(expected_getreadborrowsetmutate_in_protocol,none,
-      "expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property", ())
+      "expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or "
+      "'yielding mutate' in a protocol property", ())
 
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
@@ -332,6 +333,8 @@ WARNING(old_coroutine_accessor,none,
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
+ERROR(yields_requires_coroutine_functions,none,
+      "`yields` requires '-enable-experimental-feature CoroutineFunctions'", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -445,9 +448,9 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
-      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+      "deinitializers may only be declared within a class, actor, or non-'Copyable' type", ())
 ERROR(destructor_decl_on_noncopyable_enum,none,
-      "deinitializers are not yet supported on noncopyable enums", ())
+      "deinitializers are not yet supported on non-'Copyable' enums", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -482,7 +485,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (DeclAttribute))
+      "unexpected %kind0 in operator declaration", (DeclAttribute))
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -702,6 +705,10 @@ ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
       "mark_unresolved_non_copyable_value requires an attribute like 'noImplicitCopy'", ())
+ERROR(sil_diagnose_invalid_attribute,none,
+      "Attribute '[%0]' is not known to the diagnose instruction", (StringRef))
+ERROR(sil_diagnose_requires_attribute,none,
+      "diagnose requires an attribute like '[unpermitted_copy]'", ())
 ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
@@ -745,6 +752,9 @@ ERROR(expected_sil_stage_name, none,
       "expected 'raw' or 'canonical' after 'sil_stage'", ())
 ERROR(multiple_sil_stage_decls, none,
       "sil_stage declared multiple times", ())
+ERROR(sil_function_stage_below_module_stage, none,
+      "function stage '%0' is below the module stage '%1'", (StringRef,
+      StringRef))
 
 // SIL VTable
 ERROR(expected_sil_vtable_colon,none,
@@ -1510,10 +1520,10 @@ ERROR(multiple_access_level_modifiers,none,
 NOTE(previous_access_level_modifier,none,
      "previous modifier specified here", ())
 ERROR(mutually_exclusive_decl_attrs,none,
-      "%0 contradicts previous %select{attribute|modifier}2 %1",
-      (DeclAttribute, DeclAttribute, bool))
+      "%kind0 contradicts previous %kind1",
+      (DeclAttribute, DeclAttribute))
 ERROR(mutually_exclusive_type_attrs,none,
-      "%0 contradicts previous %1",
+      "%kind0 contradicts previous %kind1",
       (const TypeAttribute *, const TypeAttribute *))
 ERROR(mutually_exclusive_attr_names,none,
       "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
@@ -1586,6 +1596,13 @@ ERROR(attr_com_unknown_label, none,
 ERROR(attr_com_unknown_threading_model, none,
       "unknown threading model '%0'; expected 'single', 'apartment', 'free', 'both', or 'neutral'", (StringRef))
 
+// @cxx
+ERROR(attr_expected_cxx_name,none,
+      "expected C++ function name in '%0' attribute", (StringRef))
+ERROR(attr_cxx_operator_name_backticks,none,
+      "C++ operator name in '%0' attribute must be enclosed in backticks",
+      (StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
@@ -1605,7 +1622,7 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
-      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+      "%0 is unsupported on target '%1'", (DeclAttribute, StringRef))
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
@@ -1623,9 +1640,9 @@ ERROR(attr_availability_multiple_kinds ,none,
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
-       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+       "unknown platform '%0' for '%1' attribute", (StringRef, StringRef))
 WARNING(attr_availability_suggest_platform,none,
-       "unknown platform '%0' for attribute '%1'; did you mean '%2'?",
+       "unknown platform '%0' for '%1' attribute; did you mean '%2'?",
        (StringRef, StringRef, StringRef))
 ERROR(attr_availability_expected_platform,none,
       "expected platform in '%0' attribute", (StringRef))
@@ -1734,6 +1751,9 @@ ERROR(expected_rparen_after_thrown_error_type,none,
       "expected ')' after thrown error type", ())
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
+
+ERROR(expected_yield_type,none,
+      "expected yield type after 'yields('", ())
 
 ERROR(attr_isolated_expected_lparen,none,
       "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
@@ -1848,11 +1868,11 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
 
-// called
-ERROR(attr_called_expected_rparen,none,
-      "expected ')' after execution semantics", ())
-ERROR(attr_called_expected_semantics,none,
-      "expected 'once' as the `@called` execution semantics", ())
+// callable
+ERROR(attr_callable_expected_rparen,none,
+      "expected ')' after 'once'", ())
+ERROR(attr_callable_expected_once,none,
+      "expected 'once' in '@callable' attribute", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -2224,6 +2244,19 @@ ERROR(sil_failed_to_parse_sil_optional,none,
       "Expected SIL optional value of the form '[' NAME ']'", ())
 
 //------------------------------------------------------------------------------
+// MARK: Scope restrictions
+//------------------------------------------------------------------------------
+
+ERROR(expected_scope, PointsToFirstBadToken,
+      "expected identifier or 'self' in '%0' attribute", (StringRef))
+ERROR(immortal_scope_cannot_be_access, none,
+      "cannot depend on the access scope of 'immortal'", ())
+ERROR(expected_scope_param, PointsToFirstBadToken,
+      "expected scope parameter name in '_scopeParams' attribute", ())
+ERROR(immortal_scope_param, none,
+      "'immortal' cannot be used as a scope parameter name", ())
+
+//------------------------------------------------------------------------------
 // MARK: nonisolated(nonsending)
 //------------------------------------------------------------------------------
 
@@ -2237,15 +2270,13 @@ ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
 //------------------------------------------------------------------------------
-// MARK: using @<attribute> or using <identifier>
+// MARK: default @<attribute> or default <identifier>
 //------------------------------------------------------------------------------
-ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
-      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'using'",
+ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
+      "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
-ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
-      "'using' is an experimental feature that is currently disabled", ())
-ERROR(using_decl_rejects_attributes,PointsToFirstBadToken,
-      "attribute cannot be attached to a 'using' declaration", ())
+ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
+      "attribute cannot be attached to a file-level default", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

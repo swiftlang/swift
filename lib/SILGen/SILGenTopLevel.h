@@ -14,7 +14,6 @@
 #define SWIFT_SILGEN_SILGENTOPLEVEL_H
 
 #include "SILGen.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeMemberVisitor.h"
 

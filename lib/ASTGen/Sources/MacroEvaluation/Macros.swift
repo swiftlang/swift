@@ -424,7 +424,7 @@ func expandFreestandingMacro(
   macroPtr: UnsafeRawPointer,
   discriminatorText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
@@ -479,7 +479,7 @@ func expandFreestandingMacroImpl(
   macroRole: MacroRole,
   cContext: BridgedASTContext,
   expansionSyntax: FreestandingMacroExpansionSyntax,
-  sourceFilePtr: UnsafePointer<ExportedSourceFile>,
+  sourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>,
   discriminator: String
 ) -> String? {
 
@@ -518,7 +518,7 @@ func expandFreestandingMacroImpl(
         pluginProtocolVersion: pluginProtocolVersion
       )!,
       lexicalContext: pluginLexicalContext(of: expansionSyntax, pluginProtocolVersion: pluginProtocolVersion),
-      staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
+      staticBuildConfiguration: try cContext.staticBuildConfigurationJSON
     )
     let result = try macro.plugin.sendMessageAndWait(message)
     let expandedSource: String?
@@ -565,11 +565,11 @@ func expandAttachedMacro(
   qualifiedTypeText: UnsafePointer<CChar>,
   conformanceListText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
-  customAttrSourceFilePtr: UnsafeRawPointer,
+  customAttrSourceFilePtr: UnsafeMutableRawPointer,
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
-  declarationSourceFilePtr: UnsafeRawPointer,
+  declarationSourceFilePtr: UnsafeMutableRawPointer,
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
-  parentDeclSourceFilePtr: UnsafeRawPointer?,
+  parentDeclSourceFilePtr: UnsafeMutableRawPointer?,
   parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
@@ -660,11 +660,11 @@ func expandAttachedMacroImpl(
   discriminator: String,
   qualifiedType: String,
   conformanceList: String,
-  customAttrSourceFilePtr: UnsafePointer<ExportedSourceFile>,
+  customAttrSourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>,
   customAttrNode: AttributeSyntax,
-  declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
+  declarationSourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>,
   attachedTo declarationNode: Syntax,
-  parentDeclSourceFilePtr: UnsafePointer<ExportedSourceFile>?,
+  parentDeclSourceFilePtr: UnsafeMutablePointer<ExportedSourceFile>?,
   parentDeclNode: DeclSyntax?
 ) -> String? {
   let macroName: String = customAttrNode.attributeName.description
@@ -748,7 +748,7 @@ func expandAttachedMacroImpl(
         of: declarationNode,
         pluginProtocolVersion: pluginProtocolVersion
       ),
-      staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
+      staticBuildConfiguration: try cContext.staticBuildConfigurationJSON
     )
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
@@ -804,14 +804,5 @@ func expandAttachedMacroImpl(
       messageSuffix: " (from macro '\(macroName)')"
     )
     return nil
-  }
-}
-
-extension StaticBuildConfiguration {
-  /// Form the JSON representation of this static build configuration.
-  var asJSON: String {
-    get throws {
-      try String(decoding: JSON.encode(self), as: UTF8.self)
-    }
   }
 }

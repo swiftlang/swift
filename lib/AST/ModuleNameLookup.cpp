@@ -16,7 +16,6 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/ExprCXX.h"
 #include "llvm/Support/raw_ostream.h"
@@ -214,17 +213,13 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     auto newEnd = std::remove_if(
       decls.begin() + currentCount, decls.end(),
       [&](ValueDecl *VD) {
-        if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
-          return true;
-        if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(VD))
+        if (!isAcceptableLookupResult(VD, resolutionKind, options))
           return true;
         // Macros are not scoped-importable.
         if (fromScopedImport && isa<MacroDecl>(VD))
           return true;
         if (respectAccessControl &&
             !declIsVisibleToNameLookup(VD, moduleScopeContext, options))
-          return true;
-        if (!ABIRoleInfo(VD).matchesOptions(options))
           return true;
         return false;
       });
@@ -423,6 +418,16 @@ void namelookup::lookupVisibleDeclsInModule(
   lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext,
                         /*hasModuleSelector=*/false,
                         NLFlags::QualifiedDefault);
+}
+
+bool namelookup::isAcceptableLookupResult(const ValueDecl *decl,
+                                          ResolutionKind resolutionKind,
+                                          NLOptions options) {
+  if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(decl))
+    return false;
+  if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(decl))
+    return false;
+  return ABIRoleInfo(decl).matchesOptions(options);
 }
 
 void namelookup::simple_display(llvm::raw_ostream &out, ResolutionKind kind) {

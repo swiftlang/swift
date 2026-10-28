@@ -14,7 +14,6 @@
 #define SWIFT_OPENED_EXISTENTIALS_H
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/OptionalEnum.h"
 #include <optional>
 
 namespace swift {
@@ -156,6 +155,16 @@ canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
 bool canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
                           GenericTypeParamType *genericParam,
                           Type existentialTy);
+
+/// Determine whether an existential argument that \c canOpenExistentialAt
+/// chose to open could instead be passed as the existential itself, because it
+/// satisfies every protocol requirement on the generic parameter it binds to.
+///
+/// This is the condition under which coercing the argument (`x as any P`)
+/// is a valid substitute for opening it.
+bool canPassExistentialArgumentWithoutOpening(ValueDecl *callee,
+                                              unsigned paramIdx,
+                                              Type existentialTy);
 
 /// Given a type that includes an existential type that has been opened to
 /// the given type variable, replace the opened type variable and its member

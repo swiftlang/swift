@@ -25,7 +25,6 @@
 #include "swift/AST/DiagnosticList.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
@@ -38,7 +37,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/ASTContext.h"
@@ -841,6 +839,29 @@ void swift::printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os) {
                          clang::PrintingPolicy{clang::LangOptions()}, "");
 }
 
+/// Print a reference to an attribute or modifier, writing its name via
+/// \p printName.
+///
+/// With the "kind" modifier this produces "attribute 'foo'"/"modifier
+/// 'foo'"; otherwise it produces the bare "'@foo'"/"'foo'".
+static void formatAttributeArgument(StringRef formatModifier,
+                                    bool isDeclModifier,
+                                    llvm::function_ref<void()> printName,
+                                    DiagnosticFormatOptions FormatOpts,
+                                    llvm::raw_ostream &Out) {
+  const bool includeKind = formatModifier == "kind";
+  ASSERT((includeKind || formatModifier.empty()) &&
+         "Improper modifier for attribute argument");
+
+  if (includeKind)
+    Out << (isDeclModifier ? "modifier " : "attribute ");
+  Out << FormatOpts.OpeningQuotationMark;
+  if (!includeKind && !isDeclModifier)
+    Out << '@';
+  printName();
+  Out << FormatOpts.ClosingQuotationMark;
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -1148,46 +1169,23 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::DeclAttribute: {
     auto *const attr = Arg.getAsDeclAttribute();
-    const auto printAttrName = [&] {
-      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
-        custom->getTypeRepr()->print(Out);
-      } else {
-        Out << attr->getAttrName();
-      }
-    };
-
-    assert(Modifier.empty() &&
-           "Improper modifier for DeclAttribute argument");
-    if (Arg.getAsDeclAttribute()->isDeclModifier()) {
-      Out << FormatOpts.OpeningQuotationMark;
-      printAttrName();
-      Out << FormatOpts.ClosingQuotationMark;
-    } else {
-      Out << '@';
-      printAttrName();
-    }
+    formatAttributeArgument(
+        Modifier, attr->isDeclModifier(),
+        [&] {
+          if (auto *custom = dyn_cast<CustomAttr>(attr))
+            custom->getTypeRepr()->print(Out);
+          else
+            Out << attr->getAttrName();
+        },
+        FormatOpts, Out);
     break;
   }
-  case DiagnosticArgumentKind::TypeAttribute: {
-    bool useAtStyle = true;
-    if (Modifier == "kind") {
-      useAtStyle = false;
-    } else {
-      ASSERT(Modifier.empty() &&
-             "Improper modifier for TypeAttribute argument");
-    }
-
-    if (!useAtStyle) {
-      Out << "attribute ";
-    }
-    Out << FormatOpts.OpeningQuotationMark;
-    if (useAtStyle) {
-      Out << '@';
-    }
-    Out << Arg.getAsTypeAttribute()->getAttrName();
-    Out << FormatOpts.ClosingQuotationMark;
+  case DiagnosticArgumentKind::TypeAttribute:
+    formatAttributeArgument(
+        Modifier, /*isDeclModifier=*/false,
+        [&] { Out << Arg.getAsTypeAttribute()->getAttrName(); }, FormatOpts,
+        Out);
     break;
-  }
   case DiagnosticArgumentKind::AvailabilityDomain:
     assert(Modifier.empty() &&
            "Improper modifier for AvailabilityDomain argument");

@@ -1,3 +1,4 @@
+// expected-warning@<unknown> * {{libc not found for }}
 
 import Swift
 

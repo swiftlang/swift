@@ -87,7 +87,6 @@
 #define DEBUG_TYPE "address-lowering"
 
 #include "PhiStorageOptimizer.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/NodeDatastructures.h"

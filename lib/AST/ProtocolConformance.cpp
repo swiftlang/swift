@@ -37,7 +37,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "AST"
 
@@ -252,7 +251,7 @@ bool ProtocolConformance::isRetroactive() const {
   }
 
   auto conformingTypeDecl =
-      ConformingType->getNominalOrBoundGenericNominal();
+      ConformingType->getNominalDecl();
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
     if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {
@@ -484,6 +483,27 @@ bool NormalProtocolConformance::isResilient() const {
     return false;
 
   return getDeclContext()->getParentModule()->isResilient();
+}
+
+bool NormalProtocolConformance::isOriginallyInSameModuleAsProtocol() const {
+  auto *nominal = getDeclContext()->getSelfNominalTypeDecl();
+  auto *protocol = getProtocol();
+  auto *conformanceModule = getDeclContext()->getParentModule();
+
+  StringRef nominalMovedFrom = nominal->getAlternateModuleName();
+  StringRef protocolMovedFrom = protocol->getAlternateModuleName();
+
+  // If neither was moved with @_originallyDefinedIn, compare their current
+  // modules directly and skip the string comparison.
+  if (nominalMovedFrom.empty() && protocolMovedFrom.empty())
+    return conformanceModule == protocol->getParentModule();
+
+  auto originalModule = [](StringRef movedFrom,
+                           ModuleDecl *currentModule) -> StringRef {
+    return movedFrom.empty() ? currentModule->getName().str() : movedFrom;
+  };
+  return originalModule(nominalMovedFrom, conformanceModule) ==
+         originalModule(protocolMovedFrom, protocol->getParentModule());
 }
 
 std::optional<ArrayRef<Requirement>>
@@ -1284,10 +1304,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
     inverses.insert(InvertibleProtocolKind::Escapable);
 
   bool hasSuppressedConformances = false;
+  auto *classDecl = dyn_cast<ClassDecl>(this);
   for (auto ip : InvertibleProtocolSet::allKnown()) {
     if (!inverses.contains(ip) ||
-        (isa<ClassDecl>(this) &&
-         !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
+        (classDecl && !classDecl->canSuppressInvertible(ip))) {
       addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
     } else {
       hasSuppressedConformances = true;
@@ -1530,6 +1550,11 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
       trySynthesize(getKnownProtocolKind(ip));
 
     trySynthesize(KnownProtocolKind::BitwiseCopyable);
+
+    if (nominal->getASTContext().LangOpts.EnableCOMInterop)
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+        if (classDecl->isCOMImplementation())
+          trySynthesize(KnownProtocolKind::ISwiftObject);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
@@ -1799,6 +1824,28 @@ BuiltinProtocolConformance::BuiltinProtocolConformance(
     : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
       protocol(protocol) {
   Bits.BuiltinProtocolConformance.Kind = unsigned(kind);
+}
+
+std::optional<COMIdentityRequirementKind>
+swift::classifyCOMIdentityRequirement(ValueDecl *requirement) {
+  AbstractStorageDecl *storage = dyn_cast<AbstractStorageDecl>(requirement);
+  if (auto *accessor = dyn_cast<AccessorDecl>(requirement))
+    storage = accessor->getStorage();
+
+  auto *property = dyn_cast_or_null<VarDecl>(storage);
+  auto *protocol =
+      property ? dyn_cast<ProtocolDecl>(property->getDeclContext()) : nullptr;
+  if (!protocol)
+    return std::nullopt;
+
+  auto &context = property->getASTContext();
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) &&
+      property->getBaseName() == context.Id_IID)
+    return COMIdentityRequirementKind::InterfaceID;
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable) &&
+      property->getBaseName() == context.Id_CLSID)
+    return COMIdentityRequirementKind::ActivationID;
+  return std::nullopt;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

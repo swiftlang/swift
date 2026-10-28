@@ -17,9 +17,9 @@
 #ifndef SWIFT_CLANG_IMPORT_ENUM_H
 #define SWIFT_CLANG_IMPORT_ENUM_H
 
-#include "swift/AST/Decl.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
+#include "swift/AST/Decl.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace clang {
@@ -29,6 +29,7 @@ class MacroInfo;
 } // namespace clang
 
 namespace swift {
+class UnifiedStatsReporter;
 namespace importer {
 
 /// Describes how a particular C enumeration type will be imported
@@ -106,6 +107,7 @@ private:
 /// information.
 class EnumInfoCache {
   clang::Preprocessor &clangPP;
+  UnifiedStatsReporter *Stats;
 
   llvm::DenseMap<const clang::EnumDecl *, EnumInfo> enumInfos;
 
@@ -114,18 +116,14 @@ class EnumInfoCache {
   EnumInfoCache &operator = (const EnumInfoCache &) = delete;
 
 public:
-  explicit EnumInfoCache(clang::Preprocessor &cpp) : clangPP(cpp) {}
+  explicit EnumInfoCache(clang::Preprocessor &cpp,
+                         UnifiedStatsReporter *stats = nullptr)
+      : clangPP(cpp), Stats(stats) {}
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl);
 
   EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getEnumInfo(decl).getKind();
-  }
-
-  /// The prefix to be stripped from the names of the enum constants within the
-  /// given enum.
-  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *decl) {
-    return getEnumInfo(decl).getConstantNamePrefix();
   }
 };
 

@@ -109,7 +109,7 @@ internal func process(matching: String) -> ProcessIdentifier? {
     return dwProcess
   }
 
-  let hSnapshot = CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPPROCESS), 0)
+  let hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
   if hSnapshot == INVALID_HANDLE_VALUE {
     return nil
   }

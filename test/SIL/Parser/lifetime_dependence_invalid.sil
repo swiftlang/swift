@@ -1,0 +1,21 @@
+// RUN: %target-sil-opt %s \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -verify
+
+// REQUIRES: swift_feature_Lifetimes
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct BufferView : ~Escapable {
+  @_hasStorage let ptr: UnsafeRawBufferPointer { get }
+}
+
+sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 1) @owned BufferView {
+// expected-error @-1 {{invalid parameter index specified '1'}}
+bb0(%0 : $BufferView):
+  return undef : $BufferView
+}
+

@@ -1012,3 +1012,80 @@ entry:
   %retval = tuple ()
   return %retval : $()
 }
+
+/// A `debug_value` is allowed to be outside the lifetime of its operand.
+/// Therefore it must not extend liveness into an otherwise dead block: that
+/// would put liveness beyond the consuming uses, where the boundary - and with
+/// it the destroys to insert - cannot be found anymore.
+// CHECK-LABEL: begin running test {{.*}} on dont_extend_liveness_to_debug_use_in_dead_block
+// CHECK-LABEL: sil [ossa] @dont_extend_liveness_to_debug_use_in_dead_block : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    debug_value [[C]]
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function 'dont_extend_liveness_to_debug_use_in_dead_block'
+// CHECK-LABEL: end running test {{.*}} on dont_extend_liveness_to_debug_use_in_dead_block
+sil [ossa] @dont_extend_liveness_to_debug_use_in_dead_block : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "ossa_canonicalize_lifetime false false true @argument"
+  %copy = copy_value %c
+  destroy_value %copy
+  destroy_value %c
+  br exit
+
+exit:
+  debug_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+/// Same as above, but the consuming use is a forwarding one (`switch_enum`)
+/// and the debug use is in one of its successor blocks.
+// CHECK-LABEL: begin running test {{.*}} on dont_extend_liveness_to_debug_use_in_case_block
+// CHECK-LABEL: sil [ossa] @dont_extend_liveness_to_debug_use_in_case_block : {{.*}} {
+// CHECK:       bb0([[E:%[^,]+]] :
+// CHECK-NEXT:    switch_enum [[E]]
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function 'dont_extend_liveness_to_debug_use_in_case_block'
+// CHECK-LABEL: end running test {{.*}} on dont_extend_liveness_to_debug_use_in_case_block
+sil [ossa] @dont_extend_liveness_to_debug_use_in_case_block : $@convention(thin) (@owned Optional<C>) -> () {
+entry(%e : @owned $Optional<C>):
+  specify_test "ossa_canonicalize_lifetime false false true @argument"
+  %copy = copy_value %e
+  destroy_value %copy
+  switch_enum %e : $Optional<C>, case #Optional.some!enumelt: some, case #Optional.none!enumelt: none
+
+some(%payload : @owned $C):
+  debug_value %e : $Optional<C>, let, name "e"
+  destroy_value %payload
+  br exit
+
+none:
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+/// Within a block which is live anyway, liveness is still extended to the
+/// debug use: the destroy is sunk below it.
+// CHECK-LABEL: begin running test {{.*}} on extend_liveness_to_debug_use_in_live_block
+// CHECK-LABEL: sil [ossa] @extend_liveness_to_debug_use_in_live_block : {{.*}} {
+// CHECK:         debug_value
+// CHECK-NEXT:    destroy_value
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function 'extend_liveness_to_debug_use_in_live_block'
+// CHECK-LABEL: end running test {{.*}} on extend_liveness_to_debug_use_in_live_block
+sil [ossa] @extend_liveness_to_debug_use_in_live_block : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "ossa_canonicalize_lifetime false false true @argument"
+  %copy = copy_value %c
+  destroy_value %copy
+  destroy_value %c
+  debug_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}

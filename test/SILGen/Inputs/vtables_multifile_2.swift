@@ -24,6 +24,7 @@ open class OtherDerived : Derived {
 // CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile7DerivedC14privateMethod1yyF : $@convention(method) (@guaranteed Derived) -> () // user: %5
 // CHECK-NEXT:  apply [[METHOD:%.*]]([[SUPER]]) : $@convention(method) (@guaranteed Derived) -> ()
 // CHECK-NEXT:  destroy_value [[SUPER]] : $Derived
+// CHECK-NEXT:  end_formal_scope
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT:}
@@ -37,6 +38,8 @@ open class OtherDerived : Derived {
 // CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile7DerivedC14privateMethod2yyyXlSgF : $@convention(method) (@guaranteed Optional<AnyObject>, @guaranteed Derived) -> ()
 // CHECK-NEXT:  apply [[METHOD]](%0, [[SUPER]]) : $@convention(method) (@guaranteed Optional<AnyObject>, @guaranteed Derived) -> ()
 // CHECK-NEXT:  destroy_value [[SUPER]] : $Derived
+// CHECK-NEXT:  end_formal_scope
+// CHECK-NEXT:  end_formal_scope
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }
@@ -48,6 +51,8 @@ open class OtherDerived : Derived {
 // CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile7DerivedC14privateMethod3yySiSgF : $@convention(method) (Optional<Int>, @guaranteed Derived) -> ()
 // CHECK-NEXT:  apply [[METHOD]](%0, [[SUPER]]) : $@convention(method) (Optional<Int>, @guaranteed Derived) -> ()
 // CHECK-NEXT:  destroy_value [[SUPER]] : $Derived
+// CHECK-NEXT:  end_formal_scope
+// CHECK-NEXT:  end_formal_scope
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }
@@ -59,6 +64,8 @@ open class OtherDerived : Derived {
 // CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile7DerivedC14privateMethod4yySiF : $@convention(method) (Int, @guaranteed Derived) -> ()
 // CHECK-NEXT:  apply [[METHOD]](%0, [[SUPER]]) : $@convention(method) (Int, @guaranteed Derived) -> ()
 // CHECK-NEXT:  destroy_value [[SUPER]] : $Derived
+// CHECK-NEXT:  end_formal_scope
+// CHECK-NEXT:  end_formal_scope
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
 // CHECK-NEXT: }

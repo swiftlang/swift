@@ -1,0 +1,16 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all %S/../Inputs/COMDynamicType.sil | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -O -sil-verify-all %S/../Inputs/COMDynamicType.sil | %FileCheck %s
+
+// Both queries must remain, even though their source is identical.
+// CHECK-LABEL: define{{.*}} @com_dynamic_type(
+// CHECK: call ptr @swift_getCOMDynamicType(ptr {{.*}}, ptr {{.*}})
+// CHECK: call ptr @swift_getCOMDynamicType(ptr {{.*}}, ptr {{.*}})
+// CHECK: ret
+// CHECK-LABEL: define{{.*}} @com_unused_dynamic_type(
+// CHECK: call ptr @swift_getCOMDynamicType(
+// CHECK: ret
+// CHECK-LABEL: define{{.*}} @native_dynamic_type(
+// CHECK-NOT: swift_getCOMDynamicType
+// CHECK: ret

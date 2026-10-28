@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalpropertyopt"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -20,9 +19,7 @@
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
@@ -108,12 +105,12 @@ class GlobalPropertyOpt {
   llvm::SmallVector<Entry *, 32> WorkList;
   
   bool isArrayType(SILType type) {
-    return type.getNominalOrBoundGenericNominal() == ArrayType &&
+    return type.getNominalDecl() == ArrayType &&
            !type.isAddress();
   }
   
   bool isArrayAddressType(SILType type) {
-    return type.getNominalOrBoundGenericNominal() == ArrayType &&
+    return type.getNominalDecl() == ArrayType &&
            type.isAddress();
   }
   
@@ -122,7 +119,7 @@ class GlobalPropertyOpt {
   bool isTupleWithArray(CanType type) {
     if (auto tuple = dyn_cast<TupleType>(type)) {
       for (Type subType : tuple->getElementTypes()) {
-        if (CanType(subType).getNominalOrBoundGenericNominal() == ArrayType)
+        if (CanType(subType).getNominalDecl() == ArrayType)
           return true;
       }
     }

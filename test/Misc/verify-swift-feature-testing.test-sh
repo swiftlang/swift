@@ -31,20 +31,6 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/IDE/complete_decl_attribute_feature_requirement.swift"),
     # Uses the pseudo-feature ApproachableConcurrency
     pathlib.Path("test/Concurrency/approachable_concurrency.swift"),
-    # Uses the pseudo-feature CodeGenerationModel=
-    pathlib.Path("test/Frontend/code-generation-model-feature.swift"),
-    pathlib.Path("test/embedded/arc-opt-runtime-helpers.swift"),
-    pathlib.Path("test/embedded/linkage/c.swift"),
-    pathlib.Path("test/embedded/linkage/cxx.swift"),
-    pathlib.Path("test/embedded/linkage/diamond.swift"),
-    pathlib.Path("test/embedded/linkage/diamond_embedded_exist.swift"),
-    pathlib.Path("test/embedded/linkage/export_interface_vars.swift"),
-    pathlib.Path("test/embedded/linkage/extern_c_body_in_other_module.swift"),
-    pathlib.Path("test/embedded/linkage/extern_c_thunk_no_interface_model.swift"),
-    pathlib.Path("test/embedded/linkage/interface.swift"),
-    pathlib.Path("test/embedded/linkage/leaf_application.swift"),
-    pathlib.Path("test/embedded/linkage/silgen_name_var_interface_emission.swift"),
-    pathlib.Path("test/embedded/serialization.swift"),
     # Uses a script that hides usage of the CoroutineAccessor feature.
     pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
     # Uses a special -experimental-features flag for the rth utility
@@ -59,10 +45,20 @@ ENABLE_FEATURE_RE = re.compile(
 )
 FEATURE_LIT_MARKER_RE = re.compile(r"swift_feature_([A-Za-z0-9]*)")
 
+# Pseudo-features that are spelled like features on the command line, but
+# aren't features and have no lit marker. They take a value, as in
+# `-enable-experimental-feature CodeGenerationModel=interface`.
+PSEUDO_FEATURES = {
+    "CodeGenerationModel",
+}
+
 
 def check_test_file(file_path, lines, existing_swift_features):
     enabled_features = {
-        feature for line in lines for feature in ENABLE_FEATURE_RE.findall(line)
+        feature
+        for line in lines
+        for feature in ENABLE_FEATURE_RE.findall(line)
+        if feature not in PSEUDO_FEATURES
     }
     required_features = {
         feature for line in lines for feature in FEATURE_LIT_MARKER_RE.findall(line)

@@ -563,3 +563,31 @@ bb3:
   unreachable
 }
 
+
+// rdar://186026580
+// A bit cast that produces a rewritten function type (e.g. from a pointer
+// returned by dlsym) must get the new function type, otherwise the apply's
+// argument is rewritten to an address while the callee keeps the old type.
+// CHECK-LABEL: sil @test_trivial_bit_cast_to_function :
+// CHECK:         [[F:%[0-9]+]] = unchecked_trivial_bit_cast %1 : $UnsafeMutableRawPointer to $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK:         apply [[F]]({{%[0-9]+}}) : $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK:       } // end sil function 'test_trivial_bit_cast_to_function'
+sil @test_trivial_bit_cast_to_function : $@convention(thin) (X, UnsafeMutableRawPointer) -> () {
+bb0(%0 : $X, %1 : $UnsafeMutableRawPointer):
+  %2 = unchecked_trivial_bit_cast %1 : $UnsafeMutableRawPointer to $@convention(thin) (X) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (X) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @test_bitwise_cast_to_function :
+// CHECK:         [[F:%[0-9]+]] = unchecked_bitwise_cast %1 : $Builtin.RawPointer to $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK:         apply [[F]]({{%[0-9]+}}) : $@convention(thin) (@in_guaranteed X) -> ()
+// CHECK:       } // end sil function 'test_bitwise_cast_to_function'
+sil @test_bitwise_cast_to_function : $@convention(thin) (X, Builtin.RawPointer) -> () {
+bb0(%0 : $X, %1 : $Builtin.RawPointer):
+  %2 = unchecked_bitwise_cast %1 : $Builtin.RawPointer to $@convention(thin) (X) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (X) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}

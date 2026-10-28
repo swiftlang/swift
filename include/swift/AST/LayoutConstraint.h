@@ -369,12 +369,6 @@ struct simplify_type<::swift::LayoutConstraint>
 
 // LayoutConstraint hashes just like pointers.
 template <> struct DenseMapInfo<swift::LayoutConstraint> {
-  static swift::LayoutConstraint getEmptyKey() {
-    return llvm::DenseMapInfo<swift::LayoutConstraintInfo *>::getEmptyKey();
-  }
-  static swift::LayoutConstraint getTombstoneKey() {
-    return llvm::DenseMapInfo<swift::LayoutConstraintInfo *>::getTombstoneKey();
-  }
   static unsigned getHashValue(swift::LayoutConstraint Val) {
     return DenseMapInfo<swift::LayoutConstraintInfo *>::getHashValue(
         Val.getPointer());

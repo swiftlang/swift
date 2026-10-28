@@ -5,7 +5,7 @@ import Templates
 // CHECK-LABEL: define {{.*}}void @"$s4main10basicTestsyyF"()
 // CHECK: call ptr @{{_ZN12TemplatesNS121basicFunctionTemplateIiEEPKcT_|"\?\?\$basicFunctionTemplate@H@TemplatesNS1@@YAPEBDH@Z"}}(i32 0)
 // CHECK: call ptr @{{_ZN12TemplatesNS118BasicClassTemplateIcE11basicMemberEv|"\?basicMember@\?\$BasicClassTemplate@D@TemplatesNS1@@QEAAPEBDXZ"}}(ptr
-// CHECK: call ptr @{{_ZN12TemplatesNS112TemplatesNS229takesClassTemplateFromSiblingENS_12TemplatesNS318BasicClassTemplateIcEE|"\?takesClassTemplateFromSibling@TemplatesNS2@TemplatesNS1@@YAPEBDU\?\$BasicClassTemplate@D@TemplatesNS3@2@@Z"}}({{(i8 %[0-9]+)?}})
+// CHECK: call ptr @{{_ZN12TemplatesNS112TemplatesNS229takesClassTemplateFromSiblingENS_12TemplatesNS318BasicClassTemplateIcEE|"\?takesClassTemplateFromSibling@TemplatesNS2@TemplatesNS1@@YAPEBDU\?\$BasicClassTemplate@D@TemplatesNS3@2@@Z"}}({{((i8|i64) %[0-9]+)?}})
 // CHECK: ret void
 public func basicTests() {
   TemplatesNS1.basicFunctionTemplate(Int32(0))

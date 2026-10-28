@@ -18,11 +18,11 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
-#include "clang/AST/Mangle.h"
 
 using namespace swift;
 
@@ -103,12 +103,14 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, targetFunction, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       } else {
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, nullptr, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       }
     }
   }
@@ -173,7 +175,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
+  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>() ||
+      Attrs.hasAttribute<CxxDeclAttr>())
     F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
@@ -183,6 +186,9 @@ void SILFunctionBuilder::addFunctionAttributes(
       // thunk function.
       shouldExportDecl = constant.isNativeToForeignThunk() || constant.isForeign;
     }
+    // A variable's storage is exported by IRGen, not its accessors.
+    if (constant.isNull() || isa_and_nonnull<VarDecl>(constant.getDecl()))
+      shouldExportDecl = false;
     if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
       // A wasm-level exported function must be retained if it appears in a
       // compilation unit.
@@ -258,6 +264,9 @@ void SILFunctionBuilder::addFunctionAttributes(
       F->setSection(*sectionName);
   }
 
+  if (auto *TA = decl->getAttrs().getAttribute<TargetAttr>())
+    F->setTargetFeatures(TA->Value);
+
   // Only emit replacements for the objc entry point of objc methods.
   // There is one exception: @_dynamicReplacement(for:) of @objc methods in
   // generic classes. In this special case we use native replacement instead of
@@ -292,12 +301,21 @@ void SILFunctionBuilder::addFunctionAttributes(
   } else if (constant.isDistributedThunk()) {
     // It's okay for `decodeFuncDecl` to be null because system could be
     // generic.
-    if (auto decodeFuncDecl =
-            getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
-                decl)) {
-      auto decodeRef = SILDeclRef(decodeFuncDecl);
-      auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
-      F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+    //
+    // In Embedded Swift, the receiver-side runtime entry that would otherwise
+    // look up `decodeNextArgument` by mangled name (and require the witness
+    // to be alive) is not used: distributed dispatch is fully concrete and
+    // goes through a compile-time-known accessor. Skip the artificial
+    // reference so the generic-over-SerializationRequirement witness can be
+    // DCE'd and is never emitted into IR.
+    if (!mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      if (auto decodeFuncDecl =
+              getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
+                  decl)) {
+        auto decodeRef = SILDeclRef(decodeFuncDecl);
+        auto *adHocFunc = getOrCreateDeclaration(decodeFuncDecl, decodeRef);
+        F->setReferencedAdHocRequirementWitnessFunction(adHocFunc);
+      }
     }
   }
 }
@@ -318,11 +336,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     // functions are mistakenly mapped to the same name (e.g. with @_cdecl).
     // We want to issue a regular error in this case and not crash with an
     // assert.
-    assert(mod.getStage() == SILStage::Raw ||
+    assert(mod.getStageFloor() == SILStage::Raw ||
            fn->getLoweredFunctionType() == constantType);
     auto linkageForDef = constant.getLinkage(ForDefinition_t::ForDefinition);
     auto fnLinkage = fn->getLinkage();
-    assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
+    assert(mod.getStageFloor() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
              (linkageForDef == SILLinkage::PublicNonABI ||
@@ -383,9 +401,18 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
-    if (constant.isForeign && decl->hasClangNode() &&
-        !decl->getObjCImplementationDecl())
-      F->setClangNodeOwner(decl);
+    if (constant.isForeign && decl->hasClangNode()) {
+      bool clangProvidesBody = !decl->getObjCImplementationDecl();
+      if (!clangProvidesBody) {
+        if (auto *thunk = dyn_cast<FuncDecl>(decl)) {
+          auto *loader = decl->getASTContext().getClangModuleLoader();
+          clangProvidesBody =
+              loader->getOriginalForVirtualThunk(thunk) != nullptr;
+        }
+      }
+      if (clangProvidesBody)
+        F->setClangNodeOwner(decl);
+    }
 
     if (auto availability = constant.getAvailabilityForLinkage())
       F->setAvailabilityForLinkage(*availability);

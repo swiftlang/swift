@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx15 -swift-version 5 -solver-scope-threshold=28000
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx15 -swift-version 5 -solver-scope-threshold=28000 -verify-ignore-unrelated
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 

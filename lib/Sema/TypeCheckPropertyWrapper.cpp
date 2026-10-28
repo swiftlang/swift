@@ -24,7 +24,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
@@ -351,7 +350,7 @@ static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
                                     ->getAs<ProtocolCompositionType>()) {
         auto newType = compositionTy->withoutMarkerProtocols();
         if (!newType->isEqual(compositionTy)) {
-          paramTy = newType->getClassOrBoundGenericClass()
+          paramTy = newType->getClassDecl()
                         ? newType
                         : ExistentialType::get(newType);
         }

@@ -14,7 +14,6 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "silgen"
 
@@ -388,9 +387,11 @@ SILGenTopLevel::SILGenTopLevel(SILGenFunction &SGF) : SGF(SGF) {}
 
 void SILGenTopLevel::visitSourceFile(SourceFile *SF) {
 
-  for (auto *D : SF->getTopLevelDecls()) {
-    D->visitAuxiliaryDecls([&](Decl *AuxiliaryDecl) { visit(AuxiliaryDecl); });
-    visit(D);
+  {
+    SmallVector<Decl *, 64> decls;
+    SF->getTopLevelDeclsWithAuxiliaryDecls(decls);
+    for (auto *D : decls)
+      visit(D);
   }
 
   if (auto *SynthesizedFile = SF->getSynthesizedFile()) {

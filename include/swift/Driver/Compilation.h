@@ -20,14 +20,12 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
-#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Chrono.h"
 
 #include <memory>
 #include <vector>

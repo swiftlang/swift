@@ -575,9 +575,6 @@ returnsArray().compactMap { $0 }.compactMap { }
 // expected-warning@-1 {{expression of type 'Int' is unused}}
 // expected-warning@-2 {{result of call to 'compactMap' is unused}}
 
-// rdar://problem/30271695
-_ = ["hi"].compactMap { $0.isEmpty ? nil : $0 }
-
 // rdar://problem/32432145 - compiler should emit fixit to remove "_ in" in closures if 0 parameters is expected
 
 func r32432145(_ a: () -> ()) {}
@@ -1153,7 +1150,7 @@ struct R_76250381<Result, Failure: Error> {
 // rdar://77022842 - crash due to a missing argument to a ternary operator
 func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
   if let a = argA ?? false, if let b = argB ?? {
-    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
+    // expected-warning@-1 {{initializer for conditional binding has non-optional type 'Bool'}}
     // expected-error@-2 {{cannot convert value of type 'Bool?' to expected argument type '(() -> ())?'}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
     // expected-error@-4 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}

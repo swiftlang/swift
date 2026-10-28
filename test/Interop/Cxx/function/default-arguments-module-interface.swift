@@ -1,6 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
 
 // CHECK: func isZero(_ value: CInt = cxxDefaultArg) -> CBool
 // CHECK: func isNil(_ ptr: UnsafeMutablePointer<CInt>! = cxxDefaultArg) -> CBool

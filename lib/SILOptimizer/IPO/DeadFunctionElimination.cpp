@@ -12,18 +12,14 @@
 
 #define DEBUG_TYPE "sil-dead-function-elimination"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -88,6 +84,8 @@ class DeadFunctionAndGlobalElimination {
   llvm::SmallSetVector<SILFunction *, 16> Worklist;
 
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
+
+  llvm::SmallVector<SingleValueInstruction *, 16> DebugBlockRefs;
 
   bool keepExternalWitnessTablesAlive;
   bool keepStringSwitchIntrinsicAlive;
@@ -375,7 +373,7 @@ class DeadFunctionAndGlobalElimination {
           assert(MI->getNumOperands() - MI->getNumTypeDependentOperands() == 1
                  && "method insts except witness_method must have 1 operand");
           ClassDecl *MethodCl = MI->getOperand(0)->getType().
-                                  getClassOrBoundGenericClass();
+                                  getClassDecl();
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
@@ -398,6 +396,16 @@ class DeadFunctionAndGlobalElimination {
           HSI->getReferencedFunctions(fns);
           for (auto fn : fns) {
             ensureAlive(fn);
+          }
+        } else if (auto *DVI = dyn_cast<DebugValueInst>(&I)) {
+          // Reconstruction blocks don't keep anything alive.
+          // References to globals are added to DebugBlockRefs and will be
+          // dropped if they are dead.
+          if (SILBasicBlock *debugBB = DVI->getDebugReconstructionBlock()) {
+            for (SILInstruction &DI : *debugBB) {
+              if (isa<FunctionRefInst>(&DI) || isa<GlobalAddrInst>(&DI))
+                DebugBlockRefs.push_back(cast<SingleValueInstruction>(&DI));
+            }
           }
         }
       }
@@ -751,6 +759,23 @@ public:
     keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive),
     keepStringSwitchIntrinsicAlive(keepStringSwitchIntrinsicAlive) {}
 
+  /// Replaces references to dead globals within debug reconstruction blocks
+  /// with undef.
+  void dropDeadDebugBlockReferences() {
+    for (SingleValueInstruction *ref : DebugBlockRefs) {
+      bool refersToDead;
+      if (auto *FRI = dyn_cast<FunctionRefInst>(ref))
+        refersToDead = !isAlive(FRI->getReferencedFunction());
+      else
+        refersToDead =
+            !isAlive(cast<GlobalAddrInst>(ref)->getReferencedGlobal());
+      if (!refersToDead)
+        continue;
+      ref->replaceAllUsesWithUndef();
+      ref->eraseFromParent();
+    }
+  }
+
   /// The main entry point of the optimization.
   void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
 
@@ -763,6 +788,8 @@ public:
     // reference counts of dead functions.
     llvm::SmallVector<SILFunction *, 16> DeadFunctions;
     llvm::SmallVector<SILGlobalVariable *, 16> DeadGlobals;
+
+    dropDeadDebugBlockReferences();
     for (SILFunction &F : *Module) {
       if (!isAlive(&F)) {
         F.dropAllReferences();

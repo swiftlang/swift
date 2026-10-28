@@ -59,6 +59,8 @@ protected:
 public:
   const TypeInfo &getTypeInfo() const { return Layout.getType(); }
 
+  Type getInterfaceTypeForSerialization() const { return {}; }
+
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
   }
@@ -146,6 +148,7 @@ protected:
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
+      fieldRepresentation.type = field.getInterfaceTypeForSerialization();
       fieldRepresentation.typeInfo = field.getTypeInfo()
                                          .createSerializableHiddenTypeInfoRepresentation(
                                              IGM);
@@ -154,6 +157,19 @@ protected:
       fieldRepresentation.storage.Begin = projectionRange.first;
       fieldRepresentation.storage.End = projectionRange.second;
       representation.fields.push_back(std::move(fieldRepresentation));
+    }
+  }
+
+  void printRecordTypeInfoAbstractLayoutInfo(IRGenModule &IGM,
+                                             llvm::raw_ostream &OS,
+                                             unsigned indentation) const {
+    this->printForAbstractTypeLayoutInfoBase(IGM, OS, indentation,
+                                             static_cast<const Impl *>(this));
+    OS.indent(indentation + 2) << "fieldTypeInfos:\n";
+    for (const auto &[index, field] : llvm::enumerate(getFields())) {
+      OS.indent(indentation + 4) << "- index: " << index << "\n";
+      field.getTypeInfo().printForAbstractTypeLayoutInfo(IGM, OS,
+                                                      indentation + 6);
     }
   }
 
@@ -909,14 +925,6 @@ private:
 
 public:
   using super::getFields;
-
-  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override {
-    auto representation =
-        std::make_unique<SerializableLoadableRecordTypeInfoRepresentation>();
-    populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
-    return representation;
-  }
 
   void loadAsCopy(IRGenFunction &IGF, Address addr,
                   Explosion &out) const override {

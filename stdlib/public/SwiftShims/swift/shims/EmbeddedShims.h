@@ -357,12 +357,15 @@ _swift_embedded_error_box_destroy(SWIFT_CONTEXT void * _Nonnull object) {
   _swift_embedded_error_destroy_impl(object);
 }
 
-// Returns the address of the calling convention bridge for metadata storage init.
-static inline void * _Nonnull _swift_embedded_error_destroy_ptr(void) {
-#if defined(__AVR__)
-  return (void *)(__UINTPTR_TYPE__)_swift_embedded_error_box_destroy;
+// Stores the bridge in the error metadata's destroy slot, signed the way
+// _swift_embedded_invoke_heap_object_destroy authenticates it.
+static inline void
+_swift_embedded_error_store_destroy(void * _Nullable * _Nonnull destroy_location) {
+#if __has_feature(ptrauth_calls)
+  *(HeapObjectDestroyer __ptrauth(0, 1, 0xbbbf) *)destroy_location =
+      _swift_embedded_error_box_destroy;
 #else
-  return (void *)_swift_embedded_error_box_destroy;
+  *(HeapObjectDestroyer *)destroy_location = _swift_embedded_error_box_destroy;
 #endif
 }
 

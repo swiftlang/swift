@@ -69,7 +69,6 @@ namespace swift {
   class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
-  class BoundGenericType;
   class BuiltinTupleDecl;
   class CASOptions;
   class ClangModuleLoader;
@@ -132,6 +131,7 @@ namespace swift {
   struct RequirementMatch;
   class TupleTypeElt;
   class EnumElementDecl;
+  class MacroDecl;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -142,6 +142,7 @@ namespace swift {
   class SearchPathOptions;
   class SILBoxType;
   class SILTransform;
+  class StructDecl;
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
@@ -263,6 +264,21 @@ struct OpenedExistentialSignature {
   CanType SelfType;
 };
 
+/// Identifies one of the builtin macros used to derive conformances \c
+/// MacroDecl is synthesized by the compiler.
+enum class BuiltinDerivedConformanceMacroKind : uint8_t {
+  DeriveEquatable,
+  DeriveHashable,
+  DeriveError,
+  DeriveComparable,
+  DeriveCaseIterable,
+  DeriveEncodable,
+  DeriveDecodable,
+  DeriveRawRepresentable,
+
+  NumKinds,
+};
+
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
 /// It is the closest thing to thread-local or compile-local storage in this
@@ -300,6 +316,14 @@ public:
   /// recompile the world every time we add a side table. See
   /// "swift/AST/ASTContextGlobalCache.h"
   GlobalCache &getGlobalCache() const;
+
+  /// Discard the static build configuration derived from LangOpts, so that
+  /// it is formed again from the current LangOpts on next use.
+  ///
+  /// The static build configuration is used for '#if' evaluation and is sent
+  /// to macro plugins. Clients that modify LangOpts after the ASTContext is
+  /// created, e.g. to change the language version, must call this.
+  void invalidateStaticBuildConfiguration();
 
   friend ConstraintCheckerArenaRAII;
 
@@ -773,7 +797,13 @@ public:
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
 
-  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  /// Retrieve the declaration of the CGFloat struct.
+  StructDecl *getCGFloatDecl() const;
+
+  /// Retrieve the type of the CGFloat struct.
+  Type getCGFloatType() const;
+
+  /// Retrieve the declaration of CGFloat.init(_: Double).
   ConcreteDeclRef getCGFloatInitDecl() const;
 
   /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
@@ -820,6 +850,9 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
+  // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast_AEIC.
+  FuncDecl *getIsOSVersionAtLeastAEICDecl() const;
+
   // Retrieve the declaration of Swift._stdlib_isVariantOSVersionAtLeast.
   FuncDecl *getIsVariantOSVersionAtLeastDecl() const;
 
@@ -849,7 +882,12 @@ public:
   /// Does *not* perform any name lookup to check whether, the module already
   /// contains a decl with the same name, only does synthesis.
   ProtocolDecl *synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const;
-  
+
+  /// Retrieve the builtin \c MacroDecl used to derive conformances via \c
+  /// SwiftMacros, synthesizing it into the stdlib on first use.
+  MacroDecl *getBuiltinDerivedConformanceMacroDecl(
+      BuiltinDerivedConformanceMacroKind kind) const;
+
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
@@ -1257,6 +1295,12 @@ public:
   iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
   getLoadedModules() const;
 
+  /// Record a type whose declaration was recovered from serialized abstract
+  /// layout information after its cross-reference could not be resolved.
+  void recordRecoveredHiddenType(CanType type);
+
+  ArrayRef<CanType> getRecoveredHiddenTypes() const;
+
   /// Returns the number of loaded modules known by this context to be loaded.
   unsigned getNumLoadedModules() const {
     auto eltRange = getLoadedModules();
@@ -1537,16 +1581,6 @@ public:
   /// Increments \c NumTypoCorrections then checks this against the limit in
   /// the language options.
   bool shouldPerformTypoCorrection();
-
-  /// Record that, when emitting the current module, references to \p type in
-  /// stored properties of public types should be substituted with a
-  /// \c HiddenType carrying \p mangledName.
-  void recordTypeToHideWhenEmittingModule(CanType type, StringRef mangledName);
-
-  /// If \p type was recorded as needing to be hidden when emitting the current
-  /// module, return its mangled name; otherwise return \c std::nullopt.
-  std::optional<StringRef>
-  lookupTypeToHideWhenEmittingModule(CanType type) const;
 
 private:
   friend class IntrinsicInfo;

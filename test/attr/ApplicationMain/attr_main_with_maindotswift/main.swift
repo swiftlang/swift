@@ -2,4 +2,6 @@
 // expected-note@-1{{pass '-parse-as-library' to compiler invocation if this is intentional}}
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s %S/file.swift
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 hi()

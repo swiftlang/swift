@@ -14,7 +14,30 @@ import SIL
 
 extension BranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
+
+    simplifyPhiArgumentsInTargetBlock(context)
+    if isDeleted {
+      return
+    }
+
     tryMergeWithTargetBlock(context)
+  }
+}
+
+private extension BranchInst {
+  func simplifyPhiArgumentsInTargetBlock(_ context: SimplifyContext) {
+    // Need to store all arguments into a temporary array because when a phi argument is
+    // deleted, we would crash when iterating over the argument array.
+    var phiArgs = Stack<Argument>(context)
+    defer { phiArgs.deinitialize() }
+    phiArgs.append(contentsOf: targetBlock.arguments)
+
+    for argument in phiArgs {
+      guard let phi = Phi(argument) else {
+        fatalError("argument of branch in target block is always a Phi")
+      }
+      phi.simplify(context)
+    }
   }
 }
 

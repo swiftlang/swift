@@ -2,6 +2,10 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all)
 
 // REQUIRES: executable_test
+// Casting an existential that suppresses `Copyable` or `Escapable` needs
+// `swift_getExtendedExistentialTypeMetadata_unique`, which older runtimes lack.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // `type(of:)` reads the dynamic type of its operand without consuming it, so it
 // must neither destroy the operand early nor perturb its lifetime.

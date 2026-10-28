@@ -22,6 +22,7 @@
 #include "ImporterImpl.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
@@ -103,6 +104,68 @@ importer::getFirstNonLocalDecl(const clang::Decl *D) {
   return *iter;
 }
 
+/// Counts the nullability and bounds-safety annotations carried by \p ty:
+/// a \c _Nonnull / \c _Nullable nullability qualifier and a \c __sized_by /
+/// \c __counted_by bounds attribute each contribute one point. Both accessors
+/// see through intervening sugar, so annotation nesting order is irrelevant.
+static unsigned typeRefinementScore(clang::QualType ty) {
+  unsigned score = 0;
+  if (ty->getNullability())
+    ++score;
+  if (ty->getAs<clang::CountAttributedType>())
+    ++score;
+  return score;
+}
+
+static unsigned functionRefinementScore(const clang::FunctionDecl *fn) {
+  unsigned score = typeRefinementScore(fn->getReturnType());
+  for (const clang::ParmVarDecl *param : fn->parameters())
+    score += typeRefinementScore(param->getType());
+  return score;
+}
+
+const clang::FunctionDecl *
+importer::mostRefinedFunctionRedecl(const clang::FunctionDecl *fn) {
+  const clang::FunctionDecl *best = fn;
+  unsigned bestScore = functionRefinementScore(fn);
+  for (const clang::FunctionDecl *redecl : fn->redecls()) {
+    if (redecl == fn)
+      continue;
+    unsigned score = functionRefinementScore(redecl);
+    if (score > bestScore) {
+      best = redecl;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+void importer::printRecordName(llvm::raw_ostream &out,
+                               const clang::RecordDecl *decl) {
+  if (decl->getIdentifier())
+    out << decl->getName();
+  else if (decl->isAnonymousStructOrUnion())
+    out << "(anonymous record)";
+  else
+    out << "(unnamed record)";
+}
+
+bool importer::anySubobjectTypeSatisfies(
+    const clang::RecordDecl *decl,
+    llvm::function_ref<bool(clang::QualType)> pred) {
+  if (const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    for (const auto &base : cxxRecordDecl->bases())
+      if (pred(base.getType()))
+        return true;
+  }
+
+  for (const auto *field : decl->fields())
+    if (pred(field->getType()))
+      return true;
+
+  return false;
+}
+
 std::optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
@@ -144,7 +207,7 @@ importer::getClangDeclContextType(const clang::DeclContext *dc) {
   }
 
   if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
-    return ctx.getTagDeclType(tag);
+    return ctx.getCanonicalTagType(tag);
   }
 
   return clang::QualType();
@@ -361,6 +424,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::BoundMember:
     case clang::BuiltinType::BuiltinFn:
     case clang::BuiltinType::IncompleteMatrixIdx:
+    case clang::BuiltinType::MetaInfo:
     case clang::BuiltinType::Overload:
     case clang::BuiltinType::PseudoObject:
     case clang::BuiltinType::UnknownAny:
@@ -454,6 +518,16 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+      return OmissionTypeName();
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+      return OmissionTypeName();
+
+    // SPIR-V builtin types that don't have Swift equivalents.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
       return OmissionTypeName();
     }
   }
@@ -591,10 +665,17 @@ bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
 }
 
 bool importer::hasNativeSwiftDecl(const clang::Decl *decl) {
-  if (auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
-    if (attr->getGeneratedDeclaration() && attr->getLanguage() == "Swift")
-      return true;
-  return false;
+  auto *attr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!attr || !attr->getGeneratedDeclaration() || attr->getLanguage() != "Swift")
+    return false;
+  // external_source_symbol is inheritable, so Clang can merge this marker from a
+  // -Swift.h forward-declaration onto a Clang module's real decl that has no Swift
+  // counterpart. Only trust it when defined_in names the decl's own module.
+  if (auto *owning = decl->getOwningModule())
+    if (!attr->getDefinedIn().empty() &&
+        attr->getDefinedIn() != owning->getTopLevelModuleName())
+      return false;
+  return true;
 }
 
 /// Translate the "nullability" notion from API notes into an optional type

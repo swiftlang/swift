@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -experimental-print-full-convention -use-clang-function-types
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ctypes
 
 // Setting a C function type with the correct cType works.

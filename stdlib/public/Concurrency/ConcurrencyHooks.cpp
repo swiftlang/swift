@@ -21,17 +21,20 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+using namespace swift;
+
 // Define all the hooks
-#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)           \
-  swift::name##_hook_t swift::name##_hook = nullptr
-#define SWIFT_CONCURRENCY_HOOK0(returnType, name)               \
-  swift::name##_hook_t swift::name##_hook = nullptr
-#define SWIFT_CONCURRENCY_HOOK_OVERRIDE0(returnType, name)      \
-  swift::name##_hook_t swift::name##_hook = nullptr
+#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                          \
+  swift::name##_hook_t __ptrauth_swift_concurrency_hook swift::name##_hook =   \
+      nullptr
+#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                              \
+  swift::name##_hook_t __ptrauth_swift_concurrency_hook swift::name##_hook =   \
+      nullptr
+#define SWIFT_CONCURRENCY_HOOK_OVERRIDE0(returnType, name)                     \
+  swift::name##_hook_t __ptrauth_swift_concurrency_hook swift::name##_hook =   \
+      nullptr
 
 #include "swift/Runtime/ConcurrencyHooks.def"
-
-using namespace swift;
 
 // Define the external entry points; because the Impl functions use the C
 // types from `ExecutorHooks.h`, we need to make an Orig version containing

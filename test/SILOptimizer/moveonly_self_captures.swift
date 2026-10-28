@@ -65,14 +65,14 @@ struct Test : ~Copyable {
         capture()
     }
 
-    func captureByLocalFunction2() { // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+    func captureByLocalFunction2() { // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
         func capture() {
             let _ = self.e2 // expected-note {{consumed here}}
         }
         capture()
     }
 
-    func captureByLocalFunction3() { // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+    func captureByLocalFunction3() { // expected-error {{non-'Copyable' 'self' cannot be consumed when captured by an escaping closure}}
         func capture() {
             let _ = self // expected-note {{consumed here}}
         }

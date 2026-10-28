@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -typecheck -verify %s 
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature Lifetimes -typecheck -verify %s 
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_Lifetimes
@@ -11,7 +11,7 @@ func a<T: ~Copyable>(x: Builtin.Borrow<T>) -> Builtin.Borrow<T> {
 }
 
 struct EscapableContainingBorrow<T> { // expected-note {{consider adding '~Escapable'}}
-	var x: Builtin.Borrow<T> // expected-error {{has non-Escapable type}}
+	var x: Builtin.Borrow<T> // expected-error {{has non-'Escapable' type}}
 }
 struct NonescapableContainingBorrow<T>: ~Escapable {
 	var x: Builtin.Borrow<T>

@@ -31,7 +31,7 @@ using TypeRelation = CodeCompletionResultTypeRelation;
 /// Returns the kind of attributes \c Ty can be used as.
 static OptionSet<CustomAttributeKind> getCustomAttributeKinds(Type Ty) {
   OptionSet<CustomAttributeKind> Result;
-  if (auto NominalTy = Ty->getAs<NominalOrBoundGenericNominalType>()) {
+  if (auto NominalTy = Ty->getAs<NominalType>()) {
     auto NominalDecl = NominalTy->getDecl();
     if (NominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
       Result |= CustomAttributeKind::PropertyWrapper;

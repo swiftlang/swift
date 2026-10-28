@@ -20,6 +20,8 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <realtimeapiset.h>
+
+#pragma comment(lib, "OneCore.Lib")
 #endif
 
 #if __has_include(<chrono>) && __STDC_HOSTED__

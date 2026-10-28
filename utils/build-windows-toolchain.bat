@@ -64,7 +64,9 @@ set NINJA_STATUS=[%%f/%%t][%%p][%%es]
 :: Build the -Test argument, if any, by subtracting skipped tests
 set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
 set "TestArg="
-set "Skip=,%SKIP_TESTS%,"
+:: Strip stray double quotes from SKIP_TESTS so the substring match below still works.
+set "SkipTests=%SKIP_TESTS:"=%"
+set "Skip=,%SkipTests%,"
 for %%I in (%TestsList%) do (
   if "!Skip:,%%I,=!" == "!Skip!" (
       set "TestArg=!TestArg!%%I,"
@@ -75,6 +77,10 @@ set "TestArg=-Test !TestArg!"
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
 set "PackagingArg="
 if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Package -Stage %PackageRoot%"
+
+:: The SBoM is only published with the installer.
+set "SBoMArg="
+if not "%INCLUDE_PACKAGING%"=="" set "SBoMArg=-IncludeSBoM"
 
 :: Build the arguments related to Windows SDK builds
 set "WindowsSDKArgs=-Windows"
@@ -96,11 +102,13 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
-  -ImageRoot %BuildRoot% ^
+  -ArtifactCache %BuildRoot%\ArtifactCache ^
+  -BuildRoot %BuildRoot% ^
+  -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
   %PackagingArg% ^
   %TestArg% ^
-  -IncludeSBoM ^
+  %SBoMArg% ^
   %DebugInfoArg% ^
   -Summary || (exit /b 1)
 

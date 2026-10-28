@@ -27,8 +27,6 @@
 #include "LocalTypeDataKind.h"
 #include "MetadataRequest.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -301,7 +299,10 @@ bool TypeInfo::withWitnessableMetadataCollector(
   bool needsCollector = false;
   LayoutIsNeeded_t needsLayout = LayoutIsNotNeeded;
   if (!T.hasLocalArchetype() &&
-      !IGF.outliningCanCallValueWitnesses()) {
+      (!IGF.outliningCanCallValueWitnesses() ||
+       // We can't call T's value witnesses if T's metadata isn't accessible
+       // here, e.g. for another module's private type.
+       !IGF.IGM.getSILModule().isTypeMetadataForLayoutAccessible(T))) {
     needsCollector = true;
     if (T.hasArchetype()) {
       needsLayout = LayoutIsNeeded;

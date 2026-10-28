@@ -34,7 +34,7 @@ class CMoveOnly: ~Copyable {
 
 struct OptionalGrandField<T> { // expected-note {{consider adding '~Copyable' to generic struct 'OptionalGrandField'}}
     var moveOnly3: T?
-    var moveOnly2: MoveOnlyKlass // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming generic struct 'OptionalGrandField' has non-Copyable type 'MoveOnlyKlass'}}
+    var moveOnly2: MoveOnlyKlass // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming generic struct 'OptionalGrandField' has non-'Copyable' type 'MoveOnlyKlass'}}
 }
 
 struct S0 {
@@ -48,7 +48,7 @@ struct SCopyable {
 
 struct S { // expected-note {{consider adding '~Copyable' to struct 'S'}}
     var copyable: CopyableKlass
-    var moveOnly2: MoveOnlyStruct? // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming struct 'S' has non-Copyable type 'MoveOnlyStruct?'}}
+    var moveOnly2: MoveOnlyStruct? // expected-error {{stored property 'moveOnly2' of 'Copyable'-conforming struct 'S' has non-'Copyable' type 'MoveOnlyStruct?'}}
     // FIXME(NCG): Shouldn't this be also an error?
     var moveOnly: MoveOnlyStruct
     var moveOnly3: OptionalGrandField<MoveOnlyKlass> // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
@@ -56,7 +56,7 @@ struct S { // expected-note {{consider adding '~Copyable' to struct 'S'}}
 }
 
 struct S2 { // expected-note {{consider adding '~Copyable' to struct 'S2'}}
-    var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyStruct'}}
+    var moveOnly: MoveOnlyStruct // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-'Copyable' type 'MoveOnlyStruct'}}
 }
 
 struct SMoveOnly: ~Copyable {
@@ -66,7 +66,7 @@ struct SMoveOnly: ~Copyable {
 
 enum E { // expected-note {{consider adding '~Copyable' to enum 'E'}}
     case lhs(CopyableKlass)
-    case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E' has non-Copyable type 'MoveOnlyKlass'}}
+    case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E' has non-'Copyable' type 'MoveOnlyKlass'}}
     case rhs2(OptionalGrandField<MoveOnlyKlass>) // expected-error {{type 'MoveOnlyKlass' does not conform to protocol 'Copyable'}}
 }
 
@@ -106,7 +106,7 @@ class C2MoveOnly: ~Copyable {
 
     struct S2 { // expected-note {{consider adding '~Copyable' to struct 'S2'}}
         var copyable: CopyableKlass
-        var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-Copyable type 'MoveOnlyKlass'}}
+        var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S2' has non-'Copyable' type 'MoveOnlyKlass'}}
     }
 
 struct S2MoveOnly: ~Copyable {
@@ -116,7 +116,7 @@ struct S2MoveOnly: ~Copyable {
 
     enum E2 { // expected-note {{consider adding '~Copyable' to enum 'E2'}}
         case lhs(CopyableKlass)
-        case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E2' has non-Copyable type 'MoveOnlyKlass'}}
+        case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E2' has non-'Copyable' type 'MoveOnlyKlass'}}
     }
 
 enum E2MoveOnly: ~Copyable {
@@ -140,7 +140,7 @@ class C3MoveOnly: ~Copyable {
 
         struct S3 { // expected-note {{consider adding '~Copyable' to struct 'S3'}}
             var copyable: CopyableKlass
-            var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S3' has non-Copyable type 'MoveOnlyKlass'}}
+            var moveOnly: MoveOnlyKlass // expected-error {{stored property 'moveOnly' of 'Copyable'-conforming struct 'S3' has non-'Copyable' type 'MoveOnlyKlass'}}
         }
 
 struct S3MoveOnly: ~Copyable {
@@ -150,7 +150,7 @@ struct S3MoveOnly: ~Copyable {
 
         enum E3 { // expected-note {{consider adding '~Copyable' to enum 'E3'}}
             case lhs(CopyableKlass)
-            case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E3' has non-Copyable type 'MoveOnlyKlass'}}
+            case rhs(MoveOnlyKlass) // expected-error {{associated value 'rhs' of 'Copyable'-conforming enum 'E3' has non-'Copyable' type 'MoveOnlyKlass'}}
         }
 
 enum E3MoveOnly: ~Copyable {
@@ -221,7 +221,7 @@ enum Color: ~Copyable {
     }
 }
 
-// expected-error@+1:21 {{'StrengthLevel' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is noncopyable}}
+// expected-error@+1:21 {{'StrengthLevel' declares raw type 'Int', but cannot yet conform to RawRepresentable because it is non-'Copyable'}}
 enum StrengthLevel: Int, ~Copyable {
     case none = 0
     case low
@@ -235,16 +235,16 @@ enum StrengthLevel: Int, ~Copyable {
 
 public class Holder {
     var one: MoveOnlyStruct {
-        get async {  } // expected-error {{getter of noncopyable type cannot be 'async' or 'throws'}}
+        get async {  } // expected-error {{getter of non-'Copyable' type cannot be 'async' or 'throws'}}
     }
     var two: MoveOnlyKlass {
-        get throws {  } // expected-error {{getter of noncopyable type cannot be 'async' or 'throws'}}
+        get throws {  } // expected-error {{getter of non-'Copyable' type cannot be 'async' or 'throws'}}
     }
 }
 
 struct StructHolder {
     var three: EMoveOnly {
-        get async throws {  } // expected-error {{getter of noncopyable type cannot be 'async' or 'throws'}}
+        get async throws {  } // expected-error {{getter of non-'Copyable' type cannot be 'async' or 'throws'}}
     }
 }
 

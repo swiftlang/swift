@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop %if swift_test_mode_optimize_none_with_opaque_values %{ -D OPAQUE_VALUES %})
 //
 // REQUIRES: executable_test
 
@@ -106,6 +106,21 @@ FunctionsTestSuite.test("mutating base member calls do not require copying") {
 
 FunctionsTestSuite.test("non-initializer function renamed to init()") {
   expectEqual(freeFuncRenamedToInit(), 42)
+}
+
+FunctionsTestSuite.test("base members with unnamed parameters from derived") {
+  let derived = DerivedFromUnnamedParams()
+  // With opaque values, SILGen passes an address where an inherited method
+  // takes a non-trivial C++ type by const reference.
+#if !OPAQUE_VALUES
+  var pointee: CInt = 0
+  var ref: CInt = 0
+  expectEqual(derived.takesUnnamed(0, true, &pointee, NonTrivial(), &ref), 1)
+#endif
+  expectEqual(derived.unnamedWithDefault(), 2)
+  expectEqual(derived.unnamedWithDefault(0), 2)
+  expectEqual(derived[0], 3)
+  expectEqual(derived(0), 4)
 }
 
 runAllTests()

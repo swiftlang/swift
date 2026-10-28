@@ -15,8 +15,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Initializer.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

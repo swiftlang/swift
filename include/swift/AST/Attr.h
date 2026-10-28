@@ -32,6 +32,7 @@
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
@@ -145,11 +146,6 @@ enum : unsigned {
 enum : unsigned {
   NumNonexhaustiveModeBits = countBitsUsed(
       static_cast<unsigned>(NonexhaustiveMode::Last_NonexhaustiveMode))
-};
-
-enum : unsigned {
-  NumExecutionSemanticsBits = countBitsUsed(
-      static_cast<unsigned>(ExecutionSemantics::Last_ExecutionSemantics))
 };
 
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
@@ -301,10 +297,6 @@ protected:
 
     SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
       threading : 3
-    );
-
-    SWIFT_INLINE_BITFIELD(CalledAttr, DeclAttribute, NumExecutionSemanticsBits,
-      Semantics : NumExecutionSemanticsBits
     );
   } Bits;
   // clang-format on
@@ -794,6 +786,35 @@ public:
   }
 };
 
+/// Defines the @cxx attribute.
+class CxxDeclAttr : public DeclAttribute {
+public:
+  CxxDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DeclAttrKind::CxxDecl, AtLoc, Range, Implicit),
+        Name(Name) {}
+
+  CxxDeclAttr(StringRef Name, bool Implicit)
+      : CxxDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The C++ function name to match against (empty means use the base
+  /// identifier). This is the C++ source name the importer looks up, it is not
+  /// a mangled symbol. The emitted symbol comes from the matched C++
+  /// declaration's mangling.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::CxxDecl;
+  }
+
+  CxxDeclAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CxxDeclAttr(Name, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const CxxDeclAttr *other, Decl *attachedTo) const {
+    return Name == other->Name;
+  }
+};
+
 /// Defines the @_semantics attribute.
 class SemanticsAttr : public DeclAttribute {
 public:
@@ -817,6 +838,32 @@ public:
   }
 
   bool isEquivalent(const SemanticsAttr *other, Decl *attachedTo) const {
+    return Value == other->Value;
+  }
+};
+
+/// The `@_target` attribute, overriding the target CPU/features for functions.
+class TargetAttr : public DeclAttribute {
+public:
+  TargetAttr(StringRef Value, SourceLoc AtLoc, SourceRange Range,
+             bool Implicit)
+      : DeclAttribute(DeclAttrKind::Target, AtLoc, Range, Implicit),
+        Value(Value) {}
+
+  TargetAttr(StringRef Value, bool Implicit)
+      : TargetAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
+
+  const StringRef Value;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Target;
+  }
+
+  TargetAttr *clone(ASTContext &ctx) const {
+    return new (ctx) TargetAttr(Value, AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const TargetAttr *other, Decl *attachedTo) const {
     return Value == other->Value;
   }
 };
@@ -914,6 +961,9 @@ private:
   AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
 
+  /// Location of the availability macro expanded to create this attribute.
+  SourceLoc MacroLoc;
+
   const StringRef Message;
   const StringRef Rename;
 
@@ -934,6 +984,12 @@ public:
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
+
+  /// Returns the location of the availability macro that was expanded to create
+  /// this attribute, or an invalid location if the attribute did not come from
+  /// a `-define-availability` argument.
+  SourceLoc getMacroLoc() const { return MacroLoc; }
+  void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
 
   /// Returns the parsed version for `introduced:`.
   std::optional<llvm::VersionTuple> getRawIntroduced() const {
@@ -3873,33 +3929,56 @@ public:
   }
 };
 
-class CalledAttr : public DeclAttribute {
+/// Returns the attribute that gives a function type the execution semantics
+/// \p semantics, as spelled in source: `@once` or `@callable(once)`.
+const char *getExecutionSemanticsAttrSpelling(ExecutionSemantics semantics);
+
+/// The `@callable(once)` attribute on a closure, which makes it at-most-once.
+/// `@once` uses the simple \c OnceAttr.
+class CallableAttr : public DeclAttribute {
 public:
-  CalledAttr(SourceLoc atLoc, SourceRange range, ExecutionSemantics semantics,
-             bool implicit = false)
-      : DeclAttribute(DeclAttrKind::Called, atLoc, range, implicit) {
-    Bits.CalledAttr.Semantics = unsigned(semantics);
-  }
-
-  CalledAttr(ExecutionSemantics semantics)
-      : CalledAttr(SourceLoc(), SourceRange(), semantics) {}
-
-  bool isOnce() const { return getSemantics() == ExecutionSemantics::Once; }
-
-  ExecutionSemantics getSemantics() const {
-    return ExecutionSemantics(Bits.CalledAttr.Semantics);
-  }
+  CallableAttr(SourceLoc atLoc, SourceRange range, bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Callable, atLoc, range, implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Called;
+    return DA->getKind() == DeclAttrKind::Callable;
   }
 
-  CalledAttr *clone(ASTContext &ctx) const {
-    return new (ctx) CalledAttr(AtLoc, Range, getSemantics(), isImplicit());
+  CallableAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CallableAttr(AtLoc, Range, isImplicit());
   }
 
-  bool isEquivalent(const CalledAttr *other, Decl *attachedTo) const {
-    return getSemantics() == other->getSemantics();
+  bool isEquivalent(const CallableAttr *other, Decl *attachedTo) const {
+    return true;
+  }
+};
+
+/// The `@_scopeParams` attribute, which declares the explicit scope parameters
+/// of a function or type, e.g. `@_scopeParams(a, b)`.
+class ScopeParamsAttr : public DeclAttribute {
+  ScopeParamListRepr *Params;
+
+public:
+  ScopeParamsAttr(SourceLoc atLoc, SourceRange range,
+                  ScopeParamListRepr *params, bool implicit = false)
+      : DeclAttribute(DeclAttrKind::ScopeParams, atLoc, range, implicit),
+        Params(params) {}
+
+  ScopeParamListRepr *getParamList() const { return Params; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::ScopeParams;
+  }
+
+  ScopeParamsAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ScopeParamsAttr(AtLoc, Range, Params, isImplicit());
+  }
+
+  bool isEquivalent(const ScopeParamsAttr *other, Decl *attachedTo) const {
+    return llvm::equal(Params->getParams(), other->Params->getParams(),
+                       [](Located<ScopeName> lhs, Located<ScopeName> rhs) {
+                         return lhs.Item == rhs.Item;
+                       });
   }
 };
 
@@ -4397,8 +4476,9 @@ protected:
       Kind : 8
     );
 
-    SWIFT_INLINE_BITFIELD_FULL(CalledTypeAttr, TypeAttribute, 8,
-      Semantics : 8
+    SWIFT_INLINE_BITFIELD_FULL(ScopedTypeAttr, TypeAttribute, 32,
+      : NumPadBits,
+      NumRestrictions : 32
     );
   } Bits;
   // clang-format on
@@ -4602,6 +4682,59 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
+class ScopedTypeAttr final
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::Scoped>,
+      private llvm::TrailingObjects<ScopedTypeAttr, ScopeRestrictionRepr> {
+  friend TrailingObjects;
+
+  ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                 ArrayRef<ScopeRestrictionRepr> restrictions);
+
+public:
+  static ScopedTypeAttr *create(const ASTContext &ctx, SourceLoc atLoc,
+                                SourceLoc kwLoc, SourceRange parens,
+                                ArrayRef<ScopeRestrictionRepr> restrictions);
+
+  ArrayRef<ScopeRestrictionRepr> getRestrictions() const {
+    return getTrailingObjects(Bits.ScopedTypeAttr.NumRestrictions);
+  }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The `@_accessScope` attribute, which binds the access of a parameter to a
+/// scope, e.g. `borrowing @_accessScope(s) [Int]`.
+class AccessScopeTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::AccessScope> {
+  ScopeRepr Scope;
+
+public:
+  AccessScopeTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                      ScopeRepr scope)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), Scope(scope) {}
+
+  ScopeRepr getScope() const { return Scope; }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The `@_scopeParams` attribute on a function type, which declares its
+/// explicit scope parameters, e.g.
+/// `@_scopeParams(a) (@_scoped(a) Ref) -> @_scoped(a) Ref`.
+class ScopeParamsTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::ScopeParams> {
+  ScopeParamListRepr *Params;
+
+public:
+  ScopeParamsTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                      ScopeParamListRepr *params)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), Params(params) {}
+
+  ScopeParamListRepr *getParamList() const { return Params; }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
 class OpaqueReturnTypeOfTypeAttr
     : public SimpleTypeAttrWithArgs<TypeAttrKind::OpaqueReturnTypeOf> {
   Located<StringRef> MangledName;
@@ -4695,31 +4828,12 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
+/// The `@callable(once)` type attribute, which makes a function type
+/// at-most-once. `@once` uses the simple \c OnceTypeAttr.
+class CallableTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Callable> {
 public:
-  enum class Semantics : uint8_t { Once };
-
-private:
-  SourceLoc SemanticsLoc;
-
-public:
-  CalledTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
-                 Located<Semantics> semantics)
-      : SimpleTypeAttr(atLoc, kwLoc, parensRange), SemanticsLoc(semantics.Loc) {
-    Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
-  }
-
-  bool isOnce() const { return getSemantics() == Semantics::Once; }
-
-  Semantics getSemantics() const {
-    return Semantics(Bits.CalledTypeAttr.Semantics);
-  }
-  SourceLoc getSemanticsLoc() const { return SemanticsLoc; }
-
-  const char *getSemanticsName() const {
-    return getSemanticsName(getSemantics());
-  }
-  static const char *getSemanticsName(Semantics semantics);
+  CallableTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange)
+      : SimpleTypeAttr(atLoc, kwLoc, parensRange) {}
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
@@ -4732,6 +4846,12 @@ void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
   return attr->getLocation();
 }
+
+/// Returns the `@once` or `@callable(once)` attribute in \p attrs that gives a
+/// closure its execution semantics, if any. If both are written, the first one
+/// in source order wins, and the attribute checker diagnoses the other one.
+const DeclAttribute *getExecutionSemanticsAttr(const DeclAttributes &attrs,
+                                               const SourceManager &SM);
 
 /// Determine whether the given attribute is available, looking up the
 /// attribute by name.

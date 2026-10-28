@@ -74,14 +74,27 @@ private extension BeginCOWMutationInst {
       return false
     }
     let buffer = instanceResult
-    guard buffer.uses.ignoreDebugUses.allSatisfy({
-        if let endCOW = $0.instruction as? EndCOWMutationInst {
-          return !endCOW.doKeepUnique
-        }
+    var needKeepUnique = false
+    for user in buffer.uses.ignoreDebugUses.users {
+      if let endCOW = user as? EndCOWMutationInst {
+        needKeepUnique = needKeepUnique || endCOW.doKeepUnique
+      } else {
         return false
-      }) else
-    {
-      return false
+      }
+    }
+    if needKeepUnique {
+      // The removed end_cow_mutations rely on the buffer being unique. Therefore the
+      // keep_unique flag must be transferred to the end_cow_mutations which define the
+      // operand of this instruction.
+      // First check if all of them can be found, before modifying anything.
+      guard visitEndCowMutations(of: instance, context, { _ in true }) else {
+        return false
+      }
+
+      _ = visitEndCowMutations(of: instance, context) { ecm in
+        ecm.set(keepUnique: true, context)
+        return true
+      }
     }
 
     for use in buffer.uses.ignoreDebugUses {
@@ -96,19 +109,56 @@ private extension BeginCOWMutationInst {
     if !uniquenessResult.uses.ignoreDebugUses.isEmpty {
       return false
     }
-    guard let endCOW = instance as? EndCOWMutationInst,
-          !endCOW.doKeepUnique else {
-      return false
-    }
-    if endCOW.uses.ignoreDebugUses.contains(where: { $0.instruction != self }) {
+    // The end_cow_mutation instructions are removed below. Therefore all values in the
+    // def-use chain must not have any other uses, which could rely on the buffer being
+    // immutable, e.g. `ref_element_addr [immutable]`.
+    guard visitEndCowMutations(of: instance, singleUseChain: true, context, { ecm in
+      !ecm.doKeepUnique
+    }) else {
       return false
     }
 
-    instanceResult.uses.replaceAll(with: endCOW.instance, context)
+    _ = visitEndCowMutations(of: instance, context) { ecm in
+      ecm.replace(with: ecm.instance, context)
+      return true
+    }
+
+    instanceResult.uses.replaceAll(with: instance, context)
     context.erase(instruction: self)
-    context.erase(instruction: endCOW)
     return true
   }
+}
+
+/// Calls `visit` for all `end_cow_mutation` instructions which define `initialValue`,
+/// either directly or via phi arguments.
+/// Returns false if `initialValue` is not exclusively defined by `end_cow_mutation`
+/// instructions or if `visit` returns false for one of them.
+/// If `singleUseChain` is true, all values in the def-use chain must have a single
+/// (non-debug) use - which is the chain's use itself.
+private func visitEndCowMutations(of initialValue: Value,
+                                  singleUseChain: Bool = false,
+                                  _ context: SimplifyContext,
+                                  _ visit: (EndCOWMutationInst) -> Bool
+) -> Bool {
+  var worklist = ValueWorklist(context)
+  defer { worklist.deinitialize() }
+
+  worklist.pushIfNotVisited(initialValue)
+  while let value = worklist.pop() {
+    if singleUseChain && !value.uses.ignoreDebugUses.isSingleUse {
+      return false
+    }
+    if let ecm = value as? EndCOWMutationInst {
+      guard visit(ecm) else {
+        return false
+      }
+    } else if let phi = Phi(value) {
+      worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+    } else {
+      return false
+    }
+  }
+  return true
 }
 
 private func isEmptyCOWSingleton(_ value: Value) -> Bool {

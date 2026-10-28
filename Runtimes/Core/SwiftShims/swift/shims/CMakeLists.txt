@@ -9,6 +9,7 @@ install(FILES
   KeyPath.h
   LibcOverlayShims.h
   LibcShims.h
+  Metadata.h
   MetadataSections.h
   ObjCShims.h
   Random.h
@@ -23,6 +24,7 @@ install(FILES
   Target.h
   ThreadLocalStorage.h
   Visibility.h
+  _SwiftCOMShims.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
   _SynchronizationShims.h

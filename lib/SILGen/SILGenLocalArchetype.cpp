@@ -17,8 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
-#include "swift/AST/LocalArchetypeRequirementCollector.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILCloner.h"
 

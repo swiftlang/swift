@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/PostfixCompletion.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -21,15 +20,14 @@ using namespace swift;
 using namespace swift::constraints;
 using namespace swift::ide;
 
-bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
-                                                 DeclContext *DC) {
+bool PostfixCompletionCallback::Result::tryMerge(const Result &Other) {
   if (BaseDecl != Other.BaseDecl)
     return false;
 
   // This should match if we are talking about the same BaseDecl.
   assert(BaseIsStaticMetaType == Other.BaseIsStaticMetaType);
 
-  auto baseTy = tryMergeBaseTypeForCompletionLookup(BaseTy, Other.BaseTy, DC);
+  auto baseTy = tryMergeBaseTypeForCompletionLookup(BaseTy, Other.BaseTy);
   if (!baseTy)
     return false;
 
@@ -65,7 +63,7 @@ bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
 
 void PostfixCompletionCallback::addResult(const Result &Res) {
   for (auto idx : indices(Results)) {
-    if (Results[idx].tryMerge(Res, DC))
+    if (Results[idx].tryMerge(Res))
       return;
   }
   Results.push_back(Res);
@@ -259,28 +257,20 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
   CodeCompletionExpr LHS(Loc);
   CodeCompletionExpr RHS(Loc);
 
-  UnresolvedDeclRefExpr UDRE(DeclNameRef(Op->getName()),
-                             getDeclRefKindOfOperator(Op), DeclNameLoc(Loc));
-  DiagnosticTransaction IgnoreDiags(DC->getASTContext().Diags);
-  Expr *OpExpr = resolveDeclRefExpr(&UDRE, DC);
-  IgnoreDiags.abort();
-  if (isa<ErrorExpr>(OpExpr)) {
-    // If we couldn't resolve the operator (e.g. because there is only an
-    // operator definition but no decls that implement it), we can't call the
-    // operator.
-    return {};
-  }
+  UnresolvedDeclRefExpr OpExpr(DeclNameRef(Op->getName()),
+                               getDeclRefKindOfOperator(Op), DeclNameLoc());
 
+  auto &ctx = CS.getASTContext();
   Expr *OpCallExpr;
   switch (Op->getKind()) {
   case DeclKind::PrefixOperator:
     // Don't insert prefix operators in postfix position.
     return {};
   case DeclKind::PostfixOperator:
-    OpCallExpr = PostfixUnaryExpr::create(DC->getASTContext(), OpExpr, &LHS);
+    OpCallExpr = PostfixUnaryExpr::create(ctx, &OpExpr, &LHS);
     break;
   case DeclKind::InfixOperator:
-    OpCallExpr = BinaryExpr::create(DC->getASTContext(), &LHS, OpExpr, &RHS,
+    OpCallExpr = BinaryExpr::create(ctx, &LHS, &OpExpr, &RHS,
                                     /*implicit*/ true);
     break;
   default:

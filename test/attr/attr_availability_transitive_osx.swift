@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library  -parse-stdlib -target arm64-apple-macos11
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 
 struct AlwaysAvailable {}

@@ -12,29 +12,19 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
-#include "swift/Basic/STLExtras.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/FieldSensitivePrunedLiveness.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeBits.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/StackList.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -44,18 +34,10 @@
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/IntervalMap.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/RecyclingAllocator.h"
 
 #include "MoveOnlyBorrowToDestructureUtils.h"
 #include "MoveOnlyDiagnostics.h"
@@ -488,6 +470,33 @@ void MoveOnlyObjectCheckerPImpl::check(
   }
 }
 
+/// A `begin_borrow` of an already-`@guaranteed` value is a redundant nested
+/// borrow. Replace it with its operand.
+///
+/// This mirrors `tryReplaceInnerBorrowScope` from SimplifyBeginBorrow.swift
+static void foldRedundantBeginBorrow(BeginBorrowInst *bbi) {
+  // We must not remove `begin_borrow [lexical]` when preserving debug info,
+  // because it is important for diagnostic passes.
+  if (bbi->isLexical() && bbi->getFunction()->preserveDebugInfo())
+    return;
+
+  // Only fold if every scope-ending use is an end_borrow.
+  BorrowedValue borrowedValue(bbi);
+  if (!borrowedValue.visitLocalScopeEndingUses(
+          [](Operand *use) { return isa<EndBorrowInst>(use->getUser()); })) {
+    return;
+  }
+
+  // Erase the end_borrows.
+  // make_early_inc_range advances past each element before the body runs, so
+  // erasing the current instruction during iteration is safe.
+  for (auto *ebi : llvm::make_early_inc_range(bbi->getEndBorrows())) {
+    ebi->eraseFromParent();
+  }
+  bbi->replaceAllUsesWith(bbi->getOperand());
+  bbi->eraseFromParent();
+}
+
 /// Erase a copy_value operand of MarkUnresolvedNonCopyableValueInst.
 bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
   MarkUnresolvedNonCopyableValueInst *markedInst)
@@ -550,6 +559,16 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
       }
       while (!destroys.empty())
         destroys.pop_back_val()->eraseFromParent();
+
+      // Once the mark is replaced by the guaranteed argument, any begin_borrow
+      // of it becomes a redundant nested borrow; fold those away.
+      auto borrowUsers = markedInst->getUsersOfType<BeginBorrowInst>();
+      SmallVector<BeginBorrowInst *, 2> borrows(borrowUsers.begin(),
+                                                borrowUsers.end());
+      for (auto *bbi : borrows) {
+        foldRedundantBeginBorrow(bbi);
+      }
+
       markedInst->replaceAllUsesWith(replacement);
       markedInst->eraseFromParent();
       cvi->eraseFromParent();

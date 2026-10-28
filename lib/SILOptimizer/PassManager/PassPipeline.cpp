@@ -23,16 +23,11 @@
 
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorOr.h"
@@ -169,6 +164,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly. This relies on the move-only
+  // checker having made every destroy explicit.
+  P.addImplicitDestroyChecker();
+
   // Check no uses after consume operator of a value in an address.
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
@@ -250,6 +250,13 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // OSLogOptimization and MandatoryDeadObjectElimination.
   P.addOnoneSimplification();
 
+  // Create the specialized bodies exported by `@specialized(exported: true)`
+  // before MandatoryPerformanceOptimizations so that
+  // MandatoryPerformanceOptimizations applies to those specialized bodies.
+  if (P.getOptions().EmbeddedSwift) {
+    P.addEmbeddedExportedPrespecializations();
+  }
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
@@ -303,8 +310,10 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
     if (P.getOptions().EnableLifetimeDependenceDiagnostics)
       P.addLifetimeDependenceInsertion();
 
+    P.addMandatoryAllocBoxToStack();
     P.addRemoveSILGenLifetimes();
     P.addLifetimeResolution();
+    P.addLifetimeResolutionDiagnose();
     return P;
   }
 
@@ -564,6 +573,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+  P.addPackTypeElimination();
 
   // Promote stack allocations to values and eliminate redundant
   // loads.
@@ -787,6 +797,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
+  // New specializations miss the earlier SILCombine before LetPropertiesOpt.
+  // Simplify their closure calls before running closure specialization.
+  P.addSILCombine();
   P.addClosureSpecialization();
   P.addDeadDebugVariableElimination();
 
@@ -825,6 +838,8 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
   // Should be after FunctionSignatureOpts and before the last inliner.
+  P.addClassDestroyDevirtualizer(); // currently a no-op in non-OSSA
+  // TODO: remove the ReleaseDevirtualizer once we have OSSA at this place in the pipeline.
   P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
@@ -1110,6 +1125,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Even at Onone it's important to remove copies of structs, especially if they are large.
   P.addMandatoryTempRValueElimination();
+  P.addMandatoryTempLValueElimination();
 
   // If we are asked to stop optimizing before lowering ownership, do so now.
   if (P.Options.StopOptimizationBeforeLoweringOwnership)

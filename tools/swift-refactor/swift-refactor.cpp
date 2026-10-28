@@ -85,7 +85,10 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::AddAsyncAlternative,
                       "add-async-alternative", "Add an async alternative of a function taking a callback"),
            clEnumValN(RefactoringKind::AddAsyncWrapper,
-                      "add-async-wrapper", "Add an async alternative that forwards onto the function taking a callback")));
+                      "add-async-wrapper", "Add an async alternative that forwards onto the function taking a callback"),
+           clEnumValN(RefactoringKind::ExpandDerivedConformance,
+                      "expand-derived-conformance", "Expands the conformance derived using macros")));
+
 
 
 static llvm::cl::opt<std::string>
@@ -142,6 +145,15 @@ Triple("target", llvm::cl::desc("target triple"));
 static llvm::cl::opt<std::string> ResourceDir(
     "resource-dir",
     llvm::cl::desc("The directory that holds the compiler resource files"));
+
+static llvm::cl::list<std::string> LoadPluginLibrary(
+    "load-plugin-library",
+    llvm::cl::desc("Path to a compiler plugin library"));
+
+static llvm::cl::list<std::string> EnableExperimentalFeature(
+    "enable-experimental-feature",
+    llvm::cl::desc("Enable an experimental feature"));
+
 
 enum class DumpType {
   REWRITTEN,
@@ -360,6 +372,17 @@ int main(int argc, char *argv[]) {
 
   if (!options::ResourceDir.empty())
     Invocation.setRuntimeResourcePath(options::ResourceDir);
+
+  for (const auto &path : options::LoadPluginLibrary)
+    Invocation.getSearchPathOptions().PluginSearchOpts.emplace_back(
+        PluginSearchOption::LoadPluginLibrary{path});
+  Invocation.setDefaultInProcessPluginServerPathIfNecessary();
+
+  for (const auto &featureName : options::EnableExperimentalFeature) {
+    auto feature = Feature::getExperimentalFeature(featureName);
+    if (feature)
+      Invocation.getLangOptions().enableFeature(*feature);
+  }
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);

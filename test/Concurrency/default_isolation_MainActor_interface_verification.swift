@@ -177,6 +177,41 @@ public extension Int {
 }
 // CHECK: }
 
+// A @globalActor type conforms to the SendableMetatype-inheriting GlobalActor,
+// so neither it nor its extensions are isolated.
+// CHECK: {{^}}@globalActor public struct SomeGlobalActor {
+@globalActor
+public struct SomeGlobalActor {
+  // CHECK: {{^}}  @_hasMissingDesignatedInitializers public actor MyActor {
+  public actor MyActor {}
+
+  // CHECK: {{^}}  public static let shared: A::SomeGlobalActor.A::MyActor
+  public static let shared = MyActor()
+}
+// CHECK: }
+
+// CHECK: {{^}}extension A::SomeGlobalActor {
+public extension SomeGlobalActor {
+  // CHECK: {{^}}  public static func helper(){{$}}
+  static func helper() {}
+}
+// CHECK: }
+
+// CHECK: {{^}}@globalActor public struct ExplicitConformanceGlobalActor : _Concurrency::GlobalActor {
+@globalActor
+public struct ExplicitConformanceGlobalActor: GlobalActor {
+  // CHECK: {{^}}  public static let shared: A::SomeGlobalActor.A::MyActor
+  public static let shared = SomeGlobalActor.MyActor()
+}
+// CHECK: }
+
+// CHECK: {{^}}extension A::ExplicitConformanceGlobalActor {
+public extension ExplicitConformanceGlobalActor {
+  // CHECK: {{^}}  public static func helper(){{$}}
+  static func helper() {}
+}
+// CHECK: }
+
 //--- Client.swift
 import A
 
@@ -194,4 +229,10 @@ nonisolated func testIsolation() {
   
   _ = C() // expected-warning {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
   _ = C.value // expected-warning {{main actor-isolated class property 'value' can not be referenced from a nonisolated context}}
+
+  _ = SomeGlobalActor.shared // Ok
+  SomeGlobalActor.helper() // Ok
+
+  _ = ExplicitConformanceGlobalActor.shared // Ok
+  ExplicitConformanceGlobalActor.helper() // Ok
 }

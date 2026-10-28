@@ -129,7 +129,9 @@
 #error Masking ISAs are incompatible with opaque ISAs
 #endif
 
-#if defined(__APPLE__) && defined(__LP64__) && __has_include(<malloc_type_private.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+#if defined(__APPLE__) && defined(__LP64__) &&                                 \
+    __has_include(<malloc_type_private.h>) &&                                  \
+    __has_include(<TargetConditionals.h>) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
 # include <TargetConditionals.h>
 # if TARGET_OS_IOS && !TARGET_OS_SIMULATOR
 #  define SWIFT_STDLIB_HAS_MALLOC_TYPE 1
@@ -185,6 +187,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_EXTERN_C
 #endif
 #define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
+
+// Debuggers find these variables by name, and a linked wasm module names a data
+// symbol only if it is exported.
+#if defined(__wasm__)
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name) __attribute__((export_name(#name)))
+#else
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name)
+#endif
 
 // Define mappings for calling conventions.
 
@@ -286,6 +296,24 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_protocol_conformance_descriptor \
   __ptrauth(ptrauth_key_process_independent_data, 1, \
             SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor)
+#define __ptrauth_swift_value_witness_table_pointer \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ValueWitnessTable)
+#define __ptrauth_swift_protocol_witness_table_pointer \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ProtocolWitnessTable)
+// The individual pointer fields of a conformance cache entry's extended
+// storage. These live in process-local heap, so they use the process-dependent
+// data key, address-discriminated against their own slot.
+#define __ptrauth_swift_conformance_cache_storage_protocol \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageProtocol)
+#define __ptrauth_swift_conformance_cache_storage_global_actor_type \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageGlobalActorType)
+#define __ptrauth_swift_conformance_cache_storage_next \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageNext)
 #define __ptrauth_swift_dynamic_replacement_key                                \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::DynamicReplacementKey)
@@ -298,6 +326,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_task_resume_context                                    \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::TaskResumeContext)
+#define __ptrauth_swift_task_next_waiting_task                                 \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TaskNextWaitingTask)
+#define __ptrauth_swift_task_result_type_metadata                              \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TaskResultTypeMetadata)
 #define __ptrauth_swift_async_context_parent                                   \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::AsyncContextParent)
@@ -325,6 +359,10 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
+// This must match __ptrauth_objc_isa_pointer, and EmbeddedHeapObject in
+// EmbeddedShims.h
+#define __ptrauth_swift_heap_object_metadata                                   \
+  __ptrauth(ptrauth_key_process_independent_data, 1, 0x6AE1)
 #define __ptrauth_swift_nonunique_extended_existential_type_shape              \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape)
@@ -347,6 +385,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_is_global_actor_function                               \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::IsCurrentGlobalActorFunction)
+#define __ptrauth_swift_concurrency_hook                                       \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::ConcurrencyHook)
+#define __ptrauth_swift_thread_sanitizer_hook                                   \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::ThreadSanitizerHook)
 
 #if __has_attribute(ptrauth_struct)
 #define swift_ptrauth_struct(key, discriminator)                               \
@@ -365,10 +409,17 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_class_method_pointer(__declkey)
 #define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
 #define __ptrauth_swift_value_witness_function_pointer(__key)
+#define __ptrauth_swift_value_witness_table_pointer
+#define __ptrauth_swift_protocol_witness_table_pointer
+#define __ptrauth_swift_conformance_cache_storage_protocol
+#define __ptrauth_swift_conformance_cache_storage_global_actor_type
+#define __ptrauth_swift_conformance_cache_storage_next
 #define __ptrauth_swift_type_metadata_instantiation_function
 #define __ptrauth_swift_job_invoke_function
 #define __ptrauth_swift_task_resume_function
 #define __ptrauth_swift_task_resume_context
+#define __ptrauth_swift_task_next_waiting_task
+#define __ptrauth_swift_task_result_type_metadata
 #define __ptrauth_swift_async_context_parent
 #define __ptrauth_swift_async_context_resume
 #define __ptrauth_swift_async_context_yield
@@ -378,6 +429,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dispatch_invoke_function
 #define __ptrauth_swift_accessible_function_record
 #define __ptrauth_swift_objc_superclass
+#define __ptrauth_swift_heap_object_metadata
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
@@ -391,6 +443,8 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_type_layout_string
 #define __ptrauth_swift_deinit_work_function
 #define __ptrauth_swift_is_global_actor_function
+#define __ptrauth_swift_concurrency_hook
+#define __ptrauth_swift_thread_sanitizer_hook
 #define swift_ptrauth_struct(key, discriminator)
 #define swift_ptrauth_struct_derived(from)
 #endif
@@ -569,8 +623,39 @@ swift_auth_code(T value, unsigned extra) {
 #endif
 }
 
+/// Authenticate an address-diversified code pointer stored at `address`, and
+/// return it carrying the default C function pointer schema, so it can be
+/// called or assigned to a function pointer.
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_auth_code_address(T value, const void *address, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_function(
+      (void *)value, ptrauth_key_process_independent_code,
+      ptrauth_blend_discriminator(address, extra));
+#else
+  return value;
+#endif
+}
+
+/// Re-sign a code pointer for at-rest storage at `address`. The value must
+/// carry the default C function pointer schema, which is what a function
+/// pointer passed through a void * or uintptr_t still has.
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_sign_code_address(T value, const void *address, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_and_resign(
+      (void *)value, ptrauth_key_function_pointer, 0,
+      ptrauth_key_process_independent_code,
+      ptrauth_blend_discriminator(address, extra));
+#else
+  return value;
+#endif
+}
+
 /// Does this platform support backtrace-on-crash?
-#ifdef __APPLE__
+#if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #  include <TargetConditionals.h>
 #  if TARGET_OS_OSX
 #    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1

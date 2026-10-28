@@ -248,6 +248,106 @@ void LifetimeTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+ScopedTypeAttr::ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
+                               SourceRange parens,
+                               ArrayRef<ScopeRestrictionRepr> restrictions)
+    : SimpleTypeAttr(atLoc, kwLoc, parens) {
+  Bits.ScopedTypeAttr.NumRestrictions = restrictions.size();
+  ASSERT(Bits.ScopedTypeAttr.NumRestrictions == restrictions.size());
+  llvm::uninitialized_copy(restrictions, getTrailingObjects());
+}
+
+ScopedTypeAttr *
+ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc, SourceLoc kwLoc,
+                       SourceRange parens,
+                       ArrayRef<ScopeRestrictionRepr> restrictions) {
+  ASSERT(!restrictions.empty());
+  void *mem =
+      ctx.Allocate(totalSizeToAlloc<ScopeRestrictionRepr>(restrictions.size()),
+                   alignof(ScopedTypeAttr));
+  return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, restrictions);
+}
+
+static void printScopeName(ASTPrinter &printer, Identifier name) {
+  if (name.is("immortal"))
+    printer << "`immortal`";
+  else
+    printer.printName(name, PrintNameContext::Attribute);
+}
+
+static void printScope(ASTPrinter &printer, ScopeRepr scope) {
+  switch (scope.getKind()) {
+  case ScopeRepr::Kind::ScopeName:
+    printScopeName(printer, scope.getScopeName().getIdentifier());
+    return;
+  case ScopeRepr::Kind::AccessedValue:
+    printer << "&";
+    printScopeName(printer, scope.getAccessedValue());
+    return;
+  case ScopeRepr::Kind::Self:
+    printer << "self";
+    return;
+  case ScopeRepr::Kind::AccessedSelf:
+    printer << "&self";
+    return;
+  case ScopeRepr::Kind::Immortal:
+    printer << "immortal";
+    return;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+static void printScopeParams(ASTPrinter &printer,
+                             ArrayRef<Located<ScopeName>> params) {
+  printer.printAttrName("@_scopeParams");
+  printer << "(";
+  interleave(
+      params,
+      [&](Located<ScopeName> param) {
+        printScopeName(printer, param.Item.getIdentifier());
+      },
+      [&] { printer << ", "; });
+  printer << ")";
+}
+
+void ScopedTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_scoped");
+  printer << "(";
+  interleave(
+      getRestrictions(),
+      [&](const ScopeRestrictionRepr &restriction) {
+        if (auto label = restriction.getLabel()) {
+          printer.printName(label->Item.getIdentifier(),
+                            PrintNameContext::Attribute);
+          printer << ": ";
+        }
+
+        printScope(printer, restriction.getScope());
+      },
+      [&] { printer << ", "; });
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void AccessScopeTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_accessScope");
+  printer << "(";
+  printScope(printer, getScope());
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void ScopeParamsTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printScopeParams(printer, getParamList()->getParams());
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 void ConventionTypeAttr::printImpl(ASTPrinter &printer,
                                    const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
@@ -307,19 +407,32 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 }
 
 const char *
-CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
+swift::getExecutionSemanticsAttrSpelling(ExecutionSemantics semantics) {
   switch (semantics) {
-  case CalledTypeAttr::Semantics::Once:
-    return "once";
+  case ExecutionSemantics::AtMostOnce:
+    return "@callable(once)";
+  case ExecutionSemantics::Once:
+    return "@once";
   }
   llvm_unreachable("bad kind");
 }
 
-void CalledTypeAttr::printImpl(ASTPrinter &printer,
-                               const PrintOptions &options) const {
+const DeclAttribute *
+swift::getExecutionSemanticsAttr(const DeclAttributes &attrs,
+                                 const SourceManager &SM) {
+  const DeclAttribute *once = attrs.getAttribute<OnceAttr>();
+  const DeclAttribute *callable = attrs.getAttribute<CallableAttr>();
+  if (!once || !callable)
+    return once ? once : callable;
+  return SM.isBefore(callable->getLocation(), once->getLocation()) ? callable
+                                                                   : once;
+}
+
+void CallableTypeAttr::printImpl(ASTPrinter &printer,
+                                 const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  printer.printAttrName("@called");
-  printer << "(" << getSemanticsName() << ")";
+  printer.printAttrName(
+      getExecutionSemanticsAttrSpelling(ExecutionSemantics::AtMostOnce));
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -917,8 +1030,18 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
           swiftVersionAvailableAttribute.emplace(*semanticAttr);
         else if (semanticAttr->isPackageDescriptionVersionSpecific())
           packageDescriptionVersionAvailableAttribute.emplace(*semanticAttr);
-        else
-          shortAvailableAttributes.push_back(*semanticAttr);
+        else {
+          // Separate attributes can specify the same domain, but a combined
+          // short-form attribute must mention each domain only once. Preserve
+          // the strongest introduction requirement when coalescing them.
+          auto existing = llvm::find_if(shortAvailableAttributes, [&](auto attr) {
+            return attr.getDomain() == semanticAttr->getDomain();
+          });
+          if (existing == shortAvailableAttributes.end())
+            shortAvailableAttributes.push_back(*semanticAttr);
+          else if (existing->getIntroduced() < semanticAttr->getIntroduced())
+            *existing = *semanticAttr;
+        }
 
         continue;
       }
@@ -1100,8 +1223,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
         // If the overridden decl won't be printed, printing override will fail
-        // the build of the interface file.
-        if (!Options.shouldPrint(BD))
+        // the build of the interface file. The exception is a member of an
+        // `@objc @implementation` extension: it's deliberately omitted from
+        // the interface because it's already visible through the imported
+        // Objective-C header, so the override is still resolvable there.
+        auto *overriddenExt = dyn_cast<ExtensionDecl>(BD->getDeclContext());
+        bool overriddenIsObjCImpl =
+            overriddenExt && overriddenExt->isObjCImplementation() &&
+            BD->isObjC();
+        if (!overriddenIsObjCImpl && !Options.shouldPrint(BD))
           return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
@@ -1120,7 +1250,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
             D->getResolvedCustomAttrType(const_cast<CustomAttr *>(attr))) {
       // Print custom attributes only if the attribute decl is accessible.
       // FIXME: rdar://85477478 They should be rejected.
-      if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
+      if (auto attrDecl = type->getNominalDecl()) {
         if (attrDecl->getFormalAccess() < Options.AccessFilter) {
           return false;
         }
@@ -1140,13 +1270,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           return false;
       }
     }
-    break;
-  }
-  case DeclAttrKind::OriginallyDefinedIn: {
-    auto Attr = cast<OriginallyDefinedInAttr>(this);
-    auto Name = D->getDeclContext()->getParentModule()->getName().str();
-    if (Options.IsForSwiftInterface && Attr->getManglingModuleName() == Name)
-      return false;
     break;
   }
   default:
@@ -1326,6 +1449,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::CxxDecl: {
+    auto Attr = cast<CxxDeclAttr>(this);
+    Printer << "@cxx";
+    if (!Attr->Name.empty())
+      Printer << "(" << identifierEscapingIfNeeded(Attr->Name) << ")";
+    break;
+  }
+
   case DeclAttrKind::Expose: {
     Printer.printAttrName("@_expose");
     auto Attr = cast<ExposeAttr>(this);
@@ -1378,6 +1509,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Target: {
+    Printer.printAttrName("@_target");
+    Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
+    break;
+  }
+
   case DeclAttrKind::Diagnose: {
     auto diagnoseAttr = cast<DiagnoseAttr>(this);
     Printer.printAttrName("@diagnose(");
@@ -1410,7 +1547,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Attr->IID.empty()) {
       Printer << "(interface: \"" << Attr->IID << "\")";
     } else if (!Attr->CLSID->empty()) {
-      Printer << "(implementation: " << Attr->CLSID.value() << ", threading: .";
+      Printer << "(implementation: \"" << Attr->CLSID.value()
+              << "\", threading: .";
       switch (Attr->getThreadingModel()) {
       case COMThreadingModel::Single:
         Printer << "single";
@@ -1466,8 +1604,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     Printer << "@" << getAttrName() << "(";
 
-    // The non-underscored @specialize attribute currently does not support
-    // parameters so lets not print them.
+    // The non-underscored @specialized attribute only supports 'exported'.
+    if (attr->isPublic() && attr->isExported())
+      Printer << "exported: true, ";
     if (!attr->isPublic()) {
       auto exported = attr->isExported() ? "true" : "false";
       auto kind = attr->isPartialSpecialization() ? "partial" : "full";
@@ -1855,6 +1994,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ScopeParams:
+    printScopeParams(Printer,
+                     cast<ScopeParamsAttr>(this)->getParamList()->getParams());
+    break;
+
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
     if (!attr->isUnderscored() || Options.SuppressLifetimes) {
@@ -1911,6 +2055,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
+  case DeclAttrKind::Callable:
+    Printer.printAttrName(
+        getExecutionSemanticsAttrSpelling(ExecutionSemantics::AtMostOnce));
+    break;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
@@ -1989,6 +2138,8 @@ StringRef DeclAttribute::getAttrName() const {
     if (cast<CDeclAttr>(this)->Underscored)
       return "_cdecl";
     return "c";
+  case DeclAttrKind::CxxDecl:
+    return "cxx";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:
@@ -2168,11 +2319,12 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
-  case DeclAttrKind::Called:
-    switch (cast<CalledAttr>(this)->getSemantics()) {
-    case ExecutionSemantics::Once:
-      return "called(once)";
-    }
+  case DeclAttrKind::Callable:
+    return "callable(once)";
+  case DeclAttrKind::Target:
+    return "_target";
+  case DeclAttrKind::ScopeParams:
+    return "_scopeParams";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2588,12 +2740,15 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(
+  auto *attr = new (C) AvailableAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
       DomainOrIdentifier, implicit ? SourceLoc() : DomainLoc, getKind(),
       Message, Rename, Introduced, implicit ? SourceRange() : IntroducedRange,
       Deprecated, implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
+  if (!implicit)
+    attr->setMacroLoc(MacroLoc);
+  return attr;
 }
 
 bool AvailableAttr::isEquivalent(const AvailableAttr *other,

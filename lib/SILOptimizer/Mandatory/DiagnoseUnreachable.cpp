@@ -16,9 +16,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -918,7 +916,7 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   if (!SWI)
     return false;
 
-  EnumDecl *ED = SWI->getOperand(0)->getType().getEnumOrBoundGenericEnum();
+  EnumDecl *ED = SWI->getOperand(0)->getType().getEnumDecl();
   assert(ED && "operand is not an enum");
 
   // No need to check the instruction if all elements are available.

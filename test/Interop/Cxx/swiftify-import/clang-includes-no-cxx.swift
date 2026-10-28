@@ -94,7 +94,7 @@
   /*
   expected-cxx-note@-2{{'foo' declared here}}
   expected-cxx-expansion@-3:54{{
-    expected-cxx-error@2:110{{cannot find type 'c1_t' in scope}}
+    expected-cxx-error@2:126{{cannot find type 'c1_t' in scope}}
   }}
   */
 
@@ -109,7 +109,7 @@
   /*
   expected-c-note@-2{{'bar' declared here}}
   expected-c-expansion@-3:54{{
-    expected-c-error@2:110{{cannot find type 'c2_t' in scope}}
+    expected-c-error@2:126{{cannot find type 'c2_t' in scope}}
   }}
   */
 

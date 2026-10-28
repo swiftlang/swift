@@ -22,6 +22,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -174,9 +175,13 @@ bool ConstraintSystem::worseThanBestSolution() const {
     return false;
 
   if (isDebugMode()) {
-    llvm::errs().indent(solverState->getCurrentIndent())
-        << "(solution " << CurrentScore << " is worse than the best solution "
-        << solverState->BestScore <<")\n";
+    auto &log = llvm::errs();
+    log.indent(solverState->getCurrentIndent())
+        << "(solution";
+    CurrentScore.print(log);
+    log << " is worse than the best solution";
+    solverState->BestScore->print(log);
+    log <<")\n";
   }
 
   return true;
@@ -990,10 +995,20 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
           break;
         }
       }
-      auto newExtInfo = funcType->getExtInfo().withRepresentation(
-          AnyFunctionType::Representation::Swift);
+      auto yields = funcType->getYields();
+      SmallVector<AnyFunctionType::Yield, 1> newYields;
+      for (auto yield : yields) {
+        newYields.emplace_back(getStrippedType(yield.getType(), ctx),
+                               yield.getFlags());
+      }
+      auto extInfo = funcType->getExtInfo();
+      auto representation = extInfo.hasContext()
+                                ? AnyFunctionType::Representation::Swift
+                                : AnyFunctionType::Representation::Thin;
+      auto newExtInfo = extInfo.withRepresentation(representation);
       return FunctionType::get(
-          newParams, getStrippedType(funcType->getResult(), ctx), newExtInfo);
+        newParams, newYields,
+        getStrippedType(funcType->getResult(), ctx), newExtInfo);
     }
 
     return std::nullopt;
@@ -1350,9 +1365,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
-              if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
+              if (canConvertTo(cs.CC, resType1, resType2)) {
                 score1 += weight;
-              } else if (TypeChecker::isSubtypeOf(resType2, resType1, cs.DC)) {
+              } else if (canConvertTo(cs.CC, resType2, resType1)) {
                 score2 += weight;
               }
             }
@@ -1557,8 +1572,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     // If either of the types have holes or unresolved type variables, we can't
     // compare them. `isSubtypeOf` cannot be used with solver-allocated types.
-    if (type1->hasTypeVariableOrPlaceholder() ||
-        type2->hasTypeVariableOrPlaceholder()) {
+    if (type1->hasTypeVariableOrHole() || type2->hasTypeVariableOrHole()) {
       identical = false;
       continue;
     }
@@ -1615,14 +1629,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // Post-1.0, we'll need to remove this hack in favor of richer constraint
     // declarations.
     if (!(score1 || score2)) {
-      if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType2 = type2->getNominalDecl()) {
         if ((nominalType2->getName() ==
              cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score2;
         }
       }
 
-      if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
+      if (auto nominalType1 = type1->getNominalDecl()) {
         if ((nominalType1->getName() ==
              cs.getASTContext().Id_OptionalNilComparisonType)) {
           ++score1;

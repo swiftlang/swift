@@ -17,7 +17,6 @@
 #include "GenIntegerLiteral.h"
 
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -45,6 +44,18 @@ public:
                          Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
                             IsTriviallyDestroyable, IsCopyable, IsFixedSize, IsABIAccessible) {}
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();

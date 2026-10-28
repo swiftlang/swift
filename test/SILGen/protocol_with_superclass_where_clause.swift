@@ -271,6 +271,7 @@ func passesRefinedProtocol(_ r: RefinedProto) {
 // CHECK-NEXT:  apply [[FUNC]]([[BASE]]) : $@convention(thin) (@in_guaranteed any BaseProto) -> ()
 // CHECK-NEXT:  destroy_addr [[BASE]] : $*any BaseProto
 // CHECK-NEXT:  dealloc_stack [[BASE]] : $*any BaseProto
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]] : $()
 

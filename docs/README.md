@@ -141,6 +141,12 @@ to ask for help!
   Contains a thorough description of the mapping between C/ObjC entities and
   Swift entities.
 
+## COM Interop
+
+- [COMInterop.md](/docs/COMInterop.md):
+  Describes the Swift source model, existential representation, native object
+  layout, dispatch, metadata, and ABI for COM interoperability.
+
 ## Rationales and Manifestos
 
 - [ABIStabilityManifesto.md](/docs/ABIStabilityManifesto.md):

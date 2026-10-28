@@ -89,6 +89,14 @@ bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_arrayDownCastTestIndirect(OpaqueValue *source,
+                                      const Metadata *targetType,
+                                      const Metadata *sourceValueType,
+                                      const Metadata *targetValueType) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 OpaqueValue *source,
                                 const Metadata *sourceValueType,
@@ -149,7 +157,8 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
                                        OpaqueValue *result,
                                        const Metadata *destinationType) {
-  abort();
+  // The runtime test fixtures do not provide Swift-value boxes to unbox.
+  return false;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL

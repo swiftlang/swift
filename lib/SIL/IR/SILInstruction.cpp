@@ -17,8 +17,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Unicode.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
@@ -34,7 +32,6 @@
 #include "swift/SIL/StackAllocation.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using namespace Lowering;
@@ -363,6 +360,87 @@ bool BorrowedFromInst::isReborrow() const {
     return phi->isReborrow();
   }
   return false;
+}
+
+SubstitutionMap
+OpenPackElementInst::tryGetElementArchetypeSubstitutionMap() const {
+
+  auto env = getOpenedGenericEnvironment();
+
+  // Collect concrete element types for each pack element binding.
+  llvm::SmallDenseMap<CanType, CanType, 4> elementReplacements;
+
+  if (auto *scalarIndex = dyn_cast<ScalarPackIndexInst>(getIndexOperand())) {
+    // If the structural pack index is statically known, we can resolve element
+    // archetypes to concrete types. A structural index always refers to a
+    // scalar pack component; we map each archetype to that component in its
+    // corresponding opened pack.
+    auto index = scalarIndex->getComponentIndex();
+    env->forEachPackElementBinding([&](ElementArchetypeType *elementArchetype,
+                                       PackType *pack) {
+      ASSERT(
+          pack->getNumElements() > index &&
+          !pack->getElementType(index)->is<PackExpansionType>() &&
+          "the opened pack types all have a scalar component at the supplied "
+          "structural index");
+      auto element = pack->getElementType(index);
+      auto interfaceTy =
+          elementArchetype->getInterfaceType()->getCanonicalType();
+      elementReplacements[interfaceTy] = element->getCanonicalType();
+    });
+  } else {
+    // If a structural pack index cannot be determined, we can still eliminate
+    // element archetypes if the opened packs are homogeneous and contain no
+    // expansions, since the same scalar type is stored at every index.
+    bool homogeneousScalar = true;
+    env->forEachPackElementBinding(
+        [&](ElementArchetypeType *elementArchetype, PackType *pack) {
+          if (!homogeneousScalar)
+            return;
+
+          // Treat zero-length packs as non-homogeneous. No code that uses their
+          // elements can run, so there is no reason to substitute them.
+          if (pack->getNumElements() == 0 ||
+              pack->getElementType(0)->is<PackExpansionType>()) {
+            homogeneousScalar = false;
+            return;
+          }
+
+          // Check if the rest of the elements are equal to the first. We know
+          // the first element is scalar, so this catches pack expansions as
+          // well as mismatched scalar types.
+          auto firstElement = pack->getElementType(0)->getCanonicalType();
+          for (unsigned i = 1; i < pack->getNumElements(); i++) {
+            if (firstElement != pack->getElementType(i)->getCanonicalType()) {
+              homogeneousScalar = false;
+              return;
+            }
+          }
+          // The pack is homogeneous and contains only scalar elements.
+          elementReplacements[elementArchetype->getInterfaceType()
+                                  ->getCanonicalType()] = firstElement;
+        });
+    if (!homogeneousScalar)
+      return SubstitutionMap();
+  }
+
+  // Build a SubstitutionMap for the full opened element signature that
+  // maps outer params via the environment's outer substitutions and element
+  // params to concrete types.
+  auto genericSig = env->getGenericSignature();
+  auto outerSubs = env->getOuterSubstitutions();
+  auto subsMap = SubstitutionMap::get(
+      genericSig,
+      [&](SubstitutableType *type) -> swift::Type {
+        auto *gp = cast<GenericTypeParamType>(type);
+        auto canGP = gp->getCanonicalType();
+        auto it = elementReplacements.find(canGP);
+        if (it != elementReplacements.end())
+          return it->second;
+        return swift::Type(type).subst(outerSubs);
+      },
+      LookUpConformanceInModule());
+  return subsMap;
 }
 
 namespace {
@@ -806,7 +884,7 @@ namespace {
     }
 
     bool visitRawPointerToRefInst(RawPointerToRefInst *RHS) {
-      return true;
+      return cast<RawPointerToRefInst>(LHS)->isImmortal() == RHS->isImmortal();
     }
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
@@ -902,6 +980,13 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitCOMMethodInst(COMMethodInst *RHS) {
+      auto *X = cast<COMMethodInst>(LHS);
+      return X->getMember() == RHS->getMember() &&
+             X->getOperand() == RHS->getOperand() &&
+             X->getType() == RHS->getType();
+    }
+
     bool visitObjCSuperMethodInst(ObjCSuperMethodInst *RHS) {
       auto *X = cast<ObjCSuperMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
@@ -929,6 +1014,10 @@ namespace {
     }
 
     bool visitOpenExistentialRefInst(const OpenExistentialRefInst *RHS) {
+      return true;
+    }
+
+    bool visitOpenCOMExistentialInst(const OpenCOMExistentialInst *RHS) {
       return true;
     }
 
@@ -1059,6 +1148,10 @@ unsigned Operand::getOperandNumber() const {
 }
 
 MemoryBehavior SILInstruction::getMemoryBehavior() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return MemoryBehavior::MayHaveSideEffects;
+  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
@@ -1082,16 +1175,22 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       auto &IAttrs = IInfo.getOrCreateFnAttributes(getModule().getASTContext());
       auto MemEffects = IAttrs.getMemoryEffects();
+      if (!IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
+        return MemoryBehavior::MayHaveSideEffects;
+      // Read-none? Note that this must be checked first, because
+      // `onlyReadsMemory` is also true for read-none.
+      if (MemEffects.doesNotAccessMemory())
+        return MemoryBehavior::None;
       // Read-only.
-      if (MemEffects.onlyReadsMemory() &&
-          IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
+      if (MemEffects.onlyReadsMemory())
         return MemoryBehavior::MayRead;
-      // Read-none?
-      return MemEffects.doesNotAccessMemory() &&
-                     IAttrs.hasAttribute(llvm::Attribute::NoUnwind)
-                 ? MemoryBehavior::None
-                 : MemoryBehavior::MayHaveSideEffects;
+      return MemoryBehavior::MayHaveSideEffects;
     }
+  }
+
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastInst>(this)) {
+    if (!cast->preservesOwnership())
+      return MemoryBehavior::MayHaveSideEffects;
   }
 
   // Handle full apply sites that have a resolvable callee function with an
@@ -1185,6 +1284,10 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 bool SILInstruction::mayRelease() const {
+  if (auto *metatype = dyn_cast<ExistentialMetatypeInst>(this)) {
+    if (metatype->getOperand()->getType().getASTType().isCOMExistentialType())
+      return true;
+  }
   // Overrule a "DoesNotRelease" of dynamic casts. If a dynamic cast is not
   // RC identity preserving it can release it's source (in some cases - we are
   // conservative here).
@@ -1635,6 +1738,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
+      isa<OpenCOMExistentialInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) ||
       isa<OpenExistentialBoxInst>(this) ||
@@ -1931,6 +2035,7 @@ void SILInstruction::forEachDefinedLocalEnvironment(
   }
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialAddrInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialRefInst)
+  SINGLE_VALUE_SINGLE_OPEN(OpenCOMExistentialInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialBoxValueInst)
   SINGLE_VALUE_SINGLE_OPEN(OpenExistentialMetatypeInst)
@@ -2099,6 +2204,15 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
+
+      // An at-most-once closure's context is consumed directly by the
+      // `apply`/`try_apply` its passed to.
+      if (hasCalledAtMostOnceSemantics() &&
+          isa<ApplyInst, TryApplyInst>(use->getUser())) {
+        liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
+        continue;
+      }
+
       auto forward = ForwardingOperand(use);
       if (!forward) {
         // There shouldn't be any non-forwarding consumptions of a nonescaping
@@ -2137,11 +2251,25 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   liveness.computeBoundary(boundary);
 
   for (auto *inst : boundary.lastUsers) {
-    // Only destroy_values were added to liveness, so only destroy_values can be
-    // the last users.
-    auto *dvi = cast<DestroyValueInst>(inst);
-    auto keepGoing = func(&dvi->getOperandRef());
-    if (!keepGoing) {
+    Operand *consumingOperand = nullptr;
+    // Non-at-most-once values end their lifetime only at
+    // `destroy_value`.
+    if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
+      consumingOperand = &dvi->getOperandRef();
+    } else if (hasCalledAtMostOnceSemantics()) {
+      // at-most-once is consumed by an apply, look up the operand
+      // where it appears.
+      for (auto &operand : inst->getAllOperands()) {
+        if (operand.isConsuming() && lookThroughOwnershipAndForwardingInsts(
+                                         operand.get()) == SILValue(this)) {
+          consumingOperand = &operand;
+          break;
+        }
+      }
+    }
+
+    ASSERT(consumingOperand && "found no consuming operand?!");
+    if (!func(consumingOperand)) {
       return false;
     }
   }
@@ -2403,3 +2531,12 @@ ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeDeclRef() const;
 #include "swift/SIL/SILNodes.def"
 
 #endif
+
+namespace swift::test {
+static FunctionTest InstructionsIdentical(
+    "instructions-identical", [](auto &function, auto &arguments, auto &test) {
+      auto *lhs = arguments.takeInstruction();
+      auto *rhs = arguments.takeInstruction();
+      llvm::outs() << (lhs->isIdenticalTo(rhs) ? "true" : "false") << '\n';
+    });
+} // namespace swift::test

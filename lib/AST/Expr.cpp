@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
@@ -23,7 +24,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
@@ -33,7 +33,6 @@
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -109,7 +108,12 @@ namespace {
 } // end anonymous namespace
 
 void Expr::setType(Type T) {
-  assert(!T || !T->hasTypeVariable() || !T->hasPlaceholder());
+  if (T) {
+    // TypeJoinExpr is only present during solving and so can use type variables
+    ASSERT(isa<TypeJoinExpr>(this) || !T->hasTypeVariableOrHole());
+    // TypeExprs can have placeholder types, they get opened in CSGen.
+    ASSERT(isa<TypeExpr>(this) || !T->hasPlaceholder());
+  }
   Ty = T;
 }
 
@@ -1628,6 +1632,9 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
                             skipFunctionConversions);
   }
 
+  if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return getCalledValue(DSBI->getRHS(), skipFunctionConversions);
+
   Expr *E2 = E->getValueProvidingExpr();
 
   if (auto *L = dyn_cast<LoadExpr>(E2))
@@ -2110,8 +2117,8 @@ bool AbstractClosureExpr::isBodyAsync() const {
   return getOrComputeExtInfo(this).isAsync();
 }
 
-bool AbstractClosureExpr::isCalledOnce() const {
-  return getOrComputeExtInfo(this).isCalledOnce();
+bool AbstractClosureExpr::hasCalledAtMostOnceSemantics() const {
+  return getOrComputeExtInfo(this).hasCalledAtMostOnceSemantics();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
@@ -2197,7 +2204,7 @@ Type ClosureExpr::getExplicitThrownType() const {
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
-  assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
+  assert(ty && !ty->hasTypeVariableOrHole() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
 }
@@ -2545,7 +2552,7 @@ std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   return std::nullopt;
 }
 
-BoundGenericType *KeyPathExpr::getKeyPathType() const {
+NominalType *KeyPathExpr::getKeyPathType() const {
   auto type = getType();
   if (!type)
     return nullptr;
@@ -2559,7 +2566,7 @@ BoundGenericType *KeyPathExpr::getKeyPathType() const {
            type->isReferenceWritableKeyPath());
   }
 
-  return type->castTo<BoundGenericType>();
+  return type->castTo<NominalType>();
 }
 
 Type KeyPathExpr::getRootType() const {
@@ -3079,6 +3086,10 @@ const Expr *Expr::findOriginalValue() const {
 Type Expr::findOriginalType() const {
   auto *expr = findOriginalValue();
   return expr->getType()->getRValueType();
+}
+
+bool Expr::isFromSyntheticMacroExpansion(const DeclContext *DC) const {
+  return ::isFromSyntheticMacroExpansion(DC->getParentModule(), getStartLoc());
 }
 
 ThrownErrorDestination

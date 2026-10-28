@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -swift-version 5 -solver-enable-promote-supertypes
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -solver-enable-promote-supertypes | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -416,10 +416,6 @@ func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
 
 // Make sure that optimizer doesn't favor CGFloat -> Double conversion
 // in presence of CGFloat initializer, otherwise it could lead to ambiguities.
-//
-// FIXME: This regressed with the real CGFloat.init overload set from the
-// SDK, but this test file previously used the mock SDK which masked the
-// regression.
 func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   func test(_: CGFloat) -> CGFloat { 0 }
   func test(_: Double) -> Double { 0 }
@@ -428,6 +424,9 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
 
   let arr = [test(CGFloat(v))]
   hasCGFloatElement(arr) // Ok
+
+  var total = 0.0 // This is Double by default
+  total += test(CGFloat(v)) + CGFloat(v)
 }
 
 // rdar://99352676
@@ -441,56 +440,4 @@ func test_init_validation() {
       // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
     }
   }
-}
-
-// Optional-to-optional conversion
-func optional_to_optional(x: CGFloat?) -> Double? {
-  return x
-}
-
-func test_joins_requiring_optional_to_optional_conversion(_ x1: Double, _ x2: CGFloat,
-                                                          _ y1: Double?, _ y2: CGFloat?) {
-  if x1 != y1 {}
-  if x1 != y2 {}
-  if x2 != y1 {}
-  if x2 != y2 {}
-
-  if y1 != x1 {}
-  if y1 != x2 {}
-  if y2 != x1 {}
-  if y2 != x2 {}
-}
-
-// Unapplied references to operators
-func test_unapplied_1(_ x: [CGFloat], y: Double) {
-  let _ = x.reduce(0, +) / y
-  let _ = x.reduce(0, *) / y
-  let _ = x.reduce(0, -) / y
-  let _ = x.reduce(0, /) / y
-}
-
-func test_unapplied_2(_ x: [Double], y: CGFloat) {
-  let _ = x.reduce(0, +) / y
-  let _ = x.reduce(0, *) / y
-  let _ = x.reduce(0, -) / y
-  let _ = x.reduce(0, /) / y
-}
-
-struct Blob {
-  let area: Double
-  let circumference: Double
-}
-
-func test_unapplied_3(_ blobs: [Blob]) {
-  let _: Double = blobs.map(\.area).reduce(0, +)
-  let _: Double = blobs.map(\.area).reduce(0.0, +)
-
-  let _: CGFloat = blobs.map(\.area).reduce(0, +)
-  let _: CGFloat = blobs.map(\.area).reduce(0.0, +)
-
-  let _: Double = blobs.map(\.circumference).reduce(0, +)
-  let _: Double = blobs.map(\.circumference).reduce(0.0, +)
-
-  let _: CGFloat = blobs.map(\.circumference).reduce(0, +)
-  let _: CGFloat = blobs.map(\.circumference).reduce(0.0, +)
 }

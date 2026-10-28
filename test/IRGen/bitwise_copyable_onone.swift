@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend                           \
 // RUN:     -primary-file %s                             \
 // RUN:     -emit-ir                                     \
-// RUN:     -disable-availability-checking               \
 // RUN:     -enable-builtin-module                       \
 // RUN: |                                                \
 // RUN: %FileCheck %s

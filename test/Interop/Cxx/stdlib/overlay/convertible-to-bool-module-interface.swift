@@ -65,3 +65,9 @@
 
 // CHECK: struct ProtectedUsingBoolBox {
 // CHECK: }
+
+// CHECK: struct NonCopyableBoolBox : ~Copyable, CxxConvertibleToBool {
+// CHECK: }
+
+// CHECK: struct NonEscapableBoolBox : ~Escapable, CxxConvertibleToBool {
+// CHECK: }

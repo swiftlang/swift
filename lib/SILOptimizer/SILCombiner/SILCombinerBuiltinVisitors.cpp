@@ -13,20 +13,14 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
@@ -783,8 +777,8 @@ SILInstruction *SILCombiner::legacyVisitBuiltinInst(BuiltinInst *I) {
     return optimizeBuiltinCompareEq(I, /*Negate Eq result*/ true);
 
   // Optimize sub(ptrtoint(index_raw_pointer(v, x)), ptrtoint(v)) -> x.
-  BuiltinInst *Bytes2;
-  IndexRawPointerInst *Indexraw;
+  BuiltinInst *Bytes2 = nullptr;
+  IndexRawPointerInst *Indexraw = nullptr;
   if (I->getNumOperands() == 2 &&
       match(I, m_BuiltinInst(BuiltinValueKind::Sub,
                              m_BuiltinInst(BuiltinValueKind::PtrToInt,

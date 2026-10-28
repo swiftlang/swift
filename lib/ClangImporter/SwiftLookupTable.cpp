@@ -18,8 +18,9 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/ParseDeclName.h"
@@ -39,6 +40,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include <memory>
 
 using namespace swift;
 using namespace importer;
@@ -70,6 +72,41 @@ namespace {
 
   using SerializedGlobalsAsMembersIndex =
     llvm::OnDiskIterableChainedHashTable<GlobalsAsMembersTableReaderInfo>;
+
+  using Counters = UnifiedStatsReporter::AlwaysOnFrontendCounters;
+  using Counter = int64_t Counters::*;
+
+  /// Add \p amount to the given frontend counter, if stats are being collected.
+  void bumpCounter(ASTContext &swiftCtx, Counter counter, int64_t amount = 1) {
+    if (auto *Stats = swiftCtx.Stats)
+      Stats->getFrontendCounters().*counter += amount;
+  }
+
+  /// If stats are enabled, times a region and adds the elapsed process time
+  /// (microseconds) to a lookup-table timing counter.
+  struct CumulativeTimer {
+    UnifiedStatsReporter *Stats;
+    Counter counter;
+    llvm::TimeRecord startTime;
+
+    CumulativeTimer(UnifiedStatsReporter *Stats, Counter counter)
+        : Stats{Stats}, counter{counter} {
+      if (Stats)
+        startTime = llvm::TimeRecord::getCurrentTime();
+    }
+    ~CumulativeTimer() {
+      if (!Stats)
+        return;
+      auto endTime = llvm::TimeRecord::getCurrentTime();
+      Stats->getFrontendCounters().*counter +=
+          (endTime.getWallTime() - startTime.getWallTime()) * 1e6;
+    }
+
+    CumulativeTimer(const CumulativeTimer &) = delete;
+    CumulativeTimer &operator=(const CumulativeTimer &) = delete;
+    CumulativeTimer(CumulativeTimer &&) = delete;
+    CumulativeTimer &operator=(CumulativeTimer &&) = delete;
+  };
 } // end anonymous namespace
 
 namespace swift {
@@ -81,18 +118,14 @@ class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   importer::ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
-  ClangImporter::Implementation *importerImpl;
-
 public:
   SwiftLookupTableWriter(
       clang::ModuleFileExtension *extension, clang::ASTWriter &writer,
       ASTContext &ctx,
       importer::ClangSourceBufferImporter &buffersForDiagnostics,
-      const PlatformAvailability &avail,
-      ClangImporter::Implementation *importerImpl)
+      const PlatformAvailability &avail)
       : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        importerImpl(importerImpl) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -406,6 +439,8 @@ bool SwiftLookupTable::resolveUnresolvedEntries(
   // the end, so that the loop can detect that nothing changed and
   // return a failure.
   while (true) {
+    bumpCounter(SwiftCtx, &Counters::LookupTableResolvePasses);
+
     // Take the list of unresolved entries to process.
     auto prevNumUnresolvedEntries = UnresolvedEntries.size();
     auto currentUnresolved = std::move(UnresolvedEntries);
@@ -482,11 +517,19 @@ bool SwiftLookupTable::addLocalEntry(
   auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
   auto moduleMacro = newEntry.dyn_cast<clang::ModuleMacro *>();
 
+  int64_t declComparisons = 0;
+  SWIFT_DEFER {
+    bumpCounter(SwiftCtx, &Counters::LookupTableDuplicateCheckComparisons,
+                declComparisons);
+  };
+
   for (auto &existingEntry : entries) {
     // If it matches an existing declaration, there's nothing to do.
-    if (decl && existingEntry.isDeclEntry() &&
-        matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
-      return false;
+    if (decl && existingEntry.isDeclEntry()) {
+      ++declComparisons;
+      if (matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
+        return false;
+    }
 
     // If a textual macro matches an existing macro, just drop the new
     // definition.
@@ -550,10 +593,12 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
     // We might be able to resolve this later.
     if (isa<clang::NamedDecl *>(newEntry)) {
       UnresolvedEntries.emplace_back(name, newEntry, effectiveContext);
+      bumpCounter(SwiftCtx, &Counters::LookupTableDeferredEntries);
     }
-
     return;
   }
+
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesAdded);
 
   auto updateTableWithEntry = [this](SingleEntry newEntry, StoredContext context,
                                      TableType::value_type::second_type &entries){
@@ -645,6 +690,7 @@ SwiftLookupTable::lookup(SerializedSwiftName baseName,
   if (known == LookupTable.end()) return result;
 
   // Walk each of the entries.
+  int64_t mapped = 0;
   for (auto &entry : known->second) {
     // If we're looking in a particular context and it doesn't match the
     // entry context, we're done.
@@ -652,11 +698,13 @@ SwiftLookupTable::lookup(SerializedSwiftName baseName,
       continue;
 
     // Map each of the declarations.
+    mapped += entry.DeclsOrMacros.size();
     for (auto &stored : entry.DeclsOrMacros)
       if (auto entry = mapStored(stored))
         result.push_back(entry);
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, mapped);
   return result;
 }
 
@@ -674,6 +722,7 @@ SwiftLookupTable::lookupGlobalsAsMembersImpl(
 
 
   // Walk each of the entries.
+  int64_t mapped = 0;
   for (auto &entry : known->second) {
     // If we're looking in a particular context and it doesn't match the
     // entry context, we're done.
@@ -681,11 +730,13 @@ SwiftLookupTable::lookupGlobalsAsMembersImpl(
       continue;
 
     // Map each of the declarations.
+    mapped += entry.DeclsOrMacros.size();
     for (auto &stored : entry.DeclsOrMacros)
       if (auto entry = mapStored(stored))
         result.push_back(entry);
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, mapped);
   return result;
 }
 
@@ -715,6 +766,7 @@ SwiftLookupTable::allGlobalsAsMembersInContext(StoredContext context) {
     result.push_back(mapStored(entry));
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, result.size());
   return result;
 }
 
@@ -763,6 +815,7 @@ SwiftLookupTable::allGlobalsAsMembers() {
     for (auto &entry : GlobalsAsMembersIndex[context])
       results.push_back(mapStored(entry));
   }
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, results.size());
   return results;
 }
 
@@ -824,6 +877,7 @@ SwiftLookupTable::lookupObjCMembers(SerializedSwiftName baseName) {
     }
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, result.size());
   return result;
 }
 
@@ -853,6 +907,7 @@ SwiftLookupTable::lookupMemberOperators(SerializedSwiftName baseName) {
     }
   }
 
+  bumpCounter(SwiftCtx, &Counters::LookupTableEntriesMapped, result.size());
   return result;
 }
 
@@ -1307,10 +1362,12 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
-  NameImporter nameImporter(swiftCtx, availability, sema, importerImpl);
+  auto Timer = CumulativeTimer(swiftCtx.Stats,
+                               &Counters::LookupTableWriteCumulativeUsec);
+  NameImporter nameImporter(swiftCtx, availability, sema);
 
   // Populate the lookup table.
-  SwiftLookupTable table(nullptr);
+  SwiftLookupTable table(nullptr, swiftCtx);
   populateTable(table, nameImporter);
 
   SmallVector<uint64_t, 64> ScratchRecord;
@@ -1320,6 +1377,9 @@ void SwiftLookupTableWriter::writeExtensionContents(
   for (const auto &entry : table.LookupTable)
     baseNames.push_back(entry.first);
   llvm::array_pod_sort(baseNames.begin(), baseNames.end());
+
+  bumpCounter(swiftCtx, &Counters::LookupTableDistinctBaseNames,
+              baseNames.size());
 
   // Form the mapping from base names to entities with their context.
   {
@@ -1566,15 +1626,10 @@ namespace {
 
 } // end anonymous namespace
 
-clang::NamedDecl *SwiftLookupTable::mapStoredDecl(StoredSingleEntry &entry) {
-  assert(entry.isDeclEntry() && "Not a declaration entry");
-
-  // If we have an AST node here, just cast it.
-  if (entry.isASTNodeEntry()) {
-    return static_cast<clang::NamedDecl *>(entry.getASTNode());
-  }
-
-  // Otherwise, resolve the declaration.
+clang::NamedDecl *
+SwiftLookupTable::resolveStoredDecl(StoredSingleEntry &entry) {
+  assert(entry.isSerializationIDEntry() && "Already resolved");
+  bumpCounter(SwiftCtx, &Counters::LookupTableDeclResolved);
   assert(Reader && "Cannot resolve the declaration without a reader");
   auto declID = entry.getSerializationID();
   auto localID = clang::LocalDeclID::get(Reader->getASTReader(),
@@ -1883,13 +1938,18 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                      clang::NamedDecl *named,
                                      NameImporter &nameImporter) {
   auto &clangContext = nameImporter.getClangContext();
+  auto &swiftCtx = nameImporter.getContext();
   clang::PrettyStackTraceDecl trace(
       named, named->getLocation(), clangContext.getSourceManager(),
       "while adding SwiftName lookup table entries for clang declaration");
 
+  bumpCounter(swiftCtx, &Counters::LookupTableDeclsVisited);
+
   // Determine whether this declaration is suppressed in Swift.
-  if (shouldSuppressDeclImport(named))
+  if (shouldSuppressDeclImport(named)) {
+    bumpCounter(swiftCtx, &Counters::LookupTableDeclsSuppressed);
     return;
+  }
 
   // Leave incomplete struct/enum/union types out of the table, unless they
   // are types that will be imported as reference types (e.g., CF types or
@@ -1904,6 +1964,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
         !tagDecl->getDefinition() &&
         !(isa<clang::RecordDecl>(tagDecl) &&
           hasImportReferenceAttr(cast<clang::RecordDecl>(tagDecl)))) {
+      bumpCounter(swiftCtx, &Counters::LookupTableDeclsSuppressed);
       return;
     }
   }
@@ -1915,13 +1976,14 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       [&](ImportedName importedName, ImportNameVersion version) {
         table.addEntry(importedName.getDeclName(), named,
                        importedName.getEffectiveContext());
+        bumpCounter(swiftCtx, &Counters::LookupTableDeclNameVariantsAdded);
 
         // In C, enumerators of an unscoped enum nested in a record were
         // historically reachable as top-level names. The primary entry above
         // now files them under the enclosing record (matching C++), so add a
         // second TU-context entry pointing at the same Clang decl that can be
         // found by unqualified lookup.
-        if (!nameImporter.getContext().LangOpts.EnableCXXInterop) {
+        if (!swiftCtx.LangOpts.EnableCXXInterop) {
           if (auto *ecd = dyn_cast<clang::EnumConstantDecl>(named)) {
             if (auto *ed = dyn_cast<clang::EnumDecl>(ecd->getDeclContext());
                 ed && !ed->isScoped() &&
@@ -1929,25 +1991,29 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
               auto *TU = ed->getASTContext().getTranslationUnitDecl();
               table.addEntry(importedName.getDeclName(), named,
                              EffectiveClangContext(TU));
+              bumpCounter(swiftCtx,
+                          &Counters::LookupTableDeclNameVariantsAdded);
             }
           }
         }
 
         // Also add the subscript entry, if needed.
         if (version == currentVersion && importedName.isSubscriptAccessor()) {
-          table.addEntry(DeclName(nameImporter.getContext(),
-                                  DeclBaseName::createSubscript(),
+          table.addEntry(DeclName(swiftCtx, DeclBaseName::createSubscript(),
                                   {Identifier()}),
                          named, importedName.getEffectiveContext());
+          bumpCounter(swiftCtx, &Counters::LookupTableDeclNameVariantsAdded);
         }
 
         if (auto swiftNameAttr = named->getAttr<clang::SwiftNameAttr>()) {
           auto parsedDeclName = parseDeclName(swiftNameAttr->getName());
-          auto swiftDeclName =
-              parsedDeclName.formDeclName(nameImporter.getContext());
-          if (importedName.getDeclName() != swiftDeclName)
+          auto swiftDeclName = parsedDeclName.formDeclName(swiftCtx);
+          if (importedName.getDeclName() != swiftDeclName) {
             table.addEntry(swiftDeclName, named,
                            importedName.getEffectiveContext());
+            bumpCounter(swiftCtx, &Counters::LookupTableDeclNameVariantsAdded);
+            bumpCounter(swiftCtx, &Counters::LookupTableDeclCustomNamesAdded);
+          }
         }
 
         return true;
@@ -1978,6 +2044,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
         if (existingEntries.empty()) {
           table.addEntry(name.getDeclName(), specializationDecl,
                          name.getEffectiveContext());
+          bumpCounter(swiftCtx,
+                      &Counters::LookupTableTemplateSpecializationsAdded);
         }
       };
   if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(named)) {
@@ -2031,6 +2099,8 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
           if (auto def = recordDecl->getDefinition())
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
+        bumpCounter(swiftCtx,
+                    &Counters::ClangNamespaceMembersAddedToLookupTable);
       }
     }
   }
@@ -2054,6 +2124,7 @@ getExplicitParentModule(const clang::Module *module) {
 
 void importer::addMacrosToLookupTable(SwiftLookupTable &table,
                                       NameImporter &nameImporter) {
+  auto &swiftCtx = nameImporter.getContext();
   auto &pp = nameImporter.getClangPreprocessor();
   auto *tu = nameImporter.getClangContext().getTranslationUnitDecl();
   bool isModule = pp.getLangOpts().isCompilingModule();
@@ -2094,6 +2165,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
           table.addEntry(entryName, moduleMacro, tu);
         else
           table.addEntry(entryName, info, tu);
+        bumpCounter(swiftCtx, &Counters::LookupTableMacrosAdded);
       };
 
       addEntry(name);
@@ -2149,6 +2221,8 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
 void importer::finalizeLookupTable(
     SwiftLookupTable &table, NameImporter &nameImporter,
     ClangSourceBufferImporter &buffersForDiagnostics) {
+  auto Timer = CumulativeTimer(nameImporter.getContext().Stats,
+                               &Counters::LookupTableFinalizeCumulativeUsec);
   // Resolve any unresolved entries.
   SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
   if (table.resolveUnresolvedEntries(unresolved)) {
@@ -2190,9 +2264,13 @@ void importer::finalizeLookupTable(
 void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
                                                    NameImporter &nameImporter,
                                                    clang::Decl *decl) {
+  bumpCounter(swiftCtx, &Counters::LookupTableTopLevelDeclsVisited);
+
   // Skip anything from an AST file.
-  if (decl->isFromASTFile())
+  if (decl->isFromASTFile()) {
+    bumpCounter(swiftCtx, &Counters::LookupTableTopLevelDeclsSkipped);
     return;
+  }
 
   // Exclude a predefined declaration that's not a definition if its
   // definition exists in the same module so that the definition will
@@ -2202,8 +2280,10 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
   // which would cause a type not found error.
   if (Writer.isDeclPredefined(decl))
     if (auto tagDecl = dyn_cast<clang::TagDecl>(decl))
-      if (!tagDecl->isThisDeclarationADefinition() && tagDecl->getDefinition())
+      if (!tagDecl->isThisDeclarationADefinition() && tagDecl->getDefinition()) {
+        bumpCounter(swiftCtx, &Counters::LookupTableTopLevelDeclsSkipped);
         return;
+      }
 
   // Iterate into extern "C" {} type declarations.
   if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
@@ -2215,8 +2295,10 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
   // Skip non-named declarations.
   auto named = dyn_cast<clang::NamedDecl>(decl);
-  if (!named)
+  if (!named) {
+    bumpCounter(swiftCtx, &Counters::LookupTableTopLevelDeclsSkipped);
     return;
+  }
 
   // Add this entry to the lookup table.
   addEntryToLookupTable(table, named, nameImporter);
@@ -2224,6 +2306,8 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
 
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
                                            NameImporter &nameImporter) {
+  auto Timer = CumulativeTimer(swiftCtx.Stats,
+                               &Counters::LookupTablePopulateCumulativeUsec);
   auto &sema = nameImporter.getClangSema();
   for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
     populateTableWithDecl(table, nameImporter, decl);
@@ -2238,9 +2322,8 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
-  return std::make_unique<SwiftLookupTableWriter>(this, writer, swiftCtx,
-                                                  buffersForDiagnostics,
-                                                  availability, importerImpl);
+  return std::make_unique<SwiftLookupTableWriter>(
+      this, writer, swiftCtx, buffersForDiagnostics, availability);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>
@@ -2273,12 +2356,17 @@ SwiftNameLookupExtension::createExtensionReader(
   }
 
   // Create the reader.
-  auto tableReader = SwiftLookupTableReader::create(this, reader, mod, onRemove,
-                                                    stream);
+  std::unique_ptr<SwiftLookupTableReader> tableReader;
+  {
+    auto Timer = CumulativeTimer(
+        swiftCtx.Stats, &Counters::LookupTableDeserializeCumulativeUsec);
+    tableReader =
+        SwiftLookupTableReader::create(this, reader, mod, onRemove, stream);
+  }
   if (!tableReader) return nullptr;
 
   // Create the lookup table.
-  target->reset(new SwiftLookupTable(tableReader.get()));
+  target->reset(new SwiftLookupTable(tableReader.get(), swiftCtx));
 
   // Return the new reader.
   return tableReader;

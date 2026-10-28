@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-cross-import-overlays
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ParserASTGen -enable-cross-import-overlays
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // REQUIRES: swift_feature_ParserASTGen
 
 import ModuleSelectorTestingKit

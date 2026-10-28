@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-emit-sil -disable-availability-checking -verify %s
+// RUN: %target-swift-emit-sil -target %target-swift-5.1-abi-triple -verify %s
 
 // rdar://88120984
 

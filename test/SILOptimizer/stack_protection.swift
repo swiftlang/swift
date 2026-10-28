@@ -53,6 +53,89 @@ public func onlyLoads(value: Int) -> Int {
   }
 }
 
+// CHECK-LABEL: sil @$s4test17onlyLoadsAtOffset5values5UInt8VSi_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test17onlyLoadsAtOffset5values5UInt8VSi_tF'
+public func onlyLoadsAtOffset(value: Int) -> UInt8 {
+  withUnsafeBytes(of: value) { $0[1] }
+}
+
+// CHECK-LABEL: sil @$s4test17onlyLoadsAllBytes5values5UInt8VSi_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test17onlyLoadsAllBytes5values5UInt8VSi_tF'
+public func onlyLoadsAllBytes(value: Int) -> UInt8 {
+  withUnsafeBytes(of: value) { buf in
+    var sum: UInt8 = 0
+    for i in 0..<buf.count { sum = sum &+ buf[i] }
+    return sum
+  }
+}
+
+// CHECK-LABEL: sil @$s4test18onlyLoadsSomeBytes5values5UInt8VSi_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test18onlyLoadsSomeBytes5values5UInt8VSi_tF'
+public func onlyLoadsSomeBytes(value: Int) -> UInt8 {
+  withUnsafeBytes(of: value) { buf in
+    var sum: UInt8 = 0
+    for i in 1..<3 { sum = sum &+ buf[i] }
+    return sum
+  }
+}
+
+// CHECK-LABEL: sil [stack_protection] @$s4test13storeAtOffset5valueS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test13storeAtOffset5valueS2i_tF'
+public func storeAtOffset(value: Int) -> Int {
+  var x = value
+  withUnsafeMutableBytes(of: &x) { $0[1] = 42 }
+  return x
+}
+
+struct S {
+  var a: Int
+  var b: Int
+}
+
+// CHECK-LABEL: sil @$s4test17loadFieldAtOffset5valueS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test17loadFieldAtOffset5valueS2i_tF'
+public func loadFieldAtOffset(value: Int) -> Int {
+  var s = S(a: value, b: 0)
+  return withUnsafeMutablePointer(to: &s) { $0[1].b }
+}
+
+// CHECK-LABEL: sil [stack_protection] @$s4test20storeToFieldAtOffset5valueS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test20storeToFieldAtOffset5valueS2i_tF'
+public func storeToFieldAtOffset(value: Int) -> Int {
+  var s = S(a: 0, b: 0)
+  withUnsafeMutablePointer(to: &s) { $0[1].b = value }
+  return s.a
+}
+
+// CHECK-LABEL: sil @$s4test24onlyLoadsAtReboundOffset5indexS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test24onlyLoadsAtReboundOffset5indexS2i_tF'
+public func onlyLoadsAtReboundOffset(index: Int) -> Int {
+  var t = (1, 2)
+  return withUnsafeMutablePointer(to: &t) {
+    let p = UnsafeMutableRawPointer($0).assumingMemoryBound(to: Int.self)
+    return p[index]
+  }
+}
+
+// CHECK-LABEL: sil [stack_protection] @$s4test20storeAtReboundOffset5value5indexS2i_SitF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test20storeAtReboundOffset5value5indexS2i_SitF'
+public func storeAtReboundOffset(value: Int, index: Int) -> Int {
+  var t = (0, 0)
+  return withUnsafeMutablePointer(to: &t) {
+    let p = UnsafeMutableRawPointer($0).assumingMemoryBound(to: Int.self)
+    p[index] = value
+    return p[0]
+  }
+}
+
 // CHECK-LABEL: sil @$s4test22unprotectedUnsafeBytesyyF
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function '$s4test22unprotectedUnsafeBytesyyF'

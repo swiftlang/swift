@@ -257,7 +257,7 @@ extension ${Self}: SIMDScalar {
       _value = Builtin.zeroInitializer()
     }
     
-    @export(implementation)
+    @export(implementation) @_transparent
     internal init(_ _builtin: Builtin.Vec${n}x${BuiltinName}) {
       _value = _builtin
     }
@@ -311,7 +311,7 @@ extension ${Self} : SIMDScalar {
       _value = Builtin.zeroInitializer()
     }
     
-    @export(implementation)
+    @export(implementation) @_transparent
     internal init(_ _builtin: Builtin.Vec${n}xFPIEEE${bits}) {
       _value = _builtin
     }

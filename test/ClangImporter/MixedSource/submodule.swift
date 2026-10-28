@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/submodule -module-name Mixed %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 @_exported import Mixed
 @_exported import Mixed.Submodule
 

@@ -1409,6 +1409,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Join:
     case TypeKind::Meet:
     case TypeKind::ErrorUnion:
+    case TypeKind::Hole:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::PrimaryArchetype:
@@ -1741,9 +1742,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Class:
     case TypeKind::Enum:
     case TypeKind::Struct:
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct:
     case TypeKind::BuiltinTuple: {
       GenericTypeDecl *Decl;
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
@@ -1759,7 +1757,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return;
 
         if (Decl->isStdlibDecl() && Decl->getName().str() == "Optional") {
-          auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
+          auto GenArgs = type->castTo<NominalType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0], sig, forDecl);
           appendOperator("Sg");
@@ -2066,14 +2064,9 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
       appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                              forDecl);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
-    if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
-                             forDecl);
-  } else {
-    auto boundType = cast<BoundGenericType>(typePtr);
-    genericArgs = boundType->getGenericArgs();
-    if (Type parent = boundType->getParent()) {
-      GenericTypeDecl *decl = boundType->getAnyGeneric();
+    genericArgs = nominalType->getGenericArgs();
+    if (Type parent = nominalType->getParent()) {
+      GenericTypeDecl *decl = nominalType->getAnyGeneric();
       if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))
         appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
                                forDecl);
@@ -2351,8 +2344,11 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
-  if (fn->isCalledOnce())
+  if (auto semantics = fn->getExecutionSemantics()) {
     OpArgs.push_back('O');
+    if (*semantics == ExecutionSemantics::AtMostOnce)
+      OpArgs.push_back('o');
+  }
 
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
@@ -2409,6 +2405,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
       break;
     case SILFunctionTypeRepresentation::WitnessMethod:
       OpArgs.push_back('W');
+      break;
+    case SILFunctionTypeRepresentation::COMMethod:
+      OpArgs.push_back('V');
       break;
     case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
     case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -3386,7 +3385,9 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
-    } else if (fn->isCalledOnce()) {
+    } else if (auto semantics = fn->getExecutionSemantics()) {
+      if (*semantics == ExecutionSemantics::AtMostOnce)
+        return appendOperator("XOo");
       return appendOperator("XO");
     }
     return appendOperator("c");
@@ -3426,7 +3427,12 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
+  if (fn->isCoroutine()) {
+    appendFunctionYieldTypes(fn, fn->getYields(), sig, forDecl, isRecursedInto);
+    appendOperator("Xy");
+  }
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
+
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3604,6 +3610,48 @@ void ASTMangler::appendFunctionInputType(
           sig, nullptr);
       appendListSeparator(isFirstParam);
       paramIndex++;
+    }
+    appendOperator("t");
+    break;
+  }
+}
+
+void ASTMangler::appendFunctionYieldTypes(
+    AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Yield> yields,
+    GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
+
+  switch (yields.size()) {
+  case 0:
+    appendOperator("y");
+    break;
+
+  case 1: {
+    const auto &yield = yields.front();
+    auto type = yield.getType();
+
+    // TODO: decide on lifetime dependencies for yields
+    if (!type->is<TupleType>()) {
+      appendParameterTypeListElement(
+          Identifier(), type,
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
+  default:
+    bool isFirstYield = true;
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      appendParameterTypeListElement(
+          Identifier(), yield.getType(),
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      appendListSeparator(isFirstYield);
     }
     appendOperator("t");
     break;
@@ -4265,7 +4313,7 @@ CanType ASTMangler::getDeclTypeForMangling(
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, info);
+                                  /* yields */ {}, C.TheErrorType, info);
     }
     return C.TheErrorType;
   }
@@ -4276,7 +4324,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   //
   // `dropIsolation` is set here as a workaround because `dropGlobalActor`
   // used to call `withoutIsolation` unconditionally before.
-  if (decl->preconcurrency()) {
+  if (decl->preconcurrencyIncludingInferred()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
                               /*dropIsolation=*/true);
   }
@@ -4289,8 +4337,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
 
-    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getYields(),
+                                 gft.getResult(), gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {
@@ -4981,6 +5029,7 @@ void ASTMangler::appendMacroExpansionContext(
   }
 
   SourceManager &sourceMgr = Context.SourceMgr;
+  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
 
   auto appendMacroExpansionLoc = [&]() {
     appendIdentifier(origDC->getParentModule()->getName().str());
@@ -4988,11 +5037,10 @@ void ASTMangler::appendMacroExpansionContext(
     auto *SF = origDC->getParentSourceFile();
     appendIdentifier(llvm::sys::path::filename(SF->getFilename()), /*allowRawIdentifiers=*/false);
 
-    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc);
+    auto lineColumn = sourceMgr.getLineAndColumnInBuffer(loc, bufferID);
     appendOperator("fMX", Index(lineColumn.first), Index(lineColumn.second));
   };
 
-  auto bufferID = sourceMgr.findBufferContainingLoc(loc);
   auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
   if (!generatedSourceInfo) {
     return appendMacroExpansionLoc();
@@ -5550,7 +5598,8 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
-    case DeclKind::Using:
+    case DeclKind::FileDefault:
+    case DeclKind::HiddenTypeLayoutInfo:
       break;
     };
   }

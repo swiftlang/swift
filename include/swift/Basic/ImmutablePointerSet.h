@@ -225,8 +225,8 @@ public:
       ID.AddPointer(PtrTraits::getAsVoidPointer(Ptr));
     }
 
-    void *InsertPt;
-    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+    llvm::FoldingSetInsertToken InsertToken;
+    if (auto *PSet = Set.lookup(ID, InsertToken)) {
       return PSet;
     }
 
@@ -246,7 +246,7 @@ public:
 
     // Allocate the new node and insert it into the Set.
     auto *NewNode = new (Mem) PtrSet(this, DataMem);
-    Set.InsertNode(NewNode, InsertPt);
+    Set.insert(NewNode, InsertToken);
     return NewNode;
   }
 
@@ -272,8 +272,8 @@ public:
     using NoPointerTy = typename std::remove_pointer<T>::type;
     NoPointerTy::Profile(ID, std::forward<Args>(args)...);
 
-    void *InsertPt;
-    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+    llvm::FoldingSetInsertToken InsertToken;
+    if (auto *PSet = Set.lookup(ID, InsertToken)) {
       return PSet;
     }
 
@@ -295,7 +295,7 @@ public:
 
     // Allocate the new node and insert it into the Set.
     auto *NewNode = new (Mem) PtrSet(this, DataMem);
-    Set.InsertNode(NewNode, InsertPt);
+    Set.insert(NewNode, InsertToken);
     return NewNode;
   }
 
@@ -303,8 +303,8 @@ public:
     llvm::FoldingSetNodeID ID;
     ID.AddPointer(PtrTraits::getAsVoidPointer(value));
 
-    void *InsertPt;
-    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+    llvm::FoldingSetInsertToken InsertToken;
+    if (auto *PSet = Set.lookup(ID, InsertToken)) {
       return PSet;
     }
 
@@ -323,7 +323,7 @@ public:
 
     // Allocate the new node and insert it into the Set.
     auto *NewNode = new (Mem) PtrSet(this, DataMem);
-    Set.InsertNode(NewNode, InsertPt);
+    Set.insert(NewNode, InsertToken);
     return NewNode;
   }
 
@@ -355,8 +355,8 @@ public:
     });
 
     // If we find our ID then continue.
-    void *InsertPt;
-    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+    llvm::FoldingSetInsertToken InsertToken;
+    if (auto *PSet = Set.lookup(ID, InsertToken)) {
       return PSet;
     }
 
@@ -375,7 +375,7 @@ public:
 
     // Allocate the new node, insert it into the Set, and return it.
     auto *NewNode = new (Mem) PtrSet(this, DataMem);
-    Set.InsertNode(NewNode, InsertPt);
+    Set.insert(NewNode, InsertToken);
     return NewNode;
   }
 
@@ -404,8 +404,8 @@ public:
     });
 
     // If we find our ID then continue.
-    void *InsertPt;
-    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+    llvm::FoldingSetInsertToken InsertToken;
+    if (auto *PSet = Set.lookup(ID, InsertToken)) {
       return PSet;
     }
 
@@ -424,7 +424,7 @@ public:
 
     // Allocate the new node, insert it into the Set, and return it.
     auto *NewNode = new (Mem) PtrSet(this, DataMem);
-    Set.InsertNode(NewNode, InsertPt);
+    Set.insert(NewNode, InsertToken);
     return NewNode;
   }
 };

@@ -7,6 +7,9 @@ public func ambiguousFunc() {}
 public func ambiguousFunc() -> Int { return 0 }
 public func genericFunc<T: P>(_ t: T) {}
 
+@MainActor public func mainActorFunc() {}
+@MainActor public func mainActorFunction(with argument: Int) {}
+
 public protocol P {
   func requirement()
   func requirementWithDefaultImpl()
@@ -27,7 +30,7 @@ extension PAT {
 }
 
 public struct S {
-  public static var staticMember: Int = 0
+  public nonisolated(unsafe) static var staticMember: Int = 0
   public static func staticFunc() {}
 
   public var member: Int
@@ -38,6 +41,14 @@ public struct S {
   public func noArgsMethod() {}
   public func method(with argument: Int) {}
   public func genericFunc<T: P>(_ t: T) {}
+  public func ambiguousMethod() {}
+  public func ambiguousMethod() -> Int { return 0 }
+
+  @MainActor public static var mainActorStaticMember: Int = 0
+  @MainActor public static func mainActorStaticFunc() {}
+  @MainActor public var mainActorMember: Int { return 0 }
+  @MainActor public func mainActorMethod() {}
+  @MainActor public subscript(index: Int) -> Int { return 0 }
 }
 
 extension S: P {
@@ -55,7 +66,7 @@ public struct GenericS<T: P> {
 }
 
 public class C {
-  public static var staticMember: Int = 0
+  public nonisolated(unsafe) static var staticMember: Int = 0
   public class func classFunc() {}
 
   public var member: Int
@@ -65,11 +76,17 @@ public class C {
   }
   public func noArgsMethod() {}
   public func method(with argument: Int) {}
+  public func methodReturningSelf() -> Self { return self }
+
+  @MainActor public func mainActorMethod() {}
+  @MainActor public func mainActorMethodReturningSelf() -> Self { return self }
 }
 
 extension C: P {
   public func requirement() {}
 }
+
+public class SubC: C {}
 
 public enum E {
   case basicCase

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -Xllvm -sil-print-function=takeLarge -swift-version 5 -disable-availability-checking 2>&1 | %IRGenFileCheck %s --dump-input=always
+// RUN: %target-swift-frontend -emit-ir %s -Xllvm -sil-print-function=takeLarge -swift-version 5 -target %target-swift-5.7-abi-triple 2>&1 | %IRGenFileCheck %s --dump-input=always
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed

@@ -283,6 +283,13 @@ extension Job {
 public struct ExecutorJob: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
+  // Workaround for inability to annotate stored property with availability
+  @available(StdlibDeploymentTarget 6.5, *)
+  @usableFromInline
+  internal var _context: Builtin.Job {
+    context
+  }
+
   @usableFromInline
   internal init(context: __owned Builtin.Job) {
     self.context = context
@@ -568,6 +575,46 @@ extension ExecutorJob {
 
 }
 
+
+@available(SwiftStdlib 6.5, *)
+extension ExecutorJob {
+  /// The task this job represents, or `nil` if this job is not a task
+  ///
+  /// This allows an executor to inspect the task it is about to run,
+  /// for example to log its ``UnsafeCurrentTask/name``
+  ///
+  /// The returned ``UnsafeCurrentTask`` does not retain the task, and must
+  /// not be used after the job has been run (e.g. using
+  /// ``runSynchronously(on:)-(UnownedSerialExecutor)``), as the task may
+  /// have completed and been destroyed by then
+  @export(implementation)
+  public var unsafeCurrentTask: UnsafeCurrentTask? {
+    @export(implementation)
+    get {
+      unsafe _jobGetUnsafeCurrentTask(_context)
+    }
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+extension UnownedJob {
+  /// The task this job represents, or `nil` if this job is not a task
+  ///
+  /// This allows an executor to inspect the task it is about to run,
+  /// for example to log its ``UnsafeCurrentTask/name``
+  ///
+  /// The returned ``UnsafeCurrentTask`` does not retain the task, and must
+  /// not be used after the job has been run (e.g. using
+  /// ``runSynchronously(on:)-(UnownedSerialExecutor)``), as the task may
+  /// have completed and been destroyed by then
+  @export(implementation)
+  public var unsafeCurrentTask: UnsafeCurrentTask? {
+    @export(implementation)
+    get {
+      unsafe ExecutorJob(self).unsafeCurrentTask
+    }
+  }
+}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 

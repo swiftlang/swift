@@ -285,6 +285,23 @@ public class ClassWithResilientThenEmpty {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/92338
+// Dispatch thunks should map a direct result back into the native calling
+// convention, so that the extra tag of the Optional stays where the caller
+// reads it.
+
+@frozen
+public struct FiveBytes {
+  public var a: UInt32
+  public var b: UInt8
+}
+
+public class ClassWithOptionalResult {
+  public func fiveBytes() -> FiveBytes? {
+    return nil
+  }
+}
+
 // ClassWithResilientProperty.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(ptr swiftself %0)
@@ -394,7 +411,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x ptr]
 // CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{7|10}}
-// CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{12|24}}, ptr [[FIELDS]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
@@ -472,7 +489,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELDS:%.*]] = alloca [2 x ptr]
 // CHECK-objc-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{10|13}}
 // CHECK-native-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], ptr %0, [[INT]] {{7|10}}
-// CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{8|16}}, ptr [[FIELDS]])
+// CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[FIELDS]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds{{.*}} [2 x ptr], ptr [[FIELDS]], i32 0, i32 0
 
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct9RectangleVMa"([[INT]] 319)
@@ -586,3 +603,18 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT:   [[RESULT:%.*]] = call ptr @swift_lookUpClassMethod(ptr %0, ptr %1, ptr @"$s16class_resilience21ResilientGenericChildCMn{{(\.ptrauth.*)?}}")
 // CHECK-NEXT:   ret ptr [[RESULT]]
 // CHECK-NEXT: }
+
+
+// ClassWithOptionalResult.fiveBytes() dispatch thunk
+
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @"$s16class_resilience23ClassWithOptionalResultC9fiveBytesAA04FiveH0VSgyFTj"(ptr swiftself %0)
+// CHECK-64:      [[RESULT:%.*]] = call swiftcc i64 {{%.*}}(ptr swiftself %0)
+// CHECK-64:      store i64 [[RESULT]], ptr
+// CHECK-64:      [[PAYLOAD:%.*]] = load i40, ptr
+// CHECK-64:      [[TAG:%.*]] = load i8, ptr
+// CHECK-64:      store i40 [[PAYLOAD]], ptr [[RETURN:%.*]],
+// CHECK-64-NEXT: [[TAG_ADDR:%.*]] = getelementptr inbounds{{.*}} %T16class_resilience9FiveBytesVSg, ptr [[RETURN]], i32 0, i32 1
+// CHECK-64-NEXT: store i8 [[TAG]], ptr [[TAG_ADDR]]
+// CHECK-64-NEXT: [[RETURN_ADDR:%.*]] = getelementptr inbounds{{.*}} { i64 }, ptr [[RETURN]], i32 0, i32 0
+// CHECK-64-NEXT: [[RETURN_VALUE:%.*]] = load i64, ptr [[RETURN_ADDR]]
+// CHECK-64:      ret i64 [[RETURN_VALUE]]

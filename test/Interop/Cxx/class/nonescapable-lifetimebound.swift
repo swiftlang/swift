@@ -111,7 +111,7 @@ struct SWIFT_NONESCAPABLE CaptureView {
     CaptureView() : view(nullptr) {}
     CaptureView(View p [[clang::lifetimebound]]) : view(p) {}
 
-    void captureView(View v [[clang::lifetime_capture_by(this)]]) {
+    void captureView(View v [[clang::lifetime_capture_by_this]]) {
         view = v;
     }
 
@@ -119,8 +119,25 @@ struct SWIFT_NONESCAPABLE CaptureView {
        v = view; 
     }
 
+    // Several 'lifetime_capture_by' attributes on one parameter or on the
+    // implicit object parameter: all of them apply.
+    void captureIntoBoth(View &out, View v [[clang::lifetime_capture_by(out)]] [[clang::lifetime_capture_by_this]]) {
+        out = v;
+        view = v;
+    }
+
+    void handOutBoth(View &a, View &b) const [[clang::lifetime_capture_by(a)]] [[clang::lifetime_capture_by(b)]] {
+        a = view;
+        b = view;
+    }
+
     View view;
 };
+
+// The ignored 'global' capture comes first and must not hide the 'out' one.
+void captureGlobalAndOut(View v [[clang::lifetime_capture_by_global]] [[clang::lifetime_capture_by(out)]], View &out) {
+    out = v;
+}
 
 CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
     return CaptureView(View{&owner.data});
@@ -140,7 +157,7 @@ struct SWIFT_NONESCAPABLE ViewFromFactory {
     const int *member;
 };
 
-// expected-warning@+2 {{the returned type 'ViewNoAnnotation' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2 {{the returned type 'ViewNoAnnotation' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 struct SWIFT_NONESCAPABLE ViewNoAnnotation {
     ViewNoAnnotation(const Owner &o);
     const int *member;
@@ -302,6 +319,11 @@ View fromLvalueRefNonTrivialValue(NonTrivialByValue &o [[clang::lifetimebound]])
 View fromRvalueRefTrivialValue(Owner &&o [[clang::lifetimebound]]);
 View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]);
 
+struct SWIFT_NONESCAPABLE IndependentCtor {
+    IndependentCtor(const Owner &o) SWIFT_RETURNS_INDEPENDENT_VALUE;
+    const int *member;
+};
+
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -318,6 +340,9 @@ View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]
 // CHECK: sil {{.*}}[clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
 // CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.captureIntoBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, View, @lifetime(copy 1) @inout CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.handOutBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 2) @inout View, @lifetime(copy 2) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang captureGlobalAndOut] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
 // CHECK: sil {{.*}}[clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang ViewFromValue.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @out ViewFromValue
 // CHECK: sil {{.*}}[clang ViewFromFactory.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @owned ViewFromFactory
@@ -332,6 +357,7 @@ View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]
 // CHECK: sil {{.*}}[clang fromLvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@inout NonTrivialByValue) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} Owner) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang IndependentCtor.init] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(immortal) @out IndependentCtor
 
 //--- test.swift
 
@@ -357,6 +383,9 @@ public func test() {
     var cv = getCaptureView(o)
     cv.captureView(v1)
     cv.handOut(&v1)
+    cv.captureIntoBoth(&out, v1)
+    cv.handOutBoth(&out, &v1)
+    captureGlobalAndOut(v2, &out)
     var _ = NS.getView(o)
 }
 
@@ -397,6 +426,10 @@ func lvalueRefLifetimebound(_ o: inout Owner, _ n: inout NonTrivialByValue) {
 func rvalueRefLifetimebound(_ o: consuming Owner, _ n: consuming NonTrivialByValue) {
     let _ = fromRvalueRefTrivialValue(consuming: o)
     let _ = fromRvalueRefNonTrivialValue(consuming: n)
+}
+
+func independentCtor(_ o: Owner) {
+    let _ = IndependentCtor(o)
 }
 
 //--- escaping_scopes.swift
@@ -523,5 +556,22 @@ func classTransitiveField(b: SwiftBoxNested) -> View {
   return b.field.field.handOutView()
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on this scoped access to variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// An independent result depends on nothing, so it may outlive the access to the
+// owner it was built from.
+@_lifetime(immortal)
+func independentCtorEscapes() -> IndependentCtor {
+  return IndependentCtor(globalOwner)
+}
+
+// Without the annotation the same escape is an error: the dependency Swift
+// infers ties the result to the owner.
+@_lifetime(immortal)
+func inferredCtorEscapes() -> ViewNoAnnotation {
+  return ViewNoAnnotation(globalOwner)
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }

@@ -219,9 +219,12 @@ OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceAddrBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrowAddr)
 
-// The dealloc_stack_ref operand needs to have NonUse ownership because
-// this use comes after the last consuming use (which is usually a dealloc_ref).
+// A dealloc_stack_ref or end_formal_scope operand needs to have NonUse
+// ownership because this use comes after the last consuming use (which is
+// usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(NonUse, EndFormalScope)
+
 OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
@@ -236,6 +239,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, ExtendLifetime)
+OPERAND_OWNERSHIP(InstantaneousUse, Diagnose)
 OPERAND_OWNERSHIP(InstantaneousUse, MergeIsolationRegion)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
@@ -251,6 +255,7 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyBlock)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ExplicitCopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCMethod)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, COMMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
@@ -278,7 +283,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // later), so treat the conversion conservatively as a non-consuming pointer
 // escape.
 //
-// A `@called(once)` function value is single-owner and move-only-checked,
+// An at-most-once function value is single-owner and move-only-checked,
 // so pre-conversion value doesn't survive to be used again -- any further
 // use would already be diagnosed as a double consumption by the move-only
 // checker. Treat the conversion as an ordinary forwarding consume in that
@@ -287,7 +292,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // special-case this instruction.
 OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *i) {
-  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+  return i->getType().castTo<SILFunctionType>()->hasCalledAtMostOnceSemantics()
              ? OperandOwnership::ForwardingConsume
              : OperandOwnership::PointerEscape;
 }
@@ -402,6 +407,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
         /*allowUnowned*/ false);                                               \
   }
 FORWARDING_OWNERSHIP(OpenExistentialRef)
+FORWARDING_OWNERSHIP(OpenCOMExistential)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
 FORWARDING_OWNERSHIP(BridgeObjectToRef)
@@ -648,13 +654,22 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
     if (operandTy.isTrivial(*i->getFunction())) {
       return OperandOwnership::TrivialUse;
     }
-    
+
     // Borrowing of address operands is ultimately handled by the move-only
     // address checker and/or exclusivity checker rather than by value ownership.
     if (operandTy.isAddress()) {
       return OperandOwnership::TrivialUse;
     }
-  
+
+    if (i->hasCalledAtMostOnceSemantics()) {
+      auto argConv = ApplySite(i).getArgumentConvention(op);
+      // Borrowed non-Copyable captures aren't owned by the closure.
+      if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
+        return OperandOwnership::Borrow;
+      // ... the rest of the operands are consumed.
+      return OperandOwnership::ForwardingConsume;
+    }
+
     return OperandOwnership::Borrow;
   }
   // All non-trivial types should be captured.
@@ -731,11 +746,6 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
   return OperandOwnership::UnownedInstantaneousUse;
 }
 
-template<SILInstructionKind Opc, typename Derived>
-static OperandOwnership
-visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, Derived> *mdi) {
-}
-
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
@@ -802,7 +812,7 @@ namespace {
 struct OperandOwnershipBuiltinClassifier
     : SILBuiltinVisitor<OperandOwnershipBuiltinClassifier, OperandOwnership> {
   using Map = OperandOwnership;
-      
+
   const Operand &op;
   OperandOwnershipBuiltinClassifier(const Operand &op) : op(op) {}
 
@@ -876,6 +886,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExactUDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericExactUDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExtractElement)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FAdd)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FAddRelaxed)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFAdd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FCMP_OEQ)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FCMP_OGE)
@@ -894,6 +905,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FCMP_UNO)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FMul)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FMulRelaxed)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFMul)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FNeg)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FPExt)
@@ -903,6 +915,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FPTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSub)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSubRelaxed)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Fence)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, Freeze)
@@ -963,6 +976,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ShuffleVector)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Interleave)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Deinterleave)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Sizeof)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypedAllocationID)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StaticReport)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Strideof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StringObjectOr)
@@ -1041,7 +1055,7 @@ OperandOwnershipBuiltinClassifier
     // The result buffer pointer is a trivial use.
     return OperandOwnership::TrivialUse;
   }
-  
+
   // The closure is borrowed while the async let task is executing.
   return OperandOwnership::Borrow;
 }
@@ -1060,6 +1074,32 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
     return OperandOwnership::DestroyingConsume;
 
   return OperandOwnership::InstantaneousUse;
+}
+
+// Both AddTaskLocalValue and TaskLocalValuePush have the same signature:
+// operand 0 is the key (Builtin.RawPointer), always trivial; operand 1 is
+// the generic value that is consumed.
+static OperandOwnership visitTaskLocalValueOperand(const Operand &op,
+                                                   BuiltinInst *bi) {
+  if (&op == &bi->getOperandRef(0))
+    return OperandOwnership::TrivialUse;
+
+  assert(&op == &bi->getOperandRef(1));
+  if (op.get()->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::DestroyingConsume;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitAddTaskLocalValue(BuiltinInst *bi,
+                                                          StringRef attr) {
+  return visitTaskLocalValueOperand(op, bi);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskLocalValuePush(BuiltinInst *bi,
+                                                           StringRef attr) {
+  return visitTaskLocalValueOperand(op, bi);
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::
@@ -1123,13 +1163,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddPriorityEscalationHandler)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
-// This is a trivial use since our first operand is a Builtin.RawPointer and our
-// second is an address to our generic Value.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AddTaskLocalValue)
 // Trivial use of the token result of AddTaskLocalValue.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
-
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
 
@@ -1138,9 +1173,16 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
 
-// TaskPushDeadline takes two borrowed generic operands passed by
-// address; at the SIL level address operands are trivial.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
+// TaskPushDeadline's two generic operands are addresses except under opaque
+// values, where the builtin is an instantaneous use of each.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
+                                                         StringRef attr) {
+  if (op.get()->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::InstantaneousUse;
+}
+
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 

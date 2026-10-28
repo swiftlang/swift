@@ -32,10 +32,6 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
-  func enableAddressDependencies() -> Bool {
-    _bridged.enableAddressDependencies()
-  }
-
   var noAllocations: Bool {
     _bridged.noAllocations()
   }

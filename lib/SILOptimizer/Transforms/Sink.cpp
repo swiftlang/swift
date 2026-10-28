@@ -19,7 +19,6 @@
 
 #define DEBUG_TYPE "sink-instructions"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
@@ -33,7 +32,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

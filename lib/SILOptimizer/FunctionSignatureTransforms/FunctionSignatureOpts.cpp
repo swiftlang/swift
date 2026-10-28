@@ -31,9 +31,7 @@
 
 #define DEBUG_TYPE "sil-function-signature-opt"
 #include "FunctionSignatureOpts.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -96,6 +94,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   case SILFunctionTypeRepresentation::WitnessMethod:
     return OptForPartialApply;
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::Block:
     return false;
   }
@@ -297,6 +296,14 @@ static bool usesGenerics(SILFunction *F,
       // Scan the parameter type of a 'type_value'.
       if (auto tvi = dyn_cast<TypeValueInst>(&I)) {
         tvi->getParamType().visit(FindArchetypesAndGenericTypes);
+      }
+
+      // Scan the formal types of a conditional cast.
+      // (In particular, `test_only` casts have a formal target type
+      // but no destination.)
+      if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(&I)) {
+        Type(CCABI->getSourceFormalType()).visit(FindArchetypesAndGenericTypes);
+        Type(CCABI->getTargetFormalType()).visit(FindArchetypesAndGenericTypes);
       }
 
       // Scan the result type of the instruction.

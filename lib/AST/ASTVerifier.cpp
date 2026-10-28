@@ -22,8 +22,6 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -42,10 +40,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include <functional>
 #include <type_traits>
 using namespace swift;
 
@@ -1516,7 +1512,7 @@ public:
         abort();
       }
 
-      if (!E->getType()->getClassOrBoundGenericClass()) {
+      if (!E->getType()->getClassDecl()) {
         Out << "ProtocolMetatypeToObject does not produce class:\n";
         E->dump(Out);
         Out << "\n";
@@ -1646,8 +1642,8 @@ public:
         abort();
       }
 
-      if (!destTy->getClassOrBoundGenericClass() ||
-          !(srcTy->getClassOrBoundGenericClass() ||
+      if (!destTy->getClassDecl() ||
+          !(srcTy->getClassDecl() ||
             srcTy->is<DynamicSelfType>())) {
         Out << "DerivedToBaseExpr does not involve class types:\n";
         E->dump(Out);
@@ -1969,6 +1965,12 @@ public:
         Out << "\n";
         abort();
       }
+      if (FT->isCoroutine()) {
+        Out << "cannot apply a coroutine yet:";
+        E->getFn()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
       Type ResultExprTy = E->getType();
       if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";
@@ -2262,8 +2264,16 @@ public:
       auto instance = metatype->getInstanceType();
       if (auto existential = metatype->getAs<ExistentialMetatypeType>())
         instance = existential->getExistentialInstanceType();
-      checkSameType(E->getBase()->getType(), instance,
-                    "base type of .Type expression");
+
+      Type baseType = E->getBase()->getType();
+      if (baseType->isCOMExistentialType()) {
+        if (!instance->isAny()) {
+          Out << "DynamicTypeExpr for a COM existential must have Any.Type\n";
+          abort();
+        }
+      } else {
+        checkSameType(baseType, instance, "base type of .Type expression");
+      }
       verifyCheckedBase(E);
     }
 
@@ -2420,7 +2430,7 @@ public:
           abort();
         }
         return;
-      } else if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
+      } else if (auto bgt = keyPathTy->getAs<NominalType>()) {
         if (keyPathTy->isPartialKeyPath()) {
           // PartialKeyPath<T> application is rvalue T -> rvalue Any
           if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
@@ -3444,6 +3454,21 @@ public:
         abort();
       }
 
+      // Yield list is nullable: it is non-null only for coroutines (functions and
+      // coroutine accessors) and then cannot be empty.
+      if (AFD->isCoroutine()) {
+        auto *Yields = AFD->getYields();
+        if (!Yields || !Yields->size()) {
+          Out << "empty yield list for a coroutine\n";
+          AFD->dump(Out);
+          abort();
+        }
+      } else if (AFD->getYields()) {
+        Out << "non-null yield list for non-coroutine\n";
+        AFD->dump(Out);
+        abort();
+      }
+      
       if (AFD->getForeignErrorConvention()
           && !AFD->isObjC() && !AFD->getAttrs().hasAttribute<CDeclAttr>()) {
         Out << "foreign error convention on non-@objc, non-@_cdecl function\n";
@@ -3727,7 +3752,7 @@ public:
       }
 
       // If the destination is a class, walk the supertypes of the source.
-      if (destTy->getClassOrBoundGenericClass()) {
+      if (destTy->getClassDecl()) {
         if (!destTy->isBindableToSuperclassOf(srcTy)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";
@@ -3768,11 +3793,6 @@ public:
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.Start);
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.End);
       return true;
-    }
-    
-    template<typename T>
-    void checkSourceRangesBase(T ASTNode) {
-      checkSourceRanges(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
     }
     
     void checkSourceRanges(Expr *E) {

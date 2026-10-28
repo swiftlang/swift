@@ -187,6 +187,7 @@ class Target {
   var exceptionCode: DWORD
   var faultAddress: Address
   var exceptionInfo: Address
+  var concurrencyTaskRegistryAddr: UInt64?
 
   var images: ImageMap
 
@@ -230,11 +231,9 @@ class Target {
     self.pid = pid
 
     guard let hProcess = OpenProcess(
-            DWORD(
-              PROCESS_VM_READ
+            PROCESS_VM_READ
               | PROCESS_QUERY_LIMITED_INFORMATION
-              | PROCESS_SUSPEND_RESUME
-            ),
+              | PROCESS_SUSPEND_RESUME,
             false,
             pid
           ) else {
@@ -258,15 +257,10 @@ class Target {
     }
 
     for thread in threads {
-      guard let hThread = OpenThread(
-              DWORD(
-                THREAD_GET_CONTEXT
+      let dwFlags = THREAD_GET_CONTEXT
                   | THREAD_QUERY_LIMITED_INFORMATION
                   | THREAD_SUSPEND_RESUME
-              ),
-              false,
-              thread
-            ) else {
+      guard let hThread = OpenThread(dwFlags, false, thread) else {
         let error = GetLastError()
         print("swift-backtrace: unable to open thread \(thread): \(hex(error)).",
               to: &standardError)
@@ -309,6 +303,7 @@ class Target {
     exceptionCode = DWORD(crashInfo.signal)
     faultAddress = Address(truncatingIfNeeded: crashInfo.fault_address)
     exceptionInfo = Address(truncatingIfNeeded: crashInfo.exception_info)
+    concurrencyTaskRegistryAddr = crashInfo.concurrency_task_registry_addr
 
     images = ImageMap.capture(for: UInt(bitPattern: hProcess))
 
@@ -487,15 +482,16 @@ class Target {
         startupInfo.lpTitle = UnsafeMutablePointer(mutating: pwszTitle)
 
         return cmdline.withCString(encodedAs: UTF16.self) { pwszCmdline in
+          let dwFlags = NORMAL_PRIORITY_CLASS
+                      | CREATE_NEW_CONSOLE
+                      | CREATE_NEW_PROCESS_GROUP
           return CreateProcessW(nil,
                                 // Not really mutating
                                 UnsafeMutablePointer(mutating: pwszCmdline),
                                 nil,
                                 nil,
                                 false,
-                                DWORD(NORMAL_PRIORITY_CLASS
-                                      | CREATE_NEW_CONSOLE
-                                      | CREATE_NEW_PROCESS_GROUP),
+                                dwFlags,
                                 nil,
                                 nil,
                                 &startupInfo,
@@ -524,4 +520,3 @@ class Target {
 }
 
 #endif // os(Windows)
-

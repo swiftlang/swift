@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -disable-availability-checking -disable-implicit-cxx-module-import -enable-experimental-feature AssumeResilientCxxTypes -verify
+// RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -target %target-swift-5.8-abi-triple -disable-implicit-cxx-module-import -enable-experimental-feature AssumeResilientCxxTypes -verify
 
 // REQUIRES: swift_feature_AssumeResilientCxxTypes
  

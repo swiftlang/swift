@@ -25,15 +25,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/Lexer.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 

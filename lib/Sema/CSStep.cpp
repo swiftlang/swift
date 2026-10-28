@@ -20,13 +20,10 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -150,18 +147,6 @@ void SplitterStep::computeFollowupSteps(
 }
 
 namespace {
-  /// Retrieve the size of a container.
-  template<typename Container>
-  unsigned getSize(const Container &container) {
-    return container.size();
-  }
-
-  /// Retrieve the size of a container referenced by a pointer.
-  template<typename Container>
-  unsigned getSize(const Container *container) {
-    return container->size();
-  }
-
   /// Identity getSize() for cases where we are working with a count.
   unsigned getSize(unsigned size) {
     return size;
@@ -928,15 +913,13 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
           restoreBestScore();
           updateScoreAfterConjunction(solution.getFixedScore());
 
-          // Transform all of the unbound outer variables into
-          // placeholders since we are not going to solve for
-          // each ambiguous solution.
+          // Transform all of the unbound outer variables into holes since we
+          // are not going to solve for each ambiguous solution.
           {
             unsigned numHoles = 0;
             for (auto *typeVar : CS.getTypeVariables()) {
               if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
-                CS.assignFixedType(
-                    typeVar, PlaceholderType::get(CS.getASTContext(), typeVar));
+                CS.assignFixedType(typeVar, HoleType::get(typeVar));
                 ++numHoles;
               }
             }

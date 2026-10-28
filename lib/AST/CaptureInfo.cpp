@@ -15,7 +15,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -66,7 +65,7 @@ CaptureInfo::CaptureInfoStorage::getCapturedTypes() const {
 CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
-                         bool genericParamCaptures,
+                         OptionSet<Flags> flags,
                          ArrayRef<GenericEnvironment *> genericEnv,
                          ArrayRef<CapturedType> capturedTypes) {
   static_assert(IsTriviallyDestructible<CapturedValue>::value,
@@ -80,10 +79,6 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
     assert(env->getKind() == GenericEnvironment::Kind::Element);
   }
 #endif
-
-  OptionSet<Flags> flags;
-  if (genericParamCaptures)
-    flags |= Flags::HasGenericParamCaptures;
 
   if (captures.empty() && genericEnv.empty() && !dynamicSelf && !opaqueValue &&
       capturedTypes.empty()) {
@@ -125,7 +120,8 @@ CaptureInfo CaptureInfo::empty() {
 bool CaptureInfo::isTrivial() const {
   assert(hasBeenComputed());
   return getCaptures().empty() && !hasGenericParamCaptures() &&
-         !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
+         !hasDynamicSelfCapture() && !hasOpaqueValueCapture() &&
+         !needsImplicitIsolationCapture();
 }
 
 VarDecl *CaptureInfo::getIsolatedParamCapture() const {
@@ -161,12 +157,23 @@ LLVM_ATTRIBUTE_USED void CaptureInfo::dump() const {
 void CaptureInfo::print(raw_ostream &OS) const {
   OS << "captures=(";
 
+  bool printedFlag = false;
+  auto printFlag = [&](StringRef flag) {
+    if (printedFlag)
+      OS << ' ';
+    OS << flag;
+    printedFlag = true;
+  };
   if (hasGenericParamCaptures())
-    OS << "<generic> ";
+    printFlag("<generic>");
   if (hasDynamicSelfCapture())
-    OS << "<dynamic_self> ";
+    printFlag("<dynamic_self>");
   if (hasOpaqueValueCapture())
-    OS << "<opaque_value> ";
+    printFlag("<opaque_value>");
+  if (needsImplicitIsolationCapture())
+    printFlag("<isolation>");
+  if (printedFlag && !getCaptures().empty())
+    OS << ' ';
 
   interleave(getCaptures(),
              [&](const CapturedValue &capture) {

@@ -29,7 +29,7 @@ bb0(%0 : @guaranteed $A):
   // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds{{.*}} [[C]], ptr %0, i32 0, i32 1
   %2 = ref_element_addr %0 : $A, #A.property
 
-  // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[SCRATCH1]])
+  // CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[SCRATCH1]])
   // CHECK-NEXT: call void @swift_beginAccess(ptr [[PROPERTY]], ptr [[SCRATCH1]], [[SIZE:i(32|64)]] 33, ptr null)
   %3 = begin_access [modify] [dynamic] %2 : $*Int64
 
@@ -38,10 +38,10 @@ bb0(%0 : @guaranteed $A):
   %4 = load [trivial] %3 : $*Int64
 
   // CHECK-NEXT: call void @swift_endAccess(ptr [[SCRATCH1]])
-  // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[SCRATCH1]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0(ptr [[SCRATCH1]])
   end_access %3 : $*Int64
 
-  // CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[SCRATCH2]])
+  // CHECK-NEXT: call void @llvm.lifetime.start.p0(ptr [[SCRATCH2]])
   // CHECK-NEXT: call void @swift_beginAccess(ptr [[PROPERTY]], ptr [[SCRATCH2]], [[SIZE]] 32, ptr null)
   %6 = begin_access [read] [dynamic] %2 : $*Int64
 
@@ -50,7 +50,7 @@ bb0(%0 : @guaranteed $A):
   %7 = load [trivial] %6 : $*Int64
 
   // CHECK-NEXT: call void @swift_endAccess(ptr [[SCRATCH2]])
-  // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[SCRATCH2]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0(ptr [[SCRATCH2]])
   end_access %6 : $*Int64
 
   apply %func(%4, %7) : $@convention(thin) (Int64, Int64) -> ()

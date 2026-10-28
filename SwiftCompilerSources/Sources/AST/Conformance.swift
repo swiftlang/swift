@@ -78,6 +78,10 @@ public struct Conformance: CustomStringConvertible, Hashable, NoReflectionChildr
     return self
   }
 
+  /// The conformance with all type sugar removed. Conformances which only differ in
+  /// type sugar are different `Conformance` values but have the same canonical conformance.
+  public var canonical: Conformance { bridged.getCanonicalConformance().conformance }
+
   public var specializedSubstitutions: SubstitutionMap {
     assert(isSpecialized)
     return SubstitutionMap(bridged: bridged.getSpecializedSubstitutions())

@@ -42,6 +42,10 @@
 // CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8Generics11GenericPairV12computedPropSivg(struct swift_interop_passStub_Generics_[[PTRPTRENC]] _self, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV11computedVarxvg(SWIFT_INDIRECT_RESULT void * _Nonnull, struct swift_interop_passStub_Generics_[[PTRPTRENC]] _self, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV11computedVarxvs(const void * _Nonnull newValue, void * _Nonnull , SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
+// CHECK-NEXT: struct Generics_GenericPair {
+// CHECK-NEXT:   _Alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// CHECK-NEXT: };
+// CHECK-EMPTY:
 // CHECK-NEXT: // Stub struct to be used to pass/return values to/from Swift functions.
 // CHECK-NEXT: struct swift_interop_passStub_Generics_uint64_t_0_8_uint64_t_8_16 {
 // CHECK-NEXT:   uint64_t _1;
@@ -85,7 +89,7 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair final {
 
-// CHECK: swift::_impl::OpaqueStorage _storage;
+// CHECK: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
@@ -146,14 +150,14 @@
 // CHECK-NEXT: _impl::$s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(Generics::_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](Generics::_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x)), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK T_0_1 GenericPair<T_0_0, T_0_1>::getY() const {
+// CHECK: SWIFT_INLINE_THUNK T_0_1 GenericPair<T_0_0, T_0_1>::getY() const noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK: _impl::$s8Generics11GenericPairV1yq_vg(reinterpret_cast<void *>(&returnValue), Generics::_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 
-// CHECK: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::setY(const T_0_1& newValue) {
+// CHECK: SWIFT_INLINE_THUNK void GenericPair<T_0_0, T_0_1>::setY(const T_0_1& newValue) noexcept {
 // CHECK-NEXT: #ifndef __cpp_concepts
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
@@ -178,5 +182,5 @@
 // CHECK-NEXT: return Generics::_impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT: _impl::swift_interop_returnDirect_Generics_[[PTRPTRENC]](result, Generics::_impl::$s8Generics11GenericPairVyACyxq_Gx_Siq_tcfC(swift::_impl::getOpaquePointer(consumedParamCopy_x), i, swift::_impl::getOpaquePointer(consumedParamCopy_y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata()));
 
-// CHECK: SWIFT_INLINE_THUNK T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const {
+// CHECK: SWIFT_INLINE_THUNK T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const noexcept {
 // CHECK: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), Generics::_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata());

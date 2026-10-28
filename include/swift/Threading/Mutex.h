@@ -127,7 +127,7 @@ class UnsafeMutex : public Mutex {
 public:
   UnsafeMutex() : Mutex() {}
 
-  void lock() { threading_impl::mutex_unsafe_unlock(Handle); }
+  void lock() { threading_impl::mutex_unsafe_lock(Handle); }
   void unlock() { threading_impl::mutex_unsafe_unlock(Handle); }
 };
 

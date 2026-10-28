@@ -17,16 +17,16 @@ import Builtin
 
 // Check that all functions are defined/declared appropriately.
 // NEG-CHECK-NOT: sil [serialized] @public_external_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @public_external_function_test : $@convention(thin) () -> ()
-// CHECK-DAG: sil [serialized] [canonical] @references_public_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @references_shared_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @references_public_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @references_shared_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @references_hidden_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @references_private_global : $@convention(thin) () -> ()
-// CHECK-DAG: sil [serialized] [canonical] @public_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [serialized] [canonical] @public_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil shared [serialized] [canonical] @shared_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @public_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @references_public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @references_shared_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @references_public_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @references_shared_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @references_hidden_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @references_private_global : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @public_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] [stage=canonical] @public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil shared [serialized] [canonical] [stage=canonical] @shared_external_function_test : $@convention(thin) () -> ()
 
 sil_global private [serialized] @private_global : $Builtin.Word
 sil_global [serialized] @public_global : $Builtin.Word

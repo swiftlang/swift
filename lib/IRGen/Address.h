@@ -23,7 +23,6 @@
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 
@@ -41,9 +40,6 @@ public:
 
   Address(llvm::Value *addr, llvm::Type *elementType, Alignment align)
       : Addr(addr), ElementType(elementType), Align(align) {
-    if (addr == llvm::DenseMapInfo<llvm::Value *>::getEmptyKey() ||
-        llvm::DenseMapInfo<llvm::Value *>::getTombstoneKey())
-      return;
     assert(addr != nullptr && "building an invalid address");
   }
 
@@ -207,16 +203,6 @@ public:
 namespace llvm {
 template <>
 struct DenseMapInfo<swift::irgen::Address> {
-  static swift::irgen::Address getEmptyKey() {
-    return swift::irgen::Address(DenseMapInfo<llvm::Value *>::getEmptyKey(),
-                                 DenseMapInfo<llvm::Type *>::getEmptyKey(),
-                                 swift::irgen::Alignment(8));
-  }
-  static swift::irgen::Address getTombstoneKey() {
-    return swift::irgen::Address(DenseMapInfo<llvm::Value *>::getTombstoneKey(),
-                                 DenseMapInfo<llvm::Type *>::getTombstoneKey(),
-                                 swift::irgen::Alignment(8));
-  }
   static unsigned getHashValue(swift::irgen::Address address) {
     return detail::combineHashValue(
         DenseMapInfo<llvm::Value *>::getHashValue(address.getAddress()),
@@ -231,18 +217,6 @@ struct DenseMapInfo<swift::irgen::Address> {
 };
 template <>
 struct DenseMapInfo<swift::irgen::StackAddress> {
-  static swift::irgen::StackAddress getEmptyKey() {
-    return swift::irgen::StackAddress(
-        DenseMapInfo<swift::irgen::Address>::getEmptyKey(),
-        swift::irgen::StackAddress::StaticAlloca,
-        DenseMapInfo<llvm::Value *>::getEmptyKey());
-  }
-  static swift::irgen::StackAddress getTombstoneKey() {
-    return swift::irgen::StackAddress(
-        DenseMapInfo<swift::irgen::Address>::getTombstoneKey(),
-        swift::irgen::StackAddress::StaticAlloca,
-        DenseMapInfo<llvm::Value *>::getTombstoneKey());
-  }
   static unsigned getHashValue(swift::irgen::StackAddress address) {
     return detail::combineHashValue(
         DenseMapInfo<swift::irgen::Address>::getHashValue(address.getAddress()),

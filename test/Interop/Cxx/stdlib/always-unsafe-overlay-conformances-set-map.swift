@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
 // The CxxSet and CxxDictionary conformances are only synthesized where the
 // standard library declares the members they are derived from -- MSVC's STL,
@@ -14,7 +13,8 @@ import StdMap
 import CxxStdlib
 
 func useSet(_ s: inout SetOfCInt) {
-  // 'insert' keeps the rename, so CxxUniqueSet.insert(_:) is not shadowed.
+  // 'insert' keeps its name as a disfavored '@unsafe(always)' overload, so
+  // CxxUniqueSet.insert(_:) is still what this resolves to.
   s.insert(1)
   _ = s.contains(1)
   _ = s.remove(1)

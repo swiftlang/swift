@@ -46,6 +46,7 @@ extension BridgedNullableDefaultArgumentInitializer: /*@retroactive*/ swiftASTGe
 extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
 extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
 extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
+extension BridgedNullableYieldList: /*@retroactive*/ swiftASTGen.BridgedNullable, Swift.ExpressibleByNilLiteral {}
 
 extension Identifier: /*@retroactive*/ Swift.Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -105,6 +106,9 @@ extension BridgedArgumentList: BridgedHasNullable {
 }
 extension BridgedVarDecl: BridgedHasNullable {
   typealias Nullable = BridgedNullableVarDecl
+}
+extension BridgedYieldList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableYieldList
 }
 
 public extension SourceLoc {

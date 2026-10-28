@@ -198,6 +198,14 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       callVisitUse(op);
       continue;
     }
+    if (auto *pesi = dyn_cast<PackElementSetInst>(user)) {
+      // Storing an address into a pack escapes it: a later pack_element_get
+      // can read it back out, and its uses aren't followed.
+      if (op == pesi->getValueOperand())
+        recordEscape(op);
+      callVisitUse(op);
+      continue;
+    }
 
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
@@ -209,20 +217,21 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
         isa<AssignOrInitInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
-        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
-        isa<DebugValueInst>(user) || isa<EndBorrowInst>(user) ||
-        isa<ExplicitCopyAddrInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<InitBlockStorageHeaderInst>(user) ||
+        isa<COMMethodInst>(user) || isa<SelectEnumAddrInst>(user) ||
+        isa<InjectEnumAddrInst>(user) || isa<IsUniqueInst>(user) ||
+        isa<ValueMetatypeInst>(user) || isa<DebugValueInst>(user) ||
+        isa<EndBorrowInst>(user) || isa<ExplicitCopyAddrInst>(user) ||
+        isa<DeallocStackInst>(user) || isa<InitBlockStorageHeaderInst>(user) ||
         isa<GetAsyncContinuationAddrInst>(user) ||
         isa<ExistentialMetatypeInst>(user) ||
+        isa<DiagnoseInst>(user) ||
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
-        isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
+        isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
         isa<MergeIsolationRegionInst>(user) ||
-        isa<EndCOWMutationAddrInst>(user) ||
+        isa<EndCOWMutationAddrInst>(user) || isa<EndFormalScopeInst>(user) ||
         isa<MakeBorrowInst>(user) || isa<DereferenceBorrowInst>(user) ||
         isa<MakeAddrBorrowInst>(user) || isa<DereferenceAddrBorrowInst>(user) ||
         isa<InitBorrowAddrInst>(user) || isa<DereferenceBorrowAddrInst>(user)) {

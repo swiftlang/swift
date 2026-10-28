@@ -914,9 +914,9 @@ bb0(%0 : @guaranteed $MyActor):
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_4:
-// CHECK-NEXT: First Value:   %8 = apply %2(%7) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Value:   %9 = apply %2(%8) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
 // CHECK-NEXT: First Isolation: 'self'-isolated
-// CHECK-NEXT: Second Value:   %10 = apply %9(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Value:   %11 = apply %10(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
 // CHECK-NEXT: Second Isolation: 'self'-isolated
 // CHECK-NEXT: Merged Isolation: 'self'-isolated
 // CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_4: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
@@ -926,7 +926,10 @@ bb0(%0 : @guaranteed $MyActor):
   specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
   %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
   %0a = init_existential_ref %0 : $MyActor : $MyActor, $AnyObject
-  %0b = unconditional_checked_cast %0a : $AnyObject to MyActor
+  // AnyObject casts do not guarantee reference-count identity, so the cast
+  // needs its own source reference even though this value came from an actor.
+  %0copy = copy_value %0a : $AnyObject
+  %0b = unconditional_checked_cast %0copy : $AnyObject to MyActor
   %0c = unchecked_ref_cast %0b : $MyActor to $AnyObject
   %0d = unchecked_ref_cast %0c : $AnyObject to $MyActor
   %0e = enum $Optional<MyActor>, #Optional.some!enumelt, %0d : $MyActor
@@ -935,6 +938,7 @@ bb0(%0 : @guaranteed $MyActor):
   %4 = apply %3(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
   debug_value [trace] %2 : $NonSendableKlass
   debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %0e : $Optional<MyActor>
   destroy_value %2 : $NonSendableKlass
   destroy_value %4 : $NonSendableKlass
   %9999 = tuple ()

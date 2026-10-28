@@ -1,0 +1,18 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
+// RUN: %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %S/../../Inputs/COMDynamicType.sil -o /dev/null
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+import Swift
+@com(interface: "10000000-0000-0000-0000-000000000006")
+public protocol ISource: AnyObject {}
+
+// A foreign implementation need not have any Swift nominal conforming type.
+// CHECK: COM existential_metatype result must be Any.Type
+sil [ossa] @invalid_result : $@convention(thin) (@guaranteed any ISource) -> @thick any ISource.Type {
+bb0(%source : @guaranteed $any ISource):
+  %type = existential_metatype $@thick any ISource.Type, %source : $any ISource
+  return %type : $@thick any ISource.Type
+}

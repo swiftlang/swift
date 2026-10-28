@@ -1,0 +1,36 @@
+{
+  "CanonicalName": "macosx13.0",
+  "Version": "13.0",
+  "IsBaseSDK": "YES",
+  "DisplayName": "macOS 13.0",
+  "MinimalDisplayName": "13.0",
+  "SupportedTargets": {
+    "macosx": {
+      "PlatformFamilyName": "macOS",
+      "Archs": ["x86_64", "x86_64h", "arm64", "arm64e"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "macos", "LLVMTargetTripleEnvironment": "",
+      "BuildVersionPlatformID": "1",
+      "ClangRuntimeLibraryPlatformName": "osx",
+      "SystemPrefix": "",
+      "DefaultDeploymentTarget": "13.0",
+      "RecommendedDeploymentTarget": "10.14.6",
+      "MinimumDeploymentTarget": "10.13", "MaximumDeploymentTarget": "13.0.99",
+      "ValidDeploymentTargets": ["10.13", "10.14", "10.15", "11.0", "11.1", "11.2", "11.3", "11.4", "11.5", "12.0", "12.2", "12.3", "12.4", "13.0"]
+    },
+    "iosmac": {
+      "Archs": ["x86_64", "x86_64h", "arm64", "arm64e"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "macabi",
+      "BuildVersionPlatformID": "6",
+      "ClangRuntimeLibraryPlatformName": "osx",
+      "SystemPrefix": "/System/iOSSupport",
+      "DefaultDeploymentTarget": "16.1",
+      "RecommendedDeploymentTarget": "13.1",
+      "MinimumDeploymentTarget": "13.1", "MaximumDeploymentTarget": "16.1.99",
+      "ValidDeploymentTargets": ["13.1", "13.2", "13.3", "13.3.1", "13.4", "13.5", "14.0", "14.1", "14.2", "14.3", "14.4", "14.5", "14.6", "14.7", "15.0", "15.2", "15.3", "15.4", "15.5", "15.6", "16.0", "16.1"]
+    }
+  },
+  "VersionMap": {
+    "macOS_iOSMac": {"10.15": "13.1", "10.15.1": "13.2", "10.15.2": "13.3", "10.15.3": "13.3.1", "10.15.4": "13.4", "10.15.5": "13.5",                                 "11.0": "14.2", "11.0.1": "14.2", "11.1": "14.3", "11.2": "14.4", "11.3": "14.5", "11.4": "14.6", "11.5": "14.7", "12.0": "15.0", "12.0.1": "15.0", "12.1": "15.2", "12.2": "15.3", "12.3": "15.4", "12.4": "15.5", "12.5": "15.6",                 "13.0": "16.1"},
+    "iOSMac_macOS": {"13.1": "10.15", "13.2": "10.15.1", "13.3": "10.15.2", "13.3.1": "10.15.3", "13.4": "10.15.4", "13.5": "10.15.5", "14.0": "11.0", "14.1": "11.0", "14.2": "11.0",                   "14.3": "11.1", "14.4": "11.2", "14.5": "11.3", "14.6": "11.4", "14.7": "11.5", "15.0": "12.0",                   "15.2": "12.1", "15.3": "12.2", "15.4": "12.3", "15.5": "12.4", "15.6": "12.5", "16.0": "13.0", "16.1": "13.0"}
+  },
+  "DefaultDeploymentTarget": "13.0",
+  "MaximumDeploymentTarget": "13.0.99"
+}

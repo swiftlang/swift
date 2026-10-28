@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature CompileTimeValues
 // REQUIRES: swift_feature_CompileTimeValues
 @const let x: Int = 42
-@const var y: Int = 42 // expected-error{{@const may only be used on 'let' declarations}}
+@const var y: Int = 42 // expected-error{{'@const' may only be used on 'let' declarations}}
 
 // FIXME: Only allow 'let' for `@const` properties, even in protocol requirements
 protocol ConstUserProto {
@@ -10,7 +10,7 @@ protocol ConstUserProto {
 
 class ConstFanClassWrong: ConstUserProto {
   @const static let v: String = ""
-  @const static var B: String = "" // expected-error{{@const may only be used on 'let' declarations}}
+  @const static var B: String = "" // expected-error{{'@const' may only be used on 'let' declarations}}
   @const static let C: String = ""
 }
 

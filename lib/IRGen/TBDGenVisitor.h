@@ -124,7 +124,7 @@ public:
                 APIRecorder &recorder)
       : DataLayoutDescription(dataLayoutString),
         UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false,
-                          /*static=*/false),
+                          /*static=*/false, /*isWholeModule=*/std::nullopt),
         SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
 

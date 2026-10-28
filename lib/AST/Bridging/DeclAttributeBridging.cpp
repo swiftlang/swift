@@ -17,7 +17,6 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -143,6 +142,10 @@ BridgedAvailableAttr BridgedAvailableAttr_createUnavailableInEmbedded(
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupMember();
 }
+void BridgedAvailableAttr_setMacroLoc(BridgedAvailableAttr cAttr,
+                                      SourceLoc loc) {
+  cAttr.unbridged()->setMacroLoc(loc);
+}
 void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupedWithWildcard();
 }
@@ -237,6 +240,14 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), atLoc, range,
                 /*Implicit=*/false, /*Underscored*/ underscored);
+}
+
+BridgedCxxDeclAttr BridgedCxxDeclAttr_createParsed(BridgedASTContext cContext,
+                                                   SourceLoc atLoc,
+                                                   SourceRange range,
+                                                   BridgedStringRef cName) {
+  return new (cContext.unbridged())
+      CxxDeclAttr(cName.unbridged(), atLoc, range, /*Implicit=*/false);
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(
@@ -754,6 +765,26 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                     /*Implicit=*/false);
 }
 
+BridgedTargetAttr
+BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, BridgedStringRef cValue) {
+  return new (cContext.unbridged())
+      TargetAttr(cValue.unbridged(), atLoc, range,
+                /*Implicit=*/false);
+}
+
+BridgedScopeParamsAttr
+BridgedScopeParamsAttr_createParsed(BridgedASTContext cContext,
+                                    SourceLoc atLoc, SourceRange range,
+                                    BridgedArrayRef cParams) {
+  SmallVector<Located<ScopeName>, 2> params;
+  for (auto cParam : cParams.unbridged<BridgedLocatedIdentifier>())
+    params.push_back({ScopeName(cParam.Name), cParam.NameLoc});
+  auto &ctx = cContext.unbridged();
+  return new (ctx)
+      ScopeParamsAttr(atLoc, range, ScopeParamListRepr::create(ctx, params));
+}
+
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
                                      SourceRange range,
@@ -862,9 +893,8 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return new (cContext.unbridged()) UnsafeAttr(atLoc, range, isAlways);
 }
 
-BridgedCalledAttr
-BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                               SourceRange range,
-                               swift::ExecutionSemantics semantics) {
-  return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
+BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
+                                                     SourceLoc atLoc,
+                                                     SourceRange range) {
+  return new (cContext.unbridged()) CallableAttr(atLoc, range);
 }

@@ -484,15 +484,24 @@ public:
   }
 
   static Type getResultOrYieldInterface(DeclContext *functionDC) {
-    if (auto *accessor = dyn_cast<AccessorDecl>(functionDC);
-        accessor && accessor->isCoroutine()) {
-      return accessor->getStorage()->getValueInterfaceType();
-    }
+    Type resultType;
     if (auto fn = dyn_cast<FuncDecl>(functionDC)) {
-      return fn->getResultInterfaceType();
+      resultType = fn->getResultInterfaceType();
+      if (fn->isCoroutine()) {
+        SmallVector<AnyFunctionType::Yield, 1> yields;
+        fn->getYieldInterfaceTypes(yields);
+
+        // TODO: Extend tracking to coroutines with multiple yields and / or
+        // yields and results.
+        ASSERT(/*resultType->isEqual(fn->getASTContext().TheEmptyTupleType) &&*/
+               yields.size() == 1);
+        resultType = yields.front().getType();
+      }
+    } else {
+      auto ctor = cast<ConstructorDecl>(functionDC);
+      resultType =  ctor->getResultInterfaceType();
     }
-    auto ctor = cast<ConstructorDecl>(functionDC);
-    return ctor->getResultInterfaceType();
+    return resultType;
   }
 
   static SourceLoc getReturnLoc(AbstractFunctionDecl *afd) {
@@ -618,15 +627,22 @@ public:
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(env),
         resultIndex(funcType->getParams().size()),
-        resultTy(
-          GenericEnvironment::mapTypeIntoEnvironment(env,
-                                                     funcType->getResult())),
         returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
         implicitSelfParamInfo(std::nullopt),
         depBuilder(resultIndex),
         isImplicit(false),
         isInit(false),
-        hasUnsafeNonEscapableResult(false) {}
+        hasUnsafeNonEscapableResult(false) {
+    if (funcType->isCoroutine()) {
+      assert(funcType->getYields().size() == 1);
+      resultTy = GenericEnvironment::mapTypeIntoEnvironment(
+        env, funcType->getYields().front().getType());
+    } else {
+      resultTy = 
+          GenericEnvironment::mapTypeIntoEnvironment(env,
+                                                     funcType->getResult());
+    }
+  }
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
@@ -979,7 +995,8 @@ protected:
 
   // Attribute parsing helper.
   bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind,
-                                 Type paramType, ValueOwnership loweredOwnership,
+                                 Type paramType,
+                                 LoweredOwnership loweredOwnership,
                                  bool isInterfaceFile = false) const {
     if (kind == ParsedLifetimeDependenceKind::Inherit) {
       return true;
@@ -988,18 +1005,18 @@ protected:
     if (kind == ParsedLifetimeDependenceKind::Borrow) {
       // An owned/consumed BitwiseCopyable value can be effectively borrowed
       // because its lifetime can be indefinitely extended.
-      if (loweredOwnership == ValueOwnership::Owned &&
+      if (loweredOwnership == LoweredOwnership::Owned &&
           isBitwiseCopyable(paramType, ctx)) {
         return true;
       }
       if (isInterfaceFile) {
-        return loweredOwnership == ValueOwnership::Shared ||
-               loweredOwnership == ValueOwnership::InOut;
+        return loweredOwnership == LoweredOwnership::Shared ||
+               loweredOwnership == LoweredOwnership::InOut;
       }
-      return loweredOwnership == ValueOwnership::Shared;
+      return loweredOwnership == LoweredOwnership::Shared;
     }
     assert(kind == ParsedLifetimeDependenceKind::Inout);
-    return loweredOwnership == ValueOwnership::InOut;
+    return loweredOwnership == LoweredOwnership::InOut;
   }
 
   // Inferrence helper.
@@ -1017,8 +1034,8 @@ protected:
       return true;
     }
     assert(kind == LifetimeDependenceKind::Scope);
-    return loweredOwnership == ValueOwnership::Shared ||
-           loweredOwnership == ValueOwnership::InOut;
+    return loweredOwnership == LoweredOwnership::Shared ||
+           loweredOwnership == LoweredOwnership::InOut;
   }
 
 
@@ -1177,8 +1194,8 @@ protected:
       }
 
       if (type->isEscapable()) {
-        if (loweredOwnership == ValueOwnership::Shared ||
-            loweredOwnership == ValueOwnership::InOut) {
+        if (loweredOwnership == LoweredOwnership::Shared ||
+            loweredOwnership == LoweredOwnership::InOut) {
           return LifetimeDependenceKind::Scope;
         }
         diagnose(
@@ -1208,18 +1225,17 @@ protected:
                getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
                getOwnershipSpelling(loweredOwnership));
       switch (loweredOwnership) {
-      case ValueOwnership::Shared:
+      case LoweredOwnership::Shared:
         diagnose(loc,
                  diag::lifetime_dependence_parsed_borrow_with_ownership_fix,
                  "borrow ", descriptor.getString());
         break;
-      case ValueOwnership::InOut:
+      case LoweredOwnership::InOut:
         diagnose(loc,
                  diag::lifetime_dependence_parsed_borrow_with_ownership_fix,
                  "&", descriptor.getString());
         break;
-      case ValueOwnership::Owned:
-      case ValueOwnership::Default:
+      case LoweredOwnership::Owned:
         break;
       }
       return std::nullopt;
@@ -1236,7 +1252,7 @@ protected:
   // @lifetime(copy x) is only valid if 'x' has a ~Escapable type.
   bool checkNonEscapableSource(LifetimeDescriptor descriptor,
                                const ParamInfo &sourceParam,
-                               ValueOwnership ownership) {
+                               LoweredOwnership ownership) {
     // Allow recompiling old interfaces with a newer compiler.
     if (isInterfaceFile())
       return true;
@@ -1254,9 +1270,8 @@ protected:
     auto loc = descriptor.getLoc();
     if (sourceParam.typeInContext->isEscapable()) {
       diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type);
-      diagnose(loc,
-               diag::lifetime_escapable_source_requires_escapable_note,
-               (ownership == ValueOwnership::InOut) ? "&" : "borrow ",
+      diagnose(loc, diag::lifetime_escapable_source_requires_escapable_note,
+               (ownership == LoweredOwnership::InOut) ? "&" : "borrow ",
                descriptor.getString());
       return false;
     }
@@ -1350,25 +1365,11 @@ protected:
   // Get the value ownership of param if it is non-default. Otherwise, compute
   // the lowered value ownership. The supplied Param must be a member of
   // parameters or implicitSelfParamInfo.value().
-  ValueOwnership getLoweredOwnership(Param const &param) const {
-    auto const ownership = param.getValueOwnership();
-    if (ownership != ValueOwnership::Default)
-      return ownership;
-    if (isLifetimeForDecl() && isa<ConstructorDecl>(afd)) {
-      return ValueOwnership::Owned;
-    }
-    if (auto *ad = dyn_cast_or_null<AccessorDecl>(afd)) {
-      auto const isSelfParameter = implicitSelfParamInfo.has_value() &&
-                                   &param == &(implicitSelfParamInfo->param);
-      if (ad->getAccessorKind() == AccessorKind::Set) {
-        return isSelfParameter ? ValueOwnership::InOut : ValueOwnership::Owned;
-      }
-      if (isYieldingMutableAccessor(ad->getAccessorKind())) {
-        assert(isSelfParameter);
-        return ValueOwnership::InOut;
-      }
-    }
-    return ValueOwnership::Shared;
+  LoweredOwnership getLoweredOwnership(Param const &param) const {
+    auto const isSelfParameter = implicitSelfParamInfo.has_value() &&
+                                 &param == &(implicitSelfParamInfo->param);
+    return swift::getLoweredOwnership(param.getValueOwnership(), afd,
+                                      isSelfParameter);
   }
 
   // Initialize TargetDeps based on the function's @_lifetime attributes.
@@ -1491,7 +1492,7 @@ protected:
     auto loweredOwnership = getLoweredOwnership(paramInfo.param);
     // It is impossible to depend on a consumed Escapable value (unless it is
     // BitwiseCopyable as checked above).
-    if (loweredOwnership == ValueOwnership::Owned) {
+    if (loweredOwnership == LoweredOwnership::Owned) {
       return std::nullopt;
     }
     return LifetimeDependenceKind::Scope;
@@ -1507,14 +1508,14 @@ protected:
       // regular methods...
     }
 
-    // Infer non-Escapable results.
+    // Infer non-Escapable results / yields
     if (isDiagnosedNonEscapable(resultTy)) {
       if (isInit && isImplicitOrSIL()) {
         inferImplicitInit();
       } else {
         // Apply the same-type rule before the single parameter rule. The
         // same-type rule does not trigger any diagnostics.
-        inferNonEscapableResultOnSameTypeParam();
+        inferNonEscapableResultOnSameTypeParam(resultTy);
 
         if (hasImplicitSelfParam()) {
           // Methods that return a non-Escapable value - single parameter
@@ -1546,7 +1547,7 @@ protected:
   //     @_lifetime(copy a) // OK: Optional<T>: Escapable requires T: Escapable
   //     func foo<T: ~Escapable>(a: T?) -> T {
   //
-  void inferNonEscapableResultOnSameTypeParam() {
+  void inferNonEscapableResultOnSameTypeParam(Type resultType) {
     // Check that no @_lifetime annotation is present for the function result.
     TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!targetDeps)
@@ -2444,7 +2445,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
     switch (source.getDescriptorKind()) {
     case LifetimeDescriptor::DescriptorKind::Ordered: {
       auto index = source.getIndex();
-      if (index > capacity) {
+      if (index >= capacity) {
         diags.diagnose(source.getLoc(),
                        diag::lifetime_dependence_invalid_param_index, index);
         return std::nullopt;

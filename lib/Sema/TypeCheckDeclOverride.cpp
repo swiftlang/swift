@@ -24,13 +24,14 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/UnsafeUse.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LanguageMode.h"
 #include "llvm/ADT/SmallVector.h"
 using namespace swift;
@@ -59,17 +60,19 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
   // Determine the input and result types of this function.
   auto fnType = type->castTo<AnyFunctionType>();
   auto parameters = fnType->getParams();
+  auto yields = fnType->getYields();
   Type resultType =
       dropResultOptionality(fnType->getResult(), uncurryLevel - 1);
 
   // Produce the resulting function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
     return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    parameters, resultType,
+                                    parameters, yields, resultType,
                                     fnType->getExtInfo());
   }
 
-  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+  return FunctionType::get(parameters, yields, resultType,
+                           fnType->getExtInfo());
 }
 
 Type swift::getMemberTypeForComparison(const ValueDecl *member,
@@ -104,8 +107,8 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     auto funcTy = memberType->castTo<AnyFunctionType>();
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    memberType =
-        FunctionType::get(funcTy->getParams(), funcTy->getResult(), info);
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                                   funcTy->getResult(), info);
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();
@@ -643,6 +646,62 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
   }
 }
 
+// Returns true if an override with the given parameter ownership specifier is
+// allowed over a base method with a given parameter ownership specifier.
+static bool paramSpecifiersMatch(const ValueDecl *baseDecl,
+                                 ParamSpecifier baseSpec,
+                                 ParamSpecifier derivedSpec) {
+  // We allow for specifier mismatches between imported ObjC base methods and
+  // Swift overrides.
+  if (baseDecl->isObjC() && baseDecl->hasClangNode()) {
+    return true;
+  }
+  
+  // The default ownership for initializer parameters is consuming. For other
+  // declarations it's borrowing.
+  auto defaultSpecifier = isa<ConstructorDecl>(baseDecl)
+    ? ParamSpecifier::Consuming
+    : ParamSpecifier::Borrowing;
+  
+  baseSpec = baseSpec == ParamSpecifier::Default
+    ? defaultSpecifier : baseSpec;
+  derivedSpec = derivedSpec == ParamSpecifier::Default
+    ? defaultSpecifier : derivedSpec;
+  
+#define SPECS(b, d) (unsigned(b) << 16 | unsigned(d))
+  switch ((SPECS(baseSpec, derivedSpec))) {
+  // Exact matches are OK.
+  case SPECS(ParamSpecifier::InOut, ParamSpecifier::InOut):
+  case SPECS(ParamSpecifier::Borrowing, ParamSpecifier::Borrowing):
+  case SPECS(ParamSpecifier::Consuming, ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::LegacyShared, ParamSpecifier::LegacyShared):
+  case SPECS(ParamSpecifier::LegacyOwned, ParamSpecifier::LegacyOwned):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  
+  // Modifiers from different eras may be matched as long as they have the same
+  // external ownership behavior.
+  case SPECS(ParamSpecifier::Borrowing, ParamSpecifier::LegacyShared):
+  case SPECS(ParamSpecifier::LegacyShared, ParamSpecifier::Borrowing):
+  case SPECS(ParamSpecifier::Consuming, ParamSpecifier::LegacyOwned):
+  case SPECS(ParamSpecifier::Consuming,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  case SPECS(ParamSpecifier::LegacyOwned, ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::LegacyOwned,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::LegacyOwned):
+    
+    return true;
+  
+  default:
+    return false;
+  }
+#undef SPECS
+}
+
 static bool parameterTypesMatch(const ValueDecl *derivedDecl,
                                 const ValueDecl *baseDecl,
                                 TypeMatchOptions matchMode) {
@@ -668,8 +727,9 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
     auto *baseParam = baseParams->get(i);
     auto *derivedParam = derivedParams->get(i);
 
-    // Make sure inout-ness and varargs match.
-    if (baseParam->isInOut() != derivedParam->isInOut() ||
+    // Make sure ownership specifiers and varargs match.
+    if (!paramSpecifiersMatch(baseDecl, baseParam->getSpecifier(),
+                                       derivedParam->getSpecifier()) ||
         baseParam->isVariadic() != derivedParam->isVariadic()) {
       return false;
     }
@@ -1127,9 +1187,10 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       diags.diagnose(decl, diag::override_of_non_open, decl);
     }
   } else if (baseHasOpenAccess &&
-             classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() < AccessLevel::Public &&
-             !decl->isSemanticallyFinal()) {
+             !decl->isSemanticallyFinal() &&
+             classDecl->hasOpenAccess(dc) &&
+             classDecl->getFormalAccessScope(dc).isPublic()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
                                  /*setter*/ false, decl,
@@ -1235,6 +1296,10 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   }
 
   checkOverrideAccessControl(baseDecl, decl, ctx);
+
+  if (!isa<AccessorDecl>(decl))
+    diagnoseImplicitForceUnwrapOfIUOParams(decl, baseDecl,
+                                           /*isWitness=*/false);
 
   bool mayHaveMismatchedOptionals =
       (attempt == OverrideCheckingAttempt::MismatchedOptional ||
@@ -1503,6 +1568,10 @@ bool swift::checkOverrides(ValueDecl *decl) {
   if (decl->getAttrs().hasAttribute<NonOverrideAttr>())
     return false;
 
+  // Neither does a @cxx implementation; see OverriddenDeclsRequest.
+  if (decl->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return false;
+
   // If we already computed overridden declarations and either succeeded
   // or invalidated the attribute, there's nothing more to do.
   if (decl->overriddenDeclsComputed()) {
@@ -1602,9 +1671,12 @@ namespace  {
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(COM)
-    UNINTERESTING_ATTR(Called)
+    UNINTERESTING_ATTR(Callable)
+    UNINTERESTING_ATTR(ScopeParams)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(Coroutine)
+    UNINTERESTING_ATTR(CxxDecl)
     UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(DynamicCallable)
@@ -1615,7 +1687,6 @@ namespace  {
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
-    UNINTERESTING_ATTR(HasHiddenStoredProperties)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
@@ -1669,9 +1740,11 @@ namespace  {
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
+    UNINTERESTING_ATTR(Once)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
+    UNINTERESTING_ATTR(Target)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
@@ -2128,7 +2201,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(
-                overrideThrownError, baseThrownError, overrideFn)) {
+                overrideThrownError, baseThrownError)) {
     case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects, override,
                      "throwing");
@@ -2546,6 +2619,13 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     return abiOverriddenDecls;
   }
+
+  // A @cxx implementation is the body of a C++ method, whose C++ declaration
+  // says what it overrides; the Swift function overrides nothing. Its
+  // `override` keyword is checked against the C++ declaration when it is
+  // matched to the imported method.
+  if (decl->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return {};
 
   auto &ctx = decl->getASTContext();
   auto overridden = computeOverriddenDecls(decl, false);

@@ -27,8 +27,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <unordered_map>
 

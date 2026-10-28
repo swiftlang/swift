@@ -13,14 +13,16 @@
 /// A C++ type that can be converted to a Boolean value.
 ///
 /// Any C++ type that defines `operator bool()` conforms to this protocol.
-public protocol CxxConvertibleToBool {
+public protocol CxxConvertibleToBool: ~Copyable & ~Escapable {
   /// Do not implement this function manually in Swift.
   func __convertToBool() -> Bool
 }
 
 extension Bool {
   @inlinable
-  public init<B: CxxConvertibleToBool>(fromCxx convertible: __shared B) {
+  public init<B: CxxConvertibleToBool & ~Copyable & ~Escapable>(
+    fromCxx convertible: borrowing B
+  ) {
     self = convertible.__convertToBool()
   }
 }

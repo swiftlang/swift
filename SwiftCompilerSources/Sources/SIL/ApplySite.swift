@@ -197,6 +197,12 @@ extension ApplySite {
     argumentOperands.values
   }
 
+  /// The `self` argument value, or nil if the callee has no `self` parameter.
+  /// `self` is always the last argument.
+  public var selfArgument: Value? {
+    functionConvention.hasSelfParameter ? arguments.last : nil
+  }
+
   /// Returns true when this apply has per-argument SILLocations stored on it.
   ///
   /// Per-argument locations are reserved today for the IsolationHistory
@@ -388,6 +394,10 @@ extension ApplySite {
 
   public var hasGuaranteedResult: Bool {
     functionConvention.hasGuaranteedResult
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    functionConvention.hasGuaranteedAddressResult
   }
 }
 

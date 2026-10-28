@@ -33,7 +33,7 @@ struct Value {
   ~Value() {}
 
   // User-declared copy ctor => "self-contained" => reference-returning members
-  // are treated as unsafe and renamed to __<name>Unsafe
+  // are treated as '@unsafe(always)'
   Value(const Value &other) : storage(other.storage) {}
 
   // This will not be explicitly specialized
@@ -47,7 +47,9 @@ struct Value {
 
 // CHECK: struct Value {
 // CHECK:   func __GetNoSpecUnsafe<T>() -> UnsafePointer<T>
+// CHECK:   func GetNoSpec<T>() -> UnsafePointer<T>
 // CHECK:   func __GetWithSpecUnsafe<T>() -> UnsafePointer<T>
+// CHECK:   func GetWithSpec<T>() -> UnsafePointer<T>
 // CHECK: }
 
 // Explicit full specialization for T = Value (mirrors value.h:1542)
@@ -58,9 +60,9 @@ inline const Value &Value::GetWithSpec<Value>() const & { return *this; }
 import Repro
 
 func f(v: Value) {
-  let _: Bool = v.__GetNoSpecUnsafe().pointee
-  let _: Bool = v.__GetWithSpecUnsafe().pointee
+  let _: Bool = unsafe v.GetNoSpec().pointee
+  let _: Bool = unsafe v.GetWithSpec().pointee
 
-  let _: Value = v.__GetNoSpecUnsafe().pointee
-  let _: Value = v.__GetWithSpecUnsafe().pointee
+  let _: Value = unsafe v.GetNoSpec().pointee
+  let _: Value = unsafe v.GetWithSpec().pointee
 }

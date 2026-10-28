@@ -22,7 +22,6 @@
 #include "MoveOnlyDiagnostics.h"
 #include "MoveOnlyUtils.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -39,7 +38,7 @@ struct MoveOnlyTempAllocationFromLetTester : SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     LLVM_DEBUG(llvm::dbgs()

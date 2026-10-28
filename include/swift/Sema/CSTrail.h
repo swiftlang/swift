@@ -40,6 +40,8 @@ class Constraint;
 enum ScoreKind : unsigned int;
 struct SyntacticElementTargetKey;
 
+class ConflictedType;
+
 namespace inference {
 struct PotentialBinding;
 }
@@ -151,8 +153,14 @@ public:
       } Binding;
 
       struct {
+        TypeVariableType *TypeVar;
+        ConflictedType *ConflictType;
+      } Conflict;
+
+      struct {
         Constraint *Disjunction;
         FunctionType *ArgFuncType;
+        unsigned ResultGenerationNumber;
       } Disjunction;
 
       ConstraintFix *TheFix;
@@ -274,9 +282,14 @@ public:
     static Change RetractedBinding(TypeVariableType *typeVar,
                                    inference::PotentialBinding binding);
 
+    /// Create a change that adds a conflict for a type variable
+    static Change AddedConflict(TypeVariableType *typeVar,
+                                ConflictedType *conflict);
+
     /// Create a change that disjunction pruning was performed.
     static Change PrunedDisjunction(Constraint *disjunction,
-                                    FunctionType *argFuncType);
+                                    FunctionType *argFuncType,
+                                    unsigned resultGenerationNumber);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.

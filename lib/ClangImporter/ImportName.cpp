@@ -28,12 +28,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/ParseDeclName.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
@@ -53,13 +52,22 @@
 #include <memory>
 #include <optional>
 
-#include "llvm/ADT/Statistic.h"
-#define DEBUG_TYPE "Import Name"
-STATISTIC(ImportNameNumCacheHits, "# of times the import name cache was hit");
-STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed");
-
 using namespace swift;
 using namespace importer;
+
+void ImportNameVersion::dump(llvm::raw_ostream &out) const {
+  if (*this == raw())
+    out << "raw";
+  else
+    out << asClangVersionTuple().getAsString();
+  if (supportsConcurrency())
+    out << " (concurrency)";
+}
+
+void ImportNameVersion::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
+}
 
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
@@ -1815,6 +1823,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           parsedName.BaseNameKind == DeclBaseName::Kind::Constructor &&
           !shouldImportAsInitializer(func, parsedName))
         skipCustomName = true;
+
+      if (!skipCustomName &&
+          parsedName.BaseNameKind == DeclBaseName::Kind::Constructor) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(func))
+          if (method->isStatic() &&
+              getUncachedForeignReferenceTypeInfo(method->getParent())
+                  .isReference())
+            // This lets a Swift subclass of this FRT initialize itself using
+            // base's constructor.
+            result.info.initKind = CtorInitializerKind::ConvenienceFactory;
+      }
     }
 
     if (!skipCustomName) {
@@ -2394,7 +2413,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
-                                                       swiftCtx, this, version);
+                                                       this, version);
       baseName = swiftCtx.getIdentifier(name).get();
     }
   }
@@ -2646,11 +2665,13 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   CacheKeyType key(decl, version);
   if (!givenName) {
     if (auto cachedRes = importNameCache[key]) {
-      ++ImportNameNumCacheHits;
+      if (auto *Stats = swiftCtx.Stats)
+        ++Stats->getFrontendCounters().ClangNameImportCacheHit;
       return cachedRes;
     }
   }
-  ++ImportNameNumCacheMisses;
+  if (auto *Stats = swiftCtx.Stats)
+    ++Stats->getFrontendCounters().ClangNameImportCacheMiss;
   auto res = importNameImpl(decl, version, givenName);
 
   // Add information about the async version of the name to the non-async

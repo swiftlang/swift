@@ -16,7 +16,6 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/DependencyScanJSON.h"
 #include "swift/DependencyScan/StringUtils.h"
@@ -34,6 +33,7 @@ namespace {
 enum Actions {
   compute_cache_key,
   compute_cache_key_from_index,
+  compute_cache_keys_from_indices,
   cache_query,
   replay_result,
   scan_dependency,
@@ -54,11 +54,23 @@ llvm::cl::opt<std::string> CASID("id", llvm::cl::desc("<casid>"),
                                  llvm::cl::cat(Category));
 llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
                                  llvm::cl::cat(Category));
-llvm::cl::opt<unsigned> Threads("threads",
+llvm::cl::opt<unsigned> Threads("scan-threads",
                                 llvm::cl::desc("<number of threads>"),
                                 llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
                                             llvm::cl::cat(Category));
+llvm::cl::list<std::string>
+    OutputFiles("o",
+                llvm::cl::desc("<path> (one per '--'-separated argument group; "
+                               "defaults to stdout)"),
+                llvm::cl::cat(Category));
+llvm::cl::list<std::string> InvalidatedPaths("invalidated-path",
+                                             llvm::cl::desc("<path>"),
+                                             llvm::cl::cat(Category));
+llvm::cl::opt<std::string> MainExecutablePath(
+    "main-executable-path",
+    llvm::cl::desc("<path of the compiler that runs the scanned jobs>"),
+    llvm::cl::cat(Category));
 llvm::cl::opt<bool>
     NonRecursive("non-recursive",
                  llvm::cl::desc("avoid recursing when ingesting a directory"),
@@ -69,6 +81,8 @@ llvm::cl::opt<Actions>
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
                             clEnumVal(compute_cache_key_from_index,
                                       "compute cache key from index"),
+                            clEnumVal(compute_cache_keys_from_indices,
+                                      "compute cache keys from indices"),
                             clEnumVal(cache_query, "cache query"),
                             clEnumVal(replay_result, "replay result"),
                             clEnumVal(scan_dependency, "scan dependency"),
@@ -132,6 +146,37 @@ static int action_compute_cache_key_from_index(swiftscan_cas_t cas,
 
   os << toString(key) << "\n";
   swiftscan_string_dispose(key);
+
+  return EXIT_SUCCESS;
+}
+
+static int
+action_compute_cache_keys_from_indices(swiftscan_cas_t cas, StringRef indices,
+                                       std::vector<const char *> &Args,
+                                       llvm::raw_ostream &os) {
+  SmallVector<StringRef> indexStrs;
+  indices.split(indexStrs, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  std::vector<unsigned> inputIndices;
+  for (auto indexStr : indexStrs) {
+    unsigned inputIndex = 0;
+    if (!to_integer(indexStr, inputIndex)) {
+      llvm::errs() << "-input is not a list of numbers for "
+                      "compute_cache_keys_from_indices\n";
+      return EXIT_FAILURE;
+    }
+    inputIndices.push_back(inputIndex);
+  }
+
+  swiftscan_string_ref_t err_msg;
+  auto keys = swiftscan_cache_compute_keys_from_input_indices(
+      cas, Args.size(), Args.data(), inputIndices.data(), inputIndices.size(),
+      &err_msg);
+  if (!keys)
+    return printError(err_msg);
+
+  for (size_t i = 0; i < keys->count; ++i)
+    os << toString(keys->strings[i]) << "\n";
+  swiftscan_string_set_dispose(keys);
 
   return EXIT_SUCCESS;
 }
@@ -275,6 +320,9 @@ static int action_scan_dependency(swiftscan_scanner_t scanner,
   swiftscan_scan_invocation_set_working_directory(
       invocation, WorkingDirectory.str().c_str());
   swiftscan_scan_invocation_set_argv(invocation, Args.size(), Args.data());
+  if (!MainExecutablePath.empty())
+    swiftscan_scan_invocation_set_main_executable_path(
+        invocation, MainExecutablePath.c_str());
 
   auto graph = swiftscan_dependency_graph_create(scanner, invocation);
   if (!graph)
@@ -377,20 +425,96 @@ int main(int argc, char *argv[]) {
     return printError(err_msg);
   SWIFT_DEFER { swiftscan_cas_dispose(cas); };
 
+  bool IsScanAction =
+      Action == scan_dependency || Action == get_chained_bridging_header;
+
+  // For scan actions, split the positional swift-frontend command into
+  // multiple groups separated by a literal "--". This allows a single
+  // swift-scan-test invocation to run several scans sequentially against the
+  // same scanner (and thus the same long-lived scanning service), to test
+  // behavior that depends on state the service retains across scans.
+  std::vector<std::vector<std::string>> CommandGroups;
+  if (IsScanAction) {
+    CommandGroups.emplace_back();
+    for (const auto &Cmd : SwiftCommands) {
+      if (Cmd == "--")
+        CommandGroups.emplace_back();
+      else
+        CommandGroups.back().push_back(Cmd);
+    }
+  } else {
+    CommandGroups.push_back(SwiftCommands);
+  }
+
+  if (!OutputFiles.empty()) {
+    if (CommandGroups.size() == 1) {
+      llvm::errs() << "-o is only supported with multiple '--'-separated "
+                      "argument groups; redirect stdout otherwise\n";
+      return EXIT_FAILURE;
+    }
+    if (OutputFiles.size() != CommandGroups.size()) {
+      llvm::errs() << "-o must be specified once per '--'-separated "
+                      "argument group ("
+                   << CommandGroups.size() << " expected, got "
+                   << OutputFiles.size() << ")\n";
+      return EXIT_FAILURE;
+    }
+  }
+
   // Convert commands.
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver(Alloc);
-  auto Args = createArgs(SwiftCommands, Saver, Action);
+  std::vector<std::vector<const char *>> ArgGroups;
+  for (const auto &Group : CommandGroups)
+    ArgGroups.push_back(createArgs(Group, Saver, Action));
 
   swiftscan_scanner_t scanner = nullptr;
-  if (Action == scan_dependency || Action == get_chained_bridging_header)
+  if (IsScanAction)
     scanner = swiftscan_scanner_create();
   SWIFT_DEFER {
     if (scanner)
       swiftscan_scanner_dispose(scanner);
   };
+  if (scanner && !InvalidatedPaths.empty()) {
+    // Spell these like Clang's directory dependencies, which are matched
+    // textually.
+    std::vector<const char *> Paths;
+    for (const auto &Path : InvalidatedPaths) {
+      SmallString<256> Canonical(Path);
+      llvm::sys::fs::make_absolute(Canonical);
+      llvm::sys::path::remove_dots(Canonical, /*remove_dot_dot=*/true);
+      Paths.push_back(Saver.save(Canonical.str()).data());
+    }
+    swiftscan_scanner_add_invalidated_paths(scanner, Paths.data(),
+                                            Paths.size());
+  }
 
   std::atomic<int> Ret = 0;
+
+  if (IsScanAction && CommandGroups.size() > 1) {
+    // Run each argument group sequentially against the same scanner, so
+    // later scans observe any state the scanner/service retained from the
+    // earlier ones.
+    for (unsigned i = 0, e = ArgGroups.size(); i != e; ++i) {
+      std::optional<llvm::raw_fd_ostream> FileOS;
+      llvm::raw_ostream *os = &llvm::outs();
+      if (!OutputFiles.empty()) {
+        std::error_code EC;
+        FileOS.emplace(OutputFiles[i], EC, llvm::sys::fs::OF_None);
+        if (EC) {
+          llvm::errs() << "failed to open '" << OutputFiles[i]
+                       << "': " << EC.message() << "\n";
+          return EXIT_FAILURE;
+        }
+        os = &*FileOS;
+      }
+      Ret += action_scan_dependency(scanner, ArgGroups[i], WorkingDirectory,
+                                    Action == get_chained_bridging_header, *os);
+    }
+    return Ret;
+  }
+
+  auto &Args = ArgGroups.front();
   llvm::raw_null_ostream nullOS;
   std::vector<llvm::raw_null_ostream> nullStreams(Threads - 1);
   // Get the output stream for the thread. Only the first thread writes the
@@ -410,6 +534,9 @@ int main(int argc, char *argv[]) {
         break;
       case compute_cache_key_from_index:
         Ret += action_compute_cache_key_from_index(cas, Input, Args, os);
+        break;
+      case compute_cache_keys_from_indices:
+        Ret += action_compute_cache_keys_from_indices(cas, Input, Args, os);
         break;
       case cache_query:
         Ret += action_cache_query(cas, CASID.c_str(), os);

@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=off \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -I %S%{fs-sep}Inputs \
 // RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}return-foreign-reference.h
 

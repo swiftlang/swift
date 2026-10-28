@@ -13,11 +13,14 @@
 #ifndef SWIFT_PREBUILT_STRING_MAP_H
 #define SWIFT_PREBUILT_STRING_MAP_H
 
+#include "llvm/ADT/StringRef.h"
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <type_traits>
 #include <utility>
 
 namespace swift {
@@ -94,9 +97,9 @@ struct PrebuiltStringMapBase {
   /// Search for a matching entry in the map. `isMatch` is called with a
   /// candidate index and returns true if there is a match at that index.
   template <typename IsMatch>
-  std::optional<size_t> findIndex(const void *string, size_t len,
+  std::optional<size_t> findIndex(llvm::StringRef string,
                                   const IsMatch &isMatch) const {
-    uint64_t hashValue = hash(string, len);
+    uint64_t hashValue = hash(string.data(), string.size());
 
     size_t index = hashValue % arraySize;
 
@@ -153,8 +156,8 @@ struct PrebuiltStringMap : PrebuiltStringMapBase {
   /// initializing the element to contain the string/value. It is assumed that
   /// the key does not already exist in the map. If it does exist, this will
   /// insert a useless duplicate.
-  ArrayElement *insert(const void *string, size_t len) {
-    auto foundIndex = findIndex(string, len, [&](size_t index) {
+  ArrayElement *insert(llvm::StringRef string) {
+    auto foundIndex = findIndex(string, [&](size_t index) {
       return stringIsNull(array()[index].key);
     });
 
@@ -163,18 +166,9 @@ struct PrebuiltStringMap : PrebuiltStringMapBase {
     return nullptr;
   }
 
-  ArrayElement *insert(const char *string) {
-    return insert(string, strlen(string));
-  }
-
   /// Look up the given string in the table. Requires that StringTy be
   /// `const char *`.
-  const ArrayElement *find(const char *toFind) const {
-    size_t len = strlen(toFind);
-    return find(toFind, len);
-  }
-
-  const ArrayElement *find(const char *toFind, size_t len) const {
+  const ArrayElement *find(llvm::StringRef toFind) const {
     auto equalOrNull = [&](size_t index) {
       auto key = array()[index].key;
 
@@ -183,15 +177,16 @@ struct PrebuiltStringMap : PrebuiltStringMapBase {
         return true;
 
       // key is NUL terminated but toFind may not be. Check that they have equal
-      // contents up to len, and check that key has a terminating NUL at the
-      // right point.
-      if (strncmp(key, toFind, len) == 0 && key[len] == 0)
+      // contents up to toFind's length, and check that key has a terminating NUL
+      // at the right point.
+      if (strncmp(key, toFind.data(), toFind.size()) == 0 &&
+          key[toFind.size()] == 0)
         return true;
 
       // Not NULL, not equal, keep searching.
       return false;
     };
-    auto foundIndex = findIndex(toFind, len, equalOrNull);
+    auto foundIndex = findIndex(toFind, equalOrNull);
     if (!foundIndex)
       return nullptr;
 
@@ -209,14 +204,20 @@ struct PrebuiltStringMap : PrebuiltStringMapBase {
 /// be determined by looking at the values. The map contains auxiliary data
 /// stored out of line from the main elements, to avoid padding when the aux
 /// data is smaller than the alignment of the main elements.
+///
+/// AuxTy may be void, for a map that needs no auxiliary data. For those maps,
+/// the aux pointer handed to callbacks is always NULL.
 template <typename ElemTy, typename AuxTy>
 struct PrebuiltAuxDataImplicitStringMap : PrebuiltStringMapBase {
   PrebuiltAuxDataImplicitStringMap(uint64_t arraySize)
       : PrebuiltStringMapBase(arraySize) {}
 
   static size_t byteSize(uint64_t arraySize) {
-    return sizeof(PrebuiltStringMapBase) + sizeof(ElemTy) * arraySize +
-           sizeof(AuxTy) * arraySize;
+    size_t size = sizeof(PrebuiltStringMapBase) + sizeof(ElemTy) * arraySize;
+    // sizeof(void) is not legal, so only add AuxTy size if it's not void.
+    if constexpr (!std::is_void_v<AuxTy>)
+      size += sizeof(AuxTy) * arraySize;
+    return size;
   }
 
   using DataPointers = std::pair<ElemTy *, AuxTy *>;
@@ -230,12 +231,27 @@ struct PrebuiltAuxDataImplicitStringMap : PrebuiltStringMapBase {
 
   AuxTy *aux() { return (AuxTy *)(elements() + arraySize); }
 
+  /// The aux data for an index, or NULL when AuxTy is void and there is none.
+  const AuxTy *auxAt(size_t index) const {
+    if constexpr (std::is_void_v<AuxTy>)
+      return nullptr;
+    else
+      return &aux()[index];
+  }
+
+  AuxTy *auxAt(size_t index) {
+    if constexpr (std::is_void_v<AuxTy>)
+      return nullptr;
+    else
+      return &aux()[index];
+  }
+
   DataPointersConst pointers(size_t index) const {
-    return {&elements()[index], &aux()[index]};
+    return {&elements()[index], auxAt(index)};
   }
 
   DataPointers pointers(size_t index) {
-    return {&elements()[index], &aux()[index]};
+    return {&elements()[index], auxAt(index)};
   }
 
   /// Perform the search portion of an insertion operation. Returns pointers to
@@ -248,8 +264,8 @@ struct PrebuiltAuxDataImplicitStringMap : PrebuiltStringMapBase {
   /// corresponding auxiliary data, and must return true if the element is
   /// considered NULL (empty).
   template <typename IsNull>
-  DataPointers insert(const char *string, const IsNull &isNull) {
-    auto foundIndex = findIndex(string, strlen(string), [&](size_t index) {
+  DataPointers insert(llvm::StringRef string, const IsNull &isNull) {
+    auto foundIndex = findIndex(string, [&](size_t index) {
       return isNull(pointers(index));
     });
     if (!foundIndex)
@@ -270,9 +286,9 @@ struct PrebuiltAuxDataImplicitStringMap : PrebuiltStringMapBase {
   /// will only be NULL if the table data was malformed and no match or NULL
   /// exists in it.
   template <typename IsMatch, typename IsNull>
-  DataPointersConst find(const char *toFind, size_t len, const IsMatch &isMatch,
+  DataPointersConst find(llvm::StringRef toFind, const IsMatch &isMatch,
                          const IsNull &isNull) const {
-    auto foundIndex = findIndex(toFind, len, [&](size_t index) {
+    auto foundIndex = findIndex(toFind, [&](size_t index) {
       return isNull(pointers(index)) || isMatch(pointers(index));
     });
     if (!foundIndex)

@@ -18,9 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILValue.h"
 
 using namespace swift;
 
@@ -84,8 +82,10 @@ void ProtocolConformanceAnalysis::populateConformanceCacheIfNecessary() {
   // Process all types implementing protocols.
   SmallVector<Decl *, 32> Decls;
 
-  // Find all top level declarations.
-  M->getSwiftModule()->getTopLevelDecls(Decls);
+  // Find all top level declarations. We don't want freestanding since ASTWalker
+  // handles those.
+  M->getSwiftModule()->getTopLevelDeclsWithAuxiliaryDecls(
+      Decls, /*visitFreestanding*/ false);
 
   /// This operation is quadratic and should only be performed
   /// in whole module compilation!

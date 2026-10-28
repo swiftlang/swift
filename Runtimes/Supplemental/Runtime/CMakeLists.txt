@@ -183,6 +183,8 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     SymbolLocator.swift
     Utils.swift
     Win32Unwinder.swift
+
+    SafeReadMemory.cpp
   )
 
   # Add the correct assembly language files

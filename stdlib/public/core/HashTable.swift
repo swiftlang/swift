@@ -77,7 +77,7 @@ extension _HashTable {
 
   internal static func capacity(forScale scale: Int8) -> Int {
     let bucketCount = (1 as Int) &<< scale
-    return unsafe Int(Double(bucketCount) * maxLoadFactor)
+    return Int(Double(bucketCount) * maxLoadFactor)
   }
 
   internal static func scale(forCapacity capacity: Int) -> Int8 {
@@ -85,7 +85,7 @@ extension _HashTable {
     // Calculate the minimum number of entries we need to allocate to satisfy
     // the maximum load factor. `capacity + 1` below ensures that we always
     // leave at least one hole.
-    let minimumEntries = unsafe Swift.max(
+    let minimumEntries = Swift.max(
       Int((Double(capacity) / maxLoadFactor).rounded(.up)),
       capacity + 1)
     // The actual number of entries we need to allocate is the lowest power of
@@ -95,7 +95,7 @@ extension _HashTable {
     _internalInvariant(exponent >= 0 && exponent < Int.bitWidth)
     // The scale is the exponent corresponding to the bucket count.
     let scale = Int8(truncatingIfNeeded: exponent)
-    unsafe _internalInvariant(self.capacity(forScale: scale) >= capacity)
+    _internalInvariant(self.capacity(forScale: scale) >= capacity)
     return scale
   }
 
@@ -148,20 +148,20 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(word: Int, bit: Int) {
-      self.offset = unsafe _UnsafeBitset.join(word: word, bit: bit)
+      self.offset = _UnsafeBitset.join(word: word, bit: bit)
     }
 
     @inlinable
     internal var word: Int {
       @inline(__always) get {
-        return unsafe _UnsafeBitset.word(for: offset)
+        return _UnsafeBitset.word(for: offset)
       }
     }
 
     @inlinable
     internal var bit: Int {
       @inline(__always) get {
-        return unsafe _UnsafeBitset.bit(for: offset)
+        return _UnsafeBitset.bit(for: offset)
       }
     }
   }

@@ -228,6 +228,18 @@ bool BridgedDeclObj::AbstractStorage_isConst() const {
   return getAs<swift::AbstractStorageDecl>()->isConstValue();
 }
 
+bool BridgedDeclObj::Var_isLet() const {
+  return getAs<swift::VarDecl>()->isLet();
+}
+
+bool BridgedDeclObj::Var_hasInitialValue() const {
+  return getAs<swift::VarDecl>()->getParentExecutableInitializer() != nullptr;
+}
+
+void BridgedDeclObj::Var_emitLetToVarNoteIfSimple() const {
+  getAs<swift::VarDecl>()->emitLetToVarNoteIfSimple(nullptr);
+}
+
 bool BridgedDeclObj::GenericType_isGenericAtAnyLevel() const {
   return getAs<swift::GenericTypeDecl>()->isGenericContext();
 }
@@ -249,6 +261,10 @@ BridgedASTType BridgedDeclObj::Enum_getRawType() const {
   if (rawTy)
     return {rawTy.getPointer()};
   return {nullptr};
+}
+
+bool BridgedDeclObj::Enum_hasCasesUnavailableDuringLowering() const {
+  return getAs<swift::EnumDecl>()->hasCasesUnavailableDuringLowering();
 }
 
 bool BridgedDeclObj::Struct_hasUnreferenceableStorage() const {
@@ -301,8 +317,21 @@ bool BridgedDeclObj::AbstractFunction_isOverridden() const {
   return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }
 
+bool BridgedDeclObj::AbstractFunction_isDistributedWitnessWithAdHocSerializationRequirement() const {
+  return getAs<swift::AbstractFunctionDecl>()
+      ->isDistributedWitnessWithAdHocSerializationRequirement();
+}
+
+BridgedParameterList BridgedDeclObj::AbstractFunction_getParameterList() const {
+  return getAs<swift::AbstractFunctionDecl>()->getParameters();
+}
+
 bool BridgedDeclObj::Constructor_isInheritable() const {
   return getAs<swift::ConstructorDecl>()->isInheritable();
+}
+
+bool BridgedDeclObj::Constructor_isFailable() const {
+  return getAs<swift::ConstructorDecl>()->isFailable();
 }
 
 bool BridgedDeclObj::Destructor_isIsolated() const {
@@ -404,6 +433,10 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(const swift::DiagnosticArgu
 
 const swift::DiagnosticArgument &BridgedDiagnosticArgument::unbridged() const {
   return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
+}
+
+BridgedDiagnosticArgument BridgedDeclObj::Value_asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(getAs<swift::ValueDecl>()->getName());
 }
 
 //===----------------------------------------------------------------------===//
@@ -559,6 +592,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasOpaqueArchetype() const {
+  return unbridged()->hasOpaqueArchetype();
+}
+
 bool BridgedASTType::hasExistentialArchetype() const {
   return unbridged()->hasOpenedExistential();
 }
@@ -673,12 +710,20 @@ bool BridgedASTType::isBuiltinFixedArray() const {
   return unbridged()->is<swift::BuiltinFixedArrayType>();
 }
 
+bool BridgedASTType::isBuiltinBridgeObject() const {
+  return unbridged()->is<swift::BuiltinBridgeObjectType>();
+}
+
 bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
 
 bool BridgedASTType::isPack() const {
   return unbridged()->is<swift::PackType>();
+}
+
+bool BridgedASTType::isPackExpansion() const {
+  return unbridged()->is<swift::PackExpansionType>();
 }
 
 bool BridgedASTType::isSILPack() const {
@@ -711,8 +756,16 @@ bool BridgedASTType::isOptional() const {
   return unbridged()->getCanonicalType()->isOptional();
 }
 
+bool BridgedASTType::isStructurallyUninhabited() const {
+  return unbridged()->isStructurallyUninhabited();
+}
+
 bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
+}
+
+bool BridgedASTType::isReferenceStorageType() const {
+  return unbridged()->is<swift::ReferenceStorageType>();
 }
 
 bool BridgedASTType::isBuiltinType() const {
@@ -739,8 +792,8 @@ bool BridgedASTType::isUnsafeMutableRawBufferPointerType() const {
   return unbridged()->isUnsafeMutableRawBufferPointer();
 }
 
-OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
-  return {unbridged()->getNominalOrBoundGenericNominal()};
+OptionalBridgedDeclObj BridgedASTType::getNominalDecl() const {
+  return {unbridged()->getNominalDecl()};
 }
 
 BridgedASTType::TraitResult BridgedASTType::canBeClass() const {
@@ -799,6 +852,8 @@ BridgedASTType::FunctionTypeRepresentation BridgedASTType::getFunctionTypeRepres
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorSetter == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorSetter);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorEquals == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorEquals);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorHash == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorHash);
+  static_assert((int)FunctionTypeRepresentation::COMMethod ==
+                (int)swift::SILFunctionTypeRepresentation::COMMethod);
 
   auto fnType = unbridged()->castTo<swift::SILFunctionType>();
   return (FunctionTypeRepresentation)(fnType->getRepresentation());
@@ -850,8 +905,12 @@ bool BridgedASTType::Tuple_containsPackExpansionType() const {
   return llvm::cast<swift::TupleType>(type)->containsPackExpansionType();
 }
 
-BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
-  return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
+BridgedASTTypeArray BridgedASTType::NominalType_getGenericArgs() const {
+  return {llvm::cast<swift::NominalType>(type)->getGenericArgs()};
+}
+
+BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {
+  return {llvm::cast<swift::PackType>(type)->getElementTypes()};
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
@@ -889,6 +948,13 @@ BridgedCanType::SILFunctionType_getSubstGenericSignature() const {
   return {swift::CanSILFunctionType(llvm::cast<swift::SILFunctionType>(type))
               ->getSubstGenericSignature()
               .getPointer()};
+}
+
+BridgedConformanceArray
+BridgedCanType::collectExistentialConformances(BridgedCanType existential) const {
+  return {swift::collectExistentialConformances(unbridged(),
+                                                existential.unbridged(),
+                                                /*allowMissing=*/ false)};
 }
 
 //===----------------------------------------------------------------------===//
@@ -940,6 +1006,10 @@ BridgedDeclObj BridgedConformance::getRequirement() const {
 BridgedConformance BridgedConformance::getGenericConformance() const {
   auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
   return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};
+}
+
+BridgedConformance BridgedConformance::getCanonicalConformance() const {
+  return {unbridged().getCanonicalConformanceRef()};
 }
 
 BridgedConformance BridgedConformance::getInheritedConformance() const {
@@ -1052,6 +1122,11 @@ bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
 
 bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
   return unbridged().hasAnySubstitutableParams();
+}
+
+BridgedSubstitutionMap
+BridgedSubstitutionMap::subst(BridgedSubstitutionMap subMap) const {
+  return unbridged().subst(subMap.unbridged());
 }
 
 SwiftInt BridgedSubstitutionMap::getNumConformances() const {

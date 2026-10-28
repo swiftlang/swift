@@ -28,7 +28,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/SILModule.h"
 
@@ -526,19 +525,15 @@ void TransitiveMetadataCompletion::complete() {
     // This should mirror findAnyTransitiveMetadata: every type whose metadata
     // is visited (i.e. has predicate called on it) by that function should be
     // pushed onto the worklist.
-    if (auto ct = dyn_cast<ClassType>(ty)) {
-      if (auto rawSuperTy = ct->getSuperclass()) {
-        auto superTy = rawSuperTy->getCanonicalType();
-        worklist.insert(superTy);
-      }
-    } else if (auto bgt = dyn_cast<BoundGenericType>(ty)) {
-      if (auto ct = dyn_cast<BoundGenericClassType>(bgt)) {
+    if (auto nt = dyn_cast<NominalType>(ty)) {
+      if (auto ct = dyn_cast<ClassType>(nt)) {
         if (auto rawSuperTy = ct->getSuperclass()) {
           auto superTy = rawSuperTy->getCanonicalType();
           worklist.insert(superTy);
         }
       }
-      for (auto arg : bgt->getExpandedGenericArgs()) {
+
+      for (auto arg : nt->getExpandedGenericArgs()) {
         auto childTy = arg->getCanonicalType();
         worklist.insert(childTy);
       }

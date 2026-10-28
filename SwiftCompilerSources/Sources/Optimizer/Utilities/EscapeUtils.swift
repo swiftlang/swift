@@ -466,9 +466,11 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       default:
         return isEscaping
       }
+    case let metatype as ExistentialMetatypeInst:
+      return metatype.mayHaveSideEffects ? isEscaping : .continueWalk
     case is StrongRetainInst, is RetainValueInst, is DebugValueInst, is ValueMetatypeInst,
       is InitExistentialMetatypeInst, is OpenExistentialMetatypeInst,
-      is ExistentialMetatypeInst, is DeallocRefInst, is FixLifetimeInst,
+      is DeallocRefInst, is FixLifetimeInst,
       is ClassifyBridgeObjectInst, is BridgeObjectToWordInst, is EndBorrowInst,
       is StrongRetainInst, is RetainValueInst,
       is ClassMethodInst, is SuperMethodInst, is ObjCMethodInst,
@@ -572,8 +574,22 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is IsUniqueInst, is DebugValueInst:
       return .continueWalk
-    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
-      return .continueWalk
+    case let bi as BuiltinInst:
+      switch bi.id {
+      case .TSanInoutAccess, .PrepareInitialization, .ZeroInitializer:
+        return .continueWalk
+      case .AddressOfRawLayout:
+        for user in bi.users {
+          guard let pta = user as? PointerToAddressInst,
+                walkDownUses(ofAddress: pta, path: path.forPointerToAddress(pta)) == .continueWalk
+          else {
+            return isEscaping
+          }
+        }
+        return .continueWalk
+      default:
+        return isEscaping
+      }
     case let uac as UncheckedAddrCastInst:
       if uac.type != uac.fromAddress.type {
         // It's dangerous to continue walking over an `unchecked_addr_cast` which casts between two different types.
@@ -657,9 +673,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         if !indirectResultEscapes(of: beginApply, path: path) {
           return .continueWalk
         }
-      } else if !apply.isAddressable(operand: argOp) &&
+      } else if !apply.mayEscapeAddress(of: argOp) &&
                 !hasAddressResult(apply) {
-        // The result does not depend on the argument's address.
+        // No result or argument depends on the argument's address.
         return .continueWalk
       }
     }
@@ -986,6 +1002,32 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 private extension SmallProjectionPath {
   var escapePath: EscapeUtilityTypes.EscapePath {
     EscapeUtilityTypes.EscapePath(projectionPath: self, followStores: false, addressIsStored: false, knownType: nil)
+  }
+}
+
+private extension ApplySite {
+  /// Returns true if the address of the indirect argument `operand` may escape to the result or to
+  /// another (non-escapable) argument of the apply.
+  ///
+  /// This is the case if there is a scoped lifetime dependence on the argument, e.g.
+  ///
+  ///   @_lifetime(&value)
+  ///   init(single value: inout Element) {
+  ///     self = unsafe MutableSpan(_unsafeStart: UnsafeMutablePointer(Builtin.addressof(&value)), count: 1)
+  ///   }
+  ///
+  /// Even if the dependence is not marked as addressable, the callee can still escape the address
+  /// of the argument, e.g. by using unsafe pointers.
+  func mayEscapeAddress(of operand: Operand) -> Bool {
+    if let dep = resultDependence(on: operand), dep.isScoped {
+      return true
+    }
+    for targetOperand in argumentOperands where !targetOperand.value.isEscapable {
+      if let dep = parameterDependence(target: targetOperand, source: operand), dep.isScoped {
+        return true
+      }
+    }
+    return false
   }
 }
 

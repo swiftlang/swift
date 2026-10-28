@@ -172,3 +172,25 @@ func stillDiagnosed<T: ~Copyable>(_ v: consuming T) { // expected-error {{'v' us
   consume(v) // expected-note {{consumed here}}
   _ = type(of: v) // expected-note {{used here}}
 }
+
+// MARK: copyable operands held in a move-only wrapped box
+
+// A `consuming` parameter of a *copyable* type is stored in a box whose type is
+// move-only wrapped, to enforce the consuming semantics. Because `type(of:)`
+// borrows that storage directly instead of copying out of it, `value_metatype`
+// ends up with a wrapped operand, so MoveOnlyWrappedTypeEliminator has to know
+// to leave the instruction alone rather than reporting it as unhandled.
+
+class Klass {}
+
+func copyableConsumingClass(_ v: consuming Klass) -> Any.Type {
+  return type(of: v)
+}
+
+func copyableConsumingGeneric<T>(_ v: consuming T) -> Any.Type {
+  return type(of: v)
+}
+
+func copyableConsumingExistential(_ v: consuming any Any) -> Any.Type {
+  return type(of: v)
+}

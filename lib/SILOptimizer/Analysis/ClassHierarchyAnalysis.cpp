@@ -11,10 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;

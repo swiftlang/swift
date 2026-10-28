@@ -63,6 +63,7 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_BORROW_ALWAYS,
+  SIL_CAST_CONSUMPTION_TEST_ONLY,
 };
 
 enum class KeyPathComponentKindEncoding : uint8_t {
@@ -90,6 +91,8 @@ enum class ExtraStringFlavor : uint8_t {
   WasmImportModule,
   /// wasm import field/name for @_extern(wasm)
   WasmImportName,
+  /// @_target string
+  TargetFeatures,
 };
 
 enum class IsNestedEncoding : uint8_t {
@@ -207,7 +210,14 @@ namespace sil_block {
     SIL_DEBUG_VALUE,
     SIL_EXTRA_STRING,
     SIL_DEBUG_RECONSTRUCTION_BLOCK,
+    SIL_STAGE,
   };
+
+  /// The module's SIL stage floor, written once at the head of the block, as a
+  /// single unabbreviated value. A function record carries its own stage, which
+  /// may be ahead of this one.
+  ///
+  /// The block has no abbrev ID left for this record. See writeSILBlock.
 
   using SILInstNoOperandLayout = BCRecordLayout<
     SIL_INST_NO_OPERAND,
@@ -429,6 +439,8 @@ namespace sil_block {
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      BCFixed<1>,  // only referenced by debug info
+                     BCFixed<2>,  // SIL stage
+                     BCFixed<1>,  // ownership for trivial values
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
@@ -443,6 +455,7 @@ namespace sil_block {
   using SILSpecializeAttrLayout =
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
                      BCFixed<1>, // exported
+                     BCFixed<1>, // written as '@specialized'
                      BCFixed<1>, // specialization kind
                      GenericSignatureIDField, // specialized signature
                      DeclIDField, // Target SILFunction name or 0.
@@ -569,6 +582,7 @@ namespace sil_block {
     ValueIDField,         // callee value
     ActorIsolationField, // Caller Isolation if we have one. Unspecified otherwise.
     ActorIsolationField, // Callee Isolation if we have one. Unspecified otherwise.
+    BCFixed<1>,          // unresolved
     BCArray<ValueIDField> // a list of arguments
   >;
 
@@ -586,7 +600,7 @@ namespace sil_block {
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<7>, // Optional attributes
+    BCFixed<8>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 

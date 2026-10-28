@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 
 using namespace swift;

@@ -62,6 +62,44 @@ struct CRTPDerived : CRTPBase<CRTPDerived> {
   CRTPDerived(int value) : value(value) {}
 };
 
+// MARK: Release in CRTP base type deletes the object
+
+// The release operation is a member of a class template specialization that
+// is only instantiated when Swift uses it.
+template <typename Derived>
+struct CRTPDeletingBase {
+  void operator delete(void *ptr) {
+    ++deleteCount;
+    ::operator delete(ptr);
+  }
+
+  void crtpRetain() const { ++refCount; }
+  void crtpRelease() const {
+    if (!--refCount)
+      delete static_cast<const Derived *>(this);
+  }
+
+  static inline int deleteCount = 0;
+
+private:
+  mutable int refCount = 1;
+} SWIFT_SHARED_REFERENCE(.crtpRetain, .crtpRelease);
+
+struct CRTPDeletingDerived : CRTPDeletingBase<CRTPDeletingDerived> {
+  int value;
+
+  // Use the global allocation function: a class-specific new-expression would
+  // make Clang instantiate the class-specific `operator delete` on its own.
+  static CRTPDeletingDerived *create(int value) SWIFT_RETURNS_RETAINED {
+    return ::new CRTPDeletingDerived(value);
+  }
+
+  static int getDeleteCount() { return deleteCount; }
+
+private:
+  CRTPDeletingDerived(int value) : value(value) {}
+};
+
 // MARK: Virtual retain and release
 
 struct VirtualRetainRelease {

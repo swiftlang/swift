@@ -22,10 +22,8 @@
 
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -59,6 +57,18 @@ namespace {
     DynamicTupleTypeInfo(llvm::Type *T,
                          IsCopyable_t copyable)
       : ResilientTypeInfo(T, copyable, IsABIAccessible) {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -273,6 +283,18 @@ namespace {
                           alwaysFixedSize, isABIAccessible)
       {}
 
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
       for (auto &field : getFields()) {
@@ -335,6 +357,18 @@ namespace {
                           isTriviallyDestroyable, isBT, isCopyable,
                           alwaysFixedSize, isABIAccessible)
     {}
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -403,6 +437,18 @@ namespace {
                           T, minAlign, isTriviallyDestroyable, isBT, isCopyable,
                           tupleAccessible) {
       }
+
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printRecordTypeInfoAbstractLayoutInfo(IGM, OS, indentation);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {

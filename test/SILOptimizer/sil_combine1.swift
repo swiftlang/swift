@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil -solver-enable-promote-supertypes | %FileCheck %s
 
 func curry<T1, T2, T3, T4>(_ f: @escaping (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
   return { x in { y in { z in f(x, y, z) } } }
@@ -24,13 +24,30 @@ func compose(_ x: P, _ y: P, _ z: P) -> Int32 {
   return x.val() + y.val() + z.val()
 }
 
-//CHECK-LABEL: sil [noinline] @$s12sil_combine120test_compose_closures5Int32VyF : $@convention(thin) () -> Int32 {
-//CHECK: [[OEADDR:%.*]] = open_existential_addr immutable_access {{%.*}} : $*any P to $*@opened
-//CHECK: [[ADDRCAST:%.*]] = unchecked_addr_cast [[OEADDR]] : $*@opened
-//CHECK: struct_element_addr [[ADDRCAST]] : $*CP, #CP.v
+// CHECK-LABEL: sil [noinline] @$s12sil_combine120test_compose_closures5Int32VyF : $@convention(thin) () -> Int32 {
+// CHECK: [[OEADDR:%.*]] = open_existential_addr immutable_access {{%.*}} : $*any P to $*@opened
+// CHECK: [[ADDRCAST:%.*]] = unchecked_addr_cast [[OEADDR]] : $*@opened
+// CHECK: struct_element_addr [[ADDRCAST]] : $*CP, #CP.v
 @inline(never)
 public func test_compose_closure() -> Int32 {
-  let insult = curry(compose)(CP(1))(CP(2))
+  // The coercions ensure we pick the solution that binds the generic parameters
+  // of 'curry' to 'any P', and not 'CP'.
+  let insult = curry(compose)(CP(1) as any P)(CP(2) as any P)
+  let gs = insult(CP(3))
+  return gs
+}
+
+// In the other variant, everything is completely optimized away.
+
+// CHECK-LABEL: sil [noinline] @$s12sil_combine122test_compose_closure_2s5Int32VyF : $@convention(thin) () -> Int32 {
+// CHECK: [[VALUE:%.*]] = integer_literal $Builtin.Int32, 6
+// CHECK: [[INT:%.*]] = struct $Int32 ([[VALUE]] : $Builtin.Int32)
+// CHECK: return [[INT]]
+@inline(never)
+public func test_compose_closure_2() -> Int32 {
+  // The coercions ensure we pick the solution that binds the generic parameters
+  // of 'curry' to 'CP', and not 'any P'.
+  let insult = curry(compose)(CP(1) as CP)(CP(2) as CP)
   let gs = insult(CP(3))
   return gs
 }

@@ -11,18 +11,18 @@ struct S: ~Copyable, P {
 
 func takeExistential(_ box: consuming any P & ~Copyable) {
   if let s = box as? S { // expected-warning {{cast from 'any P & ~Copyable' to unrelated type 'S' always fails}}
-    // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+    // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
     _ = s
   }
 }
 
 func forceCastExistential(_ box: consuming any P & ~Copyable) {
   let s = box as! S // expected-warning {{cast from 'any P & ~Copyable' to unrelated type 'S' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = s
 }
 
 func isExistential(_ box: consuming any P & ~Copyable) {
   _ = box is S // expected-warning {{cast from 'any P & ~Copyable' to unrelated type 'S' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 }

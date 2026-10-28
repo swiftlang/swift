@@ -18,7 +18,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Subsystems.h"
-#include "llvm/IR/Module.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
 using namespace swift;

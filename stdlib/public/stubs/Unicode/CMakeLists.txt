@@ -7,7 +7,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_embedded_swift_target_library(
     embedded-unicode
     swiftUnicodeDataTables
-    INSTALL_BINARY
 
     UnicodeData.cpp
     UnicodeEmoji.cpp

@@ -21,9 +21,6 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 
 namespace swift {
 
@@ -281,6 +278,15 @@ public:
 
   /// Returns true if there are any conversions from indirect to direct values.
   bool hasConversions() const { return Conversions.any(); }
+
+  /// Returns true if the specialized function keeps indirect parameters or
+  /// results, which would be converted to direct ones with the default
+  /// re-abstraction. Such a specialization has the abstraction of the original
+  /// function (e.g. as required for a witness in a specialized witness table)
+  /// and must get a different name than the re-abstracted specialization.
+  bool isNotReabstracted() const {
+    return !ConvertIndirectToDirect && hasConversions();
+  }
 
   /// Returns true if the argument at `ArgIdx` is a dropped argument.
   /// See `droppedArguments`.

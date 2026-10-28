@@ -180,3 +180,41 @@ bb3:
   %r = tuple ()
   return %r
 }
+
+// A redundant reborrow phi can be used as enclosing value in the
+// borrowed-from instruction of another phi in the same block. Such uses must
+// be replaced by the incoming value, too - otherwise the phi argument cannot
+// be erased.
+
+// CHECK-LABEL: sil [ossa] @redundant_phi_used_as_enclosing_value :
+// CHECK:         [[O:%.*]] = begin_borrow %0
+// CHECK:       bb3([[P:%.*]] : @reborrow $C):
+// CHECK-NEXT:    [[B:%.*]] = borrowed [[P]] from ([[O]])
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    end_borrow [[O]]
+// CHECK:       } // end sil function 'redundant_phi_used_as_enclosing_value'
+sil [ossa] @redundant_phi_used_as_enclosing_value : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "replace_phis_with_incoming_values"
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
+  %3 = begin_borrow %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %3
+  br bb3(%1, %2)
+
+bb2:
+  end_borrow %2
+  br bb3(%1, %3)
+
+bb3(%7 : @reborrow $C, %8 : @reborrow $C):
+  %9 = borrowed %7 from (%0)
+  %10 = borrowed %8 from (%7)
+  end_borrow %10
+  end_borrow %9
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}

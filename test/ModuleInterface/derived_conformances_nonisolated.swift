@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -disable-availability-checking -module-name Library
-// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -disable-availability-checking -module-name Library
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
 // REQUIRES: concurrency

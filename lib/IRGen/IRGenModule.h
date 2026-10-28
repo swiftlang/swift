@@ -29,7 +29,6 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
-#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -40,7 +39,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,6 +51,7 @@
 #include "llvm/Target/TargetMachine.h"
 
 #include <atomic>
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace llvm {
   class Constant;
@@ -485,7 +484,7 @@ public:
 
   void addLazyGlobalVariable(SILGlobalVariable *v);
 
-  void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
+  void addDynamicReplacement(SILFunction *f);
 
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
     DefaultIGMForFunction[f] = CurrentIGM;
@@ -655,15 +654,22 @@ private:
   std::string FunctionName;
 
   bool IsDistributed: 1;
+  bool HasLeadingImplicitActorIsolationParameter : 1;
 
   CanSILFunctionType Type;
   llvm::Constant *Address;
 
   explicit AccessibleFunction(std::string recordName, std::string funcName,
-                              bool isDistributed, CanSILFunctionType type,
-                              llvm::Constant *addr)
+                              bool isDistributed,
+                              bool hasLeadingImplicitActorIsolationParameter,
+                              CanSILFunctionType type, llvm::Constant *addr)
       : RecordName(recordName), FunctionName(funcName),
-        IsDistributed(isDistributed), Type(type), Address(addr) {}
+        IsDistributed(isDistributed),
+        HasLeadingImplicitActorIsolationParameter(hasLeadingImplicitActorIsolationParameter),
+        Type(type), Address(addr) {
+    assert((!hasLeadingImplicitActorIsolationParameter || isDistributed) &&
+           "currently only distributed accessors can take an isolated actor parameter");
+  }
 
 public:
   StringRef getRecordName() const { return RecordName; }
@@ -671,15 +677,19 @@ public:
 
   bool isDistributed() const { return IsDistributed; }
 
+  bool hasLeadingImplicitActorIsolationParameter() const {
+    return HasLeadingImplicitActorIsolationParameter;
+  }
+
   CanSILFunctionType getType() const { return Type; }
 
   llvm::Constant *getAddress() const { return Address; }
 
   static AccessibleFunction forSILFunction(IRGenModule &IGM, SILFunction *func);
-  static AccessibleFunction forDistributed(std::string recordName,
-                                           std::string accessorName,
-                                           CanSILFunctionType type,
-                                           llvm::Constant *address);
+  static AccessibleFunction
+  forDistributed(std::string recordName, std::string accessorName,
+                 bool hasLeadingImplicitActorIsolationParameter,
+                 CanSILFunctionType type, llvm::Constant *address);
 };
 
 enum class CStringSectionType {
@@ -913,6 +923,14 @@ public:
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
 
+  /// The address of the context that every captureless exactly-once closure in
+  /// this module shares. See getAddrOfExactlyOnceSharedContext().
+  llvm::Constant *ExactlyOnceSharedContext = nullptr;
+
+  /// The destructor of every exactly-once closure context in this module. See
+  /// getExactlyOnceClosureDestructor().
+  llvm::Function *ExactlyOnceClosureDestructor = nullptr;
+
   llvm::StructType *
   createTransientStructType(StringRef name,
                             std::initializer_list<llvm::Type *> types,
@@ -1142,6 +1160,10 @@ public:
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
   const TypeInfo &getTypeInfoForLowered(CanType T);
   const TypeInfo &getTypeInfo(SILType T);
+  const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
+
+  void dumpAbstractTypeLayoutInfo(CanType type, StringRef mangledName,
+                                  StringRef origin);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
@@ -1363,6 +1385,10 @@ public:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+  /// Global blocks, keyed by their invoke function and constant capture.
+  llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
+                 llvm::Constant *> GlobalBlocks;
+
 private:
   using CopyAddrHelperGenerator =
     llvm::function_ref<void(IRGenFunction &IGF, Address dest, Address src,
@@ -1508,6 +1534,11 @@ private:
   SmallVector<llvm::MDNode *> UsedConditionals;
   void emitUsedConditionals();
 
+  /// The static initializers to add to the global constructors in
+  /// emitGlobalLists(). See addStaticInitializer().
+  SmallVector<llvm::Function *, 2> StaticInitializers;
+  bool EmittedStaticInitializers = false;
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
@@ -1521,7 +1552,6 @@ public:
   std::string CaptureDescriptorSection;
   std::string ReflectionStringsSection;
   std::string ReflectionTypeRefSection;
-  std::string MultiPayloadEnumDescriptorSection;
 
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
@@ -1569,6 +1599,14 @@ public:
       llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
 
   llvm::Constant *getAddrOfFieldName(StringRef Name);
+
+  /// Returns the context that every captureless exactly-once closure shares.
+  llvm::Constant *getAddrOfExactlyOnceSharedContext();
+
+  /// Returns the destructor that terminates the program, which every
+  /// exactly-once closure context in this module has.
+  llvm::Function *getExactlyOnceClosureDestructor();
+
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
@@ -1601,7 +1639,6 @@ public:
   const char *getCaptureDescriptorMetadataSectionName();
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
-  const char *getMultiPayloadEnumDescriptorSectionName();
 
   static constexpr const char ObjCClassNameSectionName[] =
       "__TEXT,__objc_classname,cstring_literals";
@@ -1631,7 +1668,6 @@ public:
   ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
-  llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   llvm::Constant *
   getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
@@ -1640,6 +1676,12 @@ public:
   /// whose witness can never be reached, so that reaching one traps instead of
   /// requiring us to emit a real (dead) implementation.
   llvm::Function *getOrCreateDeadMethodErrorStub();
+
+  /// Like getOrCreateDeadMethodErrorStub(), but async.
+  llvm::Function *getOrCreateDeadMethodErrorAsyncStub();
+
+  /// AsyncFunctionPointer wrapping getOrCreateDeadMethodErrorAsyncStub().
+  llvm::Constant *getOrCreateDeadAsyncMethodErrorFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1669,6 +1711,10 @@ private:                                                                       \
   /// A local stub function that simply calls swift_deletedMethodError(),
   /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
   llvm::Function *DeadMethodErrorStub = nullptr;
+  /// Like DeadMethodErrorStub, but async.
+  llvm::Function *DeadMethodErrorAsyncStub = nullptr;
+  /// A local AsyncFunctionPointer wrapping DeadMethodErrorAsyncStub.
+  llvm::Constant *DeadAsyncMethodErrorFunctionPointer = nullptr;
   /// A Coroutine Function Pointer wrapping the above, suited for
   /// filling vtable/witness slots that point to "callee-allocated"
   /// (new ABI) coroutines.
@@ -1708,6 +1754,9 @@ public:
 public:
   llvm::LLVMContext &getLLVMContext() const { return *LLVMContext; }
 
+  /// Form the target-native bytes for a COM identity.
+  llvm::Constant *getCOMIdentityConstant(llvm::StringRef identity);
+
   void emitSourceFile(SourceFile &SF);
   void emitSynthesizedFileUnit(SynthesizedFileUnit &SFU);
 
@@ -1720,6 +1769,14 @@ public:
   /// invalid.
   bool finalize();
 
+  /// Adds \p fn to the module's static initializers. They run before the C++
+  /// global constructors that Clang emits into the same module.
+  void addStaticInitializer(llvm::Function *fn) {
+    assert(!EmittedStaticInitializers &&
+           "static initializer added after emitting global constructors");
+    StaticInitializers.push_back(fn);
+  }
+
   void constructInitialFnAttributes(
       llvm::AttrBuilder &Attrs,
       OptimizationMode FuncOptMode = OptimizationMode::NotSet,
@@ -1729,6 +1786,9 @@ public:
   void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
+
+  void addTargetAttrFunctionAttributes(llvm::Function *fn,
+                                       StringRef targetString);
 
   llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
 
@@ -2025,7 +2085,8 @@ public:
 
   llvm::Function *
   getAddrOfDistributedTargetAccessor(LinkEntity accessor,
-                                     ForDefinition_t forDefinition);
+                                     ForDefinition_t forDefinition,
+                                     bool hasIsolatedActorParameter);
 
   /// Emit a distributed accessor function for the given distributed thunk or
   /// protocol requirement.

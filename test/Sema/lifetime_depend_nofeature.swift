@@ -1,22 +1,21 @@
-// RUN: %target-typecheck-verify-swift \
-// RUN:   -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 
 // These tests complement lifetime_depend_noattr.swift. If you add a test here, add one there.
 
 // Check that functions that require lifetime dependence are prohibited without the flag.
 
 // Don't allow empty initialization.
-struct EmptyNonEscapable: ~Escapable {} // expected-error{{an implicit initializer cannot return a ~Escapable result}}
+struct EmptyNonEscapable: ~Escapable {} // expected-error{{an implicit initializer cannot return a non-'Escapable' result}}
 
 // Don't allow non-Escapable return values.
-func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a function cannot return a ~Escapable result}}
+func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a function cannot return a non-'Escapable' result}}
 
 func neInout(span: inout RawSpan) {} // DEFAULT OK
 
 func neInoutNEParam(span: inout RawSpan, _: RawSpan) {} // DEFAULT OK
 
 struct S {
-  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a ~Escapable result}}
+  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a non-'Escapable' result}}
 
   func neInout(span: inout RawSpan) {} // OK
 
@@ -28,7 +27,7 @@ struct S {
 }
 
 class C {
-  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a ~Escapable result}}
+  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a non-'Escapable' result}}
 
   func neInout(span: inout RawSpan) {} // OK
 }
@@ -38,7 +37,7 @@ extension MutableSpan {
 
   mutating func mutatingMethod() {} // DEFAULT OK
 
-  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a ~Escapable result}}
+  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a non-'Escapable' result}}
 
   func neInout(span: inout RawSpan) {} // DEFAULT OK
 

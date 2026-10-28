@@ -18,6 +18,25 @@
 #include "functions.h"
 
 int main() {
+  swift::Expected<void> success;
+  assert(success.has_value());
+  const auto copy = success;
+  assert(copy.has_value());
+  swift::Error error;
+  swift::Expected<void> failure(error);
+  assert(!failure.has_value());
+  const auto errorCopy = failure;
+  assert(!errorCopy.has_value());
+
+  assert(Functions::checkedVoid(false).has_value());
+  assert(!Functions::checkedVoid(true).has_value());
+  assert(Functions::genericVoid(swift::Int(1), false).has_value());
+  assert(!Functions::genericVoid(swift::Int(1), true).has_value());
+  assert(!Functions::genericNever(swift::Int(1)).has_value());
+  auto object = Functions::VoidMethods::init();
+  assert(object.checked(false).has_value());
+  assert(!object.checked(true).has_value());
+  assert(!object.never().has_value());
 
   // Test Empty Constructor
   auto testIntEmpty = swift::Expected<int>();

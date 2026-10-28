@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -dump-ast %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s | %FileCheck %s
 
 struct Transaction {
   var state: Int?
@@ -70,7 +70,7 @@ public class W_58201<Value> {
 struct S1_58201 {
   // CHECK:      argument_list implicit labels="wrappedValue:"
   // CHECK-NEXT:   argument label="wrappedValue"
-  // CHECK-NEXT:     autoclosure_expr implicit type="() -> Bool?" discriminator=0 nonisolated captures=(<opaque_value> ) escaping
+  // CHECK-NEXT:     autoclosure_expr implicit type="() -> Bool?" discriminator=0 nonisolated captures=(<opaque_value>) escaping
   // CHECK:            autoclosure_expr implicit type="() -> Bool?" discriminator=1 nonisolated escaping
   @W_58201 var a: Bool?
 }
@@ -79,7 +79,7 @@ struct S1_58201 {
 struct S2_58201 {
   // CHECK:      argument_list implicit labels="wrappedValue:"
   // CHECK-NEXT:   argument label="wrappedValue"
-  // CHECK-NEXT:     autoclosure_expr implicit type="() -> Bool" location={{.*}}.swift:[[@LINE+2]]:26 range=[{{.+}}] discriminator=0 nonisolated captures=(<opaque_value> ) escaping
+  // CHECK-NEXT:     autoclosure_expr implicit type="() -> Bool" location={{.*}}.swift:[[@LINE+2]]:26 range=[{{.+}}] discriminator=0 nonisolated captures=(<opaque_value>) escaping
   // CHECK:            autoclosure_expr implicit type="() -> Bool" location={{.*}}.swift:[[@LINE+1]]:26 range=[{{.+}}] discriminator=1 nonisolated escaping
   @W_58201 var b: Bool = false
 }

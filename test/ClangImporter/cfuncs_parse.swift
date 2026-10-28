@@ -1,6 +1,8 @@
 // XFAIL: CPU=powerpc64le
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import cfuncs
 
 func test_cfunc1(_ i: Int) {

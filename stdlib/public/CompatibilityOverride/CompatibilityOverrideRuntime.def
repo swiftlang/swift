@@ -125,7 +125,6 @@ OVERRIDE_DYNAMICCASTING(dynamicCast, bool, , , swift::,
                          DynamicCastFlags flags),
                         (dest, src, srcType, targetType, flags))
 
-
 OVERRIDE_CASTING(dynamicCastClass, const void *, , , swift::,
                  (const void *object,
                   const ClassMetadata *targetType),
@@ -435,6 +434,13 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , , swift::
                  (object, targetType, file, line, column))
 
 #endif
+
+OVERRIDE_DYNAMICCASTING(dynamicCastTest, bool, , , swift::,
+                        (OpaqueValue *src,
+                         const Metadata *srcType,
+                         const Metadata *targetType,
+                         DynamicCastFlags flags),
+                        (src, srcType, targetType, flags))
 
 #undef OVERRIDE
 #undef OVERRIDE_METADATALOOKUP

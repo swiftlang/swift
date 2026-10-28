@@ -267,6 +267,12 @@ public func copy2<S>(_ t: S, s: inout S) -> S where S: P{
   return s
 }
 
+@_specialize(where S: _TrivialAtMost(64))
+@inline(never)
+public func copy2NonExported<S>(_ s: S) -> S where S: P {
+  return s
+}
+
 // Check missing alignment.
 @_specialize(where S: _Trivial(64, )) // expected-error{{expected non-negative alignment to be specified in layout constraint}}
 // Check non-numeric size.
@@ -401,6 +407,17 @@ public func twoGenericParams2<T, U>(_ t: T, u: U) -> (T, U) {
 
 @specialized(where T == Int) // expected-error{{trailing 'where' clause in 'specialized' attribute of non-generic function 'nonGenericParam2(x:)'}}
 func nonGenericParam2(x: Int) {}
+
+// 'exported:' needs the ExtendedSpecializedAttribute feature.
+// expected-error@+2 {{unsupported parameter exported in 'specialized attribute'}}
+// expected-error@+1 {{expected declaration}}
+@specialized(exported: false, where T == Int)
+public func exportedFalse<T>(_ t: T) {}
+
+// expected-error@+2 {{unsupported parameter kind in 'specialized attribute'}}
+// expected-error@+1 {{expected declaration}}
+@specialized(kind: full, where T == Int)
+public func unsupportedKind<T>(_ t: T) {}
 
 @_specialize(where T == Int)
 @_specialize(where T == Int)

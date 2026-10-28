@@ -16,7 +16,6 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
@@ -28,11 +27,8 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
-#include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
 #include "swift/AST/IRGenOptions.h"
@@ -127,7 +123,7 @@ public:
       return Result<uint64_t>::emplaceFailure(Failure::DependentArgument);
 
     // Split into cases.
-    if (auto typeDecl = type->getNominalOrBoundGenericNominal()) {
+    if (auto typeDecl = type->getNominalDecl()) {
       return getOffsetOfField(type, typeDecl, optMetadata, memberName);
     } else if (auto tupleType = type->getAs<TupleType>()) {
       return getOffsetOfTupleElement(tupleType, optMetadata, memberName);
@@ -527,7 +523,7 @@ public:
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
     if (!result->IsBridgedError &&
-        typeResult->getClassOrBoundGenericClass()) {
+        typeResult->getClassDecl()) {
       auto pointerval = Reader.readResolvedPointerValue(payloadAddress);
       if (!pointerval)
         return getFailure<OpenedExistential>();
@@ -553,7 +549,7 @@ public:
     // address returned is the class instance itself and not the address
     // of the reference.
     auto payloadAddress = result->PayloadAddress;
-    if (typeResult->getClassOrBoundGenericClass()) {
+    if (typeResult->getClassDecl()) {
       auto pointerval = Reader.readResolvedPointerValue(payloadAddress);
       if (!pointerval)
         return getFailure<OpenedExistential>();

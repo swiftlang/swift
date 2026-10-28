@@ -35,6 +35,7 @@ struct ParsedSpecAttr {
   Identifier spiGroupID;
   ModuleDecl *spiModule;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
+  bool specializedSpelling;
 };
 
 /// The parser for an individual SIL function.
@@ -431,7 +432,8 @@ public:
   }
   
   /// Parse into checked cast options, such as [prohibit_isolated_conformances].
-  CheckedCastInstOptions parseCheckedCastInstOptions(bool *isExact);
+  CheckedCastInstOptions parseCheckedCastInstOptions(bool *isExact,
+                                                     bool *isCopy = nullptr);
 };
 
 } // namespace swift

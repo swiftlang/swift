@@ -1,0 +1,41 @@
+// RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables 2>&1 | %FileCheck %s --check-prefixes=PASS,CHECK
+// RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables -sil-stats-subpass 2>&1 | %FileCheck %s --check-prefixes=FIRST,SECOND,CHECK
+// RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables -sil-stats-subpass -sil-opt-pass-count 2.1 2>&1 | %FileCheck %s --check-prefixes=FIRST,CHECK
+// RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-subpass 2>&1 | %FileCheck %s --allow-empty
+// RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables -sil-stats-subpass -sil-opt-pass-count 2.0 2>&1 | %FileCheck %s --allow-empty
+// RUN: %target-sil-opt --dce --sil-deadfuncelim --sil-combine -o /dev/null %s -sil-stats-lost-variables -sil-stats-subpass 2>&1 | %FileCheck %s --allow-empty
+
+// SILCombine removes the dead alloc_stacks, dropping the variables "x" and "y"
+// with them. Each variable is reported against the subpass which dropped it.
+
+// Note that this loss is expected. Stores to the alloc_stack should be salvaged.
+// An alloc_stack with debug info but no stores shouldn't exist.
+
+// DCE runs first, as OptimizerStats only run after a pass, so there is no
+// baseline for the first pass.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "file.swift":1:6 parent @foo : $@convention(thin) (Int) -> Int }
+
+// Both variables are attributed to the whole pass.
+// PASS: function, lostvars, {{.*}}, SILCombine, 1, 2, {{[0-9]+}}, foo
+
+// One row per subpass instead, numbered <pass number>.<subpass number>.
+// FIRST: function, lostvars, {{.*}}, SILCombine alloc_stack, 1.0, 1, {{[0-9]+}}, foo
+// SECOND: function, lostvars, {{.*}}, SILCombine alloc_stack, 1.1, 1, {{[0-9]+}}, foo
+
+// No further lostvars reported.
+// CHECK-NOT: lostvars
+
+sil private [ossa] @foo : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int, var, name "x", loc "file.swift":2:5, scope 1
+  dealloc_stack %1 : $*Int, loc "file.swift":2:5, scope 1
+  %2 = alloc_stack $Int, var, name "y", loc "file.swift":3:5, scope 1
+  dealloc_stack %2 : $*Int, loc "file.swift":3:5, scope 1
+  return %0 : $Int, loc "file.swift":4:5, scope 1
+} // end sil function 'foo'

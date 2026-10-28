@@ -323,7 +323,7 @@ namespace {
     }
 
     template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
+    [[maybe_unused]] static size_t getExtraAllocationSize(T &&... ignored) {
       return 0;
     }
   };
@@ -1107,7 +1107,7 @@ namespace {
     }
 
     template <class... T>
-    static size_t getExtraAllocationSize(T &&... ignored) {
+    [[maybe_unused]] static size_t getExtraAllocationSize(T &&... ignored) {
       return 0;
     }
   };
@@ -1234,6 +1234,167 @@ _findProtocolDescriptor(NodePointer node,
   return foundProtocol;
 }
 
+#pragma mark Duplicate descriptor diagnostics
+
+/// Append every descriptor in \p sectionsToScan that matches \p node to
+/// \p matches, skipping any equal to one already there.
+template <typename SectionsContainer>
+static void _collectMatchingDescriptorsInSections(
+    SectionsContainer &sectionsToScan, NodePointer node,
+    llvm::SmallVectorImpl<const ContextDescriptor *> &matches) {
+  for (auto &section : sectionsToScan.snapshot()) {
+    for (const auto &record : section) {
+      auto context = getContextDescriptor(record);
+      if (!context || !_contextDescriptorMatchesMangling(context, node))
+        continue;
+      bool seen = false;
+      for (auto match : matches)
+        seen = seen || equalContexts(match, context);
+      if (!seen)
+        matches.push_back(context);
+    }
+  }
+}
+
+/// Find every descriptor in \p state's records that matches \p node.
+template <typename State>
+static void
+_collectMatchingDescriptors(State &state, NodePointer node,
+                            llvm::SmallVectorImpl<const ContextDescriptor *>
+                                &matches) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  _collectMatchingDescriptorsInSections(state.SharedCacheSectionsToScan, node,
+                                        matches);
+#endif
+  _collectMatchingDescriptorsInSections(state.SectionsToScan, node, matches);
+}
+
+namespace {
+/// Searches for duplicate types and protocols within the types and protocols
+/// referenced by a particular demangle node and logs a warning when duplicates
+/// are found. When duplicates are present, protocol conformances may attach to
+/// a different copy than the one that was found, causing type lookup errors due
+/// to conformances that exist in the source code but aren't found at runtime.
+/// This is a common cause of "impossible" type lookup errors, i.e.
+/// compiler-generated lookups that should succeed unconditionally based on
+/// what's known from the source code, so we want to check for this specific
+/// issue and warn when we find it.
+class DuplicateDescriptorDiagnoser {
+  Demangler &Dem;
+
+  /// Descriptors already searched, so each is reported at most once.
+  llvm::SmallVector<const ContextDescriptor *, 8> Searched;
+
+  bool alreadySearched(llvm::ArrayRef<const ContextDescriptor *> matches) {
+    for (auto match : matches)
+      for (auto searched : Searched)
+        if (equalContexts(match, searched))
+          return true;
+    return false;
+  }
+
+  void report(NodePointer node,
+              llvm::ArrayRef<const ContextDescriptor *> matches) {
+    std::string name;
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+    name = nodeToString(node);
+#else
+    auto mangling = Demangle::mangleNode(
+        node, ExpandResolvedSymbolicReferences(Dem), Dem,
+        Mangle::ManglingFlavor::Default);
+    if (mangling.isSuccess())
+      name = mangling.result().str();
+#endif
+    if (name.empty())
+      name = "<unknown>";
+    std::string images;
+    for (auto match : matches) {
+      if (!images.empty())
+        images += ", ";
+      auto info = SymbolInfo::lookup(match);
+      const char *filename = info ? info->getFilename() : nullptr;
+      images += filename ? filename : "<unknown image>";
+    }
+    swift::warning(0,
+                   "%zu copies of %s are loaded, from: %s. This may cause "
+                   "protocol conformance checks to fail, type lookups to "
+                   "fail, runtime misbehavior, and crashes.\n",
+                   matches.size(), name.c_str(), images.c_str());
+  }
+
+  /// Search \p state for descriptors matching \p node, report duplicates, and
+  /// return the matches, or nothing if they were searched already.
+  template <typename State>
+  llvm::SmallVector<const ContextDescriptor *, 2>
+  search(State &state, NodePointer node) {
+    llvm::SmallVector<const ContextDescriptor *, 2> matches;
+    _collectMatchingDescriptors(state, node, matches);
+    if (matches.empty() || alreadySearched(matches))
+      return {};
+    Searched.append(matches.begin(), matches.end());
+    if (matches.size() > 1)
+      report(node, matches);
+    return matches;
+  }
+
+  /// Check the protocols in \p context's generic requirements, which a failed
+  /// requirement check names only in its error message.
+  void visitRequirementProtocols(const ContextDescriptor *context) {
+    auto generics = context->getGenericContext();
+    if (!generics)
+      return;
+    for (auto &req : generics->getGenericRequirements()) {
+      if (req.getKind() != GenericRequirementKind::Protocol)
+        continue;
+      auto protocol = req.getProtocol();
+      if (!protocol || protocol.isObjC())
+        continue;
+      if (auto node =
+              _buildDemanglingForContext(protocol.getSwiftProtocol(), {}, Dem))
+        search(Protocols.get(), node);
+    }
+  }
+
+public:
+  explicit DuplicateDescriptorDiagnoser(Demangler &dem) : Dem(dem) {}
+
+  void visit(NodePointer node) {
+    if (!node)
+      return;
+
+    switch (node->getKind()) {
+    case Node::Kind::Protocol:
+      // The children only name the protocol's parent context.
+      search(Protocols.get(), node);
+      return;
+
+    case Node::Kind::Class:
+    case Node::Kind::Enum:
+    case Node::Kind::OtherNominalType:
+    case Node::Kind::Structure:
+    case Node::Kind::TypeAlias: {
+      // Descriptors match the declaration, without the generic arguments of a
+      // parent such as Outer<Int> in Outer<Int>.Inner.
+      auto unspecialized = Demangle::getUnspecialized(node, Dem);
+      if (unspecialized.isSuccess())
+        for (auto match :
+             search(TypeMetadataRecords.get(), unspecialized.result()))
+          visitRequirementProtocols(match);
+      // The parent context may carry generic arguments.
+      if (node->getNumChildren() > 0)
+        visit(node->getChild(0));
+      return;
+    }
+
+    default:
+      for (auto child : *node)
+        visit(child);
+      return;
+    }
+  }
+};
+} // end anonymous namespace
+
 #pragma mark Type field descriptor cache
 namespace {
 struct FieldDescriptorCacheEntry {
@@ -1255,7 +1416,7 @@ public:
   }
 
   template <class... Args>
-  static size_t getExtraAllocationSize(Args &&... ignored) {
+  [[maybe_unused]] static size_t getExtraAllocationSize(Args &&... ignored) {
     return 0;
   }
 };
@@ -2054,7 +2215,9 @@ public:
     for (auto arg : genArgs)
       allArgsVec.push_back(arg.getMetadata());
 
-    // Collect any other generic arguments.
+    // Collect any other generic arguments. The generalization signature never
+    // records inverses, so don't check its parameters for Copyable and
+    // Escapable.
     auto error = _checkGenericRequirements(
         genSig.getParams(), genSig.getRequirements(), allArgsVec,
         [genArgs](unsigned depth, unsigned index) -> const Metadata * {
@@ -2074,7 +2237,7 @@ public:
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
         },
-        nullptr);
+        nullptr, /*numParamsExemptFromInvertibleChecks=*/genArgs.size());
     if (error)
       return *error;
 
@@ -2642,15 +2805,15 @@ static const Metadata *_Nullable handleTypeByMangledNameResult(
       runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
     TypeLookupError *error = result.getError();
     char *errorString = error->copyErrorString();
-#if SWIFT_STDLIB_HAS_TYPE_PRINTING
     // The raw mangled name often contains symbolic references (control bytes in
     // the 0x01-0x1F range followed by relative pointers) that don't print
-    // legibly. Demangle it into a readable type name, resolving symbolic
-    // references to the names of the entities they point to.
+    // legibly. Demangle it, resolving symbolic references to the names of the
+    // entities they point to.
     Demangler demangler;
     NodePointer node =
         demangler.demangleType(StringRef(typeNameStart, typeNameLength),
                                ResolveToDemanglingForContext(demangler));
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
     std::string demangled = node ? nodeToString(node) : std::string();
     if (!demangled.empty()) {
       swift::warning(0, "failed type lookup for %s: %s\n", demangled.c_str(),
@@ -2662,6 +2825,7 @@ static const Metadata *_Nullable handleTypeByMangledNameResult(
                      (int)typeNameLength, typeNameStart, errorString);
     }
     error->freeErrorString(errorString);
+    DuplicateDescriptorDiagnoser(demangler).visit(node);
   }
   return result.getType().getMetadata();
 }
@@ -2932,36 +3096,55 @@ static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
   if (!node)
     return nullptr;
 
-  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
-  if (!node)
+  // The signature is the Function node's last child. Searching the subtree for
+  // a Type node instead would find the one belonging to the enclosing context,
+  // which is the Function's first child and can be an entity with a type of its
+  // own, such as a variable.
+  node = node->getLastChild();
+  if (!node || node->getKind() != Node::Kind::Type)
     return nullptr;
 
-  // If this is a generic function, it requires special handling.
-  if (auto genericType =
-          node->findByKind(Node::Kind::DependentGenericType, /*maxDepth=*/1)) {
-    node = genericType->findByKind(Node::Kind::Type, /*maxDepth=*/1);
-    return node->findByKind(Node::Kind::FunctionType, /*maxDepth=*/1);
+  auto funcType = node->getFirstChild();
+  if (!funcType)
+    return nullptr;
+
+  // A generic function wraps its signature in a DependentGenericType.
+  if (funcType->getKind() == Node::Kind::DependentGenericType) {
+    node = funcType->getLastChild();
+    if (!node || node->getKind() != Node::Kind::Type)
+      return nullptr;
+
+    funcType = node->getFirstChild();
+    if (!funcType)
+      return nullptr;
   }
 
-  auto funcType = node->getFirstChild();
-  assert(funcType->getKind() == Node::Kind::FunctionType);
+  if (funcType->getKind() != Node::Kind::FunctionType)
+    return nullptr;
+
   return funcType;
 }
 
 /// For a single unlabeled parameter this function returns whole
-/// `ArgumentTuple`, for everything else a `Tuple` element inside it.
+/// `ArgumentTuple`, for everything else a `Tuple` element inside it. Returns
+/// null if the function type doesn't have a well-formed parameter list.
 static NodePointer getParameterList(NodePointer funcType) {
   assert(funcType->getKind() == Node::Kind::FunctionType);
 
   auto parameterContainer =
       funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
-  assert(parameterContainer->getNumChildren() > 0);
+  if (!parameterContainer)
+    return nullptr;
 
   // This is a type that covers entire parameter list.
   auto parameterList = parameterContainer->getFirstChild();
-  assert(parameterList->getKind() == Node::Kind::Type);
+  if (!parameterList || parameterList->getKind() != Node::Kind::Type)
+    return nullptr;
 
   auto parameters = parameterList->getFirstChild();
+  if (!parameters)
+    return nullptr;
+
   if (parameters->getKind() == Node::Kind::Tuple)
     return parameters;
 
@@ -2999,6 +3182,9 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
     return -1;
 
   auto parameterList = getParameterList(funcType);
+  if (!parameterList)
+    return -1;
+
   return parameterList->getNumChildren();
 }
 
@@ -3015,16 +3201,17 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
     return nullptr;
 
   auto resultType = funcType->getLastChild();
-  if (!resultType)
+  if (!resultType || resultType->getKind() != Node::Kind::ReturnType)
     return nullptr;
-
-  assert(resultType->getKind() == Node::Kind::ReturnType);
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
   auto request = MetadataRequest(MetadataState::Complete);
 
   NodePointer nodePointer = resultType->getFirstChild();
+  if (!nodePointer)
+    return nullptr;
+
   auto typeInfoOrErr = swift_getTypeByMangledNode(
       request, demangler, nodePointer,
       /*arguments=*/genericArguments,
@@ -3075,10 +3262,13 @@ swift_func_getParameterTypeInfo(
     auto nodePointer = parameterList->getChild(index);
 
     if (nodePointer->getKind() == Node::Kind::TupleElement) {
-      assert(nodePointer->getNumChildren() == 1);
-      nodePointer = nodePointer->getFirstChild();
+      nodePointer = nodePointer->getLastChild();
+      if (!nodePointer)
+        return -3;
     }
-    assert(nodePointer->getKind() == Node::Kind::Type);
+
+    if (nodePointer->getKind() != Node::Kind::Type)
+      return -3;
 
     auto request = MetadataRequest(MetadataState::Complete);
 

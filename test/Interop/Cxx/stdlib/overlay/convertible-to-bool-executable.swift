@@ -1,5 +1,9 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking)
+
 // REQUIRES: executable_test
+
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+// FIXME: addressable parameters pass an address where the lowered apply expects a direct value (rdar://180980178)
 
 import StdlibUnittest
 import ConvertibleToBool
@@ -64,6 +68,22 @@ CxxConvertibleToBoolTestSuite.test("VirtualDiamondBoolBox as CxxConvertibleToBoo
 CxxConvertibleToBoolTestSuite.test("PublicUsingBoolBox as CxxConvertibleToBool") {
   // ProtectedBoolBox::operator bool always returns true; using-decl makes it public.
   expectTrue(Bool(fromCxx: PublicUsingBoolBox()))
+}
+
+CxxConvertibleToBoolTestSuite.test("NonCopyableBoolBox as CxxConvertibleToBool") {
+  let b1 = NonCopyableBoolBox(true)
+  expectTrue(Bool(fromCxx: b1))
+
+  let b2 = NonCopyableBoolBox(false)
+  expectFalse(Bool(fromCxx: b2))
+}
+
+CxxConvertibleToBoolTestSuite.test("NonEscapableBoolBox as CxxConvertibleToBool") {
+  let b1 = BoolBox(value: true)
+  expectTrue(Bool(fromCxx: NonEscapableBoolBox(b1)))
+
+  let b2 = BoolBox(value: false)
+  expectFalse(Bool(fromCxx: NonEscapableBoolBox(b2)))
 }
 
 runAllTests()

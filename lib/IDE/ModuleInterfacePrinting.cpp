@@ -73,7 +73,7 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
     return true;
   }
   Ty = Ty->getRValueType();
-  if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
+  if (auto ND = Ty->getNominalDecl()) {
     PrintOptions Options = PrintOptions::printTypeInterface(
         Ty.getPointer(),
         Ty->getASTContext().TypeCheckerOpts.PrintFullConvention);
@@ -141,6 +141,13 @@ static bool printModuleInterfaceDecl(Decl *D,
                                      const PrintOptions &Options,
                                      bool PrintSynthesizedExtensions,
                                      StringRef LeadingComment = StringRef()) {
+  // A module's list of decls to display holds both the PatternBindingDecl of a
+  // module-scope variable and the VarDecls it binds. Printing both prints the
+  // variable twice, so let the print options pick one of the two forms, the
+  // same way member printing does.
+  if (!D->shouldPrintInContext(Options))
+    return false;
+
   if (!Options.shouldPrint(D)) {
     Printer.callAvoidPrintDeclPost(D);
     return false;

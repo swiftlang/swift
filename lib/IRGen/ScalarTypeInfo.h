@@ -271,6 +271,11 @@ private:
 template <class Derived, class Base>
 class PODSingleScalarTypeInfo : public SingleScalarTypeInfo<Derived, Base> {
 protected:
+  PODSingleScalarTypeInfo(
+      IRGenModule &IGM,
+      const SerializableLoadableTypeInfoRepresentation &representation)
+      : SingleScalarTypeInfo<Derived, Base>(IGM, representation) {}
+
   template <class StorageType, class... T> 
   PODSingleScalarTypeInfo(StorageType *storage, Size size,
                           SpareBitVector spareBits,

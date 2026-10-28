@@ -24,13 +24,13 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -43,14 +43,10 @@
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
@@ -281,11 +277,6 @@ const {
   if (originKind == DisallowedOriginKind::None)
     return DiagnosticBehavior::Ignore;
 
-  // If we can capture the layouts of hidden types, suppress
-  // diagnostic.
-  if (encapsulatedAsHiddenStoredProperty(D, originKind))
-    return DiagnosticBehavior::Ignore;
-
   auto &ctx = DC->getASTContext();
 
   if (shouldSuppressExportabilityDiagnosticsForHiddenTypes(
@@ -351,53 +342,6 @@ ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return std::nullopt;
-}
-
-bool ExportContext::encapsulatedAsHiddenStoredProperty(
-    const ValueDecl *D, DisallowedOriginKind originKind) const {
-  if (originKind != DisallowedOriginKind::InternalBridgingHeaderImport)
-    return false;
-  if (!getDeclContext()->getASTContext().LangOpts.hasFeature(
-          Feature::AbstractStoredPropertyLayout))
-    return false;
-  auto reason = getExportabilityReason();
-  if (!reason)
-    return false;
-  switch (*reason) {
-  case ExportabilityReason::ImplicitlyPublicVarDecl:
-  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
-    break;
-  default:
-    return false;
-  }
-
-  // Encapsulation applies. Record the hidden-type layout so it will be
-  // serialized into this module's hidden-type layouts block.
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
-    if (auto layout = computeClangAbstractLayout(nominal)) {
-      auto *DC = getDeclContext();
-      DC->getParentModule()->recordHiddenTypeLayout(
-          layout->mangledName, *layout);
-      // Also record the canonical type so the serializer can substitute a
-      // HiddenType placeholder for stored-property references in the emitted
-      // .swiftmodule, without re-mangling at every VarDecl serialization site.
-      DC->getASTContext().recordTypeToHideWhenEmittingModule(
-          nominal->getDeclaredInterfaceType()->getCanonicalType(),
-          layout->mangledName);
-      auto *enclosingStruct =
-          dyn_cast_or_null<StructDecl>(DC->getInnermostTypeContext());
-      ASSERT(enclosingStruct &&
-             "encapsulated hidden stored property must be inside a struct");
-      if (!enclosingStruct->getAttrs()
-               .hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        auto &ctx = DC->getASTContext();
-        enclosingStruct->getAttrs().add(
-            new (ctx) HasHiddenStoredPropertiesAttr(/*IsImplicit=*/true));
-      }
-      return true;
-    }
-  }
-  return false;
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
@@ -1116,12 +1060,16 @@ requiresDeploymentTargetOrEarlier(AvailabilityDomain domain,
 }
 
 /// Returns the diagnostic to emit for the potentially unavailable decl and sets
-/// \p IsError accordingly.
+/// \p IsError accordingly. The returned diagnostic may refer to \p scratch,
+/// so \p scratch must outlive it.
 static Diagnostic getPotentialUnavailabilityDiagnostic(
     const ValueDecl *D, const DeclContext *ReferenceDC,
-    AvailabilityDomain Domain, const AvailabilityRange &Availability,
+    const AvailabilityRestriction &Restriction, llvm::SmallString<64> &scratch,
     bool WarnBeforeDeploymentTarget, bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  auto DomainAndRange = Restriction.getDomainAndRange(Context);
+  AvailabilityDomain Domain = DomainAndRange.getDomain();
+  const AvailabilityRange &Availability = DomainAndRange.getRange();
 
   if (requiresDeploymentTargetOrEarlier(Domain, Availability, Context)) {
     // The required OS version is at or before the deployment target so this
@@ -1138,20 +1086,20 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
   }
 
   IsError = true;
-  return Diagnostic(diag::availability_decl_only_in, D, Domain,
-                    Availability.hasMinimumVersion(), Availability);
+  return Diagnostic(diag::availability_decl_only_in, D,
+                    Restriction.getDiagnosticDescription(scratch, Context));
 }
 
 // Emits a diagnostic for a reference to a declaration that is potentially
 // unavailable at the given source location. Returns true if an error diagnostic
 // was emitted.
-static bool diagnosePotentialUnavailability(
-    const ValueDecl *D, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC,
-    const AvailabilityDomainAndRange &DomainAndRange,
-    const AvailabilityDomainAndRange &FixItDomainAndRange,
-    bool WarnBeforeDeploymentTarget = false) {
+static bool
+diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
+                                const DeclContext *ReferenceDC,
+                                const AvailabilityRestriction &Restriction,
+                                bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  auto DomainAndRange = Restriction.getDomainAndRange(Context);
   AvailabilityDomain Domain = DomainAndRange.getDomain();
   const AvailabilityRange &Availability = DomainAndRange.getRange();
   if (Context.LangOpts.DisableAvailabilityChecking)
@@ -1159,9 +1107,10 @@ static bool diagnosePotentialUnavailability(
 
   bool IsError;
   {
+    llvm::SmallString<64> scratch;
     auto Diag = Context.Diags.diagnose(
         ReferenceRange.Start, getPotentialUnavailabilityDiagnostic(
-                                  D, ReferenceDC, Domain, Availability,
+                                  D, ReferenceDC, Restriction, scratch,
                                   WarnBeforeDeploymentTarget, IsError));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -1170,7 +1119,8 @@ static bool diagnosePotentialUnavailability(
       return IsError;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, FixItDomainAndRange, Context);
+  fixAvailability(ReferenceRange, ReferenceDC,
+                  Restriction.getFixItDomainAndRange(Context), Context);
   return IsError;
 }
 
@@ -1178,10 +1128,10 @@ static bool diagnosePotentialUnavailability(
 /// potentially unavailable.
 static void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC,
-    const AvailabilityDomainAndRange &DomainAndRange,
-    const AvailabilityDomainAndRange &FixItDomainAndRange, bool ForInout) {
+    const DeclContext *ReferenceDC, const AvailabilityRestriction &Restriction,
+    bool ForInout) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  auto DomainAndRange = Restriction.getDomainAndRange(Context);
   AvailabilityDomain Domain = DomainAndRange.getDomain();
   const AvailabilityRange &Availability = DomainAndRange.getRange();
 
@@ -1191,10 +1141,10 @@ static void diagnosePotentialAccessorUnavailability(
                         : diag::availability_decl_only_in;
 
   {
-    auto Err =
-        Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
-                               Context.getTargetAvailabilityDomain(),
-                               Availability.hasMinimumVersion(), Availability);
+    llvm::SmallString<64> scratch;
+    auto Err = Context.Diags.diagnose(
+        ReferenceRange.Start, diag, Accessor,
+        Restriction.getDiagnosticDescription(scratch, Context));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
@@ -1202,7 +1152,8 @@ static void diagnosePotentialAccessorUnavailability(
       return;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, FixItDomainAndRange, Context);
+  fixAvailability(ReferenceRange, ReferenceDC,
+                  Restriction.getFixItDomainAndRange(Context), Context);
 }
 
 static DiagnosticBehavior
@@ -1226,27 +1177,26 @@ behaviorLimitForExplicitUnavailability(
 
 /// Emits a diagnostic for a protocol conformance that is potentially
 /// unavailable at the given source location.
-static bool diagnosePotentialUnavailability(
-    const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
-    SourceLoc loc, const DeclContext *dc,
-    const AvailabilityDomainAndRange &domainAndRange,
-    const AvailabilityDomainAndRange &fixItDomainAndRange) {
+static bool
+diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
+                                const ExtensionDecl *ext, SourceLoc loc,
+                                const DeclContext *dc,
+                                const AvailabilityRestriction &restriction) {
   ASTContext &ctx = dc->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
 
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
   AvailabilityDomain domain = domainAndRange.getDomain();
   const AvailabilityRange &availability = domainAndRange.getRange();
+
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-    auto err = availability.hasMinimumVersion()
-        ? ctx.Diags.diagnose(
-            loc, diag::conformance_availability_only_version_newer, type, proto,
-            domain, availability)
-        : ctx.Diags.diagnose(
-            loc, diag::conformance_availability_not_available, type, proto,
-            domain);
+    llvm::SmallString<64> scratch;
+    auto err = ctx.Diags.diagnose(
+        loc, diag::conformance_availability_unavailable, type, proto,
+        restriction.getDiagnosticDescription(scratch, ctx));
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
     if (!availability.hasMinimumVersion()) {
@@ -1263,7 +1213,7 @@ static bool diagnosePotentialUnavailability(
       return true;
   }
 
-  fixAvailability(loc, dc, fixItDomainAndRange, ctx);
+  fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
   return true;
 }
 
@@ -1883,19 +1833,16 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
-  auto attr = restriction.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
   // appropriate.
   auto behavior =
       behaviorLimitForExplicitUnavailability(rootConf, where.getDeclContext());
 
-  EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
+  llvm::SmallString<64> scratch;
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                restriction.shouldHideDomainNameInDiagnostics(),
-                domainAndRange.getDomain(), EncodedMessage.Message)
+                restriction.getDiagnosticDescription(scratch, ctx))
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
                                LanguageMode::v6);
@@ -1969,7 +1916,7 @@ static bool diagnoseTypedThrowsAvailability(
 ///          one of the generic arguments, or none if all are present for
 ///          every generic argument.
 static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
-    BoundGenericType *boundTy) {
+    NominalType *boundTy) {
   for (auto arg : boundTy->getGenericArgs()) {
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       switch (ip) {
@@ -1980,7 +1927,35 @@ static std::optional<InvertibleProtocolKind> checkGenericArgsForInvertibleReqs(
       case InvertibleProtocolKind::Escapable:
         if (!arg->isEscapable())
           return ip;
+        break;
+      case InvertibleProtocolKind::Deinitable:
+        // Nothing can suppress Deinitable, so no generic argument lacks it.
+        break;
       }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Which invertible protocol, if any, an existential's own layout suppresses.
+static std::optional<InvertibleProtocolKind>
+checkExistentialForInvertibleReqs(CanType type) {
+  if (!type.isExistentialType())
+    return std::nullopt;
+
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
+    switch (ip) {
+    case InvertibleProtocolKind::Copyable:
+      if (type->isNoncopyable())
+        return ip;
+      break;
+    case InvertibleProtocolKind::Escapable:
+      if (!type->isEscapable())
+        return ip;
+      break;
+    case InvertibleProtocolKind::Deinitable:
+      // Nothing can suppress Deinitable, so no existential lacks it.
+      break;
     }
   }
   return std::nullopt;
@@ -2000,29 +1975,88 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 
   auto type = srcType->getCanonicalType();
 
-  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
-    if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
-      std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
-      switch (*missing) {
-      case InvertibleProtocolKind::Copyable:
-        diag =
-            diag::availability_copyable_generics_casting_only_version_newer;
-        break;
-      case InvertibleProtocolKind::Escapable:
-        diag =
-            diag::availability_escapable_generics_casting_only_version_newer;
-        break;
-      }
+  // Either a generic argument that suppresses a requirement (`Wrapper<NC>`) or
+  // an existential that suppresses one in its own layout (`any P & ~Copyable`).
+  // Both need a runtime that understands `InvertedProtocols` requirements.
+  std::optional<InvertibleProtocolKind> missing;
+  bool fromExistential = false;
+  if (auto boundTy = dyn_cast<NominalType>(type);
+      boundTy && boundTy->hasGenericArgs())
+    missing = checkGenericArgsForInvertibleReqs(boundTy);
+  if (!missing) {
+    missing = checkExistentialForInvertibleReqs(type);
+    fromExistential = missing.has_value();
+  }
 
-      // Enforce the availability restriction.
-      return TypeChecker::checkAvailability(
-          refLoc,
-          refDC->getASTContext().getNoncopyableGenericsAvailability(),
-          *diag,
-          refDC);
+  if (missing) {
+    std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
+    switch (*missing) {
+    case InvertibleProtocolKind::Copyable:
+      diag = fromExistential
+          ? diag::availability_copyable_existential_casting_only_version_newer
+          : diag::availability_copyable_generics_casting_only_version_newer;
+      break;
+    case InvertibleProtocolKind::Escapable:
+      diag = fromExistential
+          ? diag::availability_escapable_existential_casting_only_version_newer
+          : diag::availability_escapable_generics_casting_only_version_newer;
+      break;
+    case InvertibleProtocolKind::Deinitable:
+      llvm_unreachable("nothing can suppress Deinitable");
     }
+
+    // Enforce the availability restriction.
+    return TypeChecker::checkAvailability(
+        refLoc,
+        fromExistential
+            ? refDC->getASTContext().getParameterizedExistentialAvailability()
+            : refDC->getASTContext().getNoncopyableGenericsAvailability(),
+        *diag,
+        refDC);
   }
   return false;
+}
+
+/// Emit a suitable diagnostic if this cast would require new runtime
+/// support that's not available on the target.
+///
+/// \param srcType the source type of the cast
+/// \param targetType the target type of the cast
+/// \param refLoc source location of the cast
+/// \param refDC decl context in which the cast occurs
+/// \return true if diagnosed
+static bool
+checkNoncopyableCastingAvailability(Type srcType, Type targetType,
+                                    SourceRange refLoc,
+                                    const DeclContext *refDC) {
+  if (!srcType || !targetType)
+    return false;
+
+  // Copyable types are supported in the old runtime
+  if (!srcType->getCanonicalType()->isNoncopyable())
+    return false;
+
+  // If the target is a concrete (non-existential) `Copyable`,
+  // then older runtimes work: It will only try to copy if the
+  // cast is successful, which can only happen if the type is `Copyable`.
+  // (This logic doesn't work for existential targets which might
+  // legitimately try to box the source by copying.)
+  auto target = targetType->getCanonicalType();
+  if (!target->isNoncopyable() && !target->isAnyExistentialType())
+    return false;
+
+  // Without NoncopyableCasting, we can't reach casts that
+  // aren't supported in old runtimes
+  auto &ctx = refDC->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableCasting))
+    return false;
+
+  // Check whether the new runtime support is present
+  return TypeChecker::checkAvailability(
+      refLoc,
+      ctx.getDynamicCastTestAvailability(),
+      diag::availability_noncopyable_casting_only_version_newer,
+      refDC);
 }
 
 static bool checkTypeMetadataAvailabilityInternal(CanType type,
@@ -2061,6 +2095,11 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
 
   auto type = refType->getCanonicalType();
 
+  // For casts, we do need the extended existential shape metadata,
+  // since casts do not open the existential.
+  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
+    return true;
+
   // SILGen emits these conversions by opening the outermost level of
   // existential, so we never need to emit type metadata for an
   // existential in such a position.  We necessarily have type metadata
@@ -2069,9 +2108,6 @@ static bool checkTypeMetadataAvailabilityForConverted(Type refType,
   if (type.isAnyExistentialType()) return false;
 
   if (checkTypeMetadataAvailabilityInternal(type, refLoc, refDC))
-    return true;
-
-  if (checkInverseGenericsCastingAvailability(type, refLoc, refDC))
     return true;
 
   return false;
@@ -2201,7 +2237,6 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -2231,11 +2266,10 @@ bool diagnoseExplicitUnavailability(
     diag.limitBehavior(limit);
     attachRenameFixIts(diag, rename);
   } else {
-    EncodedDiagnosticMessage EncodedMessage(message);
+    llvm::SmallString<64> scratch;
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
-                  restriction.shouldHideDomainNameInDiagnostics(),
-                  domainAndRange.getDomain(), EncodedMessage.Message)
+                  restriction.getDiagnosticDescription(scratch, ctx))
         .highlight(R)
         .limitBehavior(limit);
   }
@@ -2454,6 +2488,12 @@ public:
                                       Where.getDeclContext());
         checkTypeMetadataAvailabilityForConverted(CE->getSubExpr()->getType(),
                                                   loc, Where.getDeclContext());
+        auto *checked = dyn_cast<CheckedCastExpr>(CE);
+        if (!checked || checked->getCastKind() != CheckedCastKind::Coercion) {
+          checkNoncopyableCastingAvailability(
+              CE->getSubExpr()->getType(), CE->getCastType(), loc,
+              Where.getDeclContext());
+        }
       }
 
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
@@ -3038,6 +3078,17 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (ctx.LangOpts.WarnSoftDeprecated)
     restrictionFlags |= AvailabilityRestrictionFlag::IncludeSoftDeprecation;
 
+  if (Flags.contains(
+          DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol) &&
+      isa<ProtocolDecl>(D))
+    restrictionFlags |=
+        AvailabilityRestrictionFlag::AllowUnintroducedInPlatformDomains;
+
+  if (Flags.contains(DeclAvailabilityFlag::
+                         AllowPotentiallyUnavailableAtOrBelowDeploymentTarget))
+    restrictionFlags |=
+        AvailabilityRestrictionFlag::AllowUnintroducedAtOrBelowDeploymentRange;
+
   auto getAvailabilityRestriction = [&](const Decl *decl) {
     return Where.getAvailability().restrictionForDecl(decl, restrictionFlags);
   };
@@ -3072,29 +3123,13 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
   }
 
-  if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
-        && isa<ProtocolDecl>(D))
-    return false;
-
   // Diagnose (and possibly signal) for potential unavailability
-  auto domainAndRange = restriction->getDomainAndRange(ctx);
-  auto fixItDomainAndRange = restriction->getFixItDomainAndRange(ctx);
-  auto domain = domainAndRange.getDomain();
-  auto requiredRange = domainAndRange.getRange();
-
-  if (Flags.contains(
-          DeclAvailabilityFlag::
-              AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(domain, requiredRange, ctx))
-    return false;
-
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    diagnosePotentialAccessorUnavailability(accessor, R, DC, domainAndRange,
-                                            fixItDomainAndRange, forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC, *restriction,
+                                            forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, domainAndRange,
-                                         fixItDomainAndRange))
+    if (!diagnosePotentialUnavailability(D, R, DC, *restriction))
       return false;
   }
 
@@ -3105,10 +3140,17 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 /// Diagnose uses of unavailable declarations.
 void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
-  if (where.isImplicit())
+  // FIXME: We skip availability checking for expressions in synthesized
+  // derivation macros to match the behavior of the old built-in conformance
+  // synthesis, whose implicit members are skipped. This is unsound: it lets a
+  // derived conformance reference a member conformance that is unavailable,
+  // which crashes at runtime under -unavailable-decl-optimization=stub. We
+  // ought to diagnose this (likely staged in as a warning first). See
+  // https://github.com/swiftlang/swift/issues/77589.
+  if (where.isImplicit() || E->isFromSyntheticMacroExpansion(DC))
     return;
   ExprAvailabilityWalker walker(where);
-  const_cast<Expr*>(E)->walk(walker);
+  const_cast<Expr *>(E)->walk(walker);
 }
 
 namespace {
@@ -3148,6 +3190,12 @@ public:
       auto where = ExportContext::forFunctionBody(DC, P->getLoc());
       diagnoseTypeAvailability(IP->getCastTypeRepr(), IP->getCastType(),
                                P->getLoc(), where, std::nullopt);
+      // The subject type is absent when the pattern is malformed, as in
+      // `x is _`, where the placeholder is diagnosed on its own.
+      if (IP->hasType() && IP->getCastKind() != CheckedCastKind::Coercion) {
+        checkNoncopyableCastingAvailability(
+            IP->getType(), IP->getCastType(), P->getLoc(), DC);
+      }
     }
 
     return Action::Continue(P);
@@ -3305,14 +3353,6 @@ public:
       return Action::Continue;
 
     auto subs = ty->getContextSubstitutionMap();
-    (void) diagnoseSubstitutionMapAvailability(Loc, subs, Where);
-    return Action::Continue;
-  }
-
-  Action visitBoundGenericType(BoundGenericType *ty) override {
-    visitTypeDecl(ty->getDecl());
-
-    auto subs = ty->getContextSubstitutionMap();
     (void)diagnoseSubstitutionMapAvailability(
         Loc, subs, Where,
         /*depTy=*/Type(),
@@ -3320,6 +3360,7 @@ public:
         /*warnIfConformanceUnavailablePreSwift6=*/false,
         /*suppressParameterizationCheckForOptional=*/ty->isOptional(),
         /*preconcurrency*/ty->getAnyNominal()->preconcurrency());
+
     return Action::Continue;
   }
 
@@ -3331,12 +3372,20 @@ public:
     return Action::Continue;
   }
 
-  // We diagnose unserializable Clang function types in the
-  // post-visitor so that we diagnose any unexportable component
-  // types first.
   Action walkToTypePost(Type T) override {
-    if (Where.mustOnlyReferenceExportedDecls()) {
-      if (auto fnType = T->getAs<AnyFunctionType>()) {
+    if (auto fnType = T->getAs<AnyFunctionType>()) {
+      // A typed throws clause requires the thrown error type to conform to
+      // 'Error', so that conformance must be available too.
+      if (auto thrownError = fnType->getThrownError()) {
+        auto &ctx = Where.getDeclContext()->getASTContext();
+        (void)diagnoseConformanceAvailability(Loc, thrownError,
+                                              ctx.getErrorDecl(), Where);
+      }
+
+      // We diagnose unserializable Clang function types here in the
+      // post-visitor so that we diagnose any unexportable component
+      // types first.
+      if (Where.mustOnlyReferenceExportedDecls()) {
         if (auto clangType = fnType->getClangTypeInfo().getType()) {
           auto *DC = Where.getDeclContext();
           auto &ctx = DC->getASTContext();
@@ -3358,15 +3407,16 @@ public:
 
 }
 
-void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+bool swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                                      const ExportContext &where,
                                      DeclAvailabilityFlags flags) {
   if (diagnoseTypeReprAvailability(TR, where, flags))
-    return;
+    return true;
 
   if (!T)
-    return;
+    return false;
   T.walk(ProblematicTypeFinder(loc, where, flags));
+  return false;
 }
 
 static void diagnoseMissingConformance(
@@ -3389,7 +3439,6 @@ static bool diagnoseConformanceAvailabilityRestriction(
     bool warnIfConformanceUnavailablePreSwift6, bool preconcurrency,
     std::function<void(void)> maybeEmitAssociatedTypeNote) {
   auto *DC = where.getDeclContext();
-  auto &ctx = DC->getASTContext();
 
   if (restriction.isUnavailable()) {
     if (diagnoseExplicitUnavailability(loc, restriction, rootConf, ext, where,
@@ -3407,10 +3456,7 @@ static bool diagnoseConformanceAvailabilityRestriction(
   }
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto domainAndRange = restriction.getDomainAndRange(ctx);
-  auto fixItDomainAndRange = restriction.getFixItDomainAndRange(ctx);
-  if (diagnosePotentialUnavailability(rootConf, ext, loc, DC, domainAndRange,
-                                      fixItDomainAndRange)) {
+  if (diagnosePotentialUnavailability(rootConf, ext, loc, DC, restriction)) {
     maybeEmitAssociatedTypeNote();
     return true;
   }
@@ -3427,6 +3473,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        bool preconcurrency) {
   assert(!where.isImplicit());
 
+  // FIXME: Shares a lot with
+  // AvailabilityContext::enumerateUnsatisfiedRestrictionsForConformance().
   if (conformance.isInvalid() || conformance.isAbstract())
     return false;
 
@@ -3518,6 +3566,34 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   return false;
 }
 
+bool swift::diagnoseConformanceAvailability(SourceLoc loc, Type type,
+                                            ProtocolDecl *proto,
+                                            const ExportContext &where) {
+  if (!type || type->hasError() || !proto)
+    return false;
+
+  auto *DC = where.getDeclContext();
+
+  // Resolving the conformance requires a contextual type. Conditional
+  // conformances, in particular, can only be established once the requirements
+  // of the enclosing generic signature are known.
+  if (type->hasTypeParameter()) {
+    // Without a generic environment the conformance is unknowable here. It is
+    // checked at the point where the generic parameters are substituted.
+    auto *env = DC->getGenericEnvironmentOfContext();
+    if (!env)
+      return false;
+
+    type = env->mapTypeIntoEnvironment(type);
+  }
+
+  auto conformance = checkConformance(type, proto, /*allowMissing=*/false);
+  if (conformance.isInvalid())
+    return false;
+
+  return diagnoseConformanceAvailability(loc, conformance, where);
+}
+
 bool diagnoseSubstitutionMapAvailability(
     SourceLoc loc, SubstitutionMap subs, const ExportContext &where, Type depTy,
     Type replacementTy, bool warnIfConformanceUnavailablePreSwift6,
@@ -3560,14 +3636,24 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (decl->getDeclContext()->isInSwiftinterface())
     return false;
 
-  // Skip non-public decls.
   if (auto valueDecl = dyn_cast<const ValueDecl>(decl)) {
     AccessScope scope =
       valueDecl->getFormalAccessScope(/*useDC*/nullptr,
                                       /*treatUsableFromInlineAsPublic*/true);
+    // Skip non-public decls.
     if (!scope.isPublic())
       return false;
+
+    // Skip implementations of members of Obj-C decls since their availability
+    // would be declared in a header.
+    if (valueDecl->isObjCMemberImplementation())
+      return false;
   }
+
+  // Skip @implementation decls since their availability would be declared in
+  // a header.
+  if (decl->isObjCImplementation())
+    return false;
 
   // Skip functions emitted into clients, SPI or implicit.
   if (decl->isAlwaysEmittedIntoClient() || decl->isSPI() || decl->isImplicit())

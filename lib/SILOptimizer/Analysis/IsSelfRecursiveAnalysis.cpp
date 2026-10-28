@@ -12,9 +12,7 @@
 
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 

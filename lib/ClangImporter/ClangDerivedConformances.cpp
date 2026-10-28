@@ -34,7 +34,6 @@
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -96,7 +95,8 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
     return nullptr; // Was not a clang::TypeDecl
 
   if (mustBeComplete &&
-      !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+      !Sema.isCompleteType(td->getLocation(),
+                           td->getASTContext().getTypeDeclType(td)))
     return nullptr;
 
   return td;
@@ -253,7 +253,9 @@ static clang::QualType getReadOnlyParamType(const clang::ParmVarDecl *param) {
 static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
   if (!fd)
     return false;
-  auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+  auto &clangCtx = decl->getClangDecl()->getASTContext();
+  auto ty = clangCtx.getCanonicalTagType(
+      cast<clang::TagDecl>(decl->getClangDecl()));
   if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
     if (method->param_size() != 1)
       return false;
@@ -263,9 +265,10 @@ static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
     auto parTy = getReadOnlyParamType(fd->getParamDecl(0));
     if (parTy.isNull())
       return false;
-    auto thisTy = method->getParent()->getTypeForDecl();
-    return parTy.getCanonicalType() == thisTy->getCanonicalTypeUnqualified() &&
-           parTy.getCanonicalType() == ty->getCanonicalTypeUnqualified();
+
+    auto parentTy = clangCtx.getCanonicalTagType(method->getParent());
+    return parTy.getCanonicalType() == parentTy &&
+           parTy.getCanonicalType() == ty;
   }
   if (fd->param_size() != 2)
     return false;
@@ -275,8 +278,7 @@ static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
     return false;
   return lhsTy->getCanonicalTypeUnqualified() ==
              rhsTy->getCanonicalTypeUnqualified() &&
-         lhsTy->getCanonicalTypeUnqualified() ==
-             ty->getCanonicalTypeUnqualified();
+         lhsTy->getCanonicalTypeUnqualified() == ty;
 }
 
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
@@ -346,7 +348,9 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
   auto isValidGlobal = [&](const clang::FunctionDecl *fd) -> bool {
     if (!fd)
       return false;
-    auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+    auto &clangCtx = decl->getClangDecl()->getASTContext();
+    auto ty = clangCtx.getCanonicalTagType(
+        cast<clang::TagDecl>(decl->getClangDecl()));
     if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
       if (method->param_size() != 1)
         return false;
@@ -358,9 +362,9 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
         return false;
       if (!parTy->isIntegerType())
         return false;
-      auto thisTy = method->getParent()->getTypeForDecl();
-      return thisTy->getCanonicalTypeUnqualified() ==
-             ty->getCanonicalTypeUnqualified();
+
+      auto parentTy = clangCtx.getCanonicalTagType(method->getParent());
+      return parentTy == ty;
     }
     if (fd->param_size() != 2)
       return false;
@@ -370,8 +374,7 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
       return false;
     if (rhsTy->isIntegerType())
       return false;
-    return lhsTy->getCanonicalTypeUnqualified() ==
-           ty->getCanonicalTypeUnqualified();
+    return lhsTy->getCanonicalTypeUnqualified() == ty;
   };
   auto isValidMember = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
@@ -410,10 +413,9 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
   clang::Sema &clangSema = impl.getClangSema();
 
   clang::UnresolvedSet<1> ops;
-  auto qualType = clang::QualType(classDecl->getTypeForDecl(), 0);
-  auto arg = clang::CXXThisExpr::Create(clangCtx, clang::SourceLocation(),
-                                        qualType, false);
-  arg->setType(clang::QualType(classDecl->getTypeForDecl(), 0));
+  auto *arg = clang::CXXThisExpr::Create(
+      clangCtx, clang::SourceLocation(),
+      clangCtx.getCanonicalTagType(classDecl), false);
 
   clang::OverloadedOperatorKind opKind =
       clang::BinaryOperator::getOverloadedOperator(operatorKind);
@@ -522,12 +524,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
 void swift::simple_display(llvm::raw_ostream &out,
                            const CxxRecordDeclDescriptor &desc) {
   out << "Inferring C++ iterator info for '";
-  if (desc.decl->getIdentifier())
-    out << desc.decl->getName();
-  else if (desc.decl->isAnonymousStructOrUnion())
-    out << "(anonymous record)";
-  else
-    out << "(unnamed record)";
+  importer::printRecordName(out, desc.decl);
   out << "'\n";
 }
 
@@ -632,9 +629,11 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
         ctx.DeclarationNames.getIdentifier(&ctx.Idents.get("iterator_traits"));
     if (auto *iterator_traits = stdNS->lookup(iteratorTraitsId)
                                     .find_first<clang::ClassTemplateDecl>()) {
-      void *insertPos = nullptr; // unused
+      llvm::FoldingSetInsertToken insertToken; // unused
+      auto declTy = sema.getASTContext().getCanonicalTagType(decl);
+
       if (auto *traitSpecialization = iterator_traits->findSpecialization(
-              {clang::TemplateArgument(ctx.getTypeDeclType(decl))}, insertPos);
+              {clang::TemplateArgument(declTy)}, insertToken);
           traitSpecialization && traitSpecialization->hasDefinition()) {
         if (traitSpecialization->isExplicitSpecialization()) {
           // Determine info from definition of iterator_traits specialization,
@@ -767,7 +766,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
       if (!equalEqual) {
         // If `func ==` still can't be found, it might be defined for a base
         // class of the current class.
-        auto paramTy = clangCtx.getRecordType(clangDecl);
+        auto paramTy = clangCtx.getCanonicalTagType(clangDecl);
         synthesizeCXXOperator(impl, clangDecl, clang::BinaryOperatorKind::BO_EQ,
                               paramTy, paramTy, clangCtx.BoolTy);
         equalEqual = getEqualEqualOperator(decl);
@@ -824,7 +823,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
       minus = getMinusOperator(decl);
       if (!minus) {
         clang::QualType returnTy = instantiated->getReturnType();
-        auto paramTy = clangCtx.getRecordType(clangDecl);
+        auto paramTy = clangCtx.getCanonicalTagType(clangDecl);
         synthesizeCXXOperator(impl, clangDecl,
                               clang::BinaryOperatorKind::BO_Sub, paramTy,
                               paramTy, returnTy);
@@ -906,6 +905,13 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
 
   auto valueType = clangCtx.getTypeDeclType(value_type);
 
+  if (getCxxValueSemanticsKind(valueType.getTypePtr(), impl) !=
+      CxxValueSemanticsKind::Copyable) {
+    // CxxOptional doesn't support ~Copyable elements, so skip the constructor
+    // synthesis and the conformance, if the wrapped value is move-only.
+    return;
+  }
+
   auto constRefValueType =
       clangCtx.getLValueReferenceType(valueType.withConst());
   // Create a fake variable with type of the wrapped value.
@@ -919,8 +925,8 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
       constRefValueType.getNonReferenceType(), clang::ExprValueKind::VK_LValue,
       clangDecl->getLocation());
 
-  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
-      clang::QualType(clangDecl->getTypeForDecl(), 0));
+  auto *clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
+      clangCtx.getCanonicalTagType(clangDecl));
   SmallVector<clang::Expr *, 1> constructExprArgs = {fakeValueRefExpr};
 
   // Instantiate the templated constructor that would accept this fake variable.
@@ -993,7 +999,7 @@ static void conformToCxxIterableIfNeeded(
   // Substitute generic `Self` parameter.
   auto declSelfTy = decl->getDeclaredInterfaceType();
   auto borrowingIteratorTy =
-      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
+      NominalType::get(borrowingIteratorNominal, Type(), {declSelfTy}, ctx);
 
   auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
       ctx.getIdentifier("DereferenceResult"));
@@ -1058,8 +1064,15 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   } else {
     // Check if begin() returns an iterator.
     auto *iterDecl = iterTy->getAsCXXRecordDecl();
-    if (!iterDecl || !iterDecl->hasDefinition())
+    if (!iterDecl)
       return;
+
+    // NOTE: isCompleteType eagerly instantiates the return type of begin(),
+    // which may lead to spurious template instantiation failures, but is needed
+    // for CxxIteratorInfoRequest and the collection protocol conformances.
+    if (!clangSema.isCompleteType(beginConst->getLocation(), iterTy))
+      return;
+
     auto iterInfo = evaluateOrDefault(
         ctx.evaluator, CxxIteratorInfoRequest({iterDecl, clangSema}), {});
     if (!iterInfo.has_value())
@@ -1074,19 +1087,10 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   if (!begin || !end)
     return;
 
-  // Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, begin() and end() are always
-  // renamed; with it they keep their original names and the renamed spellings
-  // become migration stubs.
-  if (ctx.LangOpts.hasFeature(
-          Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
-    ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
-           "begin() and end() should keep their names");
-  } else {
-    ASSERT(begin->getBaseName() == "__beginUnsafe" &&
-           "begin() should always be __Unsafe");
-    ASSERT(end->getBaseName() == "__endUnsafe" &&
-           "end() should always be __Unsafe");
-  }
+  // begin() and end() keep their original names; the renamed spellings are
+  // migration stubs.
+  ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
+         "begin() and end() should keep their names");
   ASSERT(!begin->isMutating() && !end->isMutating() &&
          "begin() and end() should not be mutating");
 
@@ -1491,6 +1495,15 @@ static void conformToCxxVector(ClangImporter::Implementation &impl,
   if (!Element || !Size || !RawIterator)
     return;
 
+  // Before synthesizing the conformance to CxxVector, check if `RawIterator`
+  // conforms to `UnsafeCxxRandomAccessIterator`.
+  auto cxxRandomAccessIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRandomAccessIteratorProto ||
+      !checkConformance(RawIterator->getUnderlyingType(),
+                        cxxRandomAccessIteratorProto))
+    return;
+
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                Element->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
@@ -1563,8 +1576,8 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   // passing constPointer and count
   SmallVector<clang::Expr *, 2> constructExprArgs = {fakePointer, fakeCount};
 
-  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
-      clang::QualType(clangDecl->getTypeForDecl(), 0));
+  auto *clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
+      clangCtx.getCanonicalTagType(clangDecl));
 
   // Instantiate the templated constructor that would accept this fake variable.
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(

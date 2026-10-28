@@ -16,7 +16,6 @@
 
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
-#include "SourceKit/Support/UIdent.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Mutex.h"

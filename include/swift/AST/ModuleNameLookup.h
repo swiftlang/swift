@@ -18,10 +18,10 @@
 #ifndef SWIFT_AST_MODULE_NAME_LOOKUP_H
 #define SWIFT_AST_MODULE_NAME_LOOKUP_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 class ValueDecl;
@@ -43,6 +43,13 @@ enum class ResolutionKind {
 };
 
 void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
+
+/// Returns whether \p decl is the kind of declaration that a lookup with
+/// \p resolutionKind and \p options can find, without considering access
+/// control or scoped imports.
+bool isAcceptableLookupResult(const ValueDecl *decl,
+                              ResolutionKind resolutionKind,
+                              NLOptions options);
 
 /// Performs a lookup into the given module and its imports.
 ///

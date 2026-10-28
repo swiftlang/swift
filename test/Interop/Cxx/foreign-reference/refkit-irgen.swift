@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-ir -Onone %s -I %S/Inputs -cxx-interoperability-mode=default \
-// RUN:     -Xcc -fignore-exceptions -disable-availability-checking \
+// RUN:     -Xcc -fignore-exceptions -target %target-swift-5.8-abi-triple \
 // RUN: | %FileCheck %s
 
 // UNSUPPORTED: OS=windows-msvc

@@ -151,10 +151,9 @@ func casting(value: Any, i: Int) {
 }
 
 func metatypes() {
-  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  let _: Any.Type = UnsafeType.self // expected-note{{reference to unsafe type 'UnsafeType'}}
+  let _: Any.Type = UnsafeType.self
 
-  let _: Any.Type = unsafe UnsafeType.self
+  let _: Any.Type = unsafe UnsafeType.self // expected-warning{{no unsafe operations occur within 'unsafe' expression}}
 }
 
 func testKeyPath() {
@@ -391,4 +390,12 @@ func superDuperUnsafe(_ bytes: UnsafeRawBufferPointer) {
   let byte = unsafe unsafe bytes.first ?? 0
   _ = byte
   _ = unsafe bytes.first ?? 0
+}
+
+// Calling a consuming closure parameter is still diagnosed.
+func callConsumingUnsafeClosure(
+  _ body: consuming @escaping (UnsafeRawPointer?) -> Void
+) {
+  body(nil) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1{{reference to parameter 'body' involves unsafe type 'UnsafeRawPointer'}}
 }

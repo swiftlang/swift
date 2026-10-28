@@ -306,6 +306,8 @@ struct SILDeclRef {
   ClosureExpr *getClosureExpr() const;
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
+  /// If this is a 'defer' body, get the function decl representing its body
+  FuncDecl *getDeferBodyFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
   AccessorDecl *getAccessorDecl() const;
   FileUnit *getFileUnit() const { return cast<FileUnit *>(loc); }
@@ -674,14 +676,6 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using PointerInfo = DenseMapInfo<void*>;
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
-  static SILDeclRef getEmptyKey() {
-    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, false, false,
-                      false, BackDeploymentKind::None, 0, false, nullptr);
-  }
-  static SILDeclRef getTombstoneKey() {
-    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, false, false,
-                      false, BackDeploymentKind::None, 0, false, nullptr);
-  }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     return hash_value(Val);
   }

@@ -18,11 +18,9 @@
 
 #define DEBUG_TYPE "sil-epilogue-arc-dumper"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

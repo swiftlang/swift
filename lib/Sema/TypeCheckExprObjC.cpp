@@ -18,7 +18,6 @@
 #include "TypoCorrection.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Range.h"
 
 using namespace swift;
 
@@ -90,7 +89,7 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
 
     // We're updating to a property. Determine whether we're looking
     // into a bridged Swift collection of some sort.
-    if (auto boundGeneric = newType->getAs<BoundGenericType>()) {
+    if (auto boundGeneric = newType->getAs<NominalType>()) {
       // Array<T>
       if (boundGeneric->isArray()) {
         // Further lookups into the element type.
@@ -118,7 +117,7 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
     }
 
     // Determine whether we're looking into a Foundation collection.
-    if (auto classDecl = newType->getClassOrBoundGenericClass()) {
+    if (auto classDecl = newType->getClassDecl()) {
       if (classDecl->isObjC() && classDecl->hasClangNode()) {
         SmallString<32> scratch;
         StringRef objcClassName = classDecl->getObjCRuntimeName(scratch);

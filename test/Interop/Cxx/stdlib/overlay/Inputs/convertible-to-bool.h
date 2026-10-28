@@ -1,5 +1,8 @@
 #pragma once
 
+#define SWIFT_NONCOPYABLE __attribute__((swift_attr("~Copyable")))
+#define SWIFT_NONESCAPABLE __attribute__((swift_attr("~Escapable")))
+
 struct BoolBox {
   bool value;
 
@@ -78,4 +81,23 @@ struct PublicUsingBoolBox : ProtectedBoolBox {
 struct ProtectedUsingBoolBox : BoolBox {
 protected:
   using BoolBox::operator bool;
+};
+
+struct SWIFT_NONCOPYABLE NonCopyableBoolBox {
+  bool value;
+
+  NonCopyableBoolBox(bool v) : value(v) {}
+  NonCopyableBoolBox(const NonCopyableBoolBox &) = delete;
+  NonCopyableBoolBox(NonCopyableBoolBox &&other) : value(other.value) {}
+
+  operator bool() const { return value; }
+};
+
+struct SWIFT_NONESCAPABLE NonEscapableBoolBox {
+  bool value;
+
+  NonEscapableBoolBox(const BoolBox &box [[clang::lifetimebound]])
+      : value(box.value) {}
+
+  operator bool() const { return value; }
 };

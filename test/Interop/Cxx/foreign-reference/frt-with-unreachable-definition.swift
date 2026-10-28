@@ -5,7 +5,7 @@
 //
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}verify.swift \
 // RUN:   -I %t%{fs-sep}Inputs -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}FRTImpl.h \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}OpsImpl.h \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}CxxModule.h
@@ -14,7 +14,7 @@
 //
 // RUN: %target-swift-frontend -typecheck %t/compile.swift \
 // RUN:   -I %t/Inputs -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking
+// RUN:   -target %target-swift-5.8-abi-triple
 
 //--- Inputs/module.modulemap
 module CxxModule {

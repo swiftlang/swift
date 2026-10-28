@@ -15,17 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SipHash.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -33,7 +31,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 
-#include "ClassTypeInfo.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -139,6 +136,16 @@ namespace {
           ValueTypeAndIsOptional.getPointer()->getContext(), \
           getFixedSize().getValueInBits()); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
   class Nativeness##Name##ReferenceTypeInfo \
@@ -217,6 +224,16 @@ namespace {
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
+    createSerializableHiddenTypeInfoRepresentation( \
+        IRGenModule &) const override { \
+      unsupportedSerializableHiddenTypeInfoRepresentation(); \
+    } \
   };
 
   // The nativeness of a reference storage type is a policy decision.
@@ -230,38 +247,52 @@ namespace {
 #undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
 #undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  class Name##ReferenceTypeInfo \
-      : public PODSingleScalarTypeInfo<Name##ReferenceTypeInfo, \
-                                       LoadableTypeInfo> { \
-    bool IsOptional; \
-  public: \
-    Name##ReferenceTypeInfo(llvm::Type *type, \
-                            const SpareBitVector &spareBits, \
-                            Size size, Alignment alignment, bool isOptional) \
-      : PODSingleScalarTypeInfo(type, size, spareBits, alignment), \
-        IsOptional(isOptional) {} \
-    /* Static types have the same spare bits as managed heap objects. */ \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      return getHeapObjectExtraInhabitantCount(IGM) - IsOptional; \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      return getHeapObjectFixedExtraInhabitantValue(IGM, bits, \
-                                                    index + IsOptional, 0); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T, bool isOutlined) \
-    const override { \
-      return getHeapObjectExtraInhabitantIndex(IGF, src); \
-    } \
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T, bool isOutlined) \
-    const override { \
-      return storeHeapObjectExtraInhabitant(IGF, index, dest); \
-    } \
-  };
+#define UNCHECKED_REF_STORAGE(Name, ...)                                     \
+    class Name##ReferenceTypeInfo                                              \
+        : public PODSingleScalarTypeInfo<Name##ReferenceTypeInfo,              \
+                                         LoadableTypeInfo> {                   \
+      bool IsOptional;                                                         \
+                                                                               \
+    public:                                                                    \
+      Name##ReferenceTypeInfo(llvm::Type *type,                                \
+                              const SpareBitVector &spareBits, Size size,      \
+                              Alignment alignment, bool isOptional)            \
+          : PODSingleScalarTypeInfo(type, size, spareBits, alignment),         \
+            IsOptional(isOptional) {}                                          \
+      /* Static types have the same spare bits as managed heap objects. */     \
+      unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
+        return getHeapObjectExtraInhabitantCount(IGM) - IsOptional;            \
+      }                                                                        \
+      APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,      \
+                                         unsigned index) const override {      \
+        return getHeapObjectFixedExtraInhabitantValue(IGM, bits,               \
+                                                      index + IsOptional, 0);  \
+      }                                                                        \
+      llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,    \
+                                           SILType T,                          \
+                                           bool isOutlined) const override {   \
+        return PointerInfo::forHeapObject(IGF.IGM)                             \
+            .withNullable(IsNullable_t(IsOptional))                            \
+            .getExtraInhabitantIndex(IGF, src);                                \
+      }                                                                        \
+      void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,        \
+                                Address dest, SILType T,                       \
+                                bool isOutlined) const override {              \
+        return PointerInfo::forHeapObject(IGF.IGM)                             \
+            .withNullable(IsNullable_t(IsOptional))                            \
+            .storeExtraInhabitant(IGF, index, dest);                           \
+      }                                                                        \
+      void                                                                     \
+      printForAbstractTypeLayoutInfo(IRGenModule &IGM, llvm::raw_ostream &OS,  \
+                                     unsigned indentation) const override {    \
+        printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);        \
+      }                                                                        \
+      std::unique_ptr<SerializableHiddenTypeInfoRepresentation>                \
+      createSerializableHiddenTypeInfoRepresentation(                          \
+          IRGenModule &) const override {                                      \
+        unsupportedSerializableHiddenTypeInfoRepresentation();                 \
+      }                                                                        \
+    };
 #include "swift/AST/ReferenceStorage.def"
 } // end anonymous namespace
 
@@ -490,11 +521,61 @@ void irgen::emitDeallocatePartialClassInstanceTyped(
       {object, metadata, size, alignMask, typeDescriptor});
 }
 
+/// Emit the code that terminates the program when an exactly-once closure
+/// context is destroyed.
+static void emitExactlyOnceClosureDestroyedTrap(IRGenFunction &IGF,
+                                                llvm::Value *context) {
+  // Use the runtime entry point if it is available to make debugging dropped
+  // exactly-once closures easier.
+  auto &IGM = IGF.IGM;
+  if (!IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+      IGM.isOnceClosureDestroyedErrorFeatureAvailable()) {
+    auto call = IGF.Builder.CreateCall(
+        IGM.getOnceClosureDestroyedErrorFunctionPointer(), {context});
+    call->setDoesNotThrow();
+    IGF.Builder.CreateUnreachable();
+    return;
+  }
+
+  IGF.emitTrap("Exactly-once closure was destroyed without being called",
+               /*EmitUnreachable=*/true);
+}
+
+/// Returns the destructor that the context of every exactly-once closure in
+/// this module has. Reaching this destructor indicates that the exactly-once
+/// closure was dropped instead of called, violating its execution semantics.
+///
+/// This destructor implementation can be shared among all exactly once closures
+/// since it doesn't depend on the layout of the closure context.
+llvm::Function *IRGenModule::getExactlyOnceClosureDestructor() {
+  if (ExactlyOnceClosureDestructor)
+    return ExactlyOnceClosureDestructor;
+
+  llvm::Function *fn = llvm::Function::Create(
+      DeallocatingDtorTy, llvm::Function::InternalLinkage,
+      "__swift_exactly_once_closure_destructor", &Module);
+  auto attrs = constructInitialAttributes();
+  addSwiftSelfAttributes(attrs, 0);
+  fn->setAttributes(attrs);
+  fn->setCallingConv(SwiftCC);
+
+  IRGenFunction IGF(*this, fn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(IGF, fn);
+
+  emitExactlyOnceClosureDestroyedTrap(IGF, &*fn->arg_begin());
+
+  ExactlyOnceClosureDestructor = fn;
+  return fn;
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
                                     std::optional<uint64_t> mallocTypeId,
-                                    const llvm::Twine &layoutName) {
+                                    const llvm::Twine &layoutName,
+                                    const llvm::BitVector &unownedFields,
+                                    bool isStackAllocated) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
       "__swift_" + layoutName + "_destructor", &IGM.Module);
@@ -528,13 +609,20 @@ static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
     if (field.isTriviallyDestroyable())
       continue;
 
+    if (!unownedFields.empty() && unownedFields.test(i))
+      continue;
+
     field.getType().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
 
-  emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
-                           offsets.getAlignMask(), mallocTypeId);
+  // The caller is responsible for deallocating the stack slot, destruction in
+  // such cases is decoupled from deallocation.
+  if (!isStackAllocated)
+    emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
+                             offsets.getAlignMask(), mallocTypeId);
+
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -623,15 +711,23 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                                       indices);
 }
 
-llvm::Constant *
-HeapLayout::getPrivateMetadata(IRGenModule &IGM,
-                               llvm::Constant *captureDescriptor,
-                               std::optional<uint64_t> mallocTypeId,
-                               const llvm::Twine &name) const {
-  if (!privateMetadata)
+llvm::Constant *HeapLayout::getPrivateMetadata(
+    IRGenModule &IGM, llvm::Constant *captureDescriptor,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name,
+    const llvm::BitVector &unownedFields, bool isStackAllocated,
+    bool trapsOnDestroy) const {
+  if (!privateMetadata) {
+    llvm::Function *dtorFn;
+    if (trapsOnDestroy) {
+      dtorFn = IGM.getExactlyOnceClosureDestructor();
+    } else {
+      dtorFn = createDtorFn(IGM, *this, mallocTypeId, name, unownedFields,
+                            isStackAllocated);
+      privateDestructor = dtorFn;
+    }
     privateMetadata = buildPrivateMetadata(
-        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name),
-        captureDescriptor, MetadataKind::HeapLocalVariable);
+        IGM, *this, dtorFn, captureDescriptor, MetadataKind::HeapLocalVariable);
+  }
   return privateMetadata;
 }
 
@@ -661,18 +757,84 @@ HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
   return ::computeTypedMallocTypeDescriptor(IGM, storageEntries);
 }
 
-llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
-                                               const llvm::Twine &name,
-                                           llvm::Constant *captureDescriptor,
-                                           const HeapNonFixedOffsets *offsets) {
+/// Emit a static initializer that makes the runtime initialize the header of
+/// the shared context of exactly-once closures.
+static void emitExactlyOnceSharedContextInitializer(
+    IRGenModule &IGM, llvm::GlobalVariable *context, llvm::Constant *metadata) {
+  auto *fn = llvm::Function::Create(
+      llvm::FunctionType::get(IGM.VoidTy, /*isVarArg=*/false),
+      llvm::GlobalValue::PrivateLinkage,
+      "__swift_exactly_once_closure_context_init", &IGM.Module);
+  fn->setAttributes(IGM.constructInitialAttributes());
+  fn->setCallingConv(IGM.DefaultCC);
+  IGM.setColocateMetadataSection(fn);
+
+  IRGenFunction IGF(IGM, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, fn);
+
+  /// swift_initStackObject sets the metadata and the ref-count field the way that
+  /// the running runtime requires, and the object it initializes is never freed,
+  /// so it is appropriate for an object that is not heap allocated.
+  IGF.Builder.CreateCall(IGM.getInitStackObjectFunctionPointer(),
+                         {metadata, context});
+  IGF.Builder.CreateRetVoid();
+
+  // Initialize the context before the C++ global constructors in this module
+  // run, in case they use it. Global constructors in other object files might
+  // still run first.
+  IGM.addStaticInitializer(fn);
+}
+
+llvm::Constant *IRGenModule::getAddrOfExactlyOnceSharedContext() {
+  if (ExactlyOnceSharedContext)
+    return ExactlyOnceSharedContext;
+
+  // Reuse the metadata that the contexts of exactly-once closures with
+  // captures have, because it has the destructor that traps.
+  HeapLayout layout(*this, LayoutStrategy::Optimal, {}, {});
+  auto *metadata = layout.getPrivateMetadata(
+      *this, llvm::ConstantPointerNull::get(CaptureDescriptorPtrTy),
+      /*mallocTypeId=*/std::nullopt, "exactly_once_closure",
+      /*unownedFields=*/{}, /*isStackAllocated=*/false,
+      /*trapsOnDestroy=*/true);
+
+  // A newer runtime might change the layout of the ref-count field. Run a
+  // global ctor that will call into the runtime to initialize the object
+  // with an appropriate ref-count value. In Embedded Swift the field can just
+  // be initialized with a known value at compile time since the runtime is
+  // linked statically.
+  bool initializeAtLoad = !Context.LangOpts.hasFeature(Feature::Embedded);
+  const uint64_t staticRefCount = initializeAtLoad ? 0 : 1;
+
+  auto *initializer = llvm::ConstantStruct::get(
+      RefCountedStructTy,
+      {metadata, llvm::ConstantInt::get(IntPtrTy, staticRefCount)});
+  auto *var =
+      new llvm::GlobalVariable(Module, RefCountedStructTy, /*isConstant=*/false,
+                               llvm::GlobalValue::InternalLinkage, initializer,
+                               "__swift_exactly_once_closure_context");
+  var->setAlignment(llvm::MaybeAlign(getPointerAlignment().getValue()));
+
+  if (initializeAtLoad)
+    emitExactlyOnceSharedContextInitializer(*this, var, metadata);
+  ExactlyOnceSharedContext = var;
+  return var;
+}
+
+llvm::Value *IRGenFunction::emitUnmanagedAlloc(
+    const HeapLayout &layout, const llvm::Twine &name,
+    llvm::Constant *captureDescriptor, const HeapNonFixedOffsets *offsets,
+    bool trapsOnDestroy) {
   if (layout.isKnownEmpty()
       && layout.isTriviallyDestroyable()) {
     return IGM.RefCountedNull;
   }
 
   auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
-  llvm::Value *metadata =
-      layout.getPrivateMetadata(IGM, captureDescriptor, maybeDescriptor, name);
+  llvm::Value *metadata = layout.getPrivateMetadata(
+      IGM, captureDescriptor, maybeDescriptor, name, /*unownedFields=*/{},
+      /*isStackAllocated=*/false, trapsOnDestroy);
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -689,6 +851,18 @@ namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
+    void printForAbstractTypeLayoutInfo(
+        IRGenModule &IGM, llvm::raw_ostream &OS,
+        unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &) const override {
+      unsupportedSerializableHiddenTypeInfoRepresentation();
+    }
+
     BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
                                  Size size, SpareBitVector spareBits,
                                  Alignment align)
@@ -1578,11 +1752,12 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
 
   // Only output the filepath in debug mode. It is going to leak into the
   // executable. This is the same behavior as asserts.
-  auto filename = IGM.IRGen.Opts.shouldOptimize()
+  bool shouldOptimize = IGM.IRGen.Opts.shouldOptimize();
+  auto filename = shouldOptimize
                       ? IGM.getAddrOfGlobalString("")
                       : IGM.getAddrOfGlobalString(loc.filename);
-  auto filenameLength =
-      llvm::ConstantInt::get(IGM.Int32Ty, loc.filename.size());
+  auto filenameLength = llvm::ConstantInt::get(
+      IGM.Int32Ty, shouldOptimize ? 0 : loc.filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call = Builder.CreateCall(
       IGM.getIsEscapingClosureAtFileLocationFunctionPointer(),
@@ -1623,6 +1798,18 @@ public:
 /// Common implementation for empty box type info.
 class EmptyBoxTypeInfo final : public BoxTypeInfo {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1651,6 +1838,18 @@ public:
 /// Common implementation for non-fixed box type info.
 class NonFixedBoxTypeInfo final : public BoxTypeInfo {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
@@ -1759,6 +1958,18 @@ static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
 /// Common implementation for POD boxes of a known stride and alignment.
 class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                              IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
@@ -1768,6 +1979,18 @@ public:
 /// Common implementation for single-refcounted boxes.
 class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
     : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
                                    IGM.getReferenceObjectTypeInfo(refcounting)))
@@ -1807,6 +2030,18 @@ class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
   }
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &) const override {
+    unsupportedSerializableHiddenTypeInfoRepresentation();
+  }
+
   FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
     : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
   {}
@@ -2125,7 +2360,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
                                                      bool suppressCast) {
-  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassDecl();
   if ((theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) ||
       !IGF.IGM.ObjCInterop) {
     auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType);
@@ -2242,7 +2477,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
 
-  if (auto theClass = type->getClassOrBoundGenericClass()) {
+  if (auto theClass = type->getClassDecl()) {
     // We can access the isas of pure Swift classes directly.
     if (!theClass->checkAncestry(AncestryFlags::ClangImported))
       return IsaEncoding::Pointer;

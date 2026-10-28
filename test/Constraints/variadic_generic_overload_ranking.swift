@@ -95,3 +95,65 @@ func test_ranking_with_protocol_refinement() {
   // CHECK-NEXT: {{.*}} = function_ref @$s33variadic_generic_overload_ranking05test_D25_with_protocol_refinementyyF1fL_yyxxQpRvzAA1QRzlF : $@convention(thin) <each τ_0_0 where repeat each τ_0_0 : Q> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
   f(S())
 }
+
+// rdar://189930184
+
+// FIXME: This behavior is completely broken.
+protocol ExpressibleBySQLLiteral {}
+
+extension Int: ExpressibleBySQLLiteral {}
+extension String: ExpressibleBySQLLiteral {}
+extension Optional: ExpressibleBySQLLiteral where Wrapped: ExpressibleBySQLLiteral {}
+
+func executeOverloaded<each T: ExpressibleBySQLLiteral>() -> (repeat each T) {
+  fatalError()
+}
+
+func executeOverloaded() {}
+
+func executeNotOverloaded<each T: ExpressibleBySQLLiteral>() -> (repeat each T) {
+  fatalError()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s33variadic_generic_overload_ranking14testOverloadedyyF : $@convention(thin) () -> () {
+func testOverloaded() {
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking17executeOverloadedyyF : $@convention(thin) () -> ()
+  // CHECK: apply [[FN]]() : $@convention(thin) () -> ()
+  let _ = executeOverloaded()
+
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking17executeOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
+  // CHECK: apply [[FN]]<Pack{Int}>
+  let _: Int = executeOverloaded()
+
+  // FIXME: For some reason, we inject into the optional here.
+
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking17executeOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
+  // CHECK: apply [[FN]]<Pack{Int}>
+
+  let _: Int? = executeOverloaded()
+
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking17executeOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
+  // CHECK: apply [[FN]]<Pack{Int, String}>
+  let _: (Int, String) = executeOverloaded()
+
+  // CHECK: return
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s33variadic_generic_overload_ranking17testNotOverloadedyyF : $@convention(thin) () -> () {
+func testNotOverloaded() {
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking20executeNotOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
+  // CHECK: apply [[FN]]<Pack{Int}>
+  let _: Int = executeNotOverloaded()
+
+  // But not here!
+
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking20executeNotOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
+  // CHECK: apply [[FN]]<Pack{Optional<Int>}>
+  let _: Int? = executeNotOverloaded()
+
+  // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking20executeNotOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
+  // CHECK: apply [[FN]]<Pack{Int, String}>
+  let _: (Int, String) = executeNotOverloaded()
+
+  // CHECK: return
+}

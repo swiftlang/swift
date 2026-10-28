@@ -1,6 +1,5 @@
-// This test is flaky, occasionally crashing in `c-index-test`.
-// rdar://168250323
-// ALLOW_RETRIES: 5
+// This test is flaky on freebsd and windows, occasionally crashing in `c-index-test`.
+// REQUIRES: rdar168250323
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/SlashA.swiftmodule %S/Inputs/slash.swift

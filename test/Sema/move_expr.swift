@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NoImplicitCopy
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoImplicitCopy
 
 // REQUIRES: swift_feature_NoImplicitCopy
 
@@ -46,24 +46,24 @@ struct StructWithField {
 
 func testLetStructAccessField() {
     let t = StructWithField()
-    let _ = consume t.k  // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
+    let _ = consume t.k  // expected-error {{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
 }
 
 func testVarStructAccessField() {
     var t = StructWithField()
     t = StructWithField()
-    let _ = consume t.k // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
+    let _ = consume t.k // expected-error {{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
 }
 
 func testLetClassAccessField() {
     let t = Klass()
-    let _ = consume t.k  // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
+    let _ = consume t.k  // expected-error {{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
 }
 
 func testVarClassAccessField() {
     var t = Klass()
     t = Klass()
-    let _ = consume t.k // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
+    let _ = consume t.k // expected-error {{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
 }
 
 func testConsumeResultImmutable() {
@@ -78,7 +78,7 @@ func testConsumeResultImmutable() {
 
   var t = Test()
   t.mutatingTest()
-  consume t.borrowingTest() // expected-error {{'consume' can only be used to partially consume storage of a noncopyable type}}
+  consume t.borrowingTest() // expected-error {{'consume' can only be used to partially consume storage of a non-'Copyable' type}}
   (consume t).borrowingTest()
   (consume t).consumingTest()
   (consume t).mutatingTest() // expected-error {{cannot use mutating member on immutable value of type 'Test'}}

@@ -46,8 +46,6 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <initializer_list>
@@ -585,9 +583,12 @@ bool Parser::parseSpecializeAttributeArguments(
                  ParamLabel, isPublic);
       }
 
-      // The non-underscored '@specialize' mode currently does not support any
-      // parameters.
-      if (isPublic) {
+      // The non-underscored '@specialized' attribute only supports 'exported',
+      // and only with the ExtendedSpecializedAttribute feature.
+      if (isPublic &&
+          (ParamLabel != "exported" ||
+           !Context.LangOpts.hasFeature(
+               Feature::ExtendedSpecializedAttribute))) {
         diagnose(Tok.getLoc(), diag::attr_specialize_unsupported_parameter_name,
                  ParamLabel);
         DiscardAttribute = true;
@@ -837,6 +838,7 @@ bool Parser::parseAvailability(
           /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
       addAttribute(Attr);
 
+      Attr->setMacroLoc(Spec->getMacroLoc());
       Attr->setIsGroupMember();
       if (groupContainsWildcard)
         Attr->setIsGroupedWithWildcard();
@@ -1269,7 +1271,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   consumeToken(tok::identifier);
 
   // Parse @_extern(wasm, module: "x", name: "y") or @_extern(c[, "x"])
-  ExternKind kind;
+  std::optional<ExternKind> kind;
   std::optional<StringRef> importModuleName, importName;
 
   if (kindTok.getText() == "wasm") {
@@ -1301,7 +1303,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto AttrRange = SourceRange(Loc, rParenLoc);
 
   // Reject duplicate attributes with the same kind.
-  if (!DiscardAttribute && ExternAttr::find(Attributes, kind)) {
+  if (!DiscardAttribute && ExternAttr::find(Attributes, kind.value())) {
     diagnose(Loc, diag::duplicate_attribute, false);
     DiscardAttribute = true;
   }
@@ -1309,7 +1311,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   if (!DiscardAttribute) {
     Attributes.add(new (Context)
                        ExternAttr(importModuleName, importName, AtLoc,
-                                  lParenLoc, rParenLoc, AttrRange, kind,
+                                  lParenLoc, rParenLoc, AttrRange, kind.value(),
                                   /*Implicit=*/false));
   }
   return false;
@@ -1884,6 +1886,7 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   if (NameMatch == Map.Impl.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
+  SourceLoc MacroLoc = Tok.getLoc();
   consumeToken();
 
   llvm::VersionTuple Version;
@@ -1901,9 +1904,9 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     return makeParserError(); // Failed to match the version, that's an error.
   }
 
-  // Make a copy of the specs to add the macro source location
-  // for the diagnostic about the use of macros in inlinable code.
-  SourceLoc MacroLoc = Tok.getLoc();
+  // Make a copy of the specs to add the macro source location, which is used
+  // for the diagnostic about the use of macros in inlinable code and to index
+  // references to availability domains named by the macro.
   for (auto *Spec : VersionMatch->getSecond()) {
     auto SpecCopy = Spec->clone(Context);
     SpecCopy->setMacroLoc(MacroLoc);
@@ -2683,6 +2686,46 @@ parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
   return std::nullopt;
 }
 
+/// Parses the `(once)` argument of a `@callable` attribute in either form, and
+/// returns the range of its parentheses. `once` is the only argument. Returns
+/// \c std::nullopt if the argument is missing or wrong, after diagnosing it
+/// unless \p justChecking is set.
+static std::optional<SourceRange> parseCallableAttrArgument(Parser &P,
+                                                            bool justChecking) {
+  SourceLoc lpLoc = P.Tok.getLoc(), rpLoc;
+  if (!P.consumeIfAttributeLParen()) {
+    if (!justChecking)
+      P.diagnose(P.Tok, diag::attr_expected_lparen, "callable",
+                 /*isModifier=*/false);
+    return std::nullopt;
+  }
+
+  bool invalid = false;
+  if (P.isIdentifier(P.Tok, "once")) {
+    P.consumeToken(tok::identifier);
+  } else {
+    if (!justChecking) {
+      auto diag = P.diagnose(P.Tok, diag::attr_callable_expected_once);
+      if (P.Tok.is(tok::identifier))
+        diag.fixItReplace(P.Tok.getLoc(), "once");
+      else
+        diag.fixItInsert(P.Tok.getLoc(), "once");
+    }
+    invalid = true;
+    P.consumeIf(tok::identifier);
+  }
+
+  if (justChecking && !P.Tok.is(tok::r_paren))
+    return std::nullopt;
+  if (P.parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_callable_expected_rparen, lpLoc))
+    return std::nullopt;
+
+  if (invalid)
+    return std::nullopt;
+  return SourceRange(lpLoc, rpLoc);
+}
+
 ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                            SourceLoc AtLoc, DeclAttrKind DK,
                                            bool isFromClangAttribute) {
@@ -3118,6 +3161,49 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::CxxDecl: {
+    StringRef CxxName;
+    if (consumeIfAttributeLParen()) {
+      // The optional identifier argument is the C++ function name the
+      // importer matches against.
+      auto skipToEnd = [&]() {
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+      };
+
+      // A C++ operator name spelled without backticks lexes as Swift's
+      // 'operator' keyword followed by further tokens. Give it a targeted
+      // error.
+      if (Tok.is(tok::kw_operator) &&
+          peekToken().isNot(tok::r_paren, tok::colon)) {
+        diagnose(Loc, diag::attr_cxx_operator_name_backticks, AttrName);
+        skipToEnd();
+        return makeParserSuccess();
+      }
+
+      if (Tok.isNot(tok::identifier) || peekToken().is(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_cxx_name, AttrName);
+        skipToEnd();
+        return makeParserSuccess();
+      }
+      CxxName = Tok.getText();
+      consumeToken(tok::identifier);
+
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Loc, diag::attr_expected_rparen, AttrName,
+                 DeclAttribute::isDeclModifier(DK));
+        return makeParserSuccess();
+      }
+    } else {
+      AttrRange = SourceRange(Loc);
+    }
+
+    Attributes.add(new (Context) CxxDeclAttr(CxxName, AtLoc, AttrRange,
+                                             /*Implicit=*/false));
+    break;
+  }
+
   case DeclAttrKind::CDecl: {
     if (AttrName == "c") {
       std::optional<StringRef> CName;
@@ -3160,7 +3246,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     bool ParseSymbolName = true;
 
-    ExposureKind ExpKind;
+    std::optional<ExposureKind> ExpKind;
     if (DK == DeclAttrKind::Expose) {
       auto diagnoseExpectOption = [&]() {
         diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName,
@@ -3231,7 +3317,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (CurDeclContext->isLocalContext()) {
       // Emit an error, but do not discard the attribute.  This enables
       // better recovery in the parser.
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope,
+               '@' + AttrName.str());
     }
 
     if (!DiscardAttribute) {
@@ -3254,7 +3341,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         }
         Attributes.add(new (Context) ExposeAttr(
             AsmName ? AsmName.value() : StringRef(""), AtLoc, AttrRange,
-            ExpKind, /*Implicit=*/false));
+            ExpKind.value(), /*Implicit=*/false));
       } else
         llvm_unreachable("out of sync with switch");
     }
@@ -3307,6 +3394,35 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(new (Context) SectionAttr(Name, AtLoc,
                                                AttrRange, /*Implicit=*/false));
 
+    break;
+  }
+
+  case DeclAttrKind::Target: {
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return makeParserSuccess();
+    }
+    auto Name = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
+    consumeToken(tok::string_literal);
+    if (Name.has_value())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) TargetAttr(Name.value(), AtLoc,
+                                               AttrRange,
+                                               /*Implicit=*/false));
     break;
   }
 
@@ -4363,15 +4479,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::Called: {
-    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
-        *this, Loc, AttrRange, AttrName, DK,
-        {{Context.Id_once, ExecutionSemantics::Once}});
-    if (!semantics)
+  case DeclAttrKind::ScopeParams: {
+    SourceRange parens;
+    ScopeParamListRepr *params = nullptr;
+    Status |= parseScopeParamsAttrArgs(parens, params);
+    if (params && !DiscardAttribute) {
+      AttrRange = SourceRange(Loc, parens.End);
+      Attributes.add(new (Context) ScopeParamsAttr(AtLoc, AttrRange, params));
+    }
+    break;
+  }
+
+  case DeclAttrKind::Callable: {
+    auto parens = parseCallableAttrArgument(*this, /*justChecking=*/false);
+    if (!parens)
       return makeParserSuccess();
+    AttrRange = SourceRange(Loc, parens->End);
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+      Attributes.add(new (Context) CallableAttr(AtLoc, AttrRange));
 
     break;
   }
@@ -4947,6 +5073,199 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
 }
 
 /// \verbatim
+///   scope:
+///     'immortal'
+///     '&'? (identifier | 'self')
+/// \endverbatim
+static std::optional<ScopeRepr> parseScope(Parser &P, StringRef attrName) {
+  SourceLoc ampersandLoc;
+  bool isAccess = P.consumeIf(tok::amp_prefix, ampersandLoc);
+
+  if (P.Tok.isContextualKeyword("immortal")) {
+    if (isAccess) {
+      P.diagnose(ampersandLoc, diag::immortal_scope_cannot_be_access)
+          .fixItRemove(ampersandLoc);
+    }
+    return ScopeRepr::forImmortal(P.consumeToken());
+  }
+
+  if (P.Tok.is(tok::kw_self))
+    return ScopeRepr::forSelf(P.consumeToken(tok::kw_self), isAccess);
+
+  if (P.Tok.is(tok::identifier)) {
+    Identifier name;
+    auto loc = P.consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+    if (isAccess)
+      return ScopeRepr::forAccessedValue({name, loc});
+    return ScopeRepr::forScopeName({ScopeName(name), loc});
+  }
+
+  P.diagnose(P.Tok, diag::expected_scope, attrName);
+  return std::nullopt;
+}
+
+/// \verbatim
+///   scope-restriction:
+///     (identifier ':')? scope
+/// \endverbatim
+static std::optional<ScopeRestrictionRepr> parseScopeRestriction(Parser &P) {
+  std::optional<Located<ScopeName>> label;
+  if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon)) {
+    Identifier name;
+    auto loc = P.consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+    label = {ScopeName(name), loc};
+    P.consumeToken(tok::colon);
+  } else if (P.Tok.isKeyword() && P.peekToken().is(tok::colon)) {
+    P.diagnose(P.Tok, diag::keyword_cant_be_identifier, P.Tok.getText());
+    P.diagnose(P.Tok, diag::backticks_to_escape)
+        .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
+    auto name = P.Context.getIdentifier(P.Tok.getText());
+    label = {ScopeName(name), P.consumeToken()};
+    P.consumeToken(tok::colon);
+  }
+
+  auto scope = parseScope(P, "_scoped");
+  if (!scope)
+    return std::nullopt;
+  return ScopeRestrictionRepr(label, *scope);
+}
+
+/// \verbatim
+///   scoped-attribute-arguments:
+///     '(' scope-restriction (',' scope-restriction)* ')'
+/// \endverbatim
+///
+/// Only returns an error for missing parentheses, returns success and leaves
+/// \p result unset for invalid arguments to avoid cascading parse failure.
+static ParserStatus parseScopedTypeAttr(Parser &P, SourceLoc atLoc,
+                                        SourceLoc attrLoc,
+                                        TypeOrCustomAttr &result) {
+  SourceLoc lParenLoc = P.Tok.getLoc();
+  if (!P.consumeIfAttributeLParen()) {
+    P.diagnose(P.Tok, diag::attr_expected_lparen, "_scoped",
+               /*DeclModifier=*/false);
+    return makeParserError();
+  }
+
+  if (P.Tok.is(tok::r_paren)) {
+    P.diagnose(P.Tok, diag::expected_scope, "_scoped");
+    P.consumeToken(tok::r_paren);
+    return makeParserSuccess();
+  }
+
+  SmallVector<ScopeRestrictionRepr, 2> restrictions;
+  bool invalidRestriction = false;
+  SourceLoc rParenLoc;
+  auto status = P.parseList(
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
+      {diag::attr_expected_rparen, {"_scoped", /*DeclModifier=*/false}},
+      [&]() -> ParserStatus {
+        auto restriction = parseScopeRestriction(P);
+        if (!restriction) {
+          invalidRestriction = true;
+          return makeParserError();
+        }
+        restrictions.push_back(*restriction);
+        return makeParserSuccess();
+      });
+  if (status.isError())
+    return status;
+
+  if (!invalidRestriction) {
+    result = ScopedTypeAttr::create(P.Context, atLoc, attrLoc,
+                                    {lParenLoc, rParenLoc}, restrictions);
+  }
+  return status;
+}
+
+/// \verbatim
+///   access-scope-attribute-arguments:
+///     '(' scope ')'
+/// \endverbatim
+///
+/// Only returns an error for missing parentheses, returns success and leaves
+/// \p result unset for invalid arguments to avoid cascading parse failure.
+static ParserStatus parseAccessScopeTypeAttr(Parser &P, SourceLoc atLoc,
+                                             SourceLoc attrLoc,
+                                             TypeOrCustomAttr &result) {
+  SourceLoc lParenLoc = P.Tok.getLoc();
+  if (!P.consumeIfAttributeLParen()) {
+    P.diagnose(P.Tok, diag::attr_expected_lparen, "_accessScope",
+               /*DeclModifier=*/false);
+    return makeParserError();
+  }
+
+  auto scope = parseScope(P, "_accessScope");
+  SourceLoc rParenLoc;
+  if (scope && P.consumeIf(tok::r_paren, rParenLoc)) {
+    result = new (P.Context)
+        AccessScopeTypeAttr(atLoc, attrLoc, {lParenLoc, rParenLoc}, *scope);
+    return makeParserSuccess();
+  }
+
+  if (scope) {
+    P.diagnose(P.Tok, diag::attr_expected_rparen, "_accessScope",
+               /*DeclModifier=*/false);
+  }
+  P.skipUntil(tok::r_paren);
+  return P.consumeIf(tok::r_paren) ? makeParserSuccess() : makeParserError();
+}
+
+/// \verbatim
+///   scope-params-attribute-arguments:
+///     '(' identifier (',' identifier)* ')'
+/// \endverbatim
+///
+/// Only returns an error for missing parentheses, returns success and leaves
+/// \p result unset for invalid arguments to avoid cascading parse failure.
+ParserStatus Parser::parseScopeParamsAttrArgs(SourceRange &parens,
+                                              ScopeParamListRepr *&result) {
+  SourceLoc lParenLoc = Tok.getLoc();
+  if (!consumeIfAttributeLParen()) {
+    diagnose(Tok, diag::attr_expected_lparen, "_scopeParams",
+             /*DeclModifier=*/false);
+    return makeParserError();
+  }
+
+  if (Tok.is(tok::r_paren)) {
+    diagnose(Tok, diag::expected_scope_param);
+    consumeToken(tok::r_paren);
+    return makeParserSuccess();
+  }
+
+  SmallVector<Located<ScopeName>, 2> params;
+  bool invalidParam = false;
+  SourceLoc rParenLoc;
+  auto status = parseList(
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
+      {diag::attr_expected_rparen, {"_scopeParams", /*DeclModifier=*/false}},
+      [&]() -> ParserStatus {
+        if (Tok.isNot(tok::identifier)) {
+          diagnose(Tok, diag::expected_scope_param);
+          invalidParam = true;
+          return makeParserError();
+        }
+
+        if (Tok.isContextualKeyword("immortal")) {
+          diagnose(Tok, diag::immortal_scope_param);
+          diagnose(Tok, diag::backticks_to_escape)
+              .fixItReplace(Tok.getLoc(), "`immortal`");
+          invalidParam = true;
+        }
+        Identifier name;
+        auto loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+        params.push_back({ScopeName(name), loc});
+        return makeParserSuccess();
+      });
+  if (status.isError() || invalidParam)
+    return status;
+
+  parens = {lParenLoc, rParenLoc};
+  result = ScopeParamListRepr::create(Context, params);
+  return status;
+}
+
+/// \verbatim
 ///   attribute-type:
 ///     'noreturn'
 /// \endverbatim
@@ -5266,6 +5585,22 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
+  // TODO: Don't allocate / diagnose when justChecking?
+  case TypeAttrKind::Scoped:
+    return parseScopedTypeAttr(*this, AtLoc, attrLoc, result);
+
+  case TypeAttrKind::AccessScope:
+    return parseAccessScopeTypeAttr(*this, AtLoc, attrLoc, result);
+
+  case TypeAttrKind::ScopeParams: {
+    SourceRange parens;
+    ScopeParamListRepr *params = nullptr;
+    auto status = parseScopeParamsAttrArgs(parens, params);
+    if (params)
+      result = new (Context) ScopeParamsTypeAttr(AtLoc, attrLoc, parens, params);
+    return status;
+  }
+
   case TypeAttrKind::Convention: {
     ConventionTypeAttr *convention = nullptr;
     if (parseConventionAttributeInternal(AtLoc, attrLoc, convention,
@@ -5334,43 +5669,13 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
-  case TypeAttrKind::Called: {
-    SourceLoc lpLoc = Tok.getLoc(), semanticsLoc, rpLoc;
-    if (!consumeIfAttributeLParen()) {
-      if (!justChecking) {
-        diagnose(Tok, diag::attr_expected_lparen);
-      }
-      return makeParserError();
-    }
-
-    bool invalid = false;
-    std::optional<CalledTypeAttr::Semantics> semantics;
-    if (isIdentifier(Tok, "once")) {
-      semanticsLoc = consumeToken(tok::identifier);
-      semantics = CalledTypeAttr::Semantics::Once;
-    } else {
-      if (!justChecking) {
-        diagnose(Tok, diag::attr_called_expected_semantics)
-            .fixItReplace(Tok.getLoc(), "once");
-      }
-      invalid = true;
-      consumeIf(tok::identifier);
-    }
-
-    if (justChecking && !Tok.is(tok::r_paren))
-      return makeParserError();
-    if (parseMatchingToken(tok::r_paren, rpLoc,
-                           diag::attr_called_expected_rparen, lpLoc))
+  case TypeAttrKind::Callable: {
+    auto parens = parseCallableAttrArgument(*this, justChecking);
+    if (!parens)
       return makeParserError();
 
-    if (invalid)
-      return makeParserError();
-    assert(semantics);
-
-    if (!justChecking) {
-      result = new (Context) CalledTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
-                                            {*semantics, semanticsLoc});
-    }
+    if (!justChecking)
+      result = new (Context) CallableTypeAttr(AtLoc, attrLoc, *parens);
     return makeParserSuccess();
   }
   }
@@ -5882,7 +6187,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
     if (it != fixityAttrs.begin()) {
       auto *attr = *it;
       P.diagnose(attr->getLocation(), diag::mutually_exclusive_decl_attrs, attr,
-                 fixityAttrs.front(), attr->isDeclModifier())
+                 fixityAttrs.front())
           .fixItRemove(attr->getRange());
       attr->setInvalid();
     }
@@ -6044,6 +6349,7 @@ bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
   case tok::kw_subscript:
   case tok::kw_typealias:
   case tok::kw_var:
+  case tok::kw_default:
   case tok::pound:
   case tok::pound_if:
   case tok::pound_warning:
@@ -6157,6 +6463,14 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // case, not an enum case declaration.
   if (Tok.is(tok::kw_case)) {
     return !isa<AbstractFunctionDecl>(CurDeclContext);
+  }
+
+  // 'default' is a file-level default when it isn't followed by a colon, and is
+  // outside a switch.
+  if (Tok.is(tok::kw_default)) {
+    const Token &Tok2 = peekToken();
+
+    return !Tok2.is(tok::colon);
   }
 
   // The protocol keyword needs more checking to reject "protocol<Int>".
@@ -6347,17 +6661,6 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
       return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
                                 /*hadAttrsOrModifiers=*/true);
     }
-  }
-
-  // `using @<attribute>` or `using <identifier>`.
-  if (Tok.isContextualKeyword("using")) {
-    // `using` declarations don't support attributes or modifiers.
-    if (hadAttrsOrModifiers)
-      return false;
-
-    return !Tok2.isAtStartOfLine() &&
-           (Tok2.is(tok::at_sign) || Tok2.is(tok::identifier) ||
-            Tok2.is(tok::code_complete));
   }
 
   // If the next token is obviously not the start of a decl, bail early.
@@ -6639,6 +6942,9 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
   case tok::kw_func:
     parseFunc(/*HasFuncKeyword=*/true);
     break;
+  case tok::kw_default:
+      DeclResult = parseDeclFileDefault(Flags, Attributes);
+      break;
   case tok::kw_subscript: {
     llvm::SmallVector<Decl *, 4> Entries;
     DeclResult = parseDeclSubscript(StaticLoc, StaticSpelling, Flags,
@@ -6712,17 +7018,6 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       Tok.setKind(tok::contextual_keyword);
       DeclResult = parseDeclMacro(Attributes);
       break;
-    }
-
-    // `using @<attribute>` or `using <identifier>`
-    if (Tok.isContextualKeyword("using")) {
-      auto nextToken = peekToken();
-      if (!nextToken.isAtStartOfLine() &&
-          (nextToken.is(tok::at_sign) || nextToken.is(tok::identifier) ||
-           nextToken.is(tok::code_complete))) {
-        DeclResult = parseDeclUsing(Flags, Attributes);
-        break;
-      }
     }
 
     if (Flags.contains(PD_HasContainerType) &&
@@ -7099,34 +7394,38 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   return DCC.fixupParserResult(ID);
 }
 
-/// Parse an `using` declaration.
+/// Parse a `default` declaration.
 ///
 /// \verbatim
-///   decl-using:
-///     'using' (@<attribute> | <modifier>)
+///   decl-file-default:
+///     'default' (@<attribute> | <modifier>)
 /// \endverbatim
-ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
-                                               DeclAttributes &Attributes) {
-  assert(Tok.isContextualKeyword("using"));
+ParserResult<FileDefaultDecl>
+Parser::parseDeclFileDefault(ParseDeclOptions Flags,
+                             DeclAttributes &Attributes) {
   DebuggerContextChange DCC(*this);
   ParserStatus Status;
 
-  if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
-    diagnose(Tok, diag::experimental_using_decl_disabled);
-  }
+  SourceLoc DefaultLoc = consumeToken(tok::kw_default);
 
   if (!Attributes.isEmpty()) {
     diagnose((*Attributes.begin())->getStartLoc(),
-             diag::using_decl_rejects_attributes);
+             diag::file_default_rejects_attributes);
   }
 
-  SourceLoc UsingLoc = consumeToken();
+  // We can't go to the next line or we can steal attributes / modifiers from
+  // following decl and introduce cascading errors due to bad recovery.
+  if (Tok.isAtStartOfLine()) {
+    diagnose(Tok, diag::file_default_invalid_specifier);
+    Status.setIsParseError();
+    return Status;
+  }
 
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeUsingDecl();
+      CodeCompletionCallbacks->completeFileDefaultDecl();
     }
-    return makeParserCodeCompletionStatus();
+    return makeParserCodeCompletionResult<FileDefaultDecl>();
   }
 
   DeclAttributes specifiedAttributes;
@@ -7142,7 +7441,8 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     Status |= parseNewDeclAttribute(specifiedAttributes, /*AtLoc=*/{},
                                     DeclAttrKind::Nonisolated);
   } else {
-    diagnose(Tok, diag::using_decl_invalid_specifier);
+    // A keyword, punctuation, or an identifier that isn't 'nonisolated'.
+    diagnose(Tok, diag::file_default_invalid_specifier);
     Status.setIsParseError();
     return Status;
   }
@@ -7157,9 +7457,9 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
     return Status;
   }
 
-  auto *UD =
-      UsingDecl::create(Context, UsingLoc, specifiedAttributes, CurDeclContext);
-  return DCC.fixupParserResult(Status, UD);
+  auto *FDD = FileDefaultDecl::create(Context, DefaultLoc, specifiedAttributes,
+                                      CurDeclContext);
+  return DCC.fixupParserResult(Status, FDD);
 }
 
 /// Parse an inheritance clause.
@@ -8220,6 +8520,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::YieldingBorrow:
   case AccessorKind::Borrow:
   case AccessorKind::Mutate:
+  case AccessorKind::YieldingMutate:
     return true;
 
   case AccessorKind::Address:
@@ -8228,7 +8529,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
-  case AccessorKind::YieldingMutate:
     return false;
 
   case AccessorKind::Init:
@@ -9491,16 +9791,15 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
+  YieldList *BodyYields = nullptr;
   SourceLoc asyncLoc;
   bool reasync;
   SourceLoc throwsLoc;
   bool rethrows;
   TypeRepr *thrownTy = nullptr;
   Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
-                                   DefaultArgs,
-                                   asyncLoc, reasync,
-                                   throwsLoc, rethrows, thrownTy,
-                                   FuncRetTy);
+                                   DefaultArgs, asyncLoc, reasync, throwsLoc,
+                                   rethrows, thrownTy, BodyYields, FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return Status;
@@ -9522,13 +9821,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   }
 
   // Create the decl for the func and add it to the parent scope.
-  auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                              FuncLoc, FullName, NameLoc,
-                              /*Async=*/isAsync, asyncLoc,
-                              /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              thrownTy, GenericParams,
-                              BodyParams, FuncRetTy,
-                              CurDeclContext);
+  auto *FD = FuncDecl::create(
+      Context, StaticLoc, StaticSpelling, FuncLoc, FullName, NameLoc,
+      /*Async=*/isAsync, asyncLoc,
+      /*Throws=*/throwsLoc.isValid(), throwsLoc, thrownTy, GenericParams,
+      BodyParams, BodyYields, FuncRetTy, CurDeclContext);
 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
@@ -10538,17 +10835,18 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
+  YieldList *bodyYields = nullptr;
   SourceLoc asyncLoc;
   bool reasync;
   SourceLoc throwsLoc;
   bool rethrows;
   TypeRepr *thrownTy = nullptr;
-  Status |= parseFunctionSignature(DeclBaseName::createConstructor(), FullName,
-                                   BodyParams,
-                                   DefaultArgs,
-                                   asyncLoc, reasync,
-                                   throwsLoc, rethrows, thrownTy,
-                                   FuncRetTy);
+  // TODO: Decide what to do if/when constructor could yield
+  Status |= parseFunctionSignature(
+      DeclBaseName::createConstructor(), FullName, BodyParams, DefaultArgs,
+      asyncLoc, reasync, throwsLoc, rethrows, thrownTy, bodyYields, FuncRetTy);
+  // TODO: check that bodyYields are empty
+
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return Status;

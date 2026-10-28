@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -target %target-swift-5.1-abi-triple
 
 // REQUIRES: swift_feature_Extern
 
@@ -140,23 +140,23 @@ func throwsFuncC() throws // expected-error {{raising errors from C functions is
 @_extern(c)
 func genericFuncC<T>(_: T) // expected-error {{'T' cannot be represented in C}}
 
-@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_C()
 
-@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
+@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_Wasm()
 
-@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an '@_silgen_name' declaration}}
 @_silgen_name("another_sil_name")
 func withAtSILGenName_C()
 
-@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}}
+@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an '@_silgen_name' declaration}}
 @_silgen_name("another_sil_name")
 func withAtSILGenName_Wasm()
 
-@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}} expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an '@_silgen_name' declaration}} expected-error {{'@_extern' cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 @_silgen_name("another_sil_name")
 func withAtSILGenName_CDecl_C()

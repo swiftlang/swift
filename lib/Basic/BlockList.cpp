@@ -13,8 +13,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/SourceManager.h"
 

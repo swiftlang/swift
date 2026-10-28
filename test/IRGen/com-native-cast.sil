@@ -1,0 +1,19 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -I %S/../Interpreter/Inputs/COMIdentity -module-name M -emit-module-path %t/M.swiftmodule %S/../Interpreter/Inputs/COMIdentity.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name Casts -emit-ir -sil-verify-all -disable-llvm-optzns %S/../Inputs/COMNativeCasts.sil | %FileCheck %s
+
+// A successful scalar cast consumes the interface and acquires a native result.
+// Failure leaves the interface for the caller's failure block to destroy.
+// CHECK-LABEL: define{{.*}} @com_native_conditional(
+// CHECK: store ptr null, ptr [[DEST:%.*]], align
+// CHECK: call zeroext i1 @swift_dynamicCast(ptr [[DEST]], ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, i{{32|64}} 2)
+// CHECK: load ptr, ptr [[DEST]]
+// CHECK-LABEL: define{{.*}} @com_native_forced(
+// CHECK: call zeroext i1 @swift_dynamicCast(ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, i{{32|64}} 3)
+// CHECK-LABEL: define{{.*}} @com_native_optional(
+// CHECK: call zeroext i1 @swift_dynamicCast(
+// Class-bound native protocols carry a witness pointer as well as the object.
+// CHECK-LABEL: define{{.*}} @com_native_protocol(
+// CHECK: store {{.*}} zeroinitializer, ptr
+// CHECK: call zeroext i1 @swift_dynamicCast(

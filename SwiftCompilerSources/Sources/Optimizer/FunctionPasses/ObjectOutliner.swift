@@ -55,8 +55,8 @@ import SIL
 let objectOutliner = FunctionPass(name: "object-outliner") {
   (function: Function, context: FunctionPassContext) in
 
-  if function.hasOwnership && !function.isSwift51RuntimeAvailable {
-    // Since Swift 5.1 global objects have immortal ref counts. And that's required for ownership.
+  // Since Swift 5.1 global objects have immortal ref counts. And that's required for global objects.
+  guard function.isSwift51RuntimeAvailable else {
     return
   }
 
@@ -118,8 +118,8 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
         markedAsUsed: false)
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
-  context.erase(instructions: storesToClassFields)
-  context.erase(instructions: storesToTailElements)
+  erase(stores: storesToClassFields, context)
+  erase(stores: storesToTailElements, context)
 
   return replace(object: allocRef, with: outlinedGlobal, context)
 }
@@ -416,6 +416,16 @@ private func constructObject(of allocRef: AllocRefInstBase,
   global.stripAccessInstructionFromInitializer(context)
 }
 
+private func erase(stores: [StoreInst], _ context: FunctionPassContext) {
+  for store in stores {
+    if store.source.ownership == .owned {
+      let builder = Builder(before: store, context)
+      builder.createEndLifetime(of: store.source)
+    }
+    context.erase(instruction: store)
+  }
+}
+
 private func replace(object allocRef: AllocRefInstBase,
                      with global: GlobalVariable,
                      _ context: FunctionPassContext) -> GlobalValueInst {
@@ -456,8 +466,13 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       worklist.pushIfNotVisited(usersOf: refCast)
     case let moveValue as MoveValueInst:
       worklist.pushIfNotVisited(usersOf: moveValue)
-    case is DeallocRefInst, is DeallocStackRefInst:
-      context.erase(instruction: inst)
+    case let deallocRef as DeallocRefInst:
+      if deallocRef.parentFunction.hasOwnership {
+        Builder(before: deallocRef, context).createEndLifetime(of: deallocRef.operand.value)
+      }
+      context.erase(instruction: deallocRef)
+    case let deallocStack as DeallocStackRefInst:
+      context.erase(instruction: deallocStack)
     default:
       break
     }
@@ -477,6 +492,14 @@ private extension AllocRefInstBase {
       return false
     }
     if isObjC {
+      return false
+    }
+    // IRGen lays out class fields with the minimal type expansion, where a field of opaque type
+    // (e.g. `some View`) has no fixed offset. Such an object cannot be statically initialized
+    // because the offset is only known after the class metadata is initialized. Bail out outlining if
+    // the class fields are not known (resilient class) or if a field has an opaque type.
+    if type.getNominalFields(in: parentFunction, withMinimalTypeExpansion: true)?
+         .contains(where: { $0.hasOpaqueArchetype }) ?? true {
       return false
     }
     return true

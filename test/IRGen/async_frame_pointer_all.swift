@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-irgen  -module-name async -disable-availability-checking -O -enable-async-frame-pointer-all | %FileCheck %s --check-prefix=ENABLED
-// RUN: %target-swift-frontend -primary-file %s -emit-irgen  -module-name async -disable-availability-checking -O -disable-async-frame-pointer-all | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -primary-file %s -emit-irgen  -module-name async -target %target-swift-5.1-abi-triple -O -enable-async-frame-pointer-all | %FileCheck %s --check-prefix=ENABLED
+// RUN: %target-swift-frontend -primary-file %s -emit-irgen  -module-name async -target %target-swift-5.1-abi-triple -O -disable-async-frame-pointer-all | %FileCheck %s --check-prefix=DISABLED
 
 // x86_64 seems to choose a different default for frame pointers.
 // REQUIRES: CPU=arm64 || CPU=arm64e
@@ -21,7 +21,10 @@ public func minusOne() {
 // DISABLED: define{{.*}} swifttailcc void @"$s5async6calleeyyYaF"(ptr swiftasync %0) [[ATTRS:#[0-9]+]]
 // DISABLED: define swifttailcc void @"$s5async6callerySiSbYaF"(ptr swiftasync %0, i1 %1) [[ATTRS]]
 
-// DISABLED: attributes [[ATTRS]] = { {{.*}}"frame-pointer"="non-leaf"
+// The exact non-leaf kind depends on whether the target reserves the frame
+// pointer register in leaf functions; all that matters here is that it is not
+// "all".
+// DISABLED: attributes [[ATTRS]] = { {{.*}}"frame-pointer"="non-leaf{{(-no-reserve)?}}"
 
 
 

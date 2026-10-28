@@ -66,6 +66,7 @@ public func registerOptimizerTests() {
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,
     lifetimeResolutionResolveTest,
+    lifetimeResolutionDiagnoseTest,
     linearLivenessTest,
     localVariableReachableUsesTest,
     localVariableReachingAssignmentsTest,

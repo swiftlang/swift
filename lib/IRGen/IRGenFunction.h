@@ -28,9 +28,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/IR/CallingConv.h"
 
 namespace llvm {
   class AllocaInst;
@@ -655,7 +653,8 @@ public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
                                   llvm::Constant *captureDescriptor,
-                                  const HeapNonFixedOffsets *offsets = 0);
+                                  const HeapNonFixedOffsets *offsets = 0,
+                                  bool trapsOnDestroy = false);
 
   // Functions that don't care about the reference-counting style.
   void emitFixLifetime(llvm::Value *value);

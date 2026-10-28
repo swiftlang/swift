@@ -224,18 +224,13 @@
 
 #define DEBUG_TYPE "sil-move-only-checker"
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Consumption.h"
@@ -255,7 +250,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -264,8 +258,6 @@
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -425,6 +417,16 @@ using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
 ///
 ///     end_access %addr // %addr must be initialized here
 ///
+/// (4) mutate accessor.  Must be initialized at the end of the scope of the
+///     accessor's self argument: its enclosing modify access, or otherwise the
+///     scope of the address that self is marked on, e.g. (1) or (2).
+///
+///     (%yield, %token) = begin_apply ... -> @yields @inout Self
+///     %self = mark_unresolved_non_copyable_value %yield
+///     %addr = apply %mutate(%self) : $(@inout Self) -> @inout MOV
+///     ...
+///     end_apply %token // %addr must be initialized here
+///
 /// To enforce this requirement, function exiting instructions are treated as
 /// liveness uses of such addresses, ensuring that the address is initialized at
 /// that point.
@@ -512,6 +514,12 @@ static bool visitScopeEndsRequiringInit(
           visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
         }
         return true;
+      }
+      // Without an enclosing access, self is projected from a marked yield or
+      // inout argument whose scope ends are those of its marker.
+      if (auto *selfMark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+              stripAddressProjections(ai->getSelfArgument()))) {
+        return visitScopeEndsRequiringInit(selfMark, visit);
       }
       return false;
     }
@@ -1833,6 +1841,12 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
         if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
+          // A borrow accessor's callsite consists of copy_value +
+          // mark_unresolved_non_copyable_value instructions, which the object
+          // checker handles. If it emitted a diagnostic, the copy remains but
+          // does not copy the loaded value.
+          if (cvi->getOperand()->isBorrowAccessorResult())
+            continue;
           if (!isCopyableValue(cvi->getOperand())) {
             shouldConvertToLoadCopy = true;
             break;
@@ -1997,7 +2011,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
-        && !targetType.getEnumOrBoundGenericEnum()) {
+        && !targetType.getEnumDecl()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
 
@@ -2027,7 +2041,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // deinit. We know that it must be non-copyable since copyable types
     // cannot contain non-copyable types and that our parent root type must be
     // an enum, tuple, or struct.
-    if (auto *nom = iterType.getNominalOrBoundGenericNominal()) {
+    if (auto *nom = iterType.getNominalDecl()) {
       if (auto error = shouldEmitPartialMutationErrorForType(
               iterType, nom, user->getFunction())) {
         return error;
@@ -2039,7 +2053,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
       auto isAllowedPartialConsume =
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
-           useState.address->getType().getNominalOrBoundGenericNominal());
+           useState.address->getType().getNominalDecl());
       if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
@@ -2704,6 +2718,84 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       }
     }
     return true;
+  }
+
+  if (auto *cast = dyn_cast<UnconditionalCheckedCastAddrInst>(user)) {
+    if (cast->getSrc() == op->get() && cast->isCopy()) {
+      SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+      TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+      if (leafRanges.empty())
+        return false;
+      for (auto leafRange : leafRanges)
+        useState.recordLivenessUse(user, leafRange);
+      return true;
+    }
+  }
+
+  auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user);
+  if (ccabi && ccabi->getSrc() == op->get()) {
+    LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: "
+                            << *user);
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+      return false;
+    }
+
+    switch (ccabi->getConsumptionKind()) {
+
+    case CastConsumptionKind::TakeOnSuccess: {
+      // For TakeOnSuccess, a successful cast consumes Src.  A failed cast
+      // leaves Src in place.
+
+      // Diagnose storage that may not be consumed: a class property, a global,
+      // a capture of an escaping closure.
+      using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
+      if (markedValue->getCheckKind() != CheckKind::ConsumableAndAssignable) {
+        auto *fArg = dyn_cast<SILFunctionArgument>(
+            stripAccessMarkers(markedValue->getOperand()));
+        if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
+          moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(
+              markedValue, fArg);
+        } else if (!moveChecker.diagnosticEmitter
+                        .emitGlobalOrClassFieldLoadedAndConsumed(markedValue)) {
+          moveChecker.diagnosticEmitter
+              .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);
+        }
+        return true;
+      }
+
+      // Record the take at the entry of the success block rather than at the
+      // branch itself, so liveness treats Src as consumed starting there while
+      // still live from the branch to the failure edge.
+      for (auto leafRange : leafRanges) {
+        useState.recordTakeUse(&ccabi->getSuccessBB()->front(), leafRange);
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
+
+    case CastConsumptionKind::CopyOnSuccess:
+    case CastConsumptionKind::TestOnly: {
+      // Neither CopyOnSuccess nor TestOnly consume Src.
+      // They are just liveness uses.
+      for (auto leafRange : leafRanges) {
+        useState.recordLivenessUse(user, leafRange);
+      }
+      return true;
+    }
+
+    case CastConsumptionKind::TakeAlways:
+      // Handled by general consumption code below.
+      break;
+
+    case CastConsumptionKind::BorrowAlways:
+      // BorrowAlways is never used on this instruction
+      // and is rejected by the SIL verifier.
+      ASSERT(false && "checked_cast_addr_br borrow_always is impossible");
+      break;
+    }
   }
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our
@@ -4168,9 +4260,13 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     // Move the debug_value to right after the markedAddress to ensure that we
     // do not actually change our liveness computation.
     //
-    // NOTE: The author is not sure if this can ever happen with SILGen output,
-    // but this is being put just to be safe.
-    di->moveAfter(markedAddress);
+    // Only do this if markedAddress is itself the initialization. Otherwise,
+    // moving the debug_value would place it before the real initialization,
+    // making the value live-in to the block. This happens when the debug_value
+    // belonged to a stacked [strict] mark that has already been checked and
+    // replaced by its operand.
+    if (addressBeginsInitialized(markedAddress))
+      di->moveAfter(markedAddress);
     liveness.updateForUse(di, TypeTreeLeafTypeRange(markedAddress),
                           false /*lifetime ending*/);
   }

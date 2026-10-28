@@ -2,9 +2,9 @@
 // byte-identical.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name DeterministicOrder -clang-header-expose-decls=all-public -disable-availability-checking -typecheck -emit-clang-header-path %t/header1.h
-// RUN: %target-swift-frontend %s -module-name DeterministicOrder -clang-header-expose-decls=all-public -disable-availability-checking -typecheck -emit-clang-header-path %t/header2.h
-// RUN: %target-swift-frontend %s -module-name DeterministicOrder -clang-header-expose-decls=all-public -disable-availability-checking -typecheck -emit-clang-header-path %t/header3.h
+// RUN: %target-swift-frontend %s -module-name DeterministicOrder -clang-header-expose-decls=all-public -typecheck -emit-clang-header-path %t/header1.h
+// RUN: %target-swift-frontend %s -module-name DeterministicOrder -clang-header-expose-decls=all-public -typecheck -emit-clang-header-path %t/header2.h
+// RUN: %target-swift-frontend %s -module-name DeterministicOrder -clang-header-expose-decls=all-public -typecheck -emit-clang-header-path %t/header3.h
 // RUN: cmp %t/header1.h %t/header2.h
 // RUN: cmp %t/header2.h %t/header3.h
 

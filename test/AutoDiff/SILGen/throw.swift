@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 import _Differentiation
 
 // Nothing special for throwing functions
@@ -39,17 +41,21 @@ func catching(input: Float) -> Float {
 
 // See if pullback correctly unwraps the Optional
 // CHECK-LABEL: sil {{.*}} @$s5throw8catching5inputS2f_tFTJpSpSr
-// CHECK: bb{{.*}}(%[[ADJ:.*]] : $Float, %[[PAYLOAD:.*]] : $(_: Optional<@callee_guaranteed (Float) -> Float>)):
-// CHECK:   %[[OPT_PULLBACK:.*]] = tuple_extract %[[PAYLOAD]] : $(_: Optional<@callee_guaranteed (Float) -> Float>), 0
-// CHECK:   switch_enum %[[OPT_PULLBACK]] : $Optional<@callee_guaranteed (Float) -> Float>, case #Optional.some!enumelt: [[BB_NORMAL:.*]], case #Optional.none!enumelt: [[BB_ERROR:.*]] //
+// CHECK: bb0(%[[SEED:.*]] : $Float, %{{.*}} : $_AD__{{.*}}):
+// CHECK:   %[[ZERO:.*]] = float_literal $Builtin.FPIEEE32, 0x0
+// CHECK:   %[[ZERO_ADJ:.*]] = struct $Float (%[[ZERO]] : $Builtin.FPIEEE32)
+// CHECK:   %[[OPT_PULLBACK:.*]] = tuple_extract %{{.*}} : $(_: Optional<@callee_guaranteed (Float) -> Float>), 0
+// The phi of the merge block is "unwrapped": it passes the Optional instead of the 1-element tuple.
+// CHECK:   br [[BB_UNWRAP:bb[0-9]+]](%[[OPT_PULLBACK]] : $Optional<@callee_guaranteed (Float) -> Float>)
+// CHECK: [[BB_UNWRAP]](%[[PHI_PULLBACK:.*]] : $Optional<@callee_guaranteed (Float) -> Float>):
+// CHECK:   switch_enum %[[PHI_PULLBACK]] : $Optional<@callee_guaranteed (Float) -> Float>, case #Optional.some!enumelt: [[BB_NORMAL:.*]], case #Optional.none!enumelt: [[BB_ERROR:.*]] //
 // CHECK: [[BB_NORMAL]](%[[PULLBACK:.*]] : $@callee_guaranteed (Float) -> Float)
-// Call pullback and accumulate adjoints
-// CHECK:   %[[CALLEE_ADJ:.*]] = apply %[[PULLBACK]](%{{.*}}) : $@callee_guaranteed (Float) -> Float
-// CHECK-DAG:   %[[FLOAT_ADJ:.*]] = struct_extract %[[ADJ]] : $Float, #Float._value
-// CHECK-DAG:   %[[FLOAT_CALLEE_ADJ:.*]] = struct_extract %[[CALLEE_ADJ]] : $Float, #Float._value
-// CHECK:   %[[NEW_FLOAT_ADJ:.*]] = builtin "fadd_FPIEEE32"(%[[FLOAT_CALLEE_ADJ]] : $Builtin.FPIEEE32, %[[FLOAT_ADJ]] : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// Call pullback (with the incoming adjoint seed) and accumulate adjoints
+// CHECK:   %[[CALLEE_ADJ:.*]] = apply %[[PULLBACK]](%[[SEED]]) : $@callee_guaranteed (Float) -> Float
+// CHECK:   %[[FLOAT_CALLEE_ADJ:.*]] = struct_extract %[[CALLEE_ADJ]] : $Float, #Float._value
+// CHECK:   %[[NEW_FLOAT_ADJ:.*]] = builtin "fadd_FPIEEE32"(%[[FLOAT_CALLEE_ADJ]] : $Builtin.FPIEEE32, %[[ZERO]] : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %[[NEW_ADJ:.*]] = struct $Float (%[[NEW_FLOAT_ADJ]] : $Builtin.FPIEEE32)
 // CHECK:   br {{.*}}(%[[NEW_ADJ]] : $Float)
 // CHECK: [[BB_ERROR]]:
-// Just forward input adjoint w/o any accumulation
-// CHECK:   br bb{{.}}(%[[ADJ]] : $Float)
+// Just forward the zero adjoint w/o any accumulation
+// CHECK:   br bb{{.}}(%[[ZERO_ADJ]] : $Float)

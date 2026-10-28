@@ -980,7 +980,7 @@ fileprivate func fastParse64(
     var explicitExponent = Int32(0)
     let firstExponentDigitOffset = i
     while i < input.count {
-      let t = unsafe input[unchecked: i] - 0x30
+      let t = unsafe input[unchecked: i] &- 0x30
       if t > 9 {
         break
       }
@@ -1871,7 +1871,7 @@ fileprivate func slowDecimalToBinary(
   let significandDigits = min(digitCount, targetFormat.maxDecimalMidpointDigits &+ 1)
   let decimalExponent = Int(parsedExponent) &- significandDigits &+ digitCount &- Int(unparsedDigitCount)
   // Slightly over-estimate the number of bits needed to represent the decimal significand
-  let significandBitsNeeded = (significandDigits &* 1701) >> 9
+  let significandBitsNeeded = (significandDigits &* 1701 + 511) >> 9
   let bitsPerMPWord = MPWord.bitWidth
   let significandWordsNeeded = (significandBitsNeeded &+ (bitsPerMPWord - 1)) / bitsPerMPWord
 

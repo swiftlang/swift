@@ -24,7 +24,6 @@
 #include "FormalEvaluation.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/Basic/Assertions.h"
 
 namespace swift {
 namespace Lowering {
@@ -97,33 +96,33 @@ class PathComponent {
 public:
   enum KindTy {
     // Physical lvalue kinds
-    RefElementKind,             // ref_element_addr
-    TupleElementKind,           // tuple_element_addr
-    StructElementKind,          // struct_element_addr
-    OptionalObjectKind,         // optional projection
-    OpenOpaqueExistentialKind,  // opened opaque existential
-    AddressorKind,              // var/subscript addressor
-    CoroutineAccessorKind,      // coroutine accessor
-    ValueKind,                  // random base pointer as an lvalue
+    RefElementKind,                 // ref_element_addr
+    TupleElementKind,               // tuple_element_addr
+    StructElementKind,              // struct_element_addr
+    OptionalObjectKind,             // optional projection
+    OpenAddressExistentialKind,     // opened address existential
+    AddressorKind,                  // var/subscript addressor
+    CoroutineAccessorKind,          // coroutine accessor
+    ValueKind,                      // random base pointer as an lvalue
     OptionalAddressKind,            // optional address projection
     PhysicalKeyPathApplicationKind, // applying a key path
-    BorrowValueKind,            // load_borrow the base rvalue for a projection
-    BorrowMutateKind,           // borrow and mutate accessor
+    BorrowValueKind,  // load_borrow the base rvalue for a projection
+    BorrowMutateKind, // borrow and mutate accessor
 
     // Logical LValue kinds
-    GetterSetterKind,           // property or subscript getter/setter
+    GetterSetterKind, // property or subscript getter/setter
     MaterializeToTemporaryKind,
-    OwnershipKind,              // weak pointer remapping
-    AutoreleasingWritebackKind, // autorelease pointer on set
-    WritebackPseudoKind,        // a fake component to customize writeback
+    OwnershipKind,                 // weak pointer remapping
+    AutoreleasingWritebackKind,    // autorelease pointer on set
+    WritebackPseudoKind,           // a fake component to customize writeback
     OpenNonOpaqueExistentialKind,  // opened class or metatype existential
     LogicalKeyPathApplicationKind, // applying a key path
-    InitAccessorKind,           // init accessor
-    
+    InitAccessorKind,              // init accessor
+
     // Translation LValue kinds (a subtype of logical)
-    OrigToSubstKind,            // generic type substitution
-    SubstToOrigKind,            // generic type substitution
-    UncheckedConversionKind,    // unchecked_X_cast
+    OrigToSubstKind,         // generic type substitution
+    SubstToOrigKind,         // generic type substitution
+    UncheckedConversionKind, // unchecked_X_cast
 
     FirstLogicalKind = GetterSetterKind,
     FirstTranslationKind = OrigToSubstKind,
@@ -176,7 +175,7 @@ public:
 
   /// Is this some form of open-existential component?
   bool isOpenExistential() const {
-    return getKind() == OpenOpaqueExistentialKind ||
+    return getKind() == OpenAddressExistentialKind ||
            getKind() == OpenNonOpaqueExistentialKind;
   }
 
@@ -376,6 +375,11 @@ public:
                            std::optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
+
+  /// If this l-value is nothing but a reference to a value or an address, as
+  /// `forValue` and `forAddress` build, return an equivalent l-value referring
+  /// to the same one. Returns an invalid l-value for any other l-value.
+  LValue copyOfValueReference() const;
 
   bool isValid() const { return !Path.empty(); }
 

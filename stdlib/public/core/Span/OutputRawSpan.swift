@@ -61,7 +61,7 @@ extension OutputRawSpan {
   @unsafe
   internal func _tail() -> UnsafeMutableRawPointer {
     // NOTE: `_pointer` must be known to be not-nil.
-    unsafe _start().advanced(by: _count)
+    unsafe _start().advanced(by: byteCount)
   }
 }
 
@@ -73,20 +73,25 @@ extension OutputRawSpan {
   @_semantics("fixed_storage.get_count")
   public var byteCount: Int { _assumeNonNegative(_count) }
 
+  @export(implementation) @inline(always)
+  internal func _nnCapacity() -> Int { _assumeNonNegative(capacity) }
+
   /// The number of additional bytes that can be appended to this span.
   @export(implementation)
   @_transparent
-  public var freeCapacity: Int { capacity &- _count }
+  public var freeCapacity: Int {
+    _assumeNonNegative(_nnCapacity() &- byteCount)
+  }
 
   /// A Boolean value indicating whether the span is empty.
   @export(implementation)
   @_transparent
-  public var isEmpty: Bool { _count == 0 }
+  public var isEmpty: Bool { byteCount == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @export(implementation)
   @_transparent
-  public var isFull: Bool { _count == capacity }
+  public var isFull: Bool { byteCount == _nnCapacity() }
 
   /// The indices that are valid for subscripting the span, in ascending
   /// order.
@@ -211,7 +216,7 @@ extension OutputRawSpan {
   @_lifetime(self: copy self)
   public mutating func removeLast(_ n: Int) {
     _precondition(n >= 0, "Can't remove a negative number of bytes")
-    _precondition(n <= _count, "OutputRawSpan underflow")
+    _precondition(n <= byteCount, "OutputRawSpan underflow")
     _count &-= n
   }
 
@@ -231,7 +236,7 @@ extension OutputRawSpan {
   // Can we use: @_semantics("fixed_storage.check_index")
   @export(implementation) @inline(__always)
   internal func _checkIndex(_ position: Int) {
-    _precondition(position >= 0 && position < _count, "Index out of bounds")
+    _precondition(position >= 0 && position < byteCount, "Index out of bounds")
   }
 
   /// Accesses the byte at the specified offset in the span.
@@ -298,6 +303,7 @@ extension OutputRawSpan {
     _precondition(
       MemoryLayout<T>.size <= freeCapacity, "OutputRawSpan capacity overflow"
     )
+    guard MemoryLayout<T>.size > 0 else { return }
     unsafe _tail().initializeMemory(as: T.self, to: value)
     _count &+= MemoryLayout<T>.size
   }
@@ -369,8 +375,10 @@ extension OutputRawSpan {
   internal mutating func _append<T: BitwiseCopyable>(
     repeating repeatedValue: T, count: Int, as type: T.Type
   ) {
+    _precondition(count >= 0, "Can't append a negative number of values")
     let total = count * MemoryLayout<T>.stride
     _precondition(total <= freeCapacity, "OutputRawSpan capacity overflow")
+    guard count > 0 else { return }
     unsafe _tail().initializeMemory(
       as: T.self, repeating: repeatedValue, count: count
     )
@@ -434,8 +442,7 @@ extension OutputRawSpan {
   public var bytes: RawSpan {
     @_lifetime(borrow self)
     borrowing get {
-      let buffer = unsafe UnsafeRawBufferPointer(start: _pointer, count: _count)
-      let span = unsafe RawSpan(_unsafeBytes: buffer)
+      let span = unsafe RawSpan(_unchecked: _pointer, byteCount: byteCount)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -446,10 +453,9 @@ extension OutputRawSpan {
   public var mutableBytes: MutableRawSpan {
     @_lifetime(&self)
     mutating get {
-      let buffer = unsafe UnsafeMutableRawBufferPointer(
-        start: _pointer, count: _count
+      let span = unsafe MutableRawSpan(
+        _unchecked: _pointer, byteCount: byteCount
       )
-      let span = unsafe MutableRawSpan(_unsafeBytes: buffer)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
@@ -495,12 +501,12 @@ extension OutputRawSpan {
     ) throws(E) -> R
   ) throws(E) -> R {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: _pointer, count: capacity
+      start: _pointer, count: _nnCapacity()
     )
-    var initializedCount = _count
+    var initializedCount = byteCount
     defer {
       _precondition(
-        0 <= initializedCount && initializedCount <= capacity,
+        UInt(bitPattern: initializedCount) <= UInt(bitPattern: _nnCapacity()),
         "OutputRawSpan capacity overflow"
       )
       _count = initializedCount
@@ -533,10 +539,10 @@ extension OutputRawSpan {
     for buffer: UnsafeMutableRawBufferPointer
   ) -> Int {
     _precondition(
-      unsafe buffer.baseAddress == self._pointer
-      && buffer.count == self.capacity,
+      unsafe buffer.baseAddress == _pointer
+      && buffer.count == _nnCapacity(),
       "OutputRawSpan identity mismatch")
-    return _count
+    return byteCount
   }
 
   /// Consume the output span and return the number of initialized bytes.

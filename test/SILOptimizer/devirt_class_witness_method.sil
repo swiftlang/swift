@@ -3,7 +3,7 @@ sil_stage canonical
 // RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
 
 import Builtin
-enum Error {}
+enum Error { case failed } // case-less would be uninhabited, so 'caller2' would need no try_apply
 protocol P {
   func f()
   func g() throws

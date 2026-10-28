@@ -20,9 +20,9 @@
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class AbstractFunctionDecl;
@@ -58,6 +58,18 @@ namespace swift {
   void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
                    AccessLevel desiredAccess, bool isForSetter = false,
                    bool shouldUseDefaultAccess = false, bool updateAttr = true);
+
+  /// Diagnose (as part of the opt-in ImplicitForceUnwrap group) places where
+  /// \p decl, which overrides or witnesses \p baseDecl, uses a non-optional
+  /// type for a value that \p baseDecl declares as an implicitly unwrapped
+  /// optional, so that a 'nil' passed by a caller of \p baseDecl will be
+  /// implicitly force-unwrapped.
+  ///
+  /// \param isWitness Whether \p decl is a witness for the protocol
+  /// requirement \p baseDecl, rather than an override of it.
+  void diagnoseImplicitForceUnwrapOfIUOParams(const ValueDecl *decl,
+                                              const ValueDecl *baseDecl,
+                                              bool isWitness);
 
   /// Compute the location of the 'var' keyword for a 'var'-to-'let' Fix-It.
   SourceLoc getFixItLocForVarToLet(VarDecl *var);
@@ -160,6 +172,7 @@ namespace swift {
   struct DeferredDiag {
     SourceLoc loc;
     ZeroArgDiagnostic diag;
+
     DeferredDiag(SourceLoc loc, ZeroArgDiagnostic diag)
       : loc(loc), diag(diag) {}
 

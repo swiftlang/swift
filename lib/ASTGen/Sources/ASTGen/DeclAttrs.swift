@@ -140,6 +140,8 @@ extension ASTGenVisitor {
         return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
       case .COM:
         return handle(self.generateCOMAttr(attribute: node)?.asDeclAttribute)
+      case .CxxDecl:
+        return handle(self.generateCxxDeclAttr(attribute: node)?.asDeclAttribute)
       case .Derivative:
         return handle(self.generateDerivativeAttr(attribute: node)?.asDeclAttribute)
       case .Differentiable:
@@ -204,6 +206,8 @@ extension ASTGenVisitor {
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
       case .Diagnose:
         return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
+      case .Target:
+        return handle(self.generateTargetAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
@@ -218,8 +222,14 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .AtRethrows))
       case .Concurrent:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Concurrent))
-      case .Called:
-        return handle(self.generateCalledAttr(attribute: node)?.asDeclAttribute)
+      case .Once:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Once))
+      case .Callable:
+        return handle(self.generateCallableAttr(attribute: node)?.asDeclAttribute)
+      case .ScopeParams:
+        return handle(self.generateScopeParamsAttr(attribute: node)?.asDeclAttribute)
+      case .Coroutine:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Coroutine))
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -264,7 +274,6 @@ extension ASTGenVisitor {
         .Frozen,
         .GKInspectable,
         .GlobalActor,
-        .HasHiddenStoredProperties,
         .HasInitialValue,
         .HasMissingDesignatedInitializers,
         .HasStorage,
@@ -598,6 +607,33 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       name: name ?? "",
       underscored: underscored
+    )
+  }
+
+  func generateCxxDeclAttr(attribute node: AttributeSyntax) -> BridgedCxxDeclAttr? {
+    // The optional identifier argument is the C++ function name the importer
+    // matches against.
+    var name: BridgedStringRef = ""
+    if node.arguments != nil {
+      guard let parsed = self.generateWithLabeledExprListArguments(attribute: node, { args in
+        self.generateConsumingPlainIdentifierAttrOption(args: &args) { (token) -> BridgedStringRef? in
+          var text = token.rawText
+          if text.count > 2 && text.hasPrefix("`") && text.hasSuffix("`") {
+            text = .init(rebasing: text.dropFirst().dropLast())
+          }
+          return text.bridged
+        }
+      }) else {
+        return nil
+      }
+      name = parsed
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      name: name
     )
   }
 
@@ -2012,6 +2048,25 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
+  ///   @_target("avx2")
+  ///   ```
+  func generateTargetAttr(attribute node: AttributeSyntax) -> BridgedTargetAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let value = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
+        return nil
+      }
+
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        value: value
+      )
+    }
+  }
+
+  /// E.g.:
+  ///   ```
   ///   @_silgen_name("external_func")
   ///   ```
   func generateSILGenNameAttr(attribute node: AttributeSyntax) -> BridgedSILGenNameAttr? {
@@ -2051,7 +2106,7 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
-  ///   @specialized(T == Int)
+  ///   @specialized(exported: true, where T == Int)
   ///   ```
   func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
     guard
@@ -2060,7 +2115,15 @@ extension ASTGenVisitor {
       // TODO: Diagnose
       return nil
     }
-    let exported: Bool? = nil
+    let exported: Bool? = arg.exportedArgument.map {
+      // The argument reuses '@_specialize's labeled argument node, but the
+      // parser only builds it with the 'exported' label.
+      precondition(
+        $0.label.rawText == "exported",
+        "(compiler bug) '@specialized' argument should only be parsed with the 'exported' label"
+      )
+      return $0.value.rawText == "true"
+    }
     let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
     let targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)? = nil
@@ -2762,26 +2825,61 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateCalledAttr(attribute node: AttributeSyntax) -> BridgedCalledAttr? {
-    let semantics: swift.ExecutionSemantics? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "once": return .once
-        default: return nil
-        }
-      }
-    )
-    guard let semantics else {
+  /// E.g.:
+  ///   ```
+  ///   @_scopeParams(a, b)
+  ///   ```
+  func generateScopeParamsAttr(attribute node: AttributeSyntax) -> BridgedScopeParamsAttr? {
+    guard let params = self.generateScopeParams(attribute: node) else {
       return nil
     }
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      semantics: semantics
+      params: params.lazy.bridgedArray(in: self)
     )
   }
+
+  func generateCallableAttr(attribute node: AttributeSyntax) -> BridgedCallableAttr? {
+    guard self.generateCallableAttrArgument(attribute: node) else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node)
+    )
+  }
+
+  /// Checks that the argument of a `@callable` attribute in either form is
+  /// `once`, which is the only argument. Diagnoses and returns `false`
+  /// otherwise.
+  func generateCallableAttrArgument(attribute node: AttributeSyntax) -> Bool {
+    guard node.arguments != nil else {
+      self.diagnose(.expectedLParenInCallableAttribute(node))
+      return false
+    }
+    let isOnce: Bool? = self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let arg = args.first else {
+        self.diagnose(.expectedOnceInCallableAttribute(node))
+        return nil
+      }
+      guard arg.label == nil,
+        let declRef = arg.expression.as(DeclReferenceExprSyntax.self),
+        declRef.argumentNames == nil, declRef.moduleSelector == nil,
+        declRef.baseName.rawText == "once"
+      else {
+        self.diagnose(.expectedOnceInCallableAttribute(arg))
+        return nil
+      }
+      args = args.dropFirst()
+      return true
+    }
+    return isOnce ?? false
+  }
+
+
 
   func generateSimpleDeclAttr(declModifier node: DeclModifierSyntax, kind: swift.DeclAttrKind) -> BridgedDeclAttribute? {
     // TODO: Diagnose non-modifier kind? Parser shouldn't accept them, though.

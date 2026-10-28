@@ -22,8 +22,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
 #include <optional>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
   class ApplyExpr;
@@ -46,7 +46,8 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// We allow a type to conform to a protocol that is less available than the
   /// type itself. This enables a type to retroactively model or directly conform
   /// to a protocol only available on newer OSes and yet still be used on older
-  /// OSes.
+  /// OSes. This exception only applies to platform domains; potential
+  /// unavailability in other domains, like custom domains, is still diagnosed.
   AllowPotentiallyUnavailableProtocol = 1 << 0,
 
   /// Diagnose uses of declarations in versions before they were introduced, but
@@ -212,13 +213,6 @@ public:
   behaviorForReferenceToOrigin(const ValueDecl *D,
                                DisallowedOriginKind originKind) const;
 
-  /// Returns true if a reference to \p D under the given \p originKind from
-  /// this context is being encapsulated as a hidden stored property. When this
-  /// returns true, the abstract layout for the hidden type has been recorded on
-  /// the current module.
-  bool encapsulatedAsHiddenStoredProperty(
-      const ValueDecl *D, DisallowedOriginKind originKind) const;
-
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
@@ -232,8 +226,9 @@ void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 void diagnoseStmtAvailability(const Stmt *S, DeclContext *DC);
 
 /// Checks both a TypeRepr and a Type, but avoids emitting duplicate
-/// diagnostics by only checking the Type if the TypeRepr succeeded.
-void diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
+/// diagnostics by only checking the Type if the TypeRepr succeeded. Returns
+/// true if the TypeRepr was diagnosed as unavailable.
+bool diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
                               const ExportContext &context,
                               DeclAvailabilityFlags flags = std::nullopt);
 
@@ -245,6 +240,16 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 Type replacementTy=Type(),
                                 bool warnIfConformanceUnavailablePreSwift6 = false,
                                 bool preconcurrency = false);
+
+/// Resolve the conformance of \p type to \p proto and diagnose its
+/// availability. This is for a conformance that a declaration's interface
+/// requires implicitly, and that therefore has no `TypeRepr` of its own; the
+/// thrown error type of a typed throws clause is one. Does nothing if \p proto
+/// is null or if the conformance cannot be resolved in this context. Returns
+/// true if a diagnostic was emitted.
+bool diagnoseConformanceAvailability(SourceLoc loc, Type type,
+                                     ProtocolDecl *proto,
+                                     const ExportContext &where);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
@@ -297,4 +302,3 @@ getRequirementMatchAvailabilityRestriction(
 } // namespace swift
 
 #endif // SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
-

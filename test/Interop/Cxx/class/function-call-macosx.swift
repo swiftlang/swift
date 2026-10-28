@@ -26,6 +26,7 @@ public func testARCWeak() {
 // CHECK: apply %[[V6]](%[[V3]]) : $@convention(c) () -> @out ARCWeak
 // CHECK: apply %[[MV1]](%[[V3]]) : $@convention(c) (@in ARCWeak) -> ()
 // CHECK-NEXT: dealloc_stack %[[V3]] : $*ARCWeak
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: extend_lifetime %[[MV1]] : $@convention(c) (@in ARCWeak) -> ()
 // CHECK-NEXT: %[[V9:.*]] = tuple ()
 // CHECK-NEXT: return %[[V9]] : $()

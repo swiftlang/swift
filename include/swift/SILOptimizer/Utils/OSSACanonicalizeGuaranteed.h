@@ -25,7 +25,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
 
 #include "swift/Basic/GraphNodeWorklist.h"
-#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"

@@ -17,9 +17,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
@@ -774,8 +771,14 @@ bool DiagnosticEmitter::emitGlobalOrClassFieldLoadedAndConsumed(
     return true;
   }
 
-  // is it a global?
-  if (isa<GlobalAddrInst>(operand)) {
+  // is it a global? A lazily initialized global (or a static property) is
+  // reached through its addressor rather than a global_addr.
+  bool isGlobal = isa<GlobalAddrInst>(operand);
+  if (auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand))
+    if (auto *apply = dyn_cast<ApplyInst>(ptrToAddr->getOperand()))
+      if (auto *callee = apply->getReferencedFunctionOrNull())
+        isGlobal = callee->isGlobalInit();
+  if (isGlobal) {
     diagnose(markedValue->getModule().getASTContext(),
              markedValue,
              diag::sil_movechecking_notconsumable_but_assignable_was_consumed,

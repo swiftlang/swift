@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckEmbedded.h"
+#include "OpenedExistentials.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticGroups.h"
@@ -22,10 +24,12 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Bridging/ASTGen.h"
+#include "swift/Sema/ConstraintSystem.h"
 
 using namespace swift;
 
@@ -37,9 +41,27 @@ defaultEmbeddedLimitationForError(const DeclContext *dc, SourceLoc loc) {
   return DiagnosticBehavior::Warning;
 }
 
+/// Determine whether the code in this declaration context will never be
+/// emitted when compiling for Embedded Swift, in which case there is no point
+/// in diagnosing Embedded Swift limitations within it.
+static bool isNeverEmittedForEmbedded(const DeclContext *dc) {
+  auto decl = dc->getInnermostDeclarationDeclContext();
+  if (!decl)
+    return false;
+
+  // A declaration that is not available during lowering never reaches SILGen,
+  // so its restrictions can never be hit.
+  return !decl->isAvailableDuringLowering();
+}
+
 std::optional<DiagnosticBehavior>
 swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
                                          bool wasAlwaysEmbeddedError) {
+  // Code that is never emitted for Embedded Swift is free to use constructs
+  // Embedded Swift cannot support.
+  if (isNeverEmittedForEmbedded(dc))
+    return std::nullopt;
+
   // In Embedded Swift, things that were always errors will still be emitted
   // as errors. Use "unspecified" so we don't change anything.
   if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
@@ -146,10 +168,62 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
   }
 }
 
+void swift::diagnoseOpenedExistentialArgumentInEmbedded(
+    const DeclContext *dc, Expr *argExpr, Type existentialType,
+    ValueDecl *callee, unsigned paramIdx) {
+  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, argExpr->getLoc());
+  if (!behavior)
+    return;
+
+  auto &ctx = dc->getASTContext();
+  ctx.Diags
+      .diagnose(argExpr->getLoc(),
+                diag::open_existential_argument_in_embedded_swift,
+                existentialType, callee)
+      .limitBehavior(*behavior);
+
+  // Coercing the argument to its own existential type suppresses the implicit
+  // opening, but only helps when the existential satisfies the requirements on
+  // the generic parameter in the first place. When it does not, opening is the
+  // only way the call type checks, so there is nothing to suggest.
+  if (!canPassExistentialArgumentWithoutOpening(callee, paramIdx,
+                                                existentialType))
+    return;
+
+  // The coercion has to bind to the whole argument, which takes parentheses
+  // when the argument binds more loosely than 'as'.
+  auto *mutableDC = const_cast<DeclContext *>(dc);
+  auto *castingPG = TypeChecker::lookupPrecedenceGroup(
+                        mutableDC, ctx.Id_CastingPrecedence, SourceLoc())
+                        .getSingle();
+  bool needsParens =
+      !castingPG ||
+      exprNeedsParensInsideFollowingOperator(mutableDC, argExpr, castingPG);
+
+  SmallString<32> insertAfter;
+  if (needsParens)
+    insertAfter += ")";
+  insertAfter += " as ";
+  insertAfter += existentialType->getString();
+
+  auto note = ctx.Diags.diagnose(
+      argExpr->getLoc(),
+      diag::open_existential_argument_coerce_in_embedded_swift,
+      existentialType);
+  if (needsParens)
+    note.fixItInsert(argExpr->getStartLoc(), "(");
+  note.fixItInsertAfter(argExpr->getEndLoc(), insertAfter);
+}
+
 void swift::diagnoseDynamicCastInEmbedded(
     const DeclContext *dc, const CheckedCastExpr *cast) {
-  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
-  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc());
+  // A cast to a type involving a protocol needs a runtime conformance lookup,
+  // which the embedded runtime cannot do. This has always been unsupported --
+  // for the address-only forms SILGen produces, the optimizer rejects it
+  // outright -- so it is an error in Embedded Swift rather than a warning.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc(),
+                                                   /*wasAlwaysEmbeddedError=*/true);
   if (!behavior)
     return;
 

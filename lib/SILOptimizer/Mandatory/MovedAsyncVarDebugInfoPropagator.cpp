@@ -65,8 +65,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -75,10 +73,7 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Format.h"
 #include <cstring>
 
@@ -88,41 +83,64 @@ using namespace swift;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+// This pass uses the spare bits of DebugVarCarryingInst to mark the "undef"
+// lattice element: a spare bit value of 1 means that the instruction is only a
+// representative that identifies the SILDebugVariable, and that the variable
+// has no single valid value at this point. No other code interprets the spare
+// bits, so keep all accesses to this convention behind these helpers.
+
+static bool isUndef(DebugVarCarryingInst inst) {
+  return inst.getSpareBits() == 1;
+}
+
+static void setUndef(DebugVarCarryingInst &inst) {
+  inst.setSpareBits(1);
+}
+
+/// Clone \p original with \p builder, changing the clone's operand to undef.
+static DebugVarCarryingInst
+cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBuilder &builder) {
+  builder.setCurrentDebugScope(original->getDebugScope());
+  SILValue undef = SILUndef::get(original.getOperandForDebugValueClone());
+  auto varInfo = *original.getVarInfo();
+
+  // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
+  // refer to the project_box. Undef debug_values, however, should always
+  // have the type of the variable.
+  if (auto *abi = dyn_cast<AllocBoxInst>(*original)) {
+    SILType type = abi->getAddressType().getObjectType();
+    if (type.isLoadableOrOpaque(*original->getFunction())) {
+      undef = SILUndef::get(original->getFunction(), type);
+    } else {
+      // An address-only variable must stay an address, with a matching deref.
+      undef = SILUndef::get(original->getFunction(), type.getAddressType());
+      varInfo.DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+    }
+  }
+
+  return builder.createDebugValue(original->getLoc(), undef, varInfo,
+                                  UsesMoveableValueDebugInfo);
+}
+
 /// Clone \p original changing the clone's operand to be undef and insert at the
 /// beginning of \p block.
 static DebugVarCarryingInst
 cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
-  builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
-  // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
-  // refer to the project_box. Undef debug_values, however, should always
-  // have the type of the variable.
-  if (auto *abi = dyn_cast<AllocBoxInst>(*original))
-    undef = SILUndef::get(original->getFunction(),
-                          abi->getAddressType().getObjectType());
-  return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(),
-                                  UsesMoveableValueDebugInfo);
+  return cloneDebugValueMakeUndef(original, builder);
 }
 
 static DebugVarCarryingInst
 cloneDebugValueMakeUndef(DebugVarCarryingInst original,
                          SILInstruction *insertPt) {
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
-  builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
-  if (auto *abi = dyn_cast<AllocBoxInst>(*original))
-    undef = SILUndef::get(original->getFunction(),
-                          abi->getAddressType().getObjectType());
-  return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(),
-                                  UsesMoveableValueDebugInfo);
+  return cloneDebugValueMakeUndef(original, builder);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
                                        SILInstruction *insertPt) {
-  if (original.getSpareBits())
+  if (isUndef(original))
     return *cloneDebugValueMakeUndef(original, insertPt);
 
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
@@ -136,7 +154,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
                                        SILBasicBlock *block) {
-  if (original.getSpareBits())
+  if (isUndef(original))
     return *cloneDebugValueMakeUndef(original, block);
 
   SILBuilderWithScope builder(&block->front());
@@ -172,9 +190,21 @@ struct DebugInstMutableArrayRef {
     memcpy(state.data(), other.state.data(), getNumBytes());
   }
 
+  /// Compares two dataflow states for equality.
   bool operator==(DebugInstMutableArrayRef other) const {
     assert(state.size() == other.state.size());
-    return memcmp(state.data(), other.state.data(), getNumBytes()) == 0;
+    for (unsigned i : range(state.size())) {
+      auto lhs = state[i], rhs = other.state[i];
+      if (lhs == rhs)
+        continue;
+      if (lhs && rhs && isUndef(lhs) && isUndef(rhs)) {
+        // Treat any two undef values as equal, even if they
+        // store different instructions
+        continue;
+      }
+      return false;
+    }
+    return true;
   }
 
   bool operator!=(DebugInstMutableArrayRef other) const {
@@ -212,7 +242,7 @@ struct DebugInstMutableArrayRef {
     LLVM_DEBUG(llvm::dbgs() << "Cloning debug info for undef at block: bb"
                             << insertBlock->getDebugID() << '\n');
     for (auto value : state) {
-      if (!value || !value.getSpareBits())
+      if (!value || !isUndef(value))
         continue;
       LLVM_DEBUG(llvm::dbgs() << "    Inst to clone: " << **value);
       cloneDebugValueMakeUndef(value, insertBlock);
@@ -268,19 +298,19 @@ struct BlockState {
     for (unsigned i : range(inState.size())) {
       llvm::dbgs() << "[" << i << "] = "
                    << llvm::format_hex(uintptr_t(*inState.getElt(i)), 16)
-                   << '\n';
+                   << (isUndef(inState.getElt(i)) ? " undef" : "") << '\n';
     }
     llvm::dbgs() << "GenSet.\n";
     for (unsigned i : range(genSet.size())) {
       llvm::dbgs() << "[" << i << "] = "
                    << llvm::format_hex(uintptr_t(*genSet.getElt(i)), 16)
-                   << '\n';
+                   << (isUndef(genSet.getElt(i)) ? " undef" : "") << '\n';
     }
     llvm::dbgs() << "OutSet.\n";
     for (unsigned i : range(outState.size())) {
       llvm::dbgs() << "[" << i << "] = "
                    << llvm::format_hex(uintptr_t(*outState.getElt(i)), 16)
-                   << '\n';
+                   << (isUndef(outState.getElt(i)) ? " undef" : "") << '\n';
     }
   }
 };
@@ -466,7 +496,7 @@ void DebugInfoPropagator::performInitialLocalDataflow() {
       // Check if our debug inst is an undef. If so, we store an undef sentinel
       // value. This just means the spare bit is set to 1.
       if (isa<SILUndef>(debugInst.getOperandForDebugValueClone())) {
-        debugInst.setSpareBits(1);
+        setUndef(debugInst);
       }
 
       // Destructively update blockLastGenInst with this. This ensures we always
@@ -605,7 +635,7 @@ void DebugInfoPropagator::performGlobalDataflow() {
                          << "Invalidating along one path... inserting undef "
                             "at merge point?!\n");
               currentValue = dbgVar;
-              currentValue.setSpareBits(1);
+              setUndef(currentValue);
             }
 
             // In either case, we then continue.
@@ -619,7 +649,7 @@ void DebugInfoPropagator::performGlobalDataflow() {
           // If our intersection fails, need to insert later SILUndef
           // debug_value at merge point. Set the spareBit to 1 so we know this
           // is undef.
-          currentValue.setSpareBits(1);
+          setUndef(currentValue);
           LLVM_DEBUG(llvm::dbgs() << "Invalidating along one path... "
                                      "inserting undef at merge point 2?!\n");
         }

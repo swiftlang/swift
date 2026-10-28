@@ -2,22 +2,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ParserASTGen \
 // RUN:    -enable-experimental-feature CoroutineAccessors \
-// RUN:    -enable-experimental-feature DefaultIsolationPerFile \
 // RUN:    | %sanitize-address > %t/astgen.ast
 // RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency \
 // RUN:    -enable-experimental-feature CoroutineAccessors \
-// RUN:    -enable-experimental-feature DefaultIsolationPerFile \
 // RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_CoroutineAccessors
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -35,11 +32,11 @@ import func Swift.max
 import var Swift._playgroundPrintHook
 
 
-using @MainActor
-// FIXME: cannot add `using nonisolated` here because it's a re-declaration
-using @diagnose(StrictMemorySafety, as: error)
-using @diagnose(DeprecatedDeclaration, as: warning, reason: "round-trip the reason: argument")
-using @available(*, deprecated, message: "deprecation message")
+default @MainActor
+// FIXME: cannot add `default nonisolated` here because it's a re-declaration
+default @diagnose(StrictMemorySafety, as: error)
+default @diagnose(DeprecatedDeclaration, as: warning, reason: "round-trip the reason: argument")
+default @available(*, deprecated, message: "deprecation message")
 
 func
 test1

@@ -1,0 +1,104 @@
+// RUN: %target-sil-opt -sil-print-types --differentiation -emit-sorted-sil %s | %FileCheck %s
+
+// rdar://186786631: Indirect error results cause an off-by-one error in
+// LinearMapInfo.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+struct LoadableError : Error {
+  @_hasStorage var payload: Int { get set }
+}
+
+struct AddressOnlyError : Error {
+  // `Any` storage makes the error address-only, i.e. an indirect error result.
+  @_hasStorage var payload: Any { get set }
+}
+
+//===----------------------------------------------------------------------===//
+// Indirect error result, no indirect results: parameter 0 is SIL argument 1.
+//===----------------------------------------------------------------------===//
+
+sil hidden [ossa] @indirectErrorCallee : $@convention(thin) (Double) -> (Double, @error_indirect AddressOnlyError) {
+bb0(%0 : $*AddressOnlyError, %1 : $Double):
+  return %1 : $Double
+}
+
+sil hidden [ossa] @testIndirectError : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  %1 = alloc_stack $AddressOnlyError
+  %2 = function_ref @indirectErrorCallee : $@convention(thin) (Double) -> (Double, @error_indirect AddressOnlyError)
+  try_apply %2(%1, %0) : $@convention(thin) (Double) -> (Double, @error_indirect AddressOnlyError), normal bb1, error bb2
+
+bb1(%4 : $Double):
+  dealloc_stack %1 : $*AddressOnlyError
+  br bb3(%4 : $Double)
+
+bb2:
+  destroy_addr %1 : $*AddressOnlyError
+  dealloc_stack %1 : $*AddressOnlyError
+  %8 = float_literal $Builtin.FPIEEE64, 0x0
+  %9 = struct $Double (%8 : $Builtin.FPIEEE64)
+  br bb3(%9 : $Double)
+
+bb3(%11 : $Double):
+  return %11 : $Double
+}
+
+sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @testIndirectError : $@convention(thin) (Double) -> Double {
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testIndirectErrorTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double) {
+// CHECK: bb0([[X:%.*]] : $Double):
+// CHECK:   [[ERROR:%.*]] = alloc_stack $AddressOnlyError
+// CHECK:   [[VJP:%.*]] = differentiable_function_extract [vjp]
+// CHECK:   try_apply [[VJP]]([[ERROR]], [[X]])
+// CHECK: } // end sil function 'testIndirectErrorTJrSpSr'
+
+//===----------------------------------------------------------------------===//
+// Indirect result *and* indirect error result: parameter 0 is SIL argument 2.
+//===----------------------------------------------------------------------===//
+
+sil hidden [ossa] @indirectResultIndirectErrorCallee : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> (@out T, @error_indirect AddressOnlyError) {
+bb0(%0 : $*T, %1 : $*AddressOnlyError, %2 : $*T):
+  copy_addr %2 to [init] %0 : $*T
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil hidden [ossa] @testIndirectResultIndirectError : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = alloc_stack $AddressOnlyError
+  %3 = function_ref @indirectResultIndirectErrorCallee : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect AddressOnlyError)
+  try_apply %3<T>(%0, %2, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect AddressOnlyError), normal bb1, error bb2
+
+bb1(%5 : $()):
+  dealloc_stack %2 : $*AddressOnlyError
+  br bb3
+
+bb2:
+  destroy_addr %2 : $*AddressOnlyError
+  dealloc_stack %2 : $*AddressOnlyError
+  copy_addr %1 to [init] %0 : $*T
+  br bb3
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] <T where T : Differentiable> @testIndirectResultIndirectError : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testIndirectResultIndirectError16_Differentiation14DifferentiableRzlTJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) {
+// CHECK: bb0([[OUT:%.*]] : $*τ_0_0, [[IN:%.*]] : $*τ_0_0):
+// CHECK:   [[ERROR:%.*]] = alloc_stack $AddressOnlyError
+// CHECK:   [[VJP:%.*]] = differentiable_function_extract [vjp]
+// CHECK:   [[VJP_COPY:%.*]] = copy_value [[VJP]]
+// CHECK:   try_apply [[VJP_COPY]]([[OUT]], [[ERROR]], [[IN]])
+// CHECK: } // end sil function 'testIndirectResultIndirectError16_Differentiation14DifferentiableRzlTJrSpSr'

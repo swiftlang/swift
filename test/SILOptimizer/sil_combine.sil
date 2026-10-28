@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-transform-blocks=false -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // REQUIRES: objc_codegen
 
@@ -1310,6 +1310,7 @@ bb0(%0 : $E):
 // CHECK-NEXT: load
 // CHECK-NEXT: switch_enum
 // CHECK: bb1:
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: load
 // CHECK-NEXT: unchecked_enum_data
 // CHECK-NEXT: return

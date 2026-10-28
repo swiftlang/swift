@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -enable-objc-interop
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Foundation
 import user_objc
 

@@ -1,3 +1,4 @@
+;; -*- lexical-binding: nil; -*-
 ;===--- swift-project-settings.el - Swift project's format conventions ---===;
 ;
 ; This source file is part of the Swift.org open source project

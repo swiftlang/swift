@@ -251,7 +251,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 ///     protocol NoRequirements: ~Copyable { }
 ///
 /// Extensions to the `Copyable` protocol are not allowed.
-@_marker public protocol Copyable/*: ~Escapable*/ {}
+@_marker public protocol Copyable: Deinitable/*, ~Escapable*/ {}
 
 /// A type whose values can persist beyond their immediate local scope.
 ///
@@ -268,6 +268,18 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// arguments. A conformance requirement for `Escapable` is automatically inferred in extensions and for generic type
 /// parameters, unless suppressed with `~Escapable`.
 @_marker public protocol Escapable/*: ~Copyable*/ {}
+
+/// A type whose values can be destroyed implicitly.
+///
+/// When a value of a `Deinitable` type reaches the end of its lifetime, Swift
+/// destroys it implicitly, running its `deinit` if it has one. Every
+/// `Copyable` type is `Deinitable`, and so are all of today's noncopyable
+/// types. A value of a type that suppresses this conformance can't be
+/// destroyed implicitly; code must consume it explicitly instead.
+///
+/// The compiler reserves this protocol for its own use. Source code can't
+/// refer to it yet.
+@_marker public protocol Deinitable/*: ~Copyable, ~Escapable*/ {}
 
 @_marker public protocol BitwiseCopyable: ~Escapable { }
 

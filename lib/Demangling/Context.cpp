@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
@@ -40,7 +39,7 @@ void Context::clear() {
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
 #if SWIFT_SUPPORT_OLD_MANGLING
-  if (isMangledName(MangledName)) {
+  if (isMangledName(MangledName) || isAsyncMainEntryPointSymbol(MangledName)) {
     return D->demangleSymbol(MangledName);
   }
   return demangleOldSymbolAsNode(MangledName, *D);

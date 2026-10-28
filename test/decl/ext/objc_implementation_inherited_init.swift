@@ -21,3 +21,11 @@
     super.init()
   }
 }
+
+// The interface marks 'init'/'new' unavailable (NS_UNAVAILABLE), so the stub
+// can't be invoked from Objective-C and won't trap: no diagnostic.
+@objc @implementation extension ImplsUnavailableInit {
+  init(value: Int32) {
+    super.init()
+  }
+}

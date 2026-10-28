@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo -O -Xlinker %swift_obj_root/lib/swift/embedded/%module-target-triple/libswiftUnicodeDataTables.a) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo -O -Xlinker %swift_obj_root/lib/swift/embedded/%module-target-triple/libswiftUnicodeDataTables.a %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib

@@ -22,7 +22,7 @@ func test2() {
 }
 // CHECK-LABEL: } // end sil function '$s4main5test2yyF'
 
-// CHECK-LABEL: sil public_external [canonical] @$s24def_clang_function_types17use_fp_internallyyyF
+// CHECK-LABEL: sil public_external [canonical] [stage=canonical] @$s24def_clang_function_types17use_fp_internallyyyF
 // CHECK:         enum $Optional<@convention(c, cType: "struct ForwardInTypedefForFP2 *(*)(void)") () -> Optional<OpaquePointer>>, #Optional.none!enumelt
 // CHECK:         [[FN:%.*]] = function_ref @$s24def_clang_function_types9use_inout3argyxz_tlF : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
 // CHECK:         apply [[FN]]<Optional<@convention(c, cType: "struct ForwardInTypedefForFP2 *(*)(void)") () -> Optional<OpaquePointer>>>

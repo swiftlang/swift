@@ -34,20 +34,20 @@ list(APPEND compile_flags
 foreach(flag ${compile_flags})
   check_cxx_compiler_flag("${flag}" cxx_compiler_flag_${flag}_is_supported)
   if(cxx_compiler_flag_${flag}_is_supported)
-    list(APPEND CXX_COMPILE_FLAGS "${flag}")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${flag}>)
   endif()
 endforeach()
 unset(compile_flags)
 
 
 if("Thread" IN_LIST SWIFT_RUNTIME_USE_SANITIZERS)
-  list(APPEND CXX_LINK_FLAGS "-fsanitize=thread")
+  add_link_options($<$<COMPILE_LANGUAGE:CXX>:-fsanitize=thread>)
 endif()
 
 # Compatibility libraries build in a special alternate universe that can't
 # directly link to most OS runtime libraries, and have to access the
 # runtime being patched only through public ABI.
-list(APPEND CXX_COMPILE_FLAGS "-DSWIFT_COMPATIBILITY_LIBRARY=1")
+add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:SWIFT_COMPATIBILITY_LIBRARY=1>)
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)

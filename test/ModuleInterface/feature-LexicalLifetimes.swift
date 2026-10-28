@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -disable-availability-checking
-// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest
+// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest
 // RUN: %FileCheck %s < %t/FeatureTest.swiftinterface
 
 // CHECK: @_noEagerMove public struct Permanent {

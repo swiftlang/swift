@@ -8,6 +8,11 @@ module Methods {
   requires cplusplus
 }
 
+module CallingConvention {
+  header "calling-convention.h"
+  requires cplusplus
+}
+
 module AmbiguousMethods {
   header "ambiguous_methods.h"
   requires cplusplus
@@ -37,6 +42,13 @@ module SwiftNameDifferentType {
 
 module AlwaysUnsafeProjections {
   header "always-unsafe-projections.h"
+  requires cplusplus
+
+  export *
+}
+
+module AlwaysUnsafeSafeWrapper {
+  header "always-unsafe-safe-wrapper.h"
   requires cplusplus
 
   export *

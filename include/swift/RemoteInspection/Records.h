@@ -131,7 +131,7 @@ struct TargetFieldRecordIterator {
 
   const TargetFieldRecord<Runtime> *operator->() const { return Cur; }
 
-  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, size_t bytes) {
+  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, uint64_t bytes) {
     return reinterpret_cast<const TargetFieldRecord<Runtime> *>(reinterpret_cast<const char *>(Ptr) + bytes);
   }
 
@@ -190,6 +190,16 @@ template <typename Runtime>
 class TargetFieldDescriptor {
   const TargetFieldRecord<Runtime> *getFieldRecordBuffer() const {
     return reinterpret_cast<const TargetFieldRecord<Runtime> *>(this + 1);
+  }
+
+  const TargetFieldRecord<Runtime> *getFieldRecordBufferEnd() const {
+    // We only ever emit FieldRecordSize equal to sizeof(FieldRecord). If it's
+    // anything else, consider it to be bad data and walk no records.
+    if (FieldRecordSize != sizeof(TargetFieldRecord<Runtime>))
+      return getFieldRecordBuffer();
+    return FieldRecordIterator::advanceRecordPointer(
+        getFieldRecordBuffer(),
+        (uint64_t)NumFields * (uint64_t)FieldRecordSize);
   }
 
 public:
@@ -252,14 +262,12 @@ public:
   }
 
   const_iterator begin() const {
-    auto Begin = getFieldRecordBuffer();
-    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
-    return const_iterator { FieldRecordSize, Begin, End };
+    return const_iterator { FieldRecordSize, getFieldRecordBuffer(),
+                            getFieldRecordBufferEnd() };
   }
 
   const_iterator end() const {
-    auto Begin = getFieldRecordBuffer();
-    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
+    auto End = getFieldRecordBufferEnd();
     return const_iterator { FieldRecordSize, End, End };
   }
 
@@ -413,118 +421,6 @@ public:
 
   llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(TypeName.get());
-  }
-};
-
-class MultiPayloadEnumDescriptor {
-public:
-  const RelativeDirectPointer<const char> TypeName;
-
-private:
-  // This descriptor contains a series of 32-bit words
-  uint32_t contents[];
-
-  // Properties are stored in `contents` at particular indexes:
-
-  // uint32_t SizeFlags;
-  // Upper 16 bits are the size of the contents (in 32-bit words):
-  //  (This allows us to expand this structure in the future;
-  //  new fields should have accessors that test whether the
-  //  size is large enough and return "non-existent" if the
-  //  descriptor isn't large enough to have that field.)
-  // Lower 16 bits are flag bits
-
-  size_t getSizeFlagsIndex() const { return 0; }
-
-  // uint32_t PayloadSpareBitMaskByteOffsetCount;
-  // Number of bytes in "payload spare bits", and
-  // offset of them within the payload area
-  // Only present if `usePayloadSpareBits()`
-
-  size_t getPayloadSpareBitMaskByteCountIndex() const {
-    return getSizeFlagsIndex() + 1;
-  }
-
-  // uint8_t  *PayloadSpareBits;
-  // Variably-sized bitmask field (padded to a multiple of 4 bytes)
-  // Only present if `usePayloadSpareBits()`
-
-  size_t getPayloadSpareBitsIndex() const {
-    size_t PayloadSpareBitMaskByteCountFieldSize =
-        usesPayloadSpareBits() ? 1 : 0;
-    return getPayloadSpareBitMaskByteCountIndex() + PayloadSpareBitMaskByteCountFieldSize;
-  }
-
-  // uint32_t foo;
-  // TODO: Some future field
-  // int getFooIndex() const {
-  //   int PayloadSpareBitMaskFieldSize = (getPayloadSpareBitMaskByteCount() + 3) / 4;
-  //   return getPayloadSpareBitsIndex() + PayloadSpareBitMaskFieldSize;
-  // }
-
-  // uint32_t getFoo() const {
-  //   if (getFooIndex() < getContentsSizeInWords()) {
-  //       return contents[getFooIndex()];
-  //   } else {
-  //       return 0; // Field isn't present
-  //   }
-  // }
-
-public:
-  //
-  // Data derived from the above...
-  //
-
-  uint32_t getContentsSizeInWords() const {
-    return contents[getSizeFlagsIndex()] >> 16;
-  }
-
-  size_t getSizeInBytes() const {
-//    assert(getContentsSizeInWords() > 0 && "Malformed MPEnum reflection record");
-    size_t sizeInBytes = sizeof(TypeName) + getContentsSizeInWords() * 4;
-    return sizeInBytes;
-  }
-
-  uint32_t getFlags() const {
-    assert(getContentsSizeInWords() > 0 && "Malformed MPEnum reflection record");
-    return contents[getSizeFlagsIndex()] & 0xffff;
-  }
-
-  bool usesPayloadSpareBits() const {
-    return getFlags() & 1;
-  }
-
-  uint32_t getPayloadSpareBitMaskByteOffset() const {
-    if (usesPayloadSpareBits() &&
-        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
-      return contents[getPayloadSpareBitMaskByteCountIndex()] >> 16;
-    } else {
-      return 0;
-    }
-  }
-
-  uint32_t getPayloadSpareBitMaskByteCount() const {
-    if (usesPayloadSpareBits() &&
-        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
-      auto byteCount = contents[getPayloadSpareBitMaskByteCountIndex()] & 0xffff;
-      uint32_t maxBytes = (getContentsSizeInWords() - 2) * 4;
-      assert(byteCount <= maxBytes &&
-             "Malformed MPEnum reflection record: mask bigger than record");
-      return byteCount <= maxBytes ? byteCount : maxBytes;
-    } else {
-      return 0;
-    }
-  }
-
-  const uint8_t *getPayloadSpareBits() const {
-    // The mask bytes live in contents[2...], only present when the record
-    // declares at least two content words.
-    if (usesPayloadSpareBits() &&
-        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
-      return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
-    } else {
-      return nullptr;
-    }
   }
 };
 

@@ -56,6 +56,10 @@ struct GoodStruct {
 
   int operator+(Incomplete) const;
 
+  // expected-swift-note@+4 {{'begin()' has been explicitly marked unavailable here}}
+  // expected-swift-note@+3 {{'begin' and 'end' are assumed to return iterators}}
+  // expected-swift-note@+3 {{'end()' has been explicitly marked unavailable here}}
+  // expected-swift-note@+2 {{'begin' and 'end' are assumed to return iterators}}
   Incomplete begin() const;
   Incomplete end() const;
 };
@@ -77,8 +81,14 @@ struct GoodStruct {
 //
 // NOTE-MISSING: static func +(lhs: GoodStruct, rhs: Never) -> Int32
 //
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func __beginUnsafe() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   func begin() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func __endUnsafe() -> Never
+// CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   func end() -> Never
 // CHECK-NEXT: }
 
 
@@ -86,10 +96,12 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK:      struct DerivedGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
-// CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
-// CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
+// CHECK-NEXT:   func overloadsSameNumArgs(_ __param0: CInt)
+// CHECK-NEXT:   func overloadsDiffNumArgs(_ __param0: CInt, _ __param1: CInt)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
+// CHECK-NEXT:   func begin() -> Never
 // CHECK-NEXT:   func __endUnsafe() -> Never
+// CHECK-NEXT:   func end() -> Never
 // CHECK-NEXT: }
 
 struct UsingGoodStruct : GoodStruct {
@@ -101,10 +113,12 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK:      struct UsingGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
-// CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
-// CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
+// CHECK-NEXT:   func overloadsSameNumArgs(_ __param0: CInt)
+// CHECK-NEXT:   func overloadsDiffNumArgs(_ __param0: CInt, _ __param1: CInt)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
+// CHECK-NEXT:   func begin() -> Never
 // CHECK-NEXT:   func __endUnsafe() -> Never
+// CHECK-NEXT:   func end() -> Never
 // CHECK-NEXT: }
 
 
@@ -195,12 +209,12 @@ func err() {
 
   let _ = gs + inc    // expected-swift-error {{binary operator '+' cannot be applied}}
 
-  let _ = gs.begin()  // expected-swift-error {{has no member}}
-                      // expected-swift-note@-1 {{is unavailable}}
-                      // expected-swift-note@-2 {{try using Swift collection APIs instead}}
-  let _ = gs.end()    // expected-swift-error {{has no member}}
-                      // expected-swift-note@-1 {{is unavailable}}
-                      // expected-swift-note@-2 {{try using Swift collection APIs instead}}
+  let _ = gs.begin()  // expected-swift-error {{'begin()' is unavailable: return type is unavailable in Swift}}
+                      // expected-swift-error@-1 {{must be marked with 'unsafe'}}
+                      // expected-swift-note@-2 {{reference to unsafe instance method 'begin()'}}
+  let _ = gs.end()    // expected-swift-error {{'end()' is unavailable: return type is unavailable in Swift}}
+                      // expected-swift-error@-1 {{must be marked with 'unsafe'}}
+                      // expected-swift-note@-2 {{reference to unsafe instance method 'end()'}}
 
   let dgs = DerivedGoodStruct()
   let dinc = dgs.badReturn()  // expected-swift-error {{is unavailable}}

@@ -17,17 +17,16 @@
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformance/DerivedConformance.h"
+#include "LiteralExpressionFolding.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
 #include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "LiteralExpressionFolding.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -40,7 +39,6 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -54,13 +52,11 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/YieldList.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -69,14 +65,21 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/DJB.h"
 
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
+
+/// Whether expr is a literal of a kind that can serve as an enum raw value
+/// (i.e. one handled by RawValueKey). This excludes literals such as `#file`
+/// and other magic identifiers and regex literals, which are not valid raw
+/// values.
+static bool isValidEnumRawValueLiteral(const LiteralExpr *expr) {
+  return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr) ||
+         isa<StringLiteralExpr>(expr) || isa<BooleanLiteralExpr>(expr);
+}
 
 /// Used during enum raw value checking to identify duplicate raw values.
 /// Character, string, float, and integer literals are all keyed by value.
@@ -269,7 +272,7 @@ HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
   if (canSkipCircularityCheck(decl) || !decl->hasRawType())
     return false;
 
-  auto *inherited = decl->getRawType()->getEnumOrBoundGenericEnum();
+  auto *inherited = decl->getRawType()->getEnumDecl();
   if (!inherited)
     return false;
 
@@ -862,8 +865,16 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     }
 
     case DeclKind::Func: {
+      auto *FD = cast<FuncDecl>(decl);
+
+      // Distributed actor methods are effectively final because actors don't allow subclassing.
+      // We enable this inference just in Embedded for now, but could enable globally perhaps.
+      if (cls->isDistributedActor() &&
+          decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        return true;
+
       // Methods declared 'static' are final.
-      auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
+      auto staticSpelling = FD->getStaticSpelling();
       if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
                                         staticSpelling))
         return true;
@@ -955,6 +966,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
+    return false;
+
+  // Embedded Swift does not support dynamic replacement, so nothing is
+  // 'dynamic'. An explicit 'dynamic' is diagnosed and ignored.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
   // Add dynamic if -enable-implicit-dynamic was requested.
@@ -1129,6 +1145,9 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
 /// Given the raw value literal expression for an enum case, produces the
 /// auto-incremented raw value for the subsequent case, or returns null if
 /// the value is not auto-incrementable.
+///
+/// The literal is implicit, but takes the case's location, so that a
+/// diagnostic about the value has somewhere to point.
 static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
                                              EnumElementDecl *forElt,
                                              LiteralExpr *prevValue) {
@@ -1140,13 +1159,13 @@ static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
     return nullptr;
 
   case AutomaticEnumValueKind::String:
-    return new (Ctx) StringLiteralExpr(forElt->getNameStr(), SourceLoc(),
+    return new (Ctx) StringLiteralExpr(forElt->getNameStr(), forElt->getLoc(),
                                               /*Implicit=*/true);
 
   case AutomaticEnumValueKind::Integer:
     // If there was no previous value, start from zero.
     if (!prevValue) {
-      return new (Ctx) IntegerLiteralExpr("0", SourceLoc(),
+      return new (Ctx) IntegerLiteralExpr("0", forElt->getLoc(),
                                                  /*Implicit=*/true);
     }
 
@@ -1210,6 +1229,107 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   }
 }
 
+static void
+diagnoseDuplicateRawValue(EnumDecl *ED, EnumElementDecl *elt,
+                          const RawValueSource &prevSource,
+                          EnumElementDecl *lastExplicitValueElt,
+                          std::optional<AutomaticEnumValueKind> valueKind) {
+  auto &Diags = ED->getASTContext().Diags;
+  const bool counting = valueKind == AutomaticEnumValueKind::Integer;
+
+  Diags.diagnose(elt->getRawValueUnchecked()->getLoc(),
+                 diag::enum_raw_value_not_unique);
+  if (lastExplicitValueElt != elt && counting)
+    Diags.diagnose(lastExplicitValueElt->getRawValueUnchecked()->getLoc(),
+                   diag::enum_raw_value_incrementing_from_here);
+
+  auto *foundElt = prevSource.sourceElt;
+  Diags.diagnose(foundElt->getRawValueUnchecked()->getLoc(),
+                 diag::enum_raw_value_used_here);
+  if (foundElt != prevSource.lastExplicitValueElt && counting) {
+    if (prevSource.lastExplicitValueElt)
+      Diags.diagnose(
+          prevSource.lastExplicitValueElt->getRawValueUnchecked()->getLoc(),
+          diag::enum_raw_value_incrementing_from_here);
+    else
+      Diags.diagnose(ED->getAllElements().front()->getLoc(),
+                     diag::enum_raw_value_incrementing_from_zero);
+  }
+}
+
+/// Drop a written raw value whose literal kind can never be one: a regex
+/// literal, a magic identifier such as #file, or an object literal. Diagnosing
+/// before type checking avoids a spurious conversion error, and clearing it
+/// lets the case fall back to an automatic value.
+static void dropUnusableRawValueLiteral(EnumElementDecl *elt) {
+  auto *litExpr = dyn_cast_or_null<LiteralExpr>(elt->getRawValueUnchecked());
+  if (!litExpr || isValidEnumRawValueLiteral(litExpr) ||
+      isa<NilLiteralExpr>(litExpr))
+    return;
+
+  elt->getASTContext().Diags.diagnose(litExpr->getLoc(),
+                                      diag::nonliteral_enum_case_raw_value);
+  elt->setRawValueExpr(nullptr);
+}
+
+/// Type-check an enum case's raw value expression against rawTy, installing the
+/// checked expression on the element when it succeeds.
+///
+/// Returns the type-checked expression to the caller.
+static Expr *typeCheckRawValueExpr(EnumDecl *ED, EnumElementDecl *elt,
+                                   Type rawTy) {
+  Expr *value = elt->getRawValueUnchecked();
+  if (TypeChecker::typeCheckExpression(
+          value, ED, /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+    checkEnumElementActorIsolation(elt, value);
+    TypeChecker::checkEnumElementEffects(elt, value);
+    if (auto *seqExpr = dyn_cast<SequenceExpr>(value))
+      value = TypeChecker::foldSequence(seqExpr, ED);
+    elt->setRawValueExpr(value);
+  }
+  return value;
+}
+
+/// Reduce a type-checked raw value to a single literal, folding a
+/// constant integer expression like '1 + 1' down to '2'.
+///
+/// Takes the expression because the element must keep the original raw value as
+/// written.
+static LiteralExpr *reduceRawValueToLiteral(Expr *value, ASTContext &ctx,
+                                            bool foldIntegerRawValue) {
+  if (!foldIntegerRawValue)
+    return dyn_cast<LiteralExpr>(value);
+  return dyn_cast<LiteralExpr>(foldLiteralExpression(value, &ctx));
+}
+
+/// Synthesise the automatic value the case would have had, keeping the enum
+/// conforming. Null means none is available, and the caller must invalidate.
+static LiteralExpr *
+recoverWithAutomaticRawValue(EnumDecl *ED, EnumElementDecl *elt, Type rawTy,
+                             LiteralExpr *prevValue,
+                             std::optional<AutomaticEnumValueKind> &valueKind) {
+  if (!valueKind)
+    valueKind = computeAutomaticEnumValueKind(ED);
+  if (!valueKind)
+    return nullptr;
+
+  // getAutomaticRawValueExpr diagnoses and fails on a non-integer seed under
+  // integer numbering, so drop an unusable one rather than pass it on.
+  LiteralExpr *seed = prevValue;
+  if (*valueKind == AutomaticEnumValueKind::Integer &&
+      !isa_and_nonnull<IntegerLiteralExpr>(seed))
+    seed = nullptr;
+
+  Expr *automatic = getAutomaticRawValueExpr(*valueKind, elt, seed);
+  if (!automatic ||
+      !TypeChecker::typeCheckExpression(
+          automatic, ED, /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue}))
+    return nullptr;
+
+  elt->setRawValueExpr(automatic);
+  return dyn_cast<LiteralExpr>(automatic);
+}
+
 evaluator::SideEffect
 EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   Type rawTy = ED->getRawType();
@@ -1233,26 +1353,44 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   if (rawTy->hasError())
     return std::make_tuple<>();
 
-  // Check the raw values of the cases.
+  // The sequence cursor until the assignment near the end of the body, and this
+  // element's own literal after it. The early continues leave it untouched, so
+  // it can predate the immediately preceding element.
   LiteralExpr *prevValue = nullptr;
+
+  // Snapshotted into uniqueRawValues and read back later for a different
+  // element, so it cannot be recomputed from the current one.
   EnumElementDecl *lastExplicitValueElt = nullptr;
 
   // Keep a map we can use to check for duplicate case values.
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
-  // Make the raw member accesses explicit.
-  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> Expr * {
-    return EED->RawValueExpr;
-  };
+  // Queries that do not vary across elements. rawTy is fixed above, and the
+  // language option cannot change mid-request.
+  auto &ctx = ED->getASTContext();
+  auto &Diags = ctx.Diags;
+  const bool literalExprEnabled =
+      ctx.LangOpts.hasFeature(Feature::LiteralExpressions);
+  // Literal expressions are folded only for integer raw types; other raw types
+  // use the written literal directly.
+  const bool foldIntegerRawValue =
+      literalExprEnabled && rawTy->isStdlibInteger();
 
+  // Left empty until an element needs an automatic value. Emptiness gates the
+  // provenance notes on a duplicate, so do not compute this eagerly.
   std::optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
     // If the element has been diagnosed up to now, skip it.
     if (elt->isInvalid())
       continue;
 
-    if (uncheckedRawValueOf(elt)) {
-      if (!uncheckedRawValueOf(elt)->isImplicit())
+    // Restored below if this element's written value turns out to be unusable.
+    auto *lastExplicitValueEltOnEntry = lastExplicitValueElt;
+
+    dropUnusableRawValueLiteral(elt);
+
+    if (elt->getRawValueUnchecked()) {
+      if (!elt->getRawValueUnchecked()->isImplicit())
         lastExplicitValueElt = elt;
     } else if (!ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues)) {
       // Try to pull out the automatic enum value kind.  If that fails, bail.
@@ -1275,35 +1413,39 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
       elt->setRawValueExpr(nextValue);
     }
 
-    auto value = uncheckedRawValueOf(elt);
-    {
-      if (TypeChecker::typeCheckExpression(
-              value, ED,
-              /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
-        checkEnumElementActorIsolation(elt, value);
-        TypeChecker::checkEnumElementEffects(elt, value);
-        if (auto *seqExpr = dyn_cast<SequenceExpr>(value))
-          value = TypeChecker::foldSequence(seqExpr, ED);
-        elt->setRawValueExpr(value);
-      }
-    }
+    Expr *value = typeCheckRawValueExpr(ED, elt, rawTy);
 
-    bool literalExprEnabled =
-        ED->getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
-    // We must constant-fold the expression here to reduce it to
-    // a LiteralExpr so that:
-    // 1. We validate the expression *is* foldable down to a constant
-    // 2. We can use it to compute the next automatic raw value expression.
-    prevValue = literalExprEnabled
-                    ? dyn_cast<LiteralExpr>(
-                          foldLiteralExpression(value, &ED->getASTContext()))
-                    : dyn_cast<LiteralExpr>(value);
-    if (!prevValue) {
-      if (literalExprEnabled && value)
-        ED->getASTContext().Diags.diagnose(
-            value->getLoc(), diag::nonliteral_int_expr_enum_case_raw_value);
-      continue;
+    // Into a local, not prevValue: this can fail, and the recovery below needs
+    // prevValue intact so the automatic value continues the sequence.
+    LiteralExpr *reduced =
+        reduceRawValueToLiteral(value, ctx, foldIntegerRawValue);
+    if (!reduced) {
+      // The parser only screens out values that are syntactically non-literal,
+      // so it cannot catch a literal that stops being one during type checking.
+      // Diagnose those here.
+      if (value)
+        Diags.diagnose(
+            value->getLoc(), foldIntegerRawValue
+                                 ? diag::nonliteral_int_expr_enum_case_raw_value
+                                 : diag::nonliteral_enum_case_raw_value);
+
+      // The automatic-value path above ran before this element's raw value was
+      // known to be unusable, so recover by assigning an automatic value here.
+      reduced =
+          recoverWithAutomaticRawValue(ED, elt, rawTy, prevValue, valueKind);
+      if (!reduced) {
+        elt->setInvalid();
+        continue;
+      }
+
+      // The written value was discarded, so this element is not what the
+      // sequence counts from.
+      lastExplicitValueElt = lastExplicitValueEltOnEntry;
+
+      // Fall through, so the recovered value is checked and registered for
+      // uniqueness like any other value.
     }
+    prevValue = reduced;
 
     // If we didn't find a valid initializer (maybe the initial value was
     // incompatible with the raw value type) mark the entry as being erroneous.
@@ -1319,45 +1461,24 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValues))
       continue;
 
-    // Using magic literals like #file as raw value is not supported right now.
+    // Only Integer/Float/String/Bool have a RawValueKey arm, so reject the rest
+    // before the uniqueness check below. 'nil' is exempt from the screen above
+    // and also ends up here.
     // TODO: We could potentially support #file, #function, #line and #column.
-    auto &Diags = ED->getASTContext().Diags;
-    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
-                            ? elt->getLoc()
-                            : uncheckedRawValueOf(elt)->getLoc();
-    // Check that the raw value is unique.
-    RawValueKey key{prevValue};
-    RawValueSource source{elt, lastExplicitValueElt};
-
-    auto insertIterPair = uniqueRawValues.insert({key, source});
-    if (insertIterPair.second)
+    if (!isValidEnumRawValueLiteral(prevValue)) {
+      Diags.diagnose(elt->getRawValueUnchecked()->getLoc(),
+                     diag::nonliteral_enum_case_raw_value);
+      prevValue = nullptr;
+      elt->setInvalid();
       continue;
-
-    // Diagnose the duplicate value.
-    Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-
-    if (lastExplicitValueElt != elt &&
-        valueKind == AutomaticEnumValueKind::Integer) {
-      Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
-                     diag::enum_raw_value_incrementing_from_here);
     }
 
-    RawValueSource prevSource = insertIterPair.first->second;
-    auto foundElt = prevSource.sourceElt;
-    diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
-        ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
-    Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
-
-    if (foundElt != prevSource.lastExplicitValueElt &&
-        valueKind == AutomaticEnumValueKind::Integer) {
-      if (prevSource.lastExplicitValueElt)
-        Diags.diagnose(uncheckedRawValueOf(prevSource.lastExplicitValueElt)
-                         ->getLoc(),
-                       diag::enum_raw_value_incrementing_from_here);
-      else
-        Diags.diagnose(ED->getAllElements().front()->getLoc(),
-                       diag::enum_raw_value_incrementing_from_zero);
-    }
+    // Check that the raw value is unique.
+    auto insertIterPair = uniqueRawValues.insert(
+        {RawValueKey{prevValue}, RawValueSource{elt, lastExplicitValueElt}});
+    if (!insertIterPair.second)
+      diagnoseDuplicateRawValue(ED, elt, insertIterPair.first->second,
+                                lastExplicitValueElt, valueKind);
   }
   return std::make_tuple<>();
 }
@@ -1837,9 +1958,17 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                    /*packElementOpener*/ nullptr)
           .resolveType(underlyingRepr);
 
+  auto &ctx = typeAlias->getASTContext();
   if (result->hasError()) {
     typeAlias->setInvalid();
-    return ErrorType::get(typeAlias->getASTContext());
+    return ErrorType::get(ctx);
+  }
+  if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+      hasScopeUnsaturatedType(result)) {
+    ctx.Diags.diagnose(underlyingRepr->getStartLoc(),
+                       diag::scoped_nonescapable_in_typealias);
+    typeAlias->setInvalid();
+    return ErrorType::get(ctx);
   }
   return result;
 }
@@ -2051,7 +2180,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     auto *storage = accessor->getStorage();
 
-    switch (accessor->getAccessorKind()) {
+    auto kind = accessor->getAccessorKind();
+    switch (kind) {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
@@ -2074,8 +2204,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::MutableAddress:
       return buildAddressorResultType(accessor, storage->getValueInterfaceType());
 
-    // Coroutine accessors don't mention the value type directly.
-    // If we add yield types to the function type, we'll need to update this.
+    // Coroutine accessors yield their storage value type
     case AccessorKind::Read:
     case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
@@ -2100,16 +2229,6 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         clangFn, decl->getDeclContext());
     if (returnType)
       return *returnType;
-    // Mark the imported Swift function as unavailable.
-    // That will ensure that the function will not be
-    // usable from Swift, even though it is imported.
-    if (!decl->isUnavailable()) {
-      StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
-      auto ua = AvailableAttr::createUniversallyUnavailable(
-          ctx, unavailabilityMsgRef);
-      decl->addAttribute(ua);
-    }
-
     return ctx.getNeverType();
   }
 
@@ -2126,6 +2245,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
   if (decl->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl))
+    if (funcDecl->isCoroutine())
+      options |= TypeResolutionFlags::Coroutine;
 
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
@@ -2133,6 +2255,66 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                       /*placeholderOpener*/ nullptr,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
+}
+
+Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl,
+                                 unsigned idx) const {
+  auto &ctx = decl->getASTContext();
+
+  //  Accessors always inherit their yield type from their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    ASSERT(idx == 0 && "invalid accessor decl yield");
+
+    auto *storage = accessor->getStorage();
+
+    auto kind = accessor->getAccessorKind();
+    switch (kind) {
+    case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
+    case AccessorKind::Borrow:
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
+    case AccessorKind::Set:
+    case AccessorKind::Init:
+    case AccessorKind::Mutate:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      return TupleType::getEmpty(ctx);
+
+    // Coroutine accessors yield storage value types
+    case AccessorKind::Read:
+    case AccessorKind::YieldingBorrow:
+      return storage->getValueInterfaceType();
+
+    case AccessorKind::Modify:
+    case AccessorKind::YieldingMutate:
+      return InOutType::get(storage->getValueInterfaceType());
+    }
+  }
+
+  if (auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    YieldList *YL = funcDecl->getYields();
+
+    if (!funcDecl->isCoroutine() || !YL || idx >= YL->size())
+      return ErrorType::get(ctx);
+
+    TypeRepr *yieldTyRepr = YL->get(idx).getTypeRepr();
+    assert(funcDecl->isCoroutine() && yieldTyRepr);
+
+    auto options = TypeResolutionOptions(TypeResolverContext::FunctionResult);
+    if (funcDecl->isCoroutine())
+      options |= TypeResolutionFlags::Coroutine;
+
+    auto *const dc = decl->getInnermostDeclContext();
+    return TypeResolution::forInterface(dc, options,
+                                        /*unboundTyOpener*/ nullptr,
+                                        /*placeholderOpener*/ nullptr,
+                                        /*packElementOpener*/ nullptr)
+        .resolveType(yieldTyRepr);
+  }
+
+  ASSERT(false && "unexpected coroutine decl");
+  return ErrorType::get(ctx); // TupleType::getEmpty(ctx);
 }
 
 ParamSpecifier
@@ -2231,12 +2413,11 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     return ownershipRepr->getSpecifier();
   }
 
-  // @called(once) implies `consumed`.
+  // A function type with execution semantics implies `consuming`.
   if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-    if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
-      if (cast<CalledTypeAttr>(calledAttr)->isOnce())
-        return ParamSpecifier::Consuming;
-    }
+    if (attributedTy->has(TypeAttrKind::Once) ||
+        attributedTy->has(TypeAttrKind::Callable))
+      return ParamSpecifier::Consuming;
   }
 
   return ParamSpecifier::Default;
@@ -2326,18 +2507,22 @@ static Type validateParameterType(ParamDecl *decl) {
     Ty = resolution.resolveType(decl->getTypeRepr());
   }
 
+  Ty = fillElidedScopes(decl, Ty);
+
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
 
   if (auto *F = Ty->getAs<AnyFunctionType>()) {
-    if (F->isCalledOnce()) {
+    if (F->hasCalledAtMostOnceSemantics()) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:
-        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                           diag::called_once_cannot_be_used_with_borrowing);
+        ctx.Diags.diagnose(
+            decl->getTypeRepr()->getLoc(),
+            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
+            getExecutionSemanticsAttrSpelling(*F->getExecutionSemantics()));
         return ErrorType::get(ctx);
 
       case ParamSpecifier::InOut:
@@ -2346,7 +2531,7 @@ static Type validateParameterType(ParamDecl *decl) {
       // used by `sending`
       case ParamSpecifier::ImplicitlyCopyableConsuming:
         break;
-      // @called(once) is consuming by default and we don't
+      // at-most-once is consuming by default and we don't
       // require it be to written explicitly.
       case ParamSpecifier::Default:
         ownership = ParamSpecifier::Consuming;
@@ -2399,9 +2584,20 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
-  case DeclKind::Using:
+  case DeclKind::FileDefault:
     llvm_unreachable("should not get here");
     return Type();
+
+  case DeclKind::HiddenTypeLayoutInfo: {
+    auto *hiddenDecl = cast<HiddenTypeLayoutInfoDecl>(D);
+    CanType parent;
+    if (auto *parentDecl = hiddenDecl->ParentDecl)
+      parent = parentDecl->getDeclaredInterfaceType()->getCanonicalType();
+
+    auto hiddenType =
+        HiddenType::get(Context, hiddenDecl->MangledName, hiddenDecl, parent);
+    return MetatypeType::get(hiddenType, Context);
+  }
 
   case DeclKind::GenericTypeParam: {
     auto *paramDecl = cast<GenericTypeParamDecl>(D);
@@ -2562,6 +2758,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
+    // Yields
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    if (auto fn = dyn_cast<FuncDecl>(D); fn && fn->isCoroutine())
+      fn->getYieldInterfaceTypes(yields);
+
     auto lifetimeDependenceInfo = AFD->getLifetimeDependencies();
 
     // (Args...) -> Result
@@ -2591,6 +2792,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
         if (fd->hasSendingResult())
           infoBuilder = infoBuilder.withSendingResult();
+        infoBuilder = infoBuilder.withCoroutine(fd->isCoroutine());
       }
 
       // Lifetime dependencies only apply to the outer function type for
@@ -2603,9 +2805,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
-        funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
+        funcTy = GenericFunctionType::get(sig, argTy, yields, resultTy, info);
       } else {
-        funcTy = FunctionType::get(argTy, resultTy, info);
+        funcTy = FunctionType::get(argTy, yields, resultTy, info);
       }
     }
 
@@ -2626,9 +2828,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
-        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy, selfInfo);
+        funcTy = GenericFunctionType::get(sig, {selfParam}, /* yields */ {},
+                                          funcTy, selfInfo);
       } else {
-        funcTy = FunctionType::get({selfParam}, funcTy, selfInfo);
+        funcTy =
+            FunctionType::get({selfParam}, /* yields */ {}, funcTy, selfInfo);
       }
     }
 
@@ -2654,9 +2858,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     auto info = infoBuilder.build();
     if (auto sig = SD->getGenericSignature()) {
-      funcTy = GenericFunctionType::get(sig, argTy, elementTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, /* yields */ {}, elementTy,
+                                        info);
     } else {
-      funcTy = FunctionType::get(argTy, elementTy, info);
+      funcTy = FunctionType::get(argTy, /* yields */ {}, elementTy, info);
     }
 
     return funcTy;
@@ -2679,7 +2884,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      resultTy = FunctionType::get(argTy, resultTy, info);
+      resultTy = FunctionType::get(argTy, /* yields */ {}, resultTy, info);
     }
 
     auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
@@ -2691,8 +2896,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy,
-                                          infoBuilder.build());
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, /* yields */ {},
+                                          resultTy, infoBuilder.build());
 
     } else {
       FunctionType::ExtInfoBuilder infoBuilder;
@@ -2700,7 +2905,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = FunctionType::get({selfTy}, resultTy, infoBuilder.build());
+      resultTy = FunctionType::get({selfTy}, /* yields */ {}, resultTy,
+                                   infoBuilder.build());
     }
 
     return resultTy;
@@ -2717,11 +2923,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     if (auto genericSig = macro->getGenericSignature()) {
       GenericFunctionType::ExtInfo info;
-      return GenericFunctionType::get(
-          genericSig, paramTypes, resultType, info);
+      return GenericFunctionType::get(genericSig, paramTypes, /* yields */ {},
+                                      resultType, info);
     } else {
       FunctionType::ExtInfo info;
-      return FunctionType::get(paramTypes, resultType, info);
+      return FunctionType::get(paramTypes, /* yields */ {}, resultType, info);
     }
   }
   }
@@ -3218,9 +3424,115 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   }
 }
 
+/// Give \p decl the dependencies of the declaration \p source that it forwards
+/// to. A member operator becomes a static function that takes 'self' as its
+/// leading parameter, which shifts the source's dependence indices; every other
+/// forwarding declaration has the same shape as its source.
+static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+forwardLifetimeDependencies(Evaluator &evaluator, ValueDecl *decl,
+                            ValueDecl *source) {
+  auto dependencies = evaluateOrDefault(
+      evaluator, LifetimeDependenceInfoRequest{source}, std::nullopt);
+  if (!dependencies)
+    return std::nullopt;
+
+  auto *forwarding = dyn_cast<AbstractFunctionDecl>(decl);
+  auto *forwarded = dyn_cast<AbstractFunctionDecl>(source);
+  if (!forwarding || !forwarded ||
+      forwarding->hasSelfInLifetimeDependenceIndices() ==
+          forwarded->hasSelfInLifetimeDependenceIndices())
+    return dependencies;
+
+  // 'self' is now the first parameter, so the source's parameters shift up by
+  // one. The result index does not move: the source's parameters plus 'self' is
+  // this declaration's parameter count.
+  unsigned selfIndex = forwarded->getParameters()->size();
+  ASSERT(forwarding->getParameters()->size() == selfIndex + 1 &&
+         "a forwarding declaration that takes 'self' as its first parameter "
+         "must otherwise have the source's parameters");
+  auto mapIndex = [selfIndex](unsigned index) -> unsigned {
+    if (index == selfIndex)
+      return 0;
+    return index < selfIndex ? index + 1 : index;
+  };
+
+  auto &ctx = decl->getASTContext();
+  unsigned indexCount = forwarding->getLifetimeDependenceResultIndex();
+  auto mapIndices = [&](IndexSubset *indices) -> IndexSubset * {
+    if (!indices)
+      return nullptr;
+    SmallBitVector mapped(indexCount);
+    for (unsigned index : indices->getIndices())
+      mapped.set(mapIndex(index));
+    return IndexSubset::get(ctx, mapped);
+  };
+
+  SmallVector<LifetimeDependenceInfo, 1> mappedDependencies;
+  for (auto &dependence : *dependencies)
+    mappedDependencies.emplace_back(
+        mapIndices(dependence.getInheritIndices()),
+        mapIndices(dependence.getScopeIndices()),
+        mapIndex(dependence.getTargetIndex()),
+        mapIndices(dependence.getAddressableIndices()),
+        mapIndices(dependence.getConditionallyAddressableIndices()),
+        dependence.getFlags());
+  return ctx.AllocateCopy(mappedDependencies);
+}
+
+/// Whether a written type has a `@_scoped` attribute anywhere within it.
+static bool hasScopedAttr(TypeRepr *repr) {
+  return repr && repr->findIf([](TypeRepr *repr) {
+    return repr->findAttrLoc(TypeAttrKind::Scoped).isValid();
+  });
+}
+
+/// Whether a parameter or result type in the function's signature has a
+/// `@_scoped` attribute.
+static bool hasScopedAttrInSignature(AbstractFunctionDecl *afd) {
+  for (auto *param : *afd->getParameters())
+    if (hasScopedAttr(param->getTypeRepr()))
+      return true;
+  if (auto *func = dyn_cast<FuncDecl>(afd))
+    return hasScopedAttr(func->getResultTypeRepr());
+  return false;
+}
+
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
                                         ValueDecl *decl) const {
+  // TODO: Translate lifetime dependencies into scope restrictions and stop
+  // using them, instead of dropping them here to avoid conflicts. Until then
+  // this leads to accepting invalid code when using both features.
+  // FIXME: This won't detect fully elided scopes...
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (hasScopedAttrInSignature(afd)) {
+        // Without a lifetime dependence, nothing restricts the result.
+        // FIXME: Diagnose the result of an initializer of a non-escapable type.
+        auto *func = dyn_cast<FuncDecl>(afd);
+        if (func && !hasScopedAttr(func->getResultTypeRepr()) &&
+            hasScopeUnsaturatedType(func->getResultInterfaceType()))
+          decl->getASTContext().Diags.diagnose(
+              func->getResultTypeRepr()->getLoc(), diag::scoped_elided_result);
+        return std::nullopt;
+      }
+    }
+  }
+
+  // A declaration the C++ importer synthesized around another one -- a member
+  // cloned into a derived class, an accessor, an operator function -- hands back
+  // the value that declaration produces, so it depends on the same things. Only
+  // the original carries the C++ annotations, so inferring dependencies here
+  // instead would give a different, and possibly wider, answer.
+  if (auto *loader = decl->getASTContext().getClangModuleLoader()) {
+    if (auto *source = loader->getForwardingSource(decl)) {
+      // The source may have nothing to forward even when this declaration needs
+      // a dependency: an accessor unwraps a pointer, so its ~Escapable result
+      // comes from a source that returns an Escapable one. Infer as usual then.
+      if (auto forwarded = forwardLifetimeDependencies(evaluator, decl, source))
+        return forwarded;
+    }
+  }
   return LifetimeDependenceInfo::get(decl);
 }
 

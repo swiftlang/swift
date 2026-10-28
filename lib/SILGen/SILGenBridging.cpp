@@ -872,7 +872,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   SILValue indirectResult;
   if (funcTy->getNumResults() != 0) {
     auto result = funcTy->getSingleResult();
-    if (result.getConvention() == ResultConvention::Indirect) {
+    // A formally indirect result only occupies an indirect SIL argument in
+    // lowered-address mode; with opaque values it is returned as a value.
+    if (fnConv.isSILIndirect(result)) {
       SILType resultTy =
           fnConv.getSILType(result, SGF.getTypeExpansionContext());
       indirectResult = entry->createFunctionArgument(resultTy);
@@ -1063,9 +1065,12 @@ static ManagedValue emitCBridgedToNativeValue(
       return ManagedValue();
     auto record = dyn_cast_or_null<clang::CXXRecordDecl>(
         bridgedType->castTo<StructType>()->getDecl()->getClangDecl());
-    if (record && Lowering::getBridgedSmartPtr(AbstractionPattern(
-                      bridgedType, record->getTypeForDecl()))) {
-      return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+    if (record) {
+      auto recordTy = record->getASTContext().getCanonicalTagType(record);
+      if (Lowering::getBridgedSmartPtr(
+              AbstractionPattern(bridgedType, recordTy.getTypePtr()))) {
+        return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+      }
     }
     return ManagedValue();
   };
@@ -1356,7 +1361,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If arg is non-trivial and has an address type, make a +1 copy and operate
   // on that.
-  if (!lowering.isTrivial() && arg->getType().isAddress() &&
+  if (!lowering.isTrivial(&SGF.F) && arg->getType().isAddress() &&
       SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
@@ -1415,15 +1420,20 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   auto inputs = objcFnTy->getParameters();
   auto nativeInputs = swiftFnTy->getParameters();
   auto fnConv = SGF.silConv.getFunctionConventions(swiftFnTy);
-  bool nativeInputsHasImplicitIsolatedParam = false;
-  if (auto param = swiftFnTy->maybeGetIsolatedParameter())
-    nativeInputsHasImplicitIsolatedParam = param->hasOption(SILParameterInfo::ImplicitLeading);
-  assert(nativeInputs.size() - unsigned(nativeInputsHasImplicitIsolatedParam) == bridgedFormalTypes.size());
-  assert(nativeInputs.size() - unsigned(nativeInputsHasImplicitIsolatedParam) == nativeFormalTypes.size());
+  // If the native function has an implicit leading isolated parameter, the
+  // caller passes it separately, and it has no ObjC or formal counterpart.
+  // Drop it so that the remaining native inputs line up with the bridged
+  // arguments.
+  if (auto param = swiftFnTy->maybeGetIsolatedParameter();
+      param && param->hasOption(SILParameterInfo::ImplicitLeading)) {
+    assert(nativeInputs.front().hasOption(SILParameterInfo::ImplicitLeading));
+    nativeInputs = nativeInputs.drop_front();
+  }
+  assert(nativeInputs.size() == bridgedFormalTypes.size());
+  assert(nativeInputs.size() == nativeFormalTypes.size());
   assert(inputs.size() ==
            nativeInputs.size() + unsigned(foreignError.has_value())
-                               + unsigned(foreignAsync.has_value()) -
-         unsigned(nativeInputsHasImplicitIsolatedParam));
+                               + unsigned(foreignAsync.has_value()));
 
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = SGF.getSILType(inputs[i], objcFnTy);
@@ -1470,20 +1480,18 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
            + unsigned(foreignAsync.has_value())
         == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
-  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() - bool(nativeInputsHasImplicitIsolatedParam) &&
+  assert(bridgedArgs.size() == nativeInputs.size() &&
          "swift inputs don't match number of arguments?!");
   assert((foreignErrorSlot || !foreignError) &&
          "didn't find foreign error slot");
 
   // Bridge the input types.
-  assert(bridgedArgs.size() == nativeInputs.size() - bool(nativeInputsHasImplicitIsolatedParam));
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
-    unsigned nativeParamIndex = i + nativeInputsHasImplicitIsolatedParam;
     // Consider the bridged values to be "call results" since they're coming
     // from potentially nil-unsound ObjC callers.
     ManagedValue native = SGF.emitBridgedToNativeValue(
         loc, bridgedArgs[i], bridgedFormalTypes[i], nativeFormalTypes[i],
-        swiftFnTy->getParameters()[nativeParamIndex].getSILStorageType(
+        nativeInputs[i].getSILStorageType(
             SGF.SGM.M, swiftFnTy, SGF.getTypeExpansionContext()),
         SGFContext(),
         /*isCallResult*/ true);

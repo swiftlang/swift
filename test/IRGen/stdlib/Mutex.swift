@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/Mutex.swift
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-name stdlib %t/Mutex.swift | %FileCheck %t/Mutex.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -target %target-swift-6.0-abi-triple -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-name stdlib %t/Mutex.swift | %FileCheck %t/Mutex.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_RawLayout
@@ -15,6 +15,14 @@ struct GenericMutex<T>: ~Copyable {
 // CHECK: %T6stdlib12GenericMutexVyytG
 func forceGenericMutex() -> GenericMutex<Void> {
   GenericMutex(mutex: Mutex(()))
+}
+
+// Mutex<Void.Type> must reserve pointer-sized storage for its value. It used
+// to reserve none, so storing the value overwrote the lock. Check the size of
+// its storage: the existence of [n x i8] indicates a non-zero size.
+// CHECK: %T15Synchronization5_CellVyytmG = type <{ [{{[1-9][0-9]*}} x i8] }>
+public struct VoidMetatypeMutex: ~Copyable {
+  public let mutex: Mutex<Void.Type>
 }
 
 final class Awaitable<Value, Failure>: Sendable where Value: Sendable, Failure: Error {

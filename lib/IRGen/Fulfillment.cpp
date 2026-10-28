@@ -24,7 +24,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -91,12 +90,6 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Struct:
     return !cast<NominalType>(type)->getDecl()->isGenericContext();
 
-  // Bound generic types have type arguments.
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-    return false;
-
   // Functions have component types.
   case TypeKind::Function:
   case TypeKind::GenericFunction:  // included for future-proofing
@@ -123,12 +116,37 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Integer:
     return true;
 
-  // Hidden types are leaves.
-  case TypeKind::Hidden:
-    return true;
   }
   llvm_unreachable("bad type kind");
 }
+
+namespace {
+/// RAII guard used to detect infinite recursion in searching through
+/// superclass bounds as a superclass bound can be self-referential
+/// (e.g. `protocol Q: Base<Self>`).
+class SuperclassBoundGuard {
+  llvm::SmallPtrSetImpl<TypeBase *> &InProgress;
+  TypeBase *Type;
+  bool Inserted;
+
+public:
+  SuperclassBoundGuard(llvm::SmallPtrSetImpl<TypeBase *> &inProgress,
+                       CanType type)
+      : InProgress(inProgress), Type(type.getPointer()),
+        Inserted(inProgress.insert(Type).second) {}
+
+  ~SuperclassBoundGuard() {
+    if (Inserted)
+      InProgress.erase(Type);
+  }
+
+  // true means the type was not already being expanded and safe to recurse.
+  explicit operator bool() const { return Inserted; }
+
+  SuperclassBoundGuard(const SuperclassBoundGuard &) = delete;
+  SuperclassBoundGuard &operator=(const SuperclassBoundGuard &) = delete;
+};
+} // end anonymous namespace
 
 /// Given that we have a source for metadata of the given type, check
 /// to see if it fulfills anything.
@@ -153,9 +171,14 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
 
     // Consider its super class bound.
     if (metadataState == MetadataState::Complete) {
-      if (auto superclassTy = keys.getSuperclassBound(type)) {
-        hadFulfillment |= searchNominalTypeMetadata(
-            IGM, superclassTy, metadataState, source, std::move(path), keys);
+      SuperclassBoundGuard guard(SuperclassBoundsInProgress, type);
+      if (guard) {
+        if (auto superclassTy = keys.getSuperclassBound(type)) {
+          // Copy not move the path as above as path is still used below.
+          hadFulfillment |= searchNominalTypeMetadata(
+              IGM, superclassTy, metadataState, source, MetadataPath(path),
+              keys);
+        }
       }
     }
 
@@ -169,15 +192,19 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   // is complete.
   if (metadataState == MetadataState::Complete &&
       keys.isInterestingType(type)) {
-    if (auto superclassTy = keys.getSuperclassBound(type)) {
-      return searchNominalTypeMetadata(IGM, superclassTy, metadataState,
-                                       source, std::move(path), keys);
+    SuperclassBoundGuard guard(SuperclassBoundsInProgress, type);
+    if (guard) {
+      if (auto superclassTy = keys.getSuperclassBound(type)) {
+        // Safe to move 'path': this is a tail call, so there's no later use.
+        return searchNominalTypeMetadata(IGM, superclassTy, metadataState,
+                                         source, std::move(path), keys);
+      }
     }
   }
 
   // Inexact metadata will be a problem if we ever try to use this
   // to remember that we already have the metadata for something.
-  if (isa<NominalType>(type) || isa<BoundGenericType>(type)) {
+  if (isa<NominalType>(type)) {
     return searchNominalTypeMetadata(IGM, type, metadataState,
                                      source, std::move(path), keys);
   }

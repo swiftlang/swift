@@ -175,7 +175,7 @@ bb0:
 // All trivial arguments.  No partial apply arguments.  No apply arguments.  Return partial apply.
 // CHECK-LABEL: sil hidden @trivial_nocapture_noargs_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
 // CHECK: [[FUNCTION_REF:%.*]] = function_ref @constant_zero
-// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = thin_to_thick_function [[FUNCTION_REF]] :
 // CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]()
 // CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed () -> MyInt)
 // CHECK: return [[TUPLE_RESULT]]
@@ -217,7 +217,7 @@ bb0:
 // All trivial arguments.  No partial apply arguments.  Apply arguments.  Return partial apply.
 // CHECK-LABEL: sil hidden @trivial_nocapture_args_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
 // CHECK: [[FUNCTION_REF:%.*]] = function_ref @identity_int
-// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = thin_to_thick_function [[FUNCTION_REF]] :
 // CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]({{%.*}})
 // CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed (MyInt) -> MyInt)
 // CHECK: return [[TUPLE_RESULT]]
@@ -592,7 +592,7 @@ bb0:
 // All trivial arguments.  No partial apply arguments.  No apply arguments.  Return partial apply.  OSSA.
 // CHECK-LABEL: sil [ossa] @trivial_nocapture_noargs_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
 // CHECK: [[FUNCTION_REF:%.*]] = function_ref @constant_zero
-// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = thin_to_thick_function [[FUNCTION_REF]] :
 // CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]()
 // CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed () -> MyInt)
 // CHECK: return [[TUPLE_RESULT]]
@@ -628,7 +628,7 @@ bb0:
 // All trivial arguments.  No partial apply arguments.  Apply arguments.  Return partial apply.  OSSA.
 // CHECK-LABEL: sil [ossa] @trivial_nocapture_args_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
 // CHECK: [[FUNCTION_REF:%.*]] = function_ref @identity_int
-// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = thin_to_thick_function [[FUNCTION_REF]] :
 // CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]({{%.*}})
 // CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed (MyInt) -> MyInt)
 // CHECK: return [[TUPLE_RESULT]]

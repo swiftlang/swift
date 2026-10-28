@@ -31,7 +31,7 @@ namespace importer {
 /// This function does not instantiate any templates and does not modify the AST
 /// in any way.
 std::string printClassTemplateSpecializationName(
-    const clang::ClassTemplateSpecializationDecl *decl, ASTContext &swiftCtx,
+    const clang::ClassTemplateSpecializationDecl *decl,
     NameImporter *nameImporter, ImportNameVersion version);
 
 } // namespace importer

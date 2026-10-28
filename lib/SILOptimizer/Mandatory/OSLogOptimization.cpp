@@ -78,13 +78,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/OptimizationMode.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -102,10 +99,8 @@
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
-#include "llvm/ADT/MapVector.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -243,7 +238,7 @@ static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   if (silType.is<BuiltinIntegerType>()) {
     return true;
   }
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = silType.getNominalDecl();
   return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
 }
 
@@ -638,7 +633,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
   case SymbolicValue::Aggregate: {
     // Support only stdlib integer or bool structs.
-    StructDecl *structDecl = expectedType->getStructOrBoundGenericStruct();
+    StructDecl *structDecl = expectedType->getStructDecl();
     assert(structDecl);
     assert(isStdlibIntegerOrBoolDecl(structDecl, astContext));
     assert(symVal.getAggregateType()->isEqual(expectedType) &&
@@ -742,8 +737,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
       // Convert to the expected type if necessary.
       if (expectedFnType != resultType) {
         auto convert = builder.createConvertFunction(
-            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType),
-            false);
+            loc, resultVal, SILType::getPrimitiveObjectType(expectedFnType));
         return convert;
       }
     }
@@ -994,7 +988,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   // Check if every property of the OSLogInterpolation instance has a constant
   // value.
   SILType osLogMessageType = osLogMessage->getType();
-  StructDecl *structDecl = osLogMessageType.getStructOrBoundGenericStruct();
+  StructDecl *structDecl = osLogMessageType.getStructDecl();
   assert(structDecl);
 
   auto typeExpansionContext =
@@ -1003,7 +997,7 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   SILType osLogInterpolationType = osLogMessageType.getFieldType(
       interpolationPropDecl, module, typeExpansionContext);
   StructDecl *interpolationStruct =
-      osLogInterpolationType.getStructOrBoundGenericStruct();
+      osLogInterpolationType.getStructDecl();
   assert(interpolationStruct);
 
   auto propertyDecls = interpolationStruct->getStoredProperties();

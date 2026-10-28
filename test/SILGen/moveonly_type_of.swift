@@ -14,6 +14,7 @@ protocol P: ~Copyable {}
 // CHECK-NOT:     copy_addr
 // CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[V]]
 // CHECK-NEXT:    [[META:%.*]] = value_metatype $@thick T.Type, [[MARK]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[META]]
 // CHECK:       } // end sil function '$s7type_of16genericBorrowingyxmxRi_zlF'
 func genericBorrowing<T: ~Copyable>(_ v: borrowing T) -> T.Type {
@@ -43,6 +44,7 @@ func genericConsuming<T: ~Copyable>(_ v: consuming T) -> T.Type {
 // CHECK-NOT:     copy_addr
 // CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[B]]
 // CHECK-NEXT:    [[META:%.*]] = existential_metatype $@thick any (P & ~Copyable).Type, [[MARK]]
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:    return [[META]]
 // CHECK:       } // end sil function '$s7type_of20existentialBorrowingyAA1P_pRi_s_XPXpAaC_pRi_s_XPF'
 func existentialBorrowing(

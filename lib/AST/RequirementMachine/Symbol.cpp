@@ -14,10 +14,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <vector>
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -32,10 +29,14 @@ const StringRef Symbol::Kinds[] = {
   "generic",
   "name",
   "shape",
+  "pack_element",
   "layout",
   "super",
   "concrete"
 };
+
+static_assert(static_cast<unsigned>(Symbol::Kind::ConcreteType) + 1 == Symbol::NumKinds);
+static_assert(sizeof(Symbol::Kinds) / sizeof(Symbol::Kinds[0]) == Symbol::NumKinds);
 
 /// Symbols are uniqued and immutable, stored as a single pointer;
 /// the Storage type is the allocated backing storage.
@@ -207,8 +208,8 @@ Symbol Symbol::forName(Identifier name,
   id.AddInteger(unsigned(Kind::Name));
   id.AddPointer(name.get());
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
@@ -221,7 +222,7 @@ Symbol Symbol::forName(Identifier name,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::Name));
 
   return symbol;
@@ -236,8 +237,8 @@ Symbol Symbol::forProtocol(const ProtocolDecl *proto,
   id.AddInteger(unsigned(Kind::Protocol));
   id.AddPointer(proto);
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
@@ -250,7 +251,7 @@ Symbol Symbol::forProtocol(const ProtocolDecl *proto,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::Protocol));
 
   return symbol;
@@ -265,8 +266,8 @@ Symbol Symbol::forAssociatedType(const ProtocolDecl *proto,
   id.AddPointer(proto);
   id.AddPointer(name.get());
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
@@ -279,7 +280,7 @@ Symbol Symbol::forAssociatedType(const ProtocolDecl *proto,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::AssociatedType));
 
   return symbol;
@@ -296,8 +297,8 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
   id.AddInteger(unsigned(Kind::GenericParam));
   id.AddPointer(param);
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
@@ -310,7 +311,7 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::GenericParam));
 
   return symbol;
@@ -343,8 +344,8 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
   id.AddInteger(unsigned(Kind::Layout));
   id.AddPointer(layout.getPointer());
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
@@ -357,7 +358,7 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::Layout));
 
   return symbol;
@@ -366,7 +367,7 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
 /// Creates a superclass symbol, representing a superclass constraint.
 Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
                              RewriteContext &ctx) {
-  ASSERT(type.getClassOrBoundGenericClass() != nullptr);
+  ASSERT(type.getClassDecl() != nullptr);
 
   llvm::FoldingSetNodeID id;
   id.AddInteger(unsigned(Kind::Superclass));
@@ -376,8 +377,8 @@ Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
   for (auto substitution : substitutions)
     id.AddPointer(substitution.getOpaquePointer());
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
@@ -391,7 +392,7 @@ Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::Superclass));
 
   return symbol;
@@ -407,8 +408,8 @@ Symbol Symbol::forConcreteType(CanType type, ArrayRef<Term> substitutions,
   for (auto substitution : substitutions)
     id.AddPointer(substitution.getOpaquePointer());
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
@@ -422,7 +423,7 @@ Symbol Symbol::forConcreteType(CanType type, ArrayRef<Term> substitutions,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::ConcreteType));
 
   return symbol;
@@ -441,8 +442,8 @@ Symbol Symbol::forConcreteConformance(CanType type,
   for (auto substitution : substitutions)
     id.AddPointer(substitution.getOpaquePointer());
 
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  llvm::FoldingSetInsertToken insertToken;
+  if (auto *symbol = ctx.Symbols.lookup(id, insertToken))
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
@@ -456,7 +457,7 @@ Symbol Symbol::forConcreteConformance(CanType type,
     ASSERT(id == newID);
   }
 
-  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.Symbols.insert(symbol, insertToken);
   ctx.SymbolHistogram.add(unsigned(Kind::ConcreteConformance));
 
   return symbol;

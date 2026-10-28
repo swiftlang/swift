@@ -27,7 +27,7 @@
 // RUN:   -Rmacro-loading -verify-ignore-unknown \
 // RUN:   -module-name MyApp \
 // RUN:   %s \
-// RUN:   2>&1 | tee %t/macro-expansions.txt
+// RUN:   2>&1 | grep "^[<-][->]" | tee %t/macro-expansions.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
@@ -47,7 +47,7 @@
 // RUN:   -Rmacro-loading -verify-ignore-unknown \
 // RUN:   -module-name MyApp \
 // RUN:   %s \
-// RUN:   2>&1 | tee %t/macro-expansions-2.txt
+// RUN:   2>&1 | grep "^[<-][->]" | tee %t/macro-expansions-2.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions-2.txt
 

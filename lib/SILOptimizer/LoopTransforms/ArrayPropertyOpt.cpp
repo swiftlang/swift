@@ -53,8 +53,6 @@
 #define DEBUG_TYPE "array-property-opt"
 
 #include "ArrayOpt.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LoopInfo.h"
@@ -70,7 +68,6 @@
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -390,7 +387,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType();
-    if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
+    if (auto BGT = Ty.getAs<StructType>()) {
       // Check the array element type parameter.
       bool isClass = false;
       for (auto EltTy : BGT->getGenericArgs()) {
@@ -539,10 +536,7 @@ protected:
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SSAUp.rewriteUse(*Use);
-    }
+    SSAUp.rewriteUses(UseList);
   }
 
   void updateSSAForm() {
@@ -620,7 +614,7 @@ protected:
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
   SILType Ty = Opd->getType();
-  auto SD = Ty.getStructOrBoundGenericStruct();
+  auto SD = Ty.getStructDecl();
   auto Properties = SD->getStoredProperties();
   unsigned Counter = 0;
   for (auto *D : Properties)

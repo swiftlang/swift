@@ -431,7 +431,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
   static void Profile(llvm::FoldingSetNodeID &ID,
                       const std::vector<TypeLayoutEntry *> &entries,
-                      Alignment::int_type minimumAlignment);
+                      SILType ty, Alignment::int_type minimumAlignment);
 
   llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
   llvm::Value *size(IRGenFunction &IGF) const override;

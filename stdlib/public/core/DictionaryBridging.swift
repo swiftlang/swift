@@ -572,7 +572,7 @@ extension __CocoaDictionary {
     return result
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func mapKeyedValues<Key: Hashable, Value, T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {
@@ -689,7 +689,7 @@ extension __CocoaDictionary.Index {
   internal var age: Int32 {
     @_effects(readonly)
     get {
-      return unsafe _HashTable.age(for: storage.base.object)
+      return _HashTable.age(for: storage.base.object)
     }
   }
 }

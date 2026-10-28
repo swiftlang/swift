@@ -544,6 +544,7 @@ func dontEmitIgnoredLoadExpr(_ a: NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: ignored_use
 // CHECK-NEXT: [[RESULT:%.*]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $@thin NonTrivialStruct.Type
 
 // Test that we evaluate the force unwrap to get its side effects (a potential trap),
@@ -562,6 +563,7 @@ func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivia
 // CHECK-NEXT: unchecked_inplace_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[METATYPE]]
 
 func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> NonTrivialStruct.Type {
@@ -583,6 +585,7 @@ func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> No
 // CHECK-NEXT: unchecked_inplace_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[METATYPE]]
 
 func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStruct.Type {
@@ -605,6 +608,7 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[METATYPE]]
 
 func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivialStruct.Type {
@@ -632,6 +636,7 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[METATYPE]]
 
 func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPath<NonTrivialStruct, Int>) -> Int.Type {
@@ -659,6 +664,8 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: destroy_value [[KP]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK-NOT: destroy_value %1
+// CHECK-NEXT: end_formal_scope
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[METATYPE]]
 
 

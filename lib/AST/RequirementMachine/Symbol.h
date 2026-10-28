@@ -138,7 +138,7 @@ public:
     ConcreteType,
   };
 
-  static const unsigned NumKinds = 9;
+  static const unsigned NumKinds = 10;
 
   static const llvm::StringRef Kinds[];
 
@@ -266,14 +266,6 @@ public:
 
 namespace llvm {
   template<> struct DenseMapInfo<swift::rewriting::Symbol> {
-    static swift::rewriting::Symbol getEmptyKey() {
-      return swift::rewriting::Symbol::fromOpaquePointer(
-        llvm::DenseMapInfo<void *>::getEmptyKey());
-    }
-    static swift::rewriting::Symbol getTombstoneKey() {
-      return swift::rewriting::Symbol::fromOpaquePointer(
-        llvm::DenseMapInfo<void *>::getTombstoneKey());
-    }
     static unsigned getHashValue(swift::rewriting::Symbol Val) {
       return DenseMapInfo<void *>::getHashValue(Val.getOpaquePointer());
     }

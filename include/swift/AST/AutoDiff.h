@@ -658,29 +658,32 @@ GenericSignature getConstrainedDerivativeGenericSignature(
 /// Retrieve config from the function name of a variant of
 /// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinApplyDerivativeConfig(
-    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
-    unsigned &arity, bool &rethrows);
+bool getBuiltinApplyDerivativeConfig(StringRef operationName,
+                                     AutoDiffDerivativeFunctionKind &kind,
+                                     unsigned &arity, bool &throws,
+                                     bool &async);
 
 /// Retrieve config from the function name of a variant of
 /// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinApplyTransposeConfig(
-  StringRef operationName, unsigned &arity, bool &rethrows);
+bool getBuiltinApplyTransposeConfig(StringRef operationName, unsigned &arity,
+                                    bool &throws, bool &async);
 
 /// Retrieve config from the function name of a variant of
 /// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
 /// `Builtin.differentiableFunction_arity1_throws`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws);
+bool getBuiltinDifferentiableOrLinearFunctionConfig(StringRef operationName,
+                                                    unsigned &arity,
+                                                    bool &throws, bool &async);
 
 /// Retrieve config from the function name of a variant of
 /// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
 /// `Builtin.differentiableFunction_arity1_throws`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws);
+bool getBuiltinDifferentiableOrLinearFunctionConfig(StringRef operationName,
+                                                    unsigned &arity,
+                                                    bool &throws, bool &async);
 
 /// Returns the SIL differentiability witness generic signature given the
 /// original declaration's generic signature and the derivative generic
@@ -738,24 +741,6 @@ using swift::SILDifferentiabilityWitnessKey;
 template <typename T, typename Enable> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<AutoDiffConfig> {
-  static AutoDiffConfig getEmptyKey() {
-    auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
-    // The `derivativeGenericSignature` component must be `nullptr` so that
-    // `getHashValue` and `isEqual` do not try to call
-    // `GenericSignatureImpl::getCanonicalSignature()` on an invalid pointer.
-    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            nullptr};
-  }
-
-  static AutoDiffConfig getTombstoneKey() {
-    auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
-    // The `derivativeGenericSignature` component must be `nullptr` so that
-    // `getHashValue` and `isEqual` do not try to call
-    // `GenericSignatureImpl::getCanonicalSignature()` on an invalid pointer.
-    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            nullptr};
-  }
-
   static unsigned getHashValue(const AutoDiffConfig &Val) {
     auto canGenSig = Val.derivativeGenericSignature.getCanonicalSignature();
     unsigned combinedHash = hash_combine(
@@ -775,16 +760,6 @@ template <> struct DenseMapInfo<AutoDiffConfig> {
 };
 
 template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
-  static AutoDiffDerivativeFunctionKind getEmptyKey() {
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
-        DenseMapInfo<unsigned>::getEmptyKey());
-  }
-
-  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
-        DenseMapInfo<unsigned>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
     return DenseMapInfo<unsigned>::getHashValue(Val);
   }
@@ -806,29 +781,6 @@ template <> struct DenseMapInfo<SILAutoDiffDerivativeFunctionKey> {
            lhs.derivativeFnGenSig == rhs.derivativeFnGenSig &&
            lhs.isReabstractionThunk == rhs.isReabstractionThunk &&
            lhs.isDefaultDerivative == rhs.isDefaultDerivative;
-  }
-
-  static inline SILAutoDiffDerivativeFunctionKey getEmptyKey() {
-    return {DenseMapInfo<SILFunctionType *>::getEmptyKey(),
-            DenseMapInfo<IndexSubset *>::getEmptyKey(),
-            DenseMapInfo<IndexSubset *>::getEmptyKey(),
-            AutoDiffDerivativeFunctionKind::innerty(
-                DenseMapInfo<unsigned>::getEmptyKey()),
-            CanGenericSignature(DenseMapInfo<GenericSignature>::getEmptyKey()),
-            (bool)DenseMapInfo<unsigned>::getEmptyKey(),
-            (bool)DenseMapInfo<unsigned>::getEmptyKey()};
-  }
-
-  static inline SILAutoDiffDerivativeFunctionKey getTombstoneKey() {
-    return {
-        DenseMapInfo<SILFunctionType *>::getTombstoneKey(),
-        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
-        DenseMapInfo<IndexSubset *>::getTombstoneKey(),
-        AutoDiffDerivativeFunctionKind::innerty(
-            DenseMapInfo<unsigned>::getTombstoneKey()),
-        CanGenericSignature(DenseMapInfo<GenericSignature>::getTombstoneKey()),
-        (bool)DenseMapInfo<unsigned>::getTombstoneKey(),
-        (bool)DenseMapInfo<unsigned>::getTombstoneKey()};
   }
 
   static unsigned getHashValue(const SILAutoDiffDerivativeFunctionKey &Val) {
@@ -853,18 +805,6 @@ template <> struct DenseMapInfo<SILDifferentiabilityWitnessKey> {
            DenseMapInfo<unsigned>::isEqual(
                (unsigned)lhs.kind, (unsigned)rhs.kind) &&
            DenseMapInfo<AutoDiffConfig>::isEqual(lhs.config, rhs.config);
-  }
-
-  static inline SILDifferentiabilityWitnessKey getEmptyKey() {
-    return {DenseMapInfo<StringRef>::getEmptyKey(),
-            (DifferentiabilityKind)DenseMapInfo<unsigned>::getEmptyKey(),
-            DenseMapInfo<AutoDiffConfig>::getEmptyKey()};
-  }
-
-  static inline SILDifferentiabilityWitnessKey getTombstoneKey() {
-    return {DenseMapInfo<StringRef>::getTombstoneKey(),
-            (DifferentiabilityKind)DenseMapInfo<unsigned>::getTombstoneKey(),
-            DenseMapInfo<AutoDiffConfig>::getTombstoneKey()};
   }
 
   static unsigned getHashValue(const SILDifferentiabilityWitnessKey &val) {

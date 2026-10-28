@@ -6,5 +6,6 @@ struct School {
 }
 func testKeyPathClosureLiteralError() {
   let slist = [School(name:"AHS"), School(name:"BHS")]
-  _ = slist.sorted(by: \School.name) // expected-error {{cannot convert key path into a multi-argument function type '(School, School) throws -> Bool'}}
+  _ = slist.sorted(by: \School.name)
+  // expected-error@-1 {{cannot convert key path literal to '(School, School) throws -> Bool', expected single-parameter function type '(School) -> String'}}
 }

@@ -35,8 +35,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -50,6 +48,10 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> SILGenOwnershipForTrivial(
+    "silgen-ownership-for-trivial", llvm::cl::init(false),
+    llvm::cl::desc("Emit functions in SILGen with ownership for trivial values"));
+
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC, bool IsEmittingTopLevelCode)
     : SGM(SGM), F(F), silConv(SILAddressConventions::forFunction(F)),
@@ -60,6 +62,10 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
+
+  if (SILGenOwnershipForTrivial) {
+    F.setOwnershipForTrivialValues(true);
+  }
 
   // Populate VarDeclScopeMap.
   SourceLoc SLoc = F.getLocation().getSourceLoc();
@@ -321,9 +327,11 @@ struct MacroInfo {
 };
 }
 
+/// Return \p DC or its innermost enclosing function or closure. Closures
+/// are emitted as SIL functions of their own, with the closure as FunctionDC.
 static DeclContext *getInnermostFunctionContext(DeclContext *DC) {
   for (; DC; DC = DC->getParent())
-    if (DC->getContextKind() == DeclContextKind::AbstractFunctionDecl)
+    if (isa<AbstractFunctionDecl, AbstractClosureExpr>(DC))
       return DC;
   return nullptr;
 }
@@ -349,10 +357,10 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
-    // If the parent function of the macro expansion expression is not the
-    // current function, then the macro expanded to a closure or nested
-    // function. As far as the generated SIL is concerned this is the same as a
-    // function generated from a freestanding macro expansion.
+    // If the enclosing function or closure of the macro expansion expression
+    // is not the current function, then the macro expanded to a closure or
+    // nested function. As far as the generated SIL is concerned this is the
+    // same as a function generated from a freestanding macro expansion.
     DeclContext *MacroContext = getInnermostFunctionContext(Info.declContext);
     if (MacroContext != FunctionDC)
       Result.Freestanding = true;
@@ -702,22 +710,21 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
-    auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
+    auto getAddressValue = [&](SILValue entryValue, bool callerTakesOwnership,
                                bool forLValue) -> SILValue {
       if (SGM.M.usesOpaqueValues() && !forLValue && !isPack) {
         // In opaque values mode, addresses aren't used except by lvalues.
         auto &lowering = getTypeLowering(entryValue->getType());
         if (entryValue->getType().isAddress()) {
           // If the value is currently an address, load it, copying if needed.
-          if (lowering.isTrivial()) {
+          if (lowering.isTrivial(&F)) {
             SILValue result = lowering.emitLoad(
                 B, loc, entryValue, LoadOwnershipQualifier::Trivial);
             return result;
           }
-          if (forceCopy) {
+          if (callerTakesOwnership) {
             SILValue result =
                 lowering.emitLoadOfCopy(B, loc, entryValue, IsNotTake);
-            enterDestroyCleanup(result);
             return result;
           } else {
             auto load = B.createLoadBorrow(
@@ -727,7 +734,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           }
         } else {
           // Otherwise, just return it, copying if needed.
-          if (forceCopy && !lowering.isTrivial()) {
+          if (callerTakesOwnership && !lowering.isTrivial(&F)) {
             auto result = B.emitCopyValueOperation(loc, entryValue);
             return result;
           }
@@ -739,7 +746,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
                          valueType, TypeExpansionContext::
                                         noOpaqueTypeArchetypesSubstitution(
                                             expansion.getResilienceExpansion()))
-                     .isAddressOnly() &&
+                     .getRecursiveProperties().isAddressOnly() &&
                  !entryValue->getType().isAddress()) {
 
         assert(!isPack);
@@ -752,7 +759,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         auto &lowering = getTypeLowering(entryValue->getType());
         lowering.emitStore(B, loc, val, addr, StoreOwnershipQualifier::Init);
 
-        if (!forceCopy)
+        if (!callerTakesOwnership)
           enterDestroyCleanup(addr);
         return addr;
 
@@ -765,10 +772,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
             .getInducedPackType();
         copyPackElementsToTuple(loc, addr, entryValue, formalPackType);
 
-        if (!forceCopy)
+        if (!callerTakesOwnership)
           enterDestroyCleanup(addr);
         return addr;
-      } else if (forceCopy) {
+      } else if (callerTakesOwnership) {
         // We cannot pass a valid SILDebugVariable while creating the temp here
         // See rdar://60425582
         auto addr = B.createAllocStack(loc, entryValue->getType().getObjectType());
@@ -844,7 +851,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::Consuming: {
       assert(!isPack);
       assert(val->getType().isAddress() &&
-             "@called(once) values are bound as local boxed storage");
+             "at-most-once values are bound as local boxed storage");
 
       auto &tl = getTypeLowering(valueType);
 
@@ -867,19 +874,19 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (canGuarantee) {
         // No-escaping stored declarations are captured as the
         // address of the value.
-        auto addr =
-            getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/false);
+        auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
+                                    /*forLValue=*/false);
         capturedArgs.push_back(
             addr->getOwnershipKind() == OwnershipKind::Owned
                 ? ManagedValue::forOwnedRValue(addr, CleanupHandle::invalid())
                 : ManagedValue::forBorrowedRValue(addr));
       } else {
-        auto addr =
-            getAddressValue(val, /*forceCopy=*/true, /*forLValue=*/false);
+        auto addr = getAddressValue(val, /*callerTakesOwnership=*/true,
+                                    /*forLValue=*/false);
         if (!useLoweredAddresses()) {
           auto &lowering = getTypeLowering(addr->getType());
           auto rvalue =
-              lowering.isTrivial()
+              lowering.isTrivial(&F)
                   ? ManagedValue::forObjectRValueWithoutOwnership(addr)
                   : ManagedValue::forOwnedRValue(addr,
                                                  CleanupHandle::invalid());
@@ -898,7 +905,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::StorageAddress: {
       assert(!isPack);
 
-      auto addr = getAddressValue(val, /*forceCopy=*/false, /*forLValue=*/true);
+      auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
+                                  /*forLValue=*/true);
 
       // No-escaping stored declarations are captured as the
       // address of the value.
@@ -1109,24 +1117,24 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
-    // A `@called(once)` closure value's callee convention must be
-    // `Direct_Owned` to match DefaultCalledOnceConventions, or the
-    // ABI-difference check treats it as needing a reabstraction thunk
-    // (which then fails: thunks are always Thin, and Thin + CalledOnce
-    // is an invalid combination).
-    auto calleeConvention = typeContext.ExpectedLoweredType->isCalledOnce()
-                                ? ParameterConvention::Direct_Owned
-                                : ParameterConvention::Direct_Guaranteed;
+    // An at-most-once closure value's callee convention must be
+    // `Direct_Owned` to match DefaultCalledAtMostOnceSemanticsConventions, or
+    // the ABI-difference check treats it as needing a reabstraction thunk
+    // (which then fails: thunks are always Thin, and a Thin function can't
+    // have execution semantics).
+    auto calleeConvention =
+        typeContext.ExpectedLoweredType->hasCalledAtMostOnceSemantics()
+            ? ParameterConvention::Direct_Owned
+            : ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
                             : SILFunctionTypeIsolation::forUnknown());
-    auto toClosure =
-      B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention, resultIsolation,
-                           PartialApplyInst::OnStackKind::NotOnStack,
-                           StackAllocationIsNested, nullptr,
-                           typeContext.ExpectedLoweredType->isCalledOnce());
+    auto toClosure = B.createPartialApply(
+        loc, functionRef, subs, forwardedArgs, calleeConvention,
+        resultIsolation, PartialApplyInst::OnStackKind::NotOnStack,
+        StackAllocationIsNested, nullptr,
+        typeContext.ExpectedLoweredType->getExecutionSemantics());
     result = emitManagedRValueWithCleanup(toClosure);
   }
 
@@ -1175,10 +1183,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(fd,
-                  fd->getResultInterfaceType(),
-                  fd->getEffectiveThrownErrorType(),
-                  CleanupLocation(fd));
+    prepareEpilog(fd, fd->getResultInterfaceType(),
+                  fd->getEffectiveThrownErrorType(), CleanupLocation(fd));
 
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
@@ -1870,7 +1876,7 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
   // This is a loop because we want to handle types that wrap integer types,
   // like ObjCBool (which may be Bool or Int8).
   while (!value->getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    auto structDecl = value->getType().getStructDecl();
     assert(structDecl && "value for error result wasn't of struct type!");
     assert(structDecl->getStoredProperties().size() == 1);
     auto property = structDecl->getStoredProperties()[0];
@@ -1890,7 +1896,7 @@ SILValue SILGenFunction::emitWrapIntegerLiteral(SILLocation loc,
   
   // Or wrap a value in a struct, potentially multiple times to handle types
   // that wrap integer types like ObjCBool (which may be Bool or Int8).
-  auto structDecl = ty.getStructOrBoundGenericStruct();
+  auto structDecl = ty.getStructDecl();
   assert(structDecl && "value for error result wasn't of struct type!");
   assert(structDecl->getStoredProperties().size() == 1);
   auto property = structDecl->getStoredProperties()[0];
@@ -2007,7 +2013,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   auto metatypeTy = MetatypeType::get(selfTy);
 
   SILValue selfMetatype;
-  if (selfTy->getClassOrBoundGenericClass()) {
+  if (selfTy->getClassDecl()) {
     selfMetatype = B.createValueMetatype(loc, getLoweredType(metatypeTy),
                                          selfValue).getValue();
   } else {
@@ -2087,4 +2093,12 @@ SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
     }
     return &found;
   } while (true);
+}
+
+bool SILGenFunction::usingWrapperTypeImplicitCopyEnforcement() {
+  // If we're relying on ManualOwnership or LifetimeResolution for
+  // explicit-copies enforcement, we don't need the MoveOnlyWrapper.
+  // Just the @noImplicitCopy flag on the binding is enough.
+  return !(B.hasManualOwnershipAttr() ||
+           getASTContext().SILOpts.EnableLifetimeResolution);
 }

@@ -32,11 +32,11 @@
 
 #include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
@@ -45,7 +45,6 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -854,6 +853,30 @@ static bool couldRemoveRelease(SILBasicBlock *SrcBB, SILValue SrcV,
   return IsReleaseOfDest;
 }
 
+/// Returns true if the condition of \p condBr is computed from \p arg, only
+/// considering instructions in the block of \p condBr.
+/// Only then, substituting a constant for \p arg has a chance to fold the
+/// cond_br after jump threading.
+static bool conditionDependsOnArgument(CondBranchInst *condBr,
+                                       SILArgument *arg) {
+  SILBasicBlock *block = condBr->getParent();
+  ValueWorklist worklist(condBr->getCondition());
+  unsigned numVisitedInsts = 0;
+  while (SILValue v = worklist.pop()) {
+    if (v == arg)
+      return true;
+    auto *inst = v->getDefiningInstruction();
+    if (!inst || inst->getParent() != block)
+      continue;
+    // Avoid compile time problems for corner cases of very large blocks.
+    if (++numVisitedInsts > 16)
+      return false;
+    for (SILValue op : inst->getOperandValues())
+      worklist.pushIfNotVisited(op);
+  }
+  return false;
+}
+
 /// Returns true if any instruction in \p block may write memory.
 static bool blockMayWriteMemory(SILBasicBlock *block) {
   for (auto instAndIdx : llvm::enumerate(*block)) {
@@ -947,9 +970,14 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   }
 
   if (ThreadingBudget == 0) {
-    if (isa<CondBranchInst>(destTerminator)) {
-      for (auto V : BI->getArgs()) {
-        if (isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) {
+    if (auto *condBr = dyn_cast<CondBranchInst>(destTerminator)) {
+      for (unsigned i : indices(BI->getArgs())) {
+        SILValue V = BI->getArg(i);
+        // Jump threading a literal is only worth it if it can simplify the
+        // branch condition. Otherwise we would just duplicate code, which can
+        // lead to exponential code growth for chains of diamond-shaped CFGs.
+        if ((isa<IntegerLiteralInst>(V) || isa<FloatLiteralInst>(V)) &&
+            conditionDependsOnArgument(condBr, DestBB->getArgument(i))) {
           ThreadingBudget = 4;
           break;
         }
@@ -1616,7 +1644,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // select_enum with the first case and swap our operands. This simplifies
   // later dominance based processing.
   if (auto *SEI = dyn_cast<SelectEnumInst>(BI->getCondition())) {
-    EnumDecl *E = SEI->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
+    EnumDecl *E = SEI->getEnumOperand()->getType().getEnumDecl();
 
     auto AllElts = E->getAllElements();
     auto Iter = AllElts.begin();
@@ -1877,7 +1905,7 @@ static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
     if (auto *refCast = dyn_cast<UncheckedRefCastInst>(inst)) {
       // An unchecked_ref_cast on a safe objc_method apply behaves like the
       // optional (it is null if the optional was null).
-      if (refCast->getType().getClassOrBoundGenericClass() &&
+      if (refCast->getType().getClassDecl() &&
           std::find(objCApplies.begin(), objCApplies.end(),
                     refCast->getOperand()) != objCApplies.end())
         optionalPayloads.push_back(refCast);
@@ -2065,7 +2093,7 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
   auto optional = SEI->getOperand();
   auto optionalPayloadType = optional->getType().getOptionalObjectType();
   if (!optionalPayloadType ||
-      !optionalPayloadType.getClassOrBoundGenericClass())
+      !optionalPayloadType.getClassDecl())
     return false;
 
   if (SEI->getNumCases() != 2)
@@ -3073,7 +3101,7 @@ bool ArgumentSplitter::createNewArguments() {
 
   // Only handle struct and tuple type.
   SILType Ty = Arg->getType();
-  if (!Ty.getStructOrBoundGenericStruct() && !Ty.is<TupleType>())
+  if (!Ty.getStructDecl() && !Ty.is<TupleType>())
     return false;
 
   // Get the first level projection for the struct or tuple type.
@@ -3239,7 +3267,7 @@ static bool splitBBArguments(SILFunction &Fn) {
       SILType ArgTy = Arg->getType();
 
       if (!ArgTy.isObject() ||
-          (!ArgTy.is<TupleType>() && !ArgTy.getStructOrBoundGenericStruct())) {
+          (!ArgTy.is<TupleType>() && !ArgTy.getStructDecl())) {
         continue;
       }
 
@@ -3352,24 +3380,6 @@ static bool hasMandatoryArgument(TermInst *term) {
   return (!isa<BranchInst>(term) && !isa<CondBranchInst>(term));
 }
 
-
-// Get the element of Aggregate corresponding to the one extracted by
-// Extract.
-static SILValue getInsertedValue(SILInstruction *Aggregate,
-                                 SILInstruction *Extract) {
-  if (auto *Struct = dyn_cast<StructInst>(Aggregate)) {
-    auto *SEI = cast<StructExtractInst>(Extract);
-    return Struct->getFieldValue(SEI->getField());
-  }
-  if (auto *Enum = dyn_cast<EnumInst>(Aggregate)) {
-    assert(Enum->getElement() ==
-           cast<UncheckedEnumDataInst>(Extract)->getElement());
-    return Enum->getOperand();
-  }
-  auto *Tuple = cast<TupleInst>(Aggregate);
-  auto *TEI = cast<TupleExtractInst>(Extract);
-  return Tuple->getElement(TEI->getFieldIndex());
-}
 
 /// Find a parent SwitchEnumInst of the block \p BB. The block \p BB is a
 /// predecessor of the merge-block \p PostBB which should post-dominate the
@@ -3566,7 +3576,7 @@ static bool simplifySwitchEnumToSelectEnum(SILBasicBlock *BB, unsigned ArgNum,
     // If it does, then pick one of those cases as a default.
 
     // Count the number of possible case tags for a given enum type
-    auto *Enum = SEI->getOperand()->getType().getEnumOrBoundGenericEnum();
+    auto *Enum = SEI->getOperand()->getType().getEnumDecl();
     unsigned ElemCount = 0;
     for (auto E : Enum->getAllElements()) {
       if (E)
@@ -3652,10 +3662,10 @@ static FunctionTest SimplifyCFGSimplifyBlockArgs(
     });
 } // end namespace swift::test
 
-// Attempt to simplify the ith argument of BB.  We simplify cases
-// where there is a single use of the argument that is an extract from
-// a struct, tuple or enum and where the predecessors all build the struct,
-// tuple or enum and pass it directly.
+// Attempt to simplify the ith argument of BB.
+//
+// Note: "unwrapping" of a struct, tuple or enum argument is implemented in
+// Swift - see `Phi.unwrapAggregate` in SimplifyPhiArgument.swift.
 bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   auto *A = BB->getArgument(i);
 
@@ -3665,84 +3675,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   if (!DT && A->getType().is<BuiltinIntegerType>())
     return simplifySwitchEnumToSelectEnum(BB, i, A);
 
-  // For now, just focus on cases where there is a single use.
-  SILValue argVal = lookThroughBorrowedFromUser(A);
-  if (!argVal->hasOneUse())
-    return false;
-
-  auto *Use = *argVal->use_begin();
-  auto *User = Use->getUser();
-
-  auto disableInOSSA = [](SingleValueInstruction *inst) {
-    assert(isa<StructInst>(inst) || isa<TupleInst>(inst) ||
-           isa<EnumInst>(inst));
-    if (!inst->getFunction()->hasOwnership()) {
-      return false;
-    }
-    if (inst->getOwnershipKind() == OwnershipKind::Owned)
-      return !inst->getSingleUse();
-    return false;
-  };
-
-  // Handle projections.
-  if (!isa<StructExtractInst>(User) &&
-      !isa<TupleExtractInst>(User) &&
-      !isa<UncheckedEnumDataInst>(User))
-    return false;
-  auto proj = cast<SingleValueInstruction>(User);
-
-  // For now, just handle the case where all predecessors are
-  // unconditional branches.
-  for (auto *Pred : BB->getPredecessorBlocks()) {
-    if (!isa<BranchInst>(Pred->getTerminator()))
-      return false;
-    auto *Branch = cast<BranchInst>(Pred->getTerminator());
-    SILValue BranchArg = Branch->getArg(i);
-    if (!isa<StructInst>(BranchArg) && !isa<TupleInst>(BranchArg) &&
-        !isa<EnumInst>(BranchArg)) {
-      return false;
-    }
-    if (auto *EI = dyn_cast<EnumInst>(BranchArg)) {
-      if (EI->getElement() != cast<UncheckedEnumDataInst>(proj)->getElement())
-        return false;
-    }
-    if (disableInOSSA(cast<SingleValueInstruction>(BranchArg))) {
-      return false;
-    }
-  }
-
-  // Okay, we'll replace the BB arg with one with the right type, replace
-  // the uses in this block, and then rewrite the branch operands.
-  LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  if (auto *bfi = getBorrowedFromUser(A)) {
-    bfi->replaceAllUsesWith(A);
-    bfi->eraseFromParent();
-  }
-  A->replaceAllUsesWith(SILUndef::get(A));
-  auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
-                                        BB->getArgument(i)->getOwnershipKind());
-  proj->replaceAllUsesWith(NewArg);
-
-  // Rewrite the branch operand for each incoming branch.
-  for (auto *Pred : BB->getPredecessorBlocks()) {
-    if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
-      auto *BranchOpValue = cast<SingleValueInstruction>(Branch->getOperand(i));
-      auto V = getInsertedValue(cast<SingleValueInstruction>(Branch->getArg(i)),
-                                proj);
-      Branch->setOperand(i, V);
-      if (isInstructionTriviallyDead(BranchOpValue)) {
-        BranchOpValue->replaceAllUsesWithUndef();
-        BranchOpValue->eraseFromParent();
-      }
-      addToWorklist(Pred);
-    }
-  }
-
-  proj->eraseFromParent();
-
-  updateGuaranteedPhis(PM, { NewArg });
-
-  return true;
+  return false;
 }
 
 namespace swift::test {

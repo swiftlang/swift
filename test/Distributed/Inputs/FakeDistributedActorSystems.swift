@@ -582,7 +582,7 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
   let storeReturn: (any Any) -> Void
   let storeError: (any Error) -> Void
-  init(_ storeReturn: @escaping (Any) -> Void, onError storeError: @escaping (Error) -> Void) {
+  public init(_ storeReturn: @escaping (Any) -> Void, onError storeError: @escaping (Error) -> Void) {
     self.storeReturn = storeReturn
     self.storeError = storeError
   }
@@ -605,7 +605,8 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
 // ==== CustomSerializationProtocol Transport ----------------------------------
 
-public protocol CustomSerializationProtocol {
+// Suppress Copyable like "new Codable" proposal's JSONCodable does
+public protocol CustomSerializationProtocol: ~Copyable {
   func toBytes() throws -> [UInt8]
   static func fromBytes(_ bytes: [UInt8]) throws -> Self
 }

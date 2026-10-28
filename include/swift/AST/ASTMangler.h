@@ -16,7 +16,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
-#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
@@ -619,6 +618,10 @@ protected:
       Type resultType, GenericSignature sig,
       std::optional<LifetimeDependenceInfo> lifetimeDependence,
       const ValueDecl *forDecl = nullptr);
+  void appendFunctionYieldTypes(AnyFunctionType *fnType,
+                                ArrayRef<AnyFunctionType::Yield> yields,
+                                GenericSignature sig, const ValueDecl *forDecl = nullptr,
+                                bool isRecursedInto = true);
 
   void appendTypeList(Type listTy, GenericSignature sig,
                       const ValueDecl *forDecl = nullptr);

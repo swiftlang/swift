@@ -118,7 +118,7 @@ sil [ossa] @fix_lifetime_of_empty_array : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @emptyArrayStorage : $*EmptyArrayStorage
   %1 = address_to_pointer [stack_protection] %0 to $Builtin.RawPointer
-  %2 = raw_pointer_to_ref %1 to $ArrayStorage
+  %2 = raw_pointer_to_ref [immortal] %1 to $ArrayStorage
   %3 = copy_value %2
   fix_lifetime %3
   destroy_value %3

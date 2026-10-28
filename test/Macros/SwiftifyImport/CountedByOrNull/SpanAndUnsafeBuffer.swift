@@ -16,7 +16,7 @@ public func myFunc(_ ptr1: UnsafePointer<CInt>, _ len1: CInt, _ ptr2: UnsafePoin
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 public func myFunc(_ ptr1: Span<CInt>, _ ptr2: UnsafeBufferPointer<CInt>) {
     let len1 = CInt(exactly: ptr1.count)!
     let len2 = CInt(exactly: ptr2.count)!

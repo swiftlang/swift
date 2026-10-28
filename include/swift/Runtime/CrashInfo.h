@@ -52,6 +52,10 @@ struct CrashInfo {
   // The EXCEPTION_POINTERS pointer.
   uint64_t exception_info;
 #endif
+
+  // The memory address of the Task Registry in the crashed process,
+  // populated immediately before spawning the backtracer.
+  uint64_t concurrency_task_registry_addr;
 };
 
 #ifdef __linux__

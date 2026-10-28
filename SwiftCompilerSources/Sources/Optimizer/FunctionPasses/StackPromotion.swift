@@ -91,6 +91,25 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
     return false
   }
 
+  // In Embedded Swift, a weak or unowned reference must not be formed to a
+  // stack promoted object. Weak references in the Embedded runtime work by
+  // pointing to the object directly and then returning nil if the object's
+  // refcount indicates it has started the deinit process. Weak references
+  // therefore must keep the allocation alive for an arbitrary period, and stack
+  // objects can't do that.
+  //
+  // It's also not enough to prove that the weak reference's lifetime ends
+  // before the object's. The runtime can't reliably distinguish between a stack
+  // object that's live and one that's in the middle of deinit, so it refuses
+  // all weak references to stack objects.
+  //
+  // Thus, in Embedded, any weak reference to the object must block stack
+  // promotion.
+  if context.options.enableEmbeddedSwift &&
+     allocRef.isEscaping(using: FindWeakOrUnownedReference(), context) {
+    return false
+  }
+
   if deadEndBlocks.isDeadEnd(allocRef.parentBlock) {
 
     // Allocations inside a code region which ends up in a no-return block may missing their
@@ -228,6 +247,23 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
 
   allocRef.setIsStackAllocatable(context)
   return true
+}
+
+/// Detects a use which forms a weak or unowned reference to the value.
+///
+/// This can't see the case where an object's deinit makes a weak reference to
+/// `self`. That's safe, because the runtime initializes it as `nil` and it
+/// never points to an object.
+private struct FindWeakOrUnownedReference : EscapeVisitor {
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    switch operand.instruction {
+    case is StoreWeakInst, is StoreUnownedInst, is WeakCopyValueInst,
+         is UnownedCopyValueInst, is RefToUnownedInst:
+      return .abort
+    default:
+      return .continueWalk
+    }
+  }
 }
 
 private func getDominatingBlockOfAllUsePoints(context: FunctionPassContext,

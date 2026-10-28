@@ -46,7 +46,7 @@ let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(ptr captures(none) dereferenceable({{.*}}) %0, ptr %1, ptr captures(none) dereferenceable({{.*}})
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(ptr align 4 captures(none) dereferenceable({{.*}}) %0, ptr %1, ptr align {{4|8}} captures(none) dereferenceable({{.*}})
 // CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegng_SgWOe
 // CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegng_SgWOy
 // CHECK: ret void
@@ -68,7 +68,7 @@ public func f3_uses_f2() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10f3_uses_f2yyF"()
 // CHECK: call swiftcc void @"$s22big_types_corner_cases9BigStructVACycfC"(ptr noalias sret({{.*}}) captures(none)
 // CHECK: call swiftcc { ptr, ptr } @"$s22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
-// CHECK: call swiftcc void {{.*}}(ptr noalias sret({{.*}}) captures(none) {{.*}}, ptr noalias captures(none) dereferenceable({{.*}}) {{.*}}, ptr swiftself {{.*}})
+// CHECK: call swiftcc void {{.*}}(ptr noalias sret({{.*}}) captures(none) {{.*}}, ptr noalias align 4 captures(none) dereferenceable({{.*}}) {{.*}}, ptr swiftself {{.*}})
 // CHECK: ret void
 
 public func f4_tuple_use_of_f2() {
@@ -81,7 +81,7 @@ public func f4_tuple_use_of_f2() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18f4_tuple_use_of_f2yyF"()
 // CHECK: [[TUPLE:%.*]] = call swiftcc { ptr, ptr } @"$s22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
 // CHECK: [[TUPLE_EXTRACT:%.*]] = extractvalue { ptr, ptr } [[TUPLE]], 0
-// CHECK:  call swiftcc void [[TUPLE_EXTRACT]](ptr noalias sret({{.*}}) captures(none) {{.*}}, ptr noalias captures(none) dereferenceable({{.*}}) {{.*}}, ptr swiftself %{{.*}})
+// CHECK:  call swiftcc void [[TUPLE_EXTRACT]](ptr noalias sret({{.*}}) captures(none) {{.*}}, ptr noalias align 4 captures(none) dereferenceable({{.*}}) {{.*}}, ptr swiftself %{{.*}})
 // CHECK: ret void
 
 public class BigClass {
@@ -95,8 +95,8 @@ public class BigClass {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF"(ptr noalias captures(none) dereferenceable({{.*}}) %0, ptr swiftself %1)
-// CHECK: call swiftcc void {{.*}}(ptr noalias captures(none) dereferenceable({{.*}}) %0, ptr swiftself
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF"(ptr noalias align 4 captures(none) dereferenceable({{.*}}) %0, ptr swiftself %1)
+// CHECK: call swiftcc void {{.*}}(ptr noalias align 4 captures(none) dereferenceable({{.*}}) %0, ptr swiftself
 // CHECK: ret void
 
 public struct MyStruct {
@@ -134,7 +134,7 @@ public func enumCallee(_ x: LargeEnum) {
     case .Empty2: break
   }
 }
-// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10enumCalleeyyAA9LargeEnumOF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) #0 {
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10enumCalleeyyAA9LargeEnumOF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) #0 {
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
 // CHECK-64: $ss5print_9separator10terminatoryypd_S2StF
@@ -164,7 +164,7 @@ class SuperSub : SuperBase {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg"(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias swiftself captures(none) dereferenceable({{.*}}) %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg"(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias swiftself align {{4|8}} captures(none) dereferenceable({{.*}}) %1)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: [[LOAD:%.*]] = load ptr, ptr %.callInternalLet.data
 // CHECK: call swiftcc void %{{[0-9]+}}(ptr noalias sret({{.*}}) captures(none) [[ALLOC]], ptr swiftself [[LOAD]])

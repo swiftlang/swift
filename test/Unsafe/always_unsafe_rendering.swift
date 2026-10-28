@@ -35,12 +35,6 @@ TMP_DIR/test.swift:9:11: note: argument #0 in call to global function 'generic' 
 TMP_DIR/test.swift:9:3: note: reference to unsafe type 'AlwaysUnsafeType'
   generic(AlwaysUnsafeType())
   ^
-TMP_DIR/test.swift:9:11: note: argument 'self' in call to initializer 'init' has unsafe type 'AlwaysUnsafeType.Type'
-  generic(AlwaysUnsafeType())
-          ^~~~~~~~~~~~~~~~
-TMP_DIR/test.swift:9:11: note: reference to unsafe type 'AlwaysUnsafeType'
-  generic(AlwaysUnsafeType())
-          ^
 TMP_DIR/test.swift:9:11: note: reference to initializer 'init()' involves unsafe type 'AlwaysUnsafeType'
   generic(AlwaysUnsafeType())
           ^

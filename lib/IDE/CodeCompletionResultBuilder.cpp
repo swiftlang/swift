@@ -17,13 +17,12 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/Basic/Module.h"
-#include "clang/Index/USRGeneration.h"
+#include "clang/UnifiedSymbolResolution/USRGeneration.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -107,7 +106,9 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
   if (!VD)
     return;
 
-  if (!shouldCopyAssociatedUSRForDecl(VD))
+  // Avoid verifying for invalid decls since there's no way to map the USR back
+  // to the right decl.
+  if (!shouldCopyAssociatedUSRForDecl(VD) || VD->isInvalid())
     return;
 
   SmallString<128> SwiftUSR;

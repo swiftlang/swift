@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -disable-availability-checking -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-6.0-abi-triple -verify %s -o /dev/null
 
 // This test verifies that the region isolation pass correctly detects the
 // 'inout sending' return violation when using Mutex.withLock, which passes

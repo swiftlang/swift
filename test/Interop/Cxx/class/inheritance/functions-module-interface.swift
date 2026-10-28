@@ -63,7 +63,7 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: CInt) -> CInt
 // CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   @_effects(readonly) public func pure() -> CInt
+// CHECK-NEXT:   @_effects(readonly) @_addressableSelf public func pure() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func sameMethodDifferentSignature() -> CInt
 // CHECK-NEXT:   @discardableResult
@@ -93,7 +93,7 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func swiftRenamed(input i: CInt) -> CInt
 // CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   @_effects(readonly) public func pure() -> CInt
+// CHECK-NEXT:   @_effects(readonly) @_addressableSelf public func pure() -> CInt
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func sameMethodDifferentSignature() -> CInt
 // CHECK-NEXT:   @discardableResult
@@ -187,4 +187,14 @@
 // CHECK-NEXT:   public func getY() -> CInt
 // CHECK-NEXT:   public init(_ x: CInt)
 // CHECK-NOT:    public
+// CHECK:      }
+
+// Inherited methods name their unnamed parameters, which keep their argument
+// labels and default arguments.
+// CHECK:      public struct DerivedFromUnnamedParams {
+// CHECK:        public func takesUnnamed(_ __param0: CInt, _ __param1: CBool, _ __param2: UnsafeMutablePointer<CInt>!, _ __param3: NonTrivial, _ __param4: inout CInt) -> CInt
+// CHECK:        public func unnamedWithDefault(_ __param0: CInt = cxxDefaultArg) -> CInt
+// CHECK:        public func __operatorSubscriptConst(_ __param0: CInt) -> CInt
+// CHECK:        public func callAsFunction(_ __param0: CInt) -> CInt
+// CHECK:        public subscript(__param0: CInt) -> CInt { get }
 // CHECK:      }

@@ -18,7 +18,6 @@
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -26,7 +25,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -37,8 +35,6 @@
 #include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
-#include "clang/AST/DeclarationName.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
@@ -387,7 +383,7 @@ void StoreBorrowInitialization::copyOrInitValueInto(SILGenFunction &SGF,
                                                     bool isInit) {
   auto value = mv.getValue();
   auto &lowering = SGF.getTypeLowering(value->getType());
-  if (lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+  if (!lowering.isLoadableOrOpaque(SGF.F)) {
     llvm::report_fatal_error(
         "Attempting to store_borrow an address-only value!?");
   }
@@ -564,11 +560,8 @@ public:
 
     // If our instance type is not already @moveOnly wrapped, and it's a
     // no-implicit-copy parameter, wrap it.
-    //
-    // Unless the function is using ManualOwnership, which checks for
-    // no-implicit-copies using a different mechanism.
     if (!isNoImplicitCopy && instanceType->isCopyable() &&
-        !SGF.B.hasManualOwnershipAttr()) {
+        SGF.usingWrapperTypeImplicitCopyEnforcement()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -635,7 +628,7 @@ public:
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
-
+    
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
     SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(CleanupState::Dormant,
@@ -817,13 +810,13 @@ public:
       //
       // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
-          (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
+          !lowering->isLoadableOrOpaque(SGF.F) ||
               lowering->getLoweredType().isMoveOnly(/*orWrapped=*/false);
     }
 
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
-    if (lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
+    if (lowering->getRecursiveProperties().isAddressOnly() && vd->isNoImplicitCopy()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
     }
@@ -853,7 +846,7 @@ public:
     SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
       CleanupState::Dormant, vd);
     DestroyCleanup = SGF.Cleanups.getTopCleanup();
-
+    
     // If the binding has an addressable buffer forced, it should be cleaned
     // up at this scope.
     SGF.enterLocalVariableAddressableBufferScope(vd, DestroyCleanup);
@@ -1193,6 +1186,9 @@ public:
                             RefutablePatternInitInfo initInfo, SILLocation loc,
                             SILGenFunction &SGF);
 
+  bool tryInitializeFromStorageReference(SILGenFunction &SGF, Expr *initializer,
+                                         SILLocation loc) override;
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1327,7 +1323,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         if (mv.getType().isAddress()) {
           // If the enum is address-only, take from the enum we have and load it
           // if the element value is loadable.
-          assert((eltTL.isTrivial() || mv.hasCleanup()) &&
+          assert((eltTL.isTrivial(&SGF.F) || mv.hasCleanup()) &&
                  "must be able to consume value");
           mv = SGF.B.createUncheckedEnumDataAddrForTake(loc, mv, eltDecl, eltTy);
           // Load a loadable data value.
@@ -1346,7 +1342,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
           // NOTE: The APIs that we are using here will ensure that if we have
           // a trivial value, the load_borrow will become a load [trivial] and
           // the copies will be "automagically" elided.
-          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+          if (boxedTL.isLoadableOrOpaque(SGF.F)) {
             UnenforcedAccess access;
             SILValue accessAddress = access.beginAccess(
                 SGF, loc, boxedValue.getValue(), SILAccessKind::Read);
@@ -1422,6 +1418,15 @@ public:
   void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
                                ManagedValue value, bool isInit) override;
 
+  /// Emit the cast branching straight to our failure destination, without
+  /// building an intermediate Optional. Returns false if this shape isn't
+  /// supported, in which case the caller falls back to the Optional form.
+  bool tryEmitNoncopyablePatternMatch(SILGenFunction &SGF, SILLocation loc,
+                                     ManagedValue value);
+
+  bool tryInitializeFromStorageReference(SILGenFunction &SGF, Expr *initializer,
+                                         SILLocation loc) override;
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1429,12 +1434,256 @@ public:
 };
 } // end anonymous namespace
 
+/// If \p e names storage that may be consumed out of, return the storage
+/// reference to emit as an lvalue; otherwise return null.
+///
+/// A LoadExpr means Sema resolved the reference as an rvalue load out of
+/// mutable lvalue storage -- a `var` local, a `var` stored property, an
+/// `inout`/`consuming` parameter -- which is always consumable. That is the
+/// case findStorageReferenceExprForMoveOnly(..., Consume) recognizes, and it is
+/// why that helper can't be reused here: it requires the LoadExpr
+/// unconditionally, so it rejects every immutable-storage case below.
+///
+/// Immutable storage is referenced directly, with no load, and consuming it is
+/// only *sometimes* legal -- so test the declaration rather than inferring from
+/// the shape. A local `let` may be consumed; a borrowing parameter may not.
+/// Getting that wrong is not merely a missed optimization: consuming a
+/// borrowing parameter emits SIL that mutates an @in_guaranteed argument, which
+/// the SIL verifier rejects outright rather than diagnosing. So this fails
+/// closed -- anything unrecognized returns null and the caller falls back to
+/// the ordinary rvalue path, which is always correct, just unable to preserve
+/// the subject across a failed cast.
+static Expr *findConsumableStorageReference(Expr *e) {
+  Expr *semantic = e->getSemanticsProvidingExpr();
+
+  if (auto *load = dyn_cast<LoadExpr>(semantic))
+    return load->getSubExpr();
+
+  if (auto *dre = dyn_cast<DeclRefExpr>(semantic)) {
+    auto *vd = dyn_cast<VarDecl>(dre->getDecl());
+    // A global or static `let` is only ever borrowed, never consumed.
+    if (!vd || vd->isGlobalStorage())
+      return nullptr;
+    if (auto *pd = dyn_cast<ParamDecl>(vd)) {
+      switch (pd->getSpecifier()) {
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        return dre;
+      case ParamSpecifier::Default:
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        // Note that Default means *borrowing* for a noncopyable parameter.
+        return nullptr;
+      }
+      // An ownership specifier we don't know about: fail closed.
+      return nullptr;
+    }
+    // A local `let`.
+    return dre;
+  }
+
+  // A `let` stored property is deliberately *not* handled here, even though it
+  // would be a partial consume of a consumable base. Requesting an
+  // OwnedAddressConsume lvalue for an immutable member yields the member's
+  // address under a `begin_access [read]`, so the take_on_success cast would
+  // then consume out of storage covered by a read-only access. Compare how
+  // SILGen otherwise consumes such a property (`eat(h.v)`), which uses
+  // `begin_access [modify]` plus a `copy_addr [take]` into a temporary -- but
+  // that eager take is exactly what makes preserve-on-failure impossible. So
+  // this case needs the access-kind plumbing sorted out first; until then it
+  // falls back to the ordinary rvalue path and diagnoses rather than emitting
+  // SIL whose access marker contradicts what the instruction does.
+
+  return nullptr;
+}
+
+// Try to use the original storage directly rather than a copy of it.
+bool IsPatternInitialization::tryInitializeFromStorageReference(
+    SILGenFunction &SGF, Expr *initializer, SILLocation loc) {
+  if (!subInitialization.get()) {
+    // `if case is T = box` or `if case _ as T = box` bind nothing
+    // so they just need to borrow the source within a borrow scope
+    // that is closed in the continuation block.
+    if (!canUseTypeTestForIsa(SGF, pattern->getType()->getCanonicalType(),
+                              pattern->getCastType()->getCanonicalType(),
+                              pattern->getCastKind()))
+      return false;
+
+    FormalEvaluationScope borrowScope(SGF);
+    ManagedValue borrowed = emitTypeTestOperand(SGF, initializer);
+    if (!borrowed || !borrowed.getType().isAddress())
+      return false;
+    return tryEmitNoncopyablePatternMatch(SGF, loc, borrowed);
+  }
+
+  // Binding the payload consumes the subject out of its own storage so that a
+  // *failed* cast can leave it intact. That is specific to a non-`Copyable`
+  // subject; a copyable one has no reason to avoid the ordinary copy.
+  if (!pattern->getType()->isNoncopyable())
+    return false;
+
+  // Ensure we have a plain address-based value cast before emitting anything
+  if (pattern->getCastKind() != CheckedCastKind::ValueCast)
+    return false;
+
+  // Is the subject stored where we can use it directly?  If not, return
+  // false and caller will copy it.
+  Expr *storageExpr = findConsumableStorageReference(initializer);
+  if (!storageExpr)
+    return false;
+
+  // Use the subject directly (not a copy) as the cast's source operand
+  // so a failed cast can leave the original intact for later use.
+  FormalEvaluationScope scope(SGF);
+  LValue lv = SGF.emitLValue(storageExpr, SGFAccessKind::OwnedAddressConsume);
+  ManagedValue addr = SGF.emitConsumedLValue(loc, std::move(lv));
+
+  return tryEmitNoncopyablePatternMatch(SGF, loc, addr);
+}
+
+/// Emit `checked_cast_addr_br [take_on_success]` from \p srcAddr, branching to
+/// \p failureDest on failure and initializing \p subInit with the payload on
+/// success. A failed cast leaves the source untouched.
+static bool emitTakeCastAndBind(SILGenFunction &SGF, SILLocation loc,
+                                ManagedValue srcAddr, CanType sourceType,
+                                CanType targetType,
+                                Initialization *subInitialization,
+                                const RefutablePatternInitInfo &initInfo,
+                                JumpDest failureDest) {
+  auto &targetTL = SGF.getTypeLowering(targetType);
+
+  // Destination buffer for the extracted payload. Note the target may be
+  // loadable (only the source has to actually be in memory).
+  // checked_cast_addr_br writes through an address either way.
+  SILValue destAddr = SGF.emitTemporaryAllocation(loc, targetTL.getLoweredType());
+
+  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
+  SILBasicBlock *failBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
+
+  SGF.B.createCheckedCastAddrBranch(
+      loc, CheckedCastInstOptions(), CastConsumptionKind::TakeOnSuccess,
+      srcAddr.forward(SGF), sourceType, destAddr, targetType, contBB, failBB,
+      initInfo.numTrueTaken, initInfo.numFalseTaken);
+
+  // On the success edge the payload has been moved into destAddr and is ours
+  // to bind.
+  SGF.B.setInsertionPoint(contBB);
+  ManagedValue payload;
+  if (!targetTL.isLoadableOrOpaque(SGF.F)) {
+    payload = SGF.emitManagedBufferWithCleanup(destAddr, targetTL);
+  } else {
+    payload = SGF.emitManagedRValueWithCleanup(
+        SGF.B.createTrivialLoadOr(loc, destAddr, LoadOwnershipQualifier::Take),
+        targetTL);
+  }
+  subInitialization->copyOrInitValueInto(SGF, loc, payload, /*isInit=*/true);
+  // Note: our own finishInitialization() forwards to subInitialization, so
+  // don't finish it here -- doing so would emit the local twice.
+  return true;
+}
+
+/// `if let v = x as? T` (and `guard let`, `while let`) over a non-`Copyable`
+/// subject. Rather than constructing an `Optional<T>` with the cast result
+/// (which would consume `x` even if the cast fails), emit it the same way as
+/// `if case let v as T = x`, using a conditional cast that only consumes on
+/// success.
+bool EnumElementPatternInitialization::tryInitializeFromStorageReference(
+    SILGenFunction &SGF, Expr *initializer, SILLocation loc) {
+  if (!subInitialization.get())
+    return false;
+
+  auto *cast =
+      dyn_cast<ConditionalCheckedCastExpr>(initializer->getSemanticsProvidingExpr());
+  if (!cast || cast->getCastKind() != CheckedCastKind::ValueCast)
+    return false;
+
+  Expr *subject = cast->getSubExpr();
+  Type sourceType = subject->getType();
+  if (!sourceType->isNoncopyable())
+    return false;
+
+  // Deliberately last: getOptionalSomeDecl() can force Optional's members to
+  // load, which ordinary `if let` over a Copyable subject must never trigger
+  // from here.
+  if (ElementDecl != SGF.getASTContext().getOptionalSomeDecl())
+    return false;
+
+  // The take-cast below produces exactly a T. Today an outermost `x as? T`
+  // always has type Optional<T>: CSApply splits an optional source into
+  // bind/inject layers around an inner cast, so it never reaches here. If that
+  // ever changes, fall back to the ordinary lowering rather than mis-bind.
+  CanType targetType = cast->getCastType()->getCanonicalType();
+  Type resultObject = cast->getType()->getOptionalObjectType();
+  if (!resultObject || resultObject->getCanonicalType() != targetType)
+    return false;
+
+  Expr *storageExpr = findConsumableStorageReference(subject);
+  if (!storageExpr)
+    return false;
+
+  FormalEvaluationScope scope(SGF);
+  LValue lv = SGF.emitLValue(storageExpr, SGFAccessKind::OwnedAddressConsume);
+  ManagedValue addr = SGF.emitConsumedLValue(loc, std::move(lv));
+  if (!addr.getType().isAddress())
+    return false;
+
+  return emitTakeCastAndBind(SGF, loc, addr, sourceType->getCanonicalType(),
+                             targetType, subInitialization.get(), getInitInfo(),
+                             getFailureDest());
+}
+
+// If possible, emit a cast that consumes only on success.
+bool IsPatternInitialization::tryEmitNoncopyablePatternMatch(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue value) {
+  // Only the plain address-based value cast is handled here; anything else
+  // (collection downcasts, loadable representations) keeps the existing path.
+  if (pattern->getCastKind() != CheckedCastKind::ValueCast)
+    return false;
+  if (!value.getType().isAddress())
+    return false;
+
+  CanType sourceType = pattern->getType()->getCanonicalType();
+  CanType targetType = pattern->getCastType()->getCanonicalType();
+
+  auto &initInfo = getInitInfo();
+
+  if (!subInitialization.get()) {
+    // `if case is T = box` or `if case _ as T = box`
+    // can use a simple type test.
+    SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
+    SILBasicBlock *failBB =
+        SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
+
+    emitTypeTestForIsa(SGF, loc, value, sourceType, targetType, contBB,
+                       failBB, initInfo.numTrueTaken,
+                       initInfo.numFalseTaken);
+
+    SGF.B.setInsertionPoint(contBB);
+    return true;
+  }
+
+  return emitTakeCastAndBind(SGF, loc, value, sourceType, targetType,
+                             subInitialization.get(), initInfo,
+                             getFailureDest());
+}
+
 void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
                                                       SILLocation loc,
                                                       ManagedValue value,
                                                       bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
-  
+
+  // For a non-`Copyable` subject, first try emitting the direct-branch form
+  // without producing the intermediate optional.  That encodes the success
+  // status in the CFG which makes it possible to selectively consume only on
+  // success.
+  if (pattern->getType()->isNoncopyable() &&
+      tryEmitNoncopyablePatternMatch(SGF, loc, value)) {
+    return;
+  }
+
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastType());
@@ -1511,13 +1760,28 @@ public:
       bindValue = bindValue.copy(SGF, loc);
     }
 
-    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        pattern, bindValue,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
-        MarkUnresolvedNonCopyableValueInst::IsStrict);
+    // mark_unresolved_non_copyable_value drives the move-only checker, which
+    // has nothing to check for a copyable value. It also has to own the value
+    // it checks; a guaranteed value cannot be consumed to begin with.
+    if (bindValue.getType().isMoveOnly() &&
+        (bindValue.getType().isAddress() || bindValue.isPlusOne(SGF))) {
+      bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          pattern, bindValue,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
+          MarkUnresolvedNonCopyableValueInst::IsStrict);
+    }
 
     SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                               SILAccessEnforcement::Unknown);
+
+    // Rewind to the bound value's definition so the buffer's insertion-point
+    // marker dominates it, while its cleanup is still pushed after the value's.
+    {
+      SavedInsertionPointRAII savedIP(SGF.B);
+      if (auto *def = bindValue.getValue()->getDefiningInstruction())
+        SGF.B.setInsertionPoint(def);
+      SGF.enterLocalVariableAddressableBufferScope(var);
+    }
 
     // Emit debug info for the borrowed noncopyable binding.
     if (EmitDebugValueOnInit) {
@@ -1621,9 +1885,18 @@ struct InitializationForPattern
     return InitializationPtr(res);
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
+    // A statically-satisfied test that binds nothing matches any value, so it
+    // needs no test and no storage -- it behaves exactly like `_`.
+    if (isWildcardIsPattern(P))
+      return InitializationPtr(new BlackHoleInitialization());
+
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
-      subInit = visit(subP);
+      if (!patternNeedsNoPayload(subP)) {
+	// Simplify `case _ as T` to `case is T` by handling it with no
+	// sub-initialization.
+        subInit = visit(subP);
+      }
     return InitializationPtr(
         new IsPatternInitialization(P, std::move(subInit), initInfo));
   }
@@ -1909,6 +2182,17 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
             continue;
           }
 
+          // Try directly accessing the initializer's storage instead of copying
+          // into an rvalue, so that we can leave it unconsumed if the pattern
+          // fails.
+          if (initialization->tryInitializeFromStorageReference(
+                  *this, elt.getInitializer(), loc)) {
+            // We are now on the match-succeeded path, with the binding in
+            // place; finish it as forwardInto() would have.
+            initialization->finishInitialization(*this);
+            continue;
+          }
+
           // Emit the initial value into the initialization.
           FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
           emitExprInto(elt.getInitializer(), initialization.get(), loc);
@@ -2014,6 +2298,34 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
 }
 
 namespace {
+class EndFormalScopeCleanup : public Cleanup {
+  SILValue v;
+public:
+  EndFormalScopeCleanup(SILValue v) : v(v) {
+    ASSERT(v && "formal scope value binding must be nonnull");
+  }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createEndFormalScope(l, v);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndFormalScope\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+}
+
+void SILGenFunction::enterFormalScopeCleanup(SILLocation loc,
+                                             SILValue value) {
+  Cleanups.pushCleanup<EndFormalScopeCleanup>(value);
+}
+
+namespace {
 class EndLifetimeCleanup : public Cleanup {
   SILValue v;
 public:
@@ -2058,6 +2370,7 @@ namespace {
     void emit(SILGenFunction &SGF, CleanupLocation l,
               ForUnwind_t forUnwind) override {
       switch (repr) {
+      case ExistentialRepresentation::COM:
       case ExistentialRepresentation::None:
       case ExistentialRepresentation::Class:
       case ExistentialRepresentation::Metatype:
@@ -2176,7 +2489,7 @@ SILGenFunction::useBufferAsTemporary(SILValue addr,
 CleanupHandle
 SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
                                              const TypeLowering &tempTL) {
-  if (tempTL.isTrivial())
+  if (tempTL.isTrivial(&F))
     return CleanupHandle::invalid();
 
   Cleanups.pushCleanupInState<ReleaseValueCleanup>(CleanupState::Dormant, addr);
@@ -2231,7 +2544,7 @@ SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(addr->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forTrivialAddressRValue(addr);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2246,7 +2559,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(value->getType());
-  if (lowering.isTrivial())
+  if (lowering.isTrivial(&F))
     return ManagedValue::forRValueWithoutOwnership(value);
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2259,7 +2572,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
 CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
     SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
-  if (tempTL.isTrivial())
+  if (tempTL.isTrivial(&F))
     return CleanupHandle::invalid();
 
   auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
@@ -2292,6 +2605,8 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
       B.emitDestroyValueOperation(silLoc, value);
     }
   };
+  
+  B.createEndFormalScope(silLoc, VarLocs[vd].value);
 
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.

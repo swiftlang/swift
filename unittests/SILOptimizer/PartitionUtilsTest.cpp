@@ -16,7 +16,6 @@
 
 #include "gtest/gtest.h"
 
-#include <array>
 
 using namespace swift;
 using namespace swift::PartitionPrimitives;

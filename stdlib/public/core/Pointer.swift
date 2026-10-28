@@ -315,6 +315,26 @@ extension _Pointer /*: Strideable*/ {
       self._rawValue, i._builtinWordValue, Pointee.self))
 #endif
   }
+
+  /// Returns a pointer to the element at the given index, marking the result
+  /// as a projection of this pointer's pointee array, without triggering the
+  /// insertion of a stack-protection guard for the containing function.
+  ///
+  /// Only call this when `i` is in bounds, e.g. an index drawn from
+  /// `0 ..< count`.
+  ///
+  /// - Parameter i: The index of the element to project.
+  /// - Returns: A pointer to the element at position `i`.
+  @_transparent
+  @export(implementation)
+  internal func unprotectedProject(_ i: Int) -> Self {
+#if $BuiltinUnprotectedGepProjection
+    return Self(Builtin.unprotectedGepProjection_Word(
+      self._rawValue, i._builtinWordValue, Pointee.self))
+#else
+    return project(i)
+#endif
+  }
 }
 
 extension _Pointer /*: Hashable */ {

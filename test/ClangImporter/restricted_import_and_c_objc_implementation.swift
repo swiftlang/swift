@@ -41,6 +41,18 @@
 // RUN:   -emit-objc-header-path %t/Client-Swift.h \
 // RUN:   -verify -verify-additional-file %t/Lib.h
 
+/// A public import still requires an override to be 'open'.
+// RUN: %target-swift-frontend -typecheck -I %t %t/PublicImportClient.swift \
+// RUN:   -sdk %clang-importer-sdk -swift-version 6 -enable-library-evolution \
+// RUN:   -disable-objc-attr-requires-foundation-module \
+// RUN:   -verify -verify-ignore-unrelated
+
+/// A package import requires an override to be 'package'.
+// RUN: %target-swift-frontend -typecheck -I %t %t/PackageImportClient.swift \
+// RUN:   -sdk %clang-importer-sdk -swift-version 6 -enable-library-evolution \
+// RUN:   -disable-objc-attr-requires-foundation-module -package-name MyPackage \
+// RUN:   -verify -verify-ignore-unrelated
+
 // REQUIRES: objc_interop
 
 //--- module.modulemap
@@ -60,7 +72,12 @@ typedef double MyDouble; // expected-note {{type declared here}}
 void canReferenceHiddenDependency(MyPoint, MyDouble);
 void stillUnusableFromInlinable(); // expected-note {{global function 'stillUnusableFromInlinable()' is not '@usableFromInline' or public}}
 
-@interface ObjCImplClass: NSObject // expected-note {{class declared here}}
+@interface ObjCImplSuperclass: NSObject
+- (void)superclassMethod;
+@property NSInteger superclassProperty;
+@end
+
+@interface ObjCImplClass: ObjCImplSuperclass // expected-note {{class declared here}}
 @property MyPoint point;
 - (nonnull instancetype)initWithPoint:(MyPoint)point;
 - (void)method:(MyDouble)a;
@@ -97,6 +114,15 @@ extension ObjCImplClass { // expected-error {{cannot use class 'ObjCImplClass' i
     localFunc(a)
   }
 
+#if !IOI && !SPIONLY
+  override func superclassMethod() {}
+
+  override var superclassProperty: Int {
+    get { 0 }
+    set {}
+  }
+#endif
+
 #if ERRORS
   final public func notAnImplementation(a: MyDouble) {} // expected-error {{method cannot be declared public because its parameter uses an internal type}}
   // expected-note @-1 {{type alias 'MyDouble' is imported by this file as 'internal' from 'Lib'}}
@@ -112,3 +138,51 @@ internal struct SomeInternalType {} // expected-note {{type declared here}}
     stillUnusableFromInlinable() // expected-error {{global function 'stillUnusableFromInlinable()' is internal and cannot be referenced from an '@inlinable' function}}
 }
 #endif
+
+//--- PublicImportClient.swift
+
+public import Lib
+
+@objc @implementation
+extension ObjCImplClass {
+  var point: MyPoint
+
+  public init(point: MyPoint) {
+    self.point = point
+  }
+
+  public func method(_ a: MyDouble) {}
+
+  override func superclassMethod() {}
+  // expected-error @-1 {{overriding instance method must be as accessible as the declaration it overrides}} {{3-3=open }}
+
+  override var superclassProperty: Int {
+    // expected-error @-1 {{overriding property must be as accessible as the declaration it overrides}} {{3-3=open }}
+    get { 0 }
+    set {}
+  }
+}
+
+//--- PackageImportClient.swift
+
+package import Lib
+
+@objc @implementation
+extension ObjCImplClass {
+  var point: MyPoint
+
+  public init(point: MyPoint) {
+    self.point = point
+  }
+
+  public func method(_ a: MyDouble) {}
+
+  override func superclassMethod() {}
+  // expected-error @-1 {{overriding instance method must be as accessible as its enclosing type}} {{3-3=package }}
+
+  override var superclassProperty: Int {
+    // expected-error @-1 {{overriding property must be as accessible as its enclosing type}} {{3-3=package }}
+    get { 0 }
+    set {}
+  }
+}

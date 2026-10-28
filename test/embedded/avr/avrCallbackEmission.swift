@@ -1,8 +1,9 @@
-// RUN: %swift-frontend -S -O %s -target avr-none-none-elf \
+// RUN: %swift -S -O %s -target avr-none-none-elf \
 // RUN:   -wmo -enable-experimental-feature Embedded | %FileCheck %s
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: CODEGENERATOR=AVR
 // REQUIRES: swift_feature_Embedded
+// UNSUPPORTED: CPU=wasm32
 
 // IRGen needs various patches to work with program address space 1 on AVR.
 // Even the most basic stub program will fail to lower to IR without them.

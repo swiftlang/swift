@@ -14,7 +14,6 @@
 #include "Initialization.h"
 #include "ManagedValue.h"
 #include "RValue.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 using namespace swift;
@@ -59,7 +58,7 @@ ConditionalValue::ConditionalValue(SILGenFunction &SGF, SGFContext C,
                                    const TypeLowering &valueTL)
   : SGF(SGF), tl(valueTL), contBB(SGF.createBasicBlock()), loc(loc)
 {
-  if (tl.isAddressOnly()) {
+  if (!tl.isLoadableOrOpaque(SGF.F)) {
     // If the result type is address-only, get a result buffer for it.
     result = SGF.getBufferForExprResult(loc, tl.getLoweredType(), C);
   } else {
@@ -82,7 +81,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
 
   // Code emitted in the branch can emit into our buffer for address-only
   // conditionals.
-  if (tl.isAddressOnly()) {
+  if (!tl.isLoadableOrOpaque(SGF.F)) {
     assert(!currentInitialization && "already have an initialization?!");
     currentInitialization = SGF.useBufferAsTemporary(result, tl);
     return SGFContext(currentInitialization.get());
@@ -95,7 +94,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
 
 void ConditionalValue::exitBranch(RValue &&condResult) {
   assert(scope.has_value() && "no current scope?!");
-  if (tl.isAddressOnly()) {
+  if (!tl.isLoadableOrOpaque(SGF.F)) {
     // Transfer the result into our buffer if it wasn't emitted in-place
     // already.
     assert(currentInitialization && "no current initialization?!");

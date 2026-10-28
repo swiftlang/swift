@@ -25,6 +25,8 @@
 
 // RUN: %target-swift-frontend -typecheck -sdk '%t/SDK' -prebuilt-module-cache-path '%t/PreBuiltSDKModules' -module-cache-path %t/TempModuleCacheOther -resource-dir '' -parse-stdlib -Rmodule-interface-rebuild %S/Inputs/sdk-test-stdlib-no-ossa-referent-no-rebuild-remark.swift -verify
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // Flaky hangs: rdar://77288690
 // UNSUPPORTED: CPU=arm64, CPU=arm64e
 

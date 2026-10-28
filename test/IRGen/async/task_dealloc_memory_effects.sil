@@ -1,0 +1,28 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-irgen -sil-verify-all | %FileCheck %s
+
+// REQUIRES: concurrency
+
+// Deallocating invalidates the storage the argument points to, so the memory
+// effects of the swift_task_dealloc entry points must cover argument memory
+// (this is also how LLVM models `free`). Advertising inaccessible memory only
+// lets LLVM move accesses to the deallocated async context across the call;
+// InstCombine's phi-of-load fold in particular does exactly that.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Concurrency
+
+sil hidden_external @callee : $@convention(thin) @async () -> ()
+
+sil hidden @caller : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @callee : $@convention(thin) @async () -> ()
+  %1 = apply %0() : $@convention(thin) @async () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK: declare{{( dllimport)?}} swiftcc void @swift_task_dealloc(ptr) #[[DEALLOC_ATTRS:[0-9]+]]
+// CHECK: attributes #[[DEALLOC_ATTRS]] = { nounwind memory(argmem: readwrite, inaccessiblemem: readwrite) }

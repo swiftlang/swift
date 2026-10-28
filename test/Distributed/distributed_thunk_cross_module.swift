@@ -3,6 +3,13 @@
 // RUN: %target-swift-frontend -module-name Lib -emit-module -emit-module-path %t/Lib.swiftmodule -O -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s -DLIB
 // RUN: %target-swift-frontend -emit-sil -module-name Client -O -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s -DCLIENT -o /dev/null
 
+// Protocol, conformance and use each in their own module: the client
+// deserializes the conformance's witness table, whose distributed thunk
+// requirements cross-reference the protocol's module.
+// RUN: %target-swift-frontend -module-name Protos -emit-module -emit-module-path %t/Protos.swiftmodule -O -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s -DPROTOS
+// RUN: %target-swift-frontend -module-name Impl -emit-module -emit-module-path %t/Impl.swiftmodule -O -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s -DIMPL
+// RUN: %target-swift-frontend -emit-sil -module-name ProtosClient -O -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s -DPROTOS_CLIENT -Xllvm -sil-disable-pass=sil-deadfuncelim -Xllvm -sil-disable-pass=late-deadfuncelim | %FileCheck %s --check-prefix=PROTOS-CLIENT
+
 // REQUIRES: concurrency
 // REQUIRES: distributed
 // UNSUPPORTED: back_deploy_concurrency
@@ -72,4 +79,35 @@ public func useGreeter(_ system: FakeActorSystem) async throws {
   // modules forces the getter thunk (mangled ...vgTE) to be deserialized.
   _ = try await host.greeting
 }
+#endif
+
+#if PROTOS
+public protocol Service: DistributedActor where ActorSystem == FakeActorSystem {
+  distributed func ping() async throws
+  distributed var name: String { get }
+}
+#endif
+
+#if IMPL
+import Protos
+
+public distributed actor ServiceActor: Service {
+  public typealias ActorSystem = FakeActorSystem
+  public distributed func ping() async throws {}
+  public distributed var name: String { "service" }
+}
+#endif
+
+#if PROTOS_CLIENT
+import Protos
+import Impl
+
+public func makeService(_ system: FakeActorSystem) -> any Service {
+  ServiceActor(actorSystem: system)
+}
+
+// PROTOS-CLIENT-LABEL: sil_witness_table public_external ServiceActor: Service module Impl {
+// PROTOS-CLIENT:   method #Service.ping!distributed_thunk: <Self where Self : Service> (Self) -> () async throws -> () : @$s4Impl12ServiceActorC6Protos0B0AadEP4pingyyYaKFTWTE
+// PROTOS-CLIENT:   method #Service.name!distributed_thunk!_distributed_getter: <Self where Self : Service> (Self) -> () async throws -> String : @$s4Impl12ServiceActorC6Protos0B0AadEP4nameSSvgTWTE
+// PROTOS-CLIENT: }
 #endif

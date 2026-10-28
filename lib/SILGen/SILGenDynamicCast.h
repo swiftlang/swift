@@ -18,6 +18,19 @@
 namespace swift {
 namespace Lowering {
 
+/// The SIL representation and runtime operation used for a checked cast.
+enum class CastStrategy : uint8_t {
+  Address,
+  Scalar,
+  COM,
+};
+
+CastStrategy computeCastStrategy(SILGenFunction &SGF, CanType sourceType,
+                                 CanType targetType);
+
+ManagedValue prepareCOMCastSource(SILGenFunction &SGF, SILLocation loc,
+                                  ManagedValue source);
+
 RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
                                     SILLocation loc,
                                     Expr *operand,
@@ -34,6 +47,53 @@ RValue emitConditionalCheckedCast(SILGenFunction &SGF, SILLocation loc,
 SILValue emitIsa(SILGenFunction &SGF, SILLocation loc,
                  Expr *operand, Type targetType,
                  CheckedCastKind castKind);
+
+/// True if \p pattern wants nothing from the matched value, so a cast pattern
+/// only has to answer yes or no.
+///
+/// Formally, `case is T` has the same meaning as `case _ as T`; they both
+/// verify the type without binding any payload in the result. `case is T` has
+/// no sub-pattern at all, which is why a null \p pattern is accepted.
+bool patternNeedsNoPayload(const Pattern *pattern);
+
+/// True if \p pattern matches any value, exactly like `_`.
+bool isWildcardIsPattern(const IsPattern *pattern);
+
+/// True if an `is` check from \p sourceType to \p targetType should lower to a
+/// non-consuming type test rather than to the value-producing machinery `as?`
+/// uses.
+///
+/// `is` never needs the payload, so a test is always the right *meaning*. This
+/// asks only about representation: `test_only` rides on checked_cast_addr_br, so
+/// it applies exactly where IRGen performs the cast indirectly. A scalar cast
+/// carries no consumption kind and yields its result as a block argument, and
+/// COM has its own lowering and consumption kind, so both keep the ordinary
+/// lowering.
+bool canUseTypeTestForIsa(SILGenFunction &SGF, CanType sourceType,
+                          CanType targetType, CheckedCastKind castKind);
+
+/// Borrow the storage \p operand names so a type test can read it without
+/// copying or consuming it.
+///
+/// The caller must have established a FormalEvaluationScope covering the use
+/// of the returned value.
+ManagedValue emitTypeTestOperand(SILGenFunction &SGF, Expr *operand);
+
+/// Emit a non-consuming test of whether the value at \p subjectAddr
+/// can be cast to \p targetType.  This implements certain `is` casting tests.
+///
+/// The source is only read. No value is produced on either edge.
+/// The caller must keep \p subjectAddr borrowed across the emitted
+/// terminator.
+///
+/// Not limited to existentials: every address-path `is` lowers to this. Only
+/// valid when canUseTypeTestForIsa() returns true.
+void emitTypeTestForIsa(SILGenFunction &SGF, SILLocation loc,
+                        ManagedValue subjectAddr, CanType sourceType,
+                        CanType targetType, SILBasicBlock *trueBB,
+                        SILBasicBlock *falseBB,
+                        ProfileCounter trueCount = ProfileCounter(),
+                        ProfileCounter falseCount = ProfileCounter());
 
 }
 }

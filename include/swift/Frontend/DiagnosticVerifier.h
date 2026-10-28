@@ -74,7 +74,7 @@ public:
 
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
-  std::optional<unsigned> SourceBufferID;
+  unsigned SourceBufferID;
   DiagnosticKind Classification;
   SourceLoc Loc;
   unsigned Line;
@@ -92,7 +92,7 @@ struct CapturedDiagnosticInfo {
   bool HasChildren;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
-                         std::optional<unsigned> SourceBufferID,
+                         unsigned SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
@@ -158,6 +158,12 @@ private:
     /// - Errors in the definition of expected diagnostics
     bool HadError;
     bool HadUnexpectedDiag;
+
+    Result &operator |= (const Result &rhs) {
+      HadError |= rhs.HadError;
+      HadUnexpectedDiag |= rhs.HadUnexpectedDiag;
+      return *this;
+    }
   };
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
@@ -168,15 +174,20 @@ private:
   bool verifyUnrelated(
       std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
-  bool
-  verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
-
   std::vector<SMDiagnosticWithNotes> Errors;
 
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
+
+  /// Scan \p BufferID for 'expected-*' directives, appending them to
+  /// \p ExpectedDiagnostics. As a side effect this binds the '// #name@N'
+  /// markers defined in any expected-expansion block to their expansion buffer.
+  void
+  parseExpectedDiagnostics(unsigned BufferID,
+                           std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics);
+
   bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx);
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
@@ -208,11 +219,11 @@ private:
   parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
-                     const CapturedDiagnosticInfo &D, unsigned BufferID) const;
+                     const CapturedDiagnosticInfo &D) const;
 
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
-                           unsigned BufferID, unsigned DiagnosticLineNo) const;
+                           unsigned DiagnosticLineNo) const;
 
   public:
   /// Tracks the set of macro-expansion buffers produced at a single source
@@ -316,19 +327,25 @@ private:
         return std::nullopt;
       return buffers[parsedCount++].second;
     }
+
+    // Rewind the parse cursor so a subsequent parse re-numbers this location's
+    // directives identically. Used after a marker-binding pre-pass that parses
+    // every buffer once before the real verification parse.
+    void resetParseCursor() { parsedCount = 0; }
   };
   private:
   llvm::DenseMap<SourceLoc, ExpansionContext> Expansions;
 
   struct MarkerLocation {
-    unsigned BufferID;
+    // nullopt: resolution of the buffer ID has been deferred
+    std::optional<unsigned> BufferID;
     unsigned Line;
   };
 
   /// Map from location marker names to their buffer and line number.
   /// Populated by scanForMarkers() before parsing expected diagnostics. Plain
   /// '// #name' markers are recorded with their resolved location. Expansion-
-  /// relative '// #name@N' markers are recorded with a sentinel buffer of 0
+  /// relative '// #name@N' markers are recorded with a null buffer ID
   /// until the enclosing expected-expansion block is parsed and
   /// processExpansionMarkerDefinitions() binds them.
   llvm::StringMap<MarkerLocation> LocationMarkers;

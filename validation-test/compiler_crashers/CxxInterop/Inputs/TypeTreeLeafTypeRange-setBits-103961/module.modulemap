@@ -1,0 +1,4 @@
+module NonCopyableDerived {
+  header "header.h"
+  requires cplusplus
+}

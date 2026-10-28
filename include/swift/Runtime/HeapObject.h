@@ -66,7 +66,9 @@ HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
 
-/// Initializes the object header of a stack allocated object.
+/// Initializes the object header of a stack allocated object. Note that this
+/// can also be used to initialize statically allocated objects like the shared
+/// context object of exactly-once closures.
 ///
 /// \param metadata - the object's metadata which is stored in the header
 /// \param object - the pointer to the object's memory on the stack

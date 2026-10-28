@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"

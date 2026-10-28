@@ -70,9 +70,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-rr-code-motion"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
@@ -84,8 +82,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/Strings.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"

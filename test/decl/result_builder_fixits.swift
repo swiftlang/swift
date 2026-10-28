@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 // UNSUPPORTED: OS=windows-msvc
 // Line-feeds in Fix-Its fail to check on Windows.
 

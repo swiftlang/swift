@@ -13,3 +13,21 @@ CFStringRef returns_not_retained(void);
 void passes_borrowed(CFStringRef string);
 
 void passes_consumed(CF_CONSUMED CFStringRef string);
+
+// Not ownership-audited, so this is imported as returning
+// 'Unmanaged<CFString>?'.
+CFStringRef returns_unaudited(void);
+
+// 'CFTypeRef' is imported as 'AnyObject', and uses the same reference counting.
+void passes_any_borrowed(CFTypeRef obj);
+
+CF_RETURNS_RETAINED
+CFTypeRef returns_any_retained(void);
+
+// Audited results can be implemented as returning 'Unmanaged', which is
+// returned without any retain or autorelease.
+CF_RETURNS_NOT_RETAINED
+CFStringRef returns_not_retained_unmanaged(void);
+
+CF_RETURNS_RETAINED
+CFStringRef returns_retained_unmanaged(void);

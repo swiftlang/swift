@@ -20,7 +20,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
@@ -114,9 +113,6 @@ private:
   }
 
   // Generalize the type arguments of nominal types.
-  Type visitBoundGenericType(CanBoundGenericType origType) {
-    return generalizeGenericArguments(origType->getDecl(), origType);
-  }
   Type visitNominalType(CanNominalType origType) {
     auto decl = origType->getDecl();
     if (decl->isGenericContext())

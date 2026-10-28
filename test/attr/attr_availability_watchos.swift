@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib -target i386-apple-watchos2.0 %s
 
+// expected-warning@<unknown> * {{using sysroot for }}
+
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
               message: "you don't want to do that anyway")
 func doSomething() { }

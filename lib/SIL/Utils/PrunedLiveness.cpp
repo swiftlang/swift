@@ -11,9 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/PrunedLiveness.h"
-#include "swift/AST/TypeExpansionContext.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -311,6 +308,8 @@ AddressUseKind PrunedLiveRange<LivenessWithDefs>::checkAndUpdateInteriorPointer(
   SmallVector<Operand *, 8> uses;
   auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
   for (auto *use : uses) {
+    if (use->getOperandOwnership() == OperandOwnership::DebugUse)
+      continue;
     updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   if (uses.empty()) {
@@ -354,6 +353,10 @@ LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(
   for (Operand *use : value->getUses()) {
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
+      break;
+    case OperandOwnership::DebugUse:
+      // A debug_value is allowed to be outside the lifetime of its operand,
+      // don't extend liveness for it.
       break;
     case OperandOwnership::Borrow:
       summary.meet(updateForBorrowingOperand(use));

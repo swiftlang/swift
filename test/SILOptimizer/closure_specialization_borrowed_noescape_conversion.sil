@@ -1,0 +1,81 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine %s | %FileCheck %s --check-prefix=COMBINE
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine -closure-specialization %s | %FileCheck %s --check-prefix=SPECIALIZE
+
+// This SIL is derived from the following Swift:
+//
+// @inline(never)
+// func useThrowing(_ f: () throws -> Int) throws -> Int { try f() }
+//
+// public func throwingConversion(_ n: Int) throws -> Int {
+//   let f = { n }
+//   return try useThrowing(f)
+// }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil hidden [noinline] [ossa] @$s2CS11useThrowingyS2iyKXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (Int, @error any Error) {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> (Int, @error any Error)):
+  try_apply %0() : $@noescape @callee_guaranteed () -> (Int, @error any Error), normal bb1, error bb2
+bb1(%1 : $Int):
+  return %1
+bb2(%2 : @owned $any Error):
+  throw %2
+}
+
+sil private [ossa] @$s2CS18throwingConversionyS2iKFSiycfU_ : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  return %0
+}
+
+// COMBINE-LABEL: {{^}}sil [ossa] @$s2CS18throwingConversionyS2iKF :
+// COMBINE:         %[[#OWNER:]] = partial_apply [callee_guaranteed] %[[#]](%0)
+// COMBINE-NEXT:    debug_value %[[#OWNER]], let, name "f"
+// COMBINE-NEXT:    %[[#CONVERTED:]] = convert_function %[[#OWNER]] to $@callee_guaranteed () -> (Int, @error any Error)
+// COMBINE-NEXT:    %[[#NOESCAPE:]] = convert_escape_to_noescape %[[#CONVERTED]] to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+// COMBINE:         %[[#USE:]] = function_ref @$s2CS11useThrowingyS2iyKXEKF :
+// COMBINE-NEXT:    try_apply %[[#USE]](%[[#NOESCAPE]])
+// COMBINE:       bb1(%[[#RESULT:]] : $Int):
+// COMBINE-NEXT:    destroy_value %[[#NOESCAPE]]
+// COMBINE-NEXT:    destroy_value %[[#CONVERTED]]
+// COMBINE-NEXT:    return %[[#RESULT]]
+// COMBINE:       bb2(%[[#ERROR:]] : @owned $any Error):
+// COMBINE-NEXT:    destroy_value %[[#NOESCAPE]]
+// COMBINE-NEXT:    destroy_value %[[#CONVERTED]]
+// COMBINE-NEXT:    throw %[[#ERROR]]
+// COMBINE-NEXT:  {{^}}} // end sil function '$s2CS18throwingConversionyS2iKF'
+
+// SPECIALIZE-LABEL: {{^}}sil [ossa] @$s2CS18throwingConversionyS2iKF :
+// SPECIALIZE:       bb0(%[[#CAPTURE:]] : $Int):
+// SPECIALIZE:         %[[#SPECIALIZED:]] = function_ref @$s2CS11useThrowingyS2iyKXEKF{{[^ ]+}} : $@convention(thin) (Int) -> (Int, @error any Error)
+// SPECIALIZE-NEXT:    try_apply %[[#SPECIALIZED]](%[[#CAPTURE]]) : $@convention(thin) (Int) -> (Int, @error any Error), normal bb1, error bb2
+// SPECIALIZE:       bb1(%[[#SPECIALIZED_RESULT:]] : $Int):
+// SPECIALIZE:         return %[[#SPECIALIZED_RESULT]]
+// SPECIALIZE:       bb2(%[[#SPECIALIZED_ERROR:]] : @owned $any Error):
+// SPECIALIZE:         throw %[[#SPECIALIZED_ERROR]]
+// SPECIALIZE-NEXT:  {{^}}} // end sil function '$s2CS18throwingConversionyS2iKF'
+sil [ossa] @$s2CS18throwingConversionyS2iKF : $@convention(thin) (Int) -> (Int, @error any Error) {
+bb0(%0 : $Int):
+  %1 = function_ref @$s2CS18throwingConversionyS2iKFSiycfU_ : $@convention(thin) (Int) -> Int
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (Int) -> Int
+  debug_value %2, let, name "f"
+  %3 = begin_borrow %2
+  %4 = convert_function %3 to $@callee_guaranteed () -> (Int, @error any Error)
+  %5 = convert_escape_to_noescape %4 to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  %6 = function_ref @$s2CS11useThrowingyS2iyKXEKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (Int, @error any Error)
+  try_apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%7 : $Int):
+  destroy_value %5
+  end_borrow %3
+  destroy_value %2
+  return %7
+
+bb2(%8 : @owned $any Error):
+  destroy_value %5
+  end_borrow %3
+  destroy_value %2
+  throw %8
+}

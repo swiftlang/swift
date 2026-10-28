@@ -13,8 +13,8 @@
 #ifndef SWIFT_PARSER_PARSER_RESULT_H
 #define SWIFT_PARSER_PARSER_RESULT_H
 
-#include "llvm/ADT/PointerIntPair.h"
 #include "swift/AST/ParameterList.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <type_traits>
 
 namespace swift {

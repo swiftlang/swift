@@ -1,12 +1,12 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop \
-// RUN:   -disable-availability-checking
+// RUN:   -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 
-@_cdecl("async") // expected-error{{@_cdecl global function cannot be asynchronous}}
+@_cdecl("async") // expected-error{{'@_cdecl' global function cannot be asynchronous}}
 func asynchronous() async { }
 
-@c(async2) // expected-error{{@c global function cannot be asynchronous}}
+@c(async2) // expected-error{{'@c' global function cannot be asynchronous}}
 func asynchronous2() async { }
 
 @c(asyncParam)

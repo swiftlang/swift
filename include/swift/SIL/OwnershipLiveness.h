@@ -146,8 +146,8 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/OwnershipUseVisitor.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"

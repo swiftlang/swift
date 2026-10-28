@@ -54,6 +54,5 @@ struct AlwaysUnsafeWrapper {
 struct UsesWrapper {
   @AlwaysUnsafeWrapper var value: Int = 0
   // expected-warning@-1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
-  // expected-note@-2{{argument 'self' in call to initializer 'init' has unsafe type 'AlwaysUnsafeWrapper.Type'}}
-  // expected-note@-3{{reference to initializer 'init(wrappedValue:)' involves unsafe type 'AlwaysUnsafeWrapper'}}
+  // expected-note@-2{{reference to initializer 'init(wrappedValue:)' involves unsafe type 'AlwaysUnsafeWrapper'}}
 }

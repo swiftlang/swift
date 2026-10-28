@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s -disable-availability-checking
+// RUN: %target-swift-frontend -emit-sil -O %s -target %target-swift-5.1-abi-triple
 
 // This should not hang forever.
 

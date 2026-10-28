@@ -18,9 +18,9 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Serialization/Validation.h"
@@ -30,7 +30,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitstream/BitstreamReader.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -305,6 +304,10 @@ private:
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
+  MutableArrayRef<Serialized<Decl *>> HiddenTypeLayoutInfoDecls;
+  llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
+  std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedHiddenTypeLayouts;
+
   using SerializedDeclMembersTable =
       ModuleFileSharedCore::SerializedDeclMembersTable;
 
@@ -313,6 +316,12 @@ private:
 
   llvm::DenseMap<const Decl *, Identifier> PrivateDiscriminatorsByValue;
   llvm::DenseMap<const Decl *, StringRef> FilenamesForPrivateValues;
+
+  /// Classes whose dependency types are currently being checked. A class
+  /// re-entered while in this set skips the checks, which avoids infinite
+  /// recursion when superclasses name each other, as in `class A: Base<B>`
+  /// and `class B: Base<A>`.
+  llvm::SmallDenseSet<serialization::DeclID, 4> ClassesResolvingDependencies;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -501,7 +510,7 @@ private:
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   llvm::Expected<ParameterList *> readParameterList();
-  
+
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null
@@ -930,17 +939,6 @@ public:
     return Core->TargetTriple;
   }
 
-  /// Look up the layout of a hidden type by its mangled name. Returns
-  /// std::nullopt if this module does not define a layout for that mangled
-  /// name.
-  std::optional<AbstractTypeLayout>
-  lookupHiddenTypeLayout(StringRef mangledName) const {
-    auto it = Core->HiddenTypeLayouts.find(mangledName);
-    if (it == Core->HiddenTypeLayouts.end())
-      return std::nullopt;
-    return it->second;
-  }
-
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
@@ -1076,6 +1074,13 @@ public:
     serialization::DeclID DID,
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
+  llvm::Expected<HiddenTypeLayoutInfoDecl *>
+  getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
+
+  void consumeHiddenTypeXRefPathPieces(
+      llvm::BitstreamCursor &cursor, uint32_t pathLen,
+      SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces);
+
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
 
@@ -1148,6 +1153,8 @@ public:
 
   /// Reads pattern initializer text from \c DeclTypeCursor, if present.
   std::optional<StringRef> maybeReadPatternInitializerText();
+
+  llvm::Expected<SmallVector<AnyFunctionType::Yield, 1>> readYieldList();
 };
 
 template <typename T, typename RawData>

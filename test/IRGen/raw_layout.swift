@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout.sil
-// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -disable-availability-checking -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature RawLayout -emit-ir -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %t/raw_layout.sil | %FileCheck %t/raw_layout.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: swift_feature_RawLayout
 
@@ -348,7 +348,7 @@ entry(%K: $*Keymaster):
     return undef : $()
 }
 
-// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself{{.*}} [[SELF:%.*]])
+// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}}swiftself{{.*}} [[SELF:%.*]])
 // CHECK-NEXT:   entry:
 // CHECK-NEXT:     ret ptr [[SELF]]
 sil @get_cell_addr : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {

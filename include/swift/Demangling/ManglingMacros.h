@@ -94,5 +94,11 @@ _Pragma("clang diagnostic pop")
 #define OBJC_PARTIAL_APPLY_THUNK_SYM \
           MANGLE_SYM(OBJC_PARTIAL_APPLY_THUNK_MANGLING)
 
+/// The async entry point running a program's top-level code. It is the one
+/// Swift function with no mangling, yet its async funclets are still named by
+/// appending the usual mangled suffixes to it (e.g. "async_MainTY1_"), so the
+/// demangler accepts it wherever a mangled name is expected.
+#define ASYNC_MAIN_ENTRY_POINT_NAME "async_Main"
+
 #endif // SWIFT_DEMANGLING_MANGLING_MACROS_H
 

@@ -17,7 +17,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -267,12 +266,15 @@ BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
 
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr argsTy, SourceLoc asyncLoc,
-    SourceLoc throwsLoc, BridgedNullableTypeRepr thrownType, SourceLoc arrowLoc,
+    SourceLoc throwsLoc, BridgedNullableTypeRepr thrownType,
+    BridgedNullableTypeRepr yieldsType, SourceLoc arrowLoc,
     BridgedTypeRepr resultType) {
   ASTContext &context = cContext.unbridged();
-  return new (context) FunctionTypeRepr(
-      nullptr, cast<TupleTypeRepr>(argsTy.unbridged()), asyncLoc, throwsLoc,
-      thrownType.unbridged(), arrowLoc, resultType.unbridged());
+  return new (context)
+      FunctionTypeRepr(nullptr, cast<TupleTypeRepr>(argsTy.unbridged()),
+                       asyncLoc, throwsLoc, thrownType.unbridged(),
+                       cast_or_null<TupleTypeRepr>(yieldsType.unbridged()),
+                       arrowLoc, resultType.unbridged());
 }
 
 BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(

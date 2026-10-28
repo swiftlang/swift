@@ -55,7 +55,7 @@ func foo() {
 // func myLoop() {
   // CHECK: define {{.*}} @"$s4main6myLoopyyF"
   // CHECK: #dbg_declare(ptr %index.debug, {{.*}}, ![[INDEX:[0-9]+]]
-  // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP:[0-9]+]]
+  // CHECK: icmp eq i8 %{{[0-9]+}}, 1, !dbg ![[FORLOOP:[0-9]+]]
   // CHECK: call {{.*}} @"$s4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
 

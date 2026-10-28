@@ -19,8 +19,8 @@
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
@@ -32,7 +32,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -42,7 +41,6 @@
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/LLVMPasses/Passes.h"
-#include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -51,9 +49,8 @@
 #include "swift/Subsystems.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/InlineCost.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
@@ -74,15 +71,12 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Plugins/PassPlugin.h"
 #include "llvm/ProfileData/InstrProfReader.h"
-#include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -97,12 +91,11 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Utils/AssignGUID.h"
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
-#include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/LLVMRemarkStreamer.h"
-#include "llvm/Support/ToolOutputFile.h"
 
 #include <thread>
 
@@ -152,6 +145,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
+
+  TargetOpts.EmitCallSiteInfo = Opts.DebugCallsiteInfo;
   TargetOpts.FunctionSections = Opts.FunctionSections;
 
   // Set option to UseCASBackend if CAS was enabled on the command line.
@@ -175,10 +170,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
 
+#if LLVM_VERSION_MAJOR < 24
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
+#endif
 
   if (Opts.EnableGlobalISel) {
     TargetOpts.EnableGlobalISel = true;
@@ -219,6 +216,13 @@ void setModuleFlags(IRGenModule &IGM) {
       IGM.getOptions().WitnessMethodElimination) {
     Module->addModuleFlag(llvm::Module::Error, "Virtual Function Elim", 1);
   }
+
+#if LLVM_VERSION_MAJOR >= 24
+  // WebAssembly doesn't support atomics yet, see
+  // https://github.com/apple/swift/issues/54533 for more details.
+  if (IGM.Triple.isOSBinFormatWasm())
+    Module->setThreadModel(llvm::ThreadModel::Single);
+#endif
 }
 
 static void align(llvm::Module *Module) {
@@ -389,7 +393,25 @@ void swift::performLLVMOptimizations(
     PTO.MergeFunctions = !Opts.DisableLLVMMergeFunctions;
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
-    level = llvm::OptimizationLevel::Os;
+    // LLVM is removing the Os pipeline and will instead rely
+    // on O2 with the appropriate function attributes
+    level = llvm::OptimizationLevel::O2;
+
+    // Swift always used the Os pipeline for optimized builds; a few of its
+    // tunings are keyed off the pipeline size level rather than the function
+    // optsize/minsize attribute, so reproduce them on O2 to preserve behavior.
+    // (Loop unrolling/vectorization and the per-caller inline clamps are
+    // attribute-driven and identical on Os and O2, so need no adjustment.)
+
+    // Os used the size-tuned inline threshold; O2 uses the larger speed default.
+    PTO.InlinerThreshold = llvm::InlineConstants::OptSizeThreshold;
+
+    // Os disabled IPSCCP function specialization. There is no PTO knob, so
+    // neutralize it through its cost option.
+    auto &RegisteredOpts = llvm::cl::getRegisteredOptions();
+    if (auto *MaxClones = static_cast<llvm::cl::opt<unsigned> *>(
+            RegisteredOpts.lookup("funcspec-max-clones")))
+      *MaxClones = 0;
   } else {
     level = llvm::OptimizationLevel::O0;
   }
@@ -412,7 +434,7 @@ void swift::performLLVMOptimizations(
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
-    Expected<PassPlugin> PassPlugin = PassPlugin::Load(PluginFile);
+    Expected<PassPlugin> PassPlugin = PassPlugin::load(PluginFile);
     if (PassPlugin) {
       PassPlugin->registerPassBuilderCallbacks(PB);
     } else {
@@ -586,7 +608,8 @@ void swift::performLLVMOptimizations(
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
     MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
-                                /*EmitSummaryIndex=*/false));
+                                /*EmitSummaryIndex=*/false,
+                                /*ShouldRenumberMetadata=*/true));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -595,6 +618,10 @@ void swift::performLLVMOptimizations(
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+      // ThinLTOBitcodeWriterPass requests ModuleSummaryIndexAnalysis, which
+      // requires a GUID to be assigned to every GlobalValue. The LTO prelink
+      // pipelines do that via AssignGUIDPass, but the O0 pipeline does not.
+      MPM.addPass(AssignGUIDPass());
       MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
@@ -604,6 +631,11 @@ void swift::performLLVMOptimizations(
         // lto summary.)
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
+
+        // BitcodeWriterPass with EmitSummaryIndex requests
+        // ModuleSummaryIndexAnalysis, which requires a GUID to be assigned to
+        // every GlobalValue; the per-module/O0 pipelines do not do that.
+        MPM.addPass(AssignGUIDPass());
       }
       MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
@@ -620,6 +652,7 @@ void swift::performLLVMOptimizations(
     if (irFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irFile, nullptr);
   }
 
@@ -736,6 +769,15 @@ namespace {
     SwiftDiagnosticHandler(const IRGenOptions &Opts) : IRGenOpts(Opts) {}
 
     bool handleDiagnostics(const llvm::DiagnosticInfo &DI) override {
+      // By default all backend diagnostics are swallowed here. When
+      // -print-llvm-backend-diagnostics is set, let LLVM's default handler
+      // print error-severity diagnostics (e.g. an unsupported relocation
+      // reported by MC object emission) so the underlying message is visible;
+      // performLLVM separately turns a recorded backend error into a frontend
+      // failure.
+      if (IRGenOpts.PrintLLVMBackendDiagnostics &&
+          DI.getSeverity() == llvm::DS_Error)
+        return false;
       return true;
     }
 
@@ -771,6 +813,20 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                         StringRef OutputFilename,
                         llvm::vfs::OutputBackend &Backend,
                         UnifiedStatsReporter *Stats) {
+
+  // Whenever we leave this function, finalize the main remark streamer (if the
+  // context owns one). Finalization flushes the remark string table to the end
+  // of the remarks file and deregisters the streamer from the context. It must
+  // happen before the streamer (owned by the context) is destroyed, both to
+  // produce a valid remarks file and to satisfy the RemarkStreamer destructor's
+  // assertion that its serializer was released. Using a scope guard ensures
+  // this covers every early return (e.g. incremental codegen skipping the
+  // object file), not just the successful codegen path.
+  auto &Ctxt = Module->getContext();
+  SWIFT_DEFER {
+    if (Ctxt.getMainRemarkStreamer())
+      llvm::finalizeLLVMOptimizationRemarks(Ctxt);
+  };
 
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
@@ -821,6 +877,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     }
 
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+      Module->renumberMetadataForAssembly();
       Module->print(*OutputFile, nullptr);
       return false;
     }
@@ -834,10 +891,10 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     if (irgenFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irgenFile, nullptr);
   }
 
-  auto &Ctxt = Module->getContext();
   std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
@@ -874,6 +931,18 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
   auto res = compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
                                  *OutputFile, DiagMutex,
                                  CASIDFile ? CASIDFile.get() : nullptr);
+
+  // The LLVM backend reports MC/codegen errors (e.g. an unsupported relocation)
+  // through the LLVMContext diagnostic handler, which records them but does not
+  // by itself fail this function. Without this check IRGen would keep the
+  // empty/partial object file and return success, turning a real compiler error
+  // into a confusing downstream link failure ("file is empty in '...'.o").
+  if (const auto *DiagHandler = Ctxt.getDiagHandlerPtr();
+      DiagHandler && DiagHandler->HasErrors) {
+    diagnoseSync(Diags, DiagMutex, SourceLoc(),
+                 diag::error_generating_object_file, OutputFilename);
+    res = true;
+  }
 
   Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
 
@@ -1383,8 +1452,8 @@ static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsig
 
       const auto format = SILOpts.OptRecordFormat;
       llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+          remarkSerializerOrErr =
+              llvm::remarks::createRemarkSerializer(format, *file);
       if (llvm::Error err = remarkSerializerOrErr.takeError()) {
         diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                             toString(std::move(err)));

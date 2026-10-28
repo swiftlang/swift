@@ -16,7 +16,7 @@ let _: @noDerivative Float
 func id(_ x: Float) -> Float {
   return x
 }
-// expected-error @+1 {{@derivative attribute used without importing module '_Differentiation'}}
+// expected-error @+1 {{'@derivative' attribute used without importing module '_Differentiation'}}
 @derivative(of: id)
 func jvpId(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })

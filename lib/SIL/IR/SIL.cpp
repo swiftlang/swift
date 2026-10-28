@@ -12,7 +12,6 @@
 
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILUndef.h"
@@ -22,14 +21,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/Decl.h"
-#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 
@@ -123,7 +117,12 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
                                 typeDecl->getEffectiveAccess());
 
   // Aggressive CMO "makes" all types "public".
-  if (typeDecl->getModuleContext()->isAggressiveCMOEnabled()) {
+  // Note that this has to be the module which _defines_ the conformance (i.e.
+  // which emits the witness table), and not the module of the conforming type:
+  // the conforming type can be imported from a module which was not built with
+  // aggressive CMO, while the conformance itself still needs public linkage so
+  // that it can be referenced from a serialized function.
+  if (C->getDeclContext()->getParentModule()->isAggressiveCMOEnabled()) {
     access = AccessLevel::Public;
   }
 
@@ -155,7 +154,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Ignore non-nominal types -- except for opaque result types which can be
     // private and in a different translation unit in which case they can't be
     // accessed.
-    ValueDecl *decl = type.getNominalOrBoundGenericNominal();
+    ValueDecl *decl = type.getNominalDecl();
     if (!decl)
       decl = isa<OpaqueTypeArchetypeType>(type)
                  ? cast<OpaqueTypeArchetypeType>(type)->getDecl()
@@ -253,7 +252,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
 
     Action walkToTypePre(Type ty) override {
       // Non-nominal types are always available.
-      auto decl = ty->getNominalOrBoundGenericNominal();
+      auto decl = ty->getNominalDecl();
       if (!decl)
         return Action::Continue;
       

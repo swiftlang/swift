@@ -31,6 +31,7 @@
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name Main
 // RUN: cat %t/Main.swiftinterface | %FileCheck -check-prefix=CHECK-PUBLIC %s
 // RUN: cat %t/Main.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
+// RUN: cat %t/Main.swiftinterface | %FileCheck -check-prefix=NEGATIVE-PUBLIC %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.private.swiftinterface -module-name Main
 
@@ -242,6 +243,14 @@ public struct OpType {}
 @_spi(S) public func +(_ s1: OpType, _ s2: OpType) -> OpType { s1 }
 // CHECK-PRIVATE: @_spi(S) public func + (s1: {{.*}}::OpType, s2: {{.*}}::OpType) -> {{.*}}::OpType
 // CHECK-PUBLIC-NOT: func +
+
+// Conformances to public protocols that are only implied by an SPI extension
+// should not appear in the public swiftinterface.
+@_spi(LocalSPI) public protocol SPIRefinesHashable: Hashable {}
+public struct PublicConformsThroughSPI {}
+@_spi(LocalSPI) extension PublicConformsThroughSPI: SPIRefinesHashable {}
+// CHECK-PRIVATE: @_spi(LocalSPI) extension {{.*}}::PublicConformsThroughSPI : {{.*}}::SPIRefinesHashable
+// NEGATIVE-PUBLIC-NOT: extension {{.*}}::PublicConformsThroughSPI
 
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.

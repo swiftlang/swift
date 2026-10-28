@@ -1,13 +1,9 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++20)
 
 // Also test this with a bridging header instead of the StdVector module.
 // RUN: %empty-directory(%t2)
 // RUN: cp %S/Inputs/std-vector.h %t2/std-vector-bridging-header.h
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=swift-6 -Xcc -std=c++20)
-// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=default -Xcc -std=c++20)
 
 // Ubuntu 20.04 ships with an old version of libstdc++, which does not provide
 // std::contiguous_iterator_tag from C++20.
@@ -22,6 +18,10 @@ import StdVector
 #endif
 import CxxStdlib
 
+// This test makes sure that, after C++20 and on platforms where std::contiguous_iterator_tag is available, 
+// we pick up the conformance to `UnsafeCxxContiguousIterator`. 
+// This conformances allows `nextSpan()` to return a span containing all std::vector elements, 
+// instead of a single element (like it does for C++ iterators that conform only to `UnsafeCxxInputIterator`).
 var StdVectorBorrowingIteratorTestSuite = TestSuite("StdVectorBorrowingIterator")
 
 StdVectorBorrowingIteratorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_4).code {

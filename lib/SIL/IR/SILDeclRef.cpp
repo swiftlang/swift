@@ -15,13 +15,12 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -856,6 +855,13 @@ FuncDecl *SILDeclRef::getFuncDecl() const {
   return dyn_cast_or_null<FuncDecl>(getDecl());
 }
 
+FuncDecl *SILDeclRef::getDeferBodyFuncDecl() const {
+  if (kind != Kind::Func || !hasFuncDecl())
+    return nullptr;
+  auto *FD = getFuncDecl();
+  return FD->isDeferBody() ? FD : nullptr;
+}
+
 ModuleDecl *SILDeclRef::getModuleContext() const {
   if (hasDecl()) {
     return getDecl()->getModuleContext();
@@ -1250,8 +1256,9 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
 }
 
 bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
-  // @c / @_cdecl / @objc.
+  // @c / @_cdecl / @cxx / @objc.
   if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      decl->getAttrs().hasAttribute<CxxDeclAttr>() ||
       (decl->getAttrs().hasAttribute<ObjCAttr>() &&
        decl->getDeclContext()->isModuleScopeContext())) {
     return true;
@@ -1372,7 +1379,7 @@ static void mangleClangDeclViaImporter(raw_ostream &buffer,
   importer->getMangledName(buffer, clangDecl);
 }
 
-static std::string mangleClangDecl(Decl *decl, bool isForeign) {
+static std::string mangleClangDecl(const Decl *decl, bool isForeign) {
   auto clangDecl = decl->getClangDecl();
 
   if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
@@ -1550,7 +1557,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
                                                       SKind);
 
   case SILDeclRef::Kind::AsyncEntryPoint: {
-    return "async_Main";
+    return ASYNC_MAIN_ENTRY_POINT_NAME;
   }
   case SILDeclRef::Kind::EntryPoint: {
     return getASTContext().getEntryPointFunctionName();
@@ -1569,8 +1576,18 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
     // If there is a Clang declaration, use its mangled name.
     if (isNativeToForeignThunk() || isForeign) {
       auto decl = getDecl();
-      auto hasClangDecl = decl->getClangDecl()
-          ? decl : decl->getImplementedObjCDecl();
+      const swift::Decl *hasClangDecl = decl;
+      if (!decl->getClangDecl()) {
+        hasClangDecl = decl->getImplementedObjCDecl();
+        // Implementing a foreign reference type's virtual method matches the
+        // importer's dispatch thunk. The body must define the underlying
+        // method's symbol.
+        if (const auto *thunk = dyn_cast<FuncDecl>(hasClangDecl))
+          if (const auto *original = decl->getASTContext()
+                                         .getClangModuleLoader()
+                                         ->getOriginalForVirtualThunk(thunk))
+            hasClangDecl = original;
+      }
       auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
       if (!clangMangling.empty())
         return clangMangling;
@@ -1584,8 +1601,9 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
       if (auto VD = dyn_cast<ValueDecl>(decl))
         return std::string(EA->getCName(VD));
 
-    // @c/@_cdecl
-    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+    // @c/@_cdecl/@cxx.
+    if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+        decl->getAttrs().hasAttribute<CxxDeclAttr>())
       return std::string(decl->getCDeclName());
   }
 

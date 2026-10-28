@@ -49,6 +49,18 @@ bb0(%0 : $Int, %1 : $Float):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @begin_apply_unresolved
+sil [ossa] @begin_apply_unresolved : $(Int, Float) -> () {
+bb0(%0 : $Int, %1 : $Float):
+  %coro = function_ref @yield_2 : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
+  // CHECK: begin_apply [unresolved]
+  (%int, %float, %token, %allocation) = begin_apply [unresolved] %coro(%0, %1) : $@convention(thin) @yield_once_2 (Int, Float) -> (@yields Int, @yields Float)
+  
+  dealloc_stack %allocation : $*Builtin.SILToken
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @many_signature :
 // CHECK-SAME:      $@yield_many
 // CHECK-SAME:      @convention(thin)
@@ -177,4 +189,3 @@ bb4:
 bb5:
   unwind
 }
-

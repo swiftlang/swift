@@ -13,20 +13,16 @@
 #include "ArgumentScope.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
-#include "SILGenFunctionBuilder.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallSet.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -65,7 +61,11 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
       // Note that we do NOT execute user-declared the deinit body.
       // They would be free to access state which does not exist in a remote DA
 
-      // we are a remote instance,
+      emitDistributedActorSystemResignIDCall(
+        cleanupLoc, cd, borrowedSelf,
+        DistributedResignIDKind::ResignRemoteID);
+
+      // Since we are a remote instance,
       // the only properties we can destroy are the id and system properties.
       for (VarDecl *vd : cd->getStoredProperties()) {
         if (getActorIsolation(vd) == ActorIsolation::ActorInstance)
@@ -161,7 +161,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
     Type superclassTy =
       dd->mapTypeIntoEnvironment(cd->getSuperclass());
-    ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
+    ClassDecl *superclass = superclassTy->getClassDecl();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =
       SILDeclRef(superclassDtorDecl, SILDeclRef::Kind::Destroyer);
@@ -203,7 +203,8 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     // just before returning; this is guaranteed to only be executed in the local
     // actor case - because the body is never executed for a remote proxy either.
     emitDistributedActorSystemResignIDCall(
-        cleanupLoc, cd, ManagedValue::forBorrowedRValue(selfValue));
+        cleanupLoc, cd, ManagedValue::forBorrowedRValue(selfValue),
+        DistributedResignIDKind::ResignID);
   }
 
   // Release our members.
@@ -421,8 +422,7 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
         /* invocationSubs */ {}, getASTContext());
     SILType workFuncType = SILType::getPrimitiveObjectType(workFuncType1);
     SILValue dtx = dtorValue.getValue();
-    auto castedDeallocator =
-        B.createConvertFunction(loc, dtx, workFuncType, false);
+    auto castedDeallocator = B.createConvertFunction(loc, dtx, workFuncType);
 
     auto wordTy = SILType::getBuiltinWordType(getASTContext());
     auto *flagsInst =
@@ -477,7 +477,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
 void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
                                         ManagedValue selfValue, VarDecl *D) {
   const TypeLowering &ti = getTypeLowering(D->getTypeInContext());
-  if (!ti.isTrivial()) {
+  if (!ti.isTrivial(&F)) {
     SILValue addr =
         B.createRefElementAddr(cleanupLoc, selfValue.getValue(), D,
                                ti.getLoweredType().getAddressType());
@@ -566,9 +566,31 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
     std::move(switchBuilder).emit();
   }
 
+  // Remote distributed actor proxies have no storage for user-declared stored
+  // properties. Let them use the normal release path, which properly handles
+  // deinit of remote proxies.
+  if (cd->isDistributedActor()) {
+    SILBasicBlock *localBB = createBasicBlock("localDeinitBB");
+    SILBasicBlock *remoteBB = createBasicBlock("remoteDeinitBB");
+    B.emitBlock(someBB);
+    SILValue iterBorrow = B.createLoadBorrow(cleanupLoc, iterAddr);
+    auto *node = B.createUncheckedEnumData(
+        cleanupLoc, iterBorrow, getASTContext().getOptionalSomeDecl(),
+        selfTyLowered);
+    SILValue isRemote = emitDistributedActorIsRemote(cleanupLoc, node, selfTy);
+    B.createEndBorrow(cleanupLoc, iterBorrow);
+    B.createCondBranch(cleanupLoc, isRemote, remoteBB, localBB);
+
+    B.emitBlock(remoteBB);
+    B.createBranch(cleanupLoc, cleanBB);
+
+    B.emitBlock(localBB);
+  } else {
+    B.emitBlock(someBB);
+  }
+
   // if isKnownUniquelyReferenced(&iter) {
   {
-    B.emitBlock(someBB);
     auto isUnique = B.createIsUnique(cleanupLoc, iterAddr);
     B.createCondBranch(cleanupLoc, isUnique, uniqueBB, notUniqueBB);
   }
@@ -688,7 +710,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
   if (isa<StructDecl>(nom)) {
     for (VarDecl *vd : nom->getStoredProperties()) {
       const TypeLowering &ti = getTypeLowering(vd->getTypeInContext());
-      if (ti.isTrivial())
+      if (ti.isTrivial(&F))
         continue;
 
       SILValue addr = B.createStructElementAddr(
@@ -768,7 +790,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Form a reference to the superclass -dealloc.
   Type superclassTy = dd->mapTypeIntoEnvironment(cd->getSuperclass());
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
-  ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
+  ClassDecl *superclass = superclassTy->getClassDecl();
   auto superclassDtorDecl = superclass->getDestructor();
   auto superclassDtor = SILDeclRef(superclassDtorDecl,
                                    SILDeclRef::Kind::Deallocator)

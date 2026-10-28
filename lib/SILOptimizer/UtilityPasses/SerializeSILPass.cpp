@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "serialize-sil"
-#include "swift/Strings.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -141,6 +140,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::UpcastInst:
@@ -239,6 +239,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
@@ -312,6 +313,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExtendLifetimeInst:
+  case SILInstructionKind::DiagnoseInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
@@ -331,6 +333,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndCOWMutationAddrInst:
+  case SILInstructionKind::EndFormalScopeInst:
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
@@ -452,7 +455,7 @@ void updateOpaqueArchetypes(SILFunction &F) {
 /// A utility pass to serialize a SILModule at any place inside the optimization
 /// pipeline.
 class SerializeSILPass : public SILModuleTransform {
-    
+
   /// Removes [serialized] from all functions. This allows for more
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
@@ -504,13 +507,13 @@ class SerializeSILPass : public SILModuleTransform {
 
 public:
   SerializeSILPass() {}
-  
+
   void run() override {
     auto &M = *getModule();
     // Nothing to do if the module was serialized already.
     if (M.isSerialized())
       return;
-    
+
     LLVM_DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
     M.serialize();
 

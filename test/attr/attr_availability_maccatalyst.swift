@@ -49,7 +49,15 @@ func introducedLaterOnMacCatalyst() {
 }
 
 @available(iOS 57.0, macCatalyst 56.0, *)
-func introducedLaterOnIOS() {
+func introducedEarlierOnMacCatalyst() {
+}
+
+@available(iOS 57.0, *)
+func introducedLaterOniOS() {
+}
+
+@available(anyAppleOS 56.0, *)
+func introducedLaterOnAnyAppleOS() {
 }
 
 // expected-note@+1 *{{add '@available' attribute to enclosing global function}}
@@ -58,7 +66,11 @@ func testPoundAvailable() {
   if #available(macCatalyst 55.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
+    introducedEarlierOnMacCatalyst() // expected-error {{'introducedEarlierOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS() // expected-error {{'introducedLaterOnAnyAppleOS()' is only available in iOS 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
   }
 
@@ -67,18 +79,28 @@ func testPoundAvailable() {
   if #available(iOS 56.0, macCatalyst 55.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
+    introducedEarlierOnMacCatalyst() // expected-error {{'introducedEarlierOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS() // expected-error {{'introducedLaterOnAnyAppleOS()' is only available in iOS 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
   }
 
   if #available(iOS 55.0, macCatalyst 56.0, *) {
     introducedLaterOnMacCatalyst() // no-warning
-    introducedLaterOnIOS() // no-error
+    introducedEarlierOnMacCatalyst() // no-error
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS()
   }
 
   if #available(iOS 57.0, macCatalyst 56.0, *) {
     introducedLaterOnMacCatalyst() // no-warning
-    introducedLaterOnIOS() // no-error
+    introducedEarlierOnMacCatalyst() // no-error
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS()
   }
 
   // iOS availability should be inherited when macCatalyst is not present
@@ -86,18 +108,29 @@ func testPoundAvailable() {
   if #available(iOS 55.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
-    introducedLaterOnIOS() // expected-error {{'introducedLaterOnIOS()' is only available in Mac Catalyst 56.0 or newer}}
+    introducedEarlierOnMacCatalyst() // expected-error {{'introducedEarlierOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS() // expected-error {{'introducedLaterOnAnyAppleOS()' is only available in iOS 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
   }
 
   if #available(iOS 56.0, *) {
     introducedLaterOnMacCatalyst() // no-warning
-    introducedLaterOnIOS() // no-error
+    introducedEarlierOnMacCatalyst() // no-error
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS()
   }
 
   // macOS availability doesn't count on macCatalyst for Swift.
   if #available(macOS 9999.0, *) {
     introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS() // expected-error {{'introducedLaterOnAnyAppleOS()' is only available in iOS 56.0 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
   }
 }
@@ -152,6 +185,9 @@ struct UnavailableOnMacCatalyst { }
 @available(iOS, unavailable) // expected-note * {{'UnavailableOniOS' has been explicitly marked unavailable here}}
 struct UnavailableOniOS { }
 
+@available(anyAppleOS, unavailable) // expected-note * {{'UnavailableOnAnyAppleOS' has been explicitly marked unavailable here}}
+struct UnavailableOnAnyAppleOS { }
+
 @available(iOS, unavailable)
 @available(macCatalyst, introduced: 13.0)
 struct AvailableOnMacCatalystButUnavailableOniOS { }
@@ -162,10 +198,16 @@ extension AvailableOnMacCatalystButUnavailableOniOS { } // ok
 
 @available(macCatalyst, unavailable)
 extension UnavailableOnMacCatalyst {
-  func extensionMethod() {
-    takesAnything(UnavailableOniOS())
+  func extensionMethod() { // expected-note {{add '@available' attribute to enclosing instance method}}
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS()
   }
 
   @available(iOS, unavailable)
@@ -173,13 +215,23 @@ extension UnavailableOnMacCatalyst {
     takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOnAnyAppleOS()
   }
 
   @available(iOS, introduced: 15)
   func extensionMethodIntroducedOniOS() {
-    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS()
   }
 
 }
@@ -190,6 +242,11 @@ extension UnavailableOniOS {
     takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOniOS()
+    introducedLaterOnAnyAppleOS()
   }
 
   @available(macCatalyst, unavailable)
@@ -197,6 +254,11 @@ extension UnavailableOniOS {
     takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOniOS()
+    introducedLaterOnAnyAppleOS()
   }
 
   @available(macCatalyst, introduced: 13.0)
@@ -204,23 +266,43 @@ extension UnavailableOniOS {
     takesAnything(UnavailableOniOS())
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOniOS()
+    introducedLaterOnAnyAppleOS()
   }
 }
 
 @available(iOS, unavailable)
 @available(macCatalyst, introduced: 13.0)
 extension AvailableOnMacCatalystButUnavailableOniOS {
-  func extensionMethod() {
+  func extensionMethod() { // expected-note 4 {{add '@available' attribute to enclosing instance method}}
     takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
     takesAnything(UnavailableOnMacCatalyst()) // expected-error {{'UnavailableOnMacCatalyst' is unavailable in Mac Catalyst}}
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS()) // expected-error {{'UnavailableOnAnyAppleOS' is unavailable in iOS}}
+    introducedLaterOnMacCatalyst() // expected-error {{'introducedLaterOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedEarlierOnMacCatalyst() // expected-error {{'introducedEarlierOnMacCatalyst()' is only available in Mac Catalyst 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS() // expected-error {{'introducedLaterOnAnyAppleOS()' is only available in iOS 56.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
   }
 
   @available(macCatalyst, unavailable)
   func extensionMethodUnavailableOnMacCatalyst() {
-    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
     takesAnything(UnavailableOnMacCatalyst())
     takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+    takesAnything(UnavailableOnAnyAppleOS())
+    introducedLaterOnMacCatalyst()
+    introducedEarlierOnMacCatalyst()
+    introducedLaterOniOS() // expected-error {{'introducedLaterOniOS()' is only available in iOS 57.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    introducedLaterOnAnyAppleOS()
   }
 }
 

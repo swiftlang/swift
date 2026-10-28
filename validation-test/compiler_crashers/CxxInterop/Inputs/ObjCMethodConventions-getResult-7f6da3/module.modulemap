@@ -1,0 +1,4 @@
+module ArcStruct {
+  header "header.h"
+  requires objc
+}

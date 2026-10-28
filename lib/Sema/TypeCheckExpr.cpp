@@ -22,7 +22,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LookupKinds.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -92,8 +91,8 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
     // constructed.  Apply the sugar onto it.
     if (auto FT = E->getType()->getAs<FunctionType>())
       if (FT->getResult()->isEqual(resultSugar) && !resultSugar->isCanonical()){
-        auto NFT = FunctionType::get(FT->getParams(), resultSugar,
-                                     FT->getExtInfo());
+        auto NFT = FunctionType::get(FT->getParams(), FT->getYields(),
+                                     resultSugar, FT->getExtInfo());
         E->setType(NFT);
         return E;
       }

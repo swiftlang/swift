@@ -339,18 +339,6 @@ namespace llvm {
 template <typename T, typename Enable> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<swift::SourceLoc> {
-  static swift::SourceLoc getEmptyKey() {
-    return swift::SourceLoc::getFromPointer(
-        DenseMapInfo<const char *>::getEmptyKey());
-  }
-
-  static swift::SourceLoc getTombstoneKey() {
-    // Make this different from empty key. See for context:
-    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
-    return swift::SourceLoc::getFromPointer(
-        DenseMapInfo<const char *>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(const swift::SourceLoc &Val) {
     return DenseMapInfo<const void *>::getHashValue(
         Val.getOpaquePointerValue());
@@ -363,18 +351,6 @@ template <> struct DenseMapInfo<swift::SourceLoc> {
 };
 
 template <> struct DenseMapInfo<swift::SourceRange> {
-  static swift::SourceRange getEmptyKey() {
-    return swift::SourceRange(swift::SourceLoc::getFromPointer(
-        DenseMapInfo<const char *>::getEmptyKey()));
-  }
-
-  static swift::SourceRange getTombstoneKey() {
-    // Make this different from empty key. See for context:
-    // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
-    return swift::SourceRange(swift::SourceLoc::getFromPointer(
-        DenseMapInfo<const char *>::getTombstoneKey()));
-  }
-
   static unsigned getHashValue(const swift::SourceRange &Val) {
     return hash_combine(Val.Start.getOpaquePointerValue(),
                         Val.End.getOpaquePointerValue());

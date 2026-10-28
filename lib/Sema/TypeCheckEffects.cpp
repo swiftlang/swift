@@ -26,13 +26,13 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
+#include "swift/Sema/Subtyping.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -336,10 +336,12 @@ private:
   PolymorphicEffectKind ReasyncKind = PolymorphicEffectKind::None;
   SubstitutionMap Substitutions;
   SelfApplyExpr *AppliedSelf = nullptr;
+  ParamDecl *LoadedParameter = nullptr;
 
 public:
-  explicit AbstractFunction(Kind kind, Expr *fn)
-    : TheKind(kind) {
+  explicit AbstractFunction(Kind kind, Expr *fn,
+                            ParamDecl *loadedParameter = nullptr)
+      : TheKind(kind), LoadedParameter(loadedParameter) {
     TheExpr = fn;
   }
 
@@ -460,6 +462,13 @@ public:
     assert(getKind() == Kind::Parameter);
     return TheParameter;
   }
+
+  /// The function-typed parameter that an opaque function loads, consumes, or
+  /// copies, if any.
+  ParamDecl *getLoadedParameter() const {
+    assert(getKind() == Kind::Opaque);
+    return LoadedParameter;
+  }
   Expr *getOpaqueFunction() const {
     assert(getKind() == Kind::Opaque);
     return TheExpr;
@@ -519,6 +528,10 @@ public:
                                             Expr **calleeFn) {
     assert(fn->getValueProvidingExpr() == fn);
 
+    // The callee before looking through a `consume`, `copy`, or load, if any,
+    // and whether a load was looked through.
+    Expr *calleeBeforeLookThrough = nullptr;
+    bool sawLoad = false;
     while (true) {
       // Look through Optional unwraps.
       if (auto conversion = dyn_cast<ForceValueExpr>(fn)) {
@@ -544,9 +557,46 @@ public:
       } else if (auto actorIsolationErasure =
                      dyn_cast<ActorIsolationErasureExpr>(fn)) {
         fn = actorIsolationErasure->getSubExpr()->getValueProvidingExpr();
+        // Look through `consume`.
+      } else if (auto consume = dyn_cast<ConsumeExpr>(fn)) {
+        if (!calleeBeforeLookThrough)
+          calleeBeforeLookThrough = fn;
+        fn = consume->getSubExpr()->getValueProvidingExpr();
+        // Look through `copy`.
+      } else if (auto copy = dyn_cast<CopyExpr>(fn)) {
+        if (!calleeBeforeLookThrough)
+          calleeBeforeLookThrough = fn;
+        fn = copy->getSubExpr()->getValueProvidingExpr();
+        // Look through a load, which would be necessary for a mutable
+        // parameter.
+      } else if (auto load = dyn_cast<LoadExpr>(fn)) {
+        if (!sawLoad) {
+          if (!calleeBeforeLookThrough)
+            calleeBeforeLookThrough = fn;
+          sawLoad = true;
+          fn = load->getSubExpr()->getValueProvidingExpr();
+        }
       } else {
         break;
       }
+    }
+
+    // If we found a callee that takes a consumed, copied, or loaded argument,
+    // classify it as opaque. If an argument to the callee is a parameter of the
+    // caller, remember that so that a call of that parameter can still be
+    // rethrowing-only in the parameter's own function (see
+    // classifyFunctionBody).
+    if (calleeBeforeLookThrough) {
+      auto *declRef = dyn_cast<DeclRefExpr>(fn);
+      auto *param = declRef ? dyn_cast<ParamDecl>(declRef->getDecl()) : nullptr;
+      if (!param || !param->getInterfaceType()
+                         ->lookThroughAllOptionalTypes()
+                         ->is<AnyFunctionType>())
+        param = nullptr;
+      fn = calleeBeforeLookThrough;
+      if (calleeFn)
+        *calleeFn = fn;
+      return AbstractFunction(Kind::Opaque, fn, param);
     }
 
     // Tell our caller about the callee, if they asked for it.
@@ -680,10 +730,10 @@ public:
                                       /*isImplicitlyAsync=*/false,
                                       /*isImplicitlyThrows=*/false);
     } else if (auto ECE = dyn_cast<ExplicitCastExpr>(E)) {
-      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType());
+      recurse = asImpl().checkType(E, ECE->getCastTypeRepr(), ECE->getCastType(), /*isMetatype=*/false);
     } else if (auto TE = dyn_cast<TypeExpr>(E)) {
       if (!TE->isImplicit()) {
-        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType());
+        recurse = asImpl().checkType(TE, TE->getTypeRepr(), TE->getInstanceType(), /*isMetatype=*/true);
       }
     } else if (auto KPE = dyn_cast<KeyPathExpr>(E)) {
       for (auto &component : KPE->getComponents()) {
@@ -1154,7 +1204,8 @@ public:
     if (isNeverThrownError(thrownError))
       return result;
 
-    assert(!thrownError->hasError());
+    if (thrownError->hasError())
+      return forInvalidCode();
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
@@ -1412,6 +1463,10 @@ public:
   DeclContext *DC = nullptr;
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
+
+  /// Caches whether each parameter is only ever read, if the classifier is
+  /// checking a `rethrows` or `reasync` function. See isOnlyReadParam().
+  llvm::DenseMap<ParamDecl *, bool> *OnlyReadParams = nullptr;
 
   ApplyClassifier(ASTContext &ctx) : Ctx(ctx) { }
 
@@ -2065,6 +2120,19 @@ private:
                        EffectKind kind) {
     switch (fn.getKind()) {
     case AbstractFunction::Opaque: {
+      // A load, `consume`, or `copy` of a parameter of the function whose body
+      // is being checked still produces the parameter's argument if the
+      // function only ever reads the parameter.
+      if (auto *param = fn.getLoadedParameter();
+          param &&
+          getPolymorphicEffectDeclContext(kind) == param->getDeclContext() &&
+          isOnlyReadParam(param)) {
+        SubstitutionMap subs;
+        if (auto genericEnv =
+                param->getDeclContext()->getGenericEnvironmentOfContext())
+          subs = genericEnv->getForwardingSubstitutionMap();
+        return classifyParameterBody(param, subs, reason, kind);
+      }
       return classifyArgumentByType(fn.getType(), fn.getSubstitutions(),
                                     ConditionalEffectKind::Always, reason,
                                     kind);
@@ -2106,6 +2174,80 @@ private:
 
     return classifyArgumentByType(
         param->getInterfaceType(), subs, conditional, reason, kind);
+  }
+
+  /// Returns true if every reference to \p param, a parameter of the
+  /// `rethrows` or `reasync` function being checked, reads it. If that is the
+  /// case then the parameter always holds the argument it was passed.
+  ///
+  /// The actor isolation checker classifies references to mutable locals in a
+  /// similar way (see \c mutableLocalVarParent in TypeCheckConcurrency.cpp).
+  bool isOnlyReadParam(ParamDecl *param) {
+    if (param->isInOut())
+      return false;
+    if (param->isImmutableInFunctionBody())
+      return true;
+    ASSERT(OnlyReadParams);
+    auto known = OnlyReadParams->find(param);
+    if (known != OnlyReadParams->end())
+      return known->second;
+
+    auto *fn = cast<AbstractFunctionDecl>(param->getDeclContext());
+    auto *body = fn->getBody(/*canSynthesize=*/false);
+
+    class ReferenceFinder : public ASTWalker {
+      ParamDecl *Param;
+      llvm::SmallPtrSet<Expr *, 4> LoadedRefs;
+
+      /// Returns the reference that \p load reads, looking through the
+      /// optional unwraps that the load reads through.
+      static Expr *getLoadedRef(LoadExpr *load) {
+        Expr *E = load->getSubExpr();
+        while (true) {
+          E = E->getSemanticsProvidingExpr();
+          if (auto *bind = dyn_cast<BindOptionalExpr>(E))
+            E = bind->getSubExpr();
+          else if (auto *force = dyn_cast<ForceValueExpr>(E))
+            E = force->getSubExpr();
+          else
+            return E;
+        }
+      }
+
+    public:
+      bool IsOnlyRead = true;
+
+      explicit ReferenceFinder(ParamDecl *param) : Param(param) {}
+
+      bool isReferenceToParam(Expr *E) {
+        auto *declRef = dyn_cast<DeclRefExpr>(E);
+        return declRef && declRef->getDecl() == Param;
+      }
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        if (auto *load = dyn_cast<LoadExpr>(E)) {
+          if (auto *ref = getLoadedRef(load)) {
+            if (isReferenceToParam(ref))
+              LoadedRefs.insert(ref);
+          }
+        } else if (isReferenceToParam(E) && E->getType() &&
+                   E->getType()->hasLValueType() && !LoadedRefs.contains(E)) {
+          IsOnlyRead = false;
+        }
+        if (!IsOnlyRead)
+          return Action::Stop();
+        return Action::Continue(E);
+      }
+    };
+
+    bool isOnlyRead = false;
+    if (body) {
+      ReferenceFinder finder(param);
+      body->walk(finder);
+      isOnlyRead = finder.IsOnlyRead;
+    }
+    (*OnlyReadParams)[param] = isOnlyRead;
+    return isOnlyRead;
   }
 
   bool isLocallyDefinedInPolymorphicEffectDeclContext(DeclContext *DC,
@@ -2275,7 +2417,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2428,7 +2571,8 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
       return ShouldRecurse;
     }
 
@@ -2542,8 +2686,9 @@ private:
       return ShouldRecurse;
     }
 
-    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
-      if (!assumedSafeArguments.contains(E)) {
+    ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type,
+                              bool isMetatype) {
+      if (!assumedSafeArguments.contains(E) && !isMetatype) {
         SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
         classification.merge(
             Classification::forType(type, loc).onlyUnsafe());
@@ -3534,6 +3679,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
+
+  /// Whether each mutable parameter is only ever read, shared by the
+  /// classifiers that getApplyClassifier() creates.
+  mutable llvm::DenseMap<ParamDecl *, bool> OnlyReadParams;
   Context CurContext;
 
   class ContextFlags {
@@ -3641,10 +3790,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
                    PotentialEffectReason reason,
-                   bool downgradeToWarning) :
+                   bool downgradeToWarning,
+                   ActorIsolation contextIsolation) :
       reason(reason),
       expr(failingExpr),
-      downgradeToWarning(downgradeToWarning) {}
+      downgradeToWarning(downgradeToWarning),
+      contextIsolation(contextIsolation) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
@@ -3654,6 +3805,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     /// Whether the error should be downgraded to a warning.
     bool downgradeToWarning;
+
+    /// The isolation of the failing expression's context.
+    ActorIsolation contextIsolation;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -4098,13 +4252,13 @@ private:
     return ShouldRecurse;
   }
 
-  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
+  ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type, bool isMetatype) {
     SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
     auto classification = Classification::forType(type, loc);
 
-    // If this expression is covered as a safe argument, drop the unsafe
-    // classification.
-    if (assumedSafeArguments.contains(E))
+    // If this expression is covered as a safe argument or this is a metatype,
+    // drop the unsafe classification.
+    if (assumedSafeArguments.contains(E) || isMetatype)
       classification = classification.withoutUnsafe();
 
     checkEffectSite(E, /*requiresTry=*/false, classification);
@@ -4272,6 +4426,7 @@ private:
     classifier.DC = CurContext.getDeclContext();
     classifier.RethrowsDC = RethrowsDC;
     classifier.ReasyncDC = ReasyncDC;
+    classifier.OnlyReadParams = &OnlyReadParams;
     return classifier;
   }
 
@@ -4395,7 +4550,8 @@ private:
           errorOrder.push_back(anchor);
         uncoveredAsync[anchor].emplace_back(
             *expr, classification.getAsyncReason(),
-            classification.shouldDowngradeToWarning());
+            classification.shouldDowngradeToWarning(),
+            getActorIsolationOfContext(CurContext.getDeclContext()));
       }
     }
 
@@ -4850,7 +5006,7 @@ private:
               if (var->isAsyncLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
                                    diag::async_let_without_await, var);
-                continue;
+                break;
               }
             }
           }
@@ -4858,12 +5014,12 @@ private:
         case PotentialEffectReason::Kind::PropertyAccess:
           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                              diag::async_access_without_await, 1);
-          continue;
+          break;
 
         case PotentialEffectReason::Kind::SubscriptAccess:
           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                              diag::async_access_without_await, 2);
-          continue;
+          break;
 
         case PotentialEffectReason::Kind::ByClosure:
         case PotentialEffectReason::Kind::ByDefaultClosure:
@@ -4885,7 +5041,7 @@ private:
                                   diag::async_access_without_await, 0);
                break;
            }
-          continue;
+          break;
          }
 
          auto *call = dyn_cast<ApplyExpr>(&diag.expr);
@@ -4913,10 +5069,34 @@ private:
                               diag::async_access_without_await, 0);
          }
 
-         continue;
+         break;
         }
       }
+
+      noteActorInstanceMayNotBeGlobalActor(diag);
     }
+  }
+
+  /// Note when the isolation crossing that made an expression implicitly
+  /// 'async' is between a global actor and an instance of its actor type.
+  static void noteActorInstanceMayNotBeGlobalActor(const DiagnosticInfo &info) {
+    std::optional<ActorIsolation> target;
+    const Expr *selfArgument = nullptr;
+    if (auto *apply = dyn_cast<ApplyExpr>(&info.expr)) {
+      target = apply->isImplicitlyAsync();
+      if (auto *selfApply =
+              dyn_cast<SelfApplyExpr>(apply->getFn()->getValueProvidingExpr()))
+        selfArgument = selfApply->getBase();
+    } else if (auto *lookup = dyn_cast<LookupExpr>(&info.expr)) {
+      target = lookup->isImplicitlyAsync();
+      selfArgument = lookup->getBase();
+    } else if (auto *declRef = dyn_cast<DeclRefExpr>(&info.expr)) {
+      target = declRef->isImplicitlyAsync();
+    }
+
+    if (target)
+      swift::noteActorInstanceMayNotBeGlobalActor(
+          info.expr.getLoc(), info.contextIsolation, *target, selfArgument);
   }
 
   /// Check whether the given error points to an attempt to access
@@ -4945,6 +5125,7 @@ private:
                                    LanguageMode::v6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
+      noteActorInstanceMayNotBeGlobalActor(errorInfo);
       return true;
     };
 
@@ -5009,6 +5190,23 @@ private:
     return false;
   }
 
+  /// Whether the given anchor was synthesized by the compiler. Implicit
+  /// conversions, existential openings, and optional chains wrap user-written
+  /// code, so look through them.
+  static bool isSynthesizedAnchor(const Expr *anchor) {
+    while (anchor) {
+      if (auto conversion = dyn_cast<ImplicitConversionExpr>(anchor))
+        anchor = conversion->getSubExpr();
+      else if (auto open = dyn_cast<OpenExistentialExpr>(anchor))
+        anchor = open->getSubExpr();
+      else if (auto optEval = dyn_cast<OptionalEvaluationExpr>(anchor))
+        anchor = optEval->getSubExpr();
+      else
+        return anchor->isImplicit();
+    }
+    return false;
+  }
+
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
     bool strictSafety = Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
@@ -5019,7 +5217,7 @@ private:
     // which keeps it out of the way unless strict memory safety checking asked
     // to hear about unsafe code at all.
     bool isSynthesized =
-        (anchor && anchor->isImplicit()) || isSynthesizedContext();
+        isSynthesizedAnchor(anchor) || isSynthesizedContext();
     if (isSynthesized && !strictSafety)
       return;
 
@@ -5303,8 +5501,7 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
   // All three cases come up. The first one from the "real" witness matcher,
   // and the other two from associated type inference.
-  if (type->hasTypeVariableOrPlaceholder() ||
-      type->hasTypeParameter() ||
+  if (type->hasTypeVariableOrHole() || type->hasTypeParameter() ||
       type->hasPrimaryArchetype())
     return ThrownErrorClassification::Dependent;
 
@@ -5313,12 +5510,11 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
 ThrownErrorSubtyping
 swift::compareThrownErrorsForSubtyping(
-    Type subThrownError, Type superThrownError, DeclContext *dc
+    Type subThrownError, Type superThrownError
 ) {
   // Deal with NULL errors. This should only occur when there is no standard
   // library.
   if (!subThrownError || !superThrownError) {
-    assert(!dc->getASTContext().getStdlibModule() && "NULL thrown error type");
     return ThrownErrorSubtyping::ExactMatch;
   }
 
@@ -5392,7 +5588,9 @@ swift::compareThrownErrorsForSubtyping(
 
   // Check whether the subtype's thrown error type is convertible to the
   // supertype's thrown error type.
-  if (TypeChecker::isConvertibleTo(subThrownError, superThrownError, dc))
+  constraints::ConformanceCache cache;
+
+  if (canConvertTo(cache, subThrownError, superThrownError))
     return ThrownErrorSubtyping::Subtype;
 
   // We know it doesn't work.

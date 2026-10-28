@@ -713,10 +713,13 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
-/// Read the cancellation state and reason of the given task.
+/// Read the cancellation state and reason of the given task itself.
 ///
 /// This API exists to answer, in a single runtime call, if the passed in task
 /// is cancelled, and if so, what was its cancellation reason (if any).
+///
+/// This is the same as `swift_task_getIsCancelledWithReasonWithFlags` with
+/// `swift_task_is_cancelled_flag_TaskOnly`.
 ///
 /// ### Return value layout
 ///
@@ -744,9 +747,14 @@ enum swift_task_is_cancelled_flag : uint64_t {
   /// Effectively this is a backwards compatible mode.
   swift_task_is_cancelled_flag_None = 0x0,
 
-  /// Ignore any active cancellation shield and return the actual cancellation
-  /// state of the task.
-  swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1,
+  /// Only check the cancellation of the task itself. Cancellation shields and
+  /// cancellation scopes only affect the code that runs inside of them, so
+  /// they are not taken into account.
+  ///
+  /// Without this flag, the check reports the cancellation that the code the
+  /// task currently runs observes. Only the task itself observes its
+  /// cancellation shields and cancellation scopes.
+  swift_task_is_cancelled_flag_TaskOnly = 0x1,
 };
 
 /// Check if the task is cancelled.
@@ -756,6 +764,19 @@ enum swift_task_is_cancelled_flag : uint64_t {
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelledWithFlags(AsyncTask* task,
                                      swift_task_is_cancelled_flag flags);
+
+/// Read the cancellation state and reason of the given task.
+///
+/// The return value has the same layout as the one of
+/// `swift_task_getIsCancelledWithReason`.
+///
+/// \param task The task to check cancellation status for.
+/// \param flags Flags controlling the behavior of the check.
+///
+/// Runtime availability: Swift 6.5.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_getIsCancelledWithReasonWithFlags(
+    AsyncTask *task, swift_task_is_cancelled_flag flags);
 
 /// Returns the current priority of the task which is >= base priority of the
 /// task. This function does not exist in the base ABI of this library and must
@@ -999,6 +1020,14 @@ bool swift_executor_isComplexEquality(SerialExecutorRef ref);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 uint64_t swift_task_getJobTaskId(Job *job);
 
+/// Return the 64bit TaskID of the currently-executing AsyncTask,
+/// or 0 if there is no current task. This is more efficient than getting
+/// the task object to Swift and then getting the ID from it.
+///
+/// Available: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint64_t swift_task_getCurrentTaskId(void);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.
@@ -1008,17 +1037,19 @@ void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 #endif
 
 // Declare all the hooks
-#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                   \
-  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);   \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(__VA_ARGS__, name##_original original);            \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
+#define SWIFT_CONCURRENCY_HOOK(returnType, name, ...)                          \
+  typedef SWIFT_CC(swift) returnType (*name##_original)(__VA_ARGS__);          \
+  typedef SWIFT_CC(swift)                                                      \
+      returnType (*name##_hook_t)(__VA_ARGS__, name##_original original);      \
+  SWIFT_EXPORT_FROM(swift_Concurrency)                                         \
+  name##_hook_t __ptrauth_swift_concurrency_hook name##_hook
 
-#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                       \
-  typedef SWIFT_CC(swift) returnType (*name##_original)();              \
-  typedef SWIFT_CC(swift) returnType                                    \
-    (*name##_hook_t)(name##_original original);                         \
-  SWIFT_EXPORT_FROM(swift_Concurrency) name##_hook_t name##_hook
+#define SWIFT_CONCURRENCY_HOOK0(returnType, name)                              \
+  typedef SWIFT_CC(swift) returnType (*name##_original)();                     \
+  typedef SWIFT_CC(swift)                                                      \
+      returnType (*name##_hook_t)(name##_original original);                   \
+  SWIFT_EXPORT_FROM(swift_Concurrency)                                         \
+  name##_hook_t __ptrauth_swift_concurrency_hook name##_hook
 
 #include "ConcurrencyHooks.def"
 
@@ -1027,7 +1058,8 @@ typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_original)();
 typedef SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_override)(
     swift_task_asyncMainDrainQueue_original original);
 SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_asyncMainDrainQueue_hook)(
+SWIFT_CC(swift)
+void (*__ptrauth_swift_concurrency_hook swift_task_asyncMainDrainQueue_hook)(
     swift_task_asyncMainDrainQueue_original original,
     swift_task_asyncMainDrainQueue_override compatOverride);
 
@@ -1052,9 +1084,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *actor);
 
 /// Create and initialize the runtime storage for a distributed remote actor.
+/// This is dynamic because a distributed actor may have dynamic size,
+/// dependent on generic parameters etc.
+///
+/// Unavailable in Embedded: the size and alignment cannot be computed from
+/// minimal class metadata, so in Embedded we compute them in IRGen
+/// and use `swift_distributedActor_remote_initialize_embedded` instead.
+#if !SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+/// Embedded-only variant of `swift_distributedActor_remote_initialize`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue*
+swift_distributedActor_remote_initialize_embedded(
+    const Metadata *actorType, size_t allocSize, size_t alignMask);
+#endif // SWIFT_CONCURRENCY_EMBEDDED
 
 /// Enqueue a job on the default actor implementation.
 ///

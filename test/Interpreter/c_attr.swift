@@ -22,6 +22,7 @@
 // REQUIRES: executable_test
 
 //--- Lib.swift
+// expected-warning@<unknown> * {{libc not found for }}
 
 /// My documentation
 @c(simple) public func simpleNameSwiftSide(x: CInt, bar y: CInt) -> CInt {

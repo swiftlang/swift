@@ -13,11 +13,7 @@
 #include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
 
-#include "SourceKit/Support/FileSystemProvider.h"
 
-#include "swift/IDETool/CompileInstance.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 using namespace SourceKit;
 using namespace swift;

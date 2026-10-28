@@ -145,6 +145,13 @@ bool isMoveOnlyWrapperUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
+/// Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping
+/// partial_apply converted by convert_escape_to_noescape [not_guaranteed]. If
+/// ClosureLifetimeFixup will promote \p pai to a partial_apply [on_stack],
+/// return that conversion. Otherwise, return nullptr.
+ConvertEscapeToNoEscapeInst *
+getNonEscapingClosureConversion(PartialApplyInst *pai);
+
 /// Returns true if the given user instruction checks the ref count of a
 /// pointer.
 bool mayCheckRefCount(SILInstruction *User);

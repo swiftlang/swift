@@ -1,0 +1,99 @@
+// RUN: %target-sil-opt -sil-print-types %s -sil-combine | %FileCheck %s
+
+// SILCombine removes enum payload projections. Debug uses of unchecked_inplace_enum_data_addr are salvaged
+// into the debug reconstruction block. unchecked_take_enum_data_addr has side effects, so its debug uses are
+// killed.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {}
+
+// Simple unchecked_inplace_enum_data_addr + load being transformed into a load + unchecked_enum_data
+// The debug_value cannot be moved below to use the unchecked_enum_data directly as debug_values
+// should generally not be moved.
+
+// CHECK-LABEL: sil [ossa] @test_load
+// CHECK:       bb0([[ADDR:%[0-9]+]] : $*Optional<Int64>):
+// CHECK-NEXT:    debug_value [[ADDR]] : $*Optional<Int64>, let, name "x", transform {
+// CHECK:         bb0(%0 : $*Optional<Int64>):
+// CHECK-NEXT:      %1 = unchecked_inplace_enum_data_addr %0 : $*Optional<Int64>, #Optional.some!enumelt
+// CHECK-NEXT:      %2 = load %1 : $*Int64
+// CHECK-NEXT:      return %2 : $Int64
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[LOAD:%[0-9]+]] = load [trivial] [[ADDR]]
+// CHECK-NEXT:    [[DATA:%[0-9]+]] = unchecked_enum_data [[LOAD]]
+// CHECK-NEXT:    return [[DATA]]
+// CHECK-LABEL: } // end sil function 'test_load'
+sil [ossa] @test_load : $@convention(thin) (@in Optional<Int64>) -> Int64 {
+bb0(%0 : $*Optional<Int64>):
+  %1 = unchecked_inplace_enum_data_addr %0, #Optional.some!enumelt
+  debug_value %1, let, name "x", expr op_deref
+  %3 = load [trivial] %1
+  return %3
+}
+
+// A dead unchecked_inplace_enum_data_addr is salvaged as well.
+// This works because unchecked_inplace_enum_data_addr is just a bitcast, in this case.
+
+// CHECK-LABEL: sil [ossa] @test_destroy
+// CHECK:       bb0([[ADDR_DESTROY:%[0-9]+]] : $*Optional<Klass>):
+// CHECK-NEXT:    debug_value [[ADDR_DESTROY]] : $*Optional<Klass>, let, name "k", transform {
+// CHECK:         bb0(%0 : $*Optional<Klass>):
+// CHECK-NEXT:      %1 = unchecked_inplace_enum_data_addr %0 : $*Optional<Klass>, #Optional.some!enumelt
+// CHECK-NEXT:      %2 = load %1 : $*Klass
+// CHECK-NEXT:      return %2 : $Klass
+// CHECK-NEXT:    }
+// CHECK-NEXT:    destroy_addr [[ADDR_DESTROY]]
+// CHECK-LABEL: } // end sil function 'test_destroy'
+sil [ossa] @test_destroy : $@convention(thin) (@in Optional<Klass>) -> () {
+bb0(%0 : $*Optional<Klass>):
+  %1 = unchecked_inplace_enum_data_addr %0, #Optional.some!enumelt
+  debug_value %1, let, name "k", expr op_deref
+  destroy_addr %1
+  %4 = tuple ()
+  return %4
+}
+
+// Address-only types are supported.
+
+// CHECK-LABEL: sil [ossa] @test_destroy_address_only
+// CHECK:       bb0([[ADDR_GENERIC:%[0-9]+]] : $*Optional<T>):
+// CHECK-NEXT:    debug_value [[ADDR_GENERIC]] : $*Optional<T>, let, name "t", expr op_deref, transform {
+// CHECK:         bb0(%0 : $*Optional<T>):
+// CHECK-NEXT:      %1 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT:      return %1 : $*T
+// CHECK-NEXT:    }
+// CHECK-NEXT:    destroy_addr [[ADDR_GENERIC]]
+// CHECK-LABEL: } // end sil function 'test_destroy_address_only'
+sil [ossa] @test_destroy_address_only : $@convention(thin) <T> (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %1 = unchecked_inplace_enum_data_addr %0, #Optional.some!enumelt
+  debug_value %1, let, name "t", expr op_deref
+  destroy_addr %1
+  %4 = tuple ()
+  return %4
+}
+
+// When a unchecked_take_enum_data_addr or unchecked_borrow_enum_data_addr is optimized,
+// the debug_value is killed.
+// The unchecked_take_enum_data_addr instruction is destructive (having side effects), and the
+// unchecked_borrow_enum_data_addr instruction writes into a scratch allocation, so they cannot
+// be in a debug reconstruction block.
+
+// CHECK-LABEL: sil [ossa] @test_take
+// CHECK:       bb0([[ADDR_TAKE:%[0-9]+]] : $*Optional<Int64>):
+// CHECK-NEXT:    debug_value undef : $Int64, let, name "y"
+// CHECK-NEXT:    [[LOAD_TAKE:%[0-9]+]] = load [trivial] [[ADDR_TAKE]]
+// CHECK-NEXT:    [[DATA_TAKE:%[0-9]+]] = unchecked_enum_data [[LOAD_TAKE]]
+// CHECK-NEXT:    return [[DATA_TAKE]]
+// CHECK-LABEL: } // end sil function 'test_take'
+sil [ossa] @test_take : $@convention(thin) (@in Optional<Int64>) -> Int64 {
+bb0(%0 : $*Optional<Int64>):
+  %1 = unchecked_take_enum_data_addr %0, #Optional.some!enumelt
+  debug_value %1, let, name "y", expr op_deref
+  %3 = load [trivial] %1
+  return %3
+}

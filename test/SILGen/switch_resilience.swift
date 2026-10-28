@@ -23,6 +23,7 @@ import resilient_struct
 // CHECK-NEXT: br bb4
 //
 // CHECK: bb3:
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: destroy_addr [[STACK_SLOT_COPY]]
 // CHECK-NEXT: dealloc_stack [[STACK_SLOT_COPY]]
 // CHECK-NEXT: [[REPROJECT:%.*]] = tuple_element_addr [[VALUE]]

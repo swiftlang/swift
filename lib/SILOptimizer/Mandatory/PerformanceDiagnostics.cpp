@@ -13,13 +13,11 @@
 #define DEBUG_TYPE "performance-diagnostics"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/Support/Debug.h"
 
@@ -356,6 +354,7 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
         case BuiltinValueKind::IsPOD:
         case BuiltinValueKind::IsConcrete:
         case BuiltinValueKind::IsBitwiseTakable:
+        case BuiltinValueKind::TypedAllocationID:
           continue;
         default:
           break;

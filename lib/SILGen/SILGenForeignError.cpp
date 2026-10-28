@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ASTVisitor.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
@@ -19,7 +18,6 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -110,7 +108,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
 /// Emit a value of a certain integer-like type.
 static SILValue emitIntValue(SILGenFunction &SGF, SILLocation loc,
                              SILType type, unsigned value) {
-  if (auto structDecl = type.getStructOrBoundGenericStruct()) {
+  if (auto structDecl = type.getStructDecl()) {
     auto properties = structDecl->getStoredProperties();
     assert(properties.size() == 1);
     SILType fieldType = type.getFieldType(properties[0], SGF.SGM.M,

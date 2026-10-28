@@ -14,7 +14,7 @@ import Basic
 import ASTBridging
 
 /// A Swift type.
-/// It is not necessarily canonical, e.g. typealiases are not resolved.
+/// It is not necessarily canonical, e.g. typealiases are not desugared.
 public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildren {
   public enum TraitResult {
     case isNot
@@ -65,7 +65,7 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var optionalObjectType: Type {
     assert(self.isOptional)
-    return genericArgumentsOfBoundGenericType[0]
+    return genericArgumentsOfNominalType[0]
   }
 
   public var optionalType: Type {
@@ -102,8 +102,12 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     bridged.GenericTypeParam_getParamKind()
   }
 
-  public var genericArgumentsOfBoundGenericType: TypeArray {
-    TypeArray(bridged: bridged.BoundGenericType_getGenericArgs())
+  public var genericArgumentsOfNominalType: TypeArray {
+    TypeArray(bridged: bridged.NominalType_getGenericArgs())
+  }
+
+  public var elementTypesOfPackType: TypeArray {
+    TypeArray(bridged: bridged.PackType_getElementTypes())
   }
 }
 
@@ -130,6 +134,12 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   public func hasLocalArchetype(from environment: GenericEnvironment) -> Bool {
     bridged.hasLocalArchetypeFromEnvironment(environment.bridged)
   }
+
+  /// Collect the conformances of \c fromType to each of the protocols of an
+  /// existential type's layout.
+  public func collectExistentialConformances(existentialType: CanonicalType) -> ConformanceArray {
+    return ConformanceArray(bridged: bridged.collectExistentialConformances(existentialType.bridged))
+  }
 }
 
 /// Implements the common members of `AST.Type`, `AST.CanonicalType` and `SIL.Type`.
@@ -153,6 +163,7 @@ extension TypeProperties {
   public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
   public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
   public var isBuiltinFixedArray: Bool { rawType.bridged.isBuiltinFixedArray() }
+  public var isBuiltinBridgeObject: Bool { rawType.bridged.isBuiltinBridgeObject() }
 
   public var isClass: Bool {
     if let nominal = nominal, nominal is ClassDecl {
@@ -186,11 +197,13 @@ extension TypeProperties {
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
   public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }
   public var isUnownedStorageType: Bool { return rawType.bridged.isUnownedStorageType() }
+  public var isReferenceStorageType: Bool { rawType.bridged.isReferenceStorageType() }
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
   public var isPack: Bool { rawType.bridged.isPack() }
+  public var isPackExpansion: Bool { rawType.bridged.isPackExpansion() }
   public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
@@ -213,6 +226,11 @@ extension TypeProperties {
 
   /// True if this the nominal type `Swift.Optional`.
   public var isOptional: Bool { rawType.bridged.isOptional() }
+
+  /// True if no value of this type can exist, e.g. `Never`, a case-less enum, or a tuple which
+  /// contains such a type. Note that this doesn't take resilience into account: a case-less enum
+  /// from another module can gain cases in a future version of that module.
+  public var isStructurallyUninhabited: Bool { rawType.bridged.isStructurallyUninhabited() }
 
   /// A non-nil result type implies isUnsafe[Raw][Mutable]Pointer. A raw
   /// pointer has a `void` element type.
@@ -255,6 +273,7 @@ extension TypeProperties {
       case .ObjCMethod:            return .objCMethod
       case .WitnessMethod:         return .witnessMethod
       case .Closure:               return .closure
+      case .COMMethod:             return .comMethod
       case .CXXMethod:             return .cxxMethod
       case .KeyPathAccessorGetter: return .keyPathAccessorGetter
       case .KeyPathAccessorSetter: return .keyPathAccessorSetter
@@ -272,6 +291,7 @@ extension TypeProperties {
   public var hasArchetype: Bool { rawType.bridged.hasArchetype() }
   public var hasTypeParameter: Bool { rawType.bridged.hasTypeParameter() }
   public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
+  public var hasOpaqueArchetype: Bool { rawType.bridged.hasOpaqueArchetype() }
   /// True if this type mentions an existential (opened existential) archetype.
   public var hasExistentialArchetype: Bool { rawType.bridged.hasExistentialArchetype() }
   public var hasDynamicSelf: Bool { rawType.bridged.hasDynamicSelf() }
@@ -314,7 +334,7 @@ extension TypeProperties {
   public var isGenericAtAnyLevel: Bool { rawType.bridged.isGenericAtAnyLevel() }
 
   public var nominal: NominalTypeDecl? {
-    rawType.bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
+    rawType.bridged.getNominalDecl().getAs(NominalTypeDecl.self)
   }
 
   /// Performs a global conformance lookup for this type for `protocol`.
@@ -375,6 +395,9 @@ public enum FunctionTypeRepresentation {
   /// A closure invocation function that has not been bound to a context.
   case closure
 
+  /// A COM interface method with a foreign self-first calling convention.
+  case comMethod
+
   /// A C++ method that takes a "this" argument (not a static C++ method or constructor).
   /// Except for handling the "this" argument, has the same behavior as "CFunctionPointer".
   case cxxMethod
@@ -394,6 +417,7 @@ public enum FunctionTypeRepresentation {
       case .objCMethod:            return .ObjCMethod
       case .witnessMethod:         return .WitnessMethod
       case .closure:               return .Closure
+      case .comMethod:             return .COMMethod
       case .cxxMethod:             return .CXXMethod
       case .keyPathAccessorGetter: return .KeyPathAccessorGetter
       case .keyPathAccessorSetter: return .KeyPathAccessorSetter
@@ -466,3 +490,6 @@ extension CanonicalType: Hashable {
 }
 
 public typealias GenericTypeParameterKind = swift.GenericTypeParamKind
+
+/// The execution semantics of a function type, such as at-most-once.
+public typealias ExecutionSemantics = swift.ExecutionSemantics

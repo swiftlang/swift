@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -language-mode 6 -disable-availability-checking -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -language-mode 6 -target %target-swift-5.1-abi-triple -verify %s | %FileCheck %s
 
 ////////////////////////
 // MARK: Declarations //

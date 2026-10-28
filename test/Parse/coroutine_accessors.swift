@@ -388,18 +388,19 @@ var ir_rm_m: Int {
 
 // =============================================================================
 // Protocol Requirements
-// Note that `yielding mutate` is not allowed as a protocol requirement
 // =============================================================================
 
 protocol P {
   var goodP: Int { yielding borrow set } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
 
-  var badP: Int { yielding borrow yielding mutate } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
-                                                    //expected-error@-1{{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
+  // enabled: ok
+  // disabled: implicit getter.
+  var alsoGoodP: Int { yielding borrow yielding mutate } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
+                                                    //expected-disabled-error@-1{{accessor_requires_coroutine_accessors}}
 
   subscript(goodS goodS: Int) -> Int { yielding borrow set } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
 
-  subscript(badS badS: Int) -> Int { yielding borrow yielding mutate }  //expected-disabled-error{{accessor_requires_coroutine_accessors}}
-                                                    //expected-error@-1{{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
+  subscript(alsoGoodS alsoGoodS: Int) -> Int { yielding borrow yielding mutate }  //expected-disabled-error{{accessor_requires_coroutine_accessors}}
+                                                    //expected-disabled-error@-1{{accessor_requires_coroutine_accessors}}
 
 }

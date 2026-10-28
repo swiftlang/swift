@@ -300,28 +300,6 @@ public:
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 
-class MultiPayloadEnumDescriptorIterator
-    : public ReflectionSectionIteratorBase<MultiPayloadEnumDescriptorIterator,
-                                           MultiPayloadEnumDescriptor> {
-public:
-  MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-      : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum") {}
-
-  static std::optional<uint64_t>
-  getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
-    return MPER->getSizeInBytes();
-  }
-
-  static uint64_t getMinimumRecordSize() {
-    // MultiPayloadEnumDescriptor ends in a flexible `contents` array, so its
-    // sizeof only covers TypeName. getSizeInBytes() reads contents[0], so we
-    // need room for TypeName plus that first content word.
-    return sizeof(MultiPayloadEnumDescriptor) + sizeof(uint32_t);
-  }
-};
-using MultiPayloadEnumSection =
-    ReflectionSection<MultiPayloadEnumDescriptorIterator>;
-
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
@@ -332,7 +310,6 @@ struct ReflectionInfo {
   GenericSection TypeReference;
   GenericSection ReflectionString;
   GenericSection Conformance;
-  MultiPayloadEnumSection MultiPayloadEnum;
   llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames;
 };
 
@@ -582,10 +559,6 @@ public:
     /// Get the unsubstituted capture types for a closure context.
     ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
-    /// Get the multipayload enum projection information for a given TR
-    std::unique_ptr<MultiPayloadEnumDescriptorBase>
-    getMultiPayloadEnumDescriptor(const TypeRef *TR) override;
-
     const TypeRef *lookupTypeWitness(const std::string &MangledTypeName,
                                      const std::string &Member,
                                      StringRef Protocol);
@@ -607,8 +580,6 @@ public:
 
     /// Load unsubstituted field types for a nominal type.
     RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
-
-    RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
 
     void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
 
@@ -674,8 +645,7 @@ public:
 
   public:
     ///
-    /// Dumping typerefs, field declarations, builtin types, captures,
-    /// multi-payload enums
+    /// Dumping typerefs, field declarations, builtin types, captures
     ///
     void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
                      bool printTypeName = false);
@@ -684,7 +654,6 @@ public:
     void dumpFieldSection(std::ostream &stream);
     void dumpBuiltinTypeSection(std::ostream &stream);
     void dumpCaptureSection(std::ostream &stream);
-    void dumpMultiPayloadEnumSection(std::ostream &stream);
 
     template <template <typename Runtime> class ObjCInteropKind,
               unsigned PointerSize>
@@ -924,10 +893,6 @@ public:
       stream << "CONFORMANCES:\n";
       stream << "=============\n";
       dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
-      stream << "\n";
-      stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
-      stream << "===============================\n";
-      dumpMultiPayloadEnumSection(stream);
       stream << "\n";
     }
   };
@@ -1803,16 +1768,9 @@ public:
     return RDF.getClosureContextInfo(CD);
   }
 
-  /// Get the multipayload enum projection information for a given TR
-  std::unique_ptr<MultiPayloadEnumDescriptorBase>
-  getMultiPayloadEnumDescriptor(const TypeRef *TR);
-
 private:
   /// Get the primitive type lowering for a builtin type.
   RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
-
-  RemoteRef<MultiPayloadEnumDescriptor>
-  getMultiPayloadEnumInfo(const TypeRef *TR);
 
   std::optional<uint64_t> multiPayloadEnumPointerMask;
 
@@ -1843,6 +1801,7 @@ public:
     }
     return multiPayloadEnumPointerMask.value();
   }
+
   FieldTypeCollectionResult
   collectFieldTypes(std::optional<std::string> forMangledTypeName) {
     return RDF.collectFieldTypes(forMangledTypeName);
@@ -2083,6 +2042,8 @@ private:
         remote::RemoteAddress protocolDescriptorAddress) {
       std::optional<std::string> protocolName =
           readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+      if (!protocolName.has_value())
+        return std::nullopt;
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(
@@ -2104,15 +2065,19 @@ private:
       return constructFullyQualifiedNameFromContextChain(contextNameChain);
     }
 
-    remote::RemoteAddress getParentDescriptorAddress(
+    std::optional<remote::RemoteAddress> getParentDescriptorAddress(
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor) {
       auto parentOffsetAddress = contextDescriptorAddress.applyRelativeOffset(
           (int32_t)contextDescriptor->getParentOffset());
-      auto parentOfsetBytes =
+      auto parentOffsetBytes =
           OpaqueByteReader(parentOffsetAddress, sizeof(uint32_t));
-      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      if (!parentOffsetBytes.get()) {
+        Error = "Failed to read parent offset in a context descriptor.";
+        return std::nullopt;
+      }
+      auto parentFieldOffset = (const int32_t *)parentOffsetBytes.get();
       auto parentTargetAddress =
           parentOffsetAddress.applyRelativeOffset(*parentFieldOffset);
       return parentTargetAddress;
@@ -2168,9 +2133,19 @@ private:
         remote::RemoteAddress contextDescriptorAddress,
         const ExternalContextDescriptor<ObjCInteropKind, PointerSize>
             *contextDescriptor,
-        std::vector<ContextNameInfo> &chain) {
-      const auto parentDescriptorAddress = getParentDescriptorAddress(
+        std::vector<ContextNameInfo> &chain,
+        int recursion_limit = remote::defaultTypeRecursionLimit) {
+      if (recursion_limit <= 0) {
+        Error = "Parent context chain is too deep.";
+        return;
+      }
+
+      const auto optionalParentDescriptorAddress = getParentDescriptorAddress(
           contextDescriptorAddress, contextDescriptor);
+      if (!optionalParentDescriptorAddress.has_value())
+        return;
+      const auto parentDescriptorAddress =
+          optionalParentDescriptorAddress.value();
 
       auto addParentNameAndRecurse =
           [&](remote::RemoteAddress parentContextDescriptorAddress,
@@ -2193,7 +2168,7 @@ private:
         chain.push_back(parentNameInfo.value());
         if (!isModuleDescriptor(parentDescriptor)) {
           getParentContextChain(parentContextDescriptorAddress,
-                                parentDescriptor, chain);
+                                parentDescriptor, chain, recursion_limit - 1);
         }
       };
 
@@ -2309,14 +2284,16 @@ private:
     // Given that at a given offset from the opaque type descriptor base there
     // is an offset to a TypeRef string, read it.
     auto readRequirementTypeRefAddress =
-        [&](uintptr_t offsetFromOpaqueDescBase,
-            uintptr_t requirementAddress) -> remote::RemoteAddress {
+        [&](uintptr_t offsetFromOpaqueDescBase, uintptr_t requirementAddress)
+        -> std::optional<remote::RemoteAddress> {
       std::string typeRefString = "";
       auto fieldOffsetOffset = requirementAddress + offsetFromOpaqueDescBase -
                                (uintptr_t)opaqueTypeDescriptor;
       auto fieldOffsetAddress = opaqueTypeDescriptorAddress + fieldOffsetOffset;
       auto fieldOffsetBytes =
           OpaqueByteReader(fieldOffsetAddress, sizeof(uint32_t));
+      if (!fieldOffsetBytes.get())
+        return std::nullopt;
       auto fieldOffset = (const int32_t *)fieldOffsetBytes.get();
       auto fieldAddress = fieldOffsetAddress.applyRelativeOffset(*fieldOffset);
       return fieldAddress;
@@ -2347,19 +2324,25 @@ private:
         auto conformanceRequirementProtocolName =
             nameReader.readFullyQualifiedProtocolName(
                 protocolDescriptorAddress);
+        if (!conformanceRequirementProtocolName.has_value())
+          continue;
         protocolRequirements.push_back(*conformanceRequirementProtocolName);
       }
       if (req.getKind() == GenericRequirementKind::SameType) {
         // Read Param Name
         auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
                                                           (uintptr_t)(&req));
-        std::string demangledParamName =
-            nodeToString(demangleTypeRef(RDF.readTypeRef(paramAddress)));
+        if (!paramAddress.has_value())
+          continue;
+        std::string demangledParamName = nodeToString(
+            demangleTypeRef(RDF.readTypeRef(paramAddress.value())));
 
         // Read the substituted Type Name
         auto typeAddress = readRequirementTypeRefAddress(
             req.getSameTypeNameOffset(), (uintptr_t)(&req));
-        auto typeTypeRef = RDF.readTypeRef(typeAddress);
+        if (!typeAddress.has_value())
+          continue;
+        auto typeTypeRef = RDF.readTypeRef(typeAddress.value());
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;
