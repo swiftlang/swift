@@ -1012,8 +1012,7 @@ bool IRGenModule::isResilientConformance(
   if (conformanceModule != getSwiftModule()) {
     if (auto *nominal =
             conformance->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (nominal->isBackDeployedIntoClient() &&
-          conformanceModule == nominal->getParentModule())
+      if (nominal->emitsConformanceIntoClient(conformance->getDeclContext()))
         return true;
     }
   }
@@ -1086,9 +1085,8 @@ static bool isBackDeployedIntoClient(
   if (!normal)
     return false;
   auto nominal = normal->getType()->getAnyNominal();
-  return nominal && nominal->isBackDeployedIntoClient() &&
-         normal->getDeclContext()->getParentModule() ==
-             nominal->getParentModule();
+  return nominal &&
+         nominal->emitsConformanceIntoClient(normal->getDeclContext());
 }
 
 /// Determine whether a protocol can ever have a dependent conformance.

@@ -16,6 +16,18 @@
   }
 }
 
+// A protocol that is newer than the type, and a conformance to it that is only
+// available where this module provides the type.
+@available(macOS 99, *)
+public protocol NewerProtocol {
+  func newerRequirement() -> Int
+}
+
+@available(macOS 99, *)
+extension Point: NewerProtocol {
+  public func newerRequirement() -> Int { x }
+}
+
 public protocol Transformer {
   associatedtype Element
   func transform<U>(_ f: (Element) -> U) -> [U]

@@ -77,6 +77,11 @@ import MyKit
 
 // NEWER-NEGATIVE-NOT: $s5MyKit5PointV5newerSiyFTw
 
+// A conformance that is only available where MyKit provides the type, such as
+// a conformance to a protocol that is newer than the type, isn't back-deployed
+// with the type, so the client doesn't emit a copy of it.
+// NEWER-NEGATIVE-NOT: NewerProtocol
+
 // HIGH-DAG: @"$s5MyKit5PointVN" = external global %swift.type
 // HIGH-DAG: declare swiftcc i64 @"$s5MyKit5PointV1xACSi_tcfC"(i64)
 // HIGH-DAG: declare swiftcc i1 @"$s5MyKit5PointV2eeoiySbAC_ACtFZ"(i64, i64)

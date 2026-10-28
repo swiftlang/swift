@@ -128,9 +128,8 @@ void SILGenModule::useConformance(SILInstruction *inst,
 bool SILGenModule::isBackDeployedIntoClient(
     const NormalProtocolConformance *conformance) {
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  return nominal && nominal->isBackDeployedIntoClient() &&
-         conformance->getDeclContext()->getParentModule() ==
-             nominal->getParentModule();
+  return nominal &&
+         nominal->emitsConformanceIntoClient(conformance->getDeclContext());
 }
 
 void SILGenModule::useConformancesFromSubstitutions(
