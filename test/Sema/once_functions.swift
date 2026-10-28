@@ -81,7 +81,7 @@ func impliedEscaping(atMostOnceFn: @escaping @callable(once) () -> Void) {
 
 protocol P {
   func run(_: @callable(once) () -> Void)
-  // expected-note@-1 {{protocol requires function 'run' with type '(consuming @callable(once) () -> Void) -> ()'}}
+  // expected-note@-1 {{protocol requires function 'run' with type '(@callable(once) () -> Void) -> ()'}}
 }
 
 struct S1: P { // expected-error {{type 'S1' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
@@ -161,7 +161,7 @@ struct TestWitnessAndAssociatedTypeMismatch : PA { // expected-error {{type 'Tes
 protocol PR {
   func f(_: (Int) -> Int)
   func g(_: @callable(once) (Int) -> Int)
-  // expected-note@-1 {{protocol requires function 'g' with type '(consuming @callable(once) (Int) -> Int) -> ()'}}
+  // expected-note@-1 {{protocol requires function 'g' with type '(@callable(once) (Int) -> Int) -> ()'}}
 }
 
 struct TestDifferentWitnesses : PR { // expected-error {{type 'TestDifferentWitnesses' does not conform to protocol 'PR'}}
@@ -185,7 +185,7 @@ protocol PA_Contravariant {
 struct TestContravariantAssociatedTypeInference : PA_Contravariant { // expected-error {{type 'TestContravariantAssociatedTypeInference' does not conform to protocol 'PA_Contravariant'}}
   // expected-note@-1 {{add stubs for conformance}}
   func f(_: (@callable(once) (Int) -> Int) -> Void) { }
-  // expected-note@-1 {{candidate has non-matching type '((consuming @callable(once) (Int) -> Int) -> Void) -> ()' [with A = (Int) -> Int]}}
+  // expected-note@-1 {{candidate has non-matching type '((@callable(once) (Int) -> Int) -> Void) -> ()' [with A = (Int) -> Int]}}
 }
 
 protocol P_PlainResult {
@@ -318,7 +318,7 @@ func exactlyOnceTupleOwnership(
 // exactly-once parameters are `consuming` by default.
 protocol P_ExactlyOnce {
   func run(_: @once () -> Void)
-  // expected-note@-1 {{protocol requires function 'run' with type '(consuming @once () -> Void) -> ()'}}
+  // expected-note@-1 {{protocol requires function 'run' with type '(@once () -> Void) -> ()'}}
   func runNested(_: (@once () -> Void) -> Void)
 }
 
@@ -439,7 +439,7 @@ func conversionJoin(
 // Parameters
 protocol Completable {
   func onCompletion(_ body: @once () -> Void)
-  // expected-note@-1 2 {{protocol requires function 'onCompletion' with type '(consuming @once () -> Void) -> ()'}}
+  // expected-note@-1 2 {{protocol requires function 'onCompletion' with type '(@once () -> Void) -> ()'}}
 }
 
 struct Request: Completable {
@@ -455,7 +455,7 @@ struct Broadcast: Completable { // expected-error {{type 'Broadcast' does not co
 struct Retry: Completable { // expected-error {{type 'Retry' does not conform to protocol 'Completable'}}
   // expected-note@-1 {{add stubs for conformance}}
   func onCompletion(_ body: @callable(once) () -> Void) {}
-  // expected-note@-1 {{candidate has non-matching type '(consuming @callable(once) () -> Void) -> ()'}}
+  // expected-note@-1 {{candidate has non-matching type '(@callable(once) () -> Void) -> ()'}}
 }
 
 protocol CompletableAtMostOnce {
@@ -1011,4 +1011,46 @@ func callRethrowsMissingTry() {
   rethrowsForwardOnce { throw RethrowsError() }
   // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
   // expected-note@-2 {{call is to 'rethrows' function, but argument function can throw}}
+}
+
+// MARK: - Printing
+
+// Diagnostics don't print the `consuming` that at-most-once semantics imply.
+
+func printedAndAtMostOnce(
+  _ lhs: Bool, _ rhs: @autoclosure @callable(once) () -> Bool
+) -> Bool {
+  lhs ? rhs() : false
+}
+
+func printedExplicitlyConsuming(_: consuming @once () -> Void) {}
+func printedInOut(_: inout @callable(once) () -> Void) {}
+func printedExplicitlyConsumingInFunctionType(
+  _: (consuming @callable(once) () -> Void) -> Void
+) {}
+
+// A typealias or `sending` doesn't imply `consuming`, so it's printed.
+typealias PrintedAtMostOnce = @callable(once) () -> Void
+
+func printedAlias(_: PrintedAtMostOnce) {}
+func printedConsumingAlias(_: consuming PrintedAtMostOnce) {}
+func printedConsumingSending(
+  _: consuming sending @escaping @callable(once) () -> Void
+) {}
+
+func printedTypes() {
+  let _: Int = printedAndAtMostOnce
+  // expected-error@-1 {{cannot convert value of type '(Bool, @autoclosure @callable(once) () -> Bool) -> Bool' to specified type 'Int'}}
+  let _: Int = printedExplicitlyConsuming
+  // expected-error@-1 {{cannot convert value of type '(@once () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedInOut
+  // expected-error@-1 {{cannot convert value of type '(inout @callable(once) () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedExplicitlyConsumingInFunctionType
+  // expected-error@-1 {{cannot convert value of type '((@callable(once) () -> Void) -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedAlias
+  // expected-error@-1 {{cannot convert value of type '(PrintedAtMostOnce) -> ()' (aka '(@callable(once) () -> ()) -> ()') to specified type 'Int'}}
+  let _: Int = printedConsumingAlias
+  // expected-error@-1 {{cannot convert value of type '(consuming PrintedAtMostOnce) -> ()' (aka '(@callable(once) () -> ()) -> ()') to specified type 'Int'}}
+  let _: Int = printedConsumingSending
+  // expected-error@-1 {{cannot convert value of type '(consuming sending @escaping @callable(once) () -> Void) -> ()' to specified type 'Int'}}
 }
