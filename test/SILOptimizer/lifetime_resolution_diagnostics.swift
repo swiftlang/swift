@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s
 
 // Use-after-consume / use-before-init diagnostics emitted by LifetimeResolution
 // and LifetimeResolutionDiagnose.
@@ -342,6 +342,7 @@ struct EmptyStruct {
 }
 
 enum EmptyEnum {
+  case empty
   init() {}  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
@@ -363,18 +364,30 @@ func testEmpties_ubi() {
 func testEmpties_uac() {
   let s: EmptyStruct
   s = EmptyStruct()
-  _ = consume s  // expected-warning {{has no effect}}
+  _ = consume s  // expected-warning {{'consume' applied to bitwise-copyable type}}
   _ = s
 
   let e: EmptyEnum
   e = EmptyEnum()
-  _ = consume e  // expected-warning {{has no effect}}
+  _ = consume e  // expected-warning {{'consume' applied to bitwise-copyable type}}
   _ = e
 
   let c: EmptyClass
   c = EmptyClass()
   _ = consume c  // expected-note {{consumed here}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
   _ = c          // expected-error {{'c' used after consume}}
+}
+
+enum UninhabitedEnum {
+  init() { }  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+  init(fixed: Void) { fatalError() }
+}
+
+func testUninhabited() {
+  let e: UninhabitedEnum
+  e = UninhabitedEnum()  // expected-warning {{will never be executed}}  // expected-note {{a call to a never-returning function}}
+  _ = consume e // expected-warning {{'consume' applied to bitwise-copyable type}}
+  _ = e
 }
 
 struct Point {

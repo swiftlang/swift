@@ -88,6 +88,44 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
 }
 
+static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
+  P.addClosureLifetimeFixup();
+
+  // Main sequence for LifetimeResolution
+  P.addRemoveSILGenLifetimes();
+  P.addLifetimeResolution();
+  P.addLifetimeResolutionDiagnose();
+
+  // Remaining pieces of DefiniteInitialization we still rely-on.
+  P.addLetPropertyLowering();
+  P.addRawSILInstLowering();
+
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly.
+  P.addImplicitDestroyChecker();
+}
+
+static void addLegacyMoveCheckingPasses(SILPassPipelinePlan &P) {
+  P.addClosureLifetimeFixup();
+
+  // These happen after ClosureLifetimeFixup because they depend on the
+  // resolution of nonescaping closure lifetimes to correctly check the use
+  // of move-only values as captures in nonescaping closures as borrows.
+
+  // Check noImplicitCopy and move only types for objects and addresses.
+  P.addMoveOnlyChecker();
+
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly. This relies on the move-only
+  // checker having made every destroy explicit.
+  P.addImplicitDestroyChecker();
+
+  // Check no uses after consume operator of a value in an address.
+  P.addConsumeOperatorCopyableAddressesChecker();
+  // No uses after consume operator of copyable value.
+  P.addConsumeOperatorCopyableValuesChecker();
+}
+
 // This pipeline defines a set of mandatory diagnostic passes and a set of
 // supporting optimization passes that enable those diagnostics. These are run
 // before any performance optimizations and in contrast to those optimizations
@@ -100,9 +138,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMarkNeverWrittenMutableClosureBoxesAsImmutable();
 
-  // Under LifetimeResolution, we run this earlier.
-  if (!P.getOptions().EnableLifetimeResolution)
-    P.addDiagnoseInvalidEscapingCaptures();
+  P.addDiagnoseInvalidEscapingCaptures();
 
   P.addReferenceBindingTransform();
   P.addNestedSemanticFunctionCheck();
@@ -112,9 +148,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-  // Under LifetimeResolution, we run this earlier.
-  if (!P.getOptions().EnableLifetimeResolution)
-    P.addMandatoryAllocBoxToStack();
+  P.addMandatoryAllocBoxToStack();
 
   // Needs to run after MandatoryAllocBoxToStack, because MandatoryAllocBoxToStack
   // can convert dynamic accesses to static accesses.
@@ -123,11 +157,17 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
 
-  /// Passes for performing definite initialization.
-  /// Must be run together in this order.
-  P.addDefiniteInitialization();
-  P.addLetPropertyLowering();
-  P.addRawSILInstLowering();
+  const auto &Options = P.getOptions();
+
+  if (Options.EnableLifetimeResolution) {
+    addLifetimeResolutionPasses(P);
+  } else {
+    // Passes for performing definite initialization.
+    // Must be run together in this order.
+    P.addDefiniteInitialization();
+    P.addLetPropertyLowering();
+    P.addRawSILInstLowering();
+  }
 
   P.addAddressLowering();
 
@@ -157,31 +197,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // and `differentiable_function` instructions.
   P.addDifferentiation();
 
-  const auto &Options = P.getOptions();
-
-  // Under LifetimeResolution, we run this earlier.
+  // Under LifetimeResolution, we don't need to run the move checker.
   if (!Options.EnableLifetimeResolution)
-    P.addClosureLifetimeFixup();
-
-  //===---
-  // Begin Ownership Optimizations
-  //
-  // These happen after ClosureLifetimeFixup because they depend on the
-  // resolution of nonescaping closure lifetimes to correctly check the use
-  // of move-only values as captures in nonescaping closures as borrows.
-
-  // Check noImplicitCopy and move only types for objects and addresses.
-  P.addMoveOnlyChecker();
-
-  // Check that values that must be consumed, like those of `~Deinitable`
-  // types, are never destroyed implicitly. This relies on the move-only
-  // checker having made every destroy explicit.
-  P.addImplicitDestroyChecker();
-
-  // Check no uses after consume operator of a value in an address.
-  P.addConsumeOperatorCopyableAddressesChecker();
-  // No uses after consume operator of copyable value.
-  P.addConsumeOperatorCopyableValuesChecker();
+    addLegacyMoveCheckingPasses(P);
 
   // Check ~Escapable.
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
@@ -192,10 +210,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // until we can audit the later part of the pipeline. Eventually, this should
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
-
-  //
-  // End Ownership Optimizations
-  //===---
 
 #ifndef NDEBUG
   // Add a verification pass to check our work when skipping
@@ -314,23 +328,6 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
-
-  if (P.getOptions().EnableLifetimeResolution) {
-    // First, run passes that LifetimeResolution currently depends on.
-
-    if (P.getOptions().EnableLifetimeDependenceDiagnostics)
-      P.addLifetimeDependenceInsertion();
-
-    P.addDiagnoseInvalidEscapingCaptures();  // Precedes ClosureLifetimeFixup.
-    P.addMandatoryAllocBoxToStack();
-    P.addClosureLifetimeFixup();
-
-    // Now, actually begin LifetimeResolution.
-    P.addRemoveSILGenLifetimes();
-    P.addLifetimeResolution();
-    P.addLifetimeResolutionDiagnose();
-    return P;
-  }
 
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceInsertion();
