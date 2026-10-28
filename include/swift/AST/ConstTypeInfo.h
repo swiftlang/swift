@@ -17,6 +17,7 @@
 #include "swift/AST/Type.h"
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace swift {
@@ -504,13 +505,15 @@ private:
   std::string MemberLabel;
 };
 
-struct InterpolatedStringSegment {
-  bool IsInterpolation;
-  /// Non-null for raw literal segments (IsInterpolation = false).
+struct RawStringSegment {
   std::shared_ptr<CompileTimeValue> Value;
-  /// Non-empty for interpolation segments (IsInterpolation = true).
+};
+
+struct InterpolationSegment {
   std::vector<FunctionParameter> Arguments;
 };
+
+using InterpolatedStringSegment = std::variant<RawStringSegment, InterpolationSegment>;
 
 /// A representation of an Interpolated String Literal
 class InterpolatedStringLiteralValue : public CompileTimeValue {

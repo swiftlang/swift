@@ -25,6 +25,7 @@
 #include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -499,11 +500,11 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
             if (isInterpolation) {
               auto args = extractFunctionArguments(segment->getArgs(),
                                                   declContext);
-              segments.push_back({true, nullptr, args});
+              segments.push_back(InterpolationSegment{args});
             } else {
               auto arg = segment->getArgs()->get(0);
               auto value = extractCompileTimeValue(arg.getExpr(), declContext);
-              segments.push_back({false, value, {}});
+              segments.push_back(RawStringSegment{value});
             }
           });
 
@@ -994,26 +995,29 @@ void writeValue(llvm::json::OStream &JSON,
       JSON.attributeArray("segments", [&] {
         for (auto &seg : interpolatedStringValue->getSegments()) {
           JSON.object([&] {
-            if (seg.IsInterpolation) {
-              // Backwards-compatible rule: a single unlabeled argument uses the
-              // existing flat format so existing consumers are unaffected.
-              if (seg.Arguments.size() == 1 && seg.Arguments[0].Label.empty()) {
-                writeValue(JSON, seg.Arguments[0].Value);
-              } else {
-                JSON.attributeArray("arguments", [&] {
-                  for (auto &param : seg.Arguments) {
-                    JSON.object([&] {
-                      JSON.attribute("label", param.Label);
-                      JSON.attribute("type",
-                                     toFullyQualifiedTypeNameString(param.Type));
-                      writeValue(JSON, param.Value);
-                    });
-                  }
-                });
+            std::visit(llvm::makeVisitor(
+              [&](const RawStringSegment &raw) {
+                writeValue(JSON, raw.Value);
+              },
+              [&](const InterpolationSegment &interp) {
+                // Backwards-compatible rule: a single unlabeled argument uses the
+                // existing flat format so existing consumers are unaffected.
+                if (interp.Arguments.size() == 1 && interp.Arguments[0].Label.empty()) {
+                  writeValue(JSON, interp.Arguments[0].Value);
+                } else {
+                  JSON.attributeArray("arguments", [&] {
+                    for (auto &param : interp.Arguments) {
+                      JSON.object([&] {
+                        JSON.attribute("label", param.Label);
+                        JSON.attribute("type",
+                                       toFullyQualifiedTypeNameString(param.Type));
+                        writeValue(JSON, param.Value);
+                      });
+                    }
+                  });
+                }
               }
-            } else {
-              writeValue(JSON, seg.Value);
-            }
+            ), seg);
           });
         }
       });
