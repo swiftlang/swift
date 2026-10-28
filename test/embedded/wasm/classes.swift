@@ -5,7 +5,7 @@
 // RUN:   -enable-experimental-feature Embedded -Xcc -fdeclspec -disable-stack-protector \
 // RUN:   -o %t/check.o
 // RUN: %clang -target wasm32-unknown-none-wasm %t/check.o %t/rt.c -nostdlib \
-// RUN:   -I %swift_src_root/stdlib/public/EmbeddedPlatform -o %t/check.wasm
+// RUN:   -o %t/check.wasm
 // RUN: %target-run %t/check.wasm
 // REQUIRES: executable_test
 // REQUIRES: CPU=wasm32
@@ -46,7 +46,7 @@ int posix_memalign(void **memptr, size_t alignment, size_t size) {
 // platform layer, which covers the custom-platform configuration where
 // clients implement the hooks themselves. Only the hooks this program
 // references are implemented.
-#include "swift/EmbeddedPlatform.h"
+#include <swift/EmbeddedPlatform.h>
 
 void *_swift_allocate(__swift_size_t alignment, __swift_size_t size,
                       swift_alloc_flags_t flags) {
