@@ -4369,12 +4369,36 @@ static bool isEscaping(Type type) {
   return false;
 }
 
-static void printParameterFlags(ASTPrinter &printer,
-                                const PrintOptions &options,
-                                const ParamDecl *param,
-                                ParameterTypeFlags flags,
-                                bool escaping,
-                                bool isIsolatedToCaller = false) {
+/// Returns true if printing a parameter with \p flags and type \p type
+/// shows that it's consuming without printing `consuming`, as printing a
+/// function type with at-most-once semantics does.
+static bool isImplicitlyConsuming(Type type, ParameterTypeFlags flags,
+                                  const PrintOptions &options) {
+  if (!options.SuppressImpliedConsumingParams)
+    return false;
+
+  // A `sending` parameter that isn't written as `consuming` has a different
+  // specifier.
+  if (!type || flags.isSending())
+    return false;
+
+  // A parameter whose type is written as a typealias isn't consuming unless
+  // it's written as such.
+  auto *funcType = dyn_cast<AnyFunctionType>(type.getPointer());
+  if (!funcType)
+    return false;
+
+  auto semantics = funcType->getExecutionSemantics();
+  return semantics &&
+         !options.excludeAttrKind(*semantics == ExecutionSemantics::Once
+                                      ? TypeAttrKind::Once
+                                      : TypeAttrKind::Callable);
+}
+
+static void
+printParameterFlags(ASTPrinter &printer, const PrintOptions &options,
+                    const ParamDecl *param, ParameterTypeFlags flags, Type type,
+                    bool escaping, bool isIsolatedToCaller = false) {
   // Always print `nonisolated(nonsending)` specifier on a parameter
   // first, to avoid any issues with ordering.
   if (isIsolatedToCaller) {
@@ -4392,7 +4416,8 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("borrowing", options, " ");
     break;
   case ParamSpecifier::Consuming:
-    printer.printKeyword("consuming", options, " ");
+    if (!isImplicitlyConsuming(type, flags, options))
+      printer.printKeyword("consuming", options, " ");
     break;
   case ParamSpecifier::LegacyShared:
     printer.printKeyword("__shared", options, " ");
@@ -4575,7 +4600,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
-      printParameterFlags(Printer, Options, param, paramFlags,
+      printParameterFlags(Printer, Options, param, paramFlags, type,
                           isEscaping(type) && !isEnumElement,
                           isNonisolatedNonsending);
     }
@@ -4851,7 +4876,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
         if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options))
           printParameterFlags(Printer, Options, nullptr,
-                              yield.getFlags().asParamFlags(), false);
+                              yield.getFlags().asParamFlags(), Type(), false);
 
         printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
       }
@@ -7600,7 +7625,7 @@ public:
         Printer << "...";
       } else {
         printParameterFlags(Printer, Options, nullptr,
-                            Param.getParameterFlags(), isEscaping(type));
+                            Param.getParameterFlags(), type, isEscaping(type));
         visit(type);
       }
     }
