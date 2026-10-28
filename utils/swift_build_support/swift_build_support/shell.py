@@ -163,14 +163,14 @@ def pushd(path, dry_run=None, echo=True):
         os.chdir(old_dir)
 
 
-def makedirs(path, dry_run=None, echo=True):
+def makedirs(path, dry_run=None, echo=True, exist_ok=False):
     dry_run = _coerce_dry_run(dry_run)
     if dry_run or echo:
         _echo_command(dry_run, ['mkdir', '-p', path])
     if dry_run:
         return
     if not os.path.isdir(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=exist_ok)
 
 
 def rmtree(path, dry_run=None, echo=True):
@@ -191,6 +191,15 @@ def copytree(src, dest, dry_run=None, ignore_pattern=None, echo=True):
         return
     ignore = shutil.ignore_patterns(ignore_pattern) if ignore_pattern else None
     shutil.copytree(src, dest, ignore=ignore)
+
+
+def copy(src, dest, dry_run=None, echo=True):
+    dry_run = _coerce_dry_run(dry_run)
+    if dry_run or echo:
+        _echo_command(dry_run, ['cp', src, dest])
+    if dry_run:
+        return
+    shutil.copy(src, dest)
 
 
 def symlink(source, dest, dry_run=None, echo=True):

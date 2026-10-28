@@ -64,8 +64,8 @@ class WasmKit(product.Product):
         # Copy the built binary to ./bin
         dest_bin_path = self.__class__.cli_file_path(self.build_dir)
         print("Copying wasmkit-cli to: " + dest_bin_path, flush=True)
-        os.makedirs(os.path.dirname(dest_bin_path), exist_ok=True)
-        shutil.copy(bin_path, dest_bin_path)
+        shell.makedirs(os.path.dirname(dest_bin_path), exist_ok=True)
+        shell.copy(bin_path, dest_bin_path)
 
     @classmethod
     def cli_file_path(cls, build_dir):
@@ -84,7 +84,16 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
 
     if host_target.startswith('macos'):
         # Universal binary on macOS
-        platform_args = ['--arch', 'x86_64', '--arch', 'arm64']
+        tool_archs = [
+            host.split('-')[1]
+            for host in [host_target] + [
+                cross_compile_host for cross_compile_host in product.args.cross_compile_hosts
+                if cross_compile_host.startswith("macos")
+            ]
+        ]
+        platform_args = []
+        for arch in tool_archs:
+            platform_args += ['--arch', arch]
     elif set_installation_rpath:
         # Library rpath for swift, dispatch, Foundation, etc. when installing
         build_os = host_target.split('-')[0]
@@ -113,6 +122,9 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
 
     shell.call(build_args, env=env)
 
-    bin_dir_path = shell.capture(
-        build_args + ['--show-bin-path'], dry_run=False, echo=False).rstrip()
+    if shell.dry_run:
+        bin_dir_path = product.build_dir
+    else:
+        bin_dir_path = shell.capture(
+            build_args + ['--show-bin-path'], dry_run=False, echo=False).rstrip()
     return os.path.join(bin_dir_path, swiftpm_package_product_name)
