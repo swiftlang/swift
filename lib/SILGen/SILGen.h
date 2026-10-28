@@ -370,6 +370,12 @@ public:
   bool requiresBackDeploymentThunk(ValueDecl *decl,
                                    ResilienceExpansion expansion);
 
+  /// Returns a reference to the back deployment thunk for the given constant
+  /// if it must be referenced through one in a context with the given
+  /// resilience expansion. Otherwise, returns the constant unchanged.
+  SILDeclRef getBackDeploymentEntryPoint(SILDeclRef constant,
+                                         ResilienceExpansion expansion);
+
   /// Emits a thunk that calls either the original function if it is available
   /// or otherwise calls a fallback variant of the function that was emitted
   /// into the client module.

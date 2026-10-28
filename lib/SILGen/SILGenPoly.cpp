@@ -7501,7 +7501,10 @@ getWitnessFunctionRef(SILGenFunction &SGF,
           NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
           diffFn);
     }
-    return SGF.emitGlobalFunctionRef(loc, witness);
+
+    return SGF.emitGlobalFunctionRef(
+        loc, SGF.SGM.getBackDeploymentEntryPoint(
+                 witness, SGF.F.getResilienceExpansion()));
   case WitnessDispatchKind::Dynamic:
     assert(!witness.getDerivativeFunctionIdentifier());
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();

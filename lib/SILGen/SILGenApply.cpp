@@ -1230,14 +1230,12 @@ public:
     }
 
     // A call to `@backDeployed` function may need to go through a thunk.
+    auto declRef = SGF.SGM.getBackDeploymentEntryPoint(
+        SILDeclRef(afd), SGF.F.getResilienceExpansion());
+    if (declRef.isBackDeploymentThunk())
+      return declRef;
 
-    if (SGF.SGM.requiresBackDeploymentThunk(afd,
-                                            SGF.F.getResilienceExpansion())) {
-      return SILDeclRef(afd).asBackDeploymentKind(
-          SILDeclRef::BackDeploymentKind::Thunk);
-    }
-
-    return SILDeclRef(afd).asForeign(
+    return declRef.asForeign(
         !isConstructorWithGeneratedAllocatorThunk(afd) &&
         requiresForeignEntryPoint(afd));
   }
@@ -7273,14 +7271,11 @@ void SILGenFunction::emitApplyOfUnavailableCodeReached() {
     return;
   }
 
-  auto declRef = SILDeclRef(fd);
-  if (SGM.requiresBackDeploymentThunk(fd, F.getResilienceExpansion())) {
-    // The standard library entry point for the diagnostic function was
-    // introduced in Swift 5.9 so we call the back deployment thunk in case this
-    // code will execute on an older runtime.
-    declRef =
-        declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
-  }
+  // The standard library entry point for the diagnostic function was
+  // introduced in Swift 5.9 so we call the back deployment thunk in case this
+  // code will execute on an older runtime.
+  auto declRef = SGM.getBackDeploymentEntryPoint(SILDeclRef(fd),
+                                                 F.getResilienceExpansion());
 
   emitApplyOfLibraryIntrinsic(loc, declRef, SubstitutionMap(), {},
                               SGFContext());
@@ -8085,10 +8080,10 @@ PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
 
 SILDeclRef SILGenModule::getFuncDeclRef(FuncDecl *funcDecl,
                                         ResilienceExpansion expansion) {
-  auto declRef = SILDeclRef(funcDecl, SILDeclRef::Kind::Func);
-
-  if (requiresBackDeploymentThunk(funcDecl, expansion))
-    return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
+  auto declRef = getBackDeploymentEntryPoint(
+      SILDeclRef(funcDecl, SILDeclRef::Kind::Func), expansion);
+  if (declRef.isBackDeploymentThunk())
+    return declRef;
 
   return declRef.asForeign(requiresForeignEntryPoint(funcDecl));
 }
