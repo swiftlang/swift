@@ -132,7 +132,7 @@ bb6:
 // CHECK:   [[P0:%.*]] = extractvalue { ptr, ptr } [[INS1]], 0
 // CHECK:   [[P1:%.*]] = extractvalue { ptr, ptr } [[INS1]], 1
 // CHECK:   call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @does_throw_async.0, ptr {{%.*}}, ptr {{%.*}}, ptr [[P0]], ptr [[P1]], ptr inttoptr (i64 1 to ptr))
-// CHECK:   unreachable
+// CHECK:   ret void
 
 sil @does_throw_async : $@convention(thin) @async () -> @error S {
   %0 = function_ref @create_error : $@convention(thin) () -> @owned A
@@ -148,7 +148,7 @@ sil @does_throw_async : $@convention(thin) @async () -> @error S {
 // CHECK:   [[P0:%.*]] = extractvalue { ptr, ptr } [[CMB:%.*]], 0
 // CHECK:   [[P1:%.*]] = extractvalue { ptr, ptr } [[CMB]], 1
 // CHECK:   call void (ptr, i1, ...) @llvm.coro.end.async(ptr {{.*}}, i1 false, ptr @does_not_throw_async.0, ptr {{.*}}, ptr {{.*}}, ptr [[P0]], ptr [[P1]], ptr null)
-// CHECK:   unreachable
+// CHECK:   ret void
 sil @does_not_throw_async : $@convention(thin) @async () -> (@owned A, @error S) {
   %0 = function_ref @create_error : $@convention(thin) () -> @owned A
   %1 = apply %0() : $@convention(thin) () -> @owned A
