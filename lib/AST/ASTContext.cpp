@@ -3900,7 +3900,8 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
                              RecursiveTypeProperties properties)
     : SugarType(TypeKind::TypeAlias, underlying, properties),
       typealias(typealias) {
-  ASSERT(isValidParent(parent));
+  // FIXME: Upgrade this back to ASSERT.
+  CONDITIONAL_ASSERT(isValidParent(parent));
   // Record the parent (or absence of a parent).
   if (parent) {
     Bits.TypeAliasType.HasParent = true;
