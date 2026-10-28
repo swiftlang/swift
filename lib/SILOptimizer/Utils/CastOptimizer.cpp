@@ -865,6 +865,22 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   llvm_unreachable("Unknown kind of bridging");
 }
 
+/// Whether \p dest must be preserved in mandatory passes.
+static bool isVariableOrLexicalStorage(SILValue dest) {
+  auto *ASI = dyn_cast<AllocStackInst>(dest);
+  return ASI && (ASI->getVarInfo() || ASI->isLexical());
+}
+
+/// Marks the variable stored in \p dest as optimized out, for when the cast
+/// that initializes \p dest is removed.
+static void killDestVariable(SILBuilder &B, SILValue dest) {
+  auto *ASI = dyn_cast<AllocStackInst>(dest);
+  if (!ASI)
+    return;
+  if (auto varInfo = ASI->getVarInfo())
+    B.createDebugValue(ASI->getLoc(), SILUndef::get(ASI), *varInfo);
+}
+
 //===----------------------------------------------------------------------===//
 //                         Cast Optimizer Public API
 //===----------------------------------------------------------------------===//
@@ -902,6 +918,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   }
 
   bool ResultNotUsed = !Dest || isa<AllocStackInst>(Dest);
+  // When preserving debug info, a variable counts as a use.
+  if (Dest && preserveDebugInfo && isVariableOrLexicalStorage(Dest))
+    ResultNotUsed = false;
   if (ResultNotUsed && Dest) {
     for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
@@ -942,6 +961,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       // A test_only cast has no destination, and so no destroys of one to
       // clean up.
       if (Dest) {
+        killDestVariable(Builder, Dest);
         for (auto iter = Dest->use_begin(); iter != Dest->use_end();) {
           SILInstruction *user = (*iter++)->getUser();
           if (isa<DestroyAddrInst>(user))
@@ -1619,6 +1639,9 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     SILValue dest = dynamicCast.getDest();
     bool ResultNotUsed = isa<AllocStackInst>(dest);
     DestroyAddrInst *DestroyDestInst = nullptr;
+    // When preserving debug info, a variable counts as a use.
+    if (preserveDebugInfo && isVariableOrLexicalStorage(dest))
+      ResultNotUsed = false;
     if (ResultNotUsed) {
       for (auto Use : dest->getUses()) {
         auto *User = Use->getUser();
@@ -1638,6 +1661,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
       SILBuilderWithScope B(Inst, builderContext);
       if (!Inst->isCopy())
         B.createDestroyAddr(Loc, dynamicCast.getSource());
+      killDestVariable(B, dest);
       if (DestroyDestInst)
         eraseInstAction(DestroyDestInst);
       eraseInstAction(Inst);
