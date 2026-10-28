@@ -1846,6 +1846,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t TaskExecutorPreferenceIdentity = 0xc69e; // = 50846
   const uint16_t TaskExecutorPreferenceImplementation = 0x3dac; // = 15788
 
+  /// The task waiting on a task group. It's address-diversified.
+  const uint16_t TaskGroupWaitQueue = 0x69ea; // = 27114
+
   /// Result type metadata stored in a future task or task group.
   const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
