@@ -2859,7 +2859,8 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
 
   // Avoid revisiting this apply.
   bool erased = pass.indirectApplies.erase(apply);
-  assert(erased && "all results should be rewritten at the same time");
+  assert((erased || loweredCalleeConv.hasGuaranteedAddressResult()) &&
+         "all results should be rewritten at the same time");
   (void)erased;
 
   // List of new call arguments.
