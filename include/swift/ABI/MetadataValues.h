@@ -1881,6 +1881,9 @@ namespace SpecialPointerAuthDiscriminators {
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
 
+  /// The object passed to an isolated deinit body.
+  const uint16_t IsolatedDeinitJobObject = 0xe281; // = 57985
+
   /// IsCurrentGlobalActor function used between the Swift runtime and
   /// concurrency runtime.
   const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
