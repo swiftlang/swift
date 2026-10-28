@@ -24,5 +24,5 @@ public func test() async {
 // CHECK:   call {{.*}}%swift.async_task_and_context @swift_task_create
 // CHECK:   call {{.*}}@swift_release
 // CHECK:   call {{.*}}@llvm.coro.end.async
-// CHECK:   unreachable
+// CHECK:   ret void
 // CHECK: }
