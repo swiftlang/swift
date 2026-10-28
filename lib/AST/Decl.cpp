@@ -1851,15 +1851,22 @@ minimumAvailabilityForLinkage(const Decl *decl) {
   return std::nullopt;
 }
 
-AvailabilityRange Decl::getAvailabilityForLinkage() const {
+/// Computes the availability of \p decl for linkage purposes.
+///
+/// \p honorBackDeployment says whether to use the "before" version of a
+/// \c \@backDeployed attribute on \p decl or on the declarations it inherits
+/// availability from.
+static AvailabilityRange availabilityForLinkage(const Decl *decl,
+                                                bool honorBackDeployment) {
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
-  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange())
-    return backDeployedAttrAndRange->second;
+  if (honorBackDeployment)
+    if (auto backDeployedAttrAndRange = decl->getBackDeployedAttrAndRange())
+      return backDeployedAttrAndRange->second;
 
-  auto annotatedRange = AvailabilityInference::annotatedAvailableRange(this);
+  auto annotatedRange = AvailabilityInference::annotatedAvailableRange(decl);
   if (annotatedRange.has_value()) {
-    if (auto minRange = minimumAvailabilityForLinkage(this))
+    if (auto minRange = minimumAvailabilityForLinkage(decl))
       annotatedRange->intersectWith(*minRange);
 
     return *annotatedRange;
@@ -1867,23 +1874,30 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
   // FIXME: Adopt Decl::parentDeclForAvailability()
   // here instead of duplicating the logic.
-  if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    return accessor->getStorage()->getAvailabilityForLinkage();
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl))
+    return availabilityForLinkage(accessor->getStorage(), honorBackDeployment);
 
-  if (auto *opaqueTypeDecl = dyn_cast<OpaqueTypeDecl>(this))
-    return opaqueTypeDecl->getNamingDecl()->getAvailabilityForLinkage();
+  if (auto *opaqueTypeDecl = dyn_cast<OpaqueTypeDecl>(decl))
+    return availabilityForLinkage(opaqueTypeDecl->getNamingDecl(),
+                                  honorBackDeployment);
 
-  if (auto *ext = dyn_cast<ExtensionDecl>(this))
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
     if (auto *nominal = ext->getExtendedNominal())
-      return nominal->getAvailabilityForLinkage();
+      return availabilityForLinkage(
+          nominal, honorBackDeployment &&
+                       nominal->getModuleContext() == ext->getModuleContext());
 
-  auto *dc = getDeclContext();
+  auto *dc = decl->getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    return ext->getAvailabilityForLinkage();
+    return availabilityForLinkage(ext, honorBackDeployment);
   else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
-    return nominal->getAvailabilityForLinkage();
+    return availabilityForLinkage(nominal, honorBackDeployment);
 
   return AvailabilityRange::alwaysAvailable();
+}
+
+AvailabilityRange Decl::getAvailabilityForLinkage() const {
+  return availabilityForLinkage(this, /*honorBackDeployment=*/true);
 }
 
 bool Decl::isAlwaysWeakImported() const {
