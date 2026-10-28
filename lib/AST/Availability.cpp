@@ -142,10 +142,12 @@ static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
                                           const InferredAvailability &Inferred,
                                           ASTContext &Context) {
   // If there is no information that would go into the availability attribute,
-  // don't create one.
-  if (Inferred.Kind == AvailableAttr::Kind::Default && !Inferred.Introduced &&
-      !Inferred.Deprecated && !Inferred.Obsoleted && Inferred.Message.empty() &&
-      Inferred.Rename.empty())
+  // don't create one. An attribute for an unversioned domain doesn't need any
+  // additional information, though, since it's valid without a version (e.g.
+  // `@available(SomeCustomDomain)`).
+  if (Domain.isVersioned() && Inferred.Kind == AvailableAttr::Kind::Default &&
+      !Inferred.Introduced && !Inferred.Deprecated && !Inferred.Obsoleted &&
+      Inferred.Message.empty() && Inferred.Rename.empty())
     return nullptr;
 
   llvm::VersionTuple Introduced =

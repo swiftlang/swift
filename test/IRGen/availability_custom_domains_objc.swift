@@ -8,7 +8,8 @@
 // RUN:   --implicit-check-not=DisabledDomain \
 // RUN:   --implicit-check-not=disabledDomain \
 // RUN:   --implicit-check-not=setPropertyWithDisabledSetter \
-// RUN:   --implicit-check-not=propertyWithDisabledSetterSivsTo
+// RUN:   --implicit-check-not=propertyWithDisabledSetterSivs \
+// RUN:   --implicit-check-not=propertyWithDisabledSetterSivM
 // RUN: %FileCheck %s --input-file %t.ir --check-prefix=CHECK-METADATA
 
 // REQUIRES: objc_interop
