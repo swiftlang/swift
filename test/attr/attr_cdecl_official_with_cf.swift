@@ -30,6 +30,7 @@ class SwiftClass {}
 @c(unmanagedAnyObjectParam) func unmanagedAnyObjectParam(a: Unmanaged<AnyObject>) { }
 // expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
 // expected-note@-2 {{Swift structs cannot be represented in C}}
+// expected-note@-3 {{use '@objc' to expose this function to Objective-C}}
 
 // CF types that are not bridged to an Objective-C class are representable too.
 @c(cfTreeParams) func cfTreeParams(a: CFTree, b: CFTree?) { }
@@ -54,10 +55,13 @@ typealias MyTypeRef = CFTypeRef
 @c(anyObjectParam) func anyObjectParam(a: AnyObject) { }
 // expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
 // expected-note@-2 {{protocols cannot be represented in C}}
+// expected-note@-3 {{use '@objc' to expose this function to Objective-C}}
 @c(anyObjectReturn) func anyObjectReturn() -> AnyObject? { fatalError() }
 // expected-error@-1 {{global function cannot be marked '@c' because its result type cannot be represented in C}}
+// expected-note@-2 {{use '@objc' to expose this function to Objective-C}}
 
 // Neither does 'Any'.
 @c(anyParam) func anyParam(a: Any) { }
 // expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
 // expected-note@-2 {{protocols cannot be represented in C}}
+// expected-note@-3 {{use '@objc' to expose this function to Objective-C}}

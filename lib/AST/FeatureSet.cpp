@@ -231,7 +231,8 @@ static bool usesFeatureTargetAttribute(Decl *decl) {
 
 static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
   for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
-    if (attr->isExported())
+    // Exported functions and types, and non-exported types.
+    if (attr->isExported() || isa<NominalTypeDecl>(decl))
       return true;
   return false;
 }

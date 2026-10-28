@@ -691,10 +691,19 @@ static bool isExportedSpecializedBodyOf(const SILFunction *parent,
       return true;
 
   // An erased function loses its SIL attributes, but keeps its declaration.
-  if (auto *decl = parent->getDeclRef().getAbstractFunctionDecl())
+  if (auto *decl = parent->getDeclRef().getAbstractFunctionDecl()) {
     for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
       if (attr->isExported() && matches(attr->getSpecializedSignature(decl)))
         return true;
+    // A member also gets exported specializations from its type's attributes
+    // (see SILFunctionBuilder, which also skips default argument generators).
+    SmallVector<std::pair<GenericSignature, bool>, 2> typeLevelSigs;
+    if (!parent->getDeclRef().isDefaultArgGenerator())
+      SpecializedAttr::getTypeLevelSpecializations(decl, typeLevelSigs);
+    if (llvm::any_of(typeLevelSigs,
+                     [&](auto sig) { return sig.second && matches(sig.first); }))
+      return true;
+  }
   return false;
 }
 

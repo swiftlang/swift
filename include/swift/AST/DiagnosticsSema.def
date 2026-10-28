@@ -1409,6 +1409,10 @@ ERROR(foreign_reference_subclass_cannot_have_deinit,none,
       "deinitializer cannot be declared in %kind0 because it subclasses a C++ "
       "foreign reference type",
       (const ValueDecl *))
+ERROR(foreign_reference_subclass_cannot_be_generic,none,
+      "%kind0 cannot be %select{generic|declared in a generic context}1 "
+      "because it subclasses a C++ foreign reference type",
+      (const ValueDecl *, bool))
 ERROR(operator_in_unrelated_type,none,
       "member operator %2%select{| of protocol %0}1 must have at least one "
       "argument of type %select{%0|'Self'}1",
@@ -2328,6 +2332,9 @@ NOTE(cxx_reference_param_aliasing,none,
 NOTE(cxx_reference_param_declared_here,none,
      "%select{parameter|%1}0 declared as a C++ reference here",
      (bool, const clang::NamedDecl *))
+NOTE(cdecl_suggest_objc,none,
+     "use '@objc' to expose this function to Objective-C",
+     ())
 
 // @used and @section
 ERROR(section_empty_name,none,
@@ -8143,7 +8150,7 @@ ERROR(resilient_associated_type_less_available_requires_default,none,
 //------------------------------------------------------------------------------
 
 ERROR(specialize_attr_nongeneric_trailing_where,none,
-      "trailing 'where' clause in %select{'_specialize'|'specialized'}1 attribute of non-generic function %0", (DeclName, bool))
+      "trailing 'where' clause in %select{'_specialize'|'specialized'}1 attribute of non-generic %select{function|type}2 %0", (DeclName, bool, bool))
 ERROR(specialize_missing_where_clause,none,
       "missing 'where' clause in %select{'_specialize'|'specialized'}0 attribute", (bool))
 ERROR(specialize_empty_where_clause,none,
@@ -8168,6 +8175,13 @@ ERROR(specialized_attr_exported_experimental,none,
 ERROR(specialized_attr_exported_library_evolution,none,
       "'@specialized(exported: true)' is not supported in a module built "
       "with library evolution", ())
+ERROR(specialized_attr_exported_not_public,none,
+      "'@specialized(exported: true)' requires a public declaration", ())
+ERROR(specialized_attr_exported_not_public_type,none,
+      "'@specialized(exported: true)' requires %0 to be public", (Type))
+ERROR(specialized_attr_type_experimental,none,
+      "'@specialized' on a type requires "
+      "'-enable-experimental-feature ExtendedSpecializedAttribute'", ())
 ERROR(specialized_attr_exported_emitted_into_client,none,
       "'@specialized(exported: true)' cannot be combined with "
       "%select{'@export(implementation)'|'@_alwaysEmitIntoClient'|"

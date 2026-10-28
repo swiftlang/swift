@@ -176,3 +176,9 @@ final class SubWithDeinit: SubclassableShared {
   var s = ""
   deinit {} // expected-error {{deinitializer cannot be declared in class 'SubWithDeinit' because it subclasses a C++ foreign reference type}}
 }
+
+final class GenericSub<T>: SubclassableShared {} // expected-error {{generic class 'GenericSub' cannot be generic because it subclasses a C++ foreign reference type}}
+
+struct GenericOuter<T> {
+  final class NestedSub: SubclassableShared {} // expected-error {{class 'NestedSub' cannot be declared in a generic context because it subclasses a C++ foreign reference type}}
+}

@@ -5170,7 +5170,9 @@ public:
 };
 
 /// Check a function that is exported to a foreign language for compatibility
-/// with that language. This covers @c, @_cdecl, and @cxx.
+/// with that language. This covers @c, @_cdecl, and @cxx, as well as @objc
+/// on a top-level function (SE-0495); \p attr is the attribute that
+/// requested the export.
 class TypeCheckForeignFunctionRequest
     : public SimpleRequest<TypeCheckForeignFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
@@ -5327,7 +5329,7 @@ public:
 
 class SerializeAttrGenericSignatureRequest
     : public SimpleRequest<SerializeAttrGenericSignatureRequest,
-                           GenericSignature(const AbstractFunctionDecl *,
+                           GenericSignature(const Decl *,
                                             AbstractSpecializeAttr *),
                            RequestFlags::SeparatelyCached> {
 public:
@@ -5336,8 +5338,7 @@ public:
 private:
   friend SimpleRequest;
 
-  GenericSignature evaluate(Evaluator &evaluator,
-                            const AbstractFunctionDecl *decl,
+  GenericSignature evaluate(Evaluator &evaluator, const Decl *decl,
                             AbstractSpecializeAttr *attr) const;
 
 public:

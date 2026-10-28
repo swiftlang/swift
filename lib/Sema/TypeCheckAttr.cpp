@@ -1613,7 +1613,10 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     else if (attr->hasName() && EED->getParentCase()->getElements().size() > 1)
       error = diag::objc_enum_case_multi;
   } else if (auto *func = dyn_cast<FuncDecl>(D)) {
-    if (!checkObjCDeclContext(D))
+    // A top-level function may be @objc (SE-0495): it is exposed as a
+    // C-callable entry point that accepts Objective-C types, rather than an
+    // Objective-C method.
+    if (!checkObjCDeclContext(D) && !func->isObjCGlobalFunction())
       error = diag::invalid_objc_decl_context;
     else if (auto accessor = dyn_cast<AccessorDecl>(func))
       if (!accessor->isGetterOrSetter()) {
@@ -1655,8 +1658,9 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   if (auto objcName = attr->getName()) {
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
         || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)
-        || isa<ExtensionDecl>(D)) {
-      // Types and properties can only have nullary
+        || isa<ExtensionDecl>(D)
+        || (isa<FuncDecl>(D) && cast<FuncDecl>(D)->isObjCGlobalFunction())) {
+      // Types, properties, and top-level functions can only have nullary
       // names. Complain and recover by chopping off everything
       // after the first name.
       if (objcName->getNumArgs() > 0) {
@@ -3783,9 +3787,30 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
   }
 }
 
+/// Returns a type that a specialization uses but that isn't public, if any.
+static Type getNonPublicSpecializedType(Decl *D, SpecializedAttr *attr) {
+  auto sig = attr->getSpecializedSignature(D);
+  if (!sig)
+    return Type();
+  Type nonPublic;
+  for (auto param : sig.getGenericParams())
+    if (auto concrete = sig->getConcreteType(param))
+      concrete.findIf([&](Type type) {
+        auto *nominal = type->getAnyNominal();
+        if (nominal && !nominal->getFormalAccessScope().isPublic())
+          nonPublic = type;
+        return bool(nonPublic);
+      });
+  return nonPublic;
+}
+
 /// Type check that a set of requirements provided by @_specialize/@specialize.
 /// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
+  // On a type, '@specialized' is experimental.
+  if (isa<NominalTypeDecl>(D) && !attr->isExported() &&
+      !Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
+    diagnose(attr->getLocation(), diag::specialized_attr_type_experimental);
   if (attr->isExported()) {
     if (!Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
       diagnose(attr->getLocation(),
@@ -3793,6 +3818,12 @@ void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
     else if (D->getModuleContext()->isResilient())
       diagnose(attr->getLocation(),
                diag::specialized_attr_exported_library_evolution);
+    // Clients can only use specializations of declarations they can see.
+    else if (!cast<ValueDecl>(D)->getFormalAccessScope().isPublic())
+      diagnose(attr->getLocation(), diag::specialized_attr_exported_not_public);
+    else if (auto type = getNonPublicSpecializedType(D, attr))
+      diagnose(attr->getLocation(),
+               diag::specialized_attr_exported_not_public_type, type);
     // The library can't own the specialized body of code that is emitted
     // into its clients.
     else if (D->getAttrs().hasAttribute<TransparentAttr>())
@@ -3825,8 +3856,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   visitAbstractSpecializeAttr(attr);
 }
 void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr) {
-  auto *FD = cast<AbstractFunctionDecl>(D);
-  auto genericSig = FD->getGenericSignature();
+  auto *VD = cast<ValueDecl>(D);
+  auto genericSig = D->getAsGenericContext()->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
@@ -3848,37 +3879,39 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
   if (!genericSig) {
     // Only generic functions are permitted to have trailing where clauses.
     diagnose(attr->getLocation(),
-             diag::specialize_attr_nongeneric_trailing_where, FD->getName(),
-             attr->isPublic())
+             diag::specialize_attr_nongeneric_trailing_where, VD->getName(),
+             attr->isPublic(), isa<NominalTypeDecl>(D))
         .highlight(trailingWhereClause->getSourceRange());
     return;
   }
 
-  (void)attr->getSpecializedSignature(FD);
+  (void)attr->getSpecializedSignature(D);
 
   // Force resolution of interface types written in requirements here to check
   // that generic types satisfy generic requirements, and so on.
-  WhereClauseOwner(FD, attr)
+  WhereClauseOwner(D->getInnermostDeclContext(), attr)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
 }
 
 GenericSignature
 SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
-                                               const AbstractFunctionDecl *FD,
+                                               const Decl *D,
                                                AbstractSpecializeAttr *attr) const {
   if (attr->specializedSignature)
     return attr->specializedSignature;
 
-  auto &Ctx = FD->getASTContext();
-  auto genericSig = FD->getGenericSignature();
+  auto &Ctx = D->getASTContext();
+  auto *GC = D->getAsGenericContext();
+  auto genericSig = GC ? GC->getGenericSignature() : GenericSignature();
   if (!genericSig)
     return nullptr;
 
   InferredGenericSignatureRequest request{
       genericSig.getPointer(),
       /*genericParams=*/nullptr,
-      WhereClauseOwner(const_cast<AbstractFunctionDecl *>(FD), attr),
+      WhereClauseOwner(const_cast<DeclContext *>(D->getInnermostDeclContext()),
+                       attr),
       /*addedRequirements=*/{},
       /*inferenceSources=*/{},
       attr->getLocation(),
@@ -3900,7 +3933,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
               dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
         if (attributedTy->has(TypeAttrKind::NoMetadata)) {
           const auto resolution = TypeResolution::forInterface(
-              FD->getDeclContext(), genericSig, std::nullopt,
+              D->getDeclContext(), genericSig, std::nullopt,
               /*unboundTyOpener*/ nullptr,
               /*placeholderHandler*/ nullptr,
               /*packElementOpener*/ nullptr);
@@ -3913,7 +3946,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   attr->setTypeErasedParams(typeErasedParams);
 
   // Check the target function if there is one.
-  attr->getTargetFunctionDecl(FD);
+  attr->getTargetFunctionDecl(cast<ValueDecl>(D));
 
   return specializedSig;
 }
