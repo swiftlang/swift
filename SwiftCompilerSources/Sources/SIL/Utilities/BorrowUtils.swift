@@ -282,6 +282,11 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
       return val.uses.walk { return visitor($0) }
     case .partialApply:
       // We currently assume that closure lifetimes are always complete (destroyed on all paths).
+      //
+      // FIXME: This doesn't match PartialApplyInst::visitOnStackLifetimeEnds in C++, which also follows the closure
+      // through move_value, into the closures that capture it, and through stack slots that hold nothing but the
+      // closure, such as the slot of an inlined `consuming` parameter. This walk stops at those uses instead, so it
+      // can end the borrow scope too early.
       return visitOwnedDependent(value: val, context, visitor)
     case .markDependence:
       return visitOwnedDependent(value: val, context, visitor)
