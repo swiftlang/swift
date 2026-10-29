@@ -350,7 +350,40 @@ extension Duration {
 
   @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Duration) -> Double {
-    Double(lhs.attoseconds) / Double(rhs.attoseconds)
+    let a = lhs.attoseconds.magnitude
+    let b = rhs.attoseconds.magnitude
+    // When both magnitudes are exactly representable, IEEE 754 division is
+    // already correctly rounded. This also handles zero and division by zero,
+    // matching the previous behavior for those inputs.
+    if a <= 1 << 53 && b <= 1 << 53 || a == 0 || b == 0 {
+      return Double(lhs.attoseconds) / Double(rhs.attoseconds)
+    }
+    // Long division until the quotient has at least 55 significant bits
+    // (53 for the significand, one guard bit, and one bit for round-to-odd).
+    var (m, r) = a.quotientAndRemainder(dividingBy: b)
+    var exponent = 0
+    while m < 1 << 54 {
+      // r < b <= 2**127, so shifting r left by this amount cannot overflow.
+      let shift = Swift.min(Swift.max(b.leadingZeroBitCount, 1),
+                            55 - (128 - m.leadingZeroBitCount))
+      let (digits, remainder) =
+        (r << shift).quotientAndRemainder(dividingBy: b)
+      m = m << shift | digits
+      r = remainder
+      exponent -= shift
+    }
+    var sticky = r != 0
+    let excess = 55 - (128 - m.leadingZeroBitCount)
+    if excess < 0 {
+      sticky = sticky || m & ((1 << -excess) - 1) != 0
+      m >>= -excess
+      exponent -= excess
+    }
+    // Round to odd at 55 bits, then the conversion rounds to nearest at 53
+    // bits; with two extra bits this gives the correctly rounded result.
+    if sticky { m |= 1 }
+    let sign: FloatingPointSign = (lhs < .zero) != (rhs < .zero) ? .minus : .plus
+    return Double(sign: sign, exponent: exponent, significand: Double(UInt64(m)))
   }
 
   @available(StdlibDeploymentTarget 5.7, *)
