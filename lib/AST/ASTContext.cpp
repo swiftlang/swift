@@ -4807,8 +4807,8 @@ NominalType *NominalType::get(NominalTypeDecl *D,
     break;
 
   case DeclKind::Protocol:
-    assert(genericArgs.empty());
-    return ProtocolType::get(cast<ProtocolDecl>(D), parent, C);
+    ASSERT(genericArgs.empty());
+    return ProtocolType::get(cast<ProtocolDecl>(D), parent);
 
   case DeclKind::BuiltinTuple:
     ABORT("should not end up here with BuiltinTuple");
@@ -6209,26 +6209,30 @@ OptionalType *OptionalType::get(Type base) {
   return entry = new (C, arena) OptionalType(C, base, properties);
 }
 
-ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
-                                const ASTContext &C) {
+ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
   properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
+  auto &C = D->getASTContext();
+  bool isCanonical = !Parent || Parent->isCanonical();
+
   auto *&known = C.getImpl().getArena(arena).ProtocolTypes[{D, Parent}];
   if (!known) {
-    known = new (C, arena) ProtocolType(D, Parent, C, properties);
+    known = new (C, arena) ProtocolType(D, Parent,
+                                        isCanonical ? &C : nullptr,
+                                        properties);
   }
   return known;
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
-                           const ASTContext &Ctx,
+                           const ASTContext *Ctx,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, TheDecl, Parent, /*args*/ {},
-                &Ctx, properties) {}
+                Ctx, properties) {}
 
 Type ExistentialType::get(Type constraint) {
   auto &C = constraint->getASTContext();
