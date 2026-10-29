@@ -1090,8 +1090,13 @@ static void reparentClosuresInSendOperand(Expr *operand, DeclContext *oldDC,
         return Action::SkipNode(E);
       }
       if (auto *expansion = dyn_cast<MacroExpansionExpr>(E)) {
-        if (expansion->getDeclContext() == OldDC)
+        if (expansion->getDeclContext() == OldDC) {
+          // Assign the discriminator in the context where the expansion was
+          // written: lowering the 'send' may move it back there, as an
+          // argument which is evaluated at the call site
+          (void)expansion->getDiscriminator();
           expansion->setDeclContext(NewDC);
+        }
       }
       return Action::Continue(E);
     }

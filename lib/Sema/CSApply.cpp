@@ -4144,11 +4144,10 @@ namespace {
 
         // A default argument is evaluated at the call site too, unless it is
         // isolated to the callee's actor (SE-0411), which is only satisfied
-        // in the closure; or it is a caller-side default like '#line', which
-        // does not depend on where it is evaluated
+        // in the closure. That includes a caller-side default like '#line'
+        // or '#isolation', which must see the caller's context, not the
+        // closure's
         if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(argExpr)) {
-          if (defaultArg->isCallerSide())
-            continue;
           if (defaultArg->getRequiredIsolation().isActorIsolated())
             continue;
           args->setExpr(i, captureArg(argExpr, i));
