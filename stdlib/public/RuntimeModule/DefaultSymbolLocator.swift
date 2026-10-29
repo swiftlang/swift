@@ -154,39 +154,67 @@ open class DefaultSymbolLocator: SymbolLocator {
 
     if let realImagePath = realPath(imagePath) {
       let imageDir = dirname(realImagePath)
-      let debugLink: String?
-      let debugAltLink: String?
+      let debugLink: (link: String, crc: UInt32)?
+      let debugAltLink: (link: String, uuid: [UInt8])?
 
       switch result {
         case let .elf32Image(elfImage):
-          debugLink = elfImage.getDebugLink()?.link
-          debugAltLink = elfImage.getDebugAltLink()?.link
+          debugLink = elfImage.getDebugLink().map { ($0.link, $0.crc) }
+          debugAltLink = elfImage.getDebugAltLink().map { ($0.link, $0.uuid) }
 
         case let .elf64Image(elfImage):
-          debugLink = elfImage.getDebugLink()?.link
-          debugAltLink = elfImage.getDebugAltLink()?.link
+          debugLink = elfImage.getDebugLink().map { ($0.link, $0.crc) }
+          debugAltLink = elfImage.getDebugAltLink().map { ($0.link, $0.uuid) }
       }
 
-      let tryLink = { [self] (_ link: String) -> (any SymbolSource)? in
-        let path1 = "\(imageDir)\(sep)\(link)"
-        if let result = loadElfImage(path: path1, uuid: image.uuid) {
-          return toSymbolSource(result)
+      // Look for the file named by a .gnu_debuglink or .gnu_debugaltlink
+      // section.  A file found via .gnu_debuglink has the same UUID as the
+      // image and must match the CRC recorded in the section, whereas one
+      // found via .gnu_debugaltlink has the UUID recorded in that section.
+      let tryLink = { [self] (_ link: String,
+                              _ uuid: [UInt8]?,
+                              _ crc: UInt32?) -> (any SymbolSource)? in
+        let paths: [String]
+        if link.hasPrefix(sep) {
+          // Absolute links are used as-is
+          paths = [link]
+        } else {
+          paths = [
+            "\(imageDir)\(sep)\(link)",
+            "\(imageDir)\(sep).debug\(sep)\(link)",
+            // The global debug directory mirrors the image's own directory
+            "\(symbolPath)\(sep)\(imageDir)\(sep)\(link)",
+          ]
         }
 
-        let path2 = "\(imageDir)\(sep).debug\(sep)\(link)"
-        if let result = loadElfImage(path: path2, uuid: image.uuid) {
-          return toSymbolSource(result)
-        }
+        for path in paths {
+          guard let result = loadElfImage(path: path, uuid: uuid) else {
+            continue
+          }
 
-        let path3 = "\(elfSymbolPath)\(sep)\(imageDir)\(sep)\(link)"
-        if let result = loadElfImage(path: path3, uuid: image.uuid) {
+          if let crc {
+            let actualCRC: UInt32
+            switch result {
+              case let .elf32Image(elfImage):
+                actualCRC = elfImage.debugLinkCRC
+              case let .elf64Image(elfImage):
+                actualCRC = elfImage.debugLinkCRC
+            }
+            if actualCRC != crc {
+              continue
+            }
+          }
+
           return toSymbolSource(result)
         }
 
         return nil
       }
 
-      if let debugAltLink = debugAltLink, let source = tryLink(debugAltLink) {
+      if let debugAltLink = debugAltLink,
+         let source = tryLink(debugAltLink.link,
+                           debugAltLink.uuid,
+                           nil) {
         if let uuid = image.uuid {
           cache[.uuid(uuid)] = source
         } else if let path = image.path {
@@ -195,7 +223,10 @@ open class DefaultSymbolLocator: SymbolLocator {
         return source
       }
 
-      if let debugLink = debugLink, let source = tryLink(debugLink) {
+      if let debugLink = debugLink,
+         let source = tryLink(debugLink.link,
+                           image.uuid,
+                           debugLink.crc) {
         if let uuid = image.uuid {
           cache[.uuid(uuid)] = source
         } else if let path = image.path {
