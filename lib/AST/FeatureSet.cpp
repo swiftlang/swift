@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
@@ -614,7 +615,42 @@ static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
-UNINTERESTING_FEATURE(SendCalls)
+static bool usesFeatureSendCalls(Decl *decl) {
+  // Whether the body of 'afd' is printed into a module interface, because it
+  // is inlinable, and contains a 'send' call
+  auto hasInlinableSendCall = [](AbstractFunctionDecl *afd) {
+    if (afd->getResilienceExpansion() != ResilienceExpansion::Minimal ||
+        !afd->hasInlinableBodyText())
+      return false;
+    auto *body = afd->getBody(/*canSynthesize=*/false);
+    if (!body)
+      return false;
+
+    class SendCallFinder : public ASTWalker {
+    public:
+      bool found = false;
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        // The body is printed as written, so only an explicit 'send' matters
+        if (isa<SendExpr>(E) && !E->isImplicit()) {
+          found = true;
+          return Action::Stop();
+        }
+        return Action::Continue(E);
+      }
+    };
+
+    SendCallFinder finder;
+    body->walk(finder);
+    return finder.found;
+  };
+
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
+    return hasInlinableSendCall(afd);
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+    return llvm::any_of(storage->getAllAccessors(), hasInlinableSendCall);
+  return false;
+}
 
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   auto *VD = dyn_cast<ValueDecl>(decl);
