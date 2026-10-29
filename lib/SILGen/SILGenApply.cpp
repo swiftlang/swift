@@ -3995,6 +3995,16 @@ private:
       }
       if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
                                                               paramOwnership)) {
+        // Under opaque values, an addressable parameter is still lowered as an
+        // '@in_guaranteed' parameter, but that is a by-value object rather than
+        // an address. Load the addressable buffer so the argument matches the
+        // callee's convention. AddressLowering forwards the buffer's address
+        // back into the call, which keeps the address stable.
+        if (!SGF.silConv.isSILIndirect(ParamInfos.front())) {
+          assert(paramOwnership == ValueOwnership::Shared &&
+                 "only guaranteed addressable parameters can be object typed");
+          addr = SGF.emitManagedLoadBorrow(ApplyLoc, addr.getValue());
+        }
         claimNextParameters(1);
         Args.push_back(addr);
         return;
