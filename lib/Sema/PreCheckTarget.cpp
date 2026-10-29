@@ -1580,6 +1580,10 @@ public:
           diags.diagnose(loc, diag::send_requires_call);
           return finish(false, new (Ctx) ErrorExpr(NE->getSourceRange()));
         }
+      } else {
+        // Let overload resolution prefer a '@oneway' callee for this
+        // call
+        operandCall->setIsOnewaySendOperand();
       }
       // Wrap the operand as 'try await <call>' inside an
       // 'async throws(any Error)' operation closure. 'await' handles the

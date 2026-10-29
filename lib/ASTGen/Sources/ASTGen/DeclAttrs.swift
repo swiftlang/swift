@@ -228,6 +228,8 @@ extension ASTGenVisitor {
         return handle(self.generateCallableAttr(attribute: node)?.asDeclAttribute)
       case .ScopeParams:
         return handle(self.generateScopeParamsAttr(attribute: node)?.asDeclAttribute)
+      case .Oneway:
+        return handle(self.generateOnewayAttr(attribute: node))
       case .Coroutine:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Coroutine))
       case nil where attrName == "_unavailableInEmbedded":
@@ -312,6 +314,7 @@ extension ASTGenVisitor {
         .NSManaged,
         .ObjCMembers,
         .ObjCNonLazyRealization,
+        .OnewayNever,
         .Owned,
         .Preconcurrency,
         .PropertyWrapper,
@@ -2880,6 +2883,44 @@ extension ASTGenVisitor {
   }
 
 
+
+  /// E.g.
+  ///   ```
+  ///   @oneway
+  ///   @oneway(never)
+  ///   ```
+  /// '@oneway(never)' is a separate attribute, which contradicts '@oneway'.
+  func generateOnewayAttr(attribute node: AttributeSyntax) -> BridgedDeclAttribute? {
+    var kind: swift.DeclAttrKind = .Oneway
+    if node.arguments != nil {
+      let isNever: Bool? = self.generateWithLabeledExprListArguments(attribute: node) { args in
+        guard let arg = args.first else {
+          self.diagnose(.expectedNeverInOnewayAttribute(node))
+          return nil
+        }
+        guard arg.label == nil,
+          let declRef = arg.expression.as(DeclReferenceExprSyntax.self),
+          declRef.argumentNames == nil, declRef.moduleSelector == nil,
+          declRef.baseName.rawText == "never"
+        else {
+          self.diagnose(.expectedNeverInOnewayAttribute(arg))
+          return nil
+        }
+        args = args.dropFirst()
+        return true
+      }
+      guard isNever == true else {
+        return nil
+      }
+      kind = .OnewayNever
+    }
+    return BridgedDeclAttribute.createSimple(
+      self.ctx,
+      kind: kind,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName)
+    )
+  }
 
   func generateSimpleDeclAttr(declModifier node: DeclModifierSyntax, kind: swift.DeclAttrKind) -> BridgedDeclAttribute? {
     // TODO: Diagnose non-modifier kind? Parser shouldn't accept them, though.

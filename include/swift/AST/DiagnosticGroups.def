@@ -126,6 +126,8 @@ GROUP(UselessConditionalStatement,none,"useless-conditional-statement")
 GROUP(VariableNeverMutated,none,"variable-never-mutated")
 GROUP(WeakMutability,none,"weak-mutability")
 GROUP(OldSuppressedAssociatedTypes,none,"old-suppressed-associatedtypes")
+GROUP(AwaitedOnewayCall,none,"awaited-oneway-call")
+GROUP(SentOnewayNeverCall,none,"sent-oneway-never-call")
 
 GROUP_LINK(PerformanceHints,ExistentialType)
 GROUP_LINK(PerformanceHints,HeapAllocation)

@@ -965,7 +965,28 @@ DECL_ATTR(_scopeParams, ScopeParams,
   182)
 DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
 
-LAST_DECL_ATTR(ScopeParams)
+// '@oneway' only affects how calls are written and diagnosed, not the function
+// type or the mangling, so it is ABI and API stable to add or remove on an
+// actor method. Distributed '@oneway' functions get a synthesized synchronous
+// thunk, which makes removing it ABI breaking for them; revisit this when
+// adding them
+SIMPLE_DECL_ATTR(oneway, Oneway,
+  OnFunc,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  183)
+DECL_ATTR_FEATURE_REQUIREMENT(Oneway, SendCalls)
+
+// '@oneway(never)'. It is spelled in source as '@oneway' with a 'never'
+// argument, which the parser dispatches on, and it prints with that spelling,
+// see DeclAttribute::getAttrName(). Like '@oneway', it only affects the
+// diagnostics at call sites, so it is ABI and API stable to add or remove
+SIMPLE_DECL_ATTR(_onewayNever, OnewayNever,
+  OnFunc,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  184)
+DECL_ATTR_FEATURE_REQUIREMENT(OnewayNever, SendCalls)
+
+LAST_DECL_ATTR(OnewayNever)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

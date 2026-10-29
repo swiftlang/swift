@@ -12182,6 +12182,19 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                            nullptr);
 }
 
+bool FuncDecl::isOnewayNever() const {
+  for (auto *func = this; func;
+       func = dyn_cast_or_null<FuncDecl>(func->getOverriddenDecl())) {
+    if (func->getAttrs().hasAttribute<OnewayNeverAttr>())
+      return true;
+  }
+  return false;
+}
+
+bool FuncDecl::isOneway() const {
+  return getAttrs().hasAttribute<OnewayAttr>();
+}
+
 bool FuncDecl::isStatic() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

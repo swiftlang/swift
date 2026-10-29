@@ -6188,6 +6188,8 @@ NOTE(protocol_witness_async_conflict,none,
      "candidate is %select{not |}0'async', but%select{| '@objc'}1 protocol "
      "requirement is%select{| not}0",
      (bool, bool))
+NOTE(protocol_witness_oneway_conflict,none,
+     "candidate is '@oneway', but protocol requirement is not", ())
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
@@ -6810,6 +6812,24 @@ ERROR(distributed_witness_typed_throws_requirement,none,
       "method can throw any error",
       (const ValueDecl *, const ValueDecl *, Type))
 
+ERROR(oneway_requires_void_result,none,
+      "'@oneway' %kind0 must return 'Void'",
+      (const ValueDecl *))
+ERROR(oneway_requires_nonthrowing,none,
+      "'@oneway' %kind0 must not throw",
+      (const ValueDecl *))
+ERROR(oneway_requires_actor_isolation,none,
+      "'@oneway' can only be applied to an actor isolated method", ())
+
+ERROR(override_oneway_mismatch,none,
+      "%select{%kind0 must be '@oneway' to override '@oneway' %kind2|"
+      "'@oneway' %kind0 cannot override %kind2, which is not '@oneway'}1",
+      (const ValueDecl *, bool, const ValueDecl *))
+
+ERROR(oneway_distributed_not_supported,none,
+      "'@oneway' is not supported on %kind0 yet",
+      (const ValueDecl *))
+
 ERROR(send_requires_call,none,
       "'send' can only be applied to a function call", ())
 ERROR(send_requires_actor_isolated_callee,none,
@@ -6850,6 +6870,14 @@ ERROR(send_only_version_newer,none,
 ERROR(send_distributed_not_supported,none,
       "'send' of %kind0 is not supported yet",
       (const ValueDecl *))
+GROUPED_WARNING(await_on_oneway_function,AwaitedOnewayCall,none,
+      "'@oneway' %select{function|%kind1}0 is not intended to be awaited on, "
+      "use 'send' instead",
+      (bool, const ValueDecl *))
+GROUPED_WARNING(oneway_never_call_uses_send,SentOnewayNeverCall,none,
+      "'@oneway(never)' %select{function|%kind1}0 is not intended to be called "
+      "with 'send', use 'await' instead",
+      (bool, const ValueDecl *))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "

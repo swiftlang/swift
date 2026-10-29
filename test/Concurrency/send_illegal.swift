@@ -8,8 +8,9 @@
 //
 // 'send' is fire-and-forget: it enqueues a call on the callee's actor without
 // waiting for it, so there is nobody to receive a result or an error. It can
-// be applied to a call of an actor isolated function which returns Void, even
-// if its result is '@discardableResult', and does not throw
+// be applied to a call of an actor isolated function, '@oneway' or not, which
+// returns 'Void' and does not throw. A function which returns a value cannot
+// be sent, even if its result is '@discardableResult'
 
 struct MyError: Error {}
 
@@ -21,7 +22,7 @@ actor Worker {
   func boom() throws {}
   func typedBoom() throws(MyError) {}
   func neverThrows() throws(Never) {}
-  func ensureRunning() {}
+  @oneway func ensureRunning() {}
   var name: String { "worker" }
   func update(_ value: inout Int) {}
   func updateAsync(_ value: inout Int) async {}
@@ -30,11 +31,18 @@ actor Worker {
   @discardableResult func confirmAsync() async -> Bool { true }
   @discardableResult func confirmNeverThrows() throws(Never) -> Int { 0 }
   @discardableResult func confirmThrows() throws -> Bool { true }
+  func pick() {}
+  @discardableResult func pick() -> Int { 0 }
   func add(_ values: Span<Int>) {}
   func addAsync(_ values: Span<Int>) async {}
   func addRaw(_ item: Int, _ bytes: RawSpan) {}
   func take(_ value: Int) {}
+  @oneway func record(_ line: String) {}
   func forward<each T>(_ values: repeat each T) async {}
+
+  // Overloads which only differ in 'async' and '@oneway'
+  func work() async {}
+  @oneway func work() {}
 }
 
 class Box {
@@ -50,10 +58,13 @@ func freeFunction() {}
 func isolatedParameter(_ worker: isolated Worker) {}
 
 func test(_ worker: Worker, _ box: Box, _ item: Int, _ maybe: Worker?) async {
-  // An async Void method
+  // A call of a '@oneway' method
+  send worker.ensureRunning()
+
+  // An async Void method which is not '@oneway'
   send worker.process(item)
 
-  // A synchronous Void actor method
+  // A synchronous Void actor method which is not '@oneway'
   send worker.finish()
 
   // A global actor isolated function
@@ -105,6 +116,10 @@ func test(_ worker: Worker, _ box: Box, _ item: Int, _ maybe: Worker?) async {
   // expected-error@+1{{'send' cannot discard the result of a call to 'confirmThrows()'}}{{3-7=await}}
   send worker.confirmThrows()
 
+  // A 'send' call picks the overload which returns 'Void': the one which
+  // returns a value cannot be sent, even though it is '@discardableResult'
+  send worker.pick()
+
   // A single-expression closure can consist of a 'send' call
   let closure: () -> Void = { send worker.finish() }
   _ = closure
@@ -131,11 +146,16 @@ func test(_ worker: Worker, _ box: Box, _ item: Int, _ maybe: Worker?) async {
   // expected-error@+1{{'send' cannot discard error thrown by call to 'rethrowingFunction'}}
   send rethrowingFunction({})
 
-  // An optional chain around a call of an async method: it does not make
-  // the call if 'maybe' is nil
+  // 'send' picks the '@oneway' overload and 'await' picks the 'async' one,
+  // the other choice would be diagnosed
+  send worker.work()
+  await worker.work()
+
+  // An optional chain around a call of a method which is not '@oneway': it
+  // does not make the call if 'maybe' is nil
   send maybe?.process(item)
 
-  // An optional chain around a call of a synchronous method
+  // An optional chain around a call of a '@oneway' method
   send maybe?.ensureRunning()
 
   // The caller does not wait for the call, so it cannot get the value of an
@@ -257,7 +277,7 @@ func sendAwait(_ worker: Worker) async {
   send await worker.finish()
 
   // expected-error@+1:8{{'send' cannot be combined with 'await'}}{{8-14=}}
-  send await worker.take(1)
+  send await worker.record("line")
 
   // expected-error@+1:8{{'send' cannot be combined with 'await'}}{{8-14=}}
   send await await worker.finish()
@@ -271,6 +291,10 @@ func valid(_ worker: Worker) async throws {
   send worker.take(await value())
 
   send worker.finish()
+
+  // An ordinary 'await' of a '@oneway' function is a warning
+  // expected-warning@+1:16{{'@oneway' instance method 'record' is not intended to be awaited on, use 'send' instead}}
+  await worker.record("line")
 }
 
 // ==== -----------------------------------------------------------------------

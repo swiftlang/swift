@@ -1876,6 +1876,12 @@ ERROR(attr_callable_expected_rparen,none,
 ERROR(attr_callable_expected_once,none,
       "expected 'once' in '@callable' attribute", ())
 
+// oneway
+ERROR(attr_oneway_expected_never,none,
+      "expected 'never' in '@oneway' attribute", ())
+ERROR(attr_oneway_expected_rparen,none,
+      "expected ')' after 'never'", ())
+
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
       "expected '[' to start the %0", (StringRef))

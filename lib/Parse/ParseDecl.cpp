@@ -2726,6 +2726,36 @@ static std::optional<SourceRange> parseCallableAttrArgument(Parser &P,
   return SourceRange(lpLoc, rpLoc);
 }
 
+/// Parses the optional `(never)` argument of a `@oneway` attribute, and returns
+/// the range of its parentheses, which is invalid if there is no argument.
+/// Returns \c std::nullopt if the argument is wrong, after diagnosing it.
+static std::optional<SourceRange> parseOnewayAttrArgument(Parser &P) {
+  SourceLoc lpLoc = P.Tok.getLoc(), rpLoc;
+  if (!P.consumeIfAttributeLParen())
+    return SourceRange();
+
+  bool invalid = false;
+  if (P.isIdentifier(P.Tok, "never")) {
+    P.consumeToken(tok::identifier);
+  } else {
+    auto diag = P.diagnose(P.Tok, diag::attr_oneway_expected_never);
+    if (P.Tok.is(tok::identifier))
+      diag.fixItReplace(P.Tok.getLoc(), "never");
+    else
+      diag.fixItInsert(P.Tok.getLoc(), "never");
+    invalid = true;
+    P.consumeIf(tok::identifier);
+  }
+
+  if (P.parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_oneway_expected_rparen, lpLoc))
+    return std::nullopt;
+
+  if (invalid)
+    return std::nullopt;
+  return SourceRange(lpLoc, rpLoc);
+}
+
 ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                            SourceLoc AtLoc, DeclAttrKind DK,
                                            bool isFromClangAttribute) {
@@ -2830,6 +2860,35 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
+    if (DK == DeclAttrKind::Oneway) {
+      // '@oneway(never)' is spelled as '@oneway' with an argument, but it is
+      // a separate attribute, which contradicts '@oneway'
+      auto parens = parseOnewayAttrArgument(*this);
+      if (!parens)
+        return makeParserSuccess();
+      auto kind = DeclAttrKind::Oneway;
+      auto otherKind = DeclAttrKind::OnewayNever;
+      if (parens->isValid()) {
+        std::swap(kind, otherKind);
+        AttrRange = SourceRange(Loc, parens->End);
+        DuplicateAttribute = Attributes.getAttribute(kind);
+        DiscardAttribute = DuplicateAttribute != nullptr;
+      }
+      if (DuplicateAttribute)
+        break;
+      if (Attributes.getAttribute(otherKind)) {
+        bool isNever = kind == DeclAttrKind::OnewayNever;
+        diagnose(Loc, diag::mutually_exclusive_attr_names,
+                 isNever ? "@oneway(never)" : "@oneway",
+                 isNever ? "@oneway" : "@oneway(never)",
+                 /*isModifier=*/false)
+            .highlight(attrRangeWithAt());
+        break;
+      }
+      if (!DiscardAttribute)
+        Attributes.add(DeclAttribute::createSimple(Context, kind, AtLoc, Loc));
+      break;
+    }
     if (!DiscardAttribute)
       Attributes.add(DeclAttribute::createSimple(Context, DK, AtLoc, Loc));
     break;

@@ -1499,6 +1499,23 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   return false;
 }
 
+bool ConstraintSystem::isSendCallee(ConstraintLocator *locator) {
+  auto *anchor = getAsExpr(locator->getAnchor());
+  if (!anchor)
+    return false;
+
+  // Walk up through any parentheses to the call, if any
+  Expr *callee = anchor;
+  Expr *parent = getParentExpr(callee);
+  while (parent && isa<ParenExpr>(parent)) {
+    callee = parent;
+    parent = getParentExpr(parent);
+  }
+
+  auto *apply = dyn_cast_or_null<ApplyExpr>(parent);
+  return apply && apply->isOnewaySendOperand() && apply->getFn() == callee;
+}
+
 void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
     Type boundTy, Type ty, ConstraintLocator *locator) {
   // NOTE: If we use other locator kinds for these disjunctions, we

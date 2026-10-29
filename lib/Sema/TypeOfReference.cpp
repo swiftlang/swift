@@ -3169,6 +3169,28 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
       }
     }
 
+    // Prefer a '@oneway' function as the callee of a 'send' call,
+    // and a function which is not '@oneway' everywhere else, so that
+    // 'send x.f()' picks '@oneway func f()' and 'await x.f()' picks
+    // 'func f()'
+    if (auto *func = dyn_cast<FuncDecl>(decl)) {
+      if (getASTContext().LangOpts.hasFeature(Feature::SendCalls)) {
+        bool isSendCall = isSendCallee(locator);
+        if (func->isOneway() != isSendCall)
+          increaseScore(SK_OnewayMismatch, locator);
+
+        // A 'send' call prefers a function which can be sent: one which does
+        // not throw and returns 'Void'
+        if (isSendCall && !func->isDistributed()) {
+          auto thrownTy = func->getEffectiveThrownErrorType();
+          bool canThrow = thrownTy && !(*thrownTy)->isNever();
+          bool returnsVoid = func->getResultInterfaceType()->isVoid();
+          if (canThrow || !returnsVoid)
+            increaseScore(SK_OnewayMismatch, locator, 2);
+        }
+      }
+    }
+
     if (isa<SubscriptDecl>(decl)) {
       if (locator->isResultOfKeyPathDynamicMemberLookup() ||
           locator->isKeyPathSubscriptComponent()) {
