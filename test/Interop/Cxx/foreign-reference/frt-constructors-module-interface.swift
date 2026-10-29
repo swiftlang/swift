@@ -36,3 +36,9 @@
 // Constructors of class templates do not get their default arguments imported.
 // CHECK:      class FRTTemplateCtorWithDefaultArg<CInt> {
 // CHECK:        convenience init(_ value: CInt = cxxDefaultArg){{$}}
+
+// A static factory template renamed to init(...) suppresses the factory that
+// would otherwise be synthesized from FRTTemplateFactory(int).
+// CHECK:      class FRTTemplateFactory {
+// CHECK-NOT:    init(_
+// CHECK:      }

@@ -668,13 +668,15 @@ ClangImporter::Implementation::lookupAndImportSynthesizedFactories(
   if (!CXXRecord)
     return {};
 
-  bool hasUserProvidedStaticFactory = llvm::any_of(
-      CXXRecord->methods(), [](const clang::CXXMethodDecl *method) {
-        return method->isStatic() &&
-               llvm::any_of(method->specific_attrs<clang::SwiftNameAttr>(),
-                            [](const auto *attr) {
-                              return attr->getName().starts_with("init(");
-                            });
+  bool hasUserProvidedStaticFactory =
+      llvm::any_of(CXXRecord->decls(), [&](const clang::Decl *member) {
+        const auto *method =
+            dyn_cast_or_null<clang::CXXMethodDecl>(member->getAsFunction());
+        return method && method->isStatic() &&
+               importFullName(method, CurrentVersion)
+                   .getDeclName()
+                   .getBaseName()
+                   .isConstructor();
       });
   if (hasUserProvidedStaticFactory)
     return {};
