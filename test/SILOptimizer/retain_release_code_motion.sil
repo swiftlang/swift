@@ -166,6 +166,45 @@ bb1:
   return %1 : $()
 }
 
+// An assume does not release the object.
+// CHECK-LABEL: sil @retain_not_blocked_by_assume
+// CHECK: builtin "assume_Int1"
+// CHECK: strong_retain
+// CHECK-NEXT: apply
+sil @retain_not_blocked_by_assume : $@convention(thin) (Builtin.NativeObject, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int1):
+  release_value %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  %3 = builtin "assume_Int1"(%1 : $Builtin.Int1) : $Builtin.Int1
+  %2 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  br bb1
+
+bb1:
+  %4 = tuple()
+  return %4 : $()
+}
+
+// An assume does not release the object.
+// CHECK-LABEL: sil @retain_not_blocked_by_assume_true
+// CHECK: builtin "assumeTrue"
+// CHECK: strong_retain
+// CHECK-NEXT: apply
+sil @retain_not_blocked_by_assume_true : $@convention(thin) (Builtin.NativeObject, Swift.Int, Swift.Int) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Swift.Int, %2 : $Swift.Int):
+  release_value %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  %le = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<Swift.Int>(%1 : $Swift.Int, %2 : $Swift.Int, %le : $Builtin.Int8) : $()
+  %4 = function_ref @blocker : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  br bb1
+
+bb1:
+  %5 = tuple()
+  return %5 : $()
+}
+
 // Make sure release is not hoisted above define.
 // CHECK-LABEL: sil @define_stops_codemotion : $@convention(thin) () -> () {
 // CHECK: alloc_ref
@@ -855,6 +894,53 @@ bb0(%0 : $_ContiguousArrayBuffer<UInt64>, %1 : $Builtin.Word):
   %move = builtin "int_memcpy_RawPointer_RawPointer_Word"(%newptr : $Builtin.RawPointer, %rawptr : $Builtin.RawPointer, %1 : $Builtin.Word, %f : $Builtin.Int1) : $()
   release_value %0 : $_ContiguousArrayBuffer<UInt64>
   return %newptr : $Builtin.RawPointer
+}
+
+// An assume does not use the object, so a release is hoisted above it.
+//
+// CHECK-RELEASE-HOISTING-LABEL: sil @testAssume
+// CHECK-RELEASE-HOISTING:       bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int1):
+// CHECK-RELEASE-HOISTING-NEXT:    strong_release %0 : $Builtin.NativeObject
+// CHECK-RELEASE-HOISTING-NEXT:    builtin "assume_Int1"
+// CHECK-RELEASE-HOISTING:       } // end sil function 'testAssume'
+sil @testAssume : $@convention(thin) (Builtin.NativeObject, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int1):
+  %2 = builtin "assume_Int1"(%1 : $Builtin.Int1) : $Builtin.Int1
+  strong_release %0 : $Builtin.NativeObject
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// An assume does not use the object, so a release is hoisted above it.
+// CHECK-RELEASE-HOISTING-LABEL: sil @testAssumeTrueGeneric
+// CHECK-RELEASE-HOISTING:       bb0(%0 : $Builtin.NativeObject, %1 : $Int, %2 : $Int):
+// CHECK-RELEASE-HOISTING-NEXT:    strong_release %0 : $Builtin.NativeObject
+// CHECK-RELEASE-HOISTING-NEXT:    integer_literal $Builtin.Int8, 3
+// CHECK-RELEASE-HOISTING-NEXT:    builtin "assumeTrue"
+// CHECK-RELEASE-HOISTING:       } // end sil function 'testAssumeTrueGeneric'
+sil @testAssumeTrueGeneric : $@convention(thin) (Builtin.NativeObject, Swift.Int, Swift.Int) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Swift.Int, %2 : $Swift.Int):
+  %le = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<Swift.Int>(%1 : $Swift.Int, %2 : $Swift.Int, %le : $Builtin.Int8) : $()
+  strong_release %0 : $Builtin.NativeObject
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// An assume of addresses reads memory, so a release is not hoisted above it.
+// CHECK-RELEASE-HOISTING-LABEL: sil @testAssumeTrueGenericOfAddresses
+// CHECK-RELEASE-HOISTING:       bb0(%0 : $Builtin.NativeObject, %1 : $*Int, %2 : $*Int):
+// CHECK-RELEASE-HOISTING-NEXT:    integer_literal $Builtin.Int8, 3
+// CHECK-RELEASE-HOISTING-NEXT:    builtin "assumeTrue"
+// CHECK-RELEASE-HOISTING-NEXT:    strong_release %0 : $Builtin.NativeObject
+// CHECK-RELEASE-HOISTING:       } // end sil function 'testAssumeTrueGenericOfAddresses'
+sil @testAssumeTrueGenericOfAddresses : $@convention(thin) (Builtin.NativeObject, @in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Swift.Int, %2 : $*Swift.Int):
+  %le = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<Swift.Int>(%1 : $*Swift.Int, %2 : $*Swift.Int, %le : $Builtin.Int8) : $()
+  strong_release %0 : $Builtin.NativeObject
+  %4 = tuple ()
+  return %4 : $()
 }
 
 

@@ -417,6 +417,15 @@ bool swift::isInstrumentation(SILInstruction *Instruction) {
   return false;
 }
 
+bool swift::isAssume(const SILInstruction *inst) {
+  auto *bi = dyn_cast<BuiltinInst>(inst);
+  if (!bi)
+    return false;
+  auto kind = bi->getBuiltinKind();
+  return kind == BuiltinValueKind::AssumeTrue ||
+         kind == BuiltinValueKind::AssumeTrueGeneric;
+}
+
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   // A partial_apply of a reabstraction thunk either has a single capture
   // (a function) or two captures (function and dynamic Self type).

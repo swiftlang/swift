@@ -1433,6 +1433,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
       return InlineCost::Free;
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath)
       return InlineCost::Free;
+    // So are assumes, and side effect free conditions which only assumes use.
+    if (isAssume(BI))
+      return InlineCost::Free;
+    if (!BI->use_empty() && !BI->mayHaveSideEffects() &&
+        llvm::all_of(BI->getUses(),
+                     [](Operand *use) { return isAssume(use->getUser()); }))
+      return InlineCost::Free;
 
     return InlineCost::Expensive;
   }

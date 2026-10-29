@@ -1375,6 +1375,8 @@ bool SILInstruction::mayRelease() const {
       return false;
     // If this is a builtin which might have side effect, but its side
     // effects do not cause reference counts to be decremented, return false.
+    if (isAssume(BI))
+      return false;
     if (auto Kind = BI->getBuiltinKind()) {
       switch (Kind.value()) {
         case BuiltinValueKind::CopyArray:

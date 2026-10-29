@@ -164,6 +164,11 @@ bool isSanitizerInstrumentation(SILInstruction *Instruction);
 /// run-time sanitizers or code coverage.
 bool isInstrumentation(SILInstruction *Instruction);
 
+/// Return true if the instruction is an `assume` or `assumeTrue`
+/// builtin. Its side effects only keep it in place: it doesn't access memory,
+/// except that it reads its operands which are addresses.
+bool isAssume(const SILInstruction *inst);
+
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
