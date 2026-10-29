@@ -1465,6 +1465,13 @@ namespace {
       return CS.getType(expr->getSubExpr());
     }
 
+    Type visitSendExpr(SendExpr *expr) {
+      // TODO: Type check 'send' calls
+      CS.getASTContext().Diags.diagnose(expr->getSendLoc(),
+                                        diag::send_not_supported_yet);
+      return Type();
+    }
+
     Type visitForceTryExpr(AnyTryExpr *expr) {
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding |

@@ -726,6 +726,9 @@ EXPERIMENTAL_FEATURE(ModernImportedCArrays, true)
 /// into a future language version.
 EXPERIMENTAL_FEATURE(ModernImportedCArraysOnly, true)
 
+/// The 'send' fire-and-forget call expression.
+EXPERIMENTAL_FEATURE(SendCalls, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

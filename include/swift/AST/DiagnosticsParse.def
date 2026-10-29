@@ -1424,6 +1424,8 @@ ERROR(expected_expr_after_move, none,
       "expected expression after 'consume'", ())
 ERROR(expected_expr_after_copy, none,
       "expected expression after 'copy'", ())
+ERROR(expected_expr_after_send, none,
+      "expected function call after 'send'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
 ERROR(expected_expr_after_each, none,
