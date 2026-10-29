@@ -28,6 +28,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include <array>
+#include <map>
 #include <memory>
 #include <queue>
 #include <tuple>
@@ -37,6 +38,7 @@ namespace clang {
 }
 
 namespace swift {
+  class ModuleFile;
   struct HiddenTypeLayoutRequirement;
   class SerializableFixedTypeInfoRepresentation;
   struct SerializableLLVMTypeRepresentation;
@@ -96,6 +98,23 @@ class Serializer : public SerializerBase {
   const SerializationOptions &Options;
 
   std::unique_ptr<IRABIDetailsProvider> LayoutProvider;
+
+  struct TranscribedType {
+    ModuleFile *Source;
+    TypeID SourceID;
+  };
+  struct TranscribedDecl {
+    ModuleFile *Source;
+    DeclID SourceID;
+  };
+  using TypeToSerialize = llvm::PointerUnion<TypeBase *, TranscribedType *>;
+  using DeclToSerialize =
+      llvm::PointerUnion<const Decl *, TranscribedDecl *>;
+
+  /// Source records share the normal queues so references to them use the
+  /// destination module's TypeID and DeclID namespaces.
+  std::map<std::pair<ModuleFile *, TypeID>, TranscribedType> TranscribedTypes;
+  std::map<std::pair<ModuleFile *, DeclID>, TranscribedDecl> TranscribedDecls;
 
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
@@ -222,7 +241,7 @@ class Serializer : public SerializerBase {
     }
   };
 
-  ASTBlockRecordKeeper<const Decl *, DeclID,
+  ASTBlockRecordKeeper<DeclToSerialize, DeclID,
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
 
@@ -238,7 +257,7 @@ class Serializer : public SerializerBase {
 
   SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
 
-  ASTBlockRecordKeeper<Type, TypeID,
+  ASTBlockRecordKeeper<TypeToSerialize, TypeID,
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
 
@@ -380,6 +399,30 @@ private:
 
   void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
 
+  TypeID addTranscribedTypeRef(ModuleFile &source, TypeID sourceID);
+  DeclID addTranscribedDeclRef(ModuleFile &source, DeclID sourceID);
+  ClangTypeID addTranscribedClangTypeRef(ModuleFile &source,
+                                         ClangTypeID sourceID,
+                                         bool forFunction = false);
+  GenericSignatureID
+  addTranscribedGenericSignatureRef(ModuleFile &source,
+                                    GenericSignatureID sourceID);
+  GenericEnvironmentID
+  addTranscribedGenericEnvironmentRef(ModuleFile &source,
+                                      GenericEnvironmentID sourceID);
+  SubstitutionMapID
+  addTranscribedSubstitutionMapRef(ModuleFile &source,
+                                  SubstitutionMapID sourceID);
+  ProtocolConformanceID
+  addTranscribedConformanceRef(ModuleFile &source,
+                              ProtocolConformanceID sourceID);
+  SILLayoutID addTranscribedSILLayoutRef(ModuleFile &source,
+                                         SILLayoutID sourceID);
+  IdentifierID transcribeIdentifier(ModuleFile &source,
+                                    IdentifierID sourceID);
+  void writeTranscribedType(ModuleFile &source, TypeID sourceID);
+  void writeTranscribedDecl(ModuleFile &source, DeclID sourceID);
+
   /// Handle a hidden layout requirement discovered by AST analysis.
   void handleHiddenTypeLayoutRequirement(
       const HiddenTypeLayoutRequirement &requirement);
@@ -402,6 +445,9 @@ private:
 
   /// Writes the given type.
   void writeASTBlockEntity(Type ty);
+  void writeASTBlockEntity(TypeToSerialize type);
+
+  void writeASTBlockEntity(DeclToSerialize decl);
 
   /// Writes the given Clang type.
   void writeASTBlockEntity(const clang::Type *ty);

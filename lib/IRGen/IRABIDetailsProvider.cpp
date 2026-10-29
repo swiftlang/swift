@@ -128,8 +128,6 @@ public:
   }
 
   AbstractTypeLayout getAbstractTypeLayout(Type type) {
-    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
-
     if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
         IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
       auto canonicalType = type->getCanonicalType();
@@ -140,6 +138,15 @@ public:
                                      "serialization");
     }
 
+    if (auto *hiddenType = type->getAs<HiddenType>()) {
+      auto *layoutInfo = hiddenType->getLayoutInfoDecl();
+      assert(layoutInfo && layoutInfo->Layout &&
+             layoutInfo->Layout->typeInfoRepresentation &&
+             "HiddenType must carry an abstract layout");
+      return *layoutInfo->Layout;
+    }
+
+    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     AbstractTypeLayout layout;
     auto properties = typeConverter.getTypeProperties(
         type, TypeExpansionContext::minimal());

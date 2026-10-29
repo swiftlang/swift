@@ -27,12 +27,24 @@
 namespace swift {
 
 class SerializableHiddenTypeInfoRepresentation;
+class ModuleFile;
+
+/// Identifies a type record in the serialized module from which an abstract
+/// layout was recovered. Serialization can replay this record graph without
+/// first reconstructing a complete AST type.
+struct SerializedTypeReference {
+  ModuleFile *moduleFile = nullptr;
+  unsigned typeID = 0;
+
+  explicit operator bool() const { return moduleFile && typeID; }
+};
 
 struct AbstractTypeLayout {
   SILTypeProperties typeProperties;
   std::optional<ReferenceCounting> referenceCountingSystem;
   std::shared_ptr<SerializableHiddenTypeInfoRepresentation>
       typeInfoRepresentation;
+  SerializedTypeReference serializedType;
 };
 
 } // namespace swift

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Serialization.h"
+#include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "SILFormat.h"
 #include "swift/AST/AbstractLayout.h"
@@ -640,7 +641,7 @@ DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the TypeAliasType)");
 
-  return DeclsToSerialize.addRef(D);
+  return DeclsToSerialize.addRef(DeclToSerialize(D));
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
@@ -663,7 +664,7 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
          "serializing type with an error");
 #endif
 
-  return TypesToSerialize.addRef(typeToSerialize);
+  return TypesToSerialize.addRef(TypeToSerialize(typeToSerialize.getPointer()));
 }
 
 serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty,
@@ -5685,7 +5686,7 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
   }
 
   PrettyStackTraceDecl trace("serializing", D);
-  assert(DeclsToSerialize.hasRef(D));
+  assert(DeclsToSerialize.hasRef(DeclToSerialize(D)));
 
   if (skipDeclIfInvalid(D))
     return;
@@ -5713,9 +5714,17 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
 
   assert(!D->hasClangNode() && "imported decls should use cross-references");
 
-  DeclSerializer(*this, DeclsToSerialize.addRef(D),
+  DeclSerializer(*this, DeclsToSerialize.addRef(DeclToSerialize(D)),
                  exportedPrespecializationDecls)
       .visit(D);
+}
+
+void Serializer::writeASTBlockEntity(DeclToSerialize decl) {
+  if (auto *transcribed = decl.dyn_cast<TranscribedDecl *>()) {
+    writeTranscribedDecl(*transcribed->Source, transcribed->SourceID);
+    return;
+  }
+  writeASTBlockEntity(decl.dyn_cast<const Decl *>());
 }
 
 #define SIMPLE_CASE(TYPENAME, VALUE) \
@@ -5923,6 +5932,792 @@ struct ImplementationOnlyWalker : TypeWalker {
   }
 };
 } // namespace
+
+IdentifierID Serializer::transcribeIdentifier(ModuleFile &source,
+                                               IdentifierID sourceID) {
+  if (sourceID < NUM_SPECIAL_IDS)
+    return sourceID;
+  return addDeclBaseNameRef(
+      getASTContext().getIdentifier(source.getIdentifierText(sourceID)));
+}
+
+serialization::TypeID
+Serializer::addTranscribedTypeRef(ModuleFile &source, TypeID sourceID) {
+  if (!sourceID)
+    return TypeID();
+  auto key = std::make_pair(&source, sourceID);
+  auto entry = TranscribedTypes
+                   .try_emplace(key, TranscribedType{&source, sourceID})
+                   .first;
+  return TypesToSerialize.addRef(TypeToSerialize(&entry->second));
+}
+
+DeclID Serializer::addTranscribedDeclRef(ModuleFile &source,
+                                         DeclID sourceID) {
+  if (!sourceID)
+    return DeclID();
+
+  auto decl = source.getDeclChecked(sourceID);
+  if (decl)
+    return addDeclRef(*decl);
+  llvm::consumeError(decl.takeError());
+  auto key = std::make_pair(&source, sourceID);
+  auto entry = TranscribedDecls
+                   .try_emplace(key, TranscribedDecl{&source, sourceID})
+                   .first;
+  return DeclsToSerialize.addRef(DeclToSerialize(&entry->second));
+}
+
+ClangTypeID Serializer::addTranscribedClangTypeRef(ModuleFile &source,
+                                                   ClangTypeID sourceID,
+                                                   bool forFunction) {
+  if (!sourceID)
+    return ClangTypeID();
+  auto type = source.getClangType(sourceID);
+  if (!type)
+    llvm::report_fatal_error(llvm::Twine("cannot transcribe Clang type: ") +
+                             llvm::toString(type.takeError()));
+  return addClangTypeRef(*type, forFunction);
+}
+
+GenericSignatureID Serializer::addTranscribedGenericSignatureRef(
+    ModuleFile &source, GenericSignatureID sourceID) {
+  if (!sourceID)
+    return GenericSignatureID();
+  auto signature = source.getGenericSignatureChecked(sourceID);
+  if (!signature)
+    llvm::report_fatal_error(
+        llvm::Twine("cannot transcribe generic signature: ") +
+        llvm::toString(signature.takeError()));
+  return addGenericSignatureRef(*signature);
+}
+
+GenericEnvironmentID Serializer::addTranscribedGenericEnvironmentRef(
+    ModuleFile &source, GenericEnvironmentID sourceID) {
+  if (!sourceID)
+    return GenericEnvironmentID();
+  auto environment = source.getGenericEnvironmentChecked(sourceID);
+  if (!environment)
+    llvm::report_fatal_error(
+        llvm::Twine("cannot transcribe generic environment: ") +
+        llvm::toString(environment.takeError()));
+  return addGenericEnvironmentRef(*environment);
+}
+
+SubstitutionMapID Serializer::addTranscribedSubstitutionMapRef(
+    ModuleFile &source, SubstitutionMapID sourceID) {
+  if (!sourceID)
+    return SubstitutionMapID();
+  auto substitutions = source.getSubstitutionMapChecked(sourceID);
+  if (!substitutions)
+    llvm::report_fatal_error(
+        llvm::Twine("cannot transcribe substitution map: ") +
+        llvm::toString(substitutions.takeError()));
+  return addSubstitutionMapRef(*substitutions);
+}
+
+ProtocolConformanceID Serializer::addTranscribedConformanceRef(
+    ModuleFile &source, ProtocolConformanceID sourceID) {
+  if (!sourceID)
+    return ProtocolConformanceID();
+  auto conformance = source.getConformanceChecked(sourceID);
+  if (!conformance)
+    llvm::report_fatal_error(
+        llvm::Twine("cannot transcribe protocol conformance: ") +
+        llvm::toString(conformance.takeError()));
+  return addConformanceRef(*conformance);
+}
+
+SILLayoutID Serializer::addTranscribedSILLayoutRef(ModuleFile &source,
+                                                   SILLayoutID sourceID) {
+  if (!sourceID)
+    return SILLayoutID();
+  auto layout = source.getSILLayoutChecked(sourceID);
+  if (!layout)
+    llvm::report_fatal_error(llvm::Twine("cannot transcribe SIL layout: ") +
+                             llvm::toString(layout.takeError()));
+  return addSILLayoutRef(*layout);
+}
+
+void Serializer::writeTranscribedDecl(ModuleFile &source, DeclID sourceID) {
+  using namespace decls_block;
+
+  auto cursor = source.getDeclTypeCursorForReplay();
+  llvm::cantFail(cursor.JumpToBit(source.getSerializedDeclOffset(sourceID)));
+  auto entry = llvm::cantFail(cursor.advance());
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    llvm::report_fatal_error("serialized declaration is not a record");
+
+  SmallVector<uint64_t, 64> scratch;
+  auto recordID = llvm::cantFail(cursor.readRecord(entry.ID, scratch));
+  if (recordID != XREF)
+    llvm::report_fatal_error(
+        "cannot transcribe an unresolved non-XREF declaration");
+
+  ModuleID moduleID;
+  uint32_t pathLength;
+  XRefLayout::readRecord(scratch, moduleID, pathLength);
+  auto abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
+  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                         transcribeIdentifier(source, moduleID), pathLength);
+
+  for (uint32_t index = 0; index < pathLength; ++index) {
+    scratch.clear();
+    entry = llvm::cantFail(cursor.advance());
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      llvm::report_fatal_error("invalid serialized XREF path");
+    recordID = llvm::cantFail(cursor.readRecord(entry.ID, scratch));
+
+    switch (recordID) {
+    case XREF_TYPE_PATH_PIECE: {
+      IdentifierID nameID, discriminatorID;
+      bool inProtocolExtension, importedFromClang;
+      XRefTypePathPieceLayout::readRecord(
+          scratch, nameID, discriminatorID, inProtocolExtension,
+          importedFromClang);
+      abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+      XRefTypePathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          transcribeIdentifier(source, nameID),
+          transcribeIdentifier(source, discriminatorID), inProtocolExtension,
+          importedFromClang);
+      break;
+    }
+    case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+      IdentifierID nameID;
+      XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, nameID);
+      abbrCode =
+          DeclTypeAbbrCodes[XRefOpaqueReturnTypePathPieceLayout::Code];
+      XRefOpaqueReturnTypePathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          transcribeIdentifier(source, nameID));
+      break;
+    }
+    case XREF_VALUE_PATH_PIECE: {
+      TypeID typeID;
+      IdentifierID nameID;
+      bool inProtocolExtension, importedFromClang, isStatic;
+      XRefValuePathPieceLayout::readRecord(
+          scratch, typeID, nameID, inProtocolExtension, importedFromClang,
+          isStatic);
+      abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+      XRefValuePathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedTypeRef(source, typeID),
+          transcribeIdentifier(source, nameID), inProtocolExtension,
+          importedFromClang, isStatic);
+      break;
+    }
+    case XREF_INITIALIZER_PATH_PIECE: {
+      TypeID typeID;
+      bool inProtocolExtension, importedFromClang;
+      uint8_t initializerKind;
+      XRefInitializerPathPieceLayout::readRecord(
+          scratch, typeID, inProtocolExtension, importedFromClang,
+          initializerKind);
+      abbrCode = DeclTypeAbbrCodes[XRefInitializerPathPieceLayout::Code];
+      XRefInitializerPathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedTypeRef(source, typeID), inProtocolExtension,
+          importedFromClang, initializerKind);
+      break;
+    }
+    case XREF_EXTENSION_PATH_PIECE: {
+      ModuleID ownerID;
+      GenericSignatureID signatureID;
+      XRefExtensionPathPieceLayout::readRecord(scratch, ownerID, signatureID);
+      abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
+      XRefExtensionPathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          transcribeIdentifier(source, ownerID),
+          addTranscribedGenericSignatureRef(source, signatureID));
+      break;
+    }
+    case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
+      IdentifierID nameID;
+      uint8_t kind;
+      XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, nameID, kind);
+      abbrCode =
+          DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
+      XRefOperatorOrAccessorPathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          transcribeIdentifier(source, nameID), kind);
+      break;
+    }
+    case XREF_GENERIC_PARAM_PATH_PIECE: {
+      unsigned depth, parameterIndex;
+      XRefGenericParamPathPieceLayout::readRecord(scratch, depth,
+                                                  parameterIndex);
+      abbrCode = DeclTypeAbbrCodes[XRefGenericParamPathPieceLayout::Code];
+      XRefGenericParamPathPieceLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, depth, parameterIndex);
+      break;
+    }
+    default:
+      llvm::report_fatal_error("unsupported serialized XREF path record");
+    }
+  }
+}
+
+void Serializer::writeTranscribedType(ModuleFile &source, TypeID sourceID) {
+  using namespace decls_block;
+
+  auto cursor = source.getDeclTypeCursorForReplay();
+  llvm::cantFail(cursor.JumpToBit(source.getSerializedTypeOffset(sourceID)));
+  auto entry = llvm::cantFail(cursor.advance());
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    llvm::report_fatal_error("serialized type is not a record");
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blob;
+  auto recordID = llvm::cantFail(cursor.readRecord(entry.ID, scratch, &blob));
+  unsigned abbrCode;
+
+  auto transcribeIsolation = [&](TypeID isolation) -> TypeID {
+    if (isolation < unsigned(FunctionTypeIsolation::GlobalActorOffset))
+      return isolation;
+    auto actorTypeID =
+        isolation - unsigned(FunctionTypeIsolation::GlobalActorOffset);
+    return unsigned(FunctionTypeIsolation::GlobalActorOffset) +
+           addTranscribedTypeRef(source, actorTypeID);
+  };
+
+  auto writeFunctionTrailingRecords = [&] {
+    while (true) {
+      entry = llvm::cantFail(cursor.advance(
+          llvm::BitstreamCursor::AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        return;
+
+      scratch.clear();
+      recordID = llvm::cantFail(cursor.readRecord(entry.ID, scratch));
+      if (recordID == FUNCTION_PARAM) {
+        IdentifierID labelID, internalLabelID;
+        TypeID typeID;
+        bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
+            isNoDerivative, isCompileTimeLiteral, isConstValue, isSending,
+            isAddressable;
+        unsigned ownership;
+        FunctionParamLayout::readRecord(
+            scratch, labelID, internalLabelID, typeID, isVariadic,
+            isAutoClosure, isNonEphemeral, ownership, isIsolated,
+            isNoDerivative, isCompileTimeLiteral, isConstValue, isSending,
+            isAddressable);
+        abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
+        FunctionParamLayout::emitRecord(
+            Out, ScratchRecord, abbrCode,
+            transcribeIdentifier(source, labelID),
+            transcribeIdentifier(source, internalLabelID),
+            addTranscribedTypeRef(source, typeID), isVariadic, isAutoClosure,
+            isNonEphemeral, ownership, isIsolated, isNoDerivative,
+            isCompileTimeLiteral, isConstValue, isSending, isAddressable);
+        continue;
+      }
+      if (recordID == FUNCTION_YIELD) {
+        TypeID typeID;
+        unsigned ownership;
+        FunctionYieldLayout::readRecord(scratch, typeID, ownership);
+        abbrCode = DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+        FunctionYieldLayout::emitRecord(
+            Out, ScratchRecord, abbrCode,
+            addTranscribedTypeRef(source, typeID), ownership);
+        continue;
+      }
+      if (recordID == LIFETIME_DEPENDENCE) {
+        unsigned targetIndex, parameterCount;
+        bool hasImmortal, isFromAnnotation, hasCaptures, hasInherit,
+            hasScope, hasAddressable, hasConditionallyAddressable;
+        ArrayRef<uint64_t> parameterData;
+        LifetimeDependenceLayout::readRecord(
+            scratch, targetIndex, parameterCount, hasImmortal,
+            isFromAnnotation, hasCaptures, hasInherit, hasScope,
+            hasAddressable, hasConditionallyAddressable, parameterData);
+        abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
+        LifetimeDependenceLayout::emitRecord(
+            Out, ScratchRecord, abbrCode, targetIndex, parameterCount,
+            hasImmortal, isFromAnnotation, hasCaptures, hasInherit, hasScope,
+            hasAddressable, hasConditionallyAddressable, parameterData);
+        continue;
+      }
+      return;
+    }
+  };
+
+  switch (recordID) {
+  case ERROR_TYPE: {
+    TypeID originalID;
+    ErrorTypeLayout::readRecord(scratch, originalID);
+    abbrCode = DeclTypeAbbrCodes[ErrorTypeLayout::Code];
+    ErrorTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addTranscribedTypeRef(source, originalID));
+    return;
+  }
+  case BUILTIN_ALIAS_TYPE: {
+    DeclID aliasID;
+    TypeID canonicalTypeID;
+    BuiltinAliasTypeLayout::readRecord(scratch, aliasID, canonicalTypeID);
+    abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
+    BuiltinAliasTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedDeclRef(source, aliasID),
+        addTranscribedTypeRef(source, canonicalTypeID));
+    return;
+  }
+  case BUILTIN_FIXED_ARRAY_TYPE: {
+    TypeID countID, elementID;
+    BuiltinFixedArrayTypeLayout::readRecord(scratch, countID, elementID);
+    abbrCode = DeclTypeAbbrCodes[BuiltinFixedArrayTypeLayout::Code];
+    BuiltinFixedArrayTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, countID),
+        addTranscribedTypeRef(source, elementID));
+    return;
+  }
+  case BUILTIN_BORROW_TYPE: {
+    TypeID referentID;
+    BuiltinBorrowTypeLayout::readRecord(scratch, referentID);
+    abbrCode = DeclTypeAbbrCodes[BuiltinBorrowTypeLayout::Code];
+    BuiltinBorrowTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, referentID));
+    return;
+  }
+  case NAME_ALIAS_TYPE: {
+    DeclID aliasID;
+    TypeID originalID, substitutedID, parentID;
+    ArrayRef<uint64_t> argumentIDs;
+    TypeAliasTypeLayout::readRecord(scratch, aliasID, originalID,
+                                    substitutedID, parentID, argumentIDs);
+    SmallVector<TypeID, 8> arguments;
+    for (auto argumentID : argumentIDs)
+      arguments.push_back(addTranscribedTypeRef(source, argumentID));
+    abbrCode = DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
+    TypeAliasTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedDeclRef(source, aliasID),
+        addTranscribedTypeRef(source, originalID),
+        addTranscribedTypeRef(source, substitutedID),
+        addTranscribedTypeRef(source, parentID), arguments);
+    return;
+  }
+  case GENERIC_TYPE_PARAM_TYPE: {
+    unsigned parameterKind, depth, weight, index;
+    bool hasDecl;
+    DeclID declOrIdentifier;
+    TypeID valueTypeID;
+    GenericTypeParamTypeLayout::readRecord(
+        scratch, parameterKind, hasDecl, depth, weight, index,
+        declOrIdentifier, valueTypeID);
+    if (declOrIdentifier) {
+      declOrIdentifier =
+          hasDecl ? addTranscribedDeclRef(source, declOrIdentifier)
+                  : transcribeIdentifier(source, declOrIdentifier);
+    }
+    abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
+    GenericTypeParamTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, parameterKind, hasDecl, depth, weight,
+        index, declOrIdentifier,
+        addTranscribedTypeRef(source, valueTypeID));
+    return;
+  }
+  case DEPENDENT_MEMBER_TYPE: {
+    TypeID baseID;
+    DeclID associatedTypeID;
+    DependentMemberTypeLayout::readRecord(scratch, baseID, associatedTypeID);
+    abbrCode = DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
+    DependentMemberTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, baseID),
+        addTranscribedDeclRef(source, associatedTypeID));
+    return;
+  }
+  case NOMINAL_TYPE: {
+    DeclID declID;
+    TypeID parentID;
+    NominalTypeLayout::readRecord(scratch, declID, parentID);
+    abbrCode = DeclTypeAbbrCodes[NominalTypeLayout::Code];
+    NominalTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedDeclRef(source, declID),
+        addTranscribedTypeRef(source, parentID));
+    return;
+  }
+  case METATYPE_TYPE:
+  case EXISTENTIAL_METATYPE_TYPE: {
+    TypeID instanceID;
+    unsigned representation;
+    MetatypeTypeLayout::readRecord(scratch, instanceID, representation);
+    if (recordID == METATYPE_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
+      MetatypeTypeLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedTypeRef(source, instanceID), representation);
+    } else {
+      abbrCode = DeclTypeAbbrCodes[ExistentialMetatypeTypeLayout::Code];
+      ExistentialMetatypeTypeLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedTypeRef(source, instanceID), representation);
+    }
+    return;
+  }
+  case PRIMARY_ARCHETYPE_TYPE:
+  case PACK_ARCHETYPE_TYPE: {
+    GenericSignatureID signatureID;
+    TypeID interfaceID;
+    PrimaryArchetypeTypeLayout::readRecord(scratch, signatureID, interfaceID);
+    if (recordID == PRIMARY_ARCHETYPE_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
+      PrimaryArchetypeTypeLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedGenericSignatureRef(source, signatureID),
+          addTranscribedTypeRef(source, interfaceID));
+    } else {
+      abbrCode = DeclTypeAbbrCodes[PackArchetypeTypeLayout::Code];
+      PackArchetypeTypeLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedGenericSignatureRef(source, signatureID),
+          addTranscribedTypeRef(source, interfaceID));
+    }
+    return;
+  }
+  case EXISTENTIAL_ARCHETYPE_TYPE:
+  case ELEMENT_ARCHETYPE_TYPE: {
+    TypeID interfaceID;
+    GenericEnvironmentID environmentID;
+    ExistentialArchetypeTypeLayout::readRecord(scratch, interfaceID,
+                                               environmentID);
+    if (recordID == EXISTENTIAL_ARCHETYPE_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[ExistentialArchetypeTypeLayout::Code];
+      ExistentialArchetypeTypeLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedTypeRef(source, interfaceID),
+          addTranscribedGenericEnvironmentRef(source, environmentID));
+    } else {
+      abbrCode = DeclTypeAbbrCodes[ElementArchetypeTypeLayout::Code];
+      ElementArchetypeTypeLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          addTranscribedTypeRef(source, interfaceID),
+          addTranscribedGenericEnvironmentRef(source, environmentID));
+    }
+    return;
+  }
+  case OPAQUE_ARCHETYPE_TYPE: {
+    DeclID opaqueDeclID;
+    TypeID interfaceID;
+    SubstitutionMapID substitutionsID;
+    OpaqueArchetypeTypeLayout::readRecord(scratch, opaqueDeclID, interfaceID,
+                                          substitutionsID);
+    abbrCode = DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
+    OpaqueArchetypeTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedDeclRef(source, opaqueDeclID),
+        addTranscribedTypeRef(source, interfaceID),
+        addTranscribedSubstitutionMapRef(source, substitutionsID));
+    return;
+  }
+  case DYNAMIC_SELF_TYPE: {
+    TypeID selfID;
+    DynamicSelfTypeLayout::readRecord(scratch, selfID);
+    abbrCode = DeclTypeAbbrCodes[DynamicSelfTypeLayout::Code];
+    DynamicSelfTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, selfID));
+    return;
+  }
+  case PROTOCOL_COMPOSITION_TYPE: {
+    bool hasAnyObject, hasInverseCopyable, hasInverseEscapable,
+        hasInverseDeinitable;
+    ArrayRef<uint64_t> protocolIDs;
+    ProtocolCompositionTypeLayout::readRecord(
+        scratch, hasAnyObject, hasInverseCopyable, hasInverseEscapable,
+        hasInverseDeinitable, protocolIDs);
+    SmallVector<TypeID, 8> protocols;
+    for (auto protocolID : protocolIDs)
+      protocols.push_back(addTranscribedTypeRef(source, protocolID));
+    abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
+    ProtocolCompositionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, hasAnyObject, hasInverseCopyable,
+        hasInverseEscapable, hasInverseDeinitable, protocols);
+    return;
+  }
+  case PARAMETERIZED_PROTOCOL_TYPE: {
+    TypeID baseID;
+    ArrayRef<uint64_t> argumentIDs;
+    ParameterizedProtocolTypeLayout::readRecord(scratch, baseID, argumentIDs);
+    SmallVector<TypeID, 8> arguments;
+    for (auto argumentID : argumentIDs)
+      arguments.push_back(addTranscribedTypeRef(source, argumentID));
+    abbrCode = DeclTypeAbbrCodes[ParameterizedProtocolTypeLayout::Code];
+    ParameterizedProtocolTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, baseID), arguments);
+    return;
+  }
+  case BOUND_GENERIC_TYPE: {
+    DeclID declID;
+    TypeID parentID;
+    ArrayRef<uint64_t> argumentIDs;
+    BoundGenericTypeLayout::readRecord(scratch, declID, parentID, argumentIDs);
+    SmallVector<TypeID, 8> arguments;
+    for (auto argumentID : argumentIDs)
+      arguments.push_back(addTranscribedTypeRef(source, argumentID));
+    abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
+    BoundGenericTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedDeclRef(source, declID),
+        addTranscribedTypeRef(source, parentID), arguments);
+    return;
+  }
+  case TUPLE_TYPE: {
+    abbrCode = DeclTypeAbbrCodes[TupleTypeLayout::Code];
+    TupleTypeLayout::emitRecord(Out, ScratchRecord, abbrCode);
+    while (true) {
+      auto savedCursor = cursor;
+      entry = llvm::cantFail(cursor.advance(
+          llvm::BitstreamCursor::AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+      scratch.clear();
+      recordID = llvm::cantFail(cursor.readRecord(entry.ID, scratch));
+      if (recordID != TUPLE_TYPE_ELT) {
+        cursor = std::move(savedCursor);
+        break;
+      }
+      IdentifierID nameID;
+      TypeID typeID;
+      TupleTypeEltLayout::readRecord(scratch, nameID, typeID);
+      abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
+      TupleTypeEltLayout::emitRecord(
+          Out, ScratchRecord, abbrCode,
+          transcribeIdentifier(source, nameID),
+          addTranscribedTypeRef(source, typeID));
+    }
+    return;
+  }
+  case FUNCTION_TYPE: {
+    TypeID resultID, thrownErrorID, isolation;
+    ClangTypeID clangTypeID;
+    unsigned representation, differentiability, executionSemantics;
+    bool noEscape, sendable, async, throws, hasSendingResult, coroutine;
+    FunctionTypeLayout::readRecord(
+        scratch, resultID, representation, clangTypeID, noEscape, sendable,
+        async, throws, thrownErrorID, differentiability, isolation,
+        hasSendingResult, executionSemantics, coroutine);
+    abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
+    FunctionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, resultID), representation,
+        addTranscribedClangTypeRef(source, clangTypeID,
+                                   /*forFunction=*/true),
+        noEscape, sendable, async, throws,
+        addTranscribedTypeRef(source, thrownErrorID), differentiability,
+        transcribeIsolation(isolation), hasSendingResult, executionSemantics,
+        coroutine);
+    writeFunctionTrailingRecords();
+    return;
+  }
+  case GENERIC_FUNCTION_TYPE: {
+    TypeID resultID, thrownErrorID, isolation;
+    GenericSignatureID signatureID;
+    unsigned representation, differentiability, executionSemantics;
+    bool sendable, async, throws, hasSendingResult, coroutine;
+    GenericFunctionTypeLayout::readRecord(
+        scratch, resultID, representation, sendable, async, throws,
+        thrownErrorID, differentiability, isolation, hasSendingResult,
+        executionSemantics, coroutine, signatureID);
+    abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
+    GenericFunctionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, resultID), representation, sendable,
+        async, throws, addTranscribedTypeRef(source, thrownErrorID),
+        differentiability, transcribeIsolation(isolation), hasSendingResult,
+        executionSemantics, coroutine,
+        addTranscribedGenericSignatureRef(source, signatureID));
+    writeFunctionTrailingRecords();
+    return;
+  }
+  case SIL_FUNCTION_TYPE: {
+    bool sendable, async, pseudogeneric, noEscape, unimplementable,
+        hasErrorResult;
+    unsigned coroutineKind, calleeConvention, representation,
+        executionSemantics, isolation, differentiability;
+    unsigned parameterCount, yieldCount, resultCount;
+    GenericSignatureID signatureID;
+    SubstitutionMapID invocationSubstitutionsID, patternSubstitutionsID;
+    ClangTypeID clangTypeID;
+    ArrayRef<uint64_t> sourceData;
+    SILFunctionTypeLayout::readRecord(
+        scratch, sendable, async, coroutineKind, calleeConvention,
+        representation, pseudogeneric, noEscape, unimplementable,
+        executionSemantics, isolation, differentiability, hasErrorResult,
+        parameterCount, yieldCount, resultCount, signatureID,
+        invocationSubstitutionsID, patternSubstitutionsID, clangTypeID,
+        sourceData);
+
+    SmallVector<TypeID, 16> data;
+    unsigned index = 0;
+    auto transcribeTypeAndValues = [&](unsigned count, unsigned valueCount) {
+      for (unsigned item = 0; item < count; ++item) {
+        data.push_back(addTranscribedTypeRef(source, sourceData[index++]));
+        for (unsigned value = 0; value < valueCount; ++value)
+          data.push_back(TypeID(sourceData[index++]));
+      }
+    };
+    transcribeTypeAndValues(parameterCount, 2);
+    transcribeTypeAndValues(yieldCount, 1);
+    transcribeTypeAndValues(resultCount, 2);
+    transcribeTypeAndValues(hasErrorResult ? 1 : 0, 1);
+    if (index != sourceData.size()) {
+      assert(index + 1 == sourceData.size() &&
+             "unexpected SIL function type payload");
+      data.push_back(addTranscribedConformanceRef(
+          source, ProtocolConformanceID(sourceData[index++])));
+    }
+
+    abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
+    SILFunctionTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, sendable, async, coroutineKind,
+        calleeConvention, representation, pseudogeneric, noEscape,
+        unimplementable, executionSemantics, isolation, differentiability,
+        hasErrorResult, parameterCount, yieldCount, resultCount,
+        addTranscribedGenericSignatureRef(source, signatureID),
+        addTranscribedSubstitutionMapRef(source, invocationSubstitutionsID),
+        addTranscribedSubstitutionMapRef(source, patternSubstitutionsID),
+        addTranscribedClangTypeRef(source, clangTypeID), data);
+    writeFunctionTrailingRecords();
+    return;
+  }
+  case OPTIONAL_TYPE:
+  case ARRAY_SLICE_TYPE:
+  case VARIADIC_SEQUENCE_TYPE:
+  case EXISTENTIAL_TYPE:
+  case SIL_BLOCK_STORAGE_TYPE:
+  case SIL_MOVE_ONLY_TYPE: {
+    TypeID baseID;
+    OptionalTypeLayout::readRecord(scratch, baseID);
+    TypeID base = addTranscribedTypeRef(source, baseID);
+    if (recordID == OPTIONAL_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[OptionalTypeLayout::Code];
+      OptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, base);
+    } else if (recordID == ARRAY_SLICE_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
+      ArraySliceTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, base);
+    } else if (recordID == VARIADIC_SEQUENCE_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[VariadicSequenceTypeLayout::Code];
+      VariadicSequenceTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                             base);
+    } else if (recordID == EXISTENTIAL_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[ExistentialTypeLayout::Code];
+      ExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, base);
+    } else if (recordID == SIL_BLOCK_STORAGE_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[SILBlockStorageTypeLayout::Code];
+      SILBlockStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                            base);
+    } else {
+      abbrCode = DeclTypeAbbrCodes[SILMoveOnlyWrappedTypeLayout::Code];
+      SILMoveOnlyWrappedTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                               base);
+    }
+    return;
+  }
+  case INLINE_ARRAY_TYPE:
+  case DICTIONARY_TYPE:
+  case PACK_EXPANSION_TYPE: {
+    TypeID firstID, secondID;
+    InlineArrayTypeLayout::readRecord(scratch, firstID, secondID);
+    auto first = addTranscribedTypeRef(source, firstID);
+    auto second = addTranscribedTypeRef(source, secondID);
+    if (recordID == INLINE_ARRAY_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[InlineArrayTypeLayout::Code];
+      InlineArrayTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, first,
+                                        second);
+    } else if (recordID == DICTIONARY_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[DictionaryTypeLayout::Code];
+      DictionaryTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, first,
+                                       second);
+    } else {
+      abbrCode = DeclTypeAbbrCodes[PackExpansionTypeLayout::Code];
+      PackExpansionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, first,
+                                          second);
+    }
+    return;
+  }
+  case REFERENCE_STORAGE_TYPE: {
+    unsigned ownership;
+    TypeID referentID;
+    ReferenceStorageTypeLayout::readRecord(scratch, ownership, referentID);
+    abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
+    ReferenceStorageTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, ownership,
+        addTranscribedTypeRef(source, referentID));
+    return;
+  }
+  case UNBOUND_GENERIC_TYPE: {
+    DeclID declID;
+    TypeID parentID;
+    UnboundGenericTypeLayout::readRecord(scratch, declID, parentID);
+    abbrCode = DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
+    UnboundGenericTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedDeclRef(source, declID),
+        addTranscribedTypeRef(source, parentID));
+    return;
+  }
+  case PACK_ELEMENT_TYPE: {
+    TypeID packID;
+    unsigned level;
+    PackElementTypeLayout::readRecord(scratch, packID, level);
+    abbrCode = DeclTypeAbbrCodes[PackElementTypeLayout::Code];
+    PackElementTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedTypeRef(source, packID), level);
+    return;
+  }
+  case PACK_TYPE:
+  case SIL_PACK_TYPE: {
+    bool isAddress = false;
+    ArrayRef<uint64_t> componentIDs;
+    if (recordID == PACK_TYPE)
+      PackTypeLayout::readRecord(scratch, componentIDs);
+    else
+      SILPackTypeLayout::readRecord(scratch, isAddress, componentIDs);
+    SmallVector<TypeID, 8> components;
+    for (auto componentID : componentIDs)
+      components.push_back(addTranscribedTypeRef(source, componentID));
+    if (recordID == PACK_TYPE) {
+      abbrCode = DeclTypeAbbrCodes[PackTypeLayout::Code];
+      PackTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, components);
+    } else {
+      abbrCode = DeclTypeAbbrCodes[SILPackTypeLayout::Code];
+      SILPackTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, isAddress,
+                                    components);
+    }
+    return;
+  }
+  case SIL_BOX_TYPE: {
+    SILLayoutID layoutID;
+    SubstitutionMapID substitutionsID;
+    SILBoxTypeLayout::readRecord(scratch, layoutID, substitutionsID);
+    abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
+    SILBoxTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        addTranscribedSILLayoutRef(source, layoutID),
+        addTranscribedSubstitutionMapRef(source, substitutionsID));
+    return;
+  }
+  case INTEGER_TYPE: {
+    bool isNegative;
+    IntegerTypeLayout::readRecord(scratch, isNegative);
+    abbrCode = DeclTypeAbbrCodes[IntegerTypeLayout::Code];
+    IntegerTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, isNegative,
+                                  blob);
+    return;
+  }
+  default:
+    llvm::report_fatal_error(
+        "serialization of this transcribed type record is not implemented");
+  }
+}
 
 class Serializer::TypeSerializer : public TypeVisitor<TypeSerializer> {
   Serializer &S;
@@ -6578,8 +7373,14 @@ public:
   }
 
   void visitHiddenType(const HiddenType *hidden) {
-    using namespace decls_block;
     auto *layoutDecl = hidden->getLayoutInfoDecl();
+    if (layoutDecl->Layout && layoutDecl->Layout->serializedType) {
+      auto source = layoutDecl->Layout->serializedType;
+      S.writeTranscribedType(*source.moduleFile, source.typeID);
+      return;
+    }
+
+    using namespace decls_block;
     assert(layoutDecl && "HiddenType must carry an abstract layout");
     unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
     NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -6591,7 +7392,7 @@ public:
 void Serializer::writeASTBlockEntity(Type ty) {
   using namespace decls_block;
   PrettyStackTraceType traceRAII(ty->getASTContext(), "serializing", ty);
-  assert(TypesToSerialize.hasRef(ty));
+  assert(TypesToSerialize.hasRef(TypeToSerialize(ty.getPointer())));
 
   BitOffset initialOffset = Out.GetCurrentBitNo();
   SWIFT_DEFER {
@@ -6602,6 +7403,14 @@ void Serializer::writeASTBlockEntity(Type ty) {
   };
 
   TypeSerializer(*this).visit(ty);
+}
+
+void Serializer::writeASTBlockEntity(TypeToSerialize type) {
+  if (auto *transcribed = type.dyn_cast<TranscribedType *>()) {
+    writeTranscribedType(*transcribed->Source, transcribed->SourceID);
+    return;
+  }
+  writeASTBlockEntity(Type(type.dyn_cast<TypeBase *>()));
 }
 
 namespace {
@@ -6863,9 +7672,16 @@ void Serializer::writeSerializableRecordTypeInfo(
       Out, ScratchRecord, abbrCode, representation.fieldsAreABIAccessible,
       representation.explosionSize, representation.fields.size());
   for (const auto &field : representation.fields) {
+    TypeID fieldTypeID;
+    if (field.resolvedType)
+      fieldTypeID = addTypeRef(field.resolvedType);
+    else if (field.serializedType)
+      fieldTypeID = addTranscribedTypeRef(*field.serializedType.moduleFile,
+                                          field.serializedType.typeID);
+
     abbrCode = DeclTypeAbbrCodes[SerializableRecordFieldLayout::Code];
     SerializableRecordFieldLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addTypeRef(field.type),
+        Out, ScratchRecord, abbrCode, fieldTypeID,
         field.layout.ByteOffset, field.layout.ByteOffsetForLayout,
         field.layout.Index, field.layout.IsTriviallyDestroyable,
         field.layout.TheKind, field.storage.Begin, field.storage.End);
