@@ -37,6 +37,29 @@
 
 #include "SymbolInfo.h"
 
+/// Enumerate the contents of a custom section, by name, in every image loaded
+/// in the process.
+///
+/// \param sectionName The name as written in a \c @section attribute for the
+///   current object format: "segment,section" on Mach-O, a C identifier on
+///   ELF and Wasm. On COFF the "$" group suffix is ignored.
+/// \param body A function invoked once per image that contains the section,
+///   with the section's start address and size in bytes. Return \c false to
+///   stop the enumeration.
+/// \param context A pointer passed through to \a body.
+///
+/// Only images known to the runtime are searched: on ELF, Wasm and COFF the
+/// images whose per-image stub registered their metadata sections, on Mach-O
+/// the images the dynamic loader reported. The memory handed to \a body stays
+/// valid as long as its image stays loaded; the Swift runtime does not support
+/// unloading images that contain Swift code. This is the entry point behind
+/// \c customSectionContents(named:) in the standard library.
+SWIFT_RUNTIME_EXPORT
+void swift_enumerateCustomSections(const char *sectionName,
+                                   bool (*body)(const void *start, size_t size,
+                                                void *context),
+                                   void *context);
+
 namespace swift {
 
 /// Load the metadata from the image necessary to find protocols by name.

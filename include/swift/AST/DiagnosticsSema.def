@@ -2334,6 +2334,13 @@ NOTE(cdecl_suggest_objc,none,
 // @used and @section
 ERROR(section_empty_name,none,
       "'@section' section name cannot be empty", ())
+GROUPED_WARNING(section_name_not_indexable_elf,SectionNotIndexable,none,
+        "section name '%0' is not a C identifier, so the section will not be "
+        "listed in the image's section index", (StringRef))
+GROUPED_WARNING(section_name_not_indexable_coff,SectionNotIndexable,none,
+        "section name '%0' has no '$' group that sorts between '$A' and '$Z', "
+        "so the section will not be listed in the image's section index",
+        (StringRef))
 
 // @_silgen_name and friends
 WARNING(reserved_runtime_symbol_name,none,

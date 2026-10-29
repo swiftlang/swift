@@ -56,6 +56,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
+- <doc:section-not-indexable>
 - <doc:semantic-copies>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
@@ -126,6 +127,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:region-isolation-isolation-history>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
+- <doc:section-not-indexable>
 - <doc:semantic-copies>
 - <doc:sendable-metatypes>
 - <doc:sending-closure-risks-data-race>

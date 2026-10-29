@@ -153,6 +153,7 @@ split_embedded_sources(
   EMBEDDED RangeSetRanges.swift
   EMBEDDED Ref.swift
     NORMAL ReflectionMirror.swift
+    NORMAL CustomSections.swift
   EMBEDDED Repeat.swift
   EMBEDDED Result.swift
   EMBEDDED Reverse.swift

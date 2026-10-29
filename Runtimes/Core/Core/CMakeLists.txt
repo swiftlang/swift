@@ -137,6 +137,7 @@ add_library(swiftCore
   RangeSetRanges.swift
   Ref.swift
   ReflectionMirror.swift
+  CustomSections.swift
   Repeat.swift
   REPL.swift
   Result.swift

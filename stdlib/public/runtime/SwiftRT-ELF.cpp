@@ -70,6 +70,7 @@ DECLARE_SWIFT_SECTION(swift5_accessible_functions)
 DECLARE_SWIFT_SECTION(swift5_runtime_attributes)
 
 DECLARE_SWIFT_SECTION(swift5_tests)
+DECLARE_SWIFT_SECTION(swift5_sections)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -162,6 +163,7 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
       SWIFT_SECTION_RANGE(swift5_runtime_attributes),
       SWIFT_SECTION_RANGE(swift5_tests),
+      SWIFT_SECTION_RANGE(swift5_sections),
   };
 
 #undef SWIFT_SECTION_RANGE

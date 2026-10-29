@@ -24,6 +24,8 @@
 #include "ImageInspection.h"
 #include "ImageInspectionCommon.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Concurrent.h"
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #if SWIFT_OBJC_INTEROP
@@ -288,6 +290,68 @@ void swift::initializeAccessibleFunctionsLookup() {
       addImageCallback<TextSegment, AccessibleFunctionsSection,
                        _dyld_section_location_text_swift5_ac_funcs,
                        addImageAccessibleFunctionsBlockCallbackUnsafe>);
+}
+
+//===----------------------------------------------------------------------===//
+// Custom section enumeration
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// The header of every image dyld has reported, in load order. Appended to
+/// from the dyld callback and never shrunk: the Swift runtime does not support
+/// unloading images that contain Swift code, so pointers into them stay valid.
+/// Which images are reported depends on the callback REGISTER_FUNC chose: the
+/// ObjC runtime's reports images with ObjC image info, which every Swift image
+/// has; dyld's reports every image.
+swift::Lazy<swift::ConcurrentReadableArray<const mach_header *>> LoadedImages;
+
+// The three overloads match the three callback shapes REGISTER_FUNC can
+// register. They run with the dyld and ObjC runtime locks held (see the
+// warning above) and only append to the array, which allocates with malloc.
+void recordImageHeader(const mach_header *mh) { LoadedImages->push_back(mh); }
+void recordImageHeader(const mach_header *mh, intptr_t vmaddr_slide) {
+  recordImageHeader(mh);
+}
+#if OBJC_ADDLOADIMAGEFUNC2_DEFINED
+void recordImageHeader(const mach_header *mh,
+                       struct _dyld_section_location_info_s *dyldInfo) {
+  recordImageHeader(mh);
+}
+#endif
+
+/// Registers the callback on first use. dyld reports every image that is
+/// already loaded before the registration call returns, and every later image
+/// as it loads, so the array is complete from the first query on.
+struct ImageRegistry {
+  ImageRegistry() { REGISTER_FUNC(recordImageHeader); }
+};
+swift::Lazy<ImageRegistry> Registry;
+
+} // end anonymous namespace
+
+SWIFT_RUNTIME_EXPORT
+void swift_enumerateCustomSections(const char *sectionName,
+                                   bool (*body)(const void *start, size_t size,
+                                                void *context),
+                                   void *context) {
+  char segment[17];
+  char section[17];
+  if (!parseMachOSectionName(sectionName, segment, section))
+    return;
+
+  Registry.get();
+  auto snapshot = LoadedImages->snapshot();
+  for (const mach_header *mh : snapshot) {
+    unsigned long size = 0;
+    const uint8_t *start =
+        getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                       segment, section, &size);
+    if (!start || size == 0)
+      continue;
+    if (!(*body)(start, static_cast<size_t>(size), context))
+      return;
+  }
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&

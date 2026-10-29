@@ -162,6 +162,7 @@
     "Mirror.swift",
     "Mirrors.swift",
     "ReflectionMirror.swift",
+    "CustomSections.swift",
     "ObjectIdentifier.swift",
     "ObjectIdentifier+DebugDescription.swift"
   ],

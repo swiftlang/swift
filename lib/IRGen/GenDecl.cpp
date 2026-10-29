@@ -1370,6 +1370,11 @@ void IRGenerator::emitAccessibleFunctions() {
     m.second->emitAccessibleFunctions();
 }
 
+void IRGenerator::emitCustomSectionIndex() {
+  for (auto &m : *this)
+    m.second->emitCustomSectionIndex();
+}
+
 static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
@@ -2992,6 +2997,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       addUsedGlobal(gvar);
     else if (var->shouldBePreservedForDebugger())
       addUsedGlobal(gvar);
+    if (!var->section().empty())
+      noteCustomSection(var->section());
     if (initVal) {
       gvar->setInitializer(initVal);
       if (var->isLet() &&
@@ -5032,6 +5039,139 @@ void IRGenModule::emitAccessibleFunctions() {
 
   for (const auto &func : AccessibleFunctions) {
     emitAccessibleFunction(fnsSectionName, func);
+  }
+}
+
+void IRGenModule::noteCustomSection(StringRef sectionName) {
+  // Embedded Swift places data for linker scripts and bare-metal images that
+  // have no runtime to read an index; leave their sections alone.
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
+  // Sema has already warned about names the index cannot describe.
+  if (SectionAttr::indexProblem(sectionName, TargetInfo.OutputObjectFormat) !=
+      SectionAttr::IndexProblem::None)
+    return;
+  for (const auto &name : CustomSectionNames)
+    if (name == sectionName)
+      return;
+  CustomSectionNames.push_back(sectionName.str());
+}
+
+/// Emit one SectionIndexEntry (see MetadataSections.h) per custom section that
+/// holds a variable of this IR module.
+void IRGenModule::emitCustomSectionIndex() {
+  if (CustomSectionNames.empty())
+    return;
+
+  StringRef indexSection;
+  bool useMarkers = false;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    indexSection = "swift5_sections";
+    break;
+  case llvm::Triple::COFF:
+    indexSection = ".sw5sect$B";
+    useMarkers = true;
+    break;
+  case llvm::Triple::MachO:
+    // Section bounds are in the image header and are looked up by name.
+    return;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::DXContainer:
+  case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
+  case llvm::Triple::UnknownObjectFormat:
+    return;
+  }
+
+  const uint64_t pointerSize = getPointerSize().getValue();
+
+  for (const auto &sectionName : CustomSectionNames) {
+    StringRef indexedName = sectionName;
+    if (useMarkers)
+      indexedName = indexedName.split('$').first;
+
+    // A constant this module defines once per section name and shares with
+    // every other object file of the module through its COMDAT group.
+    auto defineShared = [&](StringRef kind, llvm::Type *type,
+                            llvm::Constant *init, StringRef section,
+                            uint64_t alignment) -> llvm::Constant * {
+      std::string symbol =
+          ("__swift5_sections_" + kind + "_" + indexedName).str();
+      if (auto *existing = Module.getNamedValue(symbol))
+        return existing;
+      auto *var = new llvm::GlobalVariable(
+          Module, type, /*isConstant*/ true,
+          llvm::GlobalValue::LinkOnceODRLinkage, init, symbol);
+      var->setSection(section);
+      var->setAlignment(llvm::MaybeAlign(alignment));
+      if (!useMarkers)
+        var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+      var->setComdat(Module.getOrInsertComdat(symbol));
+      disableAddressSanitizer(*this, var);
+      addUsedGlobal(var);
+      return var;
+    };
+
+    llvm::Constant *start;
+    llvm::Constant *stop;
+    if (useMarkers) {
+      // The linker merges `name$X` sections into `name` ordered by `X`, so
+      // markers in `$A` and `$Z` bracket the records. The start marker's first
+      // word holds its own size, so the runtime can skip it.
+      const uint64_t startMarkerSize = 16;
+      auto *padTy = llvm::ArrayType::get(Int8Ty, startMarkerSize - pointerSize);
+      auto *startTy =
+          llvm::StructType::get(getLLVMContext(), {IntPtrTy, padTy});
+      llvm::Constant *startFields[] = {
+          llvm::ConstantInt::get(IntPtrTy, startMarkerSize),
+          llvm::ConstantAggregateZero::get(padTy),
+      };
+      start = defineShared("start", startTy,
+                           llvm::ConstantStruct::get(startTy, startFields),
+                           (indexedName + "$A").str(), startMarkerSize);
+      stop = defineShared("stop", IntPtrTy, llvm::ConstantInt::get(IntPtrTy, 0),
+                          (indexedName + "$Z").str(), pointerSize);
+    } else {
+      // The linker defines `__start_` and `__stop_` for an output section whose
+      // name is a C identifier.
+      auto declareBound = [&](StringRef prefix) -> llvm::Constant * {
+        std::string symbol = (prefix + indexedName).str();
+        if (auto *existing = Module.getNamedValue(symbol))
+          return existing;
+        auto *bound =
+            new llvm::GlobalVariable(Module, Int8Ty, /*isConstant*/ true,
+                                     llvm::GlobalValue::ExternalLinkage,
+                                     /*initializer*/ nullptr, symbol);
+        bound->setVisibility(llvm::GlobalValue::HiddenVisibility);
+        return bound;
+      };
+      start = declareBound("__start_");
+      stop = declareBound("__stop_");
+
+      // A zero-length retained anchor keeps the output section, and so its
+      // bounds, in the image while records without `@used` stay collectable.
+      auto *anchorTy = llvm::ArrayType::get(Int8Ty, 0);
+      defineShared("anchor", anchorTy,
+                   llvm::ConstantAggregateZero::get(anchorTy), sectionName, 1);
+    }
+
+    std::string entryName = ("__swift5_sections_entry_" + indexedName).str();
+    ConstantInitBuilder builder(*this);
+    auto fields = builder.beginStruct();
+    fields.addRelativeAddress(getAddrOfGlobalString(indexedName));
+    fields.addRelativeAddress(start);
+    fields.addRelativeAddress(stop);
+    auto *var =
+        fields.finishAndCreateGlobal(entryName, Alignment(4), /*constant*/ true,
+                                     llvm::GlobalValue::LinkOnceODRLinkage);
+    var->setSection(indexSection);
+    if (!useMarkers)
+      var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+    var->setComdat(Module.getOrInsertComdat(entryName));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
   }
 }
 
