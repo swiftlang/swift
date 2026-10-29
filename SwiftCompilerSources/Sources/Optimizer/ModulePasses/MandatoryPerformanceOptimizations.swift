@@ -338,6 +338,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     }
 
     if context.options.enableEmbeddedSwift {
+      if context.unrollPackLoops(in: function) {
+        changed = true
+      }
+
       // Eliminate @pack_element types here to allow any applies that use them to be specialized.
       if tryEliminateOpenedPackElementTypes(in: function, context) {
         changed = true
@@ -353,10 +357,6 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
                                variant: function.isGlobalInitOnceFunction ? .mandatoryInGlobalInit : .mandatory,
                                context)
     {
-      changed = true
-    }
-
-    if context.unrollPackLoops(in: function) {
       changed = true
     }
 
