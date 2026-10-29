@@ -575,7 +575,7 @@ updateSSA(SILFunction *Fn, SILLoop *Loop,
 }
 
 /// Fully unroll a loop that has a Preheader, Header, Latch & known max trip
-/// cont
+/// count.
 static bool unrollLoop(SILLoop *Loop, SILBasicBlock *Preheader,
                        SILBasicBlock *Header, SILBasicBlock *Latch,
                        uint64_t MaxTripCount) {
@@ -815,7 +815,7 @@ class LoopUnrolling : public SILFunctionTransform {
   }
 };
 
-class PackLoopUnrolling : public LoopUnrolling {
+class PackLoopUnrolling : public SILFunctionTransform {
   void run() override {
     auto *Fun = getFunction();
 
