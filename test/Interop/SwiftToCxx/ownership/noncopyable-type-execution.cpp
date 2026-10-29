@@ -13,7 +13,7 @@
 // RUN: not --crash %target-run %t/swift-noncopyable-execution consume-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 
-// Repeat with boxed values.
+// Repeat with opaque layouts, including values that fit inline.
 // RUN: %target-swift-frontend %S/noncopyable-type-in-cxx.swift -module-name Noncopyable -enable-library-evolution -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/noncopyable.h
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-noncopyable-execution.o
 // RUN: %target-interop-build-swift %S/noncopyable-type-in-cxx.swift -enable-library-evolution -o %t/swift-noncopyable-execution -Xlinker %t/swift-noncopyable-execution.o -module-name Noncopyable -Xfrontend -enable-experimental-feature -Xfrontend GenerateBindingsForNoncopyableTypesInCXX -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -54,10 +54,10 @@ static_assert(std::is_copy_constructible<CopyableStruct>::value,
               "a copyable Swift type must still be copy constructible");
 
 // The moved-from flag is stored after the Swift value, so the Swift value is
-// still at offset zero and can be handed to Swift as-is. A boxed value needs no
-// flag.
+// still at offset zero and can be handed to Swift as-is. An opaque value uses
+// OpaqueStorage without a separate flag.
 static_assert(swift::_impl::isOpaqueLayout<MoveOnlyStruct>
-                  ? sizeof(MoveOnlyStruct) == sizeof(void *)
+                  ? sizeof(MoveOnlyStruct) == sizeof(swift::_impl::OpaqueStorage)
                   : sizeof(MoveOnlyStruct) > 2 * sizeof(swift::Int),
               "the moved-from flag is stored next to the Swift value");
 static_assert(std::is_standard_layout<MoveOnlyStruct>::value,
