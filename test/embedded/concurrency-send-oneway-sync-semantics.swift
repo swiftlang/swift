@@ -14,7 +14,7 @@
 // REQUIRES: swift_feature_SendCalls
 // REQUIRES: concurrency_runtime
 
-// The runtime semantics of 'send' on a synchronous actor isolated method of a
+// The runtime semantics of 'send' on a synchronous '@oneway' method of a
 // plain actor or of a global actor in Embedded Swift, which is lowered to a
 // synchronous enqueue:
 // - the receiver and the arguments (including default arguments and variadic
@@ -63,7 +63,7 @@ final class Tracker {
 }
 
 protocol Tellable: Actor {
-  func tell(_ a: Int, _ b: Int)
+  @oneway func tell(_ a: Int, _ b: Int)
 }
 
 actor Mailbox: Tellable {
@@ -71,28 +71,28 @@ actor Mailbox: Tellable {
   var count = 0
   init(_ tracker: Tracker? = nil) { self.tracker = tracker }
 
-  func tell(_ a: Int, _ b: Int) {
+  @oneway func tell(_ a: Int, _ b: Int) {
     count += 1
     log("tell \(a) \(b)")
   }
-  func tellDefault(_ a: Int, d: Int = defaultValue()) {
+  @oneway func tellDefault(_ a: Int, d: Int = defaultValue()) {
     count += 1
     log("tellDefault \(a) \(d)")
   }
-  func tellVariadic(_ xs: Int...) {
+  @oneway func tellVariadic(_ xs: Int...) {
     count += 1
     log("tellVariadic \(xs.count) \(xs[0]) \(xs[1])")
   }
-  func tellAuto(_ x: @autoclosure () -> Int) {
+  @oneway func tellAuto(_ x: @autoclosure () -> Int) {
     count += 1
     log("tellAuto before")
     log("tellAuto \(x())")
   }
-  func tellAsync(_ n: Int) async {
+  @oneway func tellAsync(_ n: Int) async {
     count += 1
     log("tellAsync \(n)")
   }
-  func probe() {
+  @oneway func probe() {
     count += 1
     log("probe tag \(Probe.tag) inner \(Probe.inner)")
     log("probe cancelled \(Task.isCancelled)")
@@ -121,7 +121,7 @@ func waitFor(_ m: Mailbox, _ n: Int) async {
 
 @Background var backgroundCount = 0
 
-@Background func note(_ n: Int) {
+@Background @oneway func note(_ n: Int) {
   backgroundCount += 1
   log("note \(n)")
 }
@@ -134,7 +134,7 @@ func waitFor(_ m: Mailbox, _ n: Int) async {
 // The default argument is isolated to 'Background' (SE-0411), so it is
 // evaluated in the enqueued call, just as it is only evaluated after the hop
 // for an 'await'
-@Background func noteIsolatedDefault(_ n: Int = backgroundDefault()) {
+@Background @oneway func noteIsolatedDefault(_ n: Int = backgroundDefault()) {
   backgroundCount += 1
   log("noteIsolatedDefault \(n)")
 }
@@ -151,7 +151,7 @@ func waitForBackground(_ n: Int) async {
 }
 
 struct Receiver {
-  @Background func note(_ n: Int) {
+  @Background @oneway func note(_ n: Int) {
     backgroundCount += 1
     log("Receiver.note \(n)")
   }
@@ -175,7 +175,7 @@ func sendFromContexts(_ m: Mailbox) {
 func sendGeneric<T: Tellable>(_ t: T, _ n: Int) { send t.tell(n, n) }
 func sendOpaque(_ t: some Tellable, _ n: Int) { send t.tell(n, n) }
 
-// The async method keeps the task-based lowering
+// The async-bodied '@oneway' method keeps the task-based lowering
 func sendAsync(_ m: Mailbox) {
   send m.tellAsync(40)
 }

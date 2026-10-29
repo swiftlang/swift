@@ -11,7 +11,7 @@
 // REQUIRES: swift_feature_SendCalls
 // REQUIRES: concurrency_runtime
 
-// In Embedded Swift 'send' on a synchronous method of a plain actor
+// In Embedded Swift 'send' on a synchronous '@oneway' method of a plain actor
 // or of a global actor enqueues the call on the actor directly: no task body
 // with suspension points, callable from synchronous code, FIFO with other
 // work enqueued on the same actor, and the caller's task locals are visible
@@ -26,7 +26,7 @@ enum Probe {
 actor Mailbox {
   var received: [Int] = []
 
-  func tell(_ n: Int) {
+  @oneway func tell(_ n: Int) {
     received.append(n)
     print("[swift] Mailbox.tell(\(n)) tag: \(Probe.tag)")
   }
@@ -40,7 +40,7 @@ actor Mailbox {
 
 @Background var backgroundLog: [Int] = []
 
-@Background func note(_ n: Int) {
+@Background @oneway func note(_ n: Int) {
   backgroundLog.append(n)
   print("[swift] note(\(n)) tag: \(Probe.tag)")
 }
@@ -69,7 +69,7 @@ func sendToBackground() {
     print("[swift] test_actor")
     let m = Mailbox()
     sendToMailbox(m)
-    // FIFO: the awaited call is enqueued after the three sent calls
+    // FIFO: the awaited call is enqueued after the three oneway calls
     let all = await m.drain()
     print("[swift] mailbox: \(all.count) \(all[0]) \(all[1]) \(all[2])")
 

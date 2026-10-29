@@ -36,6 +36,16 @@ enum ScoreKind: unsigned int {
   /// \note Any score kind after this is considered a conversion that doesn't
   /// require fixing the source and will be ignored during code completion.
   SK_AsyncInSyncMismatch,
+  /// A reference to a '@oneway' function which is not the callee of
+  /// a 'send' call, or a reference to a function which is not
+  /// '@oneway' and is. This lets 'send x.f()' pick
+  /// '@oneway func f()' and any other call of 'x.f()' pick 'func f()'
+  /// when both overloads exist.
+  ///
+  /// This ranks above \c SK_SyncInAsync: the operand of a 'send' is
+  /// type-checked in an async operation closure, where a synchronous
+  /// '@oneway func f()' would otherwise lose to an 'async' 'func f()'
+  SK_OnewayMismatch,
   /// Synchronous function in an asynchronous context or a conversion of
   /// a synchronous function to an asynchronous one.
   SK_SyncInAsync,
@@ -190,6 +200,9 @@ struct Score {
 
     case SK_SyncInAsync:
       return "sync-in-asynchronous";
+
+    case SK_OnewayMismatch:
+      return "'@oneway' mismatch with send";
 
     case SK_ForwardTrailingClosure:
       return "forward scan when matching a trailing closure";

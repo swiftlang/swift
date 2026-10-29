@@ -358,12 +358,13 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
     ThrowsIsSet : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
-    ShouldApplyDistributedThunk : 1
+    ShouldApplyDistributedThunk : 1,
+    IsOnewaySendOperand : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -5081,6 +5082,7 @@ protected:
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
     Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
+    Bits.ApplyExpr.IsOnewaySendOperand = false;
   }
 
 public:
@@ -5196,6 +5198,14 @@ public:
   }
   void setShouldApplyDistributedThunk(bool flag) {
     Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
+  }
+
+  /// Whether this call is the operand of a 'send', e.g. the 'x.f()' in
+  /// 'send x.f()'. Overload resolution prefers a '@oneway' callee for such a
+  /// call, and a non-'@oneway' callee for any other call
+  bool isOnewaySendOperand() const { return Bits.ApplyExpr.IsOnewaySendOperand; }
+  void setIsOnewaySendOperand(bool flag = true) {
+    Bits.ApplyExpr.IsOnewaySendOperand = flag;
   }
 
   ValueDecl *getCalledValue(bool skipFunctionConversions = false) const;

@@ -5,8 +5,9 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_SendCalls
 
-// 'send' of a call of an actor isolated function runs the call on the
-// callee's actor without waiting for it
+// 'send' of a call of a function which is not '@oneway' runs the call in a
+// discarding task, like for a '@oneway' function. The task starts on the
+// callee's actor
 
 actor Worker {
   func work() {}

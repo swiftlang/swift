@@ -14,7 +14,7 @@
 
 actor Mailbox {
   var received: [Int] = []
-  func tell(_ n: Int) {
+  @oneway func tell(_ n: Int) {
     received.append(n)
     print("got \(n)")
   }

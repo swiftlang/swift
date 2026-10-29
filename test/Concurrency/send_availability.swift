@@ -8,7 +8,7 @@
 // requires the Swift 6.1 runtime
 
 actor A {
-  func f() {}
+  @oneway func f() {}
 }
 
 func tooOld(_ a: A) { // expected-note{{add '@available' attribute to enclosing global function}}

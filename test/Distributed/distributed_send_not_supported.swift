@@ -6,7 +6,8 @@
 // REQUIRES: distributed
 // REQUIRES: swift_feature_SendCalls
 
-// TODO: 'send' of distributed calls is not supported yet
+// TODO: '@oneway' distributed functions and 'send' of distributed calls are
+// not supported yet
 
 import Distributed
 import FakeDistributedActorSystems
@@ -14,6 +15,9 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 distributed actor Greeter {
+  // expected-error@+1:3{{'@oneway' is not supported on distributed instance method 'greet()' yet}}{{3-11=}}
+  @oneway distributed func greet() {}
+
   distributed func hello() {}
 
   func local() {}

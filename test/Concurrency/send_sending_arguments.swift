@@ -12,9 +12,9 @@ class NonSendable {
 }
 
 actor A {
-  func take(_ ns: NonSendable) {}
-  func takeAsync(_ ns: NonSendable) async {}
-  func takeInt(_ i: Int) {}
+  @oneway func take(_ ns: NonSendable) {}
+  @oneway func takeAsync(_ ns: NonSendable) async {}
+  @oneway func takeInt(_ i: Int) {}
 }
 
 func sendDisconnected(_ a: A) {
@@ -41,7 +41,7 @@ func sendTaskIsolatedParameter(_ a: A, _ ns: NonSendable) {
   // expected-note@-1{{'ns' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
 }
 
-// 'send' of an async call
+// 'send' of an async '@oneway' call
 func useAfterGeneralSend(_ a: A) {
   let ns = NonSendable()
   send a.takeAsync(ns) // expected-error{{sending 'ns' risks causing data races}}
@@ -64,7 +64,7 @@ func sendMainActorIsolatedParameter(_ a: A, _ ns: NonSendable) {
 actor B {
   var state = NonSendable()
 
-  func take(_ ns: NonSendable) {}
+  @oneway func take(_ ns: NonSendable) {}
 
   // The task runs on this actor too, so this is a same-actor use
   func sendOwnStateToSelf() {

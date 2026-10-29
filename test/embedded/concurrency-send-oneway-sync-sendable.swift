@@ -5,8 +5,8 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_SendCalls
 
-// In Embedded Swift 'send' on a synchronous actor isolated method is lowered to
-// a synchronous enqueue of a closure which captures the arguments. The region
+// In Embedded Swift 'send' on a synchronous '@oneway' method is lowered to a
+// synchronous enqueue of a closure which captures the arguments. The region
 // checker (SE-0414) must still diagnose the arguments exactly like it does for
 // an 'await' of the same method: a non-Sendable value that is still used
 // afterwards, or that belongs to the caller's region, cannot be sent, and a
@@ -21,7 +21,7 @@ class NonSendable {
 actor A {
   var state = NonSendable()
 
-  func take(_ n: NonSendable) {}
+  @oneway func take(_ n: NonSendable) {}
   func takeAsync(_ n: NonSendable) async {}
 
   // Same-actor calls: passing the actor's own state is fine
@@ -44,7 +44,7 @@ actor A {
 
 @GA var globalState = NonSendable()
 
-@GA func globalTake(_ n: NonSendable) {}
+@GA @oneway func globalTake(_ n: NonSendable) {}
 
 @GA func sendGlobalStateOnSameGlobalActor() {
   send globalTake(globalState)
