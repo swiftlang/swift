@@ -313,6 +313,11 @@ static bool isPackIterationLoop(SILLoop *Loop) {
   return false;
 }
 
+struct UnrollablePackLoopInfo {
+  SILBasicBlock *header;
+  unsigned depth;
+};
+
 /// Collect loop headers with an argument that is used as a dynamic pack index
 /// by an `open_pack_element` instruction whose opened Pack types contain no
 /// expansions. These are the headers of candidate loops for Pack Loop
@@ -320,7 +325,7 @@ static bool isPackIterationLoop(SILLoop *Loop) {
 ///
 /// Returns an array containing each loop header and its depth.
 static auto collectPackLoopHeaders(SILLoopInfo *LoopInfo, SILFunction *Fun) {
-  llvm::SmallVector<std::pair<SILBasicBlock *, long>, 2> packLoopHeaders;
+  llvm::SmallVector<UnrollablePackLoopInfo> packLoopHeaders;
   // Multiple `open_pack_element` instructions could use the same header
   // argument, so keep track of which ones we have already collected.
   BasicBlockSet collectedBlocks(Fun);
@@ -738,10 +743,11 @@ bool unrollPackLoopsInFunction(SILFunction *Fun, SILPassManager *PM) {
   // unrollable Pack loop headers is unaffected. This lets us avoid repeating
   // the analysis to precisely detect pack loops, which is non-trivial.
   llvm::sort(unrollablePackLoopHeaders,
-             [&](const auto &a, const auto &b) { return a.second > b.second; });
-  auto lastAnalysisDepth = unrollablePackLoopHeaders[0].second;
+             [&](const auto &a, const auto &b) { return a.depth > b.depth; });
+  auto lastAnalysisDepth = unrollablePackLoopHeaders[0].depth;
   bool changed = false;
-  for (const auto [header, depth] : unrollablePackLoopHeaders) {
+  for (const auto &packLoopInfo : unrollablePackLoopHeaders) {
+    const auto depth = packLoopInfo.depth;
     if (changed && depth != lastAnalysisDepth) {
       // An inner loop was unrolled, invalidating the loop and dead-end blocks
       // analyses for all loops at shallower depths. Clean up and re-analyse.
@@ -753,7 +759,7 @@ bool unrollPackLoopsInFunction(SILFunction *Fun, SILPassManager *PM) {
       lastAnalysisDepth = depth;
     }
 
-    auto *Loop = LoopInfo->getLoopFor(header);
+    auto *Loop = LoopInfo->getLoopFor(packLoopInfo.header);
     ASSERT(Loop && "All collected blocks are loop headers.");
     // First canonicalize and rotate the loop so more pack loops can unroll.
     changed |= canonicalizeLoop(Loop, dom, LoopInfo);
