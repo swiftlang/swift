@@ -5350,7 +5350,10 @@ public:
                                   contextID.getOpaqueValue(),
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
-                                  MemberAbstractTypeLayoutID(),
+                                  S.AbstractMemberTypeLayoutsToSerialize.hasRef(elem)
+                                      ? S.AbstractMemberTypeLayoutsToSerialize
+                                            .addRef(elem)
+                                      : MemberAbstractTypeLayoutID(),
                                   (unsigned)rawValueKind,
                                   isRawValueImplicit,
                                   isNegative,
@@ -7695,6 +7698,9 @@ bool Serializer::scheduleAbstractMemberTypeLayoutSerialization(const Decl *D) {
 void Serializer::handleHiddenTypeLayoutRequirement(
     const HiddenTypeLayoutRequirement &requirement) {
   if (isa<VarDecl>(requirement.LayoutAffectingStorage))
+    scheduleAbstractMemberTypeLayoutSerialization(
+        requirement.LayoutAffectingStorage);
+  if (isa<EnumElementDecl>(requirement.LayoutAffectingStorage))
     scheduleAbstractMemberTypeLayoutSerialization(
         requirement.LayoutAffectingStorage);
 
