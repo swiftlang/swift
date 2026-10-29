@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "../../IRGen/GenClass.h"
 #include "../../IRGen/IRGenModule.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Demangling/ManglingMacros.h"
