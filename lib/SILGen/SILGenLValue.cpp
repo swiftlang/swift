@@ -3445,7 +3445,6 @@ static bool isValueTypeRootedLocalStorage(Expr *e) {
 /// borrowed before they split.
 static BindOptionalExpr *getBindOfAddressableOptional(SILGenFunction &SGF,
                                                       Expr *e) {
-  e = e->getSemanticsProvidingExpr();
   if (auto *load = dyn_cast<LoadExpr>(e))
     e = load->getSubExpr()->getSemanticsProvidingExpr();
 
@@ -4466,8 +4465,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   }
 
   // Keep the base addressable to project the property from the base's address.
-  if (!addressable && options.TryAddressable
-      && strategy.getKind() == AccessStrategy::Storage
+  if (options.TryAddressable
       && getBindOfAddressableOptional(SGF, e->getBase())) {
     addressable = true;
     orig = AbstractionPattern::getOpaque();
@@ -4956,8 +4954,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   LValue optLV;
   auto *subMember =
       dyn_cast<MemberRefExpr>(e->getSubExpr()->getSemanticsProvidingExpr());
-  if (options.TryAddressable && subMember
-      && getBindOfAddressableOptional(SGF, subMember->getBase())) {
+  if (subMember && getBindOfAddressableOptional(SGF, subMember->getBase())) {
     // Project the property in place from an earlier binding in the chain.
     optLV = visit(subMember, baseAccessKind, options.forComputedBaseLValue());
   } else {
