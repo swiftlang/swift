@@ -17,6 +17,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -1303,6 +1304,39 @@ bool swift::isNonEscapingClosure(CanSILFunctionType funcTy) {
   return llvm::any_of(funcTy->getParameters(), isInoutAliasable);
 }
 
+/// Return true if \p fn is a specialization created by AllocBoxToStack, which
+/// promotes a box argument to an @inout_aliasable address argument. The
+/// specialization's mangled name has a function signature specialization with
+/// a BoxToStack parameter. For example: $s4main1fyyFyycfU_Tf0s_n.
+static bool isBoxToStackSpecialization(SILFunction *fn) {
+  Demangle::StackAllocatedDemangler<1024> demangler;
+  Demangle::Node *root = demangler.demangleSymbol(fn->getName());
+  if (!root || root->getKind() != Demangle::Node::Kind::Global)
+    return false;
+
+  for (Demangle::Node *specialization : *root) {
+    if (specialization->getKind() !=
+        Demangle::Node::Kind::FunctionSignatureSpecialization)
+      continue;
+    for (Demangle::Node *param : *specialization) {
+      if (param->getKind() !=
+          Demangle::Node::Kind::FunctionSignatureSpecializationParam)
+        continue;
+      for (Demangle::Node *paramKind : *param) {
+        if (paramKind->getKind() ==
+                Demangle::Node::Kind::
+                    FunctionSignatureSpecializationParamKind &&
+            paramKind->hasIndex() &&
+            paramKind->getIndex() ==
+                (Demangle::Node::IndexType)
+                    Demangle::FunctionSigSpecializationParamKind::BoxToStack)
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 void swift::findNonEscapingClosuresForFunctionValue(
     SILValue funcVal, TinyPtrVector<PartialApplyInst *> &results) {
   SILType funcTy = funcVal->getType();
@@ -1323,7 +1357,15 @@ void swift::findNonEscapingClosuresForFunctionValue(
   TinyPtrVector<PartialApplyInst *> closures;
   findClosuresForFunctionValue(funcVal, closures);
   for (auto *closure : closures) {
-    if (isNonEscapingClosure(closure->getOrigCalleeType()))
+    if (!isNonEscapingClosure(closure->getOrigCalleeType()))
+      continue;
+    // An escaping closure with an @inout_aliasable capture is either one that
+    // MandatoryAllocBoxToStack proved non-escaping when it promoted a box, or
+    // an invalid escaping capture of an inout parameter, which
+    // DiagnoseInvalidEscapingCaptures has already reported as an error. Only
+    // the first is the specialization of a closure that took the box.
+    SILFunction *callee = closure->getReferencedFunctionOrNull();
+    if (callee && isBoxToStackSpecialization(callee))
       results.push_back(closure);
   }
 }

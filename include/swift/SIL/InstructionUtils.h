@@ -203,7 +203,9 @@ bool isNonEscapingClosure(CanSILFunctionType funcTy);
 /// non-escaping, either because \p V has a @noescape function type, or because
 /// the closure has an @inout_aliasable capture (isNonEscapingClosure). The
 /// closure stored in an escaping block can't be found, so none is returned for
-/// it.
+/// it. An escaping closure is only returned if its function is a specialization
+/// created by AllocBoxToStack, because it was formed from a promoted box. An
+/// invalid escaping capture of an inout parameter is not returned.
 ///
 /// \p V may be a function type or an Optional function type.
 void findNonEscapingClosuresForFunctionValue(

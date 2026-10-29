@@ -123,6 +123,21 @@ func escapingClosureNeverCalled() {
   use(span)
 }
 
+// A local function forms the escaping closure. MandatoryAllocBoxToStack promotes the variable's box to an argument of the
+// local function, so the closure is still a specialization that DiagnoseStaticExclusivity follows.
+
+func localFunctionFormsEscapingClosure() {
+  var array = [1, 2, 3]
+  let span = array.span // expected-note {{conflicting access is here}}
+  func modify() {
+    callNow {
+      array = [] // expected-error {{overlapping accesses to 'array', but modification requires exclusive access; consider copying to a local variable}}
+    }
+  }
+  modify()
+  use(span)
+}
+
 // The closure may not access the variable.
 
 func escapingClosureMayModify(_ flag: Bool) {
