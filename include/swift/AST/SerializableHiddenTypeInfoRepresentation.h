@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H
 #define SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeInfoStorage.h"
 #include "llvm/IR/Type.h"
@@ -112,8 +113,12 @@ public:
 };
 
 struct SerializableRecordFieldRepresentation {
-  Type type;
-  std::unique_ptr<SerializableHiddenTypeInfoRepresentation> typeInfo;
+  /// The AST type resolved from serializedType, or empty if resolution failed.
+  Type resolvedType;
+
+  /// The original serialized type record, retained for fallback reserialization.
+  SerializedTypeReference serializedType;
+  std::shared_ptr<SerializableHiddenTypeInfoRepresentation> typeInfo;
   irgen::ElementLayoutStorage layout;
   irgen::RecordFieldStorage storage;
 };
