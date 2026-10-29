@@ -308,14 +308,14 @@ public:
                          joinElements(directResults, Builder, loc));
   }
 
-  void visitUnwindInst(UnwindInst *ui) {
-    Builder.setCurrentDebugScope(getOpScope(ui->getDebugScope()));
-    auto loc = ui->getLoc();
-    auto *origExit = ui->getParent();
+  void consumeUnusedPullbackValues(TermInst *ti) {
+    Builder.setCurrentDebugScope(getOpScope(ti->getDebugScope()));
+    auto loc = ti->getLoc();
+    auto *origExit = ti->getParent();
 
     // Consume unused pullback values
     if (borrowedPullbackContextValue) {
-      auto *pbTupleVal = buildPullbackValueTupleValue(ui);
+      auto *pbTupleVal = buildPullbackValueTupleValue(ti);
       // Initialize the top-level subcontext buffer with the top-level pullback
       // tuple.
       auto addr = emitProjectTopLevelSubcontext(
@@ -331,8 +331,27 @@ public:
       for (SILValue val : getPullbackValues(origExit))
         Builder.emitDestroyValueOperation(loc, val);
     }
+  }
 
-    Builder.createUnwind(loc);
+  void visitUnwindInst(UnwindInst *ui) {
+    consumeUnusedPullbackValues(ui);
+
+    Builder.setCurrentDebugScope(getOpScope(ui->getDebugScope()));
+    Builder.createUnwind(ui->getLoc());
+  }
+
+  void visitThrowInst(ThrowInst *ti) {
+    consumeUnusedPullbackValues(ti);
+
+    Builder.setCurrentDebugScope(getOpScope(ti->getDebugScope()));
+    Builder.createThrow(ti->getLoc(), getOpValue(ti->getOperand()));
+  }
+
+  void visitThrowAddrInst(ThrowAddrInst *ti) {
+    consumeUnusedPullbackValues(ti);
+
+    Builder.setCurrentDebugScope(getOpScope(ti->getDebugScope()));
+    Builder.createThrowAddr(ti->getLoc());
   }
 
   void visitBranchInst(BranchInst *bi) {
