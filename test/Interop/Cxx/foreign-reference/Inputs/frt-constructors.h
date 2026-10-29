@@ -312,3 +312,19 @@ FRTCtorWithPrivateArgCopy {
   FRTCtorWithPrivateArgCopy(int x) {}
   FRTCtorWithPrivateArgCopy(ArgWithPrivateNonConstCopy arg) {}
 };
+
+// A user-provided static factory template suppresses synthesized factories,
+// like a non-template one does.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+FRTTemplateFactory {
+  template <class T>
+  __attribute__((swift_name("init(value:)")))
+  static FRTTemplateFactory *make(T v) {
+    return new FRTTemplateFactory(static_cast<int>(v));
+  }
+
+  FRTTemplateFactory(int x) {}
+};
