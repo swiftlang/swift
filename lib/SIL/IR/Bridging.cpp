@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
@@ -148,6 +149,20 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                            SILFunctionTypeRepresentation rep,
                                            BridgedTypePurpose purpose) {
   auto clangTy = pattern.isClangType() ? pattern.getClangType() : nullptr;
+
+  // A generated C++ String wrapper carries the native Swift value.
+  if (clangTy) {
+    auto *valueTy = clangTy->isReferenceType()
+                        ? clangTy->getPointeeType().getTypePtr()
+                        : clangTy;
+    if (auto *record = valueTy->getAsCXXRecordDecl()) {
+      if (importer::isSwiftStringType(record)) {
+        auto stringTy = Context.getStringType();
+        if (stringTy && t->isEqual(stringTy))
+          return t;
+      }
+    }
+  }
 
   // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool
   // or the Darwin Boolean type.
