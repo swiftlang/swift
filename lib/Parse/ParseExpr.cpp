@@ -473,6 +473,21 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     return sub;
   }
 
+  if (Context.LangOpts.hasFeature(Feature::SendCalls) &&
+      Tok.isContextualKeyword("send") &&
+      peekToken().isAny(tok::identifier, tok::kw_self, tok::dollarident,
+                        tok::code_complete) &&
+      !peekToken().isAtStartOfLine()) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc sendLoc = consumeToken();
+    ParserResult<Expr> sub =
+        parseExprSequenceElement(diag::expected_expr_after_send, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) SendExpr(sendLoc, sub.get()));
+    }
+    return sub;
+  }
+
   if (Context.LangOpts.hasFeature(Feature::OldOwnershipOperatorSpellings)) {
     if (Tok.isContextualKeyword("_move")) {
       Tok.setKind(tok::contextual_keyword);
