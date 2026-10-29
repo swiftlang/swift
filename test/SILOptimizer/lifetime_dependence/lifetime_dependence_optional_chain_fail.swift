@@ -114,10 +114,17 @@ func computedMember(_ c: Computed?) {
   // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
 }
 
-// A noncopyable base isn't handled.
-func noncopyable(_ b: borrowing NoncopyableBase?) { // expected-error {{'b' is borrowed and cannot be consumed}}
-  f(b?.view) // expected-error {{lifetime-dependent value escapes its scope}}
-  // expected-note @-1 {{consumed here}}
-  // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
-  // expected-note @-4 {{it depends on the lifetime of argument 'b'}}
+// The view holds a read access to the base, prevents consuming.
+func noncopyableConsume(_ b: consuming NoncopyableBase?) {
+  let v = b?.view // expected-note {{conflicting access is here}}
+  _ = consume b // expected-error {{overlapping accesses to 'b', but modification requires exclusive access}}
+  f(v)
 }
+
+// The view holds a read access to the base, prevents mutations.
+func noncopyableOverlap(_ b: inout NoncopyableBase?) {
+  g(b?.view, &b) // expected-error {{overlapping accesses to 'b', but modification requires exclusive access}}
+  // expected-note @-1 {{conflicting access is here}}
+}
+
+func g(_ v: borrowing View?, _ b: inout NoncopyableBase?) {}

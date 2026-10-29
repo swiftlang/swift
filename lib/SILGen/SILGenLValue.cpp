@@ -3455,8 +3455,7 @@ static BindOptionalExpr *getBindOfAddressableOptional(SILGenFunction &SGF,
 
   auto optType = bind->getSubExpr()->getType()->getRValueType()
                      ->getCanonicalType();
-  if (!SGF.getTypeProperties(optType).isAddressableForDependencies()
-      || SGF.getLoweredType(optType).isMoveOnly())
+  if (!SGF.getTypeProperties(optType).isAddressableForDependencies())
     return nullptr;
 
   if (!isValueTypeRootedLocalStorage(bind->getSubExpr()))
@@ -4975,6 +4974,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   // The chaining operator immediately evaluates the base.
   
   ManagedValue optBase;
+  bool borrowInPlace = getBindOfAddressableOptional(SGF, e) == e;
   if (isBorrowAccess(baseAccessKind)) {
     optBase = SGF.emitBorrowedLValue(e, std::move(optLV));
     
@@ -4987,14 +4987,16 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
                                                       optBase.getValue()));
         }
       
-        optBase = enterAccessScope(SGF, e, ManagedValue(),
-                                   optBase, optTypeData,
-                                   baseAccessKind,
-                                   SILAccessEnforcement::Static,
-                                   std::nullopt,
-                                   /*no nested conflict*/ true);
-        if (optBase.getType().isLoadable(SGF.F)) {
-          optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
+        if (!borrowInPlace) {
+          optBase = enterAccessScope(SGF, e, ManagedValue(),
+                                     optBase, optTypeData,
+                                     baseAccessKind,
+                                     SILAccessEnforcement::Static,
+                                     std::nullopt,
+                                     /*no nested conflict*/ true);
+          if (optBase.getType().isLoadable(SGF.F)) {
+            optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
+          }
         }
       } else {
         optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase, IsNotLexical,

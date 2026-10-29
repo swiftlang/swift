@@ -19,12 +19,42 @@ struct View: ~Escapable {
   @_lifetime(borrow base)
   init(_ base: borrowing Base) { p = 0 }
 
+  @_lifetime(borrow base)
+  init(_ base: borrowing NoncopyableBase) { p = 0 }
+
+  @_lifetime(borrow base)
+  init<T: ~Copyable>(_ base: borrowing Box<T>) { p = 0 }
+
   var isEmpty: Bool { p == 0 }
 }
 
 @_addressableForDependencies
 struct Base {
   var id: String
+
+  var view: View {
+    @_lifetime(borrow self)
+    borrowing get { View(self) }
+  }
+}
+
+@_addressableForDependencies
+struct NoncopyableBase: ~Copyable {
+  var id: String
+
+  var view: View {
+    @_lifetime(borrow self)
+    borrowing get { View(self) }
+  }
+}
+
+struct NoncopyableHolder: ~Copyable {
+  var base: NoncopyableBase?
+}
+
+@_addressableForDependencies
+struct Box<T: ~Copyable>: ~Copyable {
+  var value: T
 
   var view: View {
     @_lifetime(borrow self)
@@ -141,4 +171,29 @@ func copyStepInout(_ b: inout Base?) {
 func copyStepBindToLet(_ b: Base?) {
   let u = b?.view.window
   g(u)
+}
+
+func noncopyableBorrowing(_ b: borrowing NoncopyableBase?) {
+  f(b?.view)
+}
+
+func noncopyableInout(_ b: inout NoncopyableBase?) {
+  f(b?.view)
+}
+
+func noncopyableConsuming(_ b: consuming NoncopyableBase?) {
+  f(b?.view)
+}
+
+func noncopyableLocal() {
+  let b: NoncopyableBase? = NoncopyableBase(id: "")
+  f(b?.view)
+}
+
+func noncopyableHop(_ h: borrowing NoncopyableHolder) {
+  f(h.base?.view)
+}
+
+func noncopyableGeneric<T: ~Copyable>(_ b: borrowing Box<T>?) {
+  f(b?.view)
 }
