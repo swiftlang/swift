@@ -9,7 +9,7 @@
 
 import MyKitZip
 
-extension VariantOnly: @retroactive CustomStringConvertible { // expected-error {{conformance of back-deployed type 'VariantOnly' to resilient protocol 'CustomStringConvertible' must not be available before iOS 99}}
+extension VariantOnly: @retroactive CustomStringConvertible { // expected-error {{conformance of back-deployed type 'VariantOnly' to protocol 'CustomStringConvertible' must not be available before iOS 99}}
   // expected-note@-1 {{this module uses its own copy of 'VariantOnly' before iOS 99, and the conformance would not apply to 'VariantOnly' from 'MyKitZip'}}
   // expected-note@-2 {{add '@available' attribute to enclosing extension}}
   public var description: String { "" }
