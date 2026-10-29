@@ -1,5 +1,6 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main %s -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999'
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999' %s
+// FIXME: AddressLowering fails to verify a borrow accessor's @guaranteed_address result for a loadable type under opaque values, with no addressable parameter involved.
+// RUN: not --crash %target-swift-emit-sil -sil-verify-all -o /dev/null -enable-sil-opaque-values -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999' %s
 
 // RUN: %target-swift-emit-silgen -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main %s -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999' | %FileCheck %s
 

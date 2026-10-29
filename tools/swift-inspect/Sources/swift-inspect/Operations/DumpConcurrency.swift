@@ -199,14 +199,15 @@ fileprivate class ConcurrencyDumper {
       return nil
     }
 
-    // These arrays are temporary pointers which we must copy out before we call
-    // into Remote Mirror again.
+    // These arrays and the name are temporary pointers which we must copy out
+    // before we call into Remote Mirror again.
     let children = Array(UnsafeBufferPointer(
         start: reflectionInfo.ChildTasks,
         count: Int(reflectionInfo.ChildTaskCount)))
     let asyncBacktraceFrames = Array(UnsafeBufferPointer(
         start: reflectionInfo.AsyncBacktraceFrames,
         count: Int(reflectionInfo.AsyncBacktraceFramesCount)))
+    let name = reflectionInfo.Name.map { String(cString: $0) }
 
     var allocatorSlab = reflectionInfo.AllocatorSlabPtr
     var allocatorTotalSize = 0
@@ -246,7 +247,7 @@ fileprivate class ConcurrencyDumper {
       allocatorTotalChunks: allocatorTotalChunks,
       childTasks: children,
       asyncBacktrace: asyncBacktraceFrames,
-      name: reflectionInfo.Name.map { String(cString: $0) }
+      name: name
     )
   }
 

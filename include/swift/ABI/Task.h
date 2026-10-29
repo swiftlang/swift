@@ -236,7 +236,8 @@ class NullaryContinuationJob : public Job {
 
 private:
   SWIFT_ATTRIBUTE_UNUSED AsyncTask *Task;
-  AsyncTask *Continuation;
+  AsyncTask *__ptrauth_swift_nullary_continuation_job_continuation
+      Continuation;
 
 public:
   NullaryContinuationJob(AsyncTask *task, JobPriority priority, AsyncTask *continuation)

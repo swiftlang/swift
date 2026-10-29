@@ -598,6 +598,8 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeInfo(
              .Builtin) {
       if (BuiltinTypeDescriptor->Stride <= 0)
         continue;
+      if (BuiltinTypeDescriptor->Size > BuiltinTypeDescriptor->Stride)
+        continue;
       if (!BuiltinTypeDescriptor->hasMangledTypeName())
         continue;
 

@@ -576,6 +576,10 @@ struct AddressLoweringState {
   // debug_value operands that are an address-only undef.
   SmallVector<Operand *, 2> undefDebugValueOperands;
 
+  // The address arguments that replaced this function's guaranteed object
+  // arguments.
+  SmallVector<SILValue, 2> guaranteedIndirectArgs;
+
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
   
@@ -690,6 +694,91 @@ protected:
 //                     Map opaque values to ValueStorage.
 //===----------------------------------------------------------------------===//
 
+/// SILGen builds the addressable buffer of an addressable parameter under
+/// opaque values by 'store_borrow'ing the incoming object into an 'alloc_stack',
+/// since the parameter is a by-value object at that point. Once the argument has
+/// an address, use it as the buffer. Otherwise the address that escapes through a
+/// lifetime dependency, or that a callee passes along, would point into a local
+/// copy rather than at the caller's storage.
+///
+/// This runs after all call arguments are rewritten, so that
+/// getLoadFromStableAddress can still recognize a call argument that is loaded
+/// from the buffer's 'store_borrow'.
+///
+/// \p argAddr is the address argument that replaced a guaranteed object argument.
+static void forwardArgAddressToAddressableBuffers(AddressLoweringState &pass,
+                                                  SILValue argAddr) {
+  // SILGen reaches the 'store_borrow' from the argument's load through a chain
+  // of ownership and move-only wrapper conversions that all forward the same
+  // value. Follow them from each load of the argument.
+  SmallVector<StoreBorrowInst *, 2> storeBorrows;
+  SmallVector<SILValue, 4> worklist;
+  for (Operand *argUse : argAddr->getUses()) {
+    SILInstruction *load = argUse->getUser();
+    if (isa<LoadInst>(load) || isa<LoadBorrowInst>(load))
+      worklist.push_back(cast<SingleValueInstruction>(load));
+  }
+  while (!worklist.empty()) {
+    SILValue value = worklist.pop_back_val();
+    for (Operand *use : value->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (auto *sbi = dyn_cast<StoreBorrowInst>(user)) {
+        if (use->get() == sbi->getSrc() && isa<AllocStackInst>(sbi->getDest()))
+          storeBorrows.push_back(sbi);
+      } else if (isa<CopyValueInst>(user) || isa<MoveValueInst>(user) ||
+                 isa<MarkUnresolvedNonCopyableValueInst>(user) ||
+                 isa<CopyableToMoveOnlyWrapperValueInst>(user) ||
+                 isa<MoveOnlyWrapperToCopyableValueInst>(user)) {
+        worklist.push_back(cast<SingleValueInstruction>(user));
+      }
+    }
+  }
+  for (auto *sbi : storeBorrows) {
+    auto *allocInst = cast<AllocStackInst>(sbi->getDest());
+
+    // The buffer may hold the move-only wrapped form of the argument's type.
+    SILValue bufferAddr;
+    if (sbi->getType() == argAddr->getType()) {
+      bufferAddr = argAddr;
+    } else if (argAddr->getType().addingMoveOnlyWrapper() == sbi->getType()) {
+      auto builder = pass.getBuilder(sbi->getIterator());
+      bufferAddr = builder.createCopyableToMoveOnlyWrapperAddr(sbi->getLoc(),
+                                                               argAddr);
+    } else {
+      continue;
+    }
+
+    SmallVector<EndBorrowInst *, 2> endBorrows;
+    for (Operand *use : sbi->getUses()) {
+      if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser()))
+        endBorrows.push_back(ebi);
+    }
+    for (auto *ebi : endBorrows) {
+      pass.deleter.forceDelete(ebi);
+    }
+    sbi->replaceAllUsesWith(bufferAddr);
+    pass.deleter.forceDelete(sbi);
+
+    // The buffer is dead if nothing but its deallocations remain.
+    SmallVector<DeallocStackInst *, 2> deallocs;
+    bool isDead = true;
+    for (Operand *use : allocInst->getUses()) {
+      if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
+        deallocs.push_back(dealloc);
+      } else {
+        isDead = false;
+        break;
+      }
+    }
+    if (isDead) {
+      for (auto *dealloc : deallocs) {
+        pass.deleter.forceDelete(dealloc);
+      }
+      pass.deleter.forceDelete(allocInst);
+    }
+  }
+}
+
 /// Before populating the ValueStorageMap, replace each value-typed argument to
 /// the current function with an address-typed argument by inserting a temporary
 /// load instruction.
@@ -737,6 +826,9 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
 
       assert(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
       load->setOperand(0, arg);
+
+      if (!param.isConsumedInCallee())
+        pass.guaranteedIndirectArgs.push_back(arg);
 
       // Indirect calling convention may be used for loadable types. In that
       // case, generating the argument loads is sufficient.
@@ -2411,6 +2503,142 @@ bool CallArgRewriter::rewriteArguments() {
   return changed;
 }
 
+/// Return true if the scope of \p root, the stable source of a trivial load, is
+/// still open when \p user runs. \p root is a 'store_borrow' or a read access.
+///
+/// A 'load_borrow' keeps its address valid and unmodified for as long as the
+/// borrow is used, but a trivial load only copies the value. The copy may be
+/// used long after the memory it came from is no longer accessible, so the
+/// address can be forwarded only when the load and the call are close enough to
+/// be sure of that: in the same block, with nothing in between that ends the
+/// scope of the source.
+static bool isRootScopeOpenBetween(SILInstruction *load, SILInstruction *user,
+                                   SILValue root) {
+  SILBasicBlock *block = load->getParent();
+  if (user->getParent() != block)
+    return false;
+  for (auto iter = std::next(load->getIterator()); iter != block->end();
+       ++iter) {
+    if (&*iter == user)
+      return true;
+    if (auto *endAccess = dyn_cast<EndAccessInst>(&*iter)) {
+      if (endAccess->getBeginAccess() == root)
+        return false;
+    } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&*iter)) {
+      if (endBorrow->getOperand() == root)
+        return false;
+    }
+  }
+  // \p user does not follow \p load in this block.
+  return false;
+}
+
+/// If \p argValue is a guaranteed load from an address that cannot change for as
+/// long as the load is used, return that load.
+///
+/// SILGen loads the addressable buffer of an addressable parameter under opaque
+/// values, because the callee's parameter is a by-value object at that point.
+/// Passing the buffer's address back to the callee preserves the stable address
+/// that addressable parameters promise. Forwarding an arbitrary address would
+/// not be sound, since a plain load of mutable memory must not observe writes
+/// that happen during the call, so only sources that are immutable for the
+/// duration of their scope are recognized.
+///
+/// \p user is the call that takes \p argValue. Only full calls qualify, since
+/// they are finished with their arguments when they return. A partial
+/// application or a coroutine could keep using the address.
+static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
+                                                        SILInstruction *user) {
+  if (!isa<ApplyInst>(user) && !isa<TryApplyInst>(user))
+    return nullptr;
+
+  // A move-only wrapped binding converts the loaded value back to its copyable
+  // type before the call.
+  if (auto *unwrap = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(argValue)) {
+    if (!unwrap->hasGuaranteedInitialKind())
+      return nullptr;
+    argValue = unwrap->getOperand();
+  }
+  SILValue addr;
+  bool isTrivialLoad = false;
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(argValue)) {
+    addr = lbi->getOperand();
+  } else if (auto *li = dyn_cast<LoadInst>(argValue)) {
+    if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Trivial)
+      return nullptr;
+    addr = li->getOperand();
+    isTrivialLoad = true;
+  } else {
+    return nullptr;
+  }
+  SILValue root = addr;
+  while (true) {
+    if (auto *mark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(root)) {
+      root = mark->getOperand();
+    } else if (auto *wrapper = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(root)) {
+      root = wrapper->getOperand();
+    } else {
+      break;
+    }
+  }
+  bool isStable = isa<StoreBorrowInst>(root);
+  if (auto *access = dyn_cast<BeginAccessInst>(root)) {
+    isStable = access->getAccessKind() == SILAccessKind::Read;
+  }
+  if (!isStable)
+    return nullptr;
+  auto *load = cast<SingleValueInstruction>(argValue);
+  if (isTrivialLoad && !isRootScopeOpenBetween(load, user, root))
+    return nullptr;
+  return load;
+}
+
+/// Return \p addr as the address of an argument of object type \p argTy, or an
+/// invalid value if the types are not related by a move-only wrapper.
+static SILValue getAddressForArgument(SILValue addr, SILType argTy,
+                                      SILBuilder &builder, SILLocation loc) {
+  SILType addrTy = argTy.getAddressType();
+  if (addr->getType() == addrTy)
+    return addr;
+  if (addr->getType().isMoveOnlyWrapped() &&
+      addr->getType().removingMoveOnlyWrapper() == addrTy) {
+    return builder.createMoveOnlyWrapperToCopyableAddr(loc, addr);
+  }
+  return SILValue();
+}
+
+/// A lifetime dependence on a value that was loaded from \p addr is a
+/// dependence on that address, as it is when the address itself is passed.
+/// LifetimeDependenceInsertion runs before this pass and takes the call
+/// argument as the base.
+static void redirectDependenceBases(SILValue value, SILValue addr) {
+  SmallVector<Operand *, 2> uses(value->getUses());
+  for (Operand *use : uses) {
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser())) {
+      if (mdi->getBase() == value)
+        mdi->setBase(addr);
+    }
+  }
+}
+
+/// Delete \p loadedValue, a load or a conversion of one that no longer feeds a
+/// call, unless it still has uses other than its own end_borrows.
+static void deleteDeadLoadedArgument(AddressLoweringState &pass,
+                                     SILValue loadedValue) {
+  auto *load = cast<SingleValueInstruction>(loadedValue);
+  SmallVector<EndBorrowInst *, 2> endBorrows;
+  for (Operand *use : load->getUses()) {
+    auto *endBorrow = dyn_cast<EndBorrowInst>(use->getUser());
+    if (!endBorrow)
+      return;
+    endBorrows.push_back(endBorrow);
+  }
+  for (auto *endBorrow : endBorrows) {
+    pass.deleter.forceDelete(endBorrow);
+  }
+  pass.deleter.forceDelete(load);
+}
+
 /// Rewrite a formally indirect argument in place.
 /// Update the operand to the incoming value's storage address.
 /// After this, the SIL argument types no longer match SIL function conventions.
@@ -2436,6 +2664,24 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
         use->set(mdi);
     }
     return;
+  }
+  // A guaranteed argument that was loaded from a stable address, such as an
+  // addressable parameter's buffer, is passed by that same address rather than
+  // by a copy.
+  if (!apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
+    if (auto *load =
+            getLoadFromStableAddress(argValue, apply.getInstruction())) {
+      if (SILValue addr = getAddressForArgument(
+              load->getOperand(0), argValue->getType(), argBuilder, callLoc)) {
+        operand->set(addr);
+        redirectDependenceBases(argValue, addr);
+        redirectDependenceBases(load, addr);
+        deleteDeadLoadedArgument(pass, argValue);
+        if (argValue != SILValue(load))
+          deleteDeadLoadedArgument(pass, load);
+        return;
+      }
+    }
   }
   // Allocate temporary storage for a loadable operand.
   // The call location may be a VarDecl (e.g. a default-argument generator),
@@ -5209,6 +5455,12 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   // address from the 'valueStorageMap'. This materializes projections in
   // forward order, setting 'storageAddress' for each projection as it goes.
   rewriteFunction(pass);
+
+  // Now that call arguments are rewritten, let addressable buffers reuse the
+  // incoming argument addresses.
+  for (SILValue argAddr : pass.guaranteedIndirectArgs) {
+    forwardArgAddressToAddressableBuffers(pass, argAddr);
+  }
 
   allocator.finalizeOpaqueStorage();
 

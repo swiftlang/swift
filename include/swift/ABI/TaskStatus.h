@@ -342,18 +342,30 @@ private:
     HasRetainedExecutor = 1 << 0
   };
   OptionSet<Flags> flags;
-  const TaskExecutorRef Preferred;
+
+  /// The two words of the preferred TaskExecutorRef, stored separately so
+  /// each can be signed.
+  HeapObject *__ptrauth_swift_task_executor_preference_identity const
+      PreferredIdentity;
+  const void *__ptrauth_swift_task_executor_preference_implementation const
+      PreferredImplementation;
 
 public:
   TaskExecutorPreferenceStatusRecord(TaskExecutorRef executor, bool retainedExecutor)
       : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
-        Preferred(executor) {
+        PreferredIdentity(executor.Identity),
+        PreferredImplementation(
+            reinterpret_cast<const void *>(executor.Implementation)) {
     if (retainedExecutor) {
       flags = Flags::HasRetainedExecutor;
     }
   }
 
-  TaskExecutorRef getPreferredExecutor() { return Preferred; }
+  TaskExecutorRef getPreferredExecutor() {
+    return TaskExecutorRef(
+        PreferredIdentity,
+        reinterpret_cast<uintptr_t>(PreferredImplementation));
+  }
 
   bool hasRetainedExecutor() const {
     return flags.contains(Flags::HasRetainedExecutor);

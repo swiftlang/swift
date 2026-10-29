@@ -30,6 +30,7 @@ class Job;
 class SerialExecutorWitnessTable;
 struct SwiftError;
 class TaskExecutorWitnessTable;
+class TaskExecutorPreferenceStatusRecord;
 
 /// An unmanaged reference to a serial executor.
 ///
@@ -230,6 +231,8 @@ class TaskExecutorRef {
 
   constexpr TaskExecutorRef(HeapObject *identity, uintptr_t implementation)
     : Identity(identity), Implementation(implementation) {}
+
+  friend class TaskExecutorPreferenceStatusRecord;
 
 public:
 

@@ -90,9 +90,13 @@
       return { (context, address, size, _) in
         let process: LinuxRemoteProcess = LinuxRemoteProcess.fromOpaque(context!)
 
+        // readArray returns a short array when only part of the range is
+        // readable. Remote Mirror expects either all `size` bytes or nil.
         guard
           let byteArray: [UInt8] = try? process.process.readArray(
-            address: address, upToCount: UInt(size)), let buffer = malloc(byteArray.count)
+            address: address, upToCount: UInt(size)),
+          byteArray.count == Int(size),
+          let buffer = malloc(byteArray.count)
         else { return nil }
 
         byteArray.withUnsafeBytes {
