@@ -90,6 +90,9 @@ namespace swift {
 
 namespace serialization {
 using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
+
+// TypeID must be the same as DeclID because it is stored in the same way.
+using TypeID = DeclID;
 }
 
 enum class DeclContextKind : unsigned {
