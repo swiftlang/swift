@@ -176,13 +176,13 @@ bool swift::paramSpecifiersMatch(const ValueDecl *baseDecl,
                                  ParamSpecifier derivedSpec) {
   // We allow for specifier mismatches between imported ObjC base methods and
   // Swift overrides.
-  if (baseDecl->isObjC() && baseDecl->hasClangNode()) {
+  if (baseDecl && baseDecl->isObjC() && baseDecl->hasClangNode()) {
     return true;
   }
 
   // The default ownership for initializer parameters is consuming. For other
   // declarations it's borrowing.
-  auto defaultSpecifier = isa<ConstructorDecl>(baseDecl)
+  auto defaultSpecifier = isa_and_nonnull<ConstructorDecl>(baseDecl)
     ? ParamSpecifier::Consuming
     : ParamSpecifier::Borrowing;
 
