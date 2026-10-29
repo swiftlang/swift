@@ -492,6 +492,8 @@ synthesizeStaticFactoryForCXXForeignRef(
   llvm::SmallVector<clang::CXXMethodDecl *, 4> synthesizedFactories;
   unsigned int selectedCtorDeclCounter = 0;
   for (clang::CXXConstructorDecl *selectedCtorDecl : ctorDeclsForSynth) {
+    clang::Sema::SFINAETrap ctorTrap(clangSema);
+
     unsigned int ctorParamCount = selectedCtorDecl->getNumParams();
     selectedCtorDeclCounter++;
 
@@ -635,6 +637,10 @@ synthesizeStaticFactoryForCXXForeignRef(
 
     synthCxxMethodDecl->setImplicit();
     synthCxxMethodDecl->setImplicitlyInline();
+
+    if (ctorTrap.hasErrorOccurred())
+      // Skip this constructor if we hit any SFINAE error
+      continue;
 
     ImporterImpl.foreignReferenceFactoryToOriginalConstructor[synthCxxMethodDecl] =
         selectedCtorDecl;

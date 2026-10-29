@@ -291,3 +291,24 @@ FRTTemplateCtorWithDefaultArg {
 };
 
 using FRTTemplateCtorWithDefaultArgInt = FRTTemplateCtorWithDefaultArg<int>;
+
+// Swift copies this with the public copy constructor, but C++ copies a
+// non-const lvalue with the private one.
+struct ArgWithPrivateNonConstCopy {
+  ArgWithPrivateNonConstCopy() {}
+  ArgWithPrivateNonConstCopy(const ArgWithPrivateNonConstCopy &) {}
+
+private:
+  ArgWithPrivateNonConstCopy(ArgWithPrivateNonConstCopy &) {}
+};
+
+// The static factory for the second constructor would forward its argument as a
+// non-const lvalue, which is an access error, so that constructor gets none.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+FRTCtorWithPrivateArgCopy {
+  FRTCtorWithPrivateArgCopy(int x) {}
+  FRTCtorWithPrivateArgCopy(ArgWithPrivateNonConstCopy arg) {}
+};
