@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 -g | %FileCheck %s
 
 protocol P {
   var p: P { get set }
@@ -29,6 +29,20 @@ func genericOverload<T>(_: T) {}
 func genericOverload<T>(_: T?) {}
 func genericOptional<T>(_: T?) {}
 func genericNoOptional<T>(_: T) {}
+
+// CHECK-LABEL: sil [ossa] @main
+
+// We prefer the function when the overloaded var is a use-after-decl.
+func overloadedWithScriptVar1(_ x: Int) {}
+overloadedWithScriptVar1(0)
+// CHECK: function_ref @$s7ranking24overloadedWithScriptVar1yySiF
+let overloadedWithScriptVar1 = { (x: Int) in }
+
+func overloadedWithScriptVar2(_ x: Int) {}
+let overloadedWithScriptVar2 = { (x: Int) in }
+overloadedWithScriptVar2(0)
+// CHECK: [[CLOSURE_ADDR:%[0-9]+]] = global_addr @$s7ranking24overloadedWithScriptVar2yySicvp
+// CHECK: load [copy] [[CLOSURE_ADDR]] {{.*}} loc {{.*}}:[[@LINE-2]]:1
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
