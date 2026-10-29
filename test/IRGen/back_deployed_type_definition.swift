@@ -1,10 +1,11 @@
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name M -enable-library-evolution -validate-tbd-against-ir=all %s > %t.ll
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -module-name M -enable-library-evolution -validate-tbd-against-ir=all %s > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck %s --check-prefix=NEGATIVE < %t.ll
 // RUN: %FileCheck %s --check-prefix=ACCESSORS < %t.ll
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -module-name M -enable-library-evolution %s | %FileCheck %s --check-prefix=SILGEN
-// RUN: %target-swift-frontend -emit-silgen -target %target-cpu-apple-macosx14.0 -parse-as-library -module-name M -enable-library-evolution %s | %FileCheck %s --check-prefix=WITNESS
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -module-name M -enable-library-evolution %s | %FileCheck %s --check-prefix=SILGEN
+// RUN: %target-swift-frontend -emit-silgen -target %target-cpu-apple-macosx14.0 -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -module-name M -enable-library-evolution %s | %FileCheck %s --check-prefix=WITNESS
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=arm64 || CPU=x86_64
 

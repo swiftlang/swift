@@ -7,8 +7,8 @@
 // RUN: %empty-directory(%t/old)
 // RUN: %empty-directory(%t/shipped)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Common)) -module-name Common %S/Inputs/back_deployed_types/Common.swift -emit-module -emit-module-path %t/Common.swiftmodule
-// RUN: %target-build-swift-dylib(%t/%target-library-name(MyKit)) -module-name MyKit %S/Inputs/back_deployed_types/MyKit.swift -enable-library-evolution -emit-module -emit-module-path %t/MyKit.swiftmodule -I %t -L %t -lCommon
-// RUN: %target-build-swift-dylib(%t/old/%target-library-name(MyKit)) -module-name MyKit %S/Inputs/back_deployed_types/MyKitOld.swift -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(MyKit)) -module-name MyKit %S/Inputs/back_deployed_types/MyKit.swift -enable-library-evolution -enable-experimental-feature BackDeployFrozenValueTypes -emit-module -emit-module-path %t/MyKit.swiftmodule -I %t -L %t -lCommon
+// RUN: %target-build-swift-dylib(%t/old/%target-library-name(MyKit)) -module-name MyKit %S/Inputs/back_deployed_types/MyKitOld.swift -enable-library-evolution -enable-experimental-feature BackDeployFrozenValueTypes
 // RUN: sed -e '/@backDeployed/d' %S/Inputs/back_deployed_types/MyKit.swift > %t/shipped/MyKit.swift
 // RUN: %target-build-swift-dylib(%t/shipped/%target-library-name(MyKit)) -module-name MyKit %t/shipped/MyKit.swift -enable-library-evolution -I %t -L %t -lCommon
 // RUN: %target-build-swift-dylib(%t/%target-library-name(A)) -module-name A %S/Inputs/back_deployed_types/Client.swift -I %t -L %t -lCommon -lMyKit -emit-module -emit-module-path %t/A.swiftmodule
@@ -23,6 +23,7 @@
 // RUN: %target-run %t/old/main %t/old/%target-library-name(A) %t/old/%target-library-name(B) %t/old/%target-library-name(Common) %t/old/%target-library-name(MyKit) | %FileCheck %s --check-prefixes=CHECK,OLD
 // RUN: %target-run %t/shipped/main %t/shipped/%target-library-name(A) %t/shipped/%target-library-name(B) %t/shipped/%target-library-name(Common) %t/shipped/%target-library-name(MyKit) | %FileCheck %s --check-prefixes=CHECK,NEW
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 

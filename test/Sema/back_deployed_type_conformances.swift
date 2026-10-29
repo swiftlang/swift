@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -module-name MyKit %S/Inputs/back_deployed_type_module.swift -o %t/MyKit.swiftmodule
+// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -enable-library-evolution -module-name MyKit %S/Inputs/back_deployed_type_module.swift -o %t/MyKit.swiftmodule
 // RUN: %target-typecheck-verify-swift -I %t
 // RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution -verify-additional-prefix resilient-
 
@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -typecheck -I %t -enable-library-evolution %s -target %target-cpu-apple-macosx99 2>&1 | %FileCheck %s --allow-empty --check-prefix=NEW
 // NEW-NOT: error
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 
 import MyKit

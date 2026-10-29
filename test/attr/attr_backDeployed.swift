@@ -1,7 +1,8 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library \
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes \
 // RUN:   -define-availability "_myProject 2.0:macOS 12.0" \
 // RUN:   -define-availability "_emptyMacro:*"
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 
 // MARK: - Valid declarations
