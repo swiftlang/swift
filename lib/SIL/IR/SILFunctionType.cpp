@@ -5151,6 +5151,7 @@ static bool checkASTTypeForABIDifferences(CanType type1,
 
 // FIXME: This makes me very upset. Can we do without this?
 static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
+                                                ValueDecl *baseDecl,
                                                 CanType derived,
                                                 CanType base) {
   // Unwrap optionals, but remember that we did.
@@ -5166,7 +5167,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   // T? +> S = (T +> S)?
   // T? +> S? = (T +> S)?
   if (derivedWasOptional) {
-    base = copyOptionalityFromDerivedToBase(tc, derived, base);
+    base = copyOptionalityFromDerivedToBase(tc, nullptr, derived, base);
 
     auto optDecl = tc.Context.getOptionalDecl();
     return CanType(EnumType::get(optDecl, Type(), base, tc.Context));
@@ -5182,6 +5183,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
           baseTuple->getElement(i).getWithType(
             copyOptionalityFromDerivedToBase(
               tc,
+              nullptr,
               derivedTuple.getElementType(i),
               baseTuple.getElementType(i))));
       }
@@ -5195,10 +5197,14 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       SmallVector<FunctionType::Param, 8> params;
       for (auto [baseParam, derivedParam] :
            llvm::zip_equal(baseFunc.getParams(), derivedFunc.getParams())) {
-        ASSERT(derivedParam.getParameterFlags() ==
-               baseParam.getParameterFlags());
+        ASSERT(paramSpecifiersMatch(
+            baseDecl,
+            baseParam.getParameterFlags().getOwnershipSpecifier(),
+            derivedParam.getParameterFlags().getOwnershipSpecifier()));
         params.emplace_back(
-            copyOptionalityFromDerivedToBase(tc, derivedParam.getPlainType(),
+            copyOptionalityFromDerivedToBase(tc,
+                                             nullptr,
+                                             derivedParam.getPlainType(),
                                              baseParam.getPlainType()),
             Identifier(), baseParam.getParameterFlags());
       }
@@ -5208,12 +5214,15 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
            llvm::zip_equal(baseFunc.getYields(), derivedFunc.getYields())) {
         assert(derivedYield.getFlags() == baseYield.getFlags());
         yields.emplace_back(
-            copyOptionalityFromDerivedToBase(tc, derivedYield.getType(),
+            copyOptionalityFromDerivedToBase(tc,
+                                             nullptr,
+                                             derivedYield.getType(),
                                              baseYield.getType()),
             baseYield.getFlags());
       }
 
       auto result = copyOptionalityFromDerivedToBase(tc,
+                                                     nullptr,
                                                      derivedFunc.getResult(),
                                                      baseFunc.getResult());
       return CanAnyFunctionType::get(
@@ -5278,6 +5287,7 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
     basePattern = AbstractionPattern(
       copyOptionalityFromDerivedToBase(
         *this,
+        base.getDecl(),
         derivedInfo.LoweredType,
         baseInfo.LoweredType));
     overrideInterfaceTy = derivedInfo.FormalType;

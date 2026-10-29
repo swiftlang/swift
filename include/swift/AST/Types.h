@@ -2602,6 +2602,12 @@ StringRef getNameForParamSpecifier(ParamSpecifier name);
 /// attached to \p VD ? Pass \c nullptr for the value for a closure.
 ParamSpecifier getDefaultParamSpecifier(const ValueDecl *VD);
 
+/// Returns true if an override with the given parameter ownership specifier is
+/// allowed over a base method with a given parameter ownership specifier.
+bool paramSpecifiersMatch(const ValueDecl *baseDecl,
+                          ParamSpecifier baseSpec,
+                          ParamSpecifier derivedSpec);
+
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
