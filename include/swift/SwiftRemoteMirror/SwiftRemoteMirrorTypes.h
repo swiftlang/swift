@@ -264,11 +264,17 @@ typedef struct swift_async_task_info {
   swift_reflection_ptr_t AllocatorSlabPtr;
 
   unsigned ChildTaskCount;
+  /// This pointer remains valid until the next
+  /// swift_reflection call on the given context.
   swift_reflection_ptr_t *ChildTasks;
 
   unsigned AsyncBacktraceFramesCount;
+  /// This pointer remains valid until the next
+  /// swift_reflection call on the given context.
   swift_reflection_ptr_t *AsyncBacktraceFrames;
 
+  /// The task's name, or NULL if it has none. This pointer remains valid until
+  /// the next swift_reflection call on the given context.
   const char *Name;
   swift_reflection_ptr_t RegistryNext;
 } swift_async_task_info_t;
