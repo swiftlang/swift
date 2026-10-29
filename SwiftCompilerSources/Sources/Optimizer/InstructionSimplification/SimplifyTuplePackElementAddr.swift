@@ -25,7 +25,7 @@ import SIL
 // %tuple = alloc_stack $(Int, Int)
 // %addr = tuple_element_addr 0 of %tuple as $*Int
 //
-extension TuplePackElementAddrInst : Simplifiable, OnoneSimplifiable {
+extension TuplePackElementAddrInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard !self.tupleOperand.value.type.tupleContainsPackExpansionType,
           let scalarIndex = self.indexOperand.value as? ScalarPackIndexInst
