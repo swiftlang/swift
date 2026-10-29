@@ -143,10 +143,12 @@ static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
                                           const InferredAvailability &Inferred,
                                           ASTContext &Context) {
   // If there is no information that would go into the availability attribute,
-  // don't create one.
-  if (Inferred.Kind == AvailableAttr::Kind::Default && !Inferred.Introduced &&
-      !Inferred.Deprecated && !Inferred.Obsoleted && Inferred.Message.empty() &&
-      Inferred.Rename.empty())
+  // don't create one. An attribute for an unversioned domain doesn't need any
+  // additional information, though, since it's valid without a version (e.g.
+  // `@available(SomeCustomDomain)`).
+  if (Domain.isVersioned() && Inferred.Kind == AvailableAttr::Kind::Default &&
+      !Inferred.Introduced && !Inferred.Deprecated && !Inferred.Obsoleted &&
+      Inferred.Message.empty() && Inferred.Rename.empty())
     return nullptr;
 
   llvm::VersionTuple Introduced =
@@ -464,8 +466,13 @@ domainRequiresABICompatibleUnavailableDecls(AvailabilityDomain domain,
 /// Computes the `DeclRuntimeAvailability` value for `decl` in isolation.
 static DeclRuntimeAvailability
 computeDeclRuntimeAvailability(const Decl *decl) {
-  // Don't trust unavailability on declarations from Clang modules.
-  if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
+  // Don't trust unavailability on declarations from Clang modules, unless the
+  // unavailability is in a custom availability domain.
+  bool isClangDecl =
+      isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext());
+  if (isClangDecl && !decl->hasAnyMatchingActiveAvailableAttr([](auto attr) {
+        return attr.getDomain().isCustom();
+      }))
     return DeclRuntimeAvailability::PotentiallyAvailable;
 
   auto &ctx = decl->getASTContext();
@@ -489,6 +496,10 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   // First, collect the unavailable domains from the constraints.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
   getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+
+  if (isClangDecl)
+    llvm::erase_if(unavailableDomains,
+                   [](auto domain) { return !domain.isCustom(); });
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains.
