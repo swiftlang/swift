@@ -6115,6 +6115,15 @@ void AttributeChecker::checkBackDeployedAttrs(
       continue;
     }
 
+    // Back-deploying types is experimental.
+    if ((isa<StructDecl>(D) || isa<EnumDecl>(D)) &&
+        !Ctx.LangOpts.hasFeature(Feature::BackDeployFrozenValueTypes)) {
+      diagnoseAndRemoveAttr(Attr, diag::attribute_requires_experimental_feature,
+                            Attr,
+                            Feature::BackDeployFrozenValueTypes.getName());
+      continue;
+    }
+
     if (VD->isObjC()) {
       diagnoseAndRemoveAttr(Attr, diag::attr_incompatible_with_objc, Attr, VD);
       continue;

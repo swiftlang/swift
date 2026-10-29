@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -module-name MyKit %S/Inputs/back_deployed_type_module.swift -o %t/MyKit.swiftmodule
+// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -enable-library-evolution -module-name MyKit %S/Inputs/back_deployed_type_module.swift -o %t/MyKit.swiftmodule
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name Client %s -I %t > %t/client.ll
 // RUN: %FileCheck %s < %t/client.ll
 // RUN: %FileCheck %s --check-prefix=THUNK < %t/client.ll
@@ -17,6 +17,7 @@
 // RUN: %FileCheck %s --check-prefix=HIGH < %t/client-new.ll
 // RUN: %FileCheck %s --check-prefix=HIGH-NEGATIVE < %t/client-new.ll
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=arm64 || CPU=x86_64
 

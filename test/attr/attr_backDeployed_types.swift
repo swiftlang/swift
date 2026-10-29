@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -enable-library-evolution
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 
 // A back-deployed type is emitted into its clients, so its metadata can't

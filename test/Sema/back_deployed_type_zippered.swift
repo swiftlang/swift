@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -module-name MyKitZip %S/../IRGen/Inputs/back_deployed_type_zippered_module.swift -o %t/MyKitZip.swiftmodule -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi
-// RUN: %target-swift-frontend -typecheck -verify -parse-as-library -enable-library-evolution -I %t %s -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi
+// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -enable-library-evolution -module-name MyKitZip %S/../IRGen/Inputs/back_deployed_type_zippered_module.swift -o %t/MyKitZip.swiftmodule -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi
+// RUN: %target-swift-frontend -typecheck -verify -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -enable-library-evolution -I %t %s -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi
 
+// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx || OS=maccatalyst
 
 // In a zippered build, a type that is back-deployed only for the target
