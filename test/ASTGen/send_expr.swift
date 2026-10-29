@@ -11,6 +11,10 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
+// RUN: %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple \
+// RUN:   -enable-experimental-feature SendCalls \
+// RUN:   -enable-experimental-feature ParserASTGen
+
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
