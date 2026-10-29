@@ -114,3 +114,49 @@ func testGenericConsumingAndInoutCaptures<T>(_ nc: consuming GenericNC<T>, _ oth
     other.mutate()
   }
 }
+
+@_transparent
+func transparentAnd(
+  _ lhs: Bool, _ rhs: @autoclosure @callable(once) () -> Bool
+) -> Bool {
+  lhs ? rhs() : false
+}
+
+final class Box {
+  var value = 0
+}
+
+// Once inlined, the autoclosure is stored into the stack slot of the consuming
+// parameter, and it's only called on one path.
+// CHECK-LABEL: sil hidden @$s42callable_once_attr_closure_stack_promotion22testInlinedAutoclosureyS2b_AA3BoxCtF : $@convention(thin) (Bool, @guaranteed Box) -> Bool {
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK:   [[SLOT:%.*]] = alloc_stack [lexical] [var_decl] $@noescape @callable(once) @callee_owned () -> Bool
+// CHECK:   store [[PA]] to [[SLOT]]
+// CHECK:   cond_br {{%.*}}, [[CALL:bb[0-9]+]], [[SKIP:bb[0-9]+]]
+// CHECK: [[CALL]]:
+// CHECK:   apply
+// CHECK: [[SKIP]]:
+// CHECK:   destroy_addr [[SLOT]]
+// CHECK:   dealloc_stack [[SLOT]]
+// CHECK:   dealloc_stack [[PA]]
+// CHECK: } // end sil function '$s42callable_once_attr_closure_stack_promotion22testInlinedAutoclosureyS2b_AA3BoxCtF'
+func testInlinedAutoclosure(_ flag: Bool, _ box: Box) -> Bool {
+  transparentAnd(flag, box.value > 0)
+}
+
+@_transparent
+func transparentDiscard(_ fn: @callable(once) () -> Int) -> Int {
+  _ = consume fn
+  return 0
+}
+
+// Once inlined, the closure is moved out of the stack slot of the parameter
+// and destroyed without being called.
+// CHECK-LABEL: sil hidden @$s42callable_once_attr_closure_stack_promotion18testInlinedDiscardyS2iF : $@convention(thin) (Int) -> Int {
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK-NOT: apply
+// CHECK:   dealloc_stack [[PA]]
+// CHECK: } // end sil function '$s42callable_once_attr_closure_stack_promotion18testInlinedDiscardyS2iF'
+func testInlinedDiscard(_ x: Int) -> Int {
+  transparentDiscard { x }
+}

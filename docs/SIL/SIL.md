@@ -684,6 +684,30 @@ result - the non-escaping closure.
   %4 = convert_function %3 to $SomeFuncType    |
   destroy_value %4                            -+ %1 and %2 must be alive until here
 ```
+
+The closure's lifetime also extends through a `move_value` and through a
+closure that captures it. A closure with at-most-once or exactly-once semantics
+is `@callee_owned`, so the `apply` that calls it ends its lifetime.
+
+The closure can also be stored into a stack slot that holds nothing but the
+closure, such as the slot of an inlined `consuming` parameter. The slot must be
+initialized only by that store. Its lifetime then extends through the values
+that `load [take]` takes out of the slot and through the slots that
+`copy_addr [take]` moves the closure into, and a `destroy_addr` of the slot
+ends it.
+
+```
+  %3 = partial_apply [on_stack] [called_at_most_once] %f(%1)  -+ borrow scope for %1
+  %4 = alloc_stack $@noescape @callable(once) () -> ()         |
+  store %3 to [init] %4                                        |
+  cond_br %c, bb1, bb2                                         |
+bb1:                                                           |
+  %5 = load [take] %4                                          |
+  %6 = apply %5()                                             -+ %1 must be alive until here
+  ...                                                          |
+bb2:                                                           |
+  destroy_addr %4                                             -+ or until here
+```
  
 #### `mark_dependence`
 
