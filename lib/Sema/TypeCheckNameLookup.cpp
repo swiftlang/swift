@@ -373,20 +373,26 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
-static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
-    TypeAliasDecl *aliasDecl) {
-  auto parentSig = aliasDecl->getDeclContext()->getGenericSignatureOfContext();
-  auto genericSig = aliasDecl->getGenericSignature();
+/// Checks whether a typealias can be referenced on an parent type with an
+/// unbound generic argument (including protocols). This is legal when the
+/// underlying type either does not reference any type parameters from the outer
+/// signature, or the outer parameters it references are concrete.
+static bool canReferenceTypeAliasOnUnboundGeneric(TypeAliasDecl *TAD) {
+  auto underlyingTy = TAD->getUnderlyingType();
+  if (!underlyingTy->hasTypeParameter())
+    return true;
 
-  if (!parentSig || !genericSig)
-    return false;
+  auto sig = TAD->getGenericSignature();
+  auto outerSig = TAD->getDeclContext()->getGenericSignatureOfContext();
+  auto outerDepth = outerSig->getMaxDepth();
 
-  for (auto *paramType : parentSig.getGenericParams()) {
-    if (!genericSig->isConcreteType(paramType))
+  return !underlyingTy->getCanonicalType().findIf([&](Type ty) -> bool {
+    auto gpt = dyn_cast<GenericTypeParamType>(ty.getPointer());
+    if (!gpt)
       return false;
-  }
 
-  return true;
+    return gpt->getDepth() <= outerDepth && !sig->isConcreteType(gpt);
+  });
 }
 
 TypeChecker::UnsupportedMemberTypeAccessKind
@@ -408,11 +414,8 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
     // Non-generic type aliases can only be accessed if the
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (!aliasDecl->hasGenericParamList() &&
-          aliasDecl->getUnderlyingType()->hasTypeParameter() &&
-          !doesTypeAliasFullyConstrainAllOuterGenericParams(aliasDecl)) {
+      if (!canReferenceTypeAliasOnUnboundGeneric(aliasDecl))
         return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;
-      }
     }
 
     if (isa<AssociatedTypeDecl>(typeDecl))
@@ -425,11 +428,10 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
 
   if (type->isExistentialType() &&
       typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-    // Allow typealias member access on existential types if the underlying
-    // type does not have any type parameters.
+    // Treat the typealias in protocol case the same as the typealias on
+    // unbound generic type case.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (aliasDecl->getUnderlyingType()->getCanonicalType()
-          ->hasTypeParameter())
+      if (!canReferenceTypeAliasOnUnboundGeneric(aliasDecl))
         return UnsupportedMemberTypeAccessKind::TypeAliasOfExistential;
     } else if (isa<AssociatedTypeDecl>(typeDecl)) {
       return UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential;
