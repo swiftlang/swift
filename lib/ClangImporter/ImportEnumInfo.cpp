@@ -238,7 +238,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 }
 
 const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
-  return importer::desugarIfElaborated(decl->getIntegerType().getTypePtr());
+  return decl->getIntegerType().getTypePtr();
 }
 
 ImportedType importer::findOptionSetEnum(clang::QualType type,
