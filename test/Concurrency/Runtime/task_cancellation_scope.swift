@@ -721,9 +721,12 @@ func test_scope_cancelled_from_two_threads() async {
             continuation.withLock { $0 = c }
           }
         } onPriorityEscalated: { _, _ in
-          // This runs while the escalating thread holds the status record
-          // lock of the task. Another thread cancels the scope while we wait,
-          // and then we cancel it with a different reason.
+          // This runs while the status record lock of the task is held: first
+          // when the handler is installed, and again when the task is
+          // escalated. The first call races the cancellations. When the second
+          // call comes the scope is already cancelled. Another thread cancels
+          // the scope while we wait and then we cancel it with a different
+          // reason.
           otherThread.enter()
           DispatchQueue.global().async {
             _cancelCancellationScope(scope.pointer, 0) // .unspecified
