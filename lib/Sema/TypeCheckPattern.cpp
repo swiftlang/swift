@@ -468,8 +468,7 @@ public:
     if (!referencedElement)
       return nullptr;
 
-    auto *base =
-        TypeExpr::createForMemberDecl(repr, ude->getNameLoc(), enumDecl);
+    auto *base = new (Context) TypeExpr(repr);
     base->setType(MetatypeType::get(ty));
     return EnumElementPattern::create(base, ude->getDotLoc(), ude->getNameLoc(),
                                       ude->getName(), referencedElement,
@@ -585,8 +584,7 @@ public:
       if (!referencedElement)
         return nullptr;
 
-      baseTE = TypeExpr::createForMemberDecl(
-          qualIdentTR->getBase(), qualIdentTR->getNameLoc(), enumDecl);
+      baseTE = new (Context) TypeExpr(qualIdentTR->getBase());
       baseTE->setType(MetatypeType::get(enumTy));
     }
 
