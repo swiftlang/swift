@@ -6842,6 +6842,8 @@ ERROR(send_call_mutating_method,none,
 ERROR(send_call_unsupported,none,
       "'send' cannot be applied to this call; its receiver and arguments "
       "could not be evaluated at the call site", ())
+ERROR(send_requires_newer_concurrency_library,none,
+      "'send' requires newer _Concurrency library", ())
 ERROR(send_only_version_newer,none,
       "'send' is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))

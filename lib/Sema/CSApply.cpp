@@ -4071,7 +4071,15 @@ namespace {
             });
       };
 
-      if (Expr *lowered = lowerSynchronousSend(closure)) {
+      bool missingConcurrencySupport = false;
+      Expr *synchronous =
+          lowerSynchronousSend(closure, missingConcurrencySupport);
+      if (missingConcurrencySupport) {
+        ctx.Diags.diagnose(expr->getSendLoc(),
+                           diag::send_requires_newer_concurrency_library);
+        return expr;
+      }
+      if (Expr *lowered = synchronous) {
         expr->setSubExpr(lowered);
         auto *call = dyn_cast<CallExpr>(lowered);
         auto *callee = call ? dyn_cast<DeclRefExpr>(call->getFn()) : nullptr;
@@ -4497,8 +4505,12 @@ namespace {
     /// caller's isolation, just like the arguments of a direct call.
     ///
     /// Returns the new operand of the 'send', or null to keep the
-    /// task-based lowering
-    Expr *lowerSynchronousSend(ClosureExpr *closure) {
+    /// task-based lowering. Sets \p missingConcurrencySupport if the call
+    /// should be enqueued but the '_enqueueOneway*' helpers are missing from
+    /// the _Concurrency module: falling back to the task-based lowering would
+    /// silently change the semantics of the call
+    Expr *lowerSynchronousSend(ClosureExpr *closure,
+                               bool &missingConcurrencySupport) {
       Expr *body = closure->getSingleExpressionBody();
       if (!body)
         return nullptr;
@@ -4556,8 +4568,10 @@ namespace {
         return nullptr;
 
       auto *concurrency = ctx.getLoadedModule(ctx.Id_Concurrency);
-      if (!concurrency)
+      if (!concurrency) {
+        missingConcurrencySupport = true;
         return nullptr;
+      }
       auto lookupEnqueueFunc = [&](StringRef name) -> FuncDecl * {
         SmallVector<ValueDecl *, 1> results;
         concurrency->lookupValue(ctx.getIdentifier(name),
@@ -4608,8 +4622,10 @@ namespace {
       } else {
         enqueueFunc = lookupEnqueueFunc("_enqueueOnewayIsolatedAny");
       }
-      if (!enqueueFunc)
+      if (!enqueueFunc) {
+        missingConcurrencySupport = true;
         return nullptr;
+      }
 
       // Only arguments which are values (including variadic arrays) can be
       // evaluated at the call site; fall back to the task-based lowering
