@@ -5696,26 +5696,6 @@ SourceLoc swift::extractNearestSourceLoc(Type ty) {
   return SourceLoc();
 }
 
-StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
-  switch (specifier) {
-  case ParamSpecifier::Default:
-    return "default";
-  case ParamSpecifier::InOut:
-    return "inout";
-  case ParamSpecifier::Borrowing:
-    return "borrowing";
-  case ParamSpecifier::Consuming:
-    return "consuming";
-  case ParamSpecifier::LegacyShared:
-    return "__shared";
-  case ParamSpecifier::LegacyOwned:
-    return "__owned";
-  case ParamSpecifier::ImplicitlyCopyableConsuming:
-    return "implicitly_copyable_consuming";
-  }
-  llvm_unreachable("bad ParamSpecifier");
-}
-
 static std::optional<DiagnosticBehavior>
 getConcurrencyDiagnosticBehaviorLimitRec(
     Type type, DeclContext *declCtx,

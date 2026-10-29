@@ -123,3 +123,104 @@ SourceRange ParameterList::getSourceRange() const {
   return SourceRange();
 }
 
+StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
+  switch (specifier) {
+  case ParamSpecifier::Default:
+    return "default";
+  case ParamSpecifier::InOut:
+    return "inout";
+  case ParamSpecifier::Borrowing:
+    return "borrowing";
+  case ParamSpecifier::Consuming:
+    return "consuming";
+  case ParamSpecifier::LegacyShared:
+    return "__shared";
+  case ParamSpecifier::LegacyOwned:
+    return "__owned";
+  case ParamSpecifier::ImplicitlyCopyableConsuming:
+    return "implicitly_copyable_consuming";
+  }
+  llvm_unreachable("bad ParamSpecifier");
+}
+
+ParamSpecifier swift::getDefaultParamSpecifier(const ValueDecl *forDecl) {
+  // `consuming` is the default ownership for initializers and setters.
+  // Everything else defaults to borrowing.
+  if (!forDecl) {
+    return ParamSpecifier::Borrowing;
+  }
+  auto forFuncDecl = dyn_cast<AbstractFunctionDecl>(forDecl);
+  if (!forFuncDecl) {
+    return ParamSpecifier::Borrowing;
+  }
+
+  if (isa<ConstructorDecl>(forFuncDecl)) {
+    return ParamSpecifier::Consuming;
+  } else if (auto accessor = dyn_cast<AccessorDecl>(forFuncDecl)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Modify:
+    case AccessorKind::Set:
+      return ParamSpecifier::Consuming;
+    default:
+      return ParamSpecifier::Borrowing;
+    }
+  }
+
+  return ParamSpecifier::Borrowing;
+}
+
+/// Returns true if an override with the given parameter ownership specifier is
+/// allowed over a base method with a given parameter ownership specifier.
+bool swift::paramSpecifiersMatch(const ValueDecl *baseDecl,
+                                 ParamSpecifier baseSpec,
+                                 ParamSpecifier derivedSpec) {
+  // We allow for specifier mismatches between imported ObjC base methods and
+  // Swift overrides.
+  if (baseDecl && baseDecl->isObjC() && baseDecl->hasClangNode()) {
+    return true;
+  }
+
+  // The default ownership for initializer parameters is consuming. For other
+  // declarations it's borrowing.
+  auto defaultSpecifier = isa_and_nonnull<ConstructorDecl>(baseDecl)
+    ? ParamSpecifier::Consuming
+    : ParamSpecifier::Borrowing;
+
+  baseSpec = baseSpec == ParamSpecifier::Default
+    ? defaultSpecifier : baseSpec;
+  derivedSpec = derivedSpec == ParamSpecifier::Default
+    ? defaultSpecifier : derivedSpec;
+
+#define SPECS(b, d) (unsigned(b) << 16 | unsigned(d))
+  switch ((SPECS(baseSpec, derivedSpec))) {
+  // Exact matches are OK.
+  case SPECS(ParamSpecifier::InOut, ParamSpecifier::InOut):
+  case SPECS(ParamSpecifier::Borrowing, ParamSpecifier::Borrowing):
+  case SPECS(ParamSpecifier::Consuming, ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::LegacyShared, ParamSpecifier::LegacyShared):
+  case SPECS(ParamSpecifier::LegacyOwned, ParamSpecifier::LegacyOwned):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+
+  // Modifiers from different eras may be matched as long as they have the same
+  // external ownership behavior.
+  case SPECS(ParamSpecifier::Borrowing, ParamSpecifier::LegacyShared):
+  case SPECS(ParamSpecifier::LegacyShared, ParamSpecifier::Borrowing):
+  case SPECS(ParamSpecifier::Consuming, ParamSpecifier::LegacyOwned):
+  case SPECS(ParamSpecifier::Consuming,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  case SPECS(ParamSpecifier::LegacyOwned, ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::LegacyOwned,
+             ParamSpecifier::ImplicitlyCopyableConsuming):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::Consuming):
+  case SPECS(ParamSpecifier::ImplicitlyCopyableConsuming,
+             ParamSpecifier::LegacyOwned):
+
+    return true;
+
+  default:
+    return false;
+  }
+#undef SPECS
+}
