@@ -1276,6 +1276,16 @@ namespace {
       }
     }
 
+    /// Adds \p method to the appropriate method list for \p decl, unless the
+    /// method is skipped during lowering.
+    void addMethod(SmallVectorImpl<MethodDescriptor> &methodList,
+                   AbstractFunctionDecl *method) {
+      if (!method->isAvailableDuringLowering())
+        return;
+
+      methodList.push_back(method);
+    }
+
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      const ClassLayout &fieldLayout)
@@ -1814,14 +1824,14 @@ namespace {
       // Don't emit getters/setters for @NSManaged methods.
       if (method->getAttrs().hasAttribute<NSManagedAttr>()) return;
 
-      getMethodList(method).push_back(method);
+      addMethod(getMethodList(method), method);
     }
 
     /// Constructors need to be collected into the appropriate methods list.
     void visitConstructorDecl(ConstructorDecl *constructor) {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
-      getMethodList(constructor).push_back(constructor);
+      addMethod(getMethodList(constructor), constructor);
     }
 
     /// Determine whether the given destructor has an Objective-C
@@ -1849,7 +1859,7 @@ namespace {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
           hasObjCDeallocDefinition(destructor)) {
-        InstanceMethods.push_back(destructor);
+        addMethod(getMethodList(destructor), destructor);
       }
     }
 
@@ -1900,8 +1910,7 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
-      if (!method->isAvailableDuringLowering())
-        return;
+      ASSERT(method->isAvailableDuringLowering());
 
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
@@ -2205,6 +2214,9 @@ namespace {
 
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
+      if (!var->isAvailableDuringLowering())
+        return;
+
       if (requiresObjCPropertyDescriptor(IGM, var)) {
         if (var->isStatic()) {
           ClassProperties.push_back(var);
@@ -2221,11 +2233,10 @@ namespace {
         if (var->getAttrs().hasAttribute<NSManagedAttr>())
           return;
 
-        auto &methods = getMethodList(var);
-        methods.push_back(getter);
+        addMethod(getMethodList(var), getter);
 
         if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
-          methods.push_back(setter);
+          addMethod(getMethodList(var), setter);
       }
     }
     
@@ -2257,8 +2268,11 @@ namespace {
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.
-      // Get-only properties are (readonly).
-      if (!prop->isSettable(propDC))
+      // Get-only properties are (readonly). So are properties with a setter
+      // that is unavailable during lowering.
+      auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+      if (!prop->isSettable(propDC) ||
+          (setter && !setter->isAvailableDuringLowering()))
         outs << ",R";
       // Weak and Unowned properties are (weak).
       else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
@@ -2480,11 +2494,10 @@ namespace {
       auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
-      auto &methods = getMethodList(subscript);
-      methods.push_back(getter);
+      addMethod(getMethodList(subscript), getter);
 
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
-        methods.push_back(setter);
+        addMethod(getMethodList(subscript), setter);
     }
     
     SWIFT_DEBUG_DUMP {

@@ -109,3 +109,92 @@ public func availableInDisabledDomainAndUnavailableUniversally() { }
 @available(*, unavailable)
 @available(DisabledDomain, unavailable)
 public func unavailableInDisabledDomainAndUniversally() { }
+
+public struct S {
+  // CHECK: s4Test1SV20disabledDomainSetterSivg
+  // CHECK-NOT: s4Test1SV20disabledDomainSetterSiv{{s|M}}
+  public var disabledDomainSetter: Int {
+    get { 0 }
+    @available(DisabledDomain)
+    set { }
+  }
+
+  // CHECK: s4Test1SV19enabledDomainSetterSivg
+  // CHECK: s4Test1SV19enabledDomainSetterSivs
+  // CHECK: s4Test1SV19enabledDomainSetterSivM
+  public var enabledDomainSetter: Int {
+    get { 0 }
+    @available(EnabledDomain)
+    set { }
+  }
+
+  // CHECK: s4Test1SV19dynamicDomainSetterSivg
+  // CHECK: s4Test1SV19dynamicDomainSetterSivs
+  // CHECK: s4Test1SV19dynamicDomainSetterSivM
+  public var dynamicDomainSetter: Int {
+    get { 0 }
+    @available(DynamicDomain)
+    set { }
+  }
+}
+
+public struct ModifyAccessors {
+  var v = 0
+
+  // CHECK: s4Test15ModifyAccessorsV014disabledDomainB0Sivg
+  // CHECK-NOT: s4Test15ModifyAccessorsV014disabledDomainB0Siv{{s|M}}
+  public var disabledDomainModify: Int {
+    get { v }
+    @available(DisabledDomain)
+    _modify { yield &v }
+  }
+
+  // CHECK: s4Test15ModifyAccessorsV013enabledDomainB0Sivg
+  // CHECK: s4Test15ModifyAccessorsV013enabledDomainB0SivM
+  // CHECK: s4Test15ModifyAccessorsV013enabledDomainB0Sivs
+  public var enabledDomainModify: Int {
+    get { v }
+    @available(EnabledDomain)
+    _modify { yield &v }
+  }
+}
+
+@propertyWrapper
+public struct Wrapper {
+  var v: Int
+  public init(wrappedValue: Int) { v = wrappedValue }
+
+  // CHECK: s4Test7WrapperV12wrappedValueSivg
+  // CHECK-NOT: s4Test7WrapperV12wrappedValueSiv{{s|M}}
+  // CHECK-NOT: s4Test7WrapperV14projectedValueSivg
+  public var wrappedValue: Int {
+    get { v }
+    @available(DisabledDomain)
+    set { v = newValue }
+  }
+
+  @available(DisabledDomain)
+  public var projectedValue: Int { v }
+}
+
+public struct WrappedProperties {
+  // CHECK: s4Test17WrappedPropertiesV7wrappedSivg
+  // CHECK-NOT: s4Test17WrappedPropertiesV7wrappedSiv{{s|M}}
+  // CHECK-NOT: s4Test17WrappedPropertiesV8$wrappedSivg
+  @Wrapper public var wrapped: Int = 0
+}
+
+open class Base {
+  public init() { }
+
+  @available(EnabledDomain)
+  public init(enabledDomain: Int) { }
+
+  // CHECK-NOT: s4Test4BaseC14disabledDomainACSi_tcf
+  @available(DisabledDomain)
+  public init(disabledDomain: Int) { }
+}
+
+// CHECK: s4Test7DerivedC13enabledDomainACSi_tcfC
+// CHECK-NOT: s4Test7DerivedC14disabledDomainACSi_tcf
+open class Derived: Base { }
