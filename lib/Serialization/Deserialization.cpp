@@ -6302,20 +6302,10 @@ public:
 } // namespace
 
 llvm::Expected<HiddenTypeLayoutInfoDecl *>
-ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+ModuleFile::deserializeHiddenTypeLayoutInfo(BitOffset offset) {
   using namespace decls_block;
-  if (!DID)
-    return nullptr;
-
-  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
-         "invalid hidden type layout decl ID");
-  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
-  if (declOrOffset.isComplete())
-    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
-
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (auto error =
-          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
+  if (auto error = diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(offset)))
     return std::move(error);
 
   SmallVector<uint64_t, 64> scratch;
@@ -6359,8 +6349,53 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
   layout->typeInfoRepresentation = std::move(representation);
   decl->Layout = layout.get();
   DeserializedHiddenTypeLayouts.push_back(std::move(layout));
-  declOrOffset = decl;
   return decl;
+}
+
+llvm::Expected<HiddenTypeLayoutInfoDecl *>
+ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+  if (!DID)
+    return nullptr;
+
+  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
+         "invalid hidden type layout decl ID");
+  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
+  if (declOrOffset.isComplete())
+    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
+
+  auto decl = deserializeHiddenTypeLayoutInfo(declOrOffset);
+  if (decl)
+    declOrOffset = decl.get();
+  return decl;
+}
+
+llvm::Expected<HiddenTypeLayoutInfoDecl *>
+ModuleFile::getAbstractMemberTypeLayout(AbstractMemberTypeLayoutID ID) {
+  if (!ID)
+    return nullptr;
+
+  assert(ID <= AbstractMemberTypeLayouts.size() &&
+         "invalid abstract member type layout ID");
+  auto &declOrOffset = AbstractMemberTypeLayouts[ID - 1];
+  if (declOrOffset.isComplete())
+    return declOrOffset.get();
+
+  auto decl = deserializeHiddenTypeLayoutInfo(declOrOffset);
+  if (decl)
+    declOrOffset = decl.get();
+  return decl;
+}
+
+llvm::Expected<Type>
+ModuleFile::getAbstractMemberType(AbstractMemberTypeLayoutID ID) {
+  auto layoutDecl = getAbstractMemberTypeLayout(ID);
+  if (!layoutDecl)
+    return layoutDecl.takeError();
+
+  Type type = HiddenType::get(getContext(), layoutDecl.get()->MangledName,
+                              layoutDecl.get(), CanType());
+  getContext().recordRecoveredHiddenType(type->getCanonicalType());
+  return type;
 }
 
 static std::optional<AvailabilityDomainKind>

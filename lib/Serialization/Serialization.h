@@ -446,6 +446,7 @@ private:
   bool writeASTBlockEntitiesIfNeeded(SpecificASTBlockRecordKeeper &entities);
 
   bool scheduleHiddenTypeLayoutSerialization(const Decl *decl);
+  bool scheduleAbstractMemberTypeLayoutSerialization(const Decl *decl);
   IRABIDetailsProvider &getLayoutProvider();
   void writeSerializableLLVMType(
       const SerializableLLVMTypeRepresentation &type);
@@ -462,7 +463,10 @@ private:
           &representation);
   void writeSerializableTypeInfo(
       const SerializableHiddenTypeInfoRepresentation &representation);
+  void writeAbstractTypeLayout(StringRef mangledName, DeclID parentDeclID,
+                               const AbstractTypeLayout &layout);
   void writeHiddenTypeLayout(const Decl *decl);
+  void writeAbstractMemberTypeLayout(const Decl *decl);
 
   /// Writes all decls and types in the DeclsToWrite queue.
   ///
@@ -472,6 +476,7 @@ private:
 
   /// Writes placeholder records for scheduled hidden type layouts.
   bool writeHiddenTypeLayoutInformationIfNeeded();
+  bool writeAbstractMemberTypeLayoutsIfNeeded();
 
   /// Writes all identifiers in the IdentifiersToWrite queue.
   ///

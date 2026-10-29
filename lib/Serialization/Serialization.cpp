@@ -52,6 +52,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/Serialization.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -6930,9 +6931,30 @@ IRABIDetailsProvider &Serializer::getLayoutProvider() {
   return *LayoutProvider;
 }
 
-void Serializer::writeHiddenTypeLayout(const Decl *decl) {
+void Serializer::writeAbstractTypeLayout(StringRef mangledName,
+                                         DeclID parentDeclID,
+                                         const AbstractTypeLayout &layout) {
   using namespace decls_block;
 
+  if (!layout.typeInfoRepresentation)
+    llvm::report_fatal_error(
+        "abstract type layout has no serializable TypeInfo representation");
+
+  auto mangledNameID = addUniquedString(mangledName).second;
+  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
+  HiddenTypeLayoutInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, mangledNameID, parentDeclID,
+      encodeReferenceCounting(layout.referenceCountingSystem));
+
+  const auto &properties = layout.typeProperties;
+  abbrCode = DeclTypeAbbrCodes[SerializableSILTypePropertiesLayout::Code];
+  SerializableSILTypePropertiesLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, properties.Flags);
+
+  writeSerializableTypeInfo(*layout.typeInfoRepresentation);
+}
+
+void Serializer::writeHiddenTypeLayout(const Decl *decl) {
   AbstractTypeLayout computedLayout;
   const AbstractTypeLayout *layout;
   std::string mangledName;
@@ -6943,7 +6965,8 @@ void Serializer::writeHiddenTypeLayout(const Decl *decl) {
     layout = hidden->Layout;
     mangledName = hidden->MangledName.str();
   } else if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    computedLayout = getLayoutProvider().getAbstractTypeLayout(nominal);
+    computedLayout = getLayoutProvider().getAbstractTypeLayout(
+        nominal->getDeclaredTypeInContext());
     layout = &computedLayout;
     mangledName =
         Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
@@ -6952,25 +6975,23 @@ void Serializer::writeHiddenTypeLayout(const Decl *decl) {
         "cannot serialize a hidden layout for a non-type declaration");
   }
 
-  if (!layout->typeInfoRepresentation)
-    llvm::report_fatal_error(
-        "abstract type layout has no serializable TypeInfo representation");
-
-  auto mangledNameID = addUniquedString(mangledName).second;
   auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(decl);
   auto parentDeclID = parentDecl ? addDeclRef(parentDecl) : DeclID();
+  writeAbstractTypeLayout(mangledName, parentDeclID, *layout);
+}
 
-  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
-  HiddenTypeLayoutInfoLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, mangledNameID, parentDeclID,
-      encodeReferenceCounting(layout->referenceCountingSystem));
-
-  const auto &properties = layout->typeProperties;
-  abbrCode = DeclTypeAbbrCodes[SerializableSILTypePropertiesLayout::Code];
-  SerializableSILTypePropertiesLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, properties.Flags);
-
-  writeSerializableTypeInfo(*layout->typeInfoRepresentation);
+void Serializer::writeAbstractMemberTypeLayout(const Decl *decl) {
+  Type type;
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
+    type = var->getInterfaceType();
+  } else {
+    type = cast<EnumElementDecl>(decl)->getPayloadInterfaceType();
+  }
+  auto layout = getLayoutProvider().getAbstractTypeLayout(type);
+  auto mangledName = std::string(MANGLING_PREFIX_STR) +
+                     Mangle::ASTMangler(type->getASTContext())
+                         .mangleTypeWithoutPrefix(type->getCanonicalType());
+  writeAbstractTypeLayout(mangledName, DeclID(), layout);
 }
 
 void Serializer::writeAllDeclsAndTypes() {
@@ -7152,8 +7173,19 @@ void Serializer::writeAllDeclsAndTypes() {
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
+    wroteSomething |= writeAbstractMemberTypeLayoutsIfNeeded();
     wroteSomething |= writeHiddenTypeLayoutInformationIfNeeded();
   } while (wroteSomething);
+}
+
+bool Serializer::writeAbstractMemberTypeLayoutsIfNeeded() {
+  if (!AbstractMemberTypeLayoutsToSerialize.hasMoreToSerialize())
+    return false;
+
+  while (auto next = AbstractMemberTypeLayoutsToSerialize.popNext(
+             Out.GetCurrentBitNo()))
+    writeAbstractMemberTypeLayout(next.value());
+  return true;
 }
 
 bool Serializer::writeHiddenTypeLayoutInformationIfNeeded() {
@@ -7641,6 +7673,13 @@ bool Serializer::scheduleHiddenTypeLayoutSerialization(const Decl *D) {
   auto hiddenLayoutID = HiddenTypeLayoutsToSerialize.addRef(D);
   HiddenTypeFallbackTable.push_back(
       {DeclsToSerialize.addRef(D), hiddenLayoutID});
+  return true;
+}
+
+bool Serializer::scheduleAbstractMemberTypeLayoutSerialization(const Decl *D) {
+  if (AbstractMemberTypeLayoutsToSerialize.hasRef(D))
+    return false;
+  AbstractMemberTypeLayoutsToSerialize.addRef(D);
   return true;
 }
 
