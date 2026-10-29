@@ -86,3 +86,63 @@ bb0(%0 : @owned $Klass):
   dealloc_stack %stk : $*Klass
   return %r : $Klass
 }
+
+// An assume of integers in a stack location reads the stored value instead.
+//
+// CHECK-LABEL: sil [ossa] @assume_integers_in_stack :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[L:%.*]] = struct_extract %0, #Range.lowerBound
+// CHECK:         [[U:%.*]] = struct_extract %0, #Range.upperBound
+// CHECK:         builtin "assumeTrue"<Int64>([[L]], [[U]], {{%[0-9]+}}) : $()
+// CHECK-LABEL: } // end sil function 'assume_integers_in_stack'
+sil [ossa] @assume_integers_in_stack : $@convention(thin) (Range<Int64>) -> () {
+bb0(%0 : $Range<Int64>):
+  %1 = alloc_stack $Range<Int64>
+  store %0 to [trivial] %1 : $*Range<Int64>
+  %3 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %4 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %le = integer_literal $Builtin.Int8, 3
+  %5 = builtin "assumeTrue"<Int64>(%3 : $*Int64, %4 : $*Int64, %le : $Builtin.Int8) : $()
+  dealloc_stack %1 : $*Range<Int64>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// An assume of other concrete types has no effect and is removed with the stack location.
+//
+// CHECK-LABEL: sil [ossa] @assume_non_integers_in_stack :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK-LABEL: } // end sil function 'assume_non_integers_in_stack'
+sil [ossa] @assume_non_integers_in_stack : $@convention(thin) (Range<Double>) -> () {
+bb0(%0 : $Range<Double>):
+  %1 = alloc_stack $Range<Double>
+  store %0 to [trivial] %1 : $*Range<Double>
+  %3 = struct_element_addr %1 : $*Range<Double>, #Range.lowerBound
+  %4 = struct_element_addr %1 : $*Range<Double>, #Range.upperBound
+  %le = integer_literal $Builtin.Int8, 3
+  %5 = builtin "assumeTrue"<Double>(%3 : $*Double, %4 : $*Double, %le : $Builtin.Int8) : $()
+  dealloc_stack %1 : $*Range<Double>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// A generic type can still become an integer type by specialization.
+//
+// CHECK-LABEL: sil [ossa] @assume_generic_in_stack :
+// CHECK:         alloc_stack
+// CHECK:         builtin "assumeTrue"<T>
+// CHECK-LABEL: } // end sil function 'assume_generic_in_stack'
+sil [ossa] @assume_generic_in_stack : $@convention(thin) <T where T : Comparable> (@in_guaranteed Range<T>) -> () {
+bb0(%0 : $*Range<T>):
+  %1 = alloc_stack $Range<T>
+  copy_addr %0 to [init] %1 : $*Range<T>
+  %3 = struct_element_addr %1 : $*Range<T>, #Range.lowerBound
+  %4 = struct_element_addr %1 : $*Range<T>, #Range.upperBound
+  %le = integer_literal $Builtin.Int8, 3
+  %5 = builtin "assumeTrue"<T>(%3 : $*T, %4 : $*T, %le : $Builtin.Int8) : $()
+  destroy_addr %1 : $*Range<T>
+  dealloc_stack %1 : $*Range<T>
+  %7 = tuple ()
+  return %7 : $()
+}

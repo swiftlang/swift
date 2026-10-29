@@ -179,6 +179,8 @@ private struct UseCollector : AddressDefUseWalker {
     case loadTake(LoadInst)
     // A hybrid between "store" and "load"
     case markDependenceAddr(MarkDependenceAddrInst)
+    // An address operand of an `assumeTrue` builtin, which reads it like a "load"
+    case assumeOperand(Operand)
 
     var instruction: Instruction {
       switch self {
@@ -187,6 +189,7 @@ private struct UseCollector : AddressDefUseWalker {
         case .loadTake(let load):   return load
         case .load(let load):       return load
         case .markDependenceAddr(let markDep): return markDep
+        case .assumeOperand(let operand): return operand.instruction
       }
     }
 
@@ -197,6 +200,7 @@ private struct UseCollector : AddressDefUseWalker {
       case .loadTake(let load):   return load.type
       case .load(let load):       return load.valueType
       case .markDependenceAddr(let markDep): return markDep.address.type.objectType
+      case .assumeOperand(let operand): return operand.value.type.objectType
       }
     }
 
@@ -218,6 +222,7 @@ private struct UseCollector : AddressDefUseWalker {
 
     // Non-consuming reads processed after all mutations.
     var loads = [(subPath: SmallProjectionPath, load: LoadLikeInstruction)]()
+    var assumeOperands = [(subPath: SmallProjectionPath, operand: Operand)]()
 
     let valueType: Type
 
@@ -226,10 +231,10 @@ private struct UseCollector : AddressDefUseWalker {
       self.valueType = valueType
     }
 
-    var hasNonDestroyAccesses: Bool { !mutatingAccesses.isEmpty || !loads.isEmpty }
+    var hasNonDestroyAccesses: Bool { !mutatingAccesses.isEmpty || !loads.isEmpty || !assumeOperands.isEmpty }
 
     var canDropWithoutRewriting: Bool {
-      mutatingAccesses.allSatisfy({ $0.access.isTrivialStore }) && loads.isEmpty
+      mutatingAccesses.allSatisfy({ $0.access.isTrivialStore }) && loads.isEmpty && assumeOperands.isEmpty
     }
 
     mutating func addAndInsertPlaceholder(access: Access,
@@ -252,6 +257,8 @@ private struct UseCollector : AddressDefUseWalker {
         addMutatingAccess(access, at: load, path: subPath, &ssaUpdater, context)
       case .markDependenceAddr(let markDep):
         addMutatingAccess(access, at: markDep, path: subPath, &ssaUpdater, context)
+      case .assumeOperand(let operand):
+        assumeOperands.append((subPath: subPath, operand: operand))
       }
     }
 
@@ -473,6 +480,20 @@ private struct UseCollector : AddressDefUseWalker {
           }
         }
         return .continueWalk
+      case .AssumeTrueGeneric:
+        let type = builtin.substitutionMap.replacementType
+        if type.hasArchetype {
+          return .abortWalk
+        }
+        // Only an assume of integers has an effect, other assumes are erased with the allocation.
+        if !type.isStdlibInteger {
+          return .continueWalk
+        }
+        guard let projectionPath = address.value.storageProjectionPath else {
+          return .abortWalk
+        }
+        accessTree.append((projectionPath, .assumeOperand(address)))
+        return .continueWalk
       default:
         return .abortWalk
       }
@@ -582,6 +603,8 @@ private struct UseCollector : AddressDefUseWalker {
           hasLoad = true
           hasStore = true
           projectedMutations.append(markDep)
+        case .assumeOperand:
+          hasLoad = true
         }
         index += 1
 
@@ -755,6 +778,7 @@ private struct UseCollector : AddressDefUseWalker {
     // ```
 
     rewrite(loads: accesses.loads, &ssaUpdater)
+    rewrite(assumeOperands: accesses.assumeOperands, &ssaUpdater)
     // ```
     //   %2 = alloc_stack $Pair
     //   store %0 to [init] %2
@@ -820,7 +844,7 @@ private struct UseCollector : AddressDefUseWalker {
         context.erase(instruction: store)
       case .markDependenceAddr(let markDep):
         context.erase(instruction: markDep)
-      case .destroy, .load, .loadTake:
+      case .destroy, .load, .loadTake, .assumeOperand:
         break
       }
     }
@@ -871,7 +895,7 @@ private struct UseCollector : AddressDefUseWalker {
                                                       kind: markDep.dependenceKind)
         }
 
-      case .load:
+      case .load, .assumeOperand:
         fatalError()
       }
       placeHolder.valueOperand.set(to: updatedValue, context)
@@ -895,6 +919,16 @@ private struct UseCollector : AddressDefUseWalker {
         insertMarkDependencies(for: loadInst, context)
       }
       load.rewrite(with: value, projection: subPath, context)
+    }
+  }
+
+  private func rewrite(assumeOperands: [(subPath: SmallProjectionPath, operand: Operand)],
+                       _ ssaUpdater: inout SSAUpdater)
+  {
+    for (subPath, operand) in assumeOperands {
+      let value = ssaUpdater.getValue(before: operand.instruction)
+      let builder = Builder(before: operand.instruction, context)
+      operand.set(to: value.createProjectionAndCopy(path: subPath, builder: builder), context)
     }
   }
 
