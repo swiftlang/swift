@@ -3442,36 +3442,6 @@ namespace {
         Impl.applyAvailabilityFloor(valueCtor);
       }
 
-      if (!isa<StructDecl>(result)) {
-        assert(
-            isa<ClassDecl>(result) &&
-            "Expected result to be a ClassDecl as it cannot be a StructDecl");
-        // When we add full support for C foreign reference types then we
-        // should synthesize static factories for them as well
-        if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-          bool hasUserProvidedStaticFactory = llvm::any_of(
-              cxxRecordDecl->methods(), [](const clang::CXXMethodDecl *method) {
-                return method->isStatic() &&
-                       llvm::any_of(
-                           method->specific_attrs<clang::SwiftNameAttr>(),
-                           [](const auto *attr) {
-                             return attr->getName().starts_with("init(");
-                           });
-              });
-          if (!hasUserProvidedStaticFactory) {
-            auto generatedCxxMethodDecls =
-                synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                    cxxRecordDecl);
-            for (auto *methodDecl : generatedCxxMethodDecls) {
-              if (Decl *importedInitDecl =
-                      Impl.SwiftContext.getClangModuleLoader()
-                          ->importDeclDirectly(methodDecl))
-                result->addMember(importedInitDecl);
-            }
-          }
-        }
-      }
-
       if (auto structResult = dyn_cast<StructDecl>(result)) {
         structResult->setHasUnreferenceableStorage(hasUnreferenceableStorage);
         if (isNonTrivialPtrAuth) {
@@ -12118,6 +12088,8 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     (void)Impl.lookupAndImportOperatorBool(swiftDecl);
     (void)Impl.lookupAndImportSubscripts(swiftDecl);
     (void)Impl.lookupAndImportAsReference(swiftDecl);
+    if (auto *classDecl = dyn_cast<ClassDecl>(swiftDecl))
+      (void)Impl.lookupAndImportSynthesizedFactories(classDecl);
   }
 }
 } // namespace
