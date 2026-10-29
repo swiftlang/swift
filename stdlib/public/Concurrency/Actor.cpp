@@ -237,7 +237,7 @@ namespace {
 /// synchronous code.
 class IsolatedDeinitJob : public Job {
 private:
-  void *Object;
+  void *__ptrauth_swift_isolated_deinit_job_object Object;
   DeinitWorkFunction *__ptrauth_swift_deinit_work_function Work;
 
 public:

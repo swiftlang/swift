@@ -1838,6 +1838,17 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
   const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
 
+  /// The task to resume in a NullaryContinuationJob.
+  const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
+
+  /// The executor identity and witness table stored in a task executor
+  /// preference status record.
+  const uint16_t TaskExecutorPreferenceIdentity = 0xc69e; // = 50846
+  const uint16_t TaskExecutorPreferenceImplementation = 0x3dac; // = 15788
+
+  /// The task waiting on a task group. It's address-diversified.
+  const uint16_t TaskGroupWaitQueue = 0x69ea; // = 27114
+
   /// Result type metadata stored in a future task or task group.
   const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
@@ -1869,6 +1880,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
+
+  /// The object passed to an isolated deinit body.
+  const uint16_t IsolatedDeinitJobObject = 0xe281; // = 57985
 
   /// IsCurrentGlobalActor function used between the Swift runtime and
   /// concurrency runtime.

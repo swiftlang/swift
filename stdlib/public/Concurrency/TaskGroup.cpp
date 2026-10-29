@@ -402,8 +402,31 @@ protected:
 
   /// The task currently waiting on `group.next()`.  Since only the owning
   /// task can ever be waiting on a group, this is just either a reference
-  /// to that task or null.
+  /// to that task or null. The task pointer is signed with the address of
+  /// this field; use signWaitingTask and authWaitingTask.
   std::atomic<AsyncTask *> waitQueue;
+
+  AsyncTask *signWaitingTask(AsyncTask *task) {
+#if SWIFT_PTRAUTH
+    if (task)
+      task = ptrauth_sign_unauthenticated(
+          task, ptrauth_key_process_dependent_data,
+          ptrauth_blend_discriminator(
+              &waitQueue, SpecialPointerAuthDiscriminators::TaskGroupWaitQueue));
+#endif
+    return task;
+  }
+
+  AsyncTask *authWaitingTask(AsyncTask *task) {
+#if SWIFT_PTRAUTH
+    if (task)
+      task = ptrauth_auth_data(
+          task, ptrauth_key_process_dependent_data,
+          ptrauth_blend_discriminator(
+              &waitQueue, SpecialPointerAuthDiscriminators::TaskGroupWaitQueue));
+#endif
+    return task;
+  }
 
   /// Queue containing completed tasks offered into this group.
   ///
@@ -779,7 +802,8 @@ AsyncTask *TaskGroupBase::claimWaitingTask() {
          "attempted to claim waiting task but status indicates no waiting "
          "task is present!");
 
-  auto waitingTask = waitQueue.exchange(nullptr, std::memory_order_acquire);
+  auto waitingTask = authWaitingTask(
+      waitQueue.exchange(nullptr, std::memory_order_acquire));
   SWIFT_TASK_GROUP_DEBUG_LOG(this, "claimed waiting task %p", waitingTask);
   if (!waitingTask)
     swift_Concurrency_fatalError(0, "Claimed NULL waitingTask!");
@@ -2005,9 +2029,9 @@ reevaluate_if_taskgroup_has_results:;
     // Put the waiting task at the beginning of the wait queue.
     SWIFT_TASK_GROUP_DEBUG_LOG(
         this, "WATCH OUT, SET WAITER %p ONTO waitQueue.head = %p", waitingTask,
-        waitQueue.load(std::memory_order_relaxed));
+        authWaitingTask(waitQueue.load(std::memory_order_relaxed)));
     if (waitQueue.compare_exchange_weak(
-        waitHead, waitingTask,
+        waitHead, signWaitingTask(waitingTask),
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
       // we must unlock before running the waiting task,
@@ -2207,7 +2231,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
   while (true) {
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_weak(
-        waitHead, waitingTask,
+        waitHead, signWaitingTask(waitingTask),
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
       statusMarkWaitingAssumeRelease();
