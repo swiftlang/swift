@@ -54,6 +54,13 @@ struct Main {
     // CHECK: 3
     printPackElements(s: Int8(1), Int16(2), UInt32(3))
 
+    // Empty pack: the body of the pack loop is unreachable.
+    // CHECK: before empty pack
+    // CHECK-NEXT: after empty pack
+    print("before empty pack")
+    printPackElements()
+    print("after empty pack")
+
     // rdar://189863699: Embedded Swift: specialized pack-expansion tuple initializer crashes at -Onone
     let s = make()
     // CHECK: 2
