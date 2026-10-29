@@ -162,6 +162,16 @@ Type Pattern::getType() const {
   return Ty;
 }
 
+void Pattern::setType(Type ty) {
+  if (ty) {
+    ASSERT(!ty->hasTypeVariableOrHole());
+    // Placeholder vars can currently have placeholder types.
+    // FIXME: We should find a better way of handling those.
+    ASSERT(isImplicit() || !ty->hasPlaceholder());
+  }
+  Ty = ty;
+}
+
 /// getLoc - Return the caret location of the pattern.
 SourceLoc Pattern::getLoc() const {
   switch (getKind()) {
