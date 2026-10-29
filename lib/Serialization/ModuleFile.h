@@ -512,6 +512,7 @@ private:
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   llvm::Expected<ParameterList *> readParameterList();
+  SmallVector<serialization::DeclID, 8> readParameterListDeclIDs();
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
