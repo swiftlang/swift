@@ -21,6 +21,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/GenericSpecializationMangler.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDefaultOverrideTable.h"
@@ -1086,6 +1087,15 @@ void SILModule::promoteLinkages() {
   // TODO: Promote linkage of other SIL entities
 }
 
+void SILModule::addExportedSpecializationOfImportedFunction(
+    SILDeclRef target, GenericSignature specializedSig, bool createdHere) {
+  // The same name the specializer gives the body.
+  auto name = Mangle::GenericSpecializationMangler::manglePrespecialization(
+      getASTContext(), target.mangle(),
+      target.getAbstractFunctionDecl()->getGenericSignature(), specializedSig);
+  exportedSpecializationsOfImportedFunctions[name] |= createdHere;
+}
+
 bool SILModule::isStdlibModule() const {
   return TheSwiftModule->isStdlibModule();
 }
@@ -1094,8 +1104,11 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   if (prespecializedFunctionDeclsImported)
     return;
 
-  // No prespecitalizations in embedded Swift
-  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // No prespecitalizations in embedded Swift, except those spelled
+  // '@specialized' (the action filters them).
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      !getASTContext().LangOpts.hasFeature(
+          Feature::ExtendedSpecializedAttribute))
     return;
 
   SmallVector<ModuleDecl *, 8> importedModules;
@@ -1118,11 +1131,25 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
     }
   }
 
-  for (auto *module : importedModules) {
+  // Also the '@specialized' declarations of modules linked only through other
+  // modules' imports, but not their '@_specialize' ones.
+  SmallVector<ModuleDecl *, 32> linkedModules;
+  SpecializedAttr::getModulesWithUsedSpecializations(getSwiftModule(),
+                                                     linkedModules);
+  size_t numDirect = importedModules.size();
+  for (auto *module : linkedModules)
+    if (!module->isNonSwiftModule() &&
+        !llvm::is_contained(importedModules, module))
+      importedModules.push_back(module);
+
+  for (auto [index, module] : llvm::enumerate(importedModules)) {
     SmallVector<Decl *, 16> prespecializations;
     module->getExportedPrespecializations(prespecializations);
     for (auto *p : prespecializations) {
       if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
+        if (index >= numDirect &&
+            !vd->getAttrs().hasAttribute<SpecializedAttr>())
+          continue;
         action(vd);
       }
     }

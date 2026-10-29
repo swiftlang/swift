@@ -406,7 +406,12 @@ bool FunctionBodyScope::lookupLocalsOrMembers(
 
 bool SpecializeAttributeScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
-  if (auto *params = whatWasSpecialized->getGenericParams())
+  // For an extension, the generic parameters of every enclosing type, not just
+  // the innermost one, e.g. 'T' and 'U' for 'extension Outer.Inner': its scope
+  // is outside the extended type, so no parent scope provides them.
+  bool isExtension = isa<ExtensionDecl>(whatWasSpecialized);
+  for (auto *params = whatWasSpecialized->getGenericParams(); params;
+       params = isExtension ? params->getOuterParameters() : nullptr)
     for (auto *param : params->getParams())
       if (consumer.consume({param}))
         return true;

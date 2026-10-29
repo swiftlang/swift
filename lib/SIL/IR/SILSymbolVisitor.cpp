@@ -471,6 +471,12 @@ public:
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+    // A '@specialized' declaration without a body has no symbol of its own,
+    // and the specialized bodies it exports are weak: other modules can export
+    // them too, so they aren't part of this module's interface.
+    if (SpecializedAttr::isSpecializationDeclaration(AFD))
+      return;
+
     // Add exported prespecialized symbols.
     for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
