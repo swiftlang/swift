@@ -4,7 +4,9 @@
 /// Generate the Objective-C header for the Swift @objc global functions.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/Lib.swift -emit-module -verify -o %t \
-// RUN:   -emit-objc-header-path %t/Lib.h
+// RUN:   -emit-objc-header-path %t/Lib.h \
+// RUN:   -disable-implicit-string-processing-module-import \
+// RUN:   -disable-implicit-concurrency-module-import
 
 /// Build and run a binary mixing Swift and Objective-C code.
 // RUN: %target-clang -fobjc-arc -c %t/Client.m -o %t/Client.o \

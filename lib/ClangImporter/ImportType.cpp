@@ -2389,7 +2389,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
   }
 
-  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  clang::QualType returnType = clangDecl->getReturnType();
   returnType = desugarIfBoundsAttributed(returnType);
   // In C interop mode, the return type of library builtin functions
   // like 'memcpy' from headers like 'string.h' drops
@@ -2510,7 +2510,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
-  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  clang::QualType returnType = clangDecl->getReturnType();
   returnType = desugarIfBoundsAttributed(returnType);
 
   // An explicit nullability specifier on a dependent return type, such as
@@ -2637,7 +2637,7 @@ ClangImporter::Implementation::importParameterType(
     std::optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
-  auto paramTy = desugarIfElaborated(param->getType());
+  auto paramTy = param->getType();
   paramTy = desugarIfBoundsAttributed(paramTy);
 
   // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
@@ -3443,7 +3443,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   ImportDiagnosticAdder addImportDiag(*this, clangDecl,
                                       clangDecl->getLocation());
-  clang::QualType resultType = desugarIfElaborated(clangDecl->getReturnType());
+  clang::QualType resultType = clangDecl->getReturnType();
   ImportedType importedType = importer::findOptionSetEnum(resultType, *this);
   if (!importedType)
     importedType = importType(resultType, resultKind, addImportDiag,
@@ -3726,9 +3726,8 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   if (!origDC)
     return {Type(), false};
 
-  auto fieldType =
-      desugarIfElaborated(isGetter ? clangDecl->getReturnType()
-                                   : clangDecl->getParamDecl(0)->getType());
+  auto fieldType = isGetter ? clangDecl->getReturnType()
+                            : clangDecl->getParamDecl(0)->getType();
   // Import the property type, independent of what kind of accessor this is.
   ImportedType importedType = importer::findOptionSetEnum(fieldType, *this);
   if (!importedType)

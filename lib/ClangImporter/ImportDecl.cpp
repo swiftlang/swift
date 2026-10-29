@@ -4894,7 +4894,7 @@ namespace {
           return nullptr;
       }
 
-      auto fieldType = desugarIfElaborated(decl->getType());
+      auto fieldType = decl->getType();
       ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       // If this is a closure field of the __SwiftFunctionWrapper type, pretend
@@ -6628,7 +6628,7 @@ namespace {
         }
       }
 
-      auto fieldType = desugarIfElaborated(decl->getType());
+      auto fieldType = decl->getType();
       ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
@@ -7623,7 +7623,6 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       getAccessorPropertyType(getter, false, getterName.getSelfIndex());
   if (propertyType.isNull())
     return nullptr;
-  propertyType = desugarIfElaborated(propertyType);
 
   // If there is a setter, check that the property it implies
   // matches that of the getter.

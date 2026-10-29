@@ -2553,16 +2553,6 @@ std::optional<CxxUnsafetyReason>
 shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
                               ASTContext &ctx);
 
-inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
-  // FIXME: Remove this function after 2026 rebranch is complete.
-  return type;
-}
-
-inline clang::QualType desugarIfElaborated(clang::QualType type) {
-  // FIXME: Remove this function after 2026 rebranch is complete.
-  return type;
-}
-
 inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
   if (auto BAT = dyn_cast<clang::BoundsAttributedType>(type))
     return BAT->desugar();
