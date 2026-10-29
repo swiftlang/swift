@@ -31,6 +31,15 @@ class Other: CP { }
 
 @inline(never) func isDerived(_ p: any CP) -> Bool { p is Derived }
 
+// A zero-sized cast destination can have a null address (IRGen passes `undef`),
+// which must not be mistaken for a test. (concurrency-taskgroup.swift is where
+// it reliably turns out to be null.)
+enum Empty: P { case only }
+@inline(never) func asEmpty(_ p: any P) -> Bool {
+  if let _ = p as? Empty { return true }
+  return false
+}
+
 // A failed test leaves the source intact for a later cast.
 @inline(never) func testThenCast(_ p: any P) -> Int {
   if p is T { return -1 }
@@ -62,5 +71,9 @@ func yn(_ b: Bool) -> StaticString { b ? "yes" : "no" }
     // OUTPUT-NEXT: -1
     print(testThenCast(S()))
     print(testThenCast(T()))
+    // OUTPUT-NEXT: yes
+    // OUTPUT-NEXT: no
+    print(yn(asEmpty(Empty.only)))
+    print(yn(asEmpty(T())))
   }
 }
