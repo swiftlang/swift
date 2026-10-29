@@ -158,6 +158,86 @@ bb0(%0 : $Int64):
   return %2
 }
 
+// CHECK-LABEL: sil @assumeTrue_same_assume_before :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_same_assume_before'
+sil @assumeTrue_same_assume_before : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %le2 = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le2 : $Builtin.Int8) : $()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil @assumeTrue_same_values_other_type :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:         builtin "assumeTrue"<UInt64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_same_values_other_type'
+sil @assumeTrue_same_values_other_type : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %le2 = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<UInt64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le2 : $Builtin.Int8) : $()
+  %4 = tuple ()
+  return %4
+}
+
+// The right side of an `&&`.
+// CHECK-LABEL: sil @assumeTrue_same_assume_in_single_predecessor :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       bb1:
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_same_assume_in_single_predecessor'
+sil @assumeTrue_same_assume_in_single_predecessor : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1):
+  %le = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  cond_br %2, bb1, bb2
+
+bb1:
+  %le2 = integer_literal $Builtin.Int8, 3
+  %5 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le2 : $Builtin.Int8) : $()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil @assumeTrue_same_assume_in_one_predecessor :
+// CHECK:       bb1:
+// CHECK-NEXT:    integer_literal $Builtin.Int8, 3
+// CHECK-NEXT:    builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       bb3:
+// CHECK-NEXT:    integer_literal $Builtin.Int8, 3
+// CHECK-NEXT:    builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_same_assume_in_one_predecessor'
+sil @assumeTrue_same_assume_in_one_predecessor : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1):
+  cond_br %2, bb1, bb2
+
+bb1:
+  %le = integer_literal $Builtin.Int8, 3
+  %4 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %le2 = integer_literal $Builtin.Int8, 3
+  %8 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le2 : $Builtin.Int8) : $()
+  %9 = tuple ()
+  return %9
+}
+
 // CHECK-LABEL: sil @assumeTrue_constants :
 // CHECK-NOT:     builtin "assumeTrue"
 // CHECK:       } // end sil function 'assumeTrue_constants'
@@ -300,6 +380,20 @@ bb0:
   %6 = builtin "assumeTrue"<Int64>(%2 : $Builtin.Int64, %0 : $Builtin.Int64, %lt : $Builtin.Int8) : $()
   %7 = tuple ()
   return %7
+}
+
+// CHECK-LABEL: sil @assumeTrue_other_comparison_before :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_other_comparison_before'
+sil @assumeTrue_other_comparison_before : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %lt = integer_literal $Builtin.Int8, 2
+  %3 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %lt : $Builtin.Int8) : $()
+  %4 = tuple ()
+  return %4
 }
 
 sil_global @rangeGlobal : $Range<Int64>

@@ -206,6 +206,10 @@ private extension BuiltinInst {
       context.erase(instruction: self)
       return
     }
+    if hasSameAssumeBefore(context) {
+      context.erase(instruction: self)
+      return
+    }
     // IRGen needs the builtin integers. They also enable other optimizations: an address would block
     // mem2reg, a struct would block replacing a struct phi by an integer phi.
     let builder = Builder(before: self, context)
@@ -219,6 +223,49 @@ private extension BuiltinInst {
       }
       operand.set(to: builder.createStructExtract(struct: value, fieldIndex: 0), context)
     }
+  }
+
+  /// An identical assume comes earlier in the block, or in a block from which only single-predecessor
+  /// blocks lead to this one, e.g. the left side of an `&&`.
+  func hasSameAssumeBefore(_ context: SimplifyContext) -> Bool {
+    let lhs = operands[0].value
+    let rhs = operands[1].value
+    // The memory behind an address can change in between.
+    if lhs.type.isAddress || rhs.type.isAddress {
+      return false
+    }
+    let type = substitutionMap.replacementType.canonical
+    let comparison = assumedComparison
+    var sameAssumeBlocks = BasicBlockSet(context)
+    defer { sameAssumeBlocks.deinitialize() }
+    var hasSameAssumeInOtherBlock = false
+    for other in lhs.uses.users(ofType: BuiltinInst.self)
+      where other != self && other.id == .AssumeTrueGeneric &&
+            other.operands[0].value == lhs && other.operands[1].value == rhs &&
+            other.assumedComparison == comparison &&
+            other.substitutionMap.replacementType.canonical == type
+    {
+      if other.parentBlock != parentBlock {
+        sameAssumeBlocks.insert(other.parentBlock)
+        hasSameAssumeInOtherBlock = true
+      } else if other.strictlyDominatesInBlock(self) {
+        return true
+      }
+    }
+    if !hasSameAssumeInOtherBlock {
+      return false
+    }
+    var visited = BasicBlockSet(context)
+    defer { visited.deinitialize() }
+    var block = parentBlock
+    // A cycle of single-predecessor blocks is unreachable.
+    while let predecessor = block.singlePredecessor, visited.insert(predecessor) {
+      if sameAssumeBlocks.contains(predecessor) {
+        return true
+      }
+      block = predecessor
+    }
+    return false
   }
 
   func carriesNoInformation(_ context: SimplifyContext) -> Bool {
