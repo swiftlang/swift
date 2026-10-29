@@ -563,7 +563,7 @@ getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   return std::nullopt;
 }
 
-Expected<ParameterList *> ModuleFile::readParameterList() {
+SmallVector<DeclID, 8> ModuleFile::readParameterListDeclIDs() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -576,6 +576,12 @@ Expected<ParameterList *> ModuleFile::readParameterList() {
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::ParameterListLayout::readRecord(scratch, rawMemberIDs);
+
+  return SmallVector<DeclID, 8>(rawMemberIDs.begin(), rawMemberIDs.end());
+}
+
+Expected<ParameterList *> ModuleFile::readParameterList() {
+  auto rawMemberIDs = readParameterListDeclIDs();
 
   SmallVector<ParamDecl *, 8> params;
   for (DeclID paramID : rawMemberIDs) {
@@ -5379,9 +5385,15 @@ public:
     DeclName name = argNames.empty() ? baseName : compoundName;
     PrettySupplementalDeclNameTrace trace(name);
 
+    bool useAbstractTypeLayout = false;
     for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
+        if (abstractTypeLayoutID) {
+          llvm::consumeError(dependency.takeError());
+          useAbstractTypeLayout = true;
+          break;
+        }
         // Enum elements never introduce missing members in their parent enum.
         //
         // A frozen enum cannot be laid out if its missing cases anyway,
@@ -5411,8 +5423,32 @@ public:
 
     // Read payload parameter list, if it exists.
     if (hasPayload) {
-      ParameterList *paramList;
-      SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
+      ParameterList *paramList = nullptr;
+      if (!useAbstractTypeLayout) {
+        auto paramListOrError = MF.readParameterList();
+        if (paramListOrError) {
+          paramList = paramListOrError.get();
+        } else if (abstractTypeLayoutID) {
+          llvm::consumeError(paramListOrError.takeError());
+          useAbstractTypeLayout = true;
+        } else {
+          return paramListOrError.takeError();
+        }
+      } else {
+        (void)MF.readParameterListDeclIDs();
+      }
+
+      if (useAbstractTypeLayout) {
+        auto fallbackType = MF.getAbstractMemberType(abstractTypeLayoutID);
+        if (!fallbackType)
+          return fallbackType.takeError();
+        auto *param = MF.createDecl<ParamDecl>(
+            SourceLoc(), SourceLoc(), Identifier(), SourceLoc(), Identifier(),
+            elem);
+        param->setSpecifier(ParamDecl::Specifier::Default);
+        param->setInterfaceType(fallbackType.get());
+        paramList = ParameterList::create(ctx, {param});
+      }
       elem->setParameterList(paramList);
     }
 
