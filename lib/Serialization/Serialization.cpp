@@ -5029,7 +5029,9 @@ public:
                           accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           S.addTypeRef(ty),
-                          AbstractMemberTypeLayoutID(),
+                          S.AbstractMemberTypeLayoutsToSerialize.hasRef(var)
+                              ? S.AbstractMemberTypeLayoutsToSerialize.addRef(var)
+                              : AbstractMemberTypeLayoutID(),
                           var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
@@ -7685,6 +7687,10 @@ bool Serializer::scheduleAbstractMemberTypeLayoutSerialization(const Decl *D) {
 
 void Serializer::handleHiddenTypeLayoutRequirement(
     const HiddenTypeLayoutRequirement &requirement) {
+  if (isa<VarDecl>(requirement.LayoutAffectingStorage))
+    scheduleAbstractMemberTypeLayoutSerialization(
+        requirement.LayoutAffectingStorage);
+
   if (!scheduleHiddenTypeLayoutSerialization(requirement.LayoutDecl) ||
       !Options.EnableHiddenTypeLayoutSerializationRemarks)
     return;

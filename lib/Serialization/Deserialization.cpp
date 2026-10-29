@@ -4232,9 +4232,15 @@ public:
     auto backingPropertyIDs = arrayFieldIDs.slice(0, numBackingProperties);
     arrayFieldIDs = arrayFieldIDs.slice(numBackingProperties);
 
+    bool useAbstractTypeLayout = false;
     for (TypeID dependencyID : arrayFieldIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
+        if (abstractTypeLayoutID) {
+          llvm::consumeError(dependency.takeError());
+          useAbstractTypeLayout = true;
+          break;
+        }
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
             getErrorFlags(), numVTableEntries);
@@ -4258,10 +4264,24 @@ public:
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
 
-    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
-    if (!interfaceTypeOrError)
-      return interfaceTypeOrError.takeError();
-    Type interfaceType = interfaceTypeOrError.get();
+    Type interfaceType;
+    if (!useAbstractTypeLayout) {
+      auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+      if (interfaceTypeOrError) {
+        interfaceType = interfaceTypeOrError.get();
+      } else if (abstractTypeLayoutID) {
+        llvm::consumeError(interfaceTypeOrError.takeError());
+        useAbstractTypeLayout = true;
+      } else {
+        return interfaceTypeOrError.takeError();
+      }
+    }
+    if (useAbstractTypeLayout) {
+      auto fallbackType = MF.getAbstractMemberType(abstractTypeLayoutID);
+      if (!fallbackType)
+        return fallbackType.takeError();
+      interfaceType = fallbackType.get();
+    }
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
 
