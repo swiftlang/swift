@@ -182,6 +182,11 @@ static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
   if (!nom->getModuleContext()->isStdlibModule())
     return false;
 
+  // A back-deployed type that this module emits its own copy of isn't known to
+  // the runtimes it is back-deployed to, so their demangler can't find it.
+  if (nom->isBackDeployedIntoClient())
+    return false;
+
   // If there's an @_originallyDefined(in:) attribute, then the nominal is
   // not always available for demangling.
   for (auto attr: nom->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
