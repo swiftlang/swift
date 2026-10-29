@@ -468,8 +468,22 @@ public:
     if (!referencedElement)
       return nullptr;
 
+    // Re-resolve the base type to produce diagnostics. CSGen and
+    // `coercePatternToType` will handle unbound generics, placeholders are not
+    // currently handled correctly so are rejected for now.
+    // FIXME: Once we properly sink patterns into the constraint system we
+    // should aim to handle the EnumElementPattern resolution there instead of
+    // here.
+    auto baseTy = TypeResolution::resolveContextualType(
+        repr, DC, TypeResolverContext::InExpression,
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        TypeResolution::defaultUnboundTypeOpener,
+        /*placeholderOpener*/ nullptr,
+        /*packElementOpener*/ nullptr);
+
     auto *base = new (Context) TypeExpr(repr);
-    base->setType(MetatypeType::get(ty));
+    base->setType(MetatypeType::get(baseTy));
     return EnumElementPattern::create(base, ude->getDotLoc(), ude->getNameLoc(),
                                       ude->getName(), referencedElement,
                                       /*subPattern*/ nullptr, DC);
@@ -565,8 +579,9 @@ public:
                            TypeResolutionFlags::SilenceDiagnostics;
 
       // See first if the entire repr resolves to a type.
+      auto *baseRepr = qualIdentTR->getBase();
       const Type enumTy = TypeResolution::resolveContextualType(
-          qualIdentTR->getBase(), DC, options,
+          baseRepr, DC, options,
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           TypeResolution::defaultUnboundTypeOpener,
@@ -584,8 +599,22 @@ public:
       if (!referencedElement)
         return nullptr;
 
-      baseTE = new (Context) TypeExpr(qualIdentTR->getBase());
-      baseTE->setType(MetatypeType::get(enumTy));
+      // Re-resolve the base type to produce diagnostics. CSGen and
+      // `coercePatternToType` will handle unbound generics, placeholders are
+      // not currently handled correctly so are rejected for now.
+      // FIXME: Once we properly sink patterns into the constraint system we
+      // should aim to handle the EnumElementPattern resolution there instead of
+      // here.
+      auto baseTy = TypeResolution::resolveContextualType(
+          baseRepr, DC, TypeResolverContext::InExpression,
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          TypeResolution::defaultUnboundTypeOpener,
+          /*placeholderOpener*/ nullptr,
+          /*packElementOpener*/ nullptr);
+
+      baseTE = new (Context) TypeExpr(baseRepr);
+      baseTE->setType(MetatypeType::get(baseTy));
     }
 
     assert(baseTE && baseTE->getType() && "Didn't initialize base expression?");
@@ -1582,9 +1611,12 @@ Pattern *TypeChecker::coercePatternToType(
     } else {
       // Check if the explicitly-written enum type matches the type we're
       // coercing to.
-      assert(!EEP->getParentType().isNull()
-             && "enum with resolved element doesn't specify parent type?!");
       auto parentTy = EEP->getParentType();
+      ASSERT(parentTy &&
+             "enum with resolved element doesn't specify parent type?!");
+      if (parentTy->hasError())
+        return nullptr;
+
       // If the type matches exactly, use it.
       if (parentTy->isEqual(type)) {
         enumTy = type;
