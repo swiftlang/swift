@@ -259,6 +259,11 @@ private struct CollectedEffects {
     case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       break
 
+    case let bi as BuiltinInst where bi.isAssume:
+      for argument in bi.arguments where argument.type.isAddress {
+        addEffects(.read, to: argument)
+      }
+
     case is BeginCOWMutationInst:
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 

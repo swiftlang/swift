@@ -1,0 +1,159 @@
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -module-name Swift -parse-stdlib -Xllvm -sil-disable-pass=simplify-builtin | %FileCheck %s
+
+import Builtin
+
+struct Bool {
+  var _value: Builtin.Int1
+}
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+struct UInt8 {
+  var _value: Builtin.Int8
+}
+
+struct MyInt {
+  var value: Builtin.Int64
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_signed(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp sle i64 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_signed : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_unsigned(i8 %0, i8 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp ule i8 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_unsigned : $@convention(thin) (Builtin.Int8, Builtin.Int8) -> () {
+bb0(%0 : $Builtin.Int8, %1 : $Builtin.Int8):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<UInt8>(%0 : $Builtin.Int8, %1 : $Builtin.Int8, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_equal(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp eq i64 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_equal : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %p = integer_literal $Builtin.Int8, 0
+  %2 = builtin "assumeTrue"<Int>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %p : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_not_equal(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp ne i64 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_not_equal : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %p = integer_literal $Builtin.Int8, 1
+  %2 = builtin "assumeTrue"<Int>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %p : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_less_than_signed(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp slt i64 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_less_than_signed : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %p = integer_literal $Builtin.Int8, 2
+  %2 = builtin "assumeTrue"<Int>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %p : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_less_than_unsigned(i8 %0, i8 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    [[C:%.*]] = icmp ult i8 %0, %1
+// CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_less_than_unsigned : $@convention(thin) (Builtin.Int8, Builtin.Int8) -> () {
+bb0(%0 : $Builtin.Int8, %1 : $Builtin.Int8):
+  %p = integer_literal $Builtin.Int8, 2
+  %2 = builtin "assumeTrue"<UInt8>(%0 : $Builtin.Int8, %1 : $Builtin.Int8, %p : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_struct_operands(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_struct_operands : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int>(%0 : $Int, %1 : $Int, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_addresses(ptr {{.*}}%0, ptr {{.*}}%1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_addresses : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int>(%0 : $*Int, %1 : $*Int, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_generic(ptr {{.*}}%0, ptr {{.*}}%1, ptr %T) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_generic : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc void @assumeTrue_not_an_integer(i64 %0, i64 %1) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NOT:     icmp
+// CHECK-NOT:     @llvm.assume
+// CHECK:         ret void
+// CHECK-NEXT:  }
+sil @assumeTrue_not_an_integer : $@convention(thin) (MyInt, MyInt) -> () {
+bb0(%0 : $MyInt, %1 : $MyInt):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<MyInt>(%0 : $MyInt, %1 : $MyInt, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}

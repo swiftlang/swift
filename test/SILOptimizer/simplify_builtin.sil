@@ -70,6 +70,237 @@ bb0(%0 : $@thin T.Type):
   return %1 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @assumeTrue_builtin_integers :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_builtin_integers'
+sil @assumeTrue_builtin_integers : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_values :
+// CHECK:         [[L:%.*]] = struct_extract %0 : $Int64, #Int64._value
+// CHECK:         [[R:%.*]] = struct_extract %1 : $Int64, #Int64._value
+// CHECK:         builtin "assumeTrue"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_values'
+sil @assumeTrue_values : $@convention(thin) (Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Int64, %1 : $Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @assumeTrue_addresses :
+// CHECK:         [[LI:%.*]] = load [trivial] %0
+// CHECK:         [[L:%.*]] = struct_extract [[LI]] : $Int64, #Int64._value
+// CHECK:         [[RI:%.*]] = load [trivial] %1
+// CHECK:         [[R:%.*]] = struct_extract [[RI]] : $Int64, #Int64._value
+// CHECK:         builtin "assumeTrue"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_addresses'
+sil [ossa] @assumeTrue_addresses : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed Int64) -> () {
+bb0(%0 : $*Int64, %1 : $*Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $*Int64, %1 : $*Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_addresses_non_ossa :
+// CHECK:         [[LI:%.*]] = load %0
+// CHECK:         [[L:%.*]] = struct_extract [[LI]] : $Int64, #Int64._value
+// CHECK:         [[RI:%.*]] = load %1
+// CHECK:         [[R:%.*]] = struct_extract [[RI]] : $Int64, #Int64._value
+// CHECK:         builtin "assumeTrue"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_addresses_non_ossa'
+sil @assumeTrue_addresses_non_ossa : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed Int64) -> () {
+bb0(%0 : $*Int64, %1 : $*Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $*Int64, %1 : $*Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_generic :
+// CHECK:         builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_generic'
+sil @assumeTrue_generic : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_not_an_integer :
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_not_an_integer'
+sil @assumeTrue_not_an_integer : $@convention(thin) (Double, Double) -> () {
+bb0(%0 : $Double, %1 : $Double):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Double>(%0 : $Double, %1 : $Double, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_same_operand :
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_same_operand'
+sil @assumeTrue_same_operand : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %1 = builtin "assumeTrue"<Int64>(%0 : $Int64, %0 : $Int64, %le : $Builtin.Int8) : $()
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil @assumeTrue_constants :
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_constants'
+sil @assumeTrue_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %le = integer_literal $Builtin.Int8, 3
+  %4 = builtin "assumeTrue"<Int64>(%1 : $Int64, %3 : $Int64, %le : $Builtin.Int8) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @assumeTrue_builtin_integer_constants :
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_builtin_integer_constants'
+sil @assumeTrue_builtin_integer_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 10
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_negative_constant :
+// CHECK:         builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_negative_constant'
+sil @assumeTrue_negative_constant : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 10
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %le = integer_literal $Builtin.Int8, 3
+  %4 = builtin "assumeTrue"<Int64>(%1 : $Int64, %3 : $Int64, %le : $Builtin.Int8) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @assumeTrue_false_constants :
+// CHECK:         builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_false_constants'
+sil @assumeTrue_false_constants : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 10
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %le = integer_literal $Builtin.Int8, 3
+  %4 = builtin "assumeTrue"<Int64>(%1 : $Int64, %3 : $Int64, %le : $Builtin.Int8) : $()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @assumeTrue_values_less_than :
+// CHECK:         [[P:%.*]] = integer_literal $Builtin.Int8, 2
+// CHECK:         [[L:%.*]] = struct_extract %0 : $Int64, #Int64._value
+// CHECK:         [[R:%.*]] = struct_extract %1 : $Int64, #Int64._value
+// CHECK:         builtin "assumeTrue"<Int64>([[L]] : $Builtin.Int64, [[R]] : $Builtin.Int64, [[P]] : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_values_less_than'
+sil @assumeTrue_values_less_than : $@convention(thin) (Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64):
+  %lt = integer_literal $Builtin.Int8, 2
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Int64, %1 : $Int64, %lt : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil @assumeTrue_same_operand_equal :
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_same_operand_equal'
+sil @assumeTrue_same_operand_equal : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %eq = integer_literal $Builtin.Int8, 0
+  %1 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %eq : $Builtin.Int8) : $()
+  %2 = tuple ()
+  return %2
+}
+
+// The assume says that the code is unreachable.
+// CHECK-LABEL: sil @assumeTrue_same_operand_not_equal :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %0 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_same_operand_not_equal'
+sil @assumeTrue_same_operand_not_equal : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %ne = integer_literal $Builtin.Int8, 1
+  %1 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %ne : $Builtin.Int8) : $()
+  %2 = tuple ()
+  return %2
+}
+
+// The assume says that the code is unreachable.
+// CHECK-LABEL: sil @assumeTrue_same_operand_less_than :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %0 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'assumeTrue_same_operand_less_than'
+sil @assumeTrue_same_operand_less_than : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %lt = integer_literal $Builtin.Int8, 2
+  %1 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %lt : $Builtin.Int8) : $()
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil @assumeTrue_true_constants_per_comparison :
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_true_constants_per_comparison'
+sil @assumeTrue_true_constants_per_comparison : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = integer_literal $Builtin.Int64, 5
+  %2 = integer_literal $Builtin.Int64, 10
+  %eq = integer_literal $Builtin.Int8, 0
+  %ne = integer_literal $Builtin.Int8, 1
+  %lt = integer_literal $Builtin.Int8, 2
+  %3 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %eq : $Builtin.Int8) : $()
+  %4 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %2 : $Builtin.Int64, %ne : $Builtin.Int8) : $()
+  %5 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %2 : $Builtin.Int64, %lt : $Builtin.Int8) : $()
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil @assumeTrue_false_constants_per_comparison :
+// CHECK-COUNT-4: builtin "assumeTrue"
+// CHECK:       } // end sil function 'assumeTrue_false_constants_per_comparison'
+sil @assumeTrue_false_constants_per_comparison : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = integer_literal $Builtin.Int64, 5
+  %2 = integer_literal $Builtin.Int64, 10
+  %eq = integer_literal $Builtin.Int8, 0
+  %ne = integer_literal $Builtin.Int8, 1
+  %lt = integer_literal $Builtin.Int8, 2
+  %3 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %2 : $Builtin.Int64, %eq : $Builtin.Int8) : $()
+  %4 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %ne : $Builtin.Int8) : $()
+  %5 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %lt : $Builtin.Int8) : $()
+  %6 = builtin "assumeTrue"<Int64>(%2 : $Builtin.Int64, %0 : $Builtin.Int64, %lt : $Builtin.Int8) : $()
+  %7 = tuple ()
+  return %7
+}
+
 // CHECK-LABEL: sil @same_metatype_same_operand
 // CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:    return [[R]]

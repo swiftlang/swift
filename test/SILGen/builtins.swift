@@ -958,6 +958,28 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins22assumeTrueWithOperandsyySi_SitF
+// CHECK: [[LE:%.*]] = integer_literal $Builtin.Int8, 3
+// CHECK: builtin "assumeTrue"<Int>(%0 : $Int, %1 : $Int, [[LE]] : $Builtin.Int8) : $()
+// CHECK: return
+// CANONICAL-LABEL: sil hidden @$s8builtins22assumeTrueWithOperandsyySi_SitF
+// CANONICAL: builtin "assumeTrue"<Int>({{%[0-9]+}} : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CANONICAL: return
+func assumeTrueWithOperands(_ x: Int, _ y: Int) {
+  Builtin.assumeTrue(x, <=, y)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins29assumeTrueWithOperandsGenericyyx_xtSLRzlF
+// CHECK: [[LE:%.*]] = integer_literal $Builtin.Int8, 3
+// CHECK: builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, [[LE]] : $Builtin.Int8) : $()
+// CHECK: return
+// CANONICAL-LABEL: sil hidden @$s8builtins29assumeTrueWithOperandsGenericyyx_xtSLRzlF
+// CANONICAL: builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CANONICAL: return
+func assumeTrueWithOperandsGeneric<T: Comparable>(_ x: T, _ y: T) {
+  Builtin.assumeTrue(x, <=, y)
+}
+
 // CHECK: sil hidden [ossa] @$s8builtins15assumeAlignmentyyBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {  
 // CHECK: builtin "assumeAlignment"(%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Builtin.Word) : $Builtin.RawPointer
 // CHECK: return

@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -irgen-prepare | %FileCheck %s
+
+// IRGenPrepare removes an `assumeTrue` which IRGen wouldn't lower,
+// together with the operands only it uses, which could still generate code.
+
+sil_stage lowered
+
+import Builtin
+import Swift
+
+struct Pair<T> {
+  var first: T
+  var second: T
+}
+
+// CHECK-LABEL: sil @generic :
+// CHECK-NOT:     struct_element_addr
+// CHECK-NOT:     builtin "assumeTrue"
+// CHECK:       } // end sil function 'generic'
+sil @generic : $@convention(thin) <T> (@in_guaranteed Pair<T>) -> () {
+bb0(%0 : $*Pair<T>):
+  %1 = struct_element_addr %0 : $*Pair<T>, #Pair.first
+  %2 = struct_element_addr %0 : $*Pair<T>, #Pair.second
+  %le = integer_literal $Builtin.Int8, 3
+  %3 = builtin "assumeTrue"<T>(%1 : $*T, %2 : $*T, %le : $Builtin.Int8) : $()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @integer :
+// CHECK:         builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CHECK:       } // end sil function 'integer'
+sil @integer : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %le = integer_literal $Builtin.Int8, 3
+  %2 = builtin "assumeTrue"<Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %le : $Builtin.Int8) : $()
+  %3 = tuple ()
+  return %3 : $()
+}

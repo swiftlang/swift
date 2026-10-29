@@ -756,6 +756,10 @@ bool BridgedASTType::isOptional() const {
   return unbridged()->getCanonicalType()->isOptional();
 }
 
+bool BridgedASTType::isStdlibInteger() const {
+  return unbridged()->isStdlibInteger();
+}
+
 bool BridgedASTType::isStructurallyUninhabited() const {
   return unbridged()->isStructurallyUninhabited();
 }

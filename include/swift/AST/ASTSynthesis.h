@@ -364,7 +364,7 @@ ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s,
 template <class S>
 FunctionType::Param synthesizeParamType(SynthesisContext &SC, const S &s) {
   auto type = synthesizeType(SC, s);
-  return type;
+  return FunctionType::Param(type);
 }
 
 /// Parameter specifiers.

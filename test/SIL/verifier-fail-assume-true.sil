@@ -1,0 +1,64 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: not --crash %target-sil-opt %t/operand-count.sil 2>&1 | %FileCheck %s --check-prefix=OPERAND-COUNT
+// RUN: not --crash %target-sil-opt %t/not-a-literal.sil 2>&1 | %FileCheck %s --check-prefix=PREDICATE
+// RUN: not --crash %target-sil-opt %t/unknown-predicate.sil 2>&1 | %FileCheck %s --check-prefix=PREDICATE
+// RUN: not --crash %target-sil-opt %t/predicate-width.sil 2>&1 | %FileCheck %s --check-prefix=PREDICATE
+// REQUIRES: asserts
+
+// OPERAND-COUNT: assumeTrue needs two values and a predicate
+// PREDICATE: the predicate of assumeTrue must be a valid literal
+
+//--- operand-count.sil
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @operand_count : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "assumeTrue"<Builtin.Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+//--- not-a-literal.sil
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @not_a_literal : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int8) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int8):
+  %3 = builtin "assumeTrue"<Builtin.Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int8) : $()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+//--- unknown-predicate.sil
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @unknown_predicate : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int8, 4
+  %3 = builtin "assumeTrue"<Builtin.Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int8) : $()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+//--- predicate-width.sil
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @predicate_width : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int32, 3
+  %3 = builtin "assumeTrue"<Builtin.Int64>(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int32) : $()
+  %4 = tuple ()
+  return %4 : $()
+}
