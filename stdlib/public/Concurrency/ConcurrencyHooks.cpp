@@ -60,8 +60,13 @@ swift::swift_task_enqueueGlobal(Job *job) {
 
 SWIFT_CC(swift) static void
 swift_task_enqueueGlobalWithDelayOrig(JobDelay delay, Job *job) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  swift_Concurrency_fatalError(
+      0, "swift_task_enqueueGlobalWithDelay() not supported in Embedded Swift");
+#else
   swift_task_enqueueGlobalWithDelayImpl(
       static_cast<SwiftJobDelay>(delay), reinterpret_cast<SwiftJob *>(job));
+#endif
 }
 
 void
@@ -82,8 +87,14 @@ swift_task_enqueueGlobalWithDeadlineOrig(
     long long tsec,
     long long tnsec,
     int clock, Job *job) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  swift_Concurrency_fatalError(
+      0,
+      "swift_task_enqueueGlobalWithDeadline() not supported in Embedded Swift");
+#else
   swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock,
                                            reinterpret_cast<SwiftJob *>(job));
+#endif
 }
 
 void

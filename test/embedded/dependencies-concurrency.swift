@@ -19,12 +19,10 @@
 
 //--- allowed-dependencies.txt
 ___assert_rtn
-___error
 ___stack_chk_fail
 ___stack_chk_guard
 ___stdoutp
 _abort
-_clock_gettime
 _exit
 _flockfile
 _free
@@ -34,7 +32,6 @@ _memcpy
 _memmove
 _memset
 _memset_s
-_nanosleep
 _posix_memalign
 _pthread_getspecific
 _pthread_main_np
