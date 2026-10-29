@@ -1466,10 +1466,8 @@ namespace {
     }
 
     Type visitSendExpr(SendExpr *expr) {
-      // TODO: Type check 'send' calls
-      CS.getASTContext().Diags.diagnose(expr->getSendLoc(),
-                                        diag::send_not_supported_yet);
-      return Type();
+      // 'send <call>' always produces Void
+      return CS.getASTContext().TheEmptyTupleType;
     }
 
     Type visitForceTryExpr(AnyTryExpr *expr) {
