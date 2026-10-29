@@ -32,6 +32,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SerializableHiddenTypeInfoRepresentation.h"
 #include "swift/AST/Types.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
@@ -126,22 +127,29 @@ public:
            TI.isBitwiseTakable(ResilienceExpansion::Minimal);
   }
 
-  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
-    auto &typeInfo =
-        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
-
+  AbstractTypeLayout getAbstractTypeLayout(Type type) {
     if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
         IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
-      auto type = TD->getDeclaredTypeInContext()->getCanonicalType();
-      auto mangledName =
-          Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
-      IGM.dumpAbstractTypeLayoutInfo(type, mangledName, "serialization");
+      auto canonicalType = type->getCanonicalType();
+      auto mangledName = std::string(MANGLING_PREFIX_STR) +
+                         Mangle::ASTMangler(type->getASTContext())
+                             .mangleTypeWithoutPrefix(canonicalType);
+      IGM.dumpAbstractTypeLayoutInfo(canonicalType, mangledName,
+                                     "serialization");
     }
 
+    if (auto *hiddenType = type->getAs<HiddenType>()) {
+      auto *layoutInfo = hiddenType->getLayoutInfoDecl();
+      assert(layoutInfo && layoutInfo->Layout &&
+             layoutInfo->Layout->typeInfoRepresentation &&
+             "HiddenType must carry an abstract layout");
+      return *layoutInfo->Layout;
+    }
+
+    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     AbstractTypeLayout layout;
-    auto type = TD->getDeclaredInterfaceType();
     auto properties = typeConverter.getTypeProperties(
-        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+        type, TypeExpansionContext::minimal());
     layout.typeProperties = properties;
     if (type->hasReferenceSemantics())
       layout.referenceCountingSystem = type->getReferenceCounting();
@@ -526,9 +534,8 @@ bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
   return impl->isTypeTrivial(TD);
 }
 
-AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
-    const NominalTypeDecl *TD) {
-  return impl->getAbstractTypeLayout(TD);
+AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(Type type) {
+  return impl->getAbstractTypeLayout(type);
 }
 
 std::optional<LoweredFunctionSignature>

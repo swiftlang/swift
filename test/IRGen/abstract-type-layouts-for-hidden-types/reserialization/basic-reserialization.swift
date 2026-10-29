@@ -20,6 +20,14 @@
 // RUN:   -parse-as-library -emit-module \
 // RUN:   -emit-module-path %t/Intermediate.swiftmodule \
 // RUN:   -module-name Intermediate -I %t %t/Intermediate.swift
+// RUN: %llvm-bcanalyzer -dump %t/Intermediate.swiftmodule | \
+// RUN:   %FileCheck %s --check-prefix=RESERIALIZED-TYPE
+
+// Every field in this test has a Swift type. In particular, reserialization
+// must preserve the unresolved HiddenCStruct TypeID rather than writing zero.
+// RESERIALIZED-TYPE: <HIDDEN_TYPE_LAYOUT_INFO
+// RESERIALIZED-TYPE-NOT: <RECORD_FIELD{{.*}}op0=0
+// RESERIALIZED-TYPE: </DECLS_AND_TYPES_BLOCK>
 
 // The client imports neither hidden dependency and must use Intermediate's
 // reserialized layouts to lower IntermediateWrapper.

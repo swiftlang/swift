@@ -148,10 +148,21 @@ protected:
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
-      fieldRepresentation.type = field.getInterfaceTypeForSerialization();
-      fieldRepresentation.typeInfo = field.getTypeInfo()
-                                         .createSerializableHiddenTypeInfoRepresentation(
-                                             IGM);
+      auto fieldType = field.getInterfaceTypeForSerialization();
+      fieldRepresentation.resolvedType = fieldType;
+      if (auto *hiddenType =
+              fieldType ? fieldType->template getAs<HiddenType>() : nullptr) {
+        auto *layoutInfo = hiddenType->getLayoutInfoDecl();
+        assert(layoutInfo && layoutInfo->Layout &&
+               layoutInfo->Layout->typeInfoRepresentation &&
+               "hidden field type must carry a TypeInfo representation");
+        fieldRepresentation.typeInfo =
+            layoutInfo->Layout->typeInfoRepresentation;
+      } else {
+        fieldRepresentation.typeInfo =
+            field.getTypeInfo()
+                .createSerializableHiddenTypeInfoRepresentation(IGM);
+      }
       fieldRepresentation.layout = field.getLayoutStorage();
       auto projectionRange = field.getProjectionRange();
       fieldRepresentation.storage.Begin = projectionRange.first;
