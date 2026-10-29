@@ -385,6 +385,16 @@ enum class TypeMatchFlags {
   /// module didn't record the Clang function type; two present-but-different
   /// Clang types still mismatch.
   AllowMissingClangType = 1 << 10,
+  /// Allow mismatched ownership qualifiers on value parameters.
+  AllowMismatchedParameterOwnership = 1 << 11,
+  /// Treat the function type as an `init` member's declaration type, so that
+  /// unqualified parameters of the method are treated as compatible with
+  /// `consuming` parameters rather than `borrowing` parameters.
+  MatchAsInit = 1 << 12,
+  /// Treat the function type as an `init` member's method type, so that
+  /// unqualified parameters of the method are treated as compatible with
+  /// `consuming` parameters rather than `borrowing` parameters.
+  MatchAsInitParams = 1 << 13,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 

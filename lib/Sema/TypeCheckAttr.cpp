@@ -4382,10 +4382,43 @@ static FuncDecl *findTargetAccessor(DeclNameRefWithLoc replacedVarName,
                              /*forDynamicReplacement*/ false);
 }
 
+namespace {
+/// The high-level feature for which we are performing a "find similar"
+/// query.
+enum class FindSimilarReason {
+  /// We are looking for the original function whose implementation is
+  /// overridden by a dynamic replacement.
+  DynamicReplacement,
+  
+  /// We are looking for the function specialized by an explicit specialization.
+  Specialization,
+};
+}
+
 static AbstractFunctionDecl *
 findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
                     const AbstractFunctionDecl *base, DeclAttribute *attr,
-                    DiagnosticEngine *Diags, bool forDynamicReplacement) {
+                    DiagnosticEngine *Diags, FindSimilarReason reason) {
+  // Parameterize the matching behavior according to why we're looking for
+  // a match.
+  Diag<DeclNameRef> diag_function_not_found;
+  Diag<DeclNameRef, Type> diag_function_of_type_not_found;
+  Diag<DeclName, Type> diag_found_candidate;
+  switch (reason) {
+  case FindSimilarReason::DynamicReplacement:
+    diag_function_not_found = diag::dynamic_replacement_function_not_found;
+    diag_function_of_type_not_found =
+      diag::dynamic_replacement_function_of_type_not_found;
+    diag_found_candidate = diag::dynamic_replacement_found_function_of_type;
+    break;
+    
+  case FindSimilarReason::Specialization:
+    diag_function_not_found = diag::specialize_target_function_not_found;
+    diag_function_of_type_not_found =
+      diag::specialize_target_function_of_type_not_found;
+    diag_found_candidate = diag::specialize_found_function_of_type;
+    break;
+  }
 
   // Note: we might pass a constant attribute when typechecker is nullptr.
   // Any modification to attr must be guarded by a null check on TC.
@@ -4412,9 +4445,7 @@ findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
                                                         replacedFunctionName,
                                                         attr, base)) {
         Diags->diagnose(attr->getLocation(),
-                        forDynamicReplacement
-                        ? diag::dynamic_replacement_function_not_found
-                        : diag::specialize_target_function_not_found,
+                        diag_function_not_found,
                         replacedFunctionName.Name);
       }
     }
@@ -4424,14 +4455,19 @@ findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
   }
 
   auto replaceTy = base->getInterfaceType();
+  
+  bool isInit = isa<ConstructorDecl>(base);
 
   // Filter based on the exact type match first.
   SmallVector<AbstractFunctionDecl *> matches;
   llvm::copy_if(candidates, std::back_inserter(matches),
-                [&replaceTy](AbstractFunctionDecl *F) {
+                [&replaceTy, isInit](AbstractFunctionDecl *F) {
                   auto resultTy = F->getInterfaceType();
                   TypeMatchOptions matchMode =
                       TypeMatchFlags::AllowABICompatible;
+                  if (isInit) {
+                    matchMode |= TypeMatchFlags::MatchAsInit;
+                  }
                   matchMode |=
                       TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
                   return resultTy->matches(replaceTy, matchMode);
@@ -4443,13 +4479,16 @@ findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
   // declarations.
   if (matches.empty()) {
     llvm::copy_if(candidates, std::back_inserter(matches),
-                  [&replaceTy](AbstractFunctionDecl *F) {
+                  [&replaceTy, isInit](AbstractFunctionDecl *F) {
                     if (!F->hasClangNode())
                       return false;
 
                     auto resultTy = F->getInterfaceType();
                     TypeMatchOptions matchMode =
                         TypeMatchFlags::AllowABICompatible;
+                    if (isInit) {
+                      matchMode |= TypeMatchFlags::MatchAsInit;
+                    }
                     matchMode |=
                         TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
                     matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
@@ -4457,17 +4496,54 @@ findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
                     return resultTy->matches(replaceTy, matchMode);
                   });
   }
+  
+  // For source compatibility, we allow specializations to mismatch with
+  // their original by parameter ownership. We really shouldn't, though, so
+  // warn about this.
+  bool matchedWithoutParamOwnership = false;
+  if (matches.empty() && reason == FindSimilarReason::Specialization) {
+    matchedWithoutParamOwnership = true;
+    llvm::copy_if(candidates, std::back_inserter(matches),
+                  [&replaceTy, isInit](AbstractFunctionDecl *F) {
+                    auto resultTy = F->getInterfaceType();
+                    TypeMatchOptions matchMode =
+                        TypeMatchFlags::AllowABICompatible;
+                    if (isInit) {
+                      matchMode |= TypeMatchFlags::MatchAsInit;
+                    }
+                    matchMode |=
+                        TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                    matchMode |=
+                        TypeMatchFlags::AllowMismatchedParameterOwnership;
+                    return resultTy->matches(replaceTy, matchMode);
+                  });
+  }
 
   if (matches.size() == 1) {
     auto result = matches.front();
-    if (forDynamicReplacement && !result->isDynamic()) {
-      if (Diags) {
-        Diags->diagnose(attr->getLocation(),
-                        diag::dynamic_replacement_function_not_dynamic,
-                        result->getName());
-        attr->setInvalid();
+    switch (reason) {
+    case FindSimilarReason::DynamicReplacement:
+      if (!result->isDynamic()) {
+        if (Diags) {
+          Diags->diagnose(attr->getLocation(),
+                          diag::dynamic_replacement_function_not_dynamic,
+                          result->getName());
+          attr->setInvalid();
+        }
+        return nullptr;
       }
-      return nullptr;
+      break;
+    
+    case FindSimilarReason::Specialization:
+      // Warn if the function being specialized doesn't match ownership with
+      // the original.
+      // This ought to be an error eventually.
+      if (Diags && matchedWithoutParamOwnership) {
+        Diags->diagnose(attr->getLocation(),
+                        diag::specialize_attr_ownership_mismatch,
+                        result->getName());
+      }
+      break;
     }
 
     return result;
@@ -4479,17 +4555,13 @@ findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
     return nullptr;
 
   Diags->diagnose(attr->getLocation(),
-                  forDynamicReplacement
-                      ? diag::dynamic_replacement_function_of_type_not_found
-                      : diag::specialize_target_function_of_type_not_found,
+                  diag_function_of_type_not_found,
                   replacedFunctionName.Name,
                   base->getInterfaceType()->getCanonicalType());
 
   for (auto *result : matches) {
     Diags->diagnose(SourceLoc(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_found_function_of_type
-                        : diag::specialize_found_function_of_type,
+                    diag_found_candidate,
                     result->getName(),
                     result->getInterfaceType()->getCanonicalType());
   }
@@ -4502,7 +4574,7 @@ findReplacedFunction(DeclNameRefWithLoc replacedFunctionName,
                      const AbstractFunctionDecl *replacement,
                      DynamicReplacementAttr *attr, DiagnosticEngine *Diags) {
   return findSimilarFunction(replacedFunctionName, replacement, attr, Diags,
-                             true /*forDynamicReplacement*/);
+                             FindSimilarReason::DynamicReplacement);
 }
 
 static AbstractFunctionDecl *
@@ -4510,7 +4582,7 @@ findTargetFunction(DeclNameRefWithLoc targetFunctionName,
                    const AbstractFunctionDecl *base,
                    AbstractSpecializeAttr * attr, DiagnosticEngine *diags) {
   return findSimilarFunction(targetFunctionName, base, attr, diags,
-                             false /*forDynamicReplacement*/);
+                             FindSimilarReason::Specialization);
 }
 
 static AbstractStorageDecl *
