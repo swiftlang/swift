@@ -23,6 +23,9 @@ struct View: ~Escapable {
   init(_ base: borrowing NoncopyableBase) { p = 0 }
 
   @_lifetime(borrow base)
+  init(_ base: borrowing NoncopyableTrivial) { p = 0 }
+
+  @_lifetime(borrow base)
   init<T: ~Copyable>(_ base: borrowing Box<T>) { p = 0 }
 
   var isEmpty: Bool { p == 0 }
@@ -50,6 +53,19 @@ struct NoncopyableBase: ~Copyable {
 
 struct NoncopyableHolder: ~Copyable {
   var base: NoncopyableBase?
+}
+
+struct NoncopyableTrivial: ~Copyable {
+  var n: Int
+
+  var view: View {
+    @_lifetime(borrow self)
+    borrowing get { View(self) }
+  }
+}
+
+struct TrivialHolder: ~Copyable {
+  var inner: NoncopyableTrivial?
 }
 
 @_addressableForDependencies
@@ -82,6 +98,12 @@ struct Outer {
 
 struct Outermost {
   var outer: Outer?
+}
+
+struct Observed {
+  var inner: Base? {
+    didSet {}
+  }
 }
 
 func f(_ s: View?) {}
@@ -196,4 +218,24 @@ func noncopyableHop(_ h: borrowing NoncopyableHolder) {
 
 func noncopyableGeneric<T: ~Copyable>(_ b: borrowing Box<T>?) {
   f(b?.view)
+}
+
+func noncopyableTrivialConsuming(_ b: consuming NoncopyableTrivial?) {
+  f(b?.view)
+}
+
+func noncopyableTrivialInout(_ b: inout NoncopyableTrivial?) {
+  f(b?.view)
+}
+
+func noncopyableTrivialHopInout(_ h: inout TrivialHolder) {
+  f(h.inner?.view)
+}
+
+func observedProperty(_ o: Observed) {
+  f(o.inner?.view)
+}
+
+func observedPropertyInout(_ o: inout Observed) {
+  f(o.inner?.view)
 }

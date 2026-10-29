@@ -51,6 +51,13 @@ struct Computed {
   var computed: Base? { stored }
 }
 
+struct Yielded {
+  var stored: Base?
+  var inner: Base? {
+    _read { yield stored }
+  }
+}
+
 var global: Base? = nil
 
 struct GlobalOuter {
@@ -110,6 +117,12 @@ func computedOperand(_ c: Computed) {
 
 func computedMember(_ c: Computed?) {
   f(c?.computed?.view) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1 {{it depends on the lifetime of this parent value}}
+  // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func yieldedOperand(_ y: Yielded) {
+  f(y.inner?.view) // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{it depends on the lifetime of this parent value}}
   // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
 }
