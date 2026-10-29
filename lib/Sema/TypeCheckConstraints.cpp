@@ -1618,6 +1618,17 @@ bool TypeChecker::isStaticallyImpossibleNoncopyableCast(Type fromType,
          (fromType->isCopyable() && isConcreteNoncopyable(toType));
 }
 
+std::optional<CheckedCastKind>
+TypeChecker::noncopyableOptionalPayloadCastKind(Type fromType, Type toType,
+                                                DeclContext *dc) {
+  Type payloadType = fromType->getOptionalObjectType();
+  if (!payloadType || !payloadType->isNoncopyable() ||
+      payloadType->getOptionalObjectType() || toType->getOptionalObjectType())
+    return std::nullopt;
+  return typeCheckCheckedCast(payloadType, toType,
+                              CheckedCastContextKind::None, dc);
+}
+
 CheckedCastKind
 TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
                                   CheckedCastContextKind contextKind,

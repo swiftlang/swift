@@ -1092,6 +1092,28 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
   return simplifyToBoolPattern(ctx, EP, BLE, patternTy);
 }
 
+/// Whether an `is` pattern over \p type, an Optional of a non-`Copyable`
+/// type, should cast the Optional as it stands rather than be consumed to
+/// produce a `.some` pattern.  Keep `.some` when:
+/// - a statically-true cast of the payload binds it (\p subPattern):
+///   matching `.some` and binding the payload needs no cast at all;
+/// - the Optional itself conforms to \p castType: that cast is a coercion,
+///   which would match `nil`.
+static bool isPatternCastsNoncopyableOptional(Type type, Type castType,
+                                              Pattern *subPattern,
+                                              DeclContext *dc) {
+  auto needsCheck = [](CheckedCastKind kind) {
+    return kind == CheckedCastKind::ValueCast ||
+           kind == CheckedCastKind::Unresolved;
+  };
+  auto payloadCastKind =
+      TypeChecker::noncopyableOptionalPayloadCastKind(type, castType, dc);
+  if (!payloadCastKind || (!needsCheck(*payloadCastKind) && subPattern))
+    return false;
+  return needsCheck(TypeChecker::typeCheckCheckedCast(
+      type, castType, CheckedCastContextKind::IsPattern, dc));
+}
+
 /// Perform top-down type coercion on the given pattern.
 Pattern *TypeChecker::coercePatternToType(
     ContextualPattern pattern, Type type, TypeResolutionOptions options,
@@ -1405,10 +1427,16 @@ Pattern *TypeChecker::coercePatternToType(
     SmallVector<Type, 2> castTypeOptionals;
     castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
+    // An Optional of a non-`Copyable` type may be cast as it stands.
+    bool castsOptionalOfNC =
+        !type->hasError() &&
+        isPatternCastsNoncopyableOptional(type, castType, IP->getSubPattern(),
+                                          dc);
+
     // If we have extra optionals on the input type. Create ".some" patterns
     // wrapping the is pattern to balance out the optionals.
     int numExtraOptionals = inputTypeOptionals.size()-castTypeOptionals.size();
-    if (numExtraOptionals > 0) {
+    if (numExtraOptionals > 0 && !castsOptionalOfNC) {
       Pattern *sub = IP;
       auto extraOpts =
           llvm::drop_end(inputTypeOptionals, castTypeOptionals.size());
@@ -1439,8 +1467,10 @@ Pattern *TypeChecker::coercePatternToType(
 
       if (!(options.contains(TypeResolutionFlags::SilenceNeverWarnings) &&
             type->isNever())) {
+        // Name the payload, as for the `.some` pattern this stands for.
         diags
-            .diagnose(IP->getLoc(), diag::downcast_to_unrelated, type,
+            .diagnose(IP->getLoc(), diag::downcast_to_unrelated,
+                      castsOptionalOfNC ? type->getOptionalObjectType() : type,
                       IP->getCastType())
             .highlight(IP->getLoc())
             .highlight(IP->getCastTypeRepr()->getSourceRange());
