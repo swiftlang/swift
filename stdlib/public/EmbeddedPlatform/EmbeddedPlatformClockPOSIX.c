@@ -62,21 +62,28 @@ static void read_resolution(clockid_t clock, __swift_int64_t *seconds,
   *nanoseconds = ts.tv_nsec;
 }
 
+// A clock function defined in an archive replaces these weak definitions only
+// when that archive comes before libswiftEmbeddedPlatformPOSIX.a on the link
+// line.
+__attribute__((weak))
 void _swift_clockContinuous_getTime(__swift_int64_t *seconds,
                                     __swift_int64_t *nanoseconds) {
   read_clock(SWIFT_CONTINUOUS_CLOCK, seconds, nanoseconds);
 }
 
+__attribute__((weak))
 void _swift_clockContinuous_getResolution(__swift_int64_t *seconds,
                                           __swift_int64_t *nanoseconds) {
   read_resolution(SWIFT_CONTINUOUS_CLOCK, seconds, nanoseconds);
 }
 
+__attribute__((weak))
 void _swift_clockSuspending_getTime(__swift_int64_t *seconds,
                                     __swift_int64_t *nanoseconds) {
   read_clock(SWIFT_SUSPENDING_CLOCK, seconds, nanoseconds);
 }
 
+__attribute__((weak))
 void _swift_clockSuspending_getResolution(__swift_int64_t *seconds,
                                           __swift_int64_t *nanoseconds) {
   read_resolution(SWIFT_SUSPENDING_RESOLUTION_CLOCK, seconds, nanoseconds);
