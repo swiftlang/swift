@@ -212,39 +212,6 @@ extension Optional where Wrapped: ~Copyable {
 }
 
 extension Optional {
-  /// Evaluates the given closure when this `Optional` instance is not `nil`,
-  /// passing the unwrapped value as a parameter.
-  ///
-  /// Use the `map` method with a closure that returns a non-optional value.
-  /// This example performs an arithmetic operation on an
-  /// optional integer.
-  ///
-  ///     let possibleNumber: Int? = Int("42")
-  ///     let possibleSquare = possibleNumber.map { $0 * $0 }
-  ///     print(possibleSquare)
-  ///     // Prints "Optional(1764)"
-  ///
-  ///     let noNumber: Int? = nil
-  ///     let noSquare = noNumber.map { $0 * $0 }
-  ///     print(noSquare)
-  ///     // Prints "nil"
-  ///
-  /// - Parameter transform: A closure that takes the unwrapped value
-  ///   of the instance.
-  /// - Returns: The result of the given closure. If this instance is `nil`,
-  ///   returns `nil`.
-  @export(implementation)
-  public func map<E: Error, U: ~Copyable>(
-    _ transform: (Wrapped) throws(E) -> U
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return .some(try transform(y))
-    case .none:
-      return .none
-    }
-  }
-
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal func map<U>(
@@ -295,37 +262,6 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 }
 
 extension Optional {
-  /// Evaluates the given closure when this `Optional` instance is not `nil`,
-  /// passing the unwrapped value as a parameter.
-  ///
-  /// Use the `flatMap` method with a closure that returns an optional value.
-  /// This example performs an arithmetic operation with an optional result on
-  /// an optional integer.
-  ///
-  ///     let possibleNumber: Int? = Int("42")
-  ///     let nonOverflowingSquare = possibleNumber.flatMap { x -> Int? in
-  ///         let (result, overflowed) = x.multipliedReportingOverflow(by: x)
-  ///         return overflowed ? nil : result
-  ///     }
-  ///     print(nonOverflowingSquare)
-  ///     // Prints "Optional(1764)"
-  ///
-  /// - Parameter transform: A closure that takes the unwrapped value
-  ///   of the instance.
-  /// - Returns: The result of the given closure. If this instance is `nil`,
-  ///   returns `nil`.
-  @export(implementation)
-  public func flatMap<E: Error, U: ~Copyable>(
-    _ transform: (Wrapped) throws(E) -> U?
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return try transform(y)
-    case .none:
-      return .none
-    }
-  }
-
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal func flatMap<U>(
