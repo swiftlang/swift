@@ -2816,6 +2816,11 @@ public:
                                       "result of createAsyncTask");
       bool haveSending =
           F.getASTContext().LangOpts.hasFeature(Feature::SendingArgsAndResults);
+      // A function which is called exactly once, like the operation of a
+      // 'send', consumes its context by being called; the task is created
+      // with 'IsTaskFunctionConsumed' and does not release the context then
+      bool isCalledOnce = fnType->getExtInfo().getExecutionSemantics() ==
+                          ExecutionSemantics::Once;
       // The operation may be a synchronous function.
       bool hasSyncOperation = !fnType->isAsync();
       require(!hasSyncOperation || !BI->getSubstitutions(),
@@ -2827,12 +2832,16 @@ public:
           SILExtInfoBuilder()
               .withAsync(!hasSyncOperation)
               .withSendable(!haveSending)
+              .withExecutionSemantics(
+                  isCalledOnce ? std::optional(ExecutionSemantics::Once)
+                               : std::nullopt)
               .build();
       require(fnType->getExtInfo().isEqualTo(expectedExtInfo, /*clang types*/true),
               "function argument to createAsyncTask has incorrect ext info");
       // FIXME: it'd be better if we took a consuming closure here
       require(fnType->getCalleeConvention() ==
-                ParameterConvention::Direct_Guaranteed,
+                  (isCalledOnce ? ParameterConvention::Direct_Owned
+                                : ParameterConvention::Direct_Guaranteed),
               "function argument to createAsyncTask has wrong callee convention");
       require(fnType->getNumParameters() == 0,
               "function argument to createAsyncTask cannot take an argument");

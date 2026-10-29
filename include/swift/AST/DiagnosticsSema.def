@@ -6810,8 +6810,44 @@ ERROR(distributed_witness_typed_throws_requirement,none,
       "method can throw any error",
       (const ValueDecl *, const ValueDecl *, Type))
 
-ERROR(send_not_supported_yet,none,
-      "'send' calls are not supported yet", ())
+ERROR(send_requires_call,none,
+      "'send' can only be applied to a function call", ())
+ERROR(send_requires_actor_isolated_callee,none,
+      "'send' can only be applied to calls of actor isolated methods", ())
+ERROR(send_property_access,none,
+      "'send' cannot be applied to property access", ())
+ERROR(send_property_assignment,none,
+      "'send' cannot be applied to property assignment", ())
+ERROR(send_subscript_access,none,
+      "'send' cannot be applied to subscript access", ())
+ERROR(send_call_discards_result,none,
+      "'send' cannot discard the result of a call%select{| to %1}0",
+      (bool, const ValueDecl *))
+ERROR(send_combined_with_await,none,
+      "%select{'await' cannot be combined with 'send'|"
+      "'send' cannot be combined with 'await'}0; an operation cannot be both "
+      "awaited on and sent without waiting for its result", (bool))
+ERROR(send_call_can_throw,none,
+      "'send' cannot discard error thrown by call%select{| to %1}0",
+      (bool, const ValueDecl *))
+ERROR(send_call_inout_argument,none,
+      "'send' cannot be applied to a call with 'inout' arguments", ())
+ERROR(send_call_nonescapable_argument,none,
+      "'send' cannot be applied to a call with non-escapable argument of "
+      "type %0", (Type))
+ERROR(send_call_pack_expansion_argument,none,
+      "'send' cannot be applied to a call with a pack expansion argument", ())
+ERROR(send_call_mutating_method,none,
+      "'send' cannot be applied to a call of a mutating method", ())
+ERROR(send_call_unsupported,none,
+      "'send' cannot be applied to this call; its receiver and arguments "
+      "could not be evaluated at the call site", ())
+ERROR(send_only_version_newer,none,
+      "'send' is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+ERROR(send_distributed_not_supported,none,
+      "'send' of %kind0 is not supported yet",
+      (const ValueDecl *))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "

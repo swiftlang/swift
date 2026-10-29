@@ -1,4 +1,4 @@
-// RUN: %if swift_feature_SendCalls %{ %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple -enable-experimental-feature SendCalls -verify-additional-prefix feature- %}
+// RUN: %if swift_feature_SendCalls %{ %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple -enable-experimental-feature SendCalls %}
 // RUN: %target-typecheck-verify-swift -target %target-swift-6.2-abi-triple -verify-additional-prefix nofeature-
 
 // REQUIRES: concurrency
@@ -34,7 +34,6 @@ func variableNamedSend() {
 }
 
 func sendKeyword(_ logger: Logger) {
-  // expected-feature-error@+4:3{{'send' calls are not supported yet}}
   // expected-nofeature-error@+3:3{{ambiguous use of 'send'}}
   // expected-nofeature-error@+2:7{{consecutive statements on a line must be separated by ';'}}
   // expected-nofeature-error@+1:15{{call to actor-isolated instance method 'log()' in a synchronous nonisolated context}}

@@ -1065,6 +1065,45 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
   return nullptr;
 }
 
+/// The closures and macro expansions in the operand of a 'send' were parsed
+/// in the enclosing context \p oldDC, which pre-checking wraps in the
+/// operation closure \p newDC, so make them children of it
+static void reparentClosuresInSendOperand(Expr *operand, DeclContext *oldDC,
+                                          DeclContext *newDC) {
+  class Reparenter : public ASTWalker {
+    DeclContext *OldDC;
+    DeclContext *NewDC;
+
+  public:
+    Reparenter(DeclContext *oldDC, DeclContext *newDC)
+        : OldDC(oldDC), NewDC(newDC) {}
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Arguments;
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // The contents of a closure are already children of it
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(E)) {
+        if (closure->getParent() == OldDC)
+          closure->setParent(NewDC);
+        return Action::SkipNode(E);
+      }
+      if (auto *expansion = dyn_cast<MacroExpansionExpr>(E)) {
+        if (expansion->getDeclContext() == OldDC)
+          expansion->setDeclContext(NewDC);
+      }
+      return Action::Continue(E);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipNode();
+    }
+  };
+
+  operand->walk(Reparenter(oldDC, newDC));
+}
+
 namespace {
 /// Update a direct callee expression node that has a function reference kind
 /// based on seeing a call to this callee.
@@ -1326,6 +1365,32 @@ public:
       return Action::VisitNodeIf(recursive, expr);
     };
 
+    // 'send' does not wait for the call, so 'await send <call>' is banned,
+    // including with 'try' or parentheses in between. Diagnose and drop the
+    // 'await', so that it does not also produce a "no 'async' operations"
+    // warning, nor make the 'send' look like it is used as a value
+    if (auto *await = dyn_cast<AwaitExpr>(expr)) {
+      if (!await->isImplicit()) {
+        Expr *sub = await->getSubExpr();
+        while (isa<ParenExpr>(sub) || isa<AnyTryExpr>(sub)) {
+          if (auto *paren = dyn_cast<ParenExpr>(sub))
+            sub = paren->getSubExpr();
+          else
+            sub = cast<AnyTryExpr>(sub)->getSubExpr();
+        }
+        if (isa<SendExpr>(sub) && !sub->isImplicit()) {
+          diags.diagnose(await->getAwaitLoc(), diag::send_combined_with_await,
+                         /*sendFirst=*/false)
+              .fixItRemove(await->getAwaitLoc());
+          Expr *result = await->getSubExpr()->walk(*this);
+          if (!result)
+            return Action::Stop();
+          // Already walked
+          return Action::SkipNode(result);
+        }
+      }
+    }
+
     // Resolve 'super' references.
     if (auto *superRef = dyn_cast<SuperRefExpr>(expr)) {
       auto loc = superRef->getLoc();
@@ -1452,12 +1517,100 @@ public:
         return finish(false, nullptr);
     }
 
-    if (auto *assignment = dyn_cast<AssignExpr>(expr))
+    if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
+      // 'send' cannot be applied to the assignment of a property or a
+      // subscript: 'send a.x = y' assigns to 'send a.x'
+      if (auto *send = dyn_cast_or_null<SendExpr>(assignment->getDest())) {
+        bool isSubscript = isa<SubscriptExpr>(
+            send->getSubExpr()->getSemanticsProvidingExpr());
+        diags.diagnose(send->getSendLoc(),
+                       isSubscript ? diag::send_subscript_access
+                                   : diag::send_property_assignment);
+        return finish(false, new (Ctx) ErrorExpr(assignment->getSourceRange()));
+      }
       markAcceptableDiscardExprs(assignment->getDest());
+    }
 
     if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
       checkSingleValueStmtExpr(SVE);
       transformForExpression(SVE);
+    }
+
+    // 'send <call>' runs its operand fire-and-forget. Wrap the operand in an
+    // implicit 'async throws' operation closure now, so the operand is
+    // type-checked and actor-isolation-checked inside an async context (a
+    // cross-actor call becomes an implicit 'await'). The closure's own
+    // effects are contained here. CSApply validates that the wrapped call
+    // returns 'Void' and does not throw, and replaces the closure for a
+    // synchronous actor-isolated callee
+    if (auto *NE = dyn_cast<SendExpr>(expr)) {
+      Expr *operand = NE->getSubExpr();
+      SourceLoc loc = NE->getSendLoc();
+      // 'send' does not wait for the call, so 'send await <call>' is banned.
+      // Drop the 'await' so that it does not produce secondary diagnostics.
+      // An 'await' within the arguments of the call is fine
+      if (auto *await = dyn_cast<AwaitExpr>(operand)) {
+        if (!await->isImplicit()) {
+          diags.diagnose(await->getAwaitLoc(), diag::send_combined_with_await,
+                         /*sendFirst=*/true)
+              .fixItRemove(await->getAwaitLoc());
+          operand = await->getSubExpr();
+          NE->setSubExpr(operand);
+        }
+      }
+      // 'send' may only be applied to a function call. It cannot be applied
+      // to a subscript access, nor to a property access, which is only
+      // distinguished from a reference to a method by type-checking the
+      // operand, see 'ExprRewriter::visitSendExpr'
+      Expr *operandSem = operand->getSemanticsProvidingExpr();
+      auto *operandCall = dyn_cast<ApplyExpr>(operandSem);
+      if (!operandCall) {
+        if (isa<SubscriptExpr>(operandSem)) {
+          diags.diagnose(loc, diag::send_subscript_access);
+          return finish(false, new (Ctx) ErrorExpr(NE->getSourceRange()));
+        }
+        if (!isa<UnresolvedDotExpr>(operandSem) &&
+            !isa<UnresolvedDeclRefExpr>(operandSem) &&
+            !isa<DeclRefExpr>(operandSem) && !isa<MemberRefExpr>(operandSem)) {
+          diags.diagnose(loc, diag::send_requires_call);
+          return finish(false, new (Ctx) ErrorExpr(NE->getSourceRange()));
+        }
+      }
+      // Wrap the operand as 'try await <call>' inside an
+      // 'async throws(any Error)' operation closure. 'await' handles the
+      // cross-actor hop; the explicit thrown type (via a repr-backed
+      // TypeExpr) plus the implicit 'try' let the operand type-check, so that
+      // a throwing callee gets the dedicated 'send' diagnostic. The closure
+      // is 'throws(any Error)' even though the callee never throws: that is
+      // exactly the operation type 'createAsyncTask' takes, while a
+      // non-throwing async closure is not ABI compatible with it and would
+      // need a reabstraction thunk (another function and context allocation)
+      Expr *awaited = AwaitExpr::createImplicit(Ctx, loc, operand);
+      Expr *tried = TryExpr::createImplicit(Ctx, loc, awaited);
+      auto *body = BraceStmt::createImplicit(Ctx, {ASTNode(tried)});
+      auto *params = ParameterList::createEmpty(Ctx);
+      TypeExpr *thrownTypeExpr = nullptr;
+      if (Type errorTy = Ctx.getErrorExistentialType()) {
+        // Use 'createImplicitHack' so the TypeExpr carries a TypeRepr: the
+        // constraint solver reads a closure's explicit thrown type from the
+        // repr, and without one it would fall back to an inferred 'Never'
+        thrownTypeExpr = TypeExpr::createImplicitHack(loc, errorTy, Ctx);
+      }
+      auto *closure = new (Ctx) ClosureExpr(
+          DeclAttributes(), /*bracketRange=*/SourceRange(),
+          /*capturedSelfDecl=*/nullptr, params, /*asyncLoc=*/loc,
+          /*throwsLoc=*/loc, /*thrownType=*/thrownTypeExpr,
+          /*arrowLoc=*/SourceLoc(), /*inLoc=*/SourceLoc(),
+          /*explicitResultType=*/nullptr, /*parent=*/DC);
+      closure->setImplicit();
+      closure->setIsOnewaySendOperation();
+      // The user wrote a plain call, so 'self' does not need to be spelled
+      // out in it, just like in the operation closure of a 'Task'
+      closure->setAllowsImplicitSelfCapture();
+      closure->setBody(body);
+      reparentClosuresInSendOperand(operand, DC, closure);
+      NE->setSubExpr(closure);
+      return finish(true, NE);
     }
 
     return finish(true, expr);
