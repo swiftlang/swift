@@ -468,6 +468,17 @@ func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.E
   let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
 }
 
+// Substituting a typealias parent with an unbound generic type.
+do {
+  protocol P {
+    typealias A = Int
+  }
+  struct S<T>: P {}
+  typealias X<T: P> = (T, T.A)
+
+  let _: X<S> = (S<String>(), 0)
+}
+
 func testLocalRequirementInference<T>(_ x: T, y: Int, s: S) {
   typealias X<U: P> = (T, U) where T == U.A
   func foo<V>(_ x: X<V>) {} // expected-note {{where 'V' = 'Int'}} expected-note {{where 'T' = 'T', 'V.A' = 'S.A' (aka 'Float')}}
