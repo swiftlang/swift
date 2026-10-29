@@ -1849,6 +1849,12 @@ namespace SpecialPointerAuthDiscriminators {
   /// The task waiting on a task group. It's address-diversified.
   const uint16_t TaskGroupWaitQueue = 0x69ea; // = 27114
 
+  /// Job pointers in a default actor's job queues: the first job in the
+  /// actor's status word, and the links between jobs and the priority queue's
+  /// head and tails. Address-diversified.
+  const uint16_t ActorStatusFirstJob = 0x0d12; // = 3346
+  const uint16_t ActorJobQueueLink = 0xcc5c;   // = 52316
+
   /// Result type metadata stored in a future task or task group.
   const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
