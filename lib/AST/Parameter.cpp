@@ -142,3 +142,29 @@ StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
   }
   llvm_unreachable("bad ParamSpecifier");
 }
+
+ParamSpecifier swift::getDefaultParamSpecifier(const ValueDecl *forDecl) {
+  // `consuming` is the default ownership for initializers and setters.
+  // Everything else defaults to borrowing.
+  if (!forDecl) {
+    return ParamSpecifier::Borrowing;
+  }
+  auto forFuncDecl = dyn_cast<AbstractFunctionDecl>(forDecl);
+  if (!forFuncDecl) {
+    return ParamSpecifier::Borrowing;
+  }
+
+  if (isa<ConstructorDecl>(forFuncDecl)) {
+    return ParamSpecifier::Consuming;
+  } else if (auto accessor = dyn_cast<AccessorDecl>(forFuncDecl)) {
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Modify:
+    case AccessorKind::Set:
+      return ParamSpecifier::Consuming;
+    default:
+      return ParamSpecifier::Borrowing;
+    }
+  }
+
+  return ParamSpecifier::Borrowing;
+}
