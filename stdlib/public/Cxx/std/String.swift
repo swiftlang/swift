@@ -384,7 +384,7 @@ extension String {
   @export(implementation)
   public init(_ cxxString: std.string) {
     let buffer = unsafe UnsafeBufferPointer<CChar>(
-      start: cxxString.__c_strUnsafe(),
+      start: cxxString.c_str(),
       count: cxxString.size())
     self = unsafe buffer.withMemoryRebound(to: UInt8.self) {
       unsafe String(decoding: $0, as: UTF8.self)
