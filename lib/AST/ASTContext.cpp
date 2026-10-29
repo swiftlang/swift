@@ -4811,27 +4811,26 @@ NominalType *NominalType::get(NominalTypeDecl *D,
     return ProtocolType::get(cast<ProtocolDecl>(D), parent, C);
 
   case DeclKind::BuiltinTuple:
-    assert(genericArgs.empty());
-    return BuiltinTupleType::get(cast<BuiltinTupleDecl>(D), parent, C);
+    ABORT("should not end up here with BuiltinTuple");
 
   default:
-    llvm_unreachable("not a nominal type declaration");
+    ABORT("not a nominal type declaration");
   }
 
-#ifndef NDEBUG
-  {
-    auto genericParams = D->getGenericParams();
-    assert(genericArgs.empty() == (genericParams == nullptr) &&
-           "params and args must match in presence");
-    if (genericParams) {
-      assert(genericArgs.size() == genericParams->getParams().size() &&
-             "params and args must match in number");
+  if (CONDITIONAL_ASSERT_enabled()) {
+    {
+      auto genericParams = D->getGenericParams();
+      ASSERT(genericArgs.empty() == (genericParams == nullptr) &&
+             "params and args must match in presence");
+      if (genericParams) {
+        ASSERT(genericArgs.size() == genericParams->getParams().size() &&
+               "params and args must match in number");
+      }
     }
+    ASSERT((!parent || parent->is<NominalType>() ||
+            parent->is<UnboundGenericType>()) &&
+           "parent must be a nominal type");
   }
-  assert((!parent || parent->is<NominalType>() ||
-          parent->is<UnboundGenericType>()) &&
-         "parent must be a nominal type");
-#endif
 
   llvm::FoldingSetNodeID ID;
   NominalType::Profile(ID, D, parent, genericArgs, scopeArgs);
