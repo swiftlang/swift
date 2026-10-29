@@ -670,6 +670,9 @@ namespace {
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
     RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
+    RValue visitSendExpr(SendExpr *E, SGFContext C) {
+      llvm_unreachable("'send' calls are rejected by the type checker");
+    }
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
     RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
     RValue visitTypeValueExpr(TypeValueExpr *E, SGFContext C);

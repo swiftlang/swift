@@ -2117,6 +2117,11 @@ BridgedUnsafeExpr BridgedUnsafeExpr_createParsed(BridgedASTContext cContext,
                                                  swift::SourceLoc unsafeLoc,
                                                  BridgedExpr cSubExpr);
 
+SWIFT_NAME("BridgedSendExpr.createParsed(_:sendLoc:subExpr:)")
+BridgedSendExpr BridgedSendExpr_createParsed(BridgedASTContext cContext,
+                                             swift::SourceLoc sendLoc,
+                                             BridgedExpr cSubExpr);
+
 SWIFT_NAME("BridgedInOutExpr.createParsed(_:loc:subExpr:)")
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
                                                swift::SourceLoc loc,

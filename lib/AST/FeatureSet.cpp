@@ -614,6 +614,8 @@ static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
+UNINTERESTING_FEATURE(SendCalls)
+
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   auto *VD = dyn_cast<ValueDecl>(decl);
   if (!VD)

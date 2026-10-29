@@ -6810,6 +6810,9 @@ ERROR(distributed_witness_typed_throws_requirement,none,
       "method can throw any error",
       (const ValueDecl *, const ValueDecl *, Type))
 
+ERROR(send_not_supported_yet,none,
+      "'send' calls are not supported yet", ())
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))

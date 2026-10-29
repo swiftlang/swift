@@ -3814,6 +3814,10 @@ namespace {
       return expr;
     }
 
+    Expr *visitSendExpr(SendExpr *expr) {
+      llvm_unreachable("'send' calls are rejected by constraint generation");
+    }
+
     Expr *visitCopyExpr(CopyExpr *expr) {
       return transformExprWithSubExpr(expr);
     }

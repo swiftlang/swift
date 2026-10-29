@@ -2213,6 +2213,35 @@ public:
   }
 };
 
+/// SendExpr - A 'send' surrounding a Void-returning, non-throwing call,
+/// marking that the call should be dispatched fire-and-forget rather than
+/// awaited
+class SendExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc SendLoc;
+
+public:
+  SendExpr(SourceLoc sendLoc, Expr *sub, bool implicit = false)
+      : Expr(ExprKind::Send, implicit), SubExpr(sub), SendLoc(sendLoc) {}
+
+  /// Create an implicit 'send', which is always of type 'Void'
+  static SendExpr *createImplicit(ASTContext &ctx, SourceLoc sendLoc,
+                                  Expr *sub);
+
+  SourceLoc getLoc() const { return SendLoc; }
+  SourceLoc getSendLoc() const { return SendLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return SendLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Send;
+  }
+};
+
 /// UnsafeExpr - An 'unsafe' surrounding an expression, marking that the
 /// expression contains uses of unsafe declarations.
 ///
