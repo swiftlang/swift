@@ -4997,7 +4997,7 @@ public:
                           S.addTypeRef(ty),
                           S.AbstractMemberTypeLayoutsToSerialize.hasRef(var)
                               ? S.AbstractMemberTypeLayoutsToSerialize.addRef(var)
-                              : AbstractMemberTypeLayoutID(),
+                              : MemberAbstractTypeLayoutID(),
                           var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
@@ -5313,7 +5313,7 @@ public:
                                   S.AbstractMemberTypeLayoutsToSerialize.hasRef(elem)
                                       ? S.AbstractMemberTypeLayoutsToSerialize
                                             .addRef(elem)
-                                      : AbstractMemberTypeLayoutID(),
+                                      : MemberAbstractTypeLayoutID(),
                                   (unsigned)rawValueKind,
                                   isRawValueImplicit,
                                   isNegative,

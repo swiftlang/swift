@@ -1076,10 +1076,10 @@ public:
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
   llvm::Expected<HiddenTypeLayoutInfoDecl *>
-  getAbstractMemberTypeLayout(serialization::AbstractMemberTypeLayoutID ID);
+  getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
 
   llvm::Expected<Type>
-  getAbstractMemberType(serialization::AbstractMemberTypeLayoutID ID,
+  getAbstractMemberType(serialization::MemberAbstractTypeLayoutID ID,
                         serialization::TypeID originalTypeID = 0);
 
   serialization::BitOffset

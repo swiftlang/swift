@@ -246,7 +246,7 @@ class Serializer : public SerializerBase {
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
 
-  ASTBlockRecordKeeper<const Decl *, AbstractMemberTypeLayoutID,
+  ASTBlockRecordKeeper<const Decl *, MemberAbstractTypeLayoutID,
                        index_block::ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS>
       AbstractMemberTypeLayoutsToSerialize;
 

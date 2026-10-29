@@ -71,8 +71,8 @@ using DeclIDField = BCFixed<31>;
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
-using AbstractMemberTypeLayoutID = DeclID;
-using AbstractMemberTypeLayoutIDField = DeclIDField;
+using MemberAbstractTypeLayoutID = DeclID;
+using MemberAbstractTypeLayoutIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
 
@@ -1805,7 +1805,7 @@ namespace decls_block {
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
-    AbstractMemberTypeLayoutIDField, // fallback abstract type layout
+    MemberAbstractTypeLayoutIDField, // fallback abstract type layout
     BCFixed<1>,   // IUO value?
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
@@ -1984,7 +1984,7 @@ namespace decls_block {
     DeclContextIDField,// context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // has payload?
-    AbstractMemberTypeLayoutIDField, // fallback abstract payload layout
+    MemberAbstractTypeLayoutIDField, // fallback abstract payload layout
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // implicit raw value?
     BCFixed<1>,  // negative raw value?

@@ -4162,7 +4162,7 @@ public:
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
-    AbstractMemberTypeLayoutID abstractTypeLayoutID;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     bool isIUO;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID, opaqueReturnTypeID;
@@ -4178,7 +4178,7 @@ public:
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
                                        interfaceTypeID,
-                                       abstractTypeLayoutID,
+                                       memberAbstractTypeLayoutID,
                                        isIUO,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
@@ -4231,7 +4231,7 @@ public:
     for (TypeID dependencyID : arrayFieldIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
-        if (abstractTypeLayoutID) {
+        if (memberAbstractTypeLayoutID) {
           llvm::consumeError(dependency.takeError());
           useAbstractTypeLayout = true;
           break;
@@ -4264,7 +4264,7 @@ public:
       auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
       if (interfaceTypeOrError) {
         interfaceType = interfaceTypeOrError.get();
-      } else if (abstractTypeLayoutID) {
+      } else if (memberAbstractTypeLayoutID) {
         llvm::consumeError(interfaceTypeOrError.takeError());
         useAbstractTypeLayout = true;
       } else {
@@ -4273,7 +4273,7 @@ public:
     }
     if (useAbstractTypeLayout) {
       auto fallbackType =
-          MF.getAbstractMemberType(abstractTypeLayoutID, interfaceTypeID);
+          MF.getAbstractMemberType(memberAbstractTypeLayoutID, interfaceTypeID);
       if (!fallbackType)
         return fallbackType.takeError();
       interfaceType = fallbackType.get();
@@ -5351,7 +5351,7 @@ public:
                                           StringRef blobData) {
     DeclContextID contextID;
     bool isImplicit, hasPayload, isRawValueImplicit, isNegative;
-    AbstractMemberTypeLayoutID abstractTypeLayoutID;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
     unsigned numArgNames;
@@ -5359,7 +5359,7 @@ public:
 
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
-                                               abstractTypeLayoutID,
+                                               memberAbstractTypeLayoutID,
                                                rawValueKindID,
                                                isRawValueImplicit, isNegative,
                                                rawValueData,
@@ -5379,7 +5379,7 @@ public:
     for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
-        if (abstractTypeLayoutID) {
+        if (memberAbstractTypeLayoutID) {
           llvm::consumeError(dependency.takeError());
           useAbstractTypeLayout = true;
           break;
@@ -5418,7 +5418,7 @@ public:
         auto paramListOrError = MF.readParameterList();
         if (paramListOrError) {
           paramList = paramListOrError.get();
-        } else if (abstractTypeLayoutID) {
+        } else if (memberAbstractTypeLayoutID) {
           llvm::consumeError(paramListOrError.takeError());
           useAbstractTypeLayout = true;
         } else {
@@ -5429,7 +5429,8 @@ public:
       }
 
       if (useAbstractTypeLayout) {
-        auto fallbackType = MF.getAbstractMemberType(abstractTypeLayoutID);
+        auto fallbackType =
+            MF.getAbstractMemberType(memberAbstractTypeLayoutID);
         if (!fallbackType)
           return fallbackType.takeError();
         auto *param = MF.createDecl<ParamDecl>(
@@ -6400,7 +6401,7 @@ ModuleFile::deserializeHiddenTypeLayoutInfo(BitOffset offset) {
 }
 
 llvm::Expected<HiddenTypeLayoutInfoDecl *>
-ModuleFile::getAbstractMemberTypeLayout(AbstractMemberTypeLayoutID ID) {
+ModuleFile::getAbstractMemberTypeLayout(MemberAbstractTypeLayoutID ID) {
   if (!ID)
     return nullptr;
 
@@ -6417,7 +6418,7 @@ ModuleFile::getAbstractMemberTypeLayout(AbstractMemberTypeLayoutID ID) {
 }
 
 llvm::Expected<Type>
-ModuleFile::getAbstractMemberType(AbstractMemberTypeLayoutID ID,
+ModuleFile::getAbstractMemberType(MemberAbstractTypeLayoutID ID,
                                   TypeID originalTypeID) {
   auto layoutDecl = getAbstractMemberTypeLayout(ID);
   if (!layoutDecl)
