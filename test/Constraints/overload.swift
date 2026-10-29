@@ -431,3 +431,26 @@ do {
   test(of: [S.self]) // expected-error {{no exact matches in call to local function 'test'}}
 }
 
+// Reduced from grpc-swift -- coverage for overload sets involving properties.
+// We didn't get the right generic signature in this case.
+struct ServerInterceptorContext<Response> {
+  func send(_: GRPCServerResponsePart<Response>) {}
+}
+
+struct MessageMetadata {
+  init() {}
+}
+
+enum GRPCServerResponsePart<Response> {
+  case message(Response, MessageMetadata)
+
+  var message: Response? {
+    return nil
+  }
+}
+
+struct Echo_EchoResponse {}
+
+func test(context: ServerInterceptorContext<Echo_EchoResponse>, response: Echo_EchoResponse) {
+  context.send(.message(response, .init()))
+}

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=11000 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000 -solver-enable-extreme-edge-contraction -solver-enable-promote-supertypes
 // REQUIRES: tools-release,no_asan
 
 let i: Int? = 1

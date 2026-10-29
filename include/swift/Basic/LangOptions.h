@@ -1119,6 +1119,10 @@ namespace swift {
     /// Enable modeling optional conversions without disjunctions.
     /// This will be on by default eventually.
     bool SolverEnableShortConversions = false;
+
+    /// Enable more conditions for edge contraction for closure parameters.
+    /// This will be on by default eventually.
+    bool SolverEnableExtremeEdgeContraction = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

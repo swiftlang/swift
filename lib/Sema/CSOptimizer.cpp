@@ -984,8 +984,10 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
   }
 
   // Check protocol requirement(s) if this parameter is a
-  // generic parameter type.
-  if (genericSig && paramType->isTypeParameter()) {
+  // generic parameter type or dependent member type.
+  if (paramType->isTypeParameter()) {
+    ASSERT(genericSig);
+
     // Light-weight check if cases where `checkRequirements` is not
     // applicable.
     auto checkProtocolRequirementsOnly = [&]() -> unsigned {
@@ -996,19 +998,14 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
             return conformance &&
                    !cs.isConformanceUnavailable(conformance, locator);
           })) {
-        if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
-          auto *paramDecl = GP->getDecl();
-          if (paramDecl && paramDecl->isOpaqueType())
-            return 100;
-        }
         return 70;
       }
 
       return 0;
     };
 
-    // If candidate is not fully resolved or is matched against a
-    // dependent member type (i.e. `Self.T`), let's check conformances
+    // If the candidate type is not fully resolved or if the parameter type is
+    // a dependent member type (i.e. `Self.T`), let's check conformances
     // only and lower the score.
     if (candidateType->hasTypeVariable() ||
         candidateType->hasUnboundGenericType() ||
@@ -1016,9 +1013,8 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
       return checkProtocolRequirementsOnly();
     }
 
-    // Cannot match anything but generic type parameters here.
-    if (!paramType->is<GenericTypeParamType>())
-      return std::nullopt;
+    // We must have a generic parameter type by now.
+    ASSERT(paramType->is<GenericTypeParamType>());
 
     bool hasUnsatisfiableRequirements = false;
     SmallVector<Requirement, 4> requirements;
@@ -1487,12 +1483,8 @@ static DisjunctionInfo computeDisjunctionInfo(
   forEachDisjunctionChoice(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
-        GenericSignature genericSig;
-        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-          genericSig = GF->getGenericSignature();
-        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-          genericSig = SD->getGenericSignature();
-        }
+        auto genericSig = decl->getInnermostDeclContext()
+                              ->getGenericSignatureOfContext();
 
         auto matchings =
             matchArguments(choice->getOverloadChoice(), overloadType);
