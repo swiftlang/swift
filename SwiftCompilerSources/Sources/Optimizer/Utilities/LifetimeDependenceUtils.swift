@@ -1514,6 +1514,12 @@ extension LifetimeDependenceUseDefValueWalker {
       return walkUp(newLifetime: transition.operand.value)
     case let load as LoadInstruction:
       return walkUp(newLifetime: load.address)
+    case let apply as FullApplySite:
+      // TODO: add an annotation for standard library functions to declare that a pointer result is derived
+      // from an argument.
+      if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
+        return walkUp(newLifetime: apply.parameterOperands[0].value)
+      }
     default:
       break
     }
