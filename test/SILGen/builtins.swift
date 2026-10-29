@@ -974,7 +974,7 @@ func assumeTrueWithOperands(_ x: Int, _ y: Int) {
 // CHECK: builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, [[LE]] : $Builtin.Int8) : $()
 // CHECK: return
 // CANONICAL-LABEL: sil hidden @$s8builtins29assumeTrueWithOperandsGenericyyx_xtSLRzlF
-// CANONICAL: builtin "assumeTrue"<T>(%0 : $*T, %1 : $*T, {{%[0-9]+}} : $Builtin.Int8) : $()
+// CANONICAL-NOT: builtin "assumeTrue"
 // CANONICAL: return
 func assumeTrueWithOperandsGeneric<T: Comparable>(_ x: T, _ y: T) {
   Builtin.assumeTrue(x, <=, y)
