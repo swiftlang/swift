@@ -28,7 +28,7 @@ internal var backtracerEventLog: EventLogHelper? = {
 }()
 
 internal class EventLogHelper {
-  let eventLog: EventLog
+  let eventLog: HANDLE
 
   init?(source: String) {
     let hEventLog = source.withCString(encodedAs: UTF16.self) {
@@ -43,7 +43,7 @@ internal class EventLogHelper {
   }
 
   deinit {
-    _ = DeregisterEventSource(eventSource)
+    _ = DeregisterEventSource(eventLog)
   }
 
   internal func report(_ text: String) -> Bool {
