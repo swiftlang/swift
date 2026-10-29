@@ -2264,6 +2264,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_short_conversions,
                    Opts.SolverEnableShortConversions);
 
+  Opts.SolverEnableExtremeEdgeContraction =
+      Args.hasFlag(OPT_solver_enable_extreme_edge_contraction,
+                   OPT_solver_disable_extreme_edge_contraction,
+                   Opts.SolverEnableExtremeEdgeContraction);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 

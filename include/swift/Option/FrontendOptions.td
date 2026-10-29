@@ -1053,6 +1053,12 @@ def solver_enable_short_conversions : Flag<["-"], "solver-enable-short-conversio
 def solver_disable_short_conversions : Flag<["-"], "solver-disable-short-conversions">,
   HelpText<"Disable an experimental optimization which will be on by default at some point">;
 
+def solver_enable_extreme_edge_contraction : Flag<["-"], "solver-enable-extreme-edge-contraction">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_extreme_edge_contraction : Flag<["-"], "solver-disable-extreme-edge-contraction">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
