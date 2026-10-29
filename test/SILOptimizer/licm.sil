@@ -964,7 +964,7 @@ bb5:                                              // Preds: bb2
   // function_ref getRange
   %29 = function_ref @getRange : $@convention(thin) () -> Range<Int64> // user: %30
   %30 = apply %29() : $@convention(thin) () -> Range<Int64> // user: %31
-  %31 = struct_extract %30 : $Range<Int64>, #Range.lowerBound // user: %32
+  %31 = struct_extract %30 : $Range<Int64>, #Range._lowerBound // user: %32
   store %31 to %13 : $*Int64                        // id: %32
   br bb6                                          // id: %33
 

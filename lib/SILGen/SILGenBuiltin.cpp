@@ -283,6 +283,86 @@ static ManagedValue emitBuiltinInit(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
+/// Returns the comparison of an operator reference like `<=`, and whether the
+/// operands must be swapped to express it.
+static std::optional<std::pair<AssumeTrueGenericPredicate, bool>>
+getAssumedComparison(Expr *op) {
+  op = op->getSemanticsProvidingExpr();
+  while (auto *conversion = dyn_cast<ImplicitConversionExpr>(op))
+    op = conversion->getSubExpr()->getSemanticsProvidingExpr();
+  if (auto *captureList = dyn_cast<CaptureListExpr>(op))
+    op = captureList->getClosureBody();
+  if (auto *closure = dyn_cast<AutoClosureExpr>(op)) {
+    if (auto *unwrapped = closure->getUnwrappedCurryThunkExpr())
+      op = unwrapped;
+  }
+  if (auto *apply = dyn_cast<ApplyExpr>(op))
+    op = apply->getFn();
+  auto *decl = op->getReferencedDecl().getDecl();
+  if (!decl || !decl->isOperator() ||
+      !decl->getModuleContext()->isStdlibModule())
+    return std::nullopt;
+
+  using Predicate = AssumeTrueGenericPredicate;
+  StringRef name = decl->getBaseIdentifier().str();
+  if (name == "==")
+    return {{Predicate::Equal, false}};
+  if (name == "!=")
+    return {{Predicate::NotEqual, false}};
+  if (name == "<")
+    return {{Predicate::LessThan, false}};
+  if (name == "<=")
+    return {{Predicate::LessThanOrEqual, false}};
+  if (name == ">")
+    return {{Predicate::LessThan, true}};
+  if (name == ">=")
+    return {{Predicate::LessThanOrEqual, true}};
+  return std::nullopt;
+}
+
+/// Specialized emitter for Builtin.assumeTrue. The operator is not called,
+/// it only selects the comparison.
+static ManagedValue emitBuiltinAssumeTrueGeneric(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SubstitutionMap substitutions,
+                                                PreparedArguments &&preparedArgs,
+                                                SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto emptyTuple = ManagedValue::forObjectRValueWithoutOwnership(
+      SGF.emitEmptyTuple(loc));
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 3);
+  if (!argsOrError)
+    return emptyTuple;
+
+  auto args = *argsOrError;
+  auto comparison = getAssumedComparison(args[1]);
+  if (!comparison) {
+    SGF.SGM.diagnose(args[1]->getLoc(), diag::assume_true_operator);
+    return emptyTuple;
+  }
+  auto [predicate, swapOperands] = *comparison;
+  // A generic type can still become an integer type by specialization.
+  Type type = substitutions.getReplacementTypes()[0];
+  if (!type->hasArchetype() && !type->isStdlibInteger()) {
+    SGF.SGM.diagnose(loc.getSourceLoc(), diag::assume_true_type, type);
+    return emptyTuple;
+  }
+
+  SILValue lhs = SGF.emitRValueAsSingleValue(
+      args[0], SGFContext::AllowGuaranteedPlusZero).getValue();
+  SILValue rhs = SGF.emitRValueAsSingleValue(
+      args[2], SGFContext::AllowGuaranteedPlusZero).getValue();
+  if (swapOperands)
+    std::swap(lhs, rhs);
+  SILValue predicateValue = SGF.B.createIntegerLiteral(
+      loc, SILType::getBuiltinIntegerType(8, ctx), unsigned(predicate));
+  SGF.B.createBuiltin(
+      loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::AssumeTrueGeneric)),
+      SILType::getEmptyTupleType(ctx), substitutions,
+      {lhs, rhs, predicateValue});
+  return emptyTuple;
+}
+
 /// Specialized emitter for Builtin.fixLifetime.
 static ManagedValue emitBuiltinFixLifetime(SILGenFunction &SGF,
                                            SILLocation loc,

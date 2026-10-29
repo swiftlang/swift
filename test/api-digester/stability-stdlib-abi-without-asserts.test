@@ -885,4 +885,13 @@ Func _hashValue(for:) has generic signature change from <H where H : Swift.Hasha
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 
+// Range's stored properties are renamed and `lowerBound` and `upperBound` read
+// them. The layout and the old accessor and property descriptor symbols stay.
+Var Range._lowerBound is a new API without '@available'
+Var Range._lowerBound is added to a non-resilient type
+Var Range._upperBound is a new API without '@available'
+Var Range._upperBound is added to a non-resilient type
+Var Range.lowerBound is no longer a stored property
+Var Range.upperBound is no longer a stored property
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

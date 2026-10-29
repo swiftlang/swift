@@ -83,6 +83,15 @@ enum class BuiltinValueKind : unsigned {
 #include "swift/AST/Builtins.def"
 };
 
+/// The comparison of an `assumeTrue` builtin, its third operand. Keep in
+/// sync with `AssumeTrueGenericPredicate` in SwiftCompilerSources.
+enum class AssumeTrueGenericPredicate : uint8_t {
+  Equal = 0,
+  NotEqual = 1,
+  LessThan = 2,
+  LessThanOrEqual = 3,
+};
+
 /// Returns true if this is a polymorphic builtin that is only valid
 /// in raw sil and thus must be resolved to have concrete types by the
 /// time we are in canonical SIL.

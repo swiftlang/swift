@@ -628,6 +628,42 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     }
     return;
   }
+  case BuiltinValueKind::AssumeTrueGeneric: {
+    // The optimizer passes the builtin integers of the integer type's values.
+    auto type = substitutions.getReplacementTypes()[0];
+    auto isBuiltinInteger = [](SILType argType) {
+      return argType.isObject() && argType.is<BuiltinIntegerType>();
+    };
+    if (!type->isStdlibInteger() || !isBuiltinInteger(argTypes[0]) ||
+        !isBuiltinInteger(argTypes[1])) {
+      (void)args.claimAll();
+      return;
+    }
+    llvm::Value *lhs = args.claimNext();
+    llvm::Value *rhs = args.claimNext();
+    auto predicate = AssumeTrueGenericPredicate(
+        cast<llvm::ConstantInt>(args.claimNext())->getZExtValue());
+    bool isSigned = type->isInt() || type->isInt8() || type->isInt16() ||
+                    type->isInt32() || type->isInt64() || type->isInt128();
+    llvm::CmpInst::Predicate comparison;
+    switch (predicate) {
+    case AssumeTrueGenericPredicate::Equal:
+      comparison = llvm::CmpInst::ICMP_EQ;
+      break;
+    case AssumeTrueGenericPredicate::NotEqual:
+      comparison = llvm::CmpInst::ICMP_NE;
+      break;
+    case AssumeTrueGenericPredicate::LessThan:
+      comparison = isSigned ? llvm::CmpInst::ICMP_SLT : llvm::CmpInst::ICMP_ULT;
+      break;
+    case AssumeTrueGenericPredicate::LessThanOrEqual:
+      comparison = isSigned ? llvm::CmpInst::ICMP_SLE : llvm::CmpInst::ICMP_ULE;
+      break;
+    }
+    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::assume,
+                                    IGF.Builder.CreateICmp(comparison, lhs, rhs));
+    return;
+  }
   case BuiltinValueKind::AssumeNonNegative: {
     llvm::Value *v = args.claimNext();
     // If the argument is a `load` or `call` we can use a range metadata to

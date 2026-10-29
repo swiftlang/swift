@@ -980,6 +980,28 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 /// own rules.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
 
+/// Allows the compiler to assume that a comparison of the operands holds if T is
+/// one of the standard library's integer types, e.g. `Int` or `UInt8`. Other
+/// concrete types are an error. For a generic T it has no effect, unless T
+/// becomes an integer type by specialization. No code is generated.
+///
+///   Builtin.assumeTrue(lower, <=, upper)
+///
+/// The comparison must be one of the standard library's operators `==`, `!=`,
+/// `<`, `<=`, `>` and `>=`, which are not called. SILGen passes it as a
+/// `Builtin.Int8` literal, see `AssumeTrueGenericPredicate`, and turns `>` and
+/// `>=` into `<` and `<=` with swapped operands:
+///
+///   builtin "assumeTrue"<Int>(%lower : $Int, %upper : $Int, %le : $Builtin.Int8) : $()
+///
+/// If the operands are addresses, e.g. in generic code, the builtin reads them.
+/// Once T is known to be an integer type, the optimizer replaces the operands
+/// with their builtin integers, e.g. `$Builtin.Int64` for `Int`. Only these
+/// get lowered by IRGen.
+///
+/// <T> (T, (T, T) -> Bool, T) -> ()
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AssumeTrueGeneric, "assumeTrue", "", Special)
+
 /// Like `zeroInitializer`, but does not actually initialize the memory.
 /// It only indicates to mandatory passes that the memory is going to be initialized.
 BUILTIN_MISC_OPERATION(PrepareInitialization, "prepareInitialization", "n", Special)

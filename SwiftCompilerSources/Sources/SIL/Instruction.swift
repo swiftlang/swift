@@ -174,6 +174,12 @@ public class Instruction : CustomStringConvertible, Hashable {
       // scope is reading, or vice versa.
       return true
 
+    case let builtin as BuiltinInst where builtin.isAssume:
+      // An assume only reads its operands which are addresses, as a load does.
+      return builtin.operands.contains { op in
+        op.value.type.isAddress && FindPointerOrGlobalWalker.mayAccessPointerOrGlobal(op.value)
+      }
+
     case let builtin as BuiltinInst:
       switch builtin.id {
       case .CopyArray:
@@ -965,6 +971,17 @@ final public class BuiltinInst : SingleValueInstruction {
 
   public var arguments: LazyMapSequence<OperandArray, Value> {
     operands.values
+  }
+
+  /// True for `assume` and `assumeTrue`. Its side effects only keep it in place: it
+  /// doesn't access memory, except that it reads its operands which are addresses.
+  public var isAssume: Bool {
+    switch id {
+    case .AssumeTrue, .AssumeTrueGeneric:
+      true
+    default:
+      false
+    }
   }
 
   public override var mayCallFunction: Bool {

@@ -842,6 +842,11 @@ struct ImmutableAddressUseVerifier {
             break;
           }
 
+          // assumeTrue only reads its operands.
+          if (builtinKind == BuiltinValueKind::AssumeTrueGeneric) {
+            break;
+          }
+
           // Get enum tag borrows its operand address value.
           if (builtinKind == BuiltinValueKind::GetEnumTag) {
             return false;
@@ -2733,6 +2738,16 @@ public:
         requireVoidObjectType(BI->getType(),
                               "result of zeroInitializer");
       }
+    }
+
+    if (builtinKind == BuiltinValueKind::AssumeTrueGeneric) {
+      require(arguments.size() == 3,
+              "assumeTrue needs two values and a predicate");
+      auto *predicate = dyn_cast<IntegerLiteralInst>(arguments[2]);
+      require(predicate && predicate->getValue().getBitWidth() == 8 &&
+                  predicate->getValue().ule(
+                      unsigned(AssumeTrueGenericPredicate::LessThanOrEqual)),
+              "the predicate of assumeTrue must be a valid literal");
     }
 
     // Check that 'getCurrentAsyncTask' only occurs within an async function.

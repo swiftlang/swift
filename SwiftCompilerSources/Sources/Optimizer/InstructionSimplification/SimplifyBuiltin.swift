@@ -28,6 +28,10 @@ extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
         optimizeCanBeClass(context)
       case .AssertConf:
         optimizeAssertConfig(context)
+      case .AssumeTrue:
+        optimizeAssumeTrue(context)
+      case .AssumeTrueGeneric:
+        optimizeAssumeTrueGeneric(context)
       case .Sizeof,
            .Strideof,
            .Alignof:
@@ -162,6 +166,139 @@ private extension BuiltinInst {
     case .unknown:
       return
     }
+  }
+
+  func optimizeAssumeTrue(_ context: SimplifyContext) {
+    if uses.isEmpty, let literal = operands[0].value as? IntegerLiteralInst, let value = literal.value, value != 0 {
+      context.erase(instruction: self)
+    }
+  }
+
+  func optimizeAssumeTrueGeneric(_ context: SimplifyContext) {
+    // Erase only after serialization: clients that inline a serialized body may use the operands.
+    if context.moduleIsSerialized && carriesNoInformation(context) {
+      context.erase(instruction: self)
+      return
+    }
+    let type = substitutionMap.replacementType
+    // A generic type can still become an integer type by specialization.
+    if type.hasArchetype {
+      return
+    }
+    // On 32-bit targets `Int128` and `UInt128` don't consist of a single builtin integer.
+    let fields = type.loweredType(in: parentFunction).getNominalFields(in: parentFunction)
+    let lhs = operands[0].value
+    let rhs = operands[1].value
+    let comparison = assumedComparison
+    if !type.isStdlibInteger || fields?.count != 1 {
+      context.erase(instruction: self)
+      return
+    }
+    // Otherwise the assume of the same values says that the code is unreachable.
+    if lhs == rhs && (comparison == .equal || comparison == .lessThanOrEqual) {
+      context.erase(instruction: self)
+      return
+    }
+    if let lhsValue = lhs.integerConstant, let rhsValue = rhs.integerConstant,
+       // Non-negative values compare the same, regardless of whether the type is signed.
+       0 <= lhsValue, 0 <= rhsValue, comparison.holds(lhsValue, rhsValue)
+    {
+      context.erase(instruction: self)
+      return
+    }
+    if hasSameAssumeBefore(context) {
+      context.erase(instruction: self)
+      return
+    }
+    // IRGen needs the builtin integers. They also enable other optimizations: an address would block
+    // mem2reg, a struct would block replacing a struct phi by an integer phi.
+    let builder = Builder(before: self, context)
+    for operand in [operands[0], operands[1]]
+      where operand.value.type.isAddress || !operand.value.type.isBuiltinInteger
+    {
+      var value = operand.value
+      if value.type.isAddress {
+        value = builder.createLoad(fromAddress: value,
+                                   ownership: parentFunction.hasOwnership ? .trivial : .unqualified)
+      }
+      operand.set(to: builder.createStructExtract(struct: value, fieldIndex: 0), context)
+    }
+  }
+
+  /// An identical assume comes earlier in the block, or in a block from which only single-predecessor
+  /// blocks lead to this one, e.g. the left side of an `&&`.
+  func hasSameAssumeBefore(_ context: SimplifyContext) -> Bool {
+    let lhs = operands[0].value
+    let rhs = operands[1].value
+    // The memory behind an address can change in between.
+    if lhs.type.isAddress || rhs.type.isAddress {
+      return false
+    }
+    let type = substitutionMap.replacementType.canonical
+    let comparison = assumedComparison
+    var sameAssumeBlocks = BasicBlockSet(context)
+    defer { sameAssumeBlocks.deinitialize() }
+    var hasSameAssumeInOtherBlock = false
+    for other in lhs.uses.users(ofType: BuiltinInst.self)
+      where other != self && other.id == .AssumeTrueGeneric &&
+            other.operands[0].value == lhs && other.operands[1].value == rhs &&
+            other.assumedComparison == comparison &&
+            other.substitutionMap.replacementType.canonical == type
+    {
+      if other.parentBlock != parentBlock {
+        sameAssumeBlocks.insert(other.parentBlock)
+        hasSameAssumeInOtherBlock = true
+      } else if other.strictlyDominatesInBlock(self) {
+        return true
+      }
+    }
+    if !hasSameAssumeInOtherBlock {
+      return false
+    }
+    var visited = BasicBlockSet(context)
+    defer { visited.deinitialize() }
+    var block = parentBlock
+    // A cycle of single-predecessor blocks is unreachable.
+    while let predecessor = block.singlePredecessor, visited.insert(predecessor) {
+      if sameAssumeBlocks.contains(predecessor) {
+        return true
+      }
+      block = predecessor
+    }
+    return false
+  }
+
+  func carriesNoInformation(_ context: SimplifyContext) -> Bool {
+    var values = ValueWorklist(context)
+    defer { values.deinitialize() }
+
+    var onlyConstants = true
+    for operand in [operands[0], operands[1]] {
+      var value = operand.value
+      values.pushIfNotVisited(value)
+      while let source = value.projectedOrLoadedFrom {
+        values.pushIfNotVisited(source)
+        value = source
+      }
+      // Inlining can give the caller more uses of an argument value.
+      if value is FunctionArgument && !value.type.isAddress {
+        return false
+      }
+      onlyConstants = onlyConstants && value.integerConstant != nil
+    }
+    // An assume of constants can still say that the code is unreachable.
+    if onlyConstants {
+      return false
+    }
+    while let value = values.pop() {
+      let otherUses = value.uses.ignoreDebugUses.ignore(usersOfType: EndAccessInst.self).ignore(user: self)
+      for use in otherUses {
+        guard let user = use.instruction as? SingleValueInstruction, values.hasBeenPushed(user) else {
+          return false
+        }
+      }
+    }
+    return true
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
@@ -343,6 +480,12 @@ private extension BuiltinInst {
 }
 
 private extension Value {
+  /// The value of an integer literal, or of a stdlib integer constant like `struct $Int (%literal)`.
+  var integerConstant: Int? {
+    let literal = (self as? StructInst)?.operands.first?.value ?? self
+    return (literal as? IntegerLiteralInst)?.value
+  }
+
   var isZeroInteger: Bool {
     if let literal = self as? IntegerLiteralInst,
        let value = literal.value
@@ -361,6 +504,25 @@ private extension Value {
       return bi.operands[0].value.lookThroughScalarCasts
     default:
       return self
+    }
+  }
+
+  var projectedOrLoadedFrom: Value? {
+    switch self {
+    case let extract as StructExtractInst:
+      return extract.struct
+    case let extract as TupleExtractInst:
+      return extract.tuple
+    case let load as LoadInst:
+      return load.address
+    case let address as StructElementAddrInst:
+      return address.struct
+    case let address as TupleElementAddrInst:
+      return address.tuple
+    case let access as BeginAccessInst:
+      return access.address
+    default:
+      return nil
     }
   }
 }
@@ -424,4 +586,28 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return false
   }
   return nil
+}
+
+/// The comparison of an `assumeTrue` builtin. Keep in sync with `AssumeTrueGenericPredicate` in
+/// Builtins.h.
+private enum AssumeTrueGenericPredicate: Int {
+  case equal = 0
+  case notEqual = 1
+  case lessThan = 2
+  case lessThanOrEqual = 3
+
+  func holds(_ lhs: Int, _ rhs: Int) -> Bool {
+    switch self {
+    case .equal:           return lhs == rhs
+    case .notEqual:        return lhs != rhs
+    case .lessThan:        return lhs < rhs
+    case .lessThanOrEqual: return lhs <= rhs
+    }
+  }
+}
+
+private extension BuiltinInst {
+  var assumedComparison: AssumeTrueGenericPredicate {
+    AssumeTrueGenericPredicate(rawValue: (operands[2].value as! IntegerLiteralInst).value!)!
+  }
 }

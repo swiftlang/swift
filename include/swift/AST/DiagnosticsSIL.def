@@ -727,6 +727,12 @@ NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
 NOTE(autodiff_cannot_differentiate_invalid_pointer_cast,none,
      "cannot differentiate non-projection raw pointer operations", ())
 
+ERROR(assume_true_operator,none,
+      "'Builtin.assumeTrue' only recognizes the following operators: '==', "
+      "'!=', '<', '<=', '>', '>='", ())
+ERROR(assume_true_type,none,
+      "'Builtin.assumeTrue' only recognizes the standard library's integer "
+      "types, not %0", (Type))
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
       "use 'withUnsafePointer' or 'withUnsafeBytes' unless you're implementing "

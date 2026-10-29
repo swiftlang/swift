@@ -113,6 +113,10 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
       isa<DeallocStackInst>(I) || isa<AllocationInst>(I))
     return ArrayBoundsEffect::kNone;
 
+  // An assume does not write memory. Its side effects only keep it in place.
+  if (isAssume(I))
+    return ArrayBoundsEffect::kNone;
+
   // A release on an arbitrary class can have sideeffects because of the deinit
   // function.
   if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
