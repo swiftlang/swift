@@ -175,12 +175,17 @@ private enum DynamicCastResult {
   /// The cast succeeded by taking from the source. The source is now
   /// uninitialized.
   case successViaTake
+
+  /// The cast would succeed. Only returned for a test (a nil destination);
+  /// nothing was produced and the source is unchanged.
+  case testSuccess
 }
 
 /// Attempt to perform a dynamic cast from src to dst, where we have information
-/// about the metadata for each.
+/// about the metadata for each.  If `dst` is nil, then this only checks
+/// whether the cast would succeed without producing any result.
 private func tryCast(
-  dst: UnsafeMutableRawPointer,
+  dst: UnsafeMutableRawPointer?,
   dstMetadata: UnsafeRawPointer,
   src: UnsafeRawPointer,
   srcMetadata: UnsafeRawPointer,
@@ -188,6 +193,9 @@ private func tryCast(
 ) -> DynamicCastResult {
   // If types match exactly, the cast succeeds. We just move/copy the data.
   if unsafe srcMetadata == dstMetadata {
+    guard let dst = unsafe dst else {
+      return .testSuccess
+    }
     switch takeOnSuccess {
     case true:
       unsafe _swift_embedded_metadata_initialize_with_take(
@@ -240,6 +248,9 @@ private func tryCast(
       targetMetadata: dstMetadata
     ) else {
       return .failure
+    }
+    guard let dst = unsafe dst else {
+      return .testSuccess
     }
 
     // Success! Write the resulting object into the destination.
@@ -316,6 +327,39 @@ public func swift_dynamicCast(
 
   case .successViaTake:
     return true
+
+  case .testSuccess:
+    fatalError("swift_dynamicCast: a cast with a destination reported a test")
+  }
+}
+
+/// Answer whether a cast of src to dstMetadata would succeed, as for
+/// swift_dynamicCast, but without producing a result: src is only read, and
+/// is left as it was whatever the answer.
+@c
+public func swift_dynamicCastTest(
+  _ src: Builtin.RawPointer, /* points to an existential or class */
+  _ srcMetadata: Builtin.RawPointer,
+  _ dstMetadata: Builtin.RawPointer,
+  _ flags: UInt
+) -> Bool {
+  // Take/destroy flags are meaningless for a test, and there is no value for
+  // an unconditional cast to produce.
+  let castResult = unsafe tryCast(
+    dst: nil,
+    dstMetadata: UnsafeRawPointer(dstMetadata),
+    src: UnsafeRawPointer(src),
+    srcMetadata: UnsafeRawPointer(srcMetadata),
+    takeOnSuccess: false
+  )
+
+  switch castResult {
+  case .failure:
+    return false
+  case .testSuccess:
+    return true
+  case .successViaCopy, .successViaTake:
+    fatalError("swift_dynamicCastTest: a test produced a value")
   }
 }
 
