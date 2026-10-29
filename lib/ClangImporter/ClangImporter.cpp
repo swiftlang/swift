@@ -7938,8 +7938,7 @@ static bool diagnoseOptionalReplacementOfNullableTemplateParam(
     }
 
     auto isAnnotatedUse = [typeParam](clang::QualType type) {
-      const auto *attributed =
-          dyn_cast<clang::AttributedType>(desugarIfElaborated(type));
+      const auto *attributed = dyn_cast<clang::AttributedType>(type);
       if (!attributed || !attributed->getImmediateNullability())
         return false;
       return attributed->getModifiedType()->getCanonicalTypeInternal() ==
