@@ -27,6 +27,7 @@ swift_compiler_sources(Optimizer
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
   SimplifyDifferentiableFunction.swift
+  SimplifyDynamicPackIndex.swift
   SimplifyEndCOWMutationAddr.swift
   SimplifyEndLifetime.swift
   SimplifyExplicitCopy.swift

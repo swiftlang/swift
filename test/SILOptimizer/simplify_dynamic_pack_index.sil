@@ -1,0 +1,103 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=dynamic_pack_index | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+protocol P {}
+
+sil @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// The body of a loop over an empty pack is unreachable.
+//
+// CHECK-LABEL: sil [ossa] @loop_over_empty_pack :
+// CHECK:       bb0(%0 : $*Pack{}):
+// CHECK:         br bb1
+// CHECK:       bb1({{%[^ ]+}} : $Builtin.Word):
+// CHECK:         cond_br {{%[^ ]+}}, bb2, bb3
+// CHECK:       bb2:
+// CHECK:         return
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-NOT:   bb4
+// CHECK-NOT:     dynamic_pack_index
+// CHECK-NOT:     open_pack_element
+// CHECK-LABEL: } // end sil function 'loop_over_empty_pack'
+sil [ossa] @loop_over_empty_pack : $@convention(thin) (@pack_guaranteed Pack{}) -> () {
+bb0(%0 : $*Pack{}):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %len = integer_literal $Builtin.Word, 0
+  br bb1(%zero)
+
+bb1(%i : $Builtin.Word):
+  %done = builtin "cmp_eq_Word"(%i, %len) : $Builtin.Int1
+  cond_br %done, bb2, bb3
+
+bb2:
+  %r = tuple ()
+  return %r
+
+bb3:
+  %idx = dynamic_pack_index %i of $Pack{}
+  %open = open_pack_element %idx of <each T where repeat each T : P> at <Pack{}>, shape $each T, id 1
+  %elt = alloc_stack $@pack_element(1) each T
+  %src = pack_element_get %idx of %0 as $*@pack_element(1) each T
+  copy_addr %src to [init] %elt
+  %f = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %a = apply %f<@pack_element(1) each T>(%elt) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_addr %elt
+  dealloc_stack %elt
+  %next = builtin "add_Word"(%i, %one) : $Builtin.Word
+  br bb1(%next)
+}
+
+// Instructions before the dynamic_pack_index are kept. Lifetime completion
+// ends the lifetimes of owned values that are live across it.
+//
+// CHECK-LABEL: sil [ossa] @empty_pack_in_entry_block :
+// CHECK:       bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Word):
+// CHECK-NEXT:    [[S:%[^ ]+]] = alloc_stack $Builtin.Word
+// CHECK-NEXT:    store %1 to [trivial] [[S]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-NOT:     dynamic_pack_index
+// CHECK-LABEL: } // end sil function 'empty_pack_in_entry_block'
+sil [ossa] @empty_pack_in_entry_block : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Word) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Word):
+  %s = alloc_stack $Builtin.Word
+  store %1 to [trivial] %s
+  %idx = dynamic_pack_index %1 of $Pack{}
+  dealloc_stack %s
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_simplify_nonempty_pack :
+// CHECK:         dynamic_pack_index %1 of $Pack{Int, Int}
+// CHECK-NOT:     unreachable
+// CHECK-LABEL: } // end sil function 'dont_simplify_nonempty_pack'
+sil [ossa] @dont_simplify_nonempty_pack : $@convention(thin) (@pack_guaranteed Pack{Int, Int}, Builtin.Word) -> Int {
+bb0(%0 : $*Pack{Int, Int}, %1 : $Builtin.Word):
+  %idx = dynamic_pack_index %1 of $Pack{Int, Int}
+  %addr = pack_element_get %idx of %0 as $*Int
+  %v = load [trivial] %addr
+  return %v
+}
+
+// CHECK-LABEL: sil [ossa] @dont_simplify_pack_expansion :
+// CHECK:         dynamic_pack_index %1 of $Pack{repeat each T}
+// CHECK-NOT:     unreachable
+// CHECK-LABEL: } // end sil function 'dont_simplify_pack_expansion'
+sil [ossa] @dont_simplify_pack_expansion : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
+bb0(%0 : $*Pack{repeat each T}, %1 : $Builtin.Word):
+  %idx = dynamic_pack_index %1 of $Pack{repeat each T}
+  %open = open_pack_element %idx of <each U> at <Pack{repeat each T}>, shape $each U, id 2
+  %addr = pack_element_get %idx of %0 as $*@pack_element(2) each U
+  %f = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %a = apply %f<@pack_element(2) each U>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %r = tuple ()
+  return %r
+}
