@@ -15,7 +15,7 @@ import MyKit
 // Before MyKit provides 'Point', this module uses its own copy of it, and
 // MyKit's metadata for it doesn't see conformances declared for the copy.
 
-extension Point: @retroactive CustomStringConvertible { // expected-error {{conformance of back-deployed type 'Point' to resilient protocol 'CustomStringConvertible' must not be available before macOS 99}}
+extension Point: @retroactive CustomStringConvertible { // expected-error {{conformance of back-deployed type 'Point' to protocol 'CustomStringConvertible' must not be available before macOS 99}}
   // expected-note@-1 {{this module uses its own copy of 'Point' before macOS 99, and the conformance would not apply to 'Point' from 'MyKit'}}
   // expected-note@-2 {{add '@available' attribute to enclosing extension}}
   public var description: String { "" }
@@ -39,7 +39,7 @@ public protocol LocalProto {
   func f()
 }
 
-extension Point: LocalProto { // expected-resilient-error {{conformance of back-deployed type 'Point' to resilient protocol 'LocalProto' must not be available before macOS 99}}
+extension Point: LocalProto { // expected-resilient-error {{conformance of back-deployed type 'Point' to protocol 'LocalProto' must not be available before macOS 99}}
   // expected-resilient-note@-1 {{this module uses its own copy of 'Point' before macOS 99, and the conformance would not apply to 'Point' from 'MyKit'}}
   // expected-resilient-note@-2 {{add '@available' attribute to enclosing extension}}
   public func f() {}

@@ -8747,7 +8747,7 @@ ERROR(back_deployed_requires_frozen,none,
 
 ERROR(back_deployed_type_resilient_layout,none,
       "%kind0 of back-deployed %kind1 cannot have type %2, whose layout is "
-      "resilient",
+      "variable at runtime",
       (const ValueDecl *, const ValueDecl *, Type))
 ERROR(back_deployed_type_static_stored_property,none,
       "back-deployed %kind0 cannot have static stored property %1",
@@ -8760,7 +8760,7 @@ ERROR(back_deployed_type_nested_requires_frozen,none,
       (const ValueDecl *, const ValueDecl *))
 
 ERROR(conformance_back_deployed_type_availability,none,
-      "conformance of back-deployed type %0 to resilient protocol %1 must "
+      "conformance of back-deployed type %0 to protocol %1 must "
       "not be available before %2 %3",
       (Type, const ProtocolDecl *, AvailabilityDomain, AvailabilityRange))
 NOTE(conformance_back_deployed_type_availability_note,none,

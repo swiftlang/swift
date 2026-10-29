@@ -23,10 +23,10 @@ public protocol Proto {}
   public var reference: Class
   public var existential: any Proto
   public var function: () -> Int
-  public var resilient: Resilient // expected-error {{property 'resilient' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is resilient}}
-  public var optional: Resilient? // expected-error {{property 'optional' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is resilient}}
-  public var array: [Resilient] // expected-error {{property 'array' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is resilient}}
-  public var tuple: (Int, Resilient) // expected-error {{property 'tuple' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is resilient}}
+  public var resilient: Resilient // expected-error {{property 'resilient' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is variable at runtime}}
+  public var optional: Resilient? // expected-error {{property 'optional' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is variable at runtime}}
+  public var array: [Resilient] // expected-error {{property 'array' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is variable at runtime}}
+  public var tuple: (Int, Resilient) // expected-error {{property 'tuple' of back-deployed struct 'Stored' cannot have type 'Resilient', whose layout is variable at runtime}}
 
   public static var staticStored = 0 // expected-error {{back-deployed struct 'Stored' cannot have static stored property 'staticStored'}}
   public static var staticComputed: Int { 0 }
@@ -39,14 +39,14 @@ extension Stored {
 @backDeployed(before: macOS 99)
 @frozen public struct Generic<T> {
   public var value: T
-  public var resilient: Resilient // expected-error {{property 'resilient' of back-deployed generic struct 'Generic' cannot have type 'Resilient', whose layout is resilient}}
+  public var resilient: Resilient // expected-error {{property 'resilient' of back-deployed generic struct 'Generic' cannot have type 'Resilient', whose layout is variable at runtime}}
 }
 
 @backDeployed(before: macOS 99)
 @frozen public enum Payloads {
   case none
   case fixed(Int, Fixed)
-  case resilient(Resilient) // expected-error {{enum case 'resilient' of back-deployed enum 'Payloads' cannot have type 'Resilient', whose layout is resilient}}
+  case resilient(Resilient) // expected-error {{enum case 'resilient' of back-deployed enum 'Payloads' cannot have type 'Resilient', whose layout is variable at runtime}}
   indirect case boxed(Resilient)
 }
 
@@ -59,7 +59,7 @@ extension Stored {
 @frozen public struct Outer {
   @frozen public struct Nested {
     public var x: Int
-    public var resilient: Resilient // expected-error {{property 'resilient' of back-deployed struct 'Nested' cannot have type 'Resilient', whose layout is resilient}}
+    public var resilient: Resilient // expected-error {{property 'resilient' of back-deployed struct 'Nested' cannot have type 'Resilient', whose layout is variable at runtime}}
     public static var staticStored = 0 // expected-error {{back-deployed struct 'Nested' cannot have static stored property 'staticStored'}}
   }
 
