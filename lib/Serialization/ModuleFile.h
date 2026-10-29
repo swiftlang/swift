@@ -1079,6 +1079,15 @@ public:
   llvm::Expected<HiddenTypeLayoutInfoDecl *>
   getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
 
+  llvm::Expected<HiddenTypeLayoutInfoDecl *>
+  getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
+
+  llvm::Expected<Type>
+  getAbstractMemberType(serialization::MemberAbstractTypeLayoutID ID);
+
+  llvm::Expected<HiddenTypeLayoutInfoDecl *>
+  deserializeHiddenTypeLayoutInfo(serialization::BitOffset offset);
+
   void consumeHiddenTypeXRefPathPieces(
       llvm::BitstreamCursor &cursor, uint32_t pathLen,
       SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces);
