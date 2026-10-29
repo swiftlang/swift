@@ -8188,6 +8188,9 @@ ERROR(specialize_target_function_of_type_not_found, none,
       "target function %0 of type %1 could not be found", (DeclNameRef, Type))
 NOTE(specialize_found_function_of_type, none,
       "found function %0 of type %1", (DeclName, Type))
+WARNING(specialize_attr_ownership_mismatch, none,
+        "specialization has parameters with different ownership from original, "
+        "which is not supported; this will become an error", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Variable usage diagnostics
