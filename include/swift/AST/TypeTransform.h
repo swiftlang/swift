@@ -512,7 +512,7 @@ case TypeKind::Id:
         if (!newParentType) return newUnderlyingTy;
       }
 
-      if (newParentType && newParentType->isExistentialType())
+      if (newParentType && !TypeAliasType::isValidParent(newParentType))
         return newUnderlyingTy;
 
       RecursiveTypeProperties substProps;
