@@ -414,10 +414,10 @@ sil @assumeTrue_unused_global_loads : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
   %1 = begin_access [read] [dynamic] %0 : $*Range<Int64>
-  %2 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %2 = struct_element_addr %1 : $*Range<Int64>, #Range._lowerBound
   %3 = struct_element_addr %2 : $*Int64, #Int64._value
   %4 = load %3 : $*Builtin.Int64
-  %5 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %5 = struct_element_addr %1 : $*Range<Int64>, #Range._upperBound
   %6 = struct_element_addr %5 : $*Int64, #Int64._value
   %7 = load %6 : $*Builtin.Int64
   end_access %1 : $*Range<Int64>
@@ -434,8 +434,8 @@ sil @assumeTrue_unused_global_struct : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
   %1 = load %0 : $*Range<Int64>
-  %2 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
-  %3 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %2 = struct_extract %1 : $Range<Int64>, #Range._lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range._upperBound
   %le = integer_literal $Builtin.Int8, 3
   %4 = builtin "assumeTrue"<Int64>(%2 : $Int64, %3 : $Int64, %le : $Builtin.Int8) : $()
   %5 = tuple ()
@@ -466,9 +466,9 @@ bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
   %1 = load %0 : $*Range<Int64>
   debug_value %1 : $Range<Int64>, let, name "range"
-  %3 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range._lowerBound
   debug_value %3 : $Int64, let, name "lower"
-  %5 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %5 = struct_extract %1 : $Range<Int64>, #Range._upperBound
   %le = integer_literal $Builtin.Int8, 3
   %6 = builtin "assumeTrue"<Int64>(%3 : $Int64, %5 : $Int64, %le : $Builtin.Int8) : $()
   %7 = tuple ()
@@ -494,9 +494,9 @@ bb0(%0 : $Pair<T>):
 sil @assumeTrue_unused_inout_loads : $@convention(thin) (@inout Range<Int64>) -> () {
 bb0(%0 : $*Range<Int64>):
   %1 = begin_access [read] [static] %0 : $*Range<Int64>
-  %2 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %2 = struct_element_addr %1 : $*Range<Int64>, #Range._lowerBound
   %3 = load %2 : $*Int64
-  %4 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %4 = struct_element_addr %1 : $*Range<Int64>, #Range._upperBound
   %5 = load %4 : $*Int64
   end_access %1 : $*Range<Int64>
   %le = integer_literal $Builtin.Int8, 3
@@ -510,8 +510,8 @@ bb0(%0 : $*Range<Int64>):
 // CHECK-SERIALIZED:       } // end sil function 'assumeTrue_argument_fields'
 sil @assumeTrue_argument_fields : $@convention(thin) (Range<Int64>) -> () {
 bb0(%0 : $Range<Int64>):
-  %1 = struct_extract %0 : $Range<Int64>, #Range.lowerBound
-  %2 = struct_extract %0 : $Range<Int64>, #Range.upperBound
+  %1 = struct_extract %0 : $Range<Int64>, #Range._lowerBound
+  %2 = struct_extract %0 : $Range<Int64>, #Range._upperBound
   %le = integer_literal $Builtin.Int8, 3
   %3 = builtin "assumeTrue"<Int64>(%1 : $Int64, %2 : $Int64, %le : $Builtin.Int8) : $()
   %4 = tuple ()
@@ -555,8 +555,8 @@ sil @assumeTrue_returned_value : $@convention(thin) () -> Int64 {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
   %1 = load %0 : $*Range<Int64>
-  %2 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
-  %3 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %2 = struct_extract %1 : $Range<Int64>, #Range._lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range._upperBound
   %le = integer_literal $Builtin.Int8, 3
   %4 = builtin "assumeTrue"<Int64>(%2 : $Int64, %3 : $Int64, %le : $Builtin.Int8) : $()
   return %2 : $Int64
@@ -569,11 +569,11 @@ sil @assumeTrue_separate_extract : $@convention(thin) () -> Int64 {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
   %1 = load %0 : $*Range<Int64>
-  %2 = struct_extract %1 : $Range<Int64>, #Range.lowerBound
-  %3 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %2 = struct_extract %1 : $Range<Int64>, #Range._lowerBound
+  %3 = struct_extract %1 : $Range<Int64>, #Range._upperBound
   %le = integer_literal $Builtin.Int8, 3
   %4 = builtin "assumeTrue"<Int64>(%2 : $Int64, %3 : $Int64, %le : $Builtin.Int8) : $()
-  %5 = struct_extract %1 : $Range<Int64>, #Range.upperBound
+  %5 = struct_extract %1 : $Range<Int64>, #Range._upperBound
   return %5 : $Int64
 }
 
@@ -600,9 +600,9 @@ bb0:
 sil @assumeTrue_separate_load : $@convention(thin) () -> Int64 {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
-  %1 = struct_element_addr %0 : $*Range<Int64>, #Range.lowerBound
+  %1 = struct_element_addr %0 : $*Range<Int64>, #Range._lowerBound
   %2 = load %1 : $*Int64
-  %3 = struct_element_addr %0 : $*Range<Int64>, #Range.upperBound
+  %3 = struct_element_addr %0 : $*Range<Int64>, #Range._upperBound
   %4 = load %3 : $*Int64
   %le = integer_literal $Builtin.Int8, 3
   %5 = builtin "assumeTrue"<Int64>(%2 : $Int64, %4 : $Int64, %le : $Builtin.Int8) : $()
@@ -616,8 +616,8 @@ bb0:
 sil @assumeTrue_addresses_read_elsewhere : $@convention(thin) () -> Range<Int64> {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
-  %1 = struct_element_addr %0 : $*Range<Int64>, #Range.lowerBound
-  %2 = struct_element_addr %0 : $*Range<Int64>, #Range.upperBound
+  %1 = struct_element_addr %0 : $*Range<Int64>, #Range._lowerBound
+  %2 = struct_element_addr %0 : $*Range<Int64>, #Range._upperBound
   %le = integer_literal $Builtin.Int8, 3
   %3 = builtin "assumeTrue"<Int64>(%1 : $*Int64, %2 : $*Int64, %le : $Builtin.Int8) : $()
   %4 = load %0 : $*Range<Int64>
@@ -631,17 +631,17 @@ sil @assumeTrue_global_accessed_again : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = global_addr @rangeGlobal : $*Range<Int64>
   %1 = begin_access [read] [dynamic] %0 : $*Range<Int64>
-  %2 = struct_element_addr %1 : $*Range<Int64>, #Range.lowerBound
+  %2 = struct_element_addr %1 : $*Range<Int64>, #Range._lowerBound
   %3 = struct_element_addr %2 : $*Int64, #Int64._value
   %4 = load %3 : $*Builtin.Int64
-  %5 = struct_element_addr %1 : $*Range<Int64>, #Range.upperBound
+  %5 = struct_element_addr %1 : $*Range<Int64>, #Range._upperBound
   %6 = struct_element_addr %5 : $*Int64, #Int64._value
   %7 = load %6 : $*Builtin.Int64
   end_access %1 : $*Range<Int64>
   %le = integer_literal $Builtin.Int8, 3
   %9 = builtin "assumeTrue"<Int64>(%4 : $Builtin.Int64, %7 : $Builtin.Int64, %le : $Builtin.Int8) : $()
   %10 = begin_access [read] [dynamic] %0 : $*Range<Int64>
-  %11 = struct_element_addr %10 : $*Range<Int64>, #Range.lowerBound
+  %11 = struct_element_addr %10 : $*Range<Int64>, #Range._lowerBound
   %12 = struct_element_addr %11 : $*Int64, #Int64._value
   %13 = load %12 : $*Builtin.Int64
   end_access %10 : $*Range<Int64>

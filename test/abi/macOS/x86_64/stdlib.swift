@@ -1384,3 +1384,10 @@ Added: _$ss4CellVMa
 Added: _$ss4CellVMn
 Added: _$ss9ConstCellVMa
 Added: _$ss9ConstCellVMn
+
+// Range stores its bounds in `_lowerBound` and `_upperBound`, read by the
+// `lowerBound` and `upperBound` getters.
+Added: _$sSn11_lowerBoundxvg
+Added: _$sSn11_lowerBoundxvpMV
+Added: _$sSn11_upperBoundxvg
+Added: _$sSn11_upperBoundxvpMV

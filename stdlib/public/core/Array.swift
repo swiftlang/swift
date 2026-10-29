@@ -1969,10 +1969,12 @@ extension Array {
     _ subrange: Range<Int>,
     with newElements: __owned C
   ) where C: Collection, C.Element == Element {
-    _precondition(subrange.lowerBound >= self._buffer.startIndex,
+    // Read the stored bounds, not `lowerBound` and `upperBound`: their assume
+    // would come before these checks, and LLVM then keeps more overflow checks.
+    _precondition(subrange._lowerBound >= self._buffer.startIndex,
       "Array replace: subrange start is negative")
 
-    _precondition(subrange.upperBound <= _buffer.endIndex,
+    _precondition(subrange._upperBound <= _buffer.endIndex,
       "Array replace: subrange extends past the end")
 
     let eraseCount = subrange.count

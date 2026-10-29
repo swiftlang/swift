@@ -147,24 +147,38 @@ extension RangeExpression {
 /// `stride(from:to:by:)` function.
 @frozen
 public struct Range<Bound: Comparable> {
+  @usableFromInline
+  internal let _lowerBound: Bound
+
+  @usableFromInline
+  internal let _upperBound: Bound
+
   /// The range's lower bound.
   ///
   /// In an empty range, `lowerBound` is equal to `upperBound`.
-  public let lowerBound: Bound
+  @_transparent
+  public var lowerBound: Bound {
+    _assumeValid()
+    return _lowerBound
+  }
 
   /// The range's upper bound.
   ///
   /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
   /// instance does not contain its upper bound.
-  public let upperBound: Bound
+  @_transparent
+  public var upperBound: Bound {
+    _assumeValid()
+    return _upperBound
+  }
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
   @unsafe
   @export(implementation) @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-    self.lowerBound = bounds.lower
-    self.upperBound = bounds.upper
+    self._lowerBound = bounds.lower
+    self._upperBound = bounds.upper
   }
 
   /// Creates an instance with the given bounds.
@@ -210,6 +224,19 @@ public struct Range<Bound: Comparable> {
   @inlinable
   public var isEmpty: Bool {
     return lowerBound == upperBound
+  }
+
+  /// Specifies that the range's lower bound is not greater than its upper bound.
+  /// This is only an optimization hint and has no effect in runtime.
+  /// Requires:
+  /// - `Bound` to be statically known at compile time.
+  /// - `Bound` to be one of stdlib's integer types.
+  /// Otherwise it has no effect.
+  @export(implementation) @_transparent
+  internal func _assumeValid() {
+#if $BuiltinAssumeTrueGeneric
+    Builtin.assumeTrue(_lowerBound, <=, _upperBound)
+#endif
   }
 }
 
@@ -428,9 +455,11 @@ extension Range: Equatable {
   ///   - rhs: Another range to compare.
   @inlinable
   public static func == (lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
+    // Read the stored bounds: the getters' assume doesn't help an equality
+    // check, and it keeps LLVM from merging the two comparisons.
     return
-      lhs.lowerBound == rhs.lowerBound &&
-      lhs.upperBound == rhs.upperBound
+      lhs._lowerBound == rhs._lowerBound &&
+      lhs._upperBound == rhs._upperBound
   }
 }
 
