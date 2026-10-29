@@ -31,6 +31,7 @@
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -391,7 +392,7 @@ public:
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {
-    assert(!isSpecial() && "Cannot retrieve identifier from special names");
+    ASSERT(!isSpecial() && "Cannot retrieve identifier from special names");
     return Ident;
   }
 
@@ -574,10 +575,7 @@ public:
 
   /// Assert that the base name is not special and return its identifier.
   Identifier getBaseIdentifier() const {
-    auto baseName = getBaseName();
-    assert(!baseName.isSpecial() &&
-           "Can't retrieve the identifier of a special base name");
-    return baseName.getIdentifier();
+    return getBaseName().getIdentifier();
   }
 
   /// Retrieve the names of the arguments, if there are any.
