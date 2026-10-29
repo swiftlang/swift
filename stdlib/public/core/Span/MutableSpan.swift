@@ -215,15 +215,13 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @_lifetime(&mutableBytes)
   public init(mutating mutableBytes: inout MutableRawSpan) {
     let pointer = unsafe mutableBytes._pointer
-    let span: MutableSpan<Element>
-    if MemoryLayout<Element>.stride == 1 {
-      span = unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    let span = if MemoryLayout<Element>.stride == 1 {
+      unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
     } else {
-      let buffer = unsafe UnsafeMutableRawBufferPointer(
-        start: pointer, count: mutableBytes.byteCount
-      )
-      span = unsafe _overrideLifetime(
-        MutableSpan(_unsafeBytes: buffer), copying: ()
+      unsafe MutableSpan(
+        _unsafeBytes: UnsafeMutableRawBufferPointer(
+          start: pointer, count: mutableBytes.byteCount
+        )
       )
     }
     self = unsafe _overrideLifetime(span, mutating: &mutableBytes)
@@ -241,15 +239,13 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @_lifetime(copy mutableBytes)
   public init(mutableBytes: consuming MutableRawSpan) {
     let pointer = unsafe mutableBytes._pointer
-    let span: MutableSpan<Element>
-    if MemoryLayout<Element>.stride == 1 {
-      span = unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    let span = if MemoryLayout<Element>.stride == 1 {
+      unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
     } else {
-      let buffer = unsafe UnsafeMutableRawBufferPointer(
-        start: pointer, count: mutableBytes.byteCount
-      )
-      span = unsafe _overrideLifetime(
-        MutableSpan(_unsafeBytes: buffer), copying: ()
+      unsafe MutableSpan(
+        _unsafeBytes: UnsafeMutableRawBufferPointer(
+          start: pointer, count: mutableBytes.byteCount
+        )
       )
     }
     self = unsafe _overrideLifetime(span, copying: mutableBytes)
