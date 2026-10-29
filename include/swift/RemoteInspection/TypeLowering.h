@@ -166,6 +166,8 @@ public:
   void dump() const;
   void dump(std::ostream &stream, unsigned Indent = 0) const;
 
+  virtual bool Equals(const TypeInfo &Other) const;
+
   // Using the provided reader, inspect our value.
   // Return false if we can't inspect value.
   // Set *inhabitant to <0 if the value is valid (not an XI)
@@ -228,6 +230,8 @@ public:
     return Name;
   }
 
+  bool Equals(const TypeInfo &Other) const override;
+
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *extraInhabitantIndex) const override;
@@ -257,6 +261,8 @@ public:
   RecordKind getRecordKind() const { return SubKind; }
   unsigned getNumFields() const { return Fields.size(); }
   const std::vector<FieldInfo> &getFields() const { return Fields; }
+
+  bool Equals(const TypeInfo &Other) const override;
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
@@ -331,6 +337,8 @@ public:
       && Cases[1].Name == "none";
   }
 
+  bool Equals(const TypeInfo &Other) const override;
+
   virtual bool projectEnumValue(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *CaseIndex) const = 0;
@@ -363,6 +371,8 @@ public:
   ReferenceCounting getReferenceCounting() const {
     return Refcounting;
   }
+
+  bool Equals(const TypeInfo &Other) const override;
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
@@ -399,6 +409,7 @@ public:
   const TypeRef *getElementTypeRef() const { return ElementTR; }
   const TypeInfo *getElementTypeInfo() const { return ElementTI; }
   intptr_t getElementCount() const { return ElementCount; }
+  bool Equals(const TypeInfo &Other) const override;
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Array;
   }
@@ -431,6 +442,7 @@ public:
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
   const TypeInfo *getReferentTypeInfo() const { return ReferentTI; }
+  bool Equals(const TypeInfo &Other) const override;
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Borrow;
   }

@@ -246,6 +246,115 @@ void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
   stream << "\n";
 }
 
+bool TypeInfo::Equals(const TypeInfo &Other) const {
+  return getKind() == Other.getKind() && getSize() == Other.getSize() &&
+         getAlignment() == Other.getAlignment() &&
+         getStride() == Other.getStride() &&
+         getNumExtraInhabitants() == Other.getNumExtraInhabitants() &&
+         getBorrowability() == Other.getBorrowability() &&
+         isAddressableForDependencies() == Other.isAddressableForDependencies();
+}
+
+namespace {
+static bool equalFieldInfos(const std::vector<FieldInfo> &A,
+                            const std::vector<FieldInfo> &B) {
+  if (A.size() != B.size())
+    return false;
+  for (size_t i = 0, e = A.size(); i != e; ++i) {
+    const FieldInfo &fa = A[i];
+    const FieldInfo &fb = B[i];
+    if (!fa.TI.Equals(fb.TI))
+      return false;
+    if (fa.Offset != fb.Offset)
+      return false;
+    if (fa.Value != fb.Value)
+      return false;
+    if (fa.Name != fb.Name)
+      return false;
+    if (!TypeRef::deepEquals(fa.TR, fb.TR))
+      return false;
+    if (!TypeRef::deepEquals(fa.IndirectPayloadTR, fb.IndirectPayloadTR))
+      return false;
+  }
+  return true;
+}
+} // end anonymous namespace
+
+bool BuiltinTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<BuiltinTypeInfo>(&Other);
+  if (!O)
+    return false;
+  return getMangledTypeName() == O->getMangledTypeName();
+}
+
+bool RecordTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<RecordTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (getRecordKind() != O->getRecordKind())
+    return false;
+  return equalFieldInfos(getFields(), O->getFields());
+}
+
+bool EnumTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<EnumTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (getEnumKind() != O->getEnumKind())
+    return false;
+  return equalFieldInfos(getCases(), O->getCases());
+}
+
+bool ReferenceTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<ReferenceTypeInfo>(&Other);
+  if (!O)
+    return false;
+  return getReferenceKind() == O->getReferenceKind() &&
+         getReferenceCounting() == O->getReferenceCounting();
+}
+
+bool ArrayTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<ArrayTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (getElementCount() != O->getElementCount())
+    return false;
+  const TypeInfo *ea = getElementTypeInfo();
+  const TypeInfo *eb = O->getElementTypeInfo();
+  if ((ea == nullptr) != (eb == nullptr))
+    return false;
+  if (ea && eb && !ea->Equals(*eb))
+    return false;
+  return TypeRef::deepEquals(getElementTypeRef(), O->getElementTypeRef());
+}
+
+bool BorrowTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<BorrowTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (usesValueRepresentation() != O->usesValueRepresentation())
+    return false;
+  const TypeInfo *ra = getReferentTypeInfo();
+  const TypeInfo *rb = O->getReferentTypeInfo();
+  if ((ra == nullptr) != (rb == nullptr))
+    return false;
+  if (ra && rb && !ra->Equals(*rb))
+    return false;
+  return true;
+}
+
 BitMask ReferenceTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
   auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
   return BitMask(getSize(), mpePointerSpareBits);
