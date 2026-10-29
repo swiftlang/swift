@@ -1492,7 +1492,12 @@ public:
       // value metadata, and finally zero or more witness tables.
       // The buffer is always bitwise takable, since non-bitwise
       // takable payloads are stored out of line.
-      builder.addField(TI->getSize() * 3,
+      uint64_t BufferSize = (uint64_t)TI->getSize() * 3;
+      if (BufferSize > UINT32_MAX) {
+        TC.setError("existential buffer size overflows");
+        return nullptr;
+      }
+      builder.addField(BufferSize,
                        TI->getAlignment(),
                        /*numExtraInhabitants=*/0,
                        /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
@@ -1545,14 +1550,21 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          bool addressableForDependencies) {
   assert(fieldAlignment > 0);
 
-  // Align the current size appropriately
-  Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
+  // Align the current size appropriately, and add the field. Size is 32 bits.
+  // Ensure we don't overflow it.
+  uint64_t alignedSize = ((uint64_t)Size + fieldAlignment - 1) &
+                         ~((uint64_t)fieldAlignment - 1);
+  uint64_t newSize = alignedSize + fieldSize;
+  if (newSize > UINT32_MAX) {
+    markInvalid("record size overflows");
+    return 0;
+  }
 
   // Record the offset
-  unsigned offset = Size;
+  unsigned offset = alignedSize;
 
   // Update the aggregate size
-  Size += fieldSize;
+  Size = newSize;
 
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
@@ -1620,7 +1632,13 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
     return nullptr;
 
   // Calculate the stride
-  unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+  uint64_t WideStride =
+      ((uint64_t)Size + Alignment - 1) & ~((uint64_t)Alignment - 1);
+  if (WideStride > UINT32_MAX) {
+    markInvalid("record stride overflows");
+    return nullptr;
+  }
+  unsigned Stride = WideStride;
   if (Stride == 0)
     Stride = 1;
 
@@ -1789,7 +1807,12 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
     return nullptr;
   }
 
-  auto size = descriptor->Size * NumWords_DefaultActor;
+  uint64_t wideSize = (uint64_t)descriptor->Size * NumWords_DefaultActor;
+  if (wideSize > UINT32_MAX) {
+    setError("default actor storage size overflows");
+    return nullptr;
+  }
+  unsigned size = wideSize;
   auto alignment = 2 * descriptor->Alignment;
 
   DefaultActorStorageTI = makeTypeInfo<BuiltinTypeInfo>(
@@ -2300,7 +2323,13 @@ public:
     // This avoids allocating lots of memory for spare bit mask calculations
     // when clients try to interpret random chunks of memory as type descriptions.
     if (Size > (1024ULL * 1024)) {
-      unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+      uint64_t WideStride =
+          ((uint64_t)Size + Alignment - 1) & ~((uint64_t)Alignment - 1);
+      if (WideStride > UINT32_MAX) {
+        markInvalid("enum stride overflows", TR);
+        return nullptr;
+      }
+      unsigned Stride = WideStride;
       return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
       	Size, Alignment, Stride, NumExtraInhabitants, Borrowability,
       	AddressableForDependencies, Kind, Cases);
@@ -2453,7 +2482,13 @@ public:
     // Builtin descriptors don't record addressable-for-dependencies, but we
     // can derive it reliably from the payloads, so AddressableForDependencies
     // is left as is.
-    unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    uint64_t WideStride =
+        ((uint64_t)Size + Alignment - 1) & ~((uint64_t)Alignment - 1);
+    if (WideStride > UINT32_MAX) {
+      markInvalid("enum stride overflows", TR);
+      return nullptr;
+    }
+    unsigned Stride = WideStride;
     if (Stride == 0)
       Stride = 1;
 
