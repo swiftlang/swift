@@ -3918,7 +3918,210 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   }
 }
 
-//
+//===----------------------------------------------------------------------===//
+//                           Builtin Classification
+//===----------------------------------------------------------------------===//
+
+namespace {
+enum class OpaqueBuiltinKind {
+  NeverOpaque,
+  /// Opaque operands are replaced by their storage address. The result is
+  /// never opaque.
+  OperandsByAddress,
+  PolymorphicBinary,
+  AddressOfBorrow,
+  UnprotectedAddressOfBorrow,
+  ZeroInitializer,
+  TaskRunInline,
+  /// May use or define an opaque value, but has no rewrite yet. This lists
+  /// known gaps only: a new builtin needs a rewrite, or NeverOpaque if none
+  /// of its operands or results can be opaque.
+  Unimplemented,
+};
+} // end anonymous namespace
+
+static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
+  auto kind = bi->getBuiltinKind();
+  // LLVM intrinsics. Overloaded ones accept any type named in their suffix.
+  if (!kind)
+    return OpaqueBuiltinKind::Unimplemented;
+
+  switch (*kind) {
+  // Operate on builtin scalars and vectors, or never appear in SIL as a
+  // builtin instruction.
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_CAST_OPERATION(Id, Name, Attrs) case BuiltinValueKind::Id:
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs)                     \
+  case BuiltinValueKind::Id:
+#define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Id, Name, Attrs, Overload)  \
+  case BuiltinValueKind::Id:
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, UncheckedID, Attrs,   \
+                                               Overload)                       \
+  case BuiltinValueKind::Id:
+#define BUILTIN_BINARY_OPERATION_RELAXED(Id, Name, StrictID, Attrs, Overload)  \
+  case BuiltinValueKind::Id:
+#define BUILTIN_UNARY_OPERATION(Id, Name, Attrs, Overload)                     \
+  case BuiltinValueKind::Id:
+#define BUILTIN_BINARY_PREDICATE(Id, Name, Attrs, Overload)                    \
+  case BuiltinValueKind::Id:
+#define BUILTIN_SIL_OPERATION(Id, Name, Overload) case BuiltinValueKind::Id:
+#define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
+
+  // No operand or result has a generic or existential type.
+  case BuiltinValueKind::AllocErrorBoxTyped:
+  case BuiltinValueKind::AllocRaw:
+  case BuiltinValueKind::AssertConf:
+  case BuiltinValueKind::AssumeAlignment:
+  case BuiltinValueKind::AtomicLoad:
+  case BuiltinValueKind::AtomicRMW:
+  case BuiltinValueKind::AtomicStore:
+  case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
+  case BuiltinValueKind::BitWidth:
+  case BuiltinValueKind::BuildMainActorExecutorRef:
+  case BuiltinValueKind::CmpXChg:
+  case BuiltinValueKind::CondFailMessage:
+  case BuiltinValueKind::CondUnreachable:
+  case BuiltinValueKind::ConvertTaskToJob:
+  case BuiltinValueKind::DeallocErrorBoxTyped:
+  case BuiltinValueKind::DeallocRaw:
+  case BuiltinValueKind::Dereferenceable:
+  case BuiltinValueKind::DestroyDefaultActor:
+  case BuiltinValueKind::DestroyTaskGroup:
+  case BuiltinValueKind::EndAsyncLetLifetime:
+  case BuiltinValueKind::Fence:
+  case BuiltinValueKind::FinishAsyncLet:
+  case BuiltinValueKind::GetCurrentAsyncTask:
+  case BuiltinValueKind::GetCurrentExecutor:
+  case BuiltinValueKind::GlobalStringTablePointer:
+  case BuiltinValueKind::Ifdef:
+  case BuiltinValueKind::InfiniteLoopTrueCondition:
+  case BuiltinValueKind::InitializeDefaultActor:
+  case BuiltinValueKind::InitializeNonDefaultDistributedActor:
+  case BuiltinValueKind::IntToFPWithOverflow:
+  case BuiltinValueKind::IsNegative:
+  case BuiltinValueKind::OnFastPath:
+  case BuiltinValueKind::Once:
+  case BuiltinValueKind::OnceWithContext:
+  case BuiltinValueKind::PoundAssert:
+  case BuiltinValueKind::RemoveTaskLocalValue:
+  case BuiltinValueKind::SToSCheckedTrunc:
+  case BuiltinValueKind::SToUCheckedTrunc:
+  case BuiltinValueKind::StackAlloc:
+  case BuiltinValueKind::StackDealloc:
+  case BuiltinValueKind::StaticReport:
+  case BuiltinValueKind::StringObjectOr:
+  case BuiltinValueKind::TargetOSVersionAtLeast:
+  case BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast:
+  case BuiltinValueKind::TargetVariantOSVersionAtLeast:
+  case BuiltinValueKind::TaskAddCancellationHandler:
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
+  case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+  case BuiltinValueKind::TaskCancellationScopePop:
+  case BuiltinValueKind::TaskCancellationScopePush:
+  case BuiltinValueKind::TaskCancellationShieldPop:
+  case BuiltinValueKind::TaskCancellationShieldPush:
+  case BuiltinValueKind::TaskLocalValuePop:
+  case BuiltinValueKind::TaskPopDeadline:
+  case BuiltinValueKind::TaskRemoveCancellationHandler:
+  case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+  case BuiltinValueKind::UToSCheckedTrunc:
+  case BuiltinValueKind::UToUCheckedTrunc:
+  case BuiltinValueKind::Unreachable:
+  case BuiltinValueKind::UnprotectedStackAlloc:
+  case BuiltinValueKind::WordAtIndex:
+  // Operands and results are builtin vectors, which are always loadable.
+  case BuiltinValueKind::Deinterleave:
+  case BuiltinValueKind::Interleave:
+  case BuiltinValueKind::ShuffleVector:
+  // Generic or existential only within metatypes, inouts, or function types.
+  case BuiltinValueKind::Alignof:
+  case BuiltinValueKind::AllocRawTyped:
+  case BuiltinValueKind::AllocVector:
+  case BuiltinValueKind::AssignCopyArrayBackToFront:
+  case BuiltinValueKind::AssignCopyArrayFrontToBack:
+  case BuiltinValueKind::AssignCopyArrayNoAlias:
+  case BuiltinValueKind::AssignTakeArray:
+  case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
+  case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
+  case BuiltinValueKind::CanBeObjCClass:
+  case BuiltinValueKind::CopyArray:
+  case BuiltinValueKind::CreateAsyncTask:
+  case BuiltinValueKind::CreateTaskGroup:
+  case BuiltinValueKind::CreateTaskGroupWithFlags:
+  case BuiltinValueKind::DeallocRawTyped:
+  case BuiltinValueKind::DestroyArray:
+  case BuiltinValueKind::GetObjCTypeEncoding:
+  case BuiltinValueKind::InitializeDistributedRemoteActor:
+  case BuiltinValueKind::InjectEnumTag:
+  case BuiltinValueKind::IsBitwiseTakable:
+  case BuiltinValueKind::IsConcrete:
+  case BuiltinValueKind::IsOptionalType:
+  case BuiltinValueKind::IsPOD:
+  case BuiltinValueKind::IsSameMetatype:
+  case BuiltinValueKind::Sizeof:
+  case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+  case BuiltinValueKind::Strideof:
+  case BuiltinValueKind::TakeArrayBackToFront:
+  case BuiltinValueKind::TakeArrayFrontToBack:
+  case BuiltinValueKind::TakeArrayNoAlias:
+  case BuiltinValueKind::TypePtrAuthDiscriminator:
+  case BuiltinValueKind::TypedAllocationID:
+  // The existential is always a boxed `any Error`.
+  case BuiltinValueKind::ErrorInMain:
+  case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+  case BuiltinValueKind::UnexpectedError:
+  case BuiltinValueKind::WillThrow:
+  // SILGen lowers these to other instructions.
+  case BuiltinValueKind::DistributedActorAsAnyActor:
+  case BuiltinValueKind::ExtractFunctionIsolation:
+  // SILGen only emits this with an address operand.
+  case BuiltinValueKind::TSanInoutAccess:
+    return OpaqueBuiltinKind::NeverOpaque;
+
+#define BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
+  case BuiltinValueKind::Id:
+#include "swift/AST/Builtins.def"
+    return OpaqueBuiltinKind::PolymorphicBinary;
+
+  case BuiltinValueKind::AddTaskLocalValue:
+  case BuiltinValueKind::AddressOfRawLayout:
+  case BuiltinValueKind::GetEnumTag:
+  case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+  case BuiltinValueKind::ResumeThrowingContinuationReturning:
+  case BuiltinValueKind::TaskLocalValuePush:
+  case BuiltinValueKind::TaskPushDeadline:
+    return OpaqueBuiltinKind::OperandsByAddress;
+
+  case BuiltinValueKind::AddressOfBorrowOpaque:
+    return OpaqueBuiltinKind::AddressOfBorrow;
+  case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+    return OpaqueBuiltinKind::UnprotectedAddressOfBorrow;
+  case BuiltinValueKind::ZeroInitializer:
+    return OpaqueBuiltinKind::ZeroInitializer;
+  case BuiltinValueKind::TaskRunInline:
+    return OpaqueBuiltinKind::TaskRunInline;
+
+  case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
+  case BuiltinValueKind::BuildDefaultActorExecutorRef:
+  case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+  case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
+  case BuiltinValueKind::COWBufferForReading:
+  case BuiltinValueKind::ExtractElement:
+  case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
+  case BuiltinValueKind::FlowSensitiveSelfIsolation:
+  case BuiltinValueKind::InsertElement:
+  case BuiltinValueKind::PrepareInitialization:
+  case BuiltinValueKind::Select:
+    return OpaqueBuiltinKind::Unimplemented;
+
+  case BuiltinValueKind::None:
+    llvm_unreachable("getBuiltinKind() does not return None");
+  }
+  llvm_unreachable("covered switch");
+}
 
 //===----------------------------------------------------------------------===//
 //                                UseRewriter
@@ -3928,10 +4131,7 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
 
 namespace {
 
-class UseRewriter : SILInstructionVisitor<UseRewriter> {
-  friend SILVisitorBase<UseRewriter>;
-  friend SILInstructionVisitor<UseRewriter>;
-
+class UseRewriter {
   AddressLoweringState &pass;
 
   SILBuilder builder;
@@ -3971,7 +4171,22 @@ protected:
     LLVM_DEBUG(llvm::dbgs() << "REWRITE USE "; inst->dump());
   }
 
-  void visitSILInstruction(SILInstruction *inst) {
+  void visit(SILInstruction *inst) {
+    beforeVisit(inst);
+    switch (inst->getKind()) {
+#define INST(CLASS, PARENT)                                                    \
+  case SILInstructionKind::CLASS:                                              \
+    return visit##CLASS(cast<CLASS>(inst));
+#include "swift/SIL/SILNodes.def"
+    }
+  }
+
+  void unexpectedOpaqueUse(SILInstruction *inst) {
+    inst->dump();
+    llvm::report_fatal_error("^^^ Unexpected opaque value use.");
+  }
+
+  void unimplementedOpaqueUse(SILInstruction *inst) {
     inst->dump();
     llvm::report_fatal_error("^^^ Unimplemented opaque value use.");
   }
@@ -4034,35 +4249,29 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    switch (classifyOpaqueBuiltin(bi)) {
     // Polymorphic builtins (e.g. "generic_add") only ever borrow their
     // operands (see the InstantaneousUse classification in
     // OperandOwnershipBuiltinClassifier), so every operand is handled the
     // same way: materialize its address in place.
-#define BUILTIN(Id, Name, Attrs)
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
-    case BuiltinValueKind::Id:
-#include "swift/AST/Builtins.def"
-    case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
-    case BuiltinValueKind::ResumeThrowingContinuationReturning:
-    case BuiltinValueKind::AddTaskLocalValue:
-    case BuiltinValueKind::TaskLocalValuePush:
-    case BuiltinValueKind::GetEnumTag:
-    case BuiltinValueKind::AddressOfRawLayout:
-    case BuiltinValueKind::TaskPushDeadline: {
+    case OpaqueBuiltinKind::PolymorphicBinary:
+    case OpaqueBuiltinKind::OperandsByAddress: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
-    case BuiltinValueKind::AddressOfBorrowOpaque:
+    case OpaqueBuiltinKind::AddressOfBorrow:
       visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/true);
       break;
-    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+    case OpaqueBuiltinKind::UnprotectedAddressOfBorrow:
       visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/false);
       break;
-    default:
-      bi->dump();
-      llvm::report_fatal_error("^^^ Unimplemented builtin opaque value use.");
+    case OpaqueBuiltinKind::NeverOpaque:
+    case OpaqueBuiltinKind::ZeroInitializer:
+    case OpaqueBuiltinKind::TaskRunInline:
+      return unexpectedOpaqueUse(bi);
+    case OpaqueBuiltinKind::Unimplemented:
+      return unimplementedOpaqueUse(bi);
     }
   }
 
@@ -4122,10 +4331,8 @@ protected:
   }
 
   void visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
-    if (use->getOperandNumber() != MarkDependenceAddrInst::Base) {
-      visitSILInstruction(mdai);
-      return;
-    }
+    if (use->getOperandNumber() != MarkDependenceAddrInst::Base)
+      return unexpectedOpaqueUse(mdai);
     SILValue baseAddr = addrMat.materializeAddress(use->get());
     mdai->setBase(baseAddr);
   }
@@ -4187,12 +4394,6 @@ protected:
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
     use->set(srcAddr);
     debugInst->prependDeref(use->getOperandNumber());
-  }
-
-  void visitDeinitExistentialValueInst(
-      DeinitExistentialValueInst *deinitExistential) {
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented DeinitExistentialValue use.");
   }
 
   void visitDestroyValueInst(DestroyValueInst *destroy) {
@@ -4404,6 +4605,217 @@ protected:
   void visitCheckedCastBranchInst(CheckedCastBranchInst *checkedCastBranch);
 
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *enumDataInst);
+
+#define NO_OPAQUE_OPERAND(INST)                                                \
+  void visit##INST##Inst(INST##Inst *inst) { unexpectedOpaqueUse(inst); }
+#define UNIMPLEMENTED_OPAQUE_OPERAND(INST)                                     \
+  void visit##INST##Inst(INST##Inst *inst) { unimplementedOpaqueUse(inst); }
+
+  // Value operands are addresses, indices, or on-stack closures.
+  NO_OPAQUE_OPERAND(AddressToPointer)
+  NO_OPAQUE_OPERAND(BeginAccess)
+  NO_OPAQUE_OPERAND(BeginUnpairedAccess)
+  NO_OPAQUE_OPERAND(CheckedCastAddrBranch)
+  NO_OPAQUE_OPERAND(CopyAddr)
+  NO_OPAQUE_OPERAND(CopyableToMoveOnlyWrapperAddr)
+  NO_OPAQUE_OPERAND(DeallocPack)
+  NO_OPAQUE_OPERAND(DeallocStack)
+  NO_OPAQUE_OPERAND(DeinitExistentialAddr)
+  NO_OPAQUE_OPERAND(DereferenceBorrowAddr)
+  NO_OPAQUE_OPERAND(DestroyAddr)
+  NO_OPAQUE_OPERAND(EndAccess)
+  NO_OPAQUE_OPERAND(EndCOWMutationAddr)
+  NO_OPAQUE_OPERAND(EndUnpairedAccess)
+  NO_OPAQUE_OPERAND(ExplicitCopyAddr)
+  NO_OPAQUE_OPERAND(GetAsyncContinuationAddr)
+  NO_OPAQUE_OPERAND(IndexAddr)
+  NO_OPAQUE_OPERAND(InitBorrowAddr)
+  NO_OPAQUE_OPERAND(InitEnumDataAddr)
+  NO_OPAQUE_OPERAND(InitExistentialAddr)
+  NO_OPAQUE_OPERAND(InjectEnumAddr)
+  NO_OPAQUE_OPERAND(IsUnique)
+  NO_OPAQUE_OPERAND(Load)
+  NO_OPAQUE_OPERAND(LoadBorrow)
+  NO_OPAQUE_OPERAND(LoadUnowned)
+  NO_OPAQUE_OPERAND(LoadWeak)
+  NO_OPAQUE_OPERAND(MakeAddrBorrow)
+  NO_OPAQUE_OPERAND(MarkFunctionEscape)
+  NO_OPAQUE_OPERAND(MarkUnresolvedMoveAddr)
+  NO_OPAQUE_OPERAND(MoveOnlyWrapperToCopyableAddr)
+  NO_OPAQUE_OPERAND(OpenExistentialAddr)
+  NO_OPAQUE_OPERAND(PackElementGet)
+  NO_OPAQUE_OPERAND(PackElementSet)
+  NO_OPAQUE_OPERAND(ProjectBlockStorage)
+  NO_OPAQUE_OPERAND(StructElementAddr)
+  NO_OPAQUE_OPERAND(SwitchEnumAddr)
+  NO_OPAQUE_OPERAND(TailAddr)
+  NO_OPAQUE_OPERAND(TupleElementAddr)
+  NO_OPAQUE_OPERAND(TuplePackElementAddr)
+  NO_OPAQUE_OPERAND(UncheckedAddrCast)
+  NO_OPAQUE_OPERAND(UncheckedBorrowEnumDataAddr)
+  NO_OPAQUE_OPERAND(UncheckedInPlaceEnumDataAddr)
+  NO_OPAQUE_OPERAND(UncheckedRefCastAddr)
+  NO_OPAQUE_OPERAND(UncheckedTakeEnumDataAddr)
+  NO_OPAQUE_OPERAND(UnconditionalCheckedCastAddr)
+  NO_OPAQUE_OPERAND(VectorBaseAddr)
+
+  // No operands, or only type-dependent ones, which rewriteUse skips.
+  NO_OPAQUE_OPERAND(AllocBox)
+  NO_OPAQUE_OPERAND(AllocExistentialBox)
+  NO_OPAQUE_OPERAND(AllocGlobal)
+  NO_OPAQUE_OPERAND(AllocPack)
+  NO_OPAQUE_OPERAND(AllocPackMetadata)
+  NO_OPAQUE_OPERAND(AllocStack)
+  NO_OPAQUE_OPERAND(BaseAddrForOffset)
+  NO_OPAQUE_OPERAND(DebugStep)
+  NO_OPAQUE_OPERAND(DifferentiabilityWitnessFunction)
+  NO_OPAQUE_OPERAND(DynamicFunctionRef)
+  NO_OPAQUE_OPERAND(FloatLiteral)
+  NO_OPAQUE_OPERAND(FunctionRef)
+  NO_OPAQUE_OPERAND(GetAsyncContinuation)
+  NO_OPAQUE_OPERAND(GlobalValue)
+  NO_OPAQUE_OPERAND(HasSymbol)
+  NO_OPAQUE_OPERAND(IncrementProfilerCounter)
+  NO_OPAQUE_OPERAND(IntegerLiteral)
+  NO_OPAQUE_OPERAND(Metatype)
+  NO_OPAQUE_OPERAND(ObjCProtocol)
+  NO_OPAQUE_OPERAND(PackLength)
+  NO_OPAQUE_OPERAND(PreviousDynamicFunctionRef)
+  NO_OPAQUE_OPERAND(ScalarPackIndex)
+  NO_OPAQUE_OPERAND(SpecifyTest)
+  NO_OPAQUE_OPERAND(StringLiteral)
+  NO_OPAQUE_OPERAND(ThrowAddr)
+  NO_OPAQUE_OPERAND(TypeValue)
+  NO_OPAQUE_OPERAND(Unreachable)
+  NO_OPAQUE_OPERAND(Unwind)
+  NO_OPAQUE_OPERAND(WitnessMethod)
+
+  // Operands are addresses, class references, boxes, metatypes, functions,
+  // tokens, or builtin types.
+  NO_OPAQUE_OPERAND(AbortApply)
+  NO_OPAQUE_OPERAND(AllocRef)
+  NO_OPAQUE_OPERAND(AllocRefDynamic)
+  NO_OPAQUE_OPERAND(AwaitAsyncContinuation)
+  NO_OPAQUE_OPERAND(BindMemory)
+  NO_OPAQUE_OPERAND(BridgeObjectToRef)
+  NO_OPAQUE_OPERAND(BridgeObjectToWord)
+  NO_OPAQUE_OPERAND(ClassMethod)
+  NO_OPAQUE_OPERAND(ClassifyBridgeObject)
+  NO_OPAQUE_OPERAND(CondBranch)
+  NO_OPAQUE_OPERAND(CondFail)
+  NO_OPAQUE_OPERAND(ConvertEscapeToNoEscape)
+  NO_OPAQUE_OPERAND(ConvertFunction)
+  NO_OPAQUE_OPERAND(CopyBlock)
+  NO_OPAQUE_OPERAND(CopyBlockWithoutEscaping)
+  NO_OPAQUE_OPERAND(DeallocBox)
+  NO_OPAQUE_OPERAND(DeallocExistentialBox)
+  NO_OPAQUE_OPERAND(DeallocPartialRef)
+  NO_OPAQUE_OPERAND(DeallocRef)
+  NO_OPAQUE_OPERAND(DeallocStackRef)
+  NO_OPAQUE_OPERAND(DestroyNotEscapedClosure)
+  NO_OPAQUE_OPERAND(DifferentiableFunction)
+  NO_OPAQUE_OPERAND(DifferentiableFunctionExtract)
+  NO_OPAQUE_OPERAND(DynamicMethodBranch)
+  NO_OPAQUE_OPERAND(DynamicPackIndex)
+  NO_OPAQUE_OPERAND(EndApply)
+  NO_OPAQUE_OPERAND(FunctionExtractIsolation)
+  NO_OPAQUE_OPERAND(GlobalAddr)
+  NO_OPAQUE_OPERAND(ImplicitActorToOpaqueIsolationCast)
+  NO_OPAQUE_OPERAND(IndexRawPointer)
+  NO_OPAQUE_OPERAND(InitBlockStorageHeader)
+  NO_OPAQUE_OPERAND(InitExistentialMetatype)
+  NO_OPAQUE_OPERAND(LinearFunction)
+  NO_OPAQUE_OPERAND(LinearFunctionExtract)
+  NO_OPAQUE_OPERAND(MarkUninitialized)
+  NO_OPAQUE_OPERAND(MarkUnresolvedReferenceBinding)
+  NO_OPAQUE_OPERAND(MoveOnlyWrapperToCopyableBox)
+  NO_OPAQUE_OPERAND(ObjCExistentialMetatypeToObject)
+  NO_OPAQUE_OPERAND(ObjCMetatypeToObject)
+  NO_OPAQUE_OPERAND(ObjCMethod)
+  NO_OPAQUE_OPERAND(ObjCSuperMethod)
+  NO_OPAQUE_OPERAND(ObjCToThickMetatype)
+  NO_OPAQUE_OPERAND(OpenCOMExistential)
+  NO_OPAQUE_OPERAND(OpenExistentialBox)
+  NO_OPAQUE_OPERAND(OpenExistentialBoxValue)
+  NO_OPAQUE_OPERAND(OpenExistentialMetatype)
+  NO_OPAQUE_OPERAND(OpenExistentialRef)
+  NO_OPAQUE_OPERAND(OpenPackElement)
+  NO_OPAQUE_OPERAND(PackPackIndex)
+  NO_OPAQUE_OPERAND(PointerToAddress)
+  NO_OPAQUE_OPERAND(ProjectBox)
+  NO_OPAQUE_OPERAND(ProjectExistentialBox)
+  NO_OPAQUE_OPERAND(RawPointerToRef)
+  NO_OPAQUE_OPERAND(RebindMemory)
+  NO_OPAQUE_OPERAND(RefElementAddr)
+  NO_OPAQUE_OPERAND(RefTailAddr)
+  NO_OPAQUE_OPERAND(RefToUnmanaged)
+  NO_OPAQUE_OPERAND(RefToUnowned)
+  NO_OPAQUE_OPERAND(StrongCopyUnmanagedValue)
+  NO_OPAQUE_OPERAND(SuperMethod)
+  NO_OPAQUE_OPERAND(SwitchValue)
+  NO_OPAQUE_OPERAND(ThickToObjCMetatype)
+  NO_OPAQUE_OPERAND(ThinToThickFunction)
+  NO_OPAQUE_OPERAND(Thunk)
+  NO_OPAQUE_OPERAND(UnmanagedToRef)
+  NO_OPAQUE_OPERAND(UnownedToRef)
+  NO_OPAQUE_OPERAND(Upcast)
+  NO_OPAQUE_OPERAND(ValueToBridgeObject)
+
+  // Not valid in OSSA.
+  NO_OPAQUE_OPERAND(ReleaseValue)
+  NO_OPAQUE_OPERAND(ReleaseValueAddr)
+  NO_OPAQUE_OPERAND(RetainValue)
+  NO_OPAQUE_OPERAND(RetainValueAddr)
+  NO_OPAQUE_OPERAND(StrongRelease)
+  NO_OPAQUE_OPERAND(StrongRetain)
+  NO_OPAQUE_OPERAND(StrongRetainUnowned)
+  NO_OPAQUE_OPERAND(UnownedRelease)
+  NO_OPAQUE_OPERAND(UnownedRetain)
+
+  // Only valid in static initializers or after this pass.
+  NO_OPAQUE_OPERAND(DeallocPackMetadata)
+  NO_OPAQUE_OPERAND(Object)
+  NO_OPAQUE_OPERAND(TupleAddrConstructor)
+  NO_OPAQUE_OPERAND(Vector)
+
+  // Can see an opaque operand, but has no rewrite yet. This lists known gaps
+  // only: a new instruction needs a rewrite, or a NO_OPAQUE_OPERAND entry
+  // with a reason if none of its operands can be opaque.
+  UNIMPLEMENTED_OPAQUE_OPERAND(Assign)
+  UNIMPLEMENTED_OPAQUE_OPERAND(AssignOrInit)
+  UNIMPLEMENTED_OPAQUE_OPERAND(AutoreleaseValue)
+  UNIMPLEMENTED_OPAQUE_OPERAND(BeginCOWMutation)
+  UNIMPLEMENTED_OPAQUE_OPERAND(BeginDeallocRef)
+  UNIMPLEMENTED_OPAQUE_OPERAND(BorrowedFrom)
+  UNIMPLEMENTED_OPAQUE_OPERAND(DeinitExistentialValue)
+  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceAddrBorrow)
+  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceBorrow)
+  UNIMPLEMENTED_OPAQUE_OPERAND(Diagnose)
+  UNIMPLEMENTED_OPAQUE_OPERAND(DropDeinit)
+  UNIMPLEMENTED_OPAQUE_OPERAND(EndCOWMutation)
+  UNIMPLEMENTED_OPAQUE_OPERAND(EndFormalScope)
+  UNIMPLEMENTED_OPAQUE_OPERAND(EndInitLetRef)
+  UNIMPLEMENTED_OPAQUE_OPERAND(EndLifetime)
+  UNIMPLEMENTED_OPAQUE_OPERAND(ExtractExecutor)
+  UNIMPLEMENTED_OPAQUE_OPERAND(HopToExecutor)
+  UNIMPLEMENTED_OPAQUE_OPERAND(InitExistentialRef)
+  UNIMPLEMENTED_OPAQUE_OPERAND(MergeIsolationRegion)
+  UNIMPLEMENTED_OPAQUE_OPERAND(RefToBridgeObject)
+  UNIMPLEMENTED_OPAQUE_OPERAND(RefToRawPointer)
+  UNIMPLEMENTED_OPAQUE_OPERAND(SelectEnumAddr)
+  UNIMPLEMENTED_OPAQUE_OPERAND(StoreUnowned)
+  UNIMPLEMENTED_OPAQUE_OPERAND(StoreWeak)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnership)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnershipConversion)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedRefCast)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedAutoreleaseValue)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedReleaseValue)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedRetainValue)
+  UNIMPLEMENTED_OPAQUE_OPERAND(UnownedCopyValue)
+  UNIMPLEMENTED_OPAQUE_OPERAND(WeakCopyValue)
+
+#undef NO_OPAQUE_OPERAND
+#undef UNIMPLEMENTED_OPAQUE_OPERAND
 };
 } // end anonymous namespace
 
@@ -4866,10 +5278,7 @@ void UseRewriter::visitUncheckedEnumDataInst(
 //===----------------------------------------------------------------------===//
 
 namespace {
-class DefRewriter : SILInstructionVisitor<DefRewriter> {
-  friend SILVisitorBase<DefRewriter>;
-  friend SILInstructionVisitor<DefRewriter>;
-
+class DefRewriter {
   AddressLoweringState &pass;
 
   SILBuilder builder;
@@ -4923,7 +5332,28 @@ protected:
       LLVM_DEBUG(llvm::dbgs() << "  STORAGE "; storage.storageAddress->dump());
   }
 
-  void visitSILInstruction(SILInstruction *inst) {
+  void visit(SILInstruction *inst) {
+    beforeVisit(inst);
+    switch (inst->getKind()) {
+#define INST(CLASS, PARENT)                                                    \
+  case SILInstructionKind::CLASS:                                              \
+    return visit##CLASS(cast<CLASS>(inst));
+#include "swift/SIL/SILNodes.def"
+    }
+  }
+
+  void unexpectedOpaqueDef(SILInstruction *inst) {
+    inst->dump();
+    llvm::report_fatal_error("^^^ Unexpected opaque value def.");
+  }
+
+  void opaqueDefNotRewrittenByUse(SILInstruction *inst) {
+    inst->dump();
+    llvm::report_fatal_error(
+        "^^^ Opaque value def should have been rewritten with its operand.");
+  }
+
+  void unimplementedOpaqueDef(SILInstruction *inst) {
     inst->dump();
     llvm::report_fatal_error("^^^ Unimplemented opaque value def.");
   }
@@ -4967,8 +5397,8 @@ protected:
   }
 
   void visitBuiltinInst(BuiltinInst *bi) {
-    switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
-    case BuiltinValueKind::ZeroInitializer: {
+    switch (classifyOpaqueBuiltin(bi)) {
+    case OpaqueBuiltinKind::ZeroInitializer: {
       // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
       assert(bi->getNumOperands() == 0 &&
              "address-form zeroInitializer should not appear as an opaque def");
@@ -4978,7 +5408,7 @@ protected:
       storage.markRewritten();
       break;
     }
-    case BuiltinValueKind::TaskRunInline: {
+    case OpaqueBuiltinKind::TaskRunInline: {
       addrMat.materializeAddress(bi);
       SmallVector<SILValue, 2> newArgs = {storage.storageAddress};
       llvm::append_range(newArgs, bi->getArguments());
@@ -4989,11 +5419,7 @@ protected:
       storage.markRewritten();
       break;
     }
-#define BUILTIN(Id, Name, Attrs)
-#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name)                         \
-    case BuiltinValueKind::Id:
-#include "swift/AST/Builtins.def"
-    {
+    case OpaqueBuiltinKind::PolymorphicBinary: {
       // Rewrite the value-form (with already address-converted operands,
       // see UseRewriter::visitBuiltinInst above):
       //   %result = builtin "generic_add"<T>(%0 : $*T, %1 : $*T) : $T
@@ -5019,9 +5445,13 @@ protected:
       storage.markRewritten();
       break;
     }
-    default:
-      bi->dump();
-      llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
+    case OpaqueBuiltinKind::NeverOpaque:
+    case OpaqueBuiltinKind::OperandsByAddress:
+    case OpaqueBuiltinKind::AddressOfBorrow:
+    case OpaqueBuiltinKind::UnprotectedAddressOfBorrow:
+      return unexpectedOpaqueDef(bi);
+    case OpaqueBuiltinKind::Unimplemented:
+      return unimplementedOpaqueDef(bi);
     }
   }
 
@@ -5148,6 +5578,185 @@ protected:
     builder.createStoreWeak(wcsvi->getLoc(), wcsvi->getOperand(), destAddr,
                             IsInitialization);
   }
+
+#define NO_OPAQUE_RESULT(INST)                                                 \
+  void visit##INST##Inst(INST##Inst *inst) { unexpectedOpaqueDef(inst); }
+#define REWRITTEN_BY_USE(INST)                                                 \
+  void visit##INST##Inst(INST##Inst *inst) { opaqueDefNotRewrittenByUse(inst); }
+#define UNIMPLEMENTED_OPAQUE_RESULT(INST)                                      \
+  void visit##INST##Inst(INST##Inst *inst) { unimplementedOpaqueDef(inst); }
+
+  // No results. Terminator results are block arguments, see rewriteArg.
+#define INST(ID, PARENT)
+#define NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)              \
+  void visit##ID(ID *inst) { unexpectedOpaqueDef(inst); }
+#include "swift/SIL/SILNodes.def"
+
+  // Results are addresses.
+  NO_OPAQUE_RESULT(AllocPack)
+  NO_OPAQUE_RESULT(AllocPackMetadata)
+  NO_OPAQUE_RESULT(AllocStack)
+  NO_OPAQUE_RESULT(BaseAddrForOffset)
+  NO_OPAQUE_RESULT(BeginAccess)
+  NO_OPAQUE_RESULT(CopyableToMoveOnlyWrapperAddr)
+  NO_OPAQUE_RESULT(DereferenceAddrBorrow)
+  NO_OPAQUE_RESULT(DereferenceBorrowAddr)
+  NO_OPAQUE_RESULT(GlobalAddr)
+  NO_OPAQUE_RESULT(IndexAddr)
+  NO_OPAQUE_RESULT(InitEnumDataAddr)
+  NO_OPAQUE_RESULT(InitExistentialAddr)
+  NO_OPAQUE_RESULT(MoveOnlyWrapperToCopyableAddr)
+  NO_OPAQUE_RESULT(OpenExistentialAddr)
+  NO_OPAQUE_RESULT(OpenExistentialBox)
+  NO_OPAQUE_RESULT(PackElementGet)
+  NO_OPAQUE_RESULT(PointerToAddress)
+  NO_OPAQUE_RESULT(ProjectBlockStorage)
+  NO_OPAQUE_RESULT(ProjectBox)
+  NO_OPAQUE_RESULT(ProjectExistentialBox)
+  NO_OPAQUE_RESULT(RefElementAddr)
+  NO_OPAQUE_RESULT(RefTailAddr)
+  NO_OPAQUE_RESULT(StoreBorrow)
+  NO_OPAQUE_RESULT(StructElementAddr)
+  NO_OPAQUE_RESULT(TailAddr)
+  NO_OPAQUE_RESULT(TupleElementAddr)
+  NO_OPAQUE_RESULT(TuplePackElementAddr)
+  NO_OPAQUE_RESULT(UncheckedAddrCast)
+  NO_OPAQUE_RESULT(UncheckedBorrowEnumDataAddr)
+  NO_OPAQUE_RESULT(UncheckedInPlaceEnumDataAddr)
+  NO_OPAQUE_RESULT(UncheckedTakeEnumDataAddr)
+  NO_OPAQUE_RESULT(VectorBaseAddr)
+
+  // Results are references, boxes, metatypes, functions, or other loadable
+  // types.
+  NO_OPAQUE_RESULT(AllocBox)
+  NO_OPAQUE_RESULT(AllocExistentialBox)
+  NO_OPAQUE_RESULT(AllocRef)
+  NO_OPAQUE_RESULT(AllocRefDynamic)
+  NO_OPAQUE_RESULT(COMMethod)
+  NO_OPAQUE_RESULT(ClassMethod)
+  NO_OPAQUE_RESULT(ConvertEscapeToNoEscape)
+  NO_OPAQUE_RESULT(ConvertFunction)
+  NO_OPAQUE_RESULT(CopyBlock)
+  NO_OPAQUE_RESULT(CopyBlockWithoutEscaping)
+  NO_OPAQUE_RESULT(DifferentiabilityWitnessFunction)
+  NO_OPAQUE_RESULT(DifferentiableFunction)
+  NO_OPAQUE_RESULT(DifferentiableFunctionExtract)
+  NO_OPAQUE_RESULT(DynamicFunctionRef)
+  NO_OPAQUE_RESULT(ExistentialMetatype)
+  NO_OPAQUE_RESULT(FunctionExtractIsolation)
+  NO_OPAQUE_RESULT(FunctionRef)
+  NO_OPAQUE_RESULT(GlobalValue)
+  NO_OPAQUE_RESULT(ImplicitActorToOpaqueIsolationCast)
+  NO_OPAQUE_RESULT(InitBlockStorageHeader)
+  NO_OPAQUE_RESULT(InitExistentialMetatype)
+  NO_OPAQUE_RESULT(InitExistentialRef)
+  NO_OPAQUE_RESULT(KeyPath)
+  NO_OPAQUE_RESULT(LinearFunction)
+  NO_OPAQUE_RESULT(LinearFunctionExtract)
+  NO_OPAQUE_RESULT(MarkUninitialized)
+  NO_OPAQUE_RESULT(MarkUnresolvedReferenceBinding)
+  NO_OPAQUE_RESULT(Metatype)
+  NO_OPAQUE_RESULT(MoveOnlyWrapperToCopyableBox)
+  NO_OPAQUE_RESULT(ObjCExistentialMetatypeToObject)
+  NO_OPAQUE_RESULT(ObjCMetatypeToObject)
+  NO_OPAQUE_RESULT(ObjCMethod)
+  NO_OPAQUE_RESULT(ObjCProtocol)
+  NO_OPAQUE_RESULT(ObjCSuperMethod)
+  NO_OPAQUE_RESULT(ObjCToThickMetatype)
+  NO_OPAQUE_RESULT(OpenCOMExistential)
+  NO_OPAQUE_RESULT(OpenExistentialMetatype)
+  NO_OPAQUE_RESULT(OpenExistentialRef)
+  NO_OPAQUE_RESULT(PartialApply)
+  NO_OPAQUE_RESULT(PreviousDynamicFunctionRef)
+  NO_OPAQUE_RESULT(RefToBridgeObject)
+  NO_OPAQUE_RESULT(RefToUnmanaged)
+  NO_OPAQUE_RESULT(RefToUnowned)
+  NO_OPAQUE_RESULT(SuperMethod)
+  NO_OPAQUE_RESULT(ThickToObjCMetatype)
+  NO_OPAQUE_RESULT(ThinToThickFunction)
+  NO_OPAQUE_RESULT(Thunk)
+  NO_OPAQUE_RESULT(TypeValue)
+  NO_OPAQUE_RESULT(UnmanagedToRef)
+  NO_OPAQUE_RESULT(UnownedToRef)
+  NO_OPAQUE_RESULT(Upcast)
+  NO_OPAQUE_RESULT(ValueMetatype)
+  NO_OPAQUE_RESULT(ValueToBridgeObject)
+  NO_OPAQUE_RESULT(WitnessMethod)
+
+  // Results have builtin types.
+  NO_OPAQUE_RESULT(AddressToPointer)
+  NO_OPAQUE_RESULT(BindMemory)
+  NO_OPAQUE_RESULT(BridgeObjectToWord)
+  NO_OPAQUE_RESULT(ClassifyBridgeObject)
+  NO_OPAQUE_RESULT(DestroyNotEscapedClosure)
+  NO_OPAQUE_RESULT(DynamicPackIndex)
+  NO_OPAQUE_RESULT(ExtractExecutor)
+  NO_OPAQUE_RESULT(FloatLiteral)
+  NO_OPAQUE_RESULT(GetAsyncContinuation)
+  NO_OPAQUE_RESULT(GetAsyncContinuationAddr)
+  NO_OPAQUE_RESULT(HasSymbol)
+  NO_OPAQUE_RESULT(IndexRawPointer)
+  NO_OPAQUE_RESULT(IntegerLiteral)
+  NO_OPAQUE_RESULT(IsUnique)
+  NO_OPAQUE_RESULT(OpenPackElement)
+  NO_OPAQUE_RESULT(PackLength)
+  NO_OPAQUE_RESULT(PackPackIndex)
+  NO_OPAQUE_RESULT(RebindMemory)
+  NO_OPAQUE_RESULT(RefToRawPointer)
+  NO_OPAQUE_RESULT(ScalarPackIndex)
+  NO_OPAQUE_RESULT(StringLiteral)
+
+  // Only valid in static initializers.
+  NO_OPAQUE_RESULT(Object)
+  NO_OPAQUE_RESULT(Vector)
+
+  // Only marks guaranteed phis, which cannot be address-only.
+  NO_OPAQUE_RESULT(BorrowedFrom)
+
+  // An address-only result implies an address-only operand.
+  REWRITTEN_BY_USE(BeginBorrow)
+  REWRITTEN_BY_USE(CopyValue)
+  REWRITTEN_BY_USE(CopyableToMoveOnlyWrapperValue)
+  REWRITTEN_BY_USE(DestructureStruct)
+  REWRITTEN_BY_USE(ExplicitCopyValue)
+  REWRITTEN_BY_USE(MarkDependence)
+  REWRITTEN_BY_USE(MarkUnresolvedNonCopyableValue)
+  REWRITTEN_BY_USE(MoveOnlyWrapperToCopyableValue)
+  REWRITTEN_BY_USE(MoveValue)
+  REWRITTEN_BY_USE(OpenExistentialValue)
+  REWRITTEN_BY_USE(StructExtract)
+  REWRITTEN_BY_USE(TupleExtract)
+  REWRITTEN_BY_USE(TuplePackExtract)
+  REWRITTEN_BY_USE(UncheckedEnumData)
+
+  // Can define an opaque result, but has no rewrite yet. This lists known
+  // gaps only: a new instruction needs a rewrite, or a NO_OPAQUE_RESULT or
+  // REWRITTEN_BY_USE entry with a reason.
+  UNIMPLEMENTED_OPAQUE_RESULT(BeginCOWMutation)
+  UNIMPLEMENTED_OPAQUE_RESULT(BeginDeallocRef)
+  UNIMPLEMENTED_OPAQUE_RESULT(BridgeObjectToRef)
+  UNIMPLEMENTED_OPAQUE_RESULT(DropDeinit)
+  UNIMPLEMENTED_OPAQUE_RESULT(EndApply)
+  UNIMPLEMENTED_OPAQUE_RESULT(EndCOWMutation)
+  UNIMPLEMENTED_OPAQUE_RESULT(EndInitLetRef)
+  UNIMPLEMENTED_OPAQUE_RESULT(LoadUnowned)
+  UNIMPLEMENTED_OPAQUE_RESULT(LoadWeak)
+  UNIMPLEMENTED_OPAQUE_RESULT(MakeAddrBorrow)
+  UNIMPLEMENTED_OPAQUE_RESULT(MakeBorrow)
+  UNIMPLEMENTED_OPAQUE_RESULT(RawPointerToRef)
+  UNIMPLEMENTED_OPAQUE_RESULT(SelectEnum)
+  UNIMPLEMENTED_OPAQUE_RESULT(SelectEnumAddr)
+  UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnmanagedValue)
+  UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnownedValue)
+  UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyWeakValue)
+  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnership)
+  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnershipConversion)
+  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedRefCast)
+  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedTrivialBitCast)
+
+#undef NO_OPAQUE_RESULT
+#undef REWRITTEN_BY_USE
+#undef UNIMPLEMENTED_OPAQUE_RESULT
 };
 } // end anonymous namespace
 
