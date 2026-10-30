@@ -353,13 +353,6 @@ public:
   /// takes a Swift closure as a single parameter.
   static ConstructorDecl *makeClosureConstructor(NominalTypeDecl *decl);
 
-  /// Synthesize a static factory method for a C++ foreign reference type,
-  /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
-  /// allocation function is not found.
-  llvm::SmallVector<clang::CXXMethodDecl *, 4>
-  synthesizeStaticFactoryForCXXForeignRef(
-      const clang::CXXRecordDecl *cxxRecordDecl);
-
   /// Synthesize (and import) a C++ function that performs a `static_cast` from
   /// a pointer to \p derivedClass to a pointer to \p baseClass, i.e.
   ///
