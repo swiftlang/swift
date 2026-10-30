@@ -139,6 +139,14 @@ void captureGlobalAndOut(View v [[clang::lifetime_capture_by_global]] [[clang::l
     out = v;
 }
 
+struct SWIFT_NONESCAPABLE MoreCaptures {
+    static void staticCapture(View &out, View v [[clang::lifetime_capture_by(out)]]) {
+        out = v;
+    }
+
+    View view;
+};
+
 CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
     return CaptureView(View{&owner.data});
 }
@@ -358,6 +366,7 @@ struct SWIFT_NONESCAPABLE IndependentCtor {
 // CHECK: sil {{.*}}[clang fromRvalueRefTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} Owner) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang IndependentCtor.init] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(immortal) @out IndependentCtor
+// CHECK-DAG: sil {{.*}}[clang MoreCaptures.staticCapture] {{.*}} : $@convention(c) (@lifetime(copy 1) @inout View, View) -> ()
 
 //--- test.swift
 
@@ -430,6 +439,11 @@ func rvalueRefLifetimebound(_ o: consuming Owner, _ n: consuming NonTrivialByVal
 
 func independentCtor(_ o: Owner) {
     let _ = IndependentCtor(o)
+}
+
+func moreCaptures(_ o: Owner, _ v: View) {
+    var a = View()
+    MoreCaptures.staticCapture(&a, v)
 }
 
 //--- escaping_scopes.swift
