@@ -212,7 +212,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       params, voidTy, dc, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
-  if (!isa<ClassDecl>(dc))
+  if (!isa<ClassDecl>(dc) && !importedFieldDecl->isStatic())
     setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   setterDecl->setAccess(importedFieldDecl->getSetterFormalAccess());
 
@@ -790,6 +790,9 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
+  assert((!options.contains(ValueConstructorFlags::WantZeroInitPrologue) ||
+          options.contains(ValueConstructorFlags::WantBody)) &&
+         "zero-init prologue requires a synthesized body");
   if (options.contains(ValueConstructorFlags::WantBody)) {
     auto *bodyContext = ValueConstructorBodyContext::create(
         context, members,
@@ -972,20 +975,106 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
 }
 
 void SwiftDeclSynthesizer::makeStructRawValued(
-    StructDecl *structDecl, Type underlyingType, Type legacyUnderlyingType,
+    StructDecl *structDecl, Type underlyingType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    MakeStructRawValuedOptions options) {
-  bool needsCArrayProjections = legacyUnderlyingType.isNull()
-        || !underlyingType->isEqual(legacyUnderlyingType);
+    MakeStructRawValuedOptions options, CArrayProjection neededCounterpart) {
+  bool needsCounterpart = neededCounterpart != CArrayProjection::Modern;
+  Type counterpartType =
+      importer::computeLegacyCArrayType({underlyingType, false},
+                                        neededCounterpart).getType();
+  ASSERT(counterpartType && "needed counterpart type should be computable");
+  auto &ctx = ImporterImpl.SwiftContext;
 
-  // `getMaxAccessLevel()` only returns a cap (and may be `Open`, which a
-  // struct member can never actually have), so clamp it against the
-  // struct's own formal access, same as `getAccessLevel()` does for
-  // ordinary members.
-  auto memberAccessLevel = std::min(
-      structDecl->getFormalAccess(),
-      ImporterImpl.getMaxAccessLevel(CArrayProjection::Modern,
-                                     needsCArrayProjections));
+  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
+                                           synthesizedProtocolAttrs);
+
+  // Create all the possibly-dual-projected members.
+
+  auto getAccessLevel = [&](CArrayProjection projection) {
+    // `getMaxAccessLevel()` only returns a cap (and may be `Open`, which a
+    // struct member can never actually have), so clamp it against the
+    // struct's own formal access, same as `getAccessLevel()` does for
+    // ordinary members.
+    return std::min(
+        structDecl->getFormalAccess(),
+        ImporterImpl.getMaxAccessLevel(projection, needsCounterpart));
+  };
+
+  bool isReadOnly = options.contains(MakeStructRawValuedFlags::ReadOnly);
+
+  // To make sure that they print in the preferred order, we don't `addMember()`
+  // the VarDecls and PatternBindingDecls until after we've added the inits.
+  SmallVector<Decl *, 4> varMembers;
+
+  // Create the stored variable for each projection. If the modern one will be
+  // computed, it can't be a `let`; a read-only forwarder gets a private setter
+  // instead. (Registering the C array projections makes it computed.)
+  auto *var = ImporterImpl.forEachCArrayProjection(
+      neededCounterpart, [&](CArrayProjection projection) -> VarDecl * {
+    bool isModern = projection == CArrayProjection::Modern;
+    auto access = getAccessLevel(projection);
+
+    VarDecl *newVar;
+    PatternBindingDecl *patternBinding;
+    std::tie(newVar, patternBinding) = createVarWithPattern(
+        structDecl, ctx.Id_rawValue,
+        isModern ? underlyingType : counterpartType,
+        isReadOnly && !needsCounterpart
+            ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+        !isModern || options.contains(MakeStructRawValuedFlags::IsImplicit),
+        access, isReadOnly ? AccessLevel::Private : access);
+    assert(newVar->hasStorage());
+
+    varMembers.push_back(patternBinding);
+    varMembers.push_back(newVar);
+
+    if (isModern && needsCounterpart)
+      ImporterImpl.addInlineArrayAvailability(newVar);
+    return newVar;
+  });
+  VarDecl *storedVar = getDeclForCounterpartCArrayProjection(var);
+
+  // Create constructors to initialize each projection's variable from a value
+  // of its type.
+  auto makeInit = [&](bool labeled) {
+    return ImporterImpl.forEachCArrayProjection(
+        neededCounterpart,
+        [&](CArrayProjection projection) -> ConstructorDecl * {
+      // Hidden storage doesn't get initializers.
+      if (projection == CArrayProjection::HiddenStorage)
+        return nullptr;
+
+      bool isModern = projection == CArrayProjection::Modern;
+
+      // In addition to the obvious differences, a modern constructor uses AST
+      // synthesis (`ValueConstructorFlags::WantBody`); a legacy constructor
+      // uses SILGen synthesis (`MemberwiseInitKind::Regular`).
+      ValueConstructorOptions ctorOptions;
+      if (labeled)
+        ctorOptions |= ValueConstructorFlags::WantParamNames;
+      if (isModern)
+        ctorOptions |= ValueConstructorFlags::WantBody;
+      auto *ctor = createValueConstructor(
+          structDecl, isModern ? var : storedVar, ctorOptions,
+          getAccessLevel(projection));
+      if (!ctorOptions.contains(ValueConstructorFlags::WantBody))
+        ctor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+
+      if (isModern && needsCounterpart)
+        ImporterImpl.addInlineArrayAvailability(ctor);
+
+      structDecl->addMember(ctor);
+      return ctor;
+    });
+  };
+
+  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
+    makeInit(/*labeled=*/false);
+  makeInit(/*labeled=*/true);
+
+  // Now add the vars.
+  for (Decl *var : varMembers)
+    structDecl->addMember(var);
 
   // We cannot dual-project RawValue, so use whichever type matches the current
   // projection. If there's no legacy type at all (the array is too big to
@@ -993,104 +1082,13 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   // which projection is visible -- the struct itself is marked Internal by
   // the caller in that case, but RawValue still needs a real type.
   Type visibleRawValueType = underlyingType;
-  if (needsCArrayProjections && !legacyUnderlyingType.isNull()
+  if (neededCounterpart == CArrayProjection::Legacy
         && ImporterImpl.VisibleCArrayProjection == CArrayProjection::Legacy)
-    visibleRawValueType = legacyUnderlyingType;
-
-  // Create the modern projections.
-  auto &ctx = ImporterImpl.SwiftContext;
-
-  ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
-                                           synthesizedProtocolAttrs);
-
-  // Create a variable to store the underlying value.
-  VarDecl *var;
-  PatternBindingDecl *patternBinding;
-  bool isReadOnly = options.contains(MakeStructRawValuedFlags::ReadOnly);
-  std::tie(var, patternBinding) = createVarWithPattern(
-      structDecl, ctx.Id_rawValue, underlyingType,
-      isReadOnly ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-      options.contains(MakeStructRawValuedFlags::IsImplicit),
-      memberAccessLevel, isReadOnly ? AccessLevel::Private : memberAccessLevel);
-
-  assert(var->hasStorage());
-
-  // Create constructors to initialize that value from a value of the
-  // underlying type.
-  ConstructorDecl *unlabeledInit = nullptr;
-  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
-    unlabeledInit = createValueConstructor(
-        structDecl, var, ValueConstructorFlags::WantBody, memberAccessLevel);
-  }
-
-  auto *initRawValue = createValueConstructor(
-      structDecl, var,
-      {ValueConstructorFlags::WantParamNames, ValueConstructorFlags::WantBody},
-      memberAccessLevel);
-
-  if (unlabeledInit)
-    structDecl->addMember(unlabeledInit);
-  structDecl->addMember(initRawValue);
-  structDecl->addMember(patternBinding);
-  structDecl->addMember(var);
-
-  if (needsCArrayProjections) {
-    if (unlabeledInit)
-      ImporterImpl.addInlineArrayAvailability(unlabeledInit);
-    ImporterImpl.addInlineArrayAvailability(initRawValue);
-  }
+    visibleRawValueType = counterpartType;
 
   ClangImporter::Implementation::addSynthesizedTypealias(
       structDecl, ctx.Id_RawValue, visibleRawValueType);
   ImporterImpl.RawTypes[structDecl] = visibleRawValueType;
-
-  // Create the legacy projections, if needed
-  if (!needsCArrayProjections)
-    return;
-
-  VarDecl *legacyVar = nullptr;
-  ConstructorDecl *legacyInitRawValue = nullptr;
-  ConstructorDecl *legacyUnlabeledInit = nullptr;
-
-  // If we got here but `legacyUnderlyingType` is null, the legacy type is
-  // un-importable, so we don't need to create legacy projections but we do need
-  // to register the modern projections.
-  if (!legacyUnderlyingType.isNull()) {
-    auto legacyMemberAccessLevel = std::min(
-        structDecl->getFormalAccess(),
-        ImporterImpl.getMaxAccessLevel(CArrayProjection::Legacy,
-                                       needsCArrayProjections));
-
-    PatternBindingDecl *legacyPatternBinding;
-    std::tie(legacyVar, legacyPatternBinding) = createVarWithPattern(
-        structDecl, ctx.Id_rawValue, legacyUnderlyingType,
-        VarDecl::Introducer::Var, /*isImplicit=*/true, legacyMemberAccessLevel,
-        isReadOnly ? AccessLevel::Private : legacyMemberAccessLevel);
-
-    if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit)) {
-      legacyUnlabeledInit = createValueConstructor(structDecl, legacyVar, {},
-                                                   legacyMemberAccessLevel);
-      legacyUnlabeledInit->setIsMemberwiseInitializer(
-                                              MemberwiseInitKind::Regular);
-    }
-
-    legacyInitRawValue = createValueConstructor(
-        structDecl, legacyVar,
-        ValueConstructorFlags::WantParamNames, legacyMemberAccessLevel);
-    legacyInitRawValue->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
-
-    if (legacyUnlabeledInit)
-      structDecl->addMember(legacyUnlabeledInit);
-    structDecl->addMember(legacyInitRawValue);
-    structDecl->addMember(legacyPatternBinding);
-    structDecl->addMember(legacyVar);
-  }
-
-  if (unlabeledInit)
-    registerCArrayProjections(unlabeledInit, legacyUnlabeledInit);
-  registerCArrayProjections(var, legacyVar);
-  // PBDs don't have their own attributes
-  registerCArrayProjections(initRawValue, legacyInitRawValue);
 }
 
 // MARK: Unions
@@ -1415,73 +1413,75 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
   return {getterDecl, setterDecl};
 }
 
-// MARK: Legacy C array projections
+// MARK: C array projections
 
-/// Synthesize the getter body for a legacy C array variable.
+/// Synthesize the getter body for a C array variable that forwards to its
+/// other projection.
 static std::pair<BraceStmt *, bool>
-synthesizeLegacyCArrayGetterBody(AbstractFunctionDecl *afd, void *context) {
+synthesizeCArrayProjectionGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto getterDecl = cast<AccessorDecl>(afd);
-  auto legacyDecl = cast<VarDecl>(getterDecl->getStorage());
-  auto modernDecl = static_cast<VarDecl *>(context);
+  auto forwardingDecl = cast<VarDecl>(getterDecl->getStorage());
+  auto storedDecl = static_cast<VarDecl *>(context);
   ASTContext &ctx = getterDecl->getASTContext();
 
-  Expr *modernValueExpr;
-  if (modernDecl->getDeclContext()->getSelfNominalTypeDecl()) {
+  Expr *storedValueExpr;
+  if (storedDecl->getDeclContext()->getSelfNominalTypeDecl()) {
     // auto selfDecl = `self`
     auto selfDecl = getterDecl->getImplicitSelfDecl();
     Expr *selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                            /*implicit=*/true);
     selfExpr->setType(selfDecl->getInterfaceType());
 
-    // modernValueExpr = `\(selfDecl).\(modernDecl)`
-    modernValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), modernDecl,
+    // storedValueExpr = `\(selfDecl).\(storedDecl)`
+    storedValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), storedDecl,
                                               DeclNameLoc(), /*implicit=*/true);
   } else {
-    // modernValueExpr = `\(modernDecl)`
-    modernValueExpr = new (ctx) DeclRefExpr(modernDecl, DeclNameLoc(),
+    // storedValueExpr = `\(storedDecl)`
+    storedValueExpr = new (ctx) DeclRefExpr(storedDecl, DeclNameLoc(),
                                             /*implicit=*/true);
   }
-  modernValueExpr->setType(modernDecl->getInterfaceType());
+  storedValueExpr->setType(storedDecl->getInterfaceType());
 
-  // auto expr = `Builtin.reinterpretCast(\(modernValueExpr))`
-  //             (to type of legacyDecl)
+  // auto expr = `Builtin.reinterpretCast(\(storedValueExpr))`
+  //             (to type of forwardingDecl)
   auto expr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
                   ctx,
-                  modernValueExpr->getType(),
-                  legacyDecl->getInterfaceType(),
-                  modernValueExpr);
+                  storedValueExpr->getType(),
+                  forwardingDecl->getInterfaceType(),
+                  storedValueExpr);
 
   return createSingleReturnBody(ctx, expr);
 }
 
-/// Synthesize the setter body for a legacy C array variable.
+/// Synthesize the setter body for a C array variable that forwards to its
+/// other projection.
 static std::pair<BraceStmt *, bool>
-synthesizeLegacyCArraySetterBody(AbstractFunctionDecl *afd, void *context) {
+synthesizeCArrayProjectionSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto setterDecl = cast<AccessorDecl>(afd);
-  auto modernDecl = static_cast<VarDecl *>(context);
+  auto storedDecl = static_cast<VarDecl *>(context);
   ASTContext &ctx = setterDecl->getASTContext();
 
-  Expr *modernValueExpr;
-  if (modernDecl->getDeclContext()->getSelfNominalTypeDecl()) {
+  Expr *storedValueExpr;
+  if (storedDecl->getDeclContext()->getSelfNominalTypeDecl()) {
     // auto selfDecl = `self`
     auto selfDecl = setterDecl->getImplicitSelfDecl();
     Expr *selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                            /*implicit=*/true);
     selfExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
 
-    // modernValueExpr = `\(selfDecl).\(modernDecl)`
+    // storedValueExpr = `\(selfDecl).\(storedDecl)`
     AccessSemantics semantics = setterDecl->isInitAccessor()
                                   ? AccessSemantics::DirectToStorage
                                   : AccessSemantics::Ordinary;
-    modernValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), modernDecl,
+    storedValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), storedDecl,
                                               DeclNameLoc(), /*implicit=*/true,
                                               semantics);
   } else {
-    // modernValueExpr = `\(modernDecl)`
-    modernValueExpr = new (ctx) DeclRefExpr(modernDecl, DeclNameLoc(),
+    // storedValueExpr = `\(storedDecl)`
+    storedValueExpr = new (ctx) DeclRefExpr(storedDecl, DeclNameLoc(),
                                             /*implicit=*/true);
   }
-  modernValueExpr->setType(LValueType::get(modernDecl->getInterfaceType()));
+  storedValueExpr->setType(LValueType::get(storedDecl->getInterfaceType()));
 
   // auto newValueExpr = `newValue`
   auto newValueDecl = setterDecl->getParameters()->get(0);
@@ -1490,15 +1490,15 @@ synthesizeLegacyCArraySetterBody(AbstractFunctionDecl *afd, void *context) {
   newValueExpr->setType(newValueDecl->getInterfaceType());
 
   // auto expr = `Builtin.reinterpretCast(\(newValueExpr))`
-  //             (to type of modernDecl)
+  //             (to type of storedDecl)
   auto expr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
                   ctx,
                   newValueDecl->getInterfaceType(),
-                  modernDecl->getInterfaceType(),
+                  storedDecl->getInterfaceType(),
                   newValueExpr);
 
-  // auto assign = `\(modernValueExpr) = \(expr)`
-  auto assign = new (ctx) AssignExpr(modernValueExpr, SourceLoc(), expr,
+  // auto assign = `\(storedValueExpr) = \(expr)`
+  auto assign = new (ctx) AssignExpr(storedValueExpr, SourceLoc(), expr,
                                      /*implicit*/ true);
   assign->setType(TupleType::getEmpty(ctx));
 
@@ -1508,34 +1508,34 @@ synthesizeLegacyCArraySetterBody(AbstractFunctionDecl *afd, void *context) {
 }
 
 std::pair<AccessorDecl *, AccessorDecl *>
-SwiftDeclSynthesizer::makeLegacyCArrayAccessors(DeclContext *dc,
-                                                VarDecl *legacyDecl,
-                                                VarDecl *modernDecl) {
+SwiftDeclSynthesizer::makeCArrayProjectionAccessors(DeclContext *dc,
+                                                VarDecl *forwardingDecl,
+                                                VarDecl *storedDecl) {
   auto &ctx = ImporterImpl.SwiftContext;
 
-  auto getterDecl = makeFieldGetterDecl(ImporterImpl, dc, legacyDecl);
+  auto getterDecl = makeFieldGetterDecl(ImporterImpl, dc, forwardingDecl);
   getterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
-  getterDecl->setBodySynthesizer(synthesizeLegacyCArrayGetterBody, modernDecl);
+  getterDecl->setBodySynthesizer(synthesizeCArrayProjectionGetterBody, storedDecl);
 
-  // If the modern projection is read-only, don't install a setter on the
-  // legacy projection either.
+  // If the stored projection is read-only, don't install a setter on the
+  // forwarding projection either.
   AccessorDecl *setterDecl = nullptr;
-  if (!modernDecl->isLet()) {
-    setterDecl = makeFieldSetterDecl(ImporterImpl, dc, legacyDecl);
+  if (!storedDecl->isLet()) {
+    setterDecl = makeFieldSetterDecl(ImporterImpl, dc, forwardingDecl);
     setterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
-    setterDecl->setBodySynthesizer(synthesizeLegacyCArraySetterBody,
-                                   modernDecl);
+    setterDecl->setBodySynthesizer(synthesizeCArrayProjectionSetterBody,
+                                   storedDecl);
   }
 
-  ClangImporter::Implementation::makeComputed(legacyDecl, getterDecl,
+  ClangImporter::Implementation::makeComputed(forwardingDecl, getterDecl,
                                               setterDecl);
 
   return {getterDecl, setterDecl};
 }
 
-void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
-                                                     Decl *legacy,
-                                                     bool addAlternate) {
+void SwiftDeclSynthesizer::registerCArrayProjections(
+    Decl *modern, Decl *counterpart, bool addAlternate,
+    CArrayProjection counterpartProjection) {
   auto &ctx = ImporterImpl.SwiftContext;
   auto addAttrs = [&](ValueDecl *current, CArrayProjection projection,
                       ValueDecl *counterpart) {
@@ -1548,76 +1548,90 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
                               UsableFromInlineAttr(/*implicit=*/true));
   };
 
+  PrettyStackTraceDecl debugStack("registering C array projections of", modern);
+
+  ASSERT(counterpartProjection != CArrayProjection::Modern &&
+         "counterpart of the modern projection can't be modern");
+
   // In practice, we should only have dual projections for ValueDecls.
   auto modernVD = cast<ValueDecl>(modern);
-  auto legacyVD = cast_or_null<ValueDecl>(legacy);
+  auto counterpartVD = cast_or_null<ValueDecl>(counterpart);
 
   // Guard against recursion or re-registration.
   if (auto *existing =
           modernVD->getAttrs().getAttribute<CArrayProjectionAttr>()) {
     ASSERT(existing->getProjection() == CArrayProjection::Modern &&
-           existing->getCounterpart() == legacyVD &&
+           existing->getCounterpart() == counterpartVD &&
            "C array projections registered twice with different counterparts");
 
     // If we're re-registering, the original registration may not have passed
     // `addAlternate`, so add it before we return (it's idempotent anyway).
-    if (addAlternate && legacyVD)
-      ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+    if (addAlternate && counterpartVD)
+      ImporterImpl.addAlternateDecl(modernVD, counterpartVD);
     return;
   }
 
-  // Mark the modern projection even if there's no legacy projection so we give
-  // it the right availability.
-  addAttrs(modernVD, CArrayProjection::Modern, legacyVD);
+  // Mark the modern projection even if there's no counterpart so we give it
+  // the right availability.
+  addAttrs(modernVD, CArrayProjection::Modern, counterpartVD);
 
-  if (legacyVD) {
-    addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
+  if (counterpartVD) {
+    addAttrs(counterpartVD, counterpartProjection, modernVD);
 
     if (addAlternate)
-      ImporterImpl.addAlternateDecl(modernVD, legacyVD);
+      ImporterImpl.addAlternateDecl(modernVD, counterpartVD);
+  }
 
-    // If we imported a stored property or global, we need to create
-    // accessors for the legacy decl to forward to the modern decl.
-    if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
-      auto legacyVar = cast<VarDecl>(legacyVD);
-      if (modernVar->hasStorage()) {
-        makeLegacyCArrayAccessors(legacyVar->getDeclContext(), legacyVar,
-                                  modernVar);
-      }
+  // If we imported a stored property or global, we need to create
+  // accessors for the modern decl to forward to its stored counterpart.
+  if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
+    auto counterpartVar = cast_or_null<VarDecl>(counterpartVD);
+    if (counterpartVar && counterpartVar->hasStorage()) {
+      makeCArrayProjectionAccessors(modernVar->getDeclContext(), modernVar,
+                                    counterpartVar);
     }
 
-    // If we're using (computed) storage decls, register the accessors too.
+    // Now that we've installed their accessors, we can assert this: modern
+    // projections can never be stored.
+    ASSERT(!modernVar->hasStorage() &&
+           "modern C array projection should not be stored");
+  }
+
+  // If we're using (computed) storage decls, register the accessors too.
+  if (counterpartVD) {
     if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
-      auto legacyASD = cast<AbstractStorageDecl>(legacyVD);
+      auto counterpartASD = cast<AbstractStorageDecl>(counterpartVD);
 
       for (auto modernAD : modernASD->getAllAccessors()) {
-        auto legacyAD = legacyASD->getAccessor(modernAD->getAccessorKind());
-        registerCArrayProjections(modernAD, legacyAD);
+        auto counterpartAD =
+            counterpartASD->getAccessor(modernAD->getAccessorKind());
+        registerCArrayProjections(modernAD, counterpartAD);
       }
     }
   }
 
   // Contrariwise, when a storage declaration is synthesized from an accessor,
   // we must recursively register it. There are a couple ways that can happen.
+  
   auto registerImplicitStorage = [&](AbstractStorageDecl *modernStorage,
-                                     AbstractStorageDecl *legacyStorage) {
-    if (!modernStorage || modernStorage == legacyStorage)
+                                     AbstractStorageDecl *counterpartStorage) {
+    if (!modernStorage || modernStorage == counterpartStorage)
       return;
 
     // ClangImporter ignores alternates of alternates, and `modernStorage` is an
     // alternate of `modernVD`, so we'll need to do the `addAlternateDecl` by
     // hand.
-    registerCArrayProjections(modernStorage, legacyStorage,
+    registerCArrayProjections(modernStorage, counterpartStorage,
                               /*addAlternate=*/false);
 
-    if (legacyStorage)
-      ImporterImpl.addAlternateDecl(modernVD, legacyStorage);
+    if (counterpartStorage)
+      ImporterImpl.addAlternateDecl(modernVD, counterpartStorage);
   };
 
   // Global functions turned into accessors using import-as-member.
   if (auto *modernAccessor = dyn_cast<AccessorDecl>(modernVD)) {
     auto *modernStorage = dyn_cast<VarDecl>(modernAccessor->getStorage());
-    auto *legacyAccessor = cast_or_null<AccessorDecl>(legacyVD);
+    auto *counterpartAccessor = cast_or_null<AccessorDecl>(counterpartVD);
 
     // Distinguish import-as-member properties (whose accessors are registered
     // first) from ordinary properties and variables (whose storage is
@@ -1626,7 +1640,7 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
     // We need an extra recursion guard here to protect against stored
     // variables. A stored variable looks like this:
     //
-    //   MODERN PROJECTIONS                       LEGACY PROJECTIONS
+    //   MODERN PROJECTIONS                     COUNTERPART PROJECTIONS
     //
     //    ┌──────────────┐                         ┌──────────────┐
     //    │    VarDecl   │◀──────counterpart──────▶│   VarDecl    │
@@ -1640,21 +1654,22 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
     //        └──────────┘
     //
     // We're currently processing one of the modern accessors, which has no
-    // legacy counterpart (stored properties don't have accessors). Since
-    // there's no legacy accessor, we would end up assuming there isn't any
-    // legacy storage either, and so we would try to re-register the modern
+    // counterpart (stored properties don't have accessors). Since
+    // there's no counterpart accessor, we would end up assuming there isn't any
+    // counterpart storage either, and so we would try to re-register the modern
     // VarDecl as a modern-only decl. This would trip the `ASSERT()` in the main
     // recursion guard above.
     //
     // Fortunately, in this scenario we have already registered the modern and
-    // legacy VarDecls, so all we need to do is detect that the modern storage
-    // has already been registered and refuse to recurse.
+    // counterpart VarDecls, so all we need to do is detect that the modern
+    // storage has already been registered and refuse to recurse.
     if (modernStorage &&
         !modernStorage->getAttrs().hasAttribute<CArrayProjectionAttr>())
       registerImplicitStorage(
           modernStorage,
-          legacyAccessor ? dyn_cast<VarDecl>(legacyAccessor->getStorage())
-                         : nullptr);
+          counterpartAccessor
+              ? dyn_cast<VarDecl>(counterpartAccessor->getStorage())
+              : nullptr);
   }
 
   // Subscripts synthesized from ObjC object subscript methods.
@@ -1666,17 +1681,18 @@ void SwiftDeclSynthesizer::registerCArrayProjections(Decl *modern,
             return subscript;
       return nullptr;
     };
-    registerImplicitStorage(findSubscript(modernVD), findSubscript(legacyVD));
+    registerImplicitStorage(findSubscript(modernVD),
+                            findSubscript(counterpartVD));
   }
 
   // If an operator was synthesized from a function, there is one for each
   // projection and they are projections of each other too.
   if (auto *modernFunc = dyn_cast<FuncDecl>(modernVD)) {
     if (auto *op = ImporterImpl.getCXXSynthesizedOperatorFunc(modernFunc)) {
-      auto *legacyOp =
-          legacyVD ? ImporterImpl.getCXXSynthesizedOperatorFunc(legacyVD)
-                   : nullptr;
-      registerCArrayProjections(op, legacyOp, /*addAlternate=*/false);
+      auto *counterpartOp = counterpartVD
+                     ? ImporterImpl.getCXXSynthesizedOperatorFunc(counterpartVD)
+                     : nullptr;
+      registerCArrayProjections(op, counterpartOp, /*addAlternate=*/false);
     }
   }
 }

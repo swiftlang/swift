@@ -2259,6 +2259,8 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<CArrayProjectionAttr>(this)->getProjection()) {
     case CArrayProjection::Modern: return "_cArrayProjection(modern)";
     case CArrayProjection::Legacy: return "_cArrayProjection(legacy)";
+    case CArrayProjection::HiddenStorage:
+      return "_cArrayProjection(hiddenStorage)";
     }
     llvm_unreachable("unknown CArrayProjection");
   case DeclAttrKind::Specialized:

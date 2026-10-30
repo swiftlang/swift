@@ -7925,9 +7925,9 @@ Type ClangImporter::importVarDeclType(
   if (!importedType)
     return ErrorType::get(Impl.SwiftContext);
 
-  if (auto attr = swiftDecl->getAttrs().getAttribute<CArrayProjectionAttr>();
-      attr && attr->getProjection() == CArrayProjection::Legacy) {
-    importedType = importer::computeLegacyCArrayType(importedType);
+  if (auto attr = swiftDecl->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+    importedType =
+        importer::computeLegacyCArrayType(importedType, attr->getProjection());
     if (!importedType)
       return ErrorType::get(Impl.SwiftContext);
   }
@@ -8797,8 +8797,17 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     return cloned;
 
   ValueDecl *clonedCounterpart = nullptr;
-  if (auto counterpart = cArrayAttr->getCounterpart())
-    clonedCounterpart = cloneAndRecord(counterpart);
+  if (auto counterpart = cArrayAttr->getCounterpart()) {
+    auto *counterpartAttr =
+        counterpart->getAttrs().getAttribute<CArrayProjectionAttr>();
+
+    // We don't need to clone a HiddenStorage projection; it wouldn't be used
+    // because the clone of a modern projection calls its base decl, not its
+    // counterpart.
+    if (counterpartAttr->getProjection() !=
+            CArrayProjection::HiddenStorage)
+      clonedCounterpart = cloneAndRecord(counterpart);
+  }
 
   // Alternates are cloned separately by the callers that need them, so don't
   // also record one here.

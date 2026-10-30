@@ -353,32 +353,43 @@ static SubstitutionMap getSubstitutionsForPropertyInitializer(
   return SubstitutionMap();
 }
 
-static bool bitcastToInlineArrayIsValid(Type paramTy, Type fieldTy) {
+static bool bitcastFromInlineArrayIsValid(Type storedTy, Type modernTy) {
   // If the field is not an inline array, don't bitcast.
-  auto fieldCount = fieldTy->getInlineArrayCount();
-  if (!fieldCount)
+  auto modernCount = modernTy->getInlineArrayCount();
+  if (!modernCount)
     return false;
+  auto modernElemTy = modernTy->getInlineArrayElementType();
+
+  if (auto fixedArrayStoredTy = storedTy->getAs<BuiltinFixedArrayType>()) {
+    auto storedCount = fixedArrayStoredTy->getSize()->getAs<IntegerType>();
+
+    if (!storedCount
+            || !APInt::isSameValue(storedCount->getValue(), *modernCount))
+      return false;
+
+    auto paramElemTy = fixedArrayStoredTy->getElementType();
+    return modernElemTy->isEqual(paramElemTy)
+              || bitcastFromInlineArrayIsValid(paramElemTy, modernElemTy);
+  }
 
   // Collect the element types from the parameter.
-  SmallVector<Type, 8> paramElemTypes;
-  if (auto tupleParamTy = paramTy->getAs<TupleType>()) {
-    for (auto &tupleElem : tupleParamTy->getElements())
-      paramElemTypes.push_back(tupleElem.getType());
+  SmallVector<Type, 8> storedElemTypes;
+  if (auto tupleStoredTy = storedTy->getAs<TupleType>()) {
+    for (auto &tupleElem : tupleStoredTy->getElements())
+      storedElemTypes.push_back(tupleElem.getType());
   } else {
     // The param not being a tuple is only valid if the array is single-element.
-    paramElemTypes.push_back(paramTy);
+    storedElemTypes.push_back(storedTy);
   }
 
   // If they are not the same size, don't bitcast.
-  if (paramElemTypes.size()
-        != fieldCount->getLimitedValue())
+  if (storedElemTypes.size() != modernCount->getLimitedValue())
     return false;
 
   // If any element in the param is different from the field, don't bitcast.
-  auto fieldElemTy = fieldTy->getInlineArrayElementType();
-  for (auto paramElemType : paramElemTypes)
-    if (!fieldElemTy->isEqual(paramElemType) &&
-        !bitcastToInlineArrayIsValid(paramElemType, fieldElemTy))
+  for (auto storedElemType : storedElemTypes)
+    if (!modernElemTy->isEqual(storedElemType) &&
+          !bitcastFromInlineArrayIsValid(storedElemType, modernElemTy))
       return false;
 
   return true;
@@ -465,17 +476,24 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       }
     }
 
-    // If the field is an InlineArray and the argument is not, the argument is
-    // the legacy projection of the field, and we need to bitcast it.
-    if (fieldTy.getASTType()->getInlineArrayElementType()
-          && !arg.getType()->getInlineArrayElementType()) {
-      ASSERT(bitcastToInlineArrayIsValid(arg.getType(), fieldTy.getASTType()));
+    // If the argument is an InlineArray and the field is a C array projection,
+    // bitcast it to the type of the field.
+    if (field->getAttrs().hasAttribute<CArrayProjectionAttr>() &&
+            arg.getType()->getInlineArrayElementType()) {
+      ASSERT(bitcastFromInlineArrayIsValid(fieldTy.getASTType(),
+                                           arg.getType()));
 
-      // Coerce the tuple argument to an InlineArray.
-      arg = RValue(SGF, Loc, fieldTy.getASTType(),
-                   SGF.B.createUncheckedBitCast(
-                            Loc, std::move(arg).getAsSingleValue(SGF, Loc),
-                            fieldTy.getObjectType()));
+      auto argValue = std::move(arg).getAsSingleValue(SGF, Loc);
+
+      // InlineArrays too large to be loadable are passed by address.
+      ManagedValue castValue;
+      if (argValue.getType().isAddress())
+        castValue = SGF.B.createUncheckedAddrCast(Loc, argValue,
+                                                  fieldTy.getAddressType());
+      else
+        castValue = SGF.B.createUncheckedBitCast(Loc, argValue,
+                                                 fieldTy.getObjectType());
+      arg = RValue(SGF, Loc, fieldTy.getASTType(), castValue);
     }
 
     return std::move(arg);

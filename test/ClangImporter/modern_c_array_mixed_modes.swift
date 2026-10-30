@@ -21,31 +21,32 @@
 //
 
 // SIL-LABEL: sil shared {{.*}}@$s9LegacyLib10legacyFuncyyF
-// SIL: [[BIT_CAST_VALUE:%.*]] = unchecked_trivial_bit_cast {{%.*}} to $InlineArray<4, Int32>
-// SIL-NEXT: struct $S ([[BIT_CAST_VALUE]])
+// SIL-NOT: unchecked_trivial_bit_cast
+// SIL: struct $S ({{%.*}})
 // SIL: keypath $WritableKeyPath
-// SIL-SAME: <S, (Int32, Int32, Int32, Int32)>, (root $S; settable_property $(Int32, Int32, Int32, Int32),  id @$sSo1SV5arrays5Int32V_A3Etvg : {{.*}}, getter @$sSo1SV5arrays5Int32V_A3EtvpABTKq : {{.*}}, setter @$sSo1SV5arrays5Int32V_A3EtvpABTkq : {{.*}})
+// SIL-SAME: <S, (Int32, Int32, Int32, Int32)>, (root $S; stored_property #S.array : $(Int32, Int32, Int32, Int32))
 // SIL: } // end sil function '$s9LegacyLib10legacyFuncyyF'
 
 // SIL-LABEL: sil shared {{.*}}@$s9ModernLib10modernFuncyyF
 // SIL: [[ALLOC_STACK_VALUE:%.*]] = alloc_stack $InlineArray<4, Int32>
 // SIL: [[LOAD_VALUE:%.*]] = load [[ALLOC_STACK_VALUE]]
-// SIL: struct $S ([[LOAD_VALUE]])
+// SIL: [[BIT_CAST_VALUE:%.*]] = unchecked_trivial_bit_cast [[LOAD_VALUE]] to $(Int32, Int32, Int32, Int32)
+// SIL: struct $S ({{%.*}})
 // SIL: keypath $WritableKeyPath
-// SIL-SAME: <S, InlineArray<4, Int32>>, (root $S; stored_property #S.array : {{.*}})
+// SIL-SAME: <S, InlineArray<4, Int32>>, (root $S; settable_property $InlineArray<4, Int32>,  id @$sSo1SV5arrays11InlineArrayVy$3_s5Int32VGvg : {{.*}}, getter @$sSo1SV5arrays11InlineArrayVy$3_s5Int32VGvpABTKq : {{.*}}
 // SIL: } // end sil function '$s9ModernLib10modernFuncyyF'
 
 // SIL-LABEL: sil shared {{.*}}@$s9LegacyLib17legacyNewtypeFuncyyF
-// SIL: [[BIT_CAST_VALUE:%.*]] = unchecked_trivial_bit_cast {{%.*}} to $InlineArray<4, Int32>
+// SIL-NOT: unchecked_trivial_bit_cast
 // SIL: keypath $KeyPath
-// SIL-SAME: <NT, (Int32, Int32, Int32, Int32)>, (root $NT; gettable_property $(Int32, Int32, Int32, Int32),  id @$sSo2NTa8rawValues5Int32V_A3Etvg : {{.*}}, getter @$sSo2NTa8rawValues5Int32V_A3EtvpABTKq : {{.*}})
+// SIL-SAME: <NT, (Int32, Int32, Int32, Int32)>, (root $NT; stored_property #NT.rawValue : $(Int32, Int32, Int32, Int32))
 // SIL: } // end sil function '$s9LegacyLib17legacyNewtypeFuncyyF'
 
 // SIL-LABEL: sil shared {{.*}}@$s9ModernLib17modernNewtypeFuncyyF
 // SIL: [[ALLOC_STACK_VALUE:%.*]] = alloc_stack $InlineArray<4, Int32>
 // SIL: [[LOAD_VALUE:%.*]] = load [[ALLOC_STACK_VALUE]]
 // SIL: keypath $KeyPath
-// SIL-SAME: <NT, InlineArray<4, Int32>>, (root $NT; stored_property #NT.rawValue : {{.*}})
+// SIL-SAME: <NT, InlineArray<4, Int32>>, (root $NT; gettable_property $InlineArray<4, Int32>,  id @$sSo2NTa8rawValues11InlineArrayVy$3_s5Int32VGvg : {{.*}}, getter @$sSo2NTa8rawValues11InlineArrayVy$3_s5Int32VGvpABTKq : {{.*}}
 // SIL: } // end sil function '$s9ModernLib17modernNewtypeFuncyyF'
 
 //
@@ -72,12 +73,24 @@
 // OUTPUT-NEXT: Row 2147483647 1 2 3
 // OUTPUT-NEXT: modernTypedefBitfieldFunc:
 // OUTPUT-NEXT: Row 2147483647 1 2 3
+// OUTPUT-NEXT: legacyHugeFunc:
+// OUTPUT-NEXT: Huge 0
+// OUTPUT-NEXT: modernHugeFunc:
+// OUTPUT-NEXT: Huge 7
+// OUTPUT-NEXT: legacyNestedHugeFunc:
+// OUTPUT-NEXT: NestedHuge 0
+// OUTPUT-NEXT: modernNestedHugeFunc:
+// OUTPUT-NEXT: NestedHuge 9
+// OUTPUT-NEXT: modernHugeNewtypeFunc:
+// OUTPUT-NEXT: HugeNT 7
 // OUTPUT-NEXT: main:
 // OUTPUT-NEXT: S 0 1 2 3
 // OUTPUT-NEXT: NT 2147483647 1 2 3
 // OUTPUT-NEXT: Row 2147483647 1 2 3
 // OUTPUT-NEXT: Row 2147483647 1 2 3
 // OUTPUT-NEXT: Row 2147483647 1 2 3
+// OUTPUT-NEXT: Huge 0
+// OUTPUT-NEXT: NestedHuge 0
 
 //--- include/CLib.h
 
@@ -86,6 +99,9 @@ struct S {
 };
 
 typedef int NT[4] __attribute__((swift_newtype(struct)));
+
+// Likewise, but too large to have a legacy projection.
+typedef int HugeNT[5000] __attribute__((swift_newtype(struct)));
 
 typedef int Row[4];
 
@@ -101,8 +117,21 @@ struct BitfieldRow {
   Row row;
 };
 
+// Too large to have a legacy projection, so it can only be accessed in modern
+// mode, but legacy mode still needs to be able to use the struct.
+struct HugeRow {
+  int values[5000];
+};
+
+// The same, but an array of huge arrays.
+struct NestedHugeRow {
+  int values[2][5000];
+};
+
 void print_s(const struct S *ptr);
 void print_row(const Row *ptr);
+void print_huge(const struct HugeRow *ptr);
+void print_nested_huge(const struct NestedHugeRow *ptr);
 
 //--- include/module.modulemap
 
@@ -146,6 +175,16 @@ import CLib
 @export(implementation) public func legacyTypedefBitfieldFunc() {
   var b = BitfieldRow(flag: 1, row: (.max, 1, 2, 3))
   print_row(&b.row)
+}
+
+@export(implementation) public func legacyHugeFunc() {
+  var h = HugeRow()
+  print_huge(&h)
+}
+
+@export(implementation) public func legacyNestedHugeFunc() {
+  var h = NestedHugeRow()
+  print_nested_huge(&h)
 }
 
 @inline(never) @usableFromInline internal func blackHole(_: some Any) {}
@@ -194,6 +233,39 @@ import CLib
 @export(implementation) public func modernTypedefBitfieldFunc() {
   var b = BitfieldRow(flag: 1, row: [.max, 1, 2, 3])
   print_row(&b.row)
+}
+
+@export(implementation) public func modernHugeFunc() {
+  var h = HugeRow()
+  h.values[4999] = 7
+  print_huge(&h)
+}
+
+@export(implementation) public func modernHugeNewtypeFunc() {
+  let nt = HugeNT(rawValue: InlineArray(repeating: 7))
+  withUnsafeBytes(of: nt.rawValue) {
+    print("HugeNT", $0.load(fromByteOffset: 4999 * MemoryLayout<Int32>.stride, as: Int32.self))
+  }
+}
+
+@export(implementation) public func modernNestedHugeFunc() {
+  var h = NestedHugeRow()
+  h.values[1][4999] = 9
+  print_nested_huge(&h)
+}
+
+// Reads through raw bytes to avoid InlineArray subscripts, which are badly
+// broken in optimize_none_with_opaque_values (this is covered by other tests).
+@c(print_huge) @implementation public func print_huge(_ ptr: UnsafePointer<HugeRow>!) {
+  withUnsafeBytes(of: ptr.pointee.values) {
+    print("Huge", $0.load(fromByteOffset: 4999 * MemoryLayout<Int32>.stride, as: Int32.self))
+  }
+}
+
+@c(print_nested_huge) @implementation public func print_nested_huge(_ ptr: UnsafePointer<NestedHugeRow>!) {
+  withUnsafeBytes(of: ptr.pointee.values) {
+    print("NestedHuge", $0.load(fromByteOffset: (5000 + 4999) * MemoryLayout<Int32>.stride, as: Int32.self))
+  }
 }
 
 @inline(never) @usableFromInline internal func blackHole(_: some Any) {}
@@ -248,6 +320,21 @@ legacyTypedefBitfieldFunc()
 print("modernTypedefBitfieldFunc:")
 modernTypedefBitfieldFunc()
 
+print("legacyHugeFunc:")
+legacyHugeFunc()
+
+print("modernHugeFunc:")
+modernHugeFunc()
+
+print("legacyNestedHugeFunc:")
+legacyNestedHugeFunc()
+
+print("modernNestedHugeFunc:")
+modernNestedHugeFunc()
+
+print("modernHugeNewtypeFunc:")
+modernHugeNewtypeFunc()
+
 print("main:")
 var s = S(array: (.max, 1, 2, 3))
 s.array.0 = 0
@@ -265,6 +352,12 @@ print_row(&u.row)
 
 var b = BitfieldRow(flag: 1, row: (.max, 1, 2, 3))
 print_row(&b.row)
+
+var h = HugeRow()
+print_huge(&h)
+
+var nh = NestedHugeRow()
+print_nested_huge(&nh)
 
 //--- src/ModernExec.swift
 
@@ -316,6 +409,21 @@ legacyTypedefBitfieldFunc()
 print("modernTypedefBitfieldFunc:")
 modernTypedefBitfieldFunc()
 
+print("legacyHugeFunc:")
+legacyHugeFunc()
+
+print("modernHugeFunc:")
+modernHugeFunc()
+
+print("legacyNestedHugeFunc:")
+legacyNestedHugeFunc()
+
+print("modernNestedHugeFunc:")
+modernNestedHugeFunc()
+
+print("modernHugeNewtypeFunc:")
+modernHugeNewtypeFunc()
+
 print("main:")
 var s = S(array: [.max, 1, 2, 3])
 s.array[0] = 0
@@ -333,3 +441,9 @@ print_row(&u.row)
 
 var b = BitfieldRow(flag: 1, row: [.max, 1, 2, 3])
 print_row(&b.row)
+
+var h = HugeRow()
+print_huge(&h)
+
+var nh = NestedHugeRow()
+print_nested_huge(&nh)

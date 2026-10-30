@@ -295,8 +295,8 @@ protected:
       mode : NumNonexhaustiveModeBits
     );
 
-    SWIFT_INLINE_BITFIELD(CArrayProjectionAttr, DeclAttribute, 1,
-      projection : 1
+    SWIFT_INLINE_BITFIELD(CArrayProjectionAttr, DeclAttribute, 2,
+      projection : 2
     );
 
     SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
@@ -3928,12 +3928,22 @@ public:
   }
 };
 
-/// Which of the two projections the declaration in question belongs to.
+/// Which of the C array projections the declaration in question belongs to.
+///
+/// This type is sometimes used to indicate which counterpart projections ought
+/// to be imported; in that context, \c Modern is a sentinel indicating that
+/// no C arrays are involved and no special behavior is needed. The order of
+/// the cases is significant for this type of logic.
 enum class CArrayProjection : uint8_t {
+  /// The modern projection, using an \c InlineArray . To avoid introducing
+  /// dependencies on \c InlineArray 's type metadata, a modern projection of a
+  /// \c VarDecl is always computed, never stored.
+  Modern = 0,
   /// The legacy projection, using a homogeneous tuple.
-  Legacy = 0,
-  /// The modern projection, using an \c InlineArray .
-  Modern = 1
+  Legacy = 1,
+  /// The hidden storage projection, using \c Builtin.FixedArray . Hidden
+  /// storage is used when a stored C array property has no legacy projection.
+  HiddenStorage = 2
 };
 
 StringRef getCArrayProjectionSpelling(CArrayProjection value);
@@ -3956,7 +3966,7 @@ public:
     return static_cast<CArrayProjection>(Bits.CArrayProjectionAttr.projection);
   }
 
-  /// The declaration that is of the opposite projection.
+  /// The declaration that is the other half of this one's pair.
   ValueDecl *getCounterpart() const {
     return counterpart;
   }

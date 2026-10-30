@@ -1025,7 +1025,8 @@ namespace {
       // special-cased Modern instead, but if only one mode can get diagnostics
       // with the typealias name, it should be the one we want people to use.)
       if (Impl.VisibleCArrayProjection == CArrayProjection::Legacy &&
-              importer::hasLegacyCArrayType(type->desugar())) {
+              importer::getNeededCArrayCounterpartForType(type->desugar()) !=
+                  CArrayProjection::Modern) {
         return underlyingResult;
       }
 
@@ -3946,51 +3947,40 @@ Type ClangImporter::Implementation::getNSObjectProtocolType() {
 constexpr unsigned MAX_TUPLE_SIZE = 4096;
 
 namespace {
-enum class ClassifyLegacyCArrayResult : uint8_t {
-  /// There is no C array in this type.
-  None,
-
-  /// There is a C array and it can be represented in the legacy projection.
-  Importable,
-
-  /// There is a C array but it cannot be imported in the legacy projection
-  /// (probably because it's too big and is not handled indirectly).
-  Unimportable
-};
-
+/// \see importer::getNeededCArrayCounterpartForType()
 class ClassifyLegacyCArrayTypeVisitor
     : public clang::TypeVisitor<ClassifyLegacyCArrayTypeVisitor,
-                                ClassifyLegacyCArrayResult> {
+                                CArrayProjection> {
 public:
-  ClassifyLegacyCArrayResult Visit(clang::QualType qualType) {
+  CArrayProjection Visit(clang::QualType qualType) {
     if (qualType.isNull())
-      return ClassifyLegacyCArrayResult::None;
+      return CArrayProjection::Modern;
 
     // Typedefs need special handling, so don't desugar until after we've
     // dispatched.
     return TypeVisitor::Visit(qualType.getTypePtr());
   }
 
-  ClassifyLegacyCArrayResult VisitType(clang::Type *) = delete;
+  CArrayProjection VisitType(clang::Type *) = delete;
 
   // Contains a C array iff Getter contains a C array.
 #define RECURSE(Class, Getter) \
-  ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
+  CArrayProjection Visit##Class##Type(const clang::Class##Type *ty) { \
     return Visit(ty->Getter); \
   }
 
   // Can never contain a C array.
 #define STOP(Class) \
-ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *) { \
-    return ClassifyLegacyCArrayResult::None; \
+  CArrayProjection Visit##Class##Type(const clang::Class##Type *) { \
+    return CArrayProjection::Modern; \
   }
 
   // If this type is sugared (this is sometimes conditional per instance),
   // desugar and re-dispatch; otherwise STOP.
 #define DESUGAR(Class) \
-ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
+  CArrayProjection Visit##Class##Type(const clang::Class##Type *ty) { \
     if (!ty->isSugared()) \
-      return ClassifyLegacyCArrayResult::None; \
+      return CArrayProjection::Modern; \
     return Visit(ty->desugar()); \
   }
 
@@ -4002,13 +3992,12 @@ ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
   STOP(Builtin)
   RECURSE(Complex, getElementType())
 
-  ClassifyLegacyCArrayResult
-  VisitPointerType(const clang::PointerType *pointerType) {
+  CArrayProjection VisitPointerType(const clang::PointerType *pointerType) {
     auto result = Visit(pointerType->getPointeeType());
 
     // We can import pointers to otherwise unimportable arrays as
     // OpaquePointer.
-    result = std::min(result, ClassifyLegacyCArrayResult::Importable);
+    result = std::min(result, CArrayProjection::Legacy);
 
     return result;
   }
@@ -4020,35 +4009,34 @@ ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
   // Only ConstantArrayType is imported as InlineArray.
   RECURSE(Array, getElementType())
 
-  ClassifyLegacyCArrayResult
+  CArrayProjection
   VisitConstantArrayType(const clang::ConstantArrayType *arrayType) {
     // Tail-allocated array is imported as an empty tuple in both legacy and
     // modern modes.
     // FIXME: Import as a span (possibly passing the count as a parameter).
     //        (You'd want to get IncompleteArrayType, too.)
     if (arrayType->getSize().isZero())
-      return ClassifyLegacyCArrayResult::None;
+      return CArrayProjection::Modern;
 
     // If the array is too large, we can't import it as a tuple.
     if (arrayType->getLimitedSize() > MAX_TUPLE_SIZE)
-      return ClassifyLegacyCArrayResult::Unimportable;
+      return CArrayProjection::HiddenStorage;
 
     // If the element type contains an unimportable array, we can't import
     // this as a tuple, either.
     if (Visit(arrayType->getElementType())
-            == ClassifyLegacyCArrayResult::Unimportable)
-      return ClassifyLegacyCArrayResult::Unimportable;
+            == CArrayProjection::HiddenStorage)
+      return CArrayProjection::HiddenStorage;
 
-    return ClassifyLegacyCArrayResult::Importable;
+    return CArrayProjection::Legacy;
   }
 
   RECURSE(Vector, getElementType())
   RECURSE(Matrix, getElementType())
 
-  ClassifyLegacyCArrayResult
-  VisitFunctionType(const clang::FunctionType *funcType) {
-    auto result = ClassifyLegacyCArrayResult::None;
-    auto ratchetResult = [&](ClassifyLegacyCArrayResult newResult) {
+  CArrayProjection VisitFunctionType(const clang::FunctionType *funcType) {
+    auto result = CArrayProjection::Modern;
+    auto ratchetResult = [&](CArrayProjection newResult) {
       result = std::max(result, newResult);
     };
 
@@ -4065,16 +4053,16 @@ ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
   DESUGAR(Using)
   RECURSE(Paren, getInnerType())
 
-  ClassifyLegacyCArrayResult VisitTypedefType(const clang::TypedefType *type) {
+  CArrayProjection VisitTypedefType(const clang::TypedefType *type) {
     auto underlyingResult = Visit(type->desugar());
 
     // If the typedef is imported as a newtype *and* the newtype is accessible
     // in legacy mode (only true if the underlying type is importable), there's
     // no need to dual-project APIs that use it.
     // FIXME: Weird that we're not version-gating like getSwiftNewtypeAttr().
-    if (underlyingResult == ClassifyLegacyCArrayResult::Importable
+    if (underlyingResult == CArrayProjection::Legacy
           && type->getDecl()->hasAttr<clang::SwiftNewTypeAttr>())
-      return ClassifyLegacyCArrayResult::None;
+      return CArrayProjection::Modern;
 
     return underlyingResult;
   }
@@ -4097,11 +4085,11 @@ ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
   DESUGAR(TemplateSpecialization)
   RECURSE(Deduced, getDeducedType())
 
-  ClassifyLegacyCArrayResult
+  CArrayProjection
   VisitPackIndexingType(const clang::PackIndexingType *indexTy) {
     if (indexTy->hasSelectedType())
       return Visit(indexTy->getSelectedType());
-    return ClassifyLegacyCArrayResult::None;
+    return CArrayProjection::Modern;
   }
 
   DESUGAR(ObjCTypeParam)
@@ -4119,23 +4107,26 @@ ClassifyLegacyCArrayResult Visit##Class##Type(const clang::Class##Type *ty) { \
 };
 } // end anonymous namespace
 
-bool importer::hasLegacyCArrayType(clang::QualType clangType) {
-  return ClassifyLegacyCArrayTypeVisitor().Visit(clangType)
-            != ClassifyLegacyCArrayResult::None;
+CArrayProjection
+importer::getNeededCArrayCounterpartForType(clang::QualType clangType) {
+  return ClassifyLegacyCArrayTypeVisitor().Visit(clangType);
 }
 
-bool importer::hasImportableLegacyCArrayType(clang::QualType clangType) {
-  return ClassifyLegacyCArrayTypeVisitor().Visit(clangType)
-            == ClassifyLegacyCArrayResult::Importable;
-}
-
+/// \param projection Either \c Legacy or \c HiddenStorage. For
+///        \c HiddenStorage, every C array is replaced with the
+///        \c Builtin.FixedArray it wraps, rather than a tuple, so arrays that
+///        aren't representable as tuples can still be imported.
 /// \returns \c Type() if there is a C array but it is not representable as a
-/// tuple; converted type otherwise.
-static Type computeLegacyCArrayTypeImpl(Type modernType) {
+/// tuple (and \p projection is \c Legacy); converted type otherwise.
+static Type computeLegacyCArrayTypeImpl(Type modernType,
+                                        CArrayProjection projection) {
+  ASSERT(projection != CArrayProjection::Modern);
   if (modernType.isNull())
     return modernType;
 
-  return modernType.transformRec([](TypeBase *ty) -> std::optional<Type> {
+  bool substituteBuiltinStorage = projection == CArrayProjection::HiddenStorage;
+
+  return modernType.transformRec([&](TypeBase *ty) -> std::optional<Type> {
     auto desugaredType = ty->getDesugaredType();
 
     // In legacy mode, a newtype with an un-importable C array type will be
@@ -4145,14 +4136,15 @@ static Type computeLegacyCArrayTypeImpl(Type modernType) {
     if (auto *nominal = desugaredType->getAnyNominal()) {
       auto *attr = nominal->getAttrs().getAttribute<CArrayProjectionAttr>();
       if (attr && attr->getProjection() == CArrayProjection::Modern
-            && !attr->getCounterpart())
+            && !attr->getCounterpart() && !substituteBuiltinStorage)
         return Type();
     }
 
     // Special case for pointers: If the pointee is a C array that *can't* be
     // imported as a legacy type, we need to map to OpaquePointer.
     if (auto pointee = desugaredType->getAnyPointerElementType()) {
-      auto legacyPointee = computeLegacyCArrayTypeImpl(pointee);
+      auto legacyPointee =
+          computeLegacyCArrayTypeImpl(pointee, CArrayProjection::Legacy);
       if (legacyPointee.isNull())
         return desugaredType->getASTContext().getOpaquePointerDecl()
                   ->getDeclaredInterfaceType();
@@ -4165,7 +4157,8 @@ static Type computeLegacyCArrayTypeImpl(Type modernType) {
       return std::nullopt;
 
     // The element type could itself be a (modern) C array.
-    elementType = computeLegacyCArrayTypeImpl(elementType);
+    elementType =
+        computeLegacyCArrayTypeImpl(elementType, projection);
     if (elementType.isNull())
       // Whoops, it was un-importable.
       return Type();
@@ -4173,6 +4166,13 @@ static Type computeLegacyCArrayTypeImpl(Type modernType) {
     auto count = desugaredType->getInlineArrayCount();
     if (!count)
       return Type();
+
+    if (substituteBuiltinStorage) {
+      auto sizeType = desugaredType->castTo<StructType>()
+                          ->getGenericArgs()[0]->getCanonicalType();
+      return BuiltinFixedArrayType::get(sizeType,
+                                        elementType->getCanonicalType());
+    }
 
     auto size = count->getZExtValue();
     if (size > MAX_TUPLE_SIZE)
@@ -4189,8 +4189,13 @@ static Type computeLegacyCArrayTypeImpl(Type modernType) {
   });
 }
 
-ImportedType importer::computeLegacyCArrayType(ImportedType modernType) {
-  auto legacyType = computeLegacyCArrayTypeImpl(modernType.getType());
+ImportedType importer::computeLegacyCArrayType(ImportedType modernType,
+                                               CArrayProjection projection) {
+  if (projection == CArrayProjection::Modern)
+    return modernType;
+
+  auto legacyType =
+      computeLegacyCArrayTypeImpl(modernType.getType(), projection);
   if (!legacyType)
     return ImportedType();
 

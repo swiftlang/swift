@@ -47,20 +47,24 @@ enum { NumImportedAccessorKindBits = 3 };
 
 /// The name version
 class ImportNameVersion : public RelationalOperationsBase<ImportNameVersion> {
-  unsigned rawValue : 30;
+  unsigned rawValue : 29;
   unsigned concurrency : 1;
-  unsigned legacyCArrays : 1;
+  unsigned cArrayProjection : 2;
 
   friend llvm::DenseMapInfo<ImportNameVersion>;
 
   enum AsConstExpr_t { AsConstExpr };
 
+  static constexpr unsigned ModernBits =
+      static_cast<unsigned>(CArrayProjection::Modern);
+
   constexpr ImportNameVersion()
-      : rawValue(0), concurrency(false), legacyCArrays(false) {}
+      : rawValue(0), concurrency(false), cArrayProjection(ModernBits) {}
   constexpr ImportNameVersion(unsigned version, AsConstExpr_t)
-      : rawValue(version), concurrency(false), legacyCArrays(false) {}
+      : rawValue(version), concurrency(false), cArrayProjection(ModernBits) {}
   explicit ImportNameVersion(unsigned version, bool concurrency = false)
-      : rawValue(version), concurrency(concurrency), legacyCArrays(false) {
+      : rawValue(version), concurrency(concurrency),
+        cArrayProjection(ModernBits) {
     assert(version >= 2 && "only Swift 2 and later are supported");
   }
 public:
@@ -110,13 +114,13 @@ public:
 
   /// Which projection of C arrays this version imports.
   CArrayProjection getCArrayProjection() const {
-    return legacyCArrays ? CArrayProjection::Legacy : CArrayProjection::Modern;
+    return static_cast<CArrayProjection>(cArrayProjection);
   }
 
   /// Returns a version that imports C arrays with \p projection.
   ImportNameVersion withCArrayProjection(CArrayProjection projection) const {
     ImportNameVersion result = *this;
-    result.legacyCArrays = projection == CArrayProjection::Legacy;
+    result.cArrayProjection = static_cast<unsigned>(projection);
     return result;
   }
 
@@ -126,14 +130,14 @@ public:
 
   bool operator==(ImportNameVersion other) const {
     return rawValue == other.rawValue && concurrency == other.concurrency &&
-           legacyCArrays == other.legacyCArrays;
+           cArrayProjection == other.cArrayProjection;
   }
   bool operator<(ImportNameVersion other) const {
     if (rawValue != other.rawValue)
       return rawValue < other.rawValue;
     if (concurrency != other.concurrency)
       return concurrency < other.concurrency;
-    return legacyCArrays < other.legacyCArrays;
+    return cArrayProjection < other.cArrayProjection;
   }
 
   /// Calls \p action for each name version other than this one, first going
@@ -564,7 +568,7 @@ template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
   using ImportNameVersion = swift::importer::ImportNameVersion;
   using DMIU = DenseMapInfo<unsigned>;
   static unsigned getHashValue(const ImportNameVersion &Val) {
-    return DMIU::getHashValue(Val.rawValue) ^ (Val.legacyCArrays ? 1 : 0);
+    return DMIU::getHashValue(Val.rawValue) ^ Val.cArrayProjection;
   }
   static bool isEqual(const ImportNameVersion &LHS,
                       const ImportNameVersion &RHS) {

@@ -1429,7 +1429,9 @@ public:
   /// \param importVersion Imports \p decl for the version it's given. It's
   ///        passed a variant of \p version for each projection that should
   ///        be imported, and should return \c nullptr if the requested
-  ///        projection of \p decl is unimportable.
+  ///        projection of \p decl is unimportable, or if a \c HiddenStorage
+  ///        projection was requested for a declaration that doesn't have
+  ///        storage.
   ///
   /// \param addAlternate Whether to record the legacy projection as an
   ///        alternate of the modern one.
@@ -1446,15 +1448,16 @@ public:
         addAlternate));
   }
 
-  /// If \p needsBoth is true, imports a declaration for both C array
-  /// projections, registering them as counterparts of one another. Otherwise,
-  /// imports only a modern projection and does not register it as a C array
-  /// projection.
+  /// If \p needsBoth is true, imports a declaration for both the modern and
+  /// legacy C array projections, registering them as counterparts of one
+  /// another. Otherwise, imports only a modern projection and does not
+  /// register it as a C array projection.
   ///
   /// \param importProjection Imports the declaration for the projection it's
   ///        given. It's passed each projection that should be imported, and
   ///        should return \c nullptr if the requested projection is
-  ///        unimportable.
+  ///        unimportable, or if a \c HiddenStorage projection was requested for
+  ///        a declaration that doesn't have storage.
   ///
   /// \param addAlternate Whether to record the legacy projection as an
   ///        alternate of the modern one.
@@ -1463,10 +1466,34 @@ public:
   template <typename BodyFn>
   auto forEachCArrayProjection(bool needsBoth, BodyFn &&importProjection,
                                bool addAlternate = true) {
+    return forEachCArrayProjection(
+        needsBoth ? CArrayProjection::Legacy : CArrayProjection::Modern,
+        std::move(importProjection), addAlternate);
+  }
+
+  /// Imports a declaration for both the modern C array projection and
+  /// \p neededCounterpartProjection , registering them as counterparts of one
+  /// another. (If \p neededCounterpartProjection is \c Modern, only one
+  /// projection is imported and it is not registered.)
+  ///
+  /// \param importProjection Imports the declaration for the projection it's
+  ///        given. It's passed each projection that should be imported, and
+  ///        should return \c nullptr if the requested projection is
+  ///        unimportable, or if a \c HiddenStorage projection was requested for
+  ///        a declaration that doesn't have storage.
+  ///
+  /// \param addAlternate Whether to record the counterpart projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \c Modern, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(CArrayProjection neededCounterpartProjection,
+                               BodyFn &&importProjection,
+                               bool addAlternate = true) {
     using DeclTy =
         std::remove_pointer_t<std::invoke_result_t<BodyFn &, CArrayProjection>>;
     return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
-        needsBoth,
+        neededCounterpartProjection,
         [&](CArrayProjection p) -> Decl * { return importProjection(p); },
         addAlternate));
   }
@@ -1477,7 +1504,7 @@ private:
     llvm::function_ref<Decl *(Version)> importVersion, bool addAlternate);
 
   Decl *forEachCArrayProjectionImpl(
-      bool needsBoth,
+      CArrayProjection neededProjection,
       llvm::function_ref<Decl *(CArrayProjection)> importProjection,
       bool addAlternate);
 
@@ -2368,38 +2395,40 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
 
-/// Returns \c true if \p type will be imported as a different type when
-/// \c Feature::ModernImportedCArrays is enabled.
-bool hasLegacyCArrayType(clang::QualType type);
-
-/// Returns \c true if \p type will be imported as a different type when
-/// \c Feature::ModernImportedCArrays is enabled \em and that type is actually
-/// importable (not too large). Usually \c computeLegacyCArrayType() detects
-/// this condition, but there's an edge case where we need to compute it from
-/// the clang type.
-bool hasImportableLegacyCArrayType(clang::QualType type);
+/// Determines which C array projection, besides the modern one, a declaration
+/// involving \p type needs. \c Modern indicates that no C arrays are involved.
+CArrayProjection getNeededCArrayCounterpartForType(clang::QualType type);
 
 /// If \p modernType is the modern type of an imported fixed-size C array
 /// ( \c InlineArray ), compute the legacy tuple type that would be used
-/// when \c Feature::ModernImportedCArrays is not enabled.
-ImportedType computeLegacyCArrayType(ImportedType modernType);
+/// for \p projection.
+///
+/// \param projection The projection to compute the type for. Legacy by default.
+ImportedType
+computeLegacyCArrayType(ImportedType modernType,
+                        CArrayProjection projection = CArrayProjection::Legacy);
 
 /// The other C array projection of \p decl, or null if \p decl has none (or
 /// has no projections at all). To tell a declaration with no projections apart
-/// from one with a modern projection only, check for a \c CArrayProjectionAttr.
+/// from one with a modern projection only, check for a
+/// \c CArrayProjectionAttr ; to get only a legacy or only a hidden storage
+/// projection, use \c getDeclForCArrayProjection() .
 template <typename DeclTy>
 DeclTy *getDeclForCounterpartCArrayProjection(const DeclTy *decl) {
   if (!decl)
     return nullptr;
   auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
-  return attr ? dyn_cast_or_null<DeclTy>(attr->getCounterpart()) : nullptr;
+  if (!attr || !attr->getCounterpart())
+    return nullptr;
+
+  return dyn_cast_or_null<DeclTy>(attr->getCounterpart());
 }
 
 /// Switch to the C array projection of \p decl that is \p projection.
 ///
 /// \returns \p decl if it has no C array projections or is already the
-///          requested one; otherwise its counterpart, which is null if the
-///          requested projection doesn't exist.
+///          requested one; otherwise its counterpart if that is the requested
+///          projection, or null if the requested projection doesn't exist.
 template <typename DeclTy>
 DeclTy *getDeclForCArrayProjection(DeclTy *decl, CArrayProjection projection) {
   if (!decl)
@@ -2407,7 +2436,14 @@ DeclTy *getDeclForCArrayProjection(DeclTy *decl, CArrayProjection projection) {
   auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
   if (!attr || attr->getProjection() == projection)
     return decl;
-  return getDeclForCounterpartCArrayProjection(decl);
+
+  auto *counterpart = getDeclForCounterpartCArrayProjection(decl);
+  if (!counterpart)
+    return nullptr;
+  auto *counterpartAttr =
+      counterpart->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  return counterpartAttr && counterpartAttr->getProjection() == projection
+             ? counterpart : nullptr;
 }
 
 /// Switch to the C array projection of \p decl that is the same as the

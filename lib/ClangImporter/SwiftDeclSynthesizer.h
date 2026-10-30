@@ -52,7 +52,8 @@ enum class ValueConstructorFlags {
   WantBody = 0x02,
 
   /// If present, \c self should be zero-initialized before the properties are
-  /// set (used when a member has no legacy projection).
+  /// set (used for a legacy init when a property has a hidden storage
+  /// projection). Only meaningful together with \c WantBody.
   WantZeroInitPrologue = 0x04,
 };
 using ValueConstructorOptions = OptionSet<ValueConstructorFlags>;
@@ -178,20 +179,22 @@ public:
   ///
   /// \param structDecl the struct to make a raw value for
   /// \param underlyingType the type of the raw value
-  /// \param legacyUnderlyingType the type of the raw value after converting
-  ///        to a legacy C array projection. If there is no possibility of a C
-  ///        array, just pass \p underlyingType again.
   /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
+  /// \param neededProjection which counterpart of the modern projection of
+  ///        \p underlyingType is needed (see
+  ///        \c getNeededCArrayCounterpartForType()). \c Modern (the default)
+  ///        means no C arrays are involved.
   ///
   /// This will perform most of the work involved in making a new Swift struct
   /// be backed by a raw value. This will populated derived protocols and
   /// synthesized protocols, add the new variable and pattern bindings, and
   /// create the inits parameterized over a raw value
   void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
-                           Type legacyUnderlyingType,
                            ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
                            MakeStructRawValuedOptions options =
-                               getDefaultMakeStructRawValuedOptions());
+                               getDefaultMakeStructRawValuedOptions(),
+                           CArrayProjection neededProjection =
+                               CArrayProjection::Modern);
 
   /// Build the union field getter and setter.
   ///
@@ -263,21 +266,30 @@ public:
                              VarDecl *importedFieldDecl,
                              VarDecl *anonymousStorageDecl);
 
+  /// Turn \p forwardingDecl , one projection of an imported C array variable,
+  /// into a computed property whose accessors forward to \p storedDecl , the
+  /// other projection.
   std::pair<AccessorDecl *, AccessorDecl *>
-  makeLegacyCArrayAccessors(DeclContext *dc,
-                            VarDecl *legacyDecl,
-                            VarDecl *modernDecl);
+  makeCArrayProjectionAccessors(DeclContext *dc,
+                                VarDecl *forwardingDecl,
+                                VarDecl *storedDecl);
 
-  /// Mark \p modern and \p legacy (if non-null) as alternate projections of
-  /// the same declaration for the purposes of
+  /// Mark \p modern and \p counterpart (if non-null) as alternate projections
+  /// of the same declaration for the purposes of
   /// \c Feature::ModernImportedCArrays , synthesizing forwarding accessors
   /// between them if needed.
   ///
-  /// \param addAlternate Whether to also record \p legacy as an alternate
+  /// \param addAlternate Whether to also record \p counterpart as an alternate
   ///        declaration of \p modern . This should be \c false if the caller
-  ///        takes care of adding the legacy projection itself.
-  void registerCArrayProjections(Decl *modern, Decl *legacy,
-                                 bool addAlternate = true);
+  ///        takes care of adding the counterpart itself.
+  ///
+  /// \param counterpartProjection What \p counterpart is: either the legacy
+  ///        projection, or, for a variable with no legacy projection, the
+  ///        hidden \c Builtin.FixedArray property that stores the array, which
+  ///        \p modern forwards to.
+  void registerCArrayProjections(
+      Decl *modern, Decl *counterpart, bool addAlternate = true,
+      CArrayProjection counterpartProjection = CArrayProjection::Legacy);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///

@@ -64,6 +64,8 @@ void ImportNameVersion::dump(llvm::raw_ostream &out) const {
     out << " (concurrency)";
   if (getCArrayProjection() == CArrayProjection::Legacy)
     out << " (legacy C arrays)";
+  else if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+    out << " (hidden C array storage)";
 }
 
 void ImportNameVersion::dump() const {

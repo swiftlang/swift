@@ -5096,6 +5096,7 @@ StringRef swift::getCArrayProjectionSpelling(CArrayProjection value) {
   switch (value) {
   case CArrayProjection::Modern: return "modern";
   case CArrayProjection::Legacy: return "legacy";
+  case CArrayProjection::HiddenStorage: return "hiddenStorage";
   }
   llvm_unreachable("unknown CArrayProjection");
 }

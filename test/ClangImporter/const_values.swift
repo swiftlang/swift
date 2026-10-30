@@ -87,7 +87,7 @@ func foo() {
 
 // Globals that don't get their value imported stay as public_external:
 // CHECK-DAG: sil_global public_external @static_int : $Int32
-// CHECK-DAG: sil_global public_external [let] @static_const_char_array : $InlineArray<4, Int8>
+// CHECK-DAG: sil_global public_external [let] @static_const_char_array : $(Int8, Int8, Int8, Int8)
 // CHECK-DAG: sil_global public_external @static_const_pointer : $Optional<UnsafePointer<Int8>>
 
 // CHECK:      sil shared [transparent] @$sSC9MACRO_INTs5Int32Vvg : $@convention(thin) () -> Int32 {

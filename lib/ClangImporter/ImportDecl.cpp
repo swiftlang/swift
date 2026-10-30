@@ -996,33 +996,35 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
 
 namespace {
 /// Decl-level counterpart of \c ClassifyLegacyCArrayTypeVisitor: answers
-/// whether importing a declaration involves a type that has a legacy C array
-/// type, and which therefore will need to have a legacy projection.
-class DeclNeedsLegacyCArrayProjectionVisitor
-    : public clang::ConstDeclVisitor<DeclNeedsLegacyCArrayProjectionVisitor,
-                                     bool> {
+/// which C array projection, besides the modern one, importing a declaration
+/// needs. See \c getNeededCArrayCounterpart() .
+class DeclNeededCArrayCounterpartVisitor
+    : public clang::ConstDeclVisitor<DeclNeededCArrayCounterpartVisitor,
+                                     CArrayProjection> {
   template <typename DeclTy>
-  static bool hasLegacyCArrayInSignature(const DeclTy *decl) {
-    if (importer::hasLegacyCArrayType(decl->getReturnType()))
-      return true;
+  static CArrayProjection getSignatureProjection(const DeclTy *decl) {
+    auto result =
+        importer::getNeededCArrayCounterpartForType(decl->getReturnType());
     for (auto *param : decl->parameters())
-      if (importer::hasLegacyCArrayType(param->getType()))
-        return true;
-    return false;
+      result = std::max(result, importer::getNeededCArrayCounterpartForType(
+                                    param->getType()));
+    return result;
   }
 
 public:
   // Only `NamedDecl`s are ever passed to `importDecl()`.
-  bool VisitDecl(const clang::Decl *) {
+  CArrayProjection VisitDecl(const clang::Decl *) {
     llvm_unreachable("not a NamedDecl");
   }
 
   // Deleted so that adding a kind of named declaration to Clang forces us to
   // decide whether it can have a dual projection.
-  bool VisitNamedDecl(const clang::NamedDecl *) = delete;
+  CArrayProjection VisitNamedDecl(const clang::NamedDecl *) = delete;
 
 #define NO_DUAL_PROJECTION(KIND)                                               \
-  bool Visit##KIND##Decl(const clang::KIND##Decl *) { return false; }
+  CArrayProjection Visit##KIND##Decl(const clang::KIND##Decl *) {              \
+    return CArrayProjection::Modern;                                           \
+  }
 
   // Types never have a dual projection. A record's array members are imported
   // as fields, which each get their own projections, and a C array typealias
@@ -1063,31 +1065,32 @@ public:
 
 #undef NO_DUAL_PROJECTION
 
-  bool VisitVarDecl(const clang::VarDecl *decl) {
-    return importer::hasLegacyCArrayType(decl->getType());
+  CArrayProjection VisitVarDecl(const clang::VarDecl *decl) {
+    return importer::getNeededCArrayCounterpartForType(decl->getType());
   }
-  bool VisitFieldDecl(const clang::FieldDecl *decl) {
-    return importer::hasLegacyCArrayType(decl->getType());
+  CArrayProjection VisitFieldDecl(const clang::FieldDecl *decl) {
+    return importer::getNeededCArrayCounterpartForType(decl->getType());
   }
 
   // A member of an anonymous struct or union, imported as its own variable.
-  bool VisitIndirectFieldDecl(const clang::IndirectFieldDecl *decl) {
-    return importer::hasLegacyCArrayType(decl->getType());
+  CArrayProjection VisitIndirectFieldDecl(const clang::IndirectFieldDecl *decl) {
+    return importer::getNeededCArrayCounterpartForType(decl->getType());
   }
 
   // Without this, ConstDeclVisitor would fall through to VisitVarDecl.
-  bool VisitParmVarDecl(const clang::ParmVarDecl *) {
+  CArrayProjection VisitParmVarDecl(const clang::ParmVarDecl *) {
     llvm_unreachable("a parameter's dual-projection status isn't asked "
                      "independently; check its enclosing function/method");
   }
 
-  bool VisitFunctionDecl(const clang::FunctionDecl *decl) {
-    return hasLegacyCArrayInSignature(decl);
+  CArrayProjection VisitFunctionDecl(const clang::FunctionDecl *decl) {
+    return getSignatureProjection(decl);
   }
 
   // Function templates are imported as generic functions, so their signatures
   // matter.
-  bool VisitFunctionTemplateDecl(const clang::FunctionTemplateDecl *decl) {
+  CArrayProjection
+  VisitFunctionTemplateDecl(const clang::FunctionTemplateDecl *decl) {
     return Visit(decl->getAsFunction());
   }
 
@@ -1095,38 +1098,35 @@ public:
   // so it needs a legacy projection if the base method does. (A using-declared
   // type is imported as a typealias, which doesn't, and other targets aren't
   // imported at all.)
-  bool VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
+  CArrayProjection VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
     return Visit(decl->getTargetDecl());
   }
 
-  bool VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
-    if (hasLegacyCArrayInSignature(decl))
-      return true;
+  CArrayProjection VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
+    auto result = getSignatureProjection(decl);
     // An accessor's signature can differ from its property's declared type.
     if (decl->isPropertyAccessor())
       if (auto *prop = decl->findPropertyDecl())
-        return importer::hasLegacyCArrayType(prop->getType());
-    return false;
+        result = std::max(result, importer::getNeededCArrayCounterpartForType(
+                                      prop->getType()));
+    return result;
   }
 
-  bool VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
-    if (importer::hasLegacyCArrayType(decl->getType()))
-      return true;
+  CArrayProjection VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
+    auto result = importer::getNeededCArrayCounterpartForType(decl->getType());
     if (auto *getter = decl->getGetterMethodDecl())
-      if (Visit(getter))
-        return true;
+      result = std::max(result, Visit(getter));
     if (auto *setter = decl->getSetterMethodDecl())
-      if (Visit(setter))
-        return true;
-    return false;
+      result = std::max(result, Visit(setter));
+    return result;
   }
 };
 
-/// Returns \c true if importing \p decl involves a type for which
-/// \c hasLegacyCArrayType() is true, and so \p decl needs a legacy
-/// projection in addition to its modern one.
-static bool needsLegacyCArrayProjection(const clang::NamedDecl *decl) {
-  return DeclNeedsLegacyCArrayProjectionVisitor().Visit(decl);
+/// Determines which C array projection, besides the modern one, \p decl needs.
+/// \c Modern indicates that no C array projections are involved.
+static CArrayProjection
+getNeededCArrayCounterpart(const clang::NamedDecl *decl) {
+  return DeclNeededCArrayCounterpartVisitor().Visit(decl);
 }
 } // end anonymous namespace
 
@@ -1135,7 +1135,7 @@ Decl *ClangImporter::Implementation::forEachCArrayProjectionImpl(
     llvm::function_ref<Decl *(ImportNameVersion)> importVersion,
     bool addAlternate) {
   auto modernDecl = forEachCArrayProjectionImpl(
-      needsLegacyCArrayProjection(decl),
+      getNeededCArrayCounterpart(decl),
       [&](CArrayProjection projection) -> Decl * {
         return importVersion(version.withCArrayProjection(projection));
       },
@@ -1145,19 +1145,20 @@ Decl *ClangImporter::Implementation::forEachCArrayProjectionImpl(
 }
 
 Decl *ClangImporter::Implementation::forEachCArrayProjectionImpl(
-    bool needsBoth,
+    CArrayProjection neededCounterpartProjection,
     llvm::function_ref<Decl *(CArrayProjection)> importProjection,
     bool addAlternate) {
   Decl *modernDecl = importProjection(CArrayProjection::Modern);
-  if (!modernDecl || !needsBoth)
+  if (!modernDecl || neededCounterpartProjection == CArrayProjection::Modern)
     return modernDecl;
 
   ASSERT(!isa<TypeDecl>(modernDecl) &&
-         "shouldn't need legacy projection of a type");
+         "shouldn't need legacy or hidden storage projection of a type");
 
-  Decl *legacyDecl = importProjection(CArrayProjection::Legacy);
-  SwiftDeclSynthesizer(*this).registerCArrayProjections(modernDecl, legacyDecl,
-                                                        addAlternate);
+  Decl *counterpartDecl = importProjection(neededCounterpartProjection);
+
+  SwiftDeclSynthesizer(*this).registerCArrayProjections(
+      modernDecl, counterpartDecl, addAlternate, neededCounterpartProjection);
   return modernDecl;
 }
 
@@ -1456,46 +1457,51 @@ namespace {
               name.getInitKind() == CtorInitializerKind::ConvenienceFactory);
     }
 
-    /// If necessary, modify an imported type (and optionally an imported
-    /// parameter list) to use the legacy projection's types.
+    /// Modify imported types for the current C array projection.
     ///
-    /// \returns A null type if the type, or one of the parameters, cannot be
-    ///          represented in the legacy projection.
+    /// \param params A parameter list whose types should also be modified.
+    ///        Can be null.
+    /// \param asyncConv A foreign async convention whose completion handler
+    ///        type should also be modified. Can be null.
+    ///
+    /// \returns A null type if any of the types cannot be represented in the
+    ///          current projection.
     ImportedType didImportType(ImportedType result,
                                ParameterList **params = nullptr,
                                ForeignAsyncConvention *asyncConv = nullptr) {
-      if (getCArrayProjection() != CArrayProjection::Legacy)
-        return result;
+      switch (getCArrayProjection()) {
+      case CArrayProjection::Modern:
+        // Never change param or async convention types.
+        break;
 
-      if (params && *params) {
-        for (auto param : **params) {
-          auto newParamType = importer::computeLegacyCArrayType(
-                                  { param->getInterfaceType(), false });
-          if (!newParamType) {
-            // Don't leave the caller with a parameter list that still
-            // mentions InlineArray; it would be mistaken for a legacy
-            // projection that can be (partially) imported.
-            *params = nullptr;
-            return ImportedType();
+      case CArrayProjection::HiddenStorage:
+        // Never have param or async convention types.
+        ASSERT(!params && !asyncConv && "HiddenStorage not a stored property?");
+        break;
+
+      case CArrayProjection::Legacy:
+        if (params && *params) {
+          for (auto param : **params) {
+            auto newParamType = importer::computeLegacyCArrayType(
+                                    { param->getInterfaceType(), false });
+            ASSERT(newParamType && "legacy projection not importable?");
+            param->setInterfaceType(newParamType.getType());
           }
-
-          param->setInterfaceType(newParamType.getType());
         }
+
+        // If there is an async convention, rewrite its completion handler type.
+        if (asyncConv) {
+          auto newHandlerType = importer::computeLegacyCArrayType(
+                                     {asyncConv->CompletionHandlerType, false});
+          ASSERT(newHandlerType && "legacy projection not importable?");
+          asyncConv->CompletionHandlerType =
+              newHandlerType.getType()->getCanonicalType();
+        }
+
+        break;
       }
 
-      // If there is an async convention, rewrite its completion handler type.
-      if (asyncConv) {
-        auto newHandlerType = importer::computeLegacyCArrayType(
-                                   {asyncConv->CompletionHandlerType, false});
-
-        if (!newHandlerType)
-          return ImportedType();
-
-        asyncConv->CompletionHandlerType =
-            newHandlerType.getType()->getCanonicalType();
-      }
-
-      return importer::computeLegacyCArrayType(result);
+      return importer::computeLegacyCArrayType(result, getCArrayProjection());
     }
 
     Type didImportType(Type result, ParameterList **params = nullptr) {
@@ -1567,10 +1573,8 @@ namespace {
 
       // Import according to whichever projection is visible, not
       // unconditionally modern.
-      if (Impl.VisibleCArrayProjection == CArrayProjection::Legacy)
-        return importer::computeLegacyCArrayType({result, false}).getType();
-
-      return result;
+      return importer::computeLegacyCArrayType(
+                 {result, false}, Impl.VisibleCArrayProjection).getType();
     }
 
     /// Import the given function return type.
@@ -1704,7 +1708,8 @@ namespace {
     ///        dual projection is needed.
     AccessLevel limitAccessForCArrayProjection(AccessLevel visibleAccess,
                                                const clang::NamedDecl *decl) {
-      bool needsBoth = needsLegacyCArrayProjection(decl);
+      bool needsBoth =
+          getNeededCArrayCounterpart(decl) != CArrayProjection::Modern;
       ASSERT(getCArrayProjection() == CArrayProjection::Modern || needsBoth &&
              "importing a legacy projection when there shouldn't be one?");
 
@@ -1746,6 +1751,9 @@ namespace {
     }
 
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       DeclContext *dc = nullptr;
       // Do not import namespace declarations marked as 'swift_private'.
       if (decl->hasAttr<clang::SwiftPrivateAttr>())
@@ -1817,6 +1825,9 @@ namespace {
     }
 
     Decl *VisitNamespaceAliasDecl(const clang::NamespaceAliasDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       ImportedName importedName;
       std::optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) = importFullName(decl);
@@ -1952,6 +1963,9 @@ namespace {
                              DeclContext *dc, Identifier name);
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       ImportedName importedName;
       std::optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) = importFullName(Decl);
@@ -2169,6 +2183,9 @@ namespace {
                                            const clang::EnumDecl *decl);
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       decl = decl->getDefinition();
       if (!decl) {
         forwardDeclaration = true;
@@ -2239,7 +2256,6 @@ namespace {
         options -= MakeStructRawValuedFlags::IsImplicit;
 
         synthesizer.makeStructRawValued(structDecl, underlyingType,
-                                        underlyingType,
                                         {KnownProtocolKind::RawRepresentable,
                                          KnownProtocolKind::Equatable,
                                          KnownProtocolKind::Hashable},
@@ -2726,6 +2742,9 @@ namespace {
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
       bool hasUnreferenceableStorage = false;
@@ -3150,15 +3169,16 @@ namespace {
       for (auto member : members) {
         auto cArrayAttr = member->getAttrs()
                               .getAttribute<CArrayProjectionAttr>();
-        if (cArrayAttr && cArrayAttr->getCounterpart()) {
-          legacyMembers.push_back(cast<VarDecl>(cArrayAttr->getCounterpart()));
+        if (!cArrayAttr) {
+          legacyMembers.push_back(member);
+        } else if (auto *legacyMember = importer::getDeclForCArrayProjection(
+                       member, CArrayProjection::Legacy)) {
+          legacyMembers.push_back(legacyMember);
           needsLegacyMemberwiseCtor = true;
-        } else if (cArrayAttr) {
+        } else {
           // No legacy projection, so we can't make a parameter for this member.
           // We'll have to zero-initialize it instead.
           hasModernOnlyMember = true;
-        } else {
-          legacyMembers.push_back(member);
         }
 
         auto nd = cast<clang::NamedDecl>(member->getClangDecl());
@@ -3186,7 +3206,7 @@ namespace {
               cArrayAttr != nullptr,
               [&](CArrayProjection projection) -> ConstructorDecl * {
             auto correctMember = getDeclForCArrayProjection(member, projection);
-            if (!correctMember)
+            if (!correctMember || projection == CArrayProjection::HiddenStorage)
               return nullptr;
 
             auto valueCtor = synthesizer.createValueConstructor(
@@ -3304,7 +3324,7 @@ namespace {
         auto valueCtor = Impl.forEachCArrayProjection(
             hasInlineArrayMember,
             [&](CArrayProjection projection) -> ConstructorDecl * {
-          if (projection == CArrayProjection::Legacy
+          if (projection != CArrayProjection::Modern
                   && !needsLegacyMemberwiseCtor)
             return nullptr;
 
@@ -3534,6 +3554,9 @@ namespace {
     }
 
     Decl *VisitCXXRecordDecl(const clang::CXXRecordDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // This can be called from lldb without C++ interop being enabled: There
       // may be C++ declarations in imported modules, but the interface for
       // those modules may be a pure C or Objective-C interface.
@@ -3762,6 +3785,9 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // Importing std::conditional substantially increases compile times when
       // building with libstdc++, i.e. on most Linux distros.
       if (decl->isInStdNamespace() && decl->getIdentifier() &&
@@ -3845,6 +3871,9 @@ namespace {
     }
 
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
 
       ImportedName importedName;
@@ -3972,6 +4001,9 @@ namespace {
     }
 
     Decl *VisitIndirectFieldDecl(const clang::IndirectFieldDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       ImportedName importedName;
       std::optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) = importFullName(decl);
@@ -4116,6 +4148,9 @@ namespace {
     }
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // Import the name of the function.
       ImportedName importedName;
       std::optional<ImportedName> correctSwiftName;
@@ -5260,6 +5295,9 @@ namespace {
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // The static `operator ()` introduced in C++ 23 is still callable as an
       // instance operator in C++, and we want to preserve the ability to call
       // it as an instance method in Swift as well for source compatibility.
@@ -5383,6 +5421,12 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+      // Union fields are not true stored properties, so there's no need to give
+      // them hidden C array storage.
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage &&
+              decl->getParent()->isUnion())
+        return nullptr;
+
       if (decl->hasAttr<clang::NoUniqueAddressAttr>()) {
         if (const auto *rd = decl->getType()->getAsRecordDecl()) {
           // Clang can store the next field in the padding of this one. Swift
@@ -5634,18 +5678,6 @@ namespace {
 
       // Otherwise, import as an external declaration
       if (!result) {
-        // `InterfaceTypeRequest` will eventually lazily import the type using
-        // `ClangImporter::importVarDeclType()`, so we don't want to fully
-        // import it here. Since we aren't calling `didImportType()` (which
-        // ends up returning a null type if the C array type is unimportable),
-        // we need to explicitly check for unimportability and bail out now.
-        if (getCArrayProjection() == CArrayProjection::Legacy &&
-            !importer::hasImportableLegacyCArrayType(decl->getType())) {
-          ASSERT(importer::hasLegacyCArrayType(decl->getType())
-                   && "shouldn't be importing a legacy projection");
-          return nullptr;
-        }
-
         result = Impl.createDeclWithClangNode<VarDecl>(
             decl, getAccessLevel(decl), /*IsStatic*/ isStatic, introducer,
             Impl.importSourceLoc(decl->getLocation()), name, dc);
@@ -5697,6 +5729,9 @@ namespace {
     }
 
     Decl *VisitFunctionTemplateDecl(const clang::FunctionTemplateDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       ImportedName importedName;
       std::optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) =
@@ -5724,6 +5759,9 @@ namespace {
     }
 
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       ImportedName importedName;
       std::tie(importedName, std::ignore) = importFullName(decl);
       auto name = importedName.getBaseIdentifier(Impl.SwiftContext);
@@ -5767,6 +5805,9 @@ namespace {
     }
 
     Decl *VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // Only import:
       //   1. Types
       //   2. C++ methods from privately inherited base classes
@@ -5899,6 +5940,9 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
         return nullptr;
@@ -6514,6 +6558,9 @@ namespace {
                                      SmallVectorImpl<Decl *> &newMembers);
 
     Decl *VisitObjCCategoryDecl(const clang::ObjCCategoryDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       // If the declaration is invalid, fail.
       if (decl->isInvalidDecl()) return nullptr;
 
@@ -6751,6 +6798,9 @@ namespace {
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       ImportedName importedName;
       std::optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) = importFullName(decl);
@@ -6869,6 +6919,8 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
 
       auto createFakeClass = [=](Identifier name, bool cacheResult,
                                      bool inheritFromNSObject,
@@ -7091,6 +7143,9 @@ namespace {
     }
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
+      if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+        return nullptr;
+
       auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
         return nullptr;
@@ -7702,13 +7757,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   bool isBridged = !storageType->isEqual(bridgedType);
 
-  /// The legacy C array projection type for \c bridgedType . This may be
-  /// exactly the same as \c bridgedType (dual projections are not needed) or it
-  /// may be null (un-importable in legacy mode).
-  Type legacyBridgedType = bridgedType;
-  if (importer::hasLegacyCArrayType(decl->getUnderlyingType()))
-    legacyBridgedType =
-        importer::computeLegacyCArrayType({ bridgedType, false }).getType();
+  auto neededProjection =
+      importer::getNeededCArrayCounterpartForType(decl->getUnderlyingType());
 
   // A newtype is never imported twice even if its underlying type is a C array.
   // However, if we're in legacy mode and the underlying type is un-importable,
@@ -7716,7 +7766,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // be attached just like any modern projection.
   //
   // `modernOnly` is what tells us whether we're in this situation.
-  bool modernOnly = legacyBridgedType.isNull()
+  bool modernOnly = neededProjection == CArrayProjection::HiddenStorage
      && Impl.VisibleCArrayProjection == CArrayProjection::Legacy;
 
   auto &ctx = Impl.SwiftContext;
@@ -7835,8 +7885,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   if (!isBridged) {
     // Simple, our storage type is equivalent to our bridged
     // type.
-    synthesizer.makeStructRawValued(structDecl, bridgedType, legacyBridgedType,
-                                    synthesizedProtocols, options);
+    synthesizer.makeStructRawValued(structDecl, bridgedType,
+                                    synthesizedProtocols, options,
+                                    neededProjection);
   } else {
     // We need to make a stored rawValue or storage type, and a
     // computed one of bridged type.
@@ -7845,8 +7896,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     // legacy projection for a bridged newtype's `rawValue`.
     // FIXME: Could merge `makeStructRawValuedWithBridge()` into
     //        `makeStructRawValued()` so everything composes cleanly.
-    ASSERT(!legacyBridgedType.isNull() &&
-           bridgedType->isEqual(legacyBridgedType));
+    ASSERT(neededProjection == CArrayProjection::Modern);
 
     synthesizer.makeStructRawValuedWithBridge(
         structDecl, storageType, bridgedType,
@@ -8030,7 +8080,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto cacheKey = Impl.getImportedDeclsKey(decl, getVersionWithoutProjection());
   Impl.ImportedDecls[cacheKey] = structDecl;
 
-  synthesizer.makeStructRawValued(structDecl, underlyingType, underlyingType,
+  synthesizer.makeStructRawValued(structDecl, underlyingType,
                                   {KnownProtocolKind::OptionSet});
   Impl.addOptionSetTypealiases(structDecl);
   return structDecl;
@@ -9113,7 +9163,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // A modern subscript can only be used where InlineArray is available.
   // (`importAttributes()` doesn't touch subscripts.)
   if (getCArrayProjection() == CArrayProjection::Modern &&
-          needsLegacyCArrayProjection(getterObjCMethod))
+          getNeededCArrayCounterpart(getterObjCMethod) !=
+              CArrayProjection::Modern)
     Impl.addInlineArrayAvailability(subscript);
 
   // Build the thunks.
@@ -10924,17 +10975,21 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (ClangDecl->isInvalidDecl())
     return nullptr;
 
-  // If the caller wanted a legacy projection, import the modern projection
+  // If the caller wanted a different projection, import the modern projection
   // instead so that the two are imported, registered, and finalized together.
-  if (version.getCArrayProjection() == CArrayProjection::Legacy) {
+  if (version.getCArrayProjection() != CArrayProjection::Modern) {
     auto *modernDecl = importDecl(
         ClangDecl, version.withCArrayProjection(CArrayProjection::Modern));
-    // A null result means that importing the legacy projection failed.
-    if (auto legacyDecl = importDeclCached(ClangDecl, version))
-      return *legacyDecl;
+    // A null result means that importing the projection failed.
+    if (auto counterpartDecl = importDeclCached(ClangDecl, version))
+      return *counterpartDecl;
 
-    // A declaration without C arrays is its own legacy projection.
-    return needsLegacyCArrayProjection(ClangDecl) ? nullptr : modernDecl;
+    // A declaration without C arrays is its own legacy projection, and has
+    // no hidden storage.
+    if (version.getCArrayProjection() == CArrayProjection::HiddenStorage)
+      return nullptr;
+    return getNeededCArrayCounterpart(ClangDecl) != CArrayProjection::Modern
+               ? nullptr : modernDecl;
   }
 
   // If '-version-independent-apinotes' is used, the `ClangDecl`
@@ -11280,14 +11335,23 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
     bool cachedDifferentDecl = !it.second && Result != it.first->second;
 
     // Make sure all the C array projections are recorded.
-    if (Result && version.getCArrayProjection() == CArrayProjection::Modern)
-      if (Result->getAttrs().hasAttribute<CArrayProjectionAttr>())
-        ImportedDecls.try_emplace(
-            getImportedDeclsKey(
-                ClangDecl,
-                version.withCArrayProjection(CArrayProjection::Legacy),
-                UseCanonicalDecl),
-            importer::getDeclForCounterpartCArrayProjection(Result));
+    if (Result && version.getCArrayProjection() == CArrayProjection::Modern &&
+        Result->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
+      ImportedDecls.try_emplace(
+          getImportedDeclsKey(
+              ClangDecl,
+              version.withCArrayProjection(CArrayProjection::Legacy),
+              UseCanonicalDecl),
+          importer::getDeclForCArrayProjection(Result,
+                                               CArrayProjection::Legacy));
+      ImportedDecls.try_emplace(
+          getImportedDeclsKey(
+              ClangDecl,
+              version.withCArrayProjection(CArrayProjection::HiddenStorage),
+              UseCanonicalDecl),
+          importer::getDeclForCArrayProjection(
+              Result, CArrayProjection::HiddenStorage));
+    }
 
     if (CONDITIONAL_ASSERT_enabled() && cachedDifferentDecl) {
       ABORT([&](auto &out) {

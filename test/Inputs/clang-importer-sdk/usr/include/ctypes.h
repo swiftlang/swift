@@ -376,6 +376,31 @@ struct StructWithAnonymousUnionArray {
   };
 };
 
+struct StructWithNestedPlainAndArrayFields {
+  struct StructWithPlainAndArrayFields inner;
+};
+
+struct ArrayElement {
+  int first;
+  int second;
+};
+
+struct StructWithArrayOfStructs {
+  struct ArrayElement elems[2];
+};
+
+struct StructWithHugeArrayOfHugeArrayPointers {
+  int (*pointers[5000])[5000];
+};
+
+struct StructWithAnonymousStructArray {
+  int plain;
+  struct {
+    int first;
+    int elems[4];
+  };
+};
+
 struct StructWithSmallAndHugeArrayFields {
   int small[4];
   int huge[5000];
@@ -399,6 +424,17 @@ struct StructWithNestedHugeArrayField {
   int elems[2][5000];
 };
 
+typedef float __attribute__((ext_vector_type(3))) VectorFloat3;
+
+struct StructWithArrayOfVectors {
+  VectorFloat3 tangents[2];
+  float scalars[2];
+};
+
+struct StructWithHugeArrayOfSmallArrays {
+  int grid[5000][2];
+};
+
 struct StructWithArrayTypedefField {
   SmallArrayTypedef small;
 };
@@ -419,6 +455,14 @@ struct StructWithStructArrayFields {
   struct FooStruct1 small[4];
   struct FooStruct1 huge[5000];
 };
+
+struct StructWithStaticArrays {
+  int plain;
+};
+extern int smallStaticArray[4]
+    __attribute__((swift_name("StructWithStaticArrays.small")));
+extern int hugeStaticArray[5000]
+    __attribute__((swift_name("StructWithStaticArrays.huge")));
 
 extern int hugeGlobalArray[5000];
 extern int smallGlobalArray[4];
