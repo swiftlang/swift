@@ -406,6 +406,12 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     if (isa<ClangModuleUnit>(NTD->getDeclContext()->getModuleScopeContext()))
       return false;
 
+    // Don't skip a back-deployed type from another module that this module
+    // emits its own copy of, which has PublicNonUnique linkage. The members
+    // that this module adds to it in extensions still have symbols.
+    if (NTD->isBackDeployedIntoClient())
+      return false;
+
     return !(getDeclLinkage(NTD) == FormalLinkage::PublicUnique ||
              getDeclLinkage(NTD) == FormalLinkage::PackageUnique);
   }

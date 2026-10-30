@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Inserts a new element into the array at the specified position.
   ///
@@ -29,7 +28,6 @@ extension _RigidArray where Element: ~Copyable {
   ///   `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(_ item: consuming Element, at index: Int) {
     _checkValidIndex(index)
@@ -45,7 +43,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Inserts a given number of new items into this array at the specified
   /// position, using a callback to directly initialize array storage by
@@ -87,7 +84,6 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `newItemCount`) in addition to the complexity
   ///    of the callback invocations.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert<E: Error>(
     addingCount newItemCount: Int,
@@ -112,7 +108,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Moves the elements of a fully initialized buffer into this array,
   /// starting at the specified position, and leaving the buffer
@@ -131,7 +126,6 @@ extension _RigidArray where Element: ~Copyable {
   ///       `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(
     moving items: UnsafeMutableBufferPointer<Element>,
@@ -158,7 +152,6 @@ extension _RigidArray where Element: ~Copyable {
   ///       `index` must be a valid index in the array.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(
     moving items: inout OutputSpan<Element>,
@@ -172,7 +165,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: Copyable {
   /// Copies the elements of a fully initialized buffer pointer into this
   /// array at the specified position.
@@ -194,7 +186,6 @@ extension _RigidArray where Element: Copyable {
   ///       a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(
     copying newElements: UnsafeBufferPointer<Element>, at index: Int
@@ -225,7 +216,6 @@ extension _RigidArray where Element: Copyable {
   ///       a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(
     copying newElements: UnsafeMutableBufferPointer<Element>,
@@ -252,7 +242,6 @@ extension _RigidArray where Element: Copyable {
   ///        a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(
     copying newElements: Span<Element>, at index: Int
@@ -308,7 +297,6 @@ extension _RigidArray where Element: Copyable {
   ///        a valid index of the array.
   ///
   /// - Complexity: O(`count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func insert(
     copying newElements: some Collection<Element>, at index: Int

@@ -446,6 +446,11 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   return false;
 }
 
+static bool usesFeatureBackDeployFrozenValueTypes(Decl *d) {
+  return (isa<StructDecl>(d) || isa<EnumDecl>(d)) &&
+         d->getAttrs().hasAttribute<BackDeployedAttr>();
+}
+
 static bool usesFeatureAddressableTypes(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
     return true;

@@ -22,6 +22,7 @@ import Swift
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
 /// ensuring spatial safety and avoiding buffer overflow errors.
+@backDeployed(before: SwiftStdlib 6.2)
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 @frozen
@@ -808,7 +809,6 @@ extension RawSpan {
   ///   - byteOrder: The order in which the bytes will be decoded.
   /// - Returns: A new value of type `T`, read from `offset`.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   public func load<T: ConvertibleFromBytes & FixedWidthInteger>(
     fromByteOffset offset: Int,
     as type: T.Type,

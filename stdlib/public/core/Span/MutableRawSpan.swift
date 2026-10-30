@@ -16,6 +16,7 @@ import Swift
 
 /// `MutableRawSpan` represents a contiguous region of memory
 /// which contains initialized bytes.
+@backDeployed(before: SwiftStdlib 6.2)
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -541,7 +542,6 @@ extension MutableRawSpan {
   ///   - byteOrder: The order in which the bytes will be decoded.
   /// - Returns: A new value of type `T`, read from `offset`.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   public func load<T: ConvertibleFromBytes & FixedWidthInteger>(
     fromByteOffset offset: Int,
     as type: T.Type,
@@ -633,7 +633,6 @@ extension MutableRawSpan {
   ///   - type: The type of the instance to store.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   @_lifetime(self: copy self)
   public mutating func storeBytes<
     T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger
@@ -715,7 +714,6 @@ extension MutableRawSpan {
   ///   - type: The type of the instance to store repeatedly.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   @_lifetime(self: copy self)
   public mutating func storeBytes<
     T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger

@@ -18,6 +18,7 @@ import Swift
 /// with some number of initialized `Element` instances followed by
 /// uninitialized memory. It provides operations to access the items it stores,
 /// as well as to add new elements and to remove existing ones.
+@backDeployed(before: SwiftStdlib 6.2)
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)

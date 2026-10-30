@@ -94,6 +94,7 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-enable-experimental-feature" "RawLayout"
   "-enable-experimental-feature" "StaticExclusiveOnly"
   "-enable-experimental-feature" "Extern"
+  "-enable-experimental-feature" "BackDeployFrozenValueTypes"
   "-strict-memory-safety"
 )
 

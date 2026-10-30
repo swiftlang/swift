@@ -1639,6 +1639,11 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
 
   auto canBeLazy = [&]() -> bool {
     auto *dc = type->getDeclContext();
+    // A back-deployed type from another module is emitted wherever it is used.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(type))
+      if (nominal->isBackDeployedIntoClient())
+        return true;
+
     if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
         return requiresForeignTypeMetadata(nominal);
@@ -4314,7 +4319,10 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
 
   if (auto *entityDC = entity.getDeclContextForEmission()) {
     auto *entitySF = entityDC->getModuleScopeContext();
-    bool clangImportedEntity = isa<ClangModuleUnit>(entitySF);
+    // Entities of back-deployed types from other modules are emitted on
+    // demand, like imported entities.
+    bool clangImportedEntity = isa<ClangModuleUnit>(entitySF) ||
+                               entity.isBackDeployedIntoClient();
 
     auto &mod = getSILModule();
 
@@ -5500,6 +5508,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
         isObjCImpl)
       return var;
 
+    // Back-deployed types don't get an alias; see getAddrOfTypeMetadata().
+    if (nominal->isBackDeployedIntoClient() && !hasEmbeddedExistentials)
+      return var;
+
     // Native Swift class metadata has a destructor before the address point.
     if (isa<ClassDecl>(nominal)) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
@@ -5562,12 +5574,18 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   bool foreign = nominal && requiresForeignTypeMetadata(nominal);
 
-  // Foreign classes and prespecialized generic types do not use an alias into
-  // the full metadata and therefore require a GEP.
+  // Back-deployed types are emitted with shared linkage into each client, and
+  // Mach-O alias symbols can't be weak definitions, so they have no alias
+  // either.
+  bool backDeployed = nominal && nominal->isBackDeployedIntoClient();
+
+  // Foreign classes, back-deployed types and prespecialized generic types do
+  // not use an alias into the full metadata and therefore require a GEP.
   bool fullMetadata =
       !Context.LangOpts.hasFeature(Feature::Embedded) &&
-      (foreign || (concreteType->getAnyGeneric() &&
-                  concreteType->getAnyGeneric()->isGenericContext()));
+      (foreign || backDeployed ||
+       (concreteType->getAnyGeneric() &&
+        concreteType->getAnyGeneric()->isGenericContext()));
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;

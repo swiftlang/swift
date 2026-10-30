@@ -18,11 +18,13 @@
 #include "GenBorrow.h"
 #include "GenType.h"
 #include "IRGen.h"
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NativeConventionSchema.h"
 #include "NonFixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeExpansionContext.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -273,6 +275,22 @@ public:
   }
 };
 
+/// Whether a borrow of a value with the given layout properties is represented
+/// by a bitwise copy of the value, rather than by a pointer to it. This must
+/// match swift_getBorrowRepresentation in the runtime.
+static llvm::Value *emitIsBorrowValueRepresentation(
+    IRGenFunction &IGF, llvm::Value *size, llvm::Value *isBitwiseBorrowable,
+    llvm::Value *isAddressableForDependencies) {
+  auto isSmall = IGF.Builder.CreateICmpULE(size,
+     llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
+                            IGF.IGM.getPointerSize().getValue() * 4));
+
+  llvm::Value *v = IGF.Builder.CreateNot(isAddressableForDependencies);
+  v = IGF.Builder.CreateAnd(v, isBitwiseBorrowable);
+  v = IGF.Builder.CreateAnd(v, isSmall);
+  return v;
+}
+
 class BorrowNonFixedTypeInfo final
   : public WitnessSizedTypeInfo<BorrowNonFixedTypeInfo>
 {
@@ -324,6 +342,12 @@ public:
     IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
   }
 
+  void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    // 'Builtin.Borrow' is always bitwise copyable.
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
   void destroy(IRGenFunction &IGF, Address address, SILType T,
                bool isOutlined) const override {
     // 'Builtin.Borrow' is always trivial to destroy, thus it's a nop.
@@ -332,18 +356,10 @@ public:
   llvm::Value *getIsValueRepresentation(IRGenFunction &IGF,
                                         SILType referentTy,
                                         const TypeInfo &referentTI) const {
-    auto isBitwiseBorrowable = referentTI.getIsBitwiseBorrowable(IGF, referentTy);
-    auto isAddressableForDependencies = referentTI.getIsAddressableForDependencies(IGF, referentTy);
-    auto size = referentTI.getSize(IGF, referentTy);
-
-    auto isSmall = IGF.Builder.CreateICmpULE(size,
-       llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
-                              IGF.IGM.getPointerSize().getValue() * 4));
-
-    llvm::Value *v = IGF.Builder.CreateNot(isAddressableForDependencies);
-    v = IGF.Builder.CreateAnd(v, isBitwiseBorrowable);
-    v = IGF.Builder.CreateAnd(v, isSmall);
-    return v;
+    return emitIsBorrowValueRepresentation(
+        IGF, referentTI.getSize(IGF, referentTy),
+        referentTI.getIsBitwiseBorrowable(IGF, referentTy),
+        referentTI.getIsAddressableForDependencies(IGF, referentTy));
   }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -543,8 +559,35 @@ void irgen::emitInitBorrowAtAddress(IRGenFunction &IGF,
     
   case BorrowTypeInfoSubclassKind::BorrowNonFixed:
     // The borrow representation is dependent on the referent type.
-    // Ask the runtime 'swift_initBorrow' to handle it.
     auto astBorrowTy = borrowTy.getASTType()->castTo<BuiltinBorrowType>();
+
+    // If the runtime might not provide 'swift_initBorrow', do the work here.
+    if (!IGF.IGM.isBorrowRuntimeAvailable()) {
+      auto referentTy =
+          SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+      auto &nonFixedTL = static_cast<const BorrowNonFixedTypeInfo &>(tl);
+      auto &referentTI = IGF.getTypeInfo(referentTy);
+      auto isValueRep =
+          nonFixedTL.getIsValueRepresentation(IGF, referentTy, referentTI);
+      auto valueBB = IGF.createBasicBlock("init_borrow.value");
+      auto pointerBB = IGF.createBasicBlock("init_borrow.pointer");
+      auto doneBB = IGF.createBasicBlock("init_borrow.done");
+      IGF.Builder.CreateCondBr(isValueRep, valueBB, pointerBB);
+
+      IGF.Builder.emitBlock(valueBB);
+      IGF.Builder.CreateMemCpy(destBorrow, srcReferent,
+                               referentTI.getSize(IGF, referentTy));
+      IGF.Builder.CreateBr(doneBB);
+
+      IGF.Builder.emitBlock(pointerBB);
+      IGF.Builder.CreateStore(srcReferent.getAddress(), destBorrow);
+      IGF.Builder.CreateBr(doneBB);
+
+      IGF.Builder.emitBlock(doneBB);
+      return;
+    }
+
+    // Otherwise, ask the runtime 'swift_initBorrow' to handle it.
     auto metadata = IGF.emitTypeMetadataRef(astBorrowTy->getReferentType());
     auto initBorrow = IGF.IGM.getInitBorrowFunctionPointer();
 
@@ -617,8 +660,42 @@ Address irgen::emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
     
   case BorrowTypeInfoSubclassKind::BorrowNonFixed: {
     // The borrow representation is dependent on the referent type.
-    // Ask the runtime 'swift_dereferenceBorrow' to handle it.
     auto astBorrowTy = borrowTy.getASTType()->castTo<BuiltinBorrowType>();
+
+    // If the runtime might not provide 'swift_dereferenceBorrow', do the work
+    // here.
+    if (!IGF.IGM.isBorrowRuntimeAvailable()) {
+      auto referentSILTy =
+          SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+      auto &nonFixedTL = static_cast<const BorrowNonFixedTypeInfo &>(tl);
+      auto &referentTI = IGF.getTypeInfo(referentSILTy);
+      auto isValueRep =
+          nonFixedTL.getIsValueRepresentation(IGF, referentSILTy, referentTI);
+      auto valueBB = IGF.createBasicBlock("deref_borrow.value");
+      auto pointerBB = IGF.createBasicBlock("deref_borrow.pointer");
+      auto doneBB = IGF.createBasicBlock("deref_borrow.done");
+      IGF.Builder.CreateCondBr(isValueRep, valueBB, pointerBB);
+
+      // The borrow is a bitwise copy of the referent, so the borrow's own
+      // address is the referent's address.
+      IGF.Builder.emitBlock(valueBB);
+      IGF.Builder.CreateBr(doneBB);
+
+      IGF.Builder.emitBlock(pointerBB);
+      auto loaded = IGF.Builder.CreateLoad(borrow.getAddress(), IGF.IGM.PtrTy,
+                                           IGF.IGM.getPointerAlignment());
+      auto loadedBB = IGF.Builder.GetInsertBlock();
+      IGF.Builder.CreateBr(doneBB);
+
+      IGF.Builder.emitBlock(doneBB);
+      auto phi = IGF.Builder.CreatePHI(IGF.IGM.PtrTy, 2);
+      phi->addIncoming(borrow.getAddress(), valueBB);
+      phi->addIncoming(loaded, loadedBB);
+      return Address(phi, referentTL.getStorageType(),
+                     referentTL.getBestKnownAlignment());
+    }
+
+    // Otherwise, ask the runtime 'swift_dereferenceBorrow' to handle it.
     auto metadata = IGF.emitTypeMetadataRef(astBorrowTy->getReferentType());
     auto dereferenceBorrow = IGF.IGM.getDereferenceBorrowFunctionPointer();
 
@@ -630,4 +707,133 @@ Address irgen::emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
   }
   }
   llvm_unreachable("invalid borrow representation!");
+}
+
+bool irgen::shouldComputeBorrowLayoutInline(IRGenFunction &IGF, SILType T) {
+  if (!T.is<BuiltinBorrowType>() || IGF.IGM.isBorrowRuntimeAvailable()) {
+    return false;
+  }
+  auto &ti = IGF.IGM.getTypeInfo(T);
+  return ti.getSubclassKind()
+    == (unsigned)BorrowTypeInfoSubclassKind::BorrowNonFixed;
+}
+
+namespace {
+/// The layout properties of a borrow, as computed from its referent's.
+struct InlineBorrowLayout {
+  llvm::Value *size, *stride, *flags, *extraInhabitantCount;
+};
+} // end anonymous namespace
+
+/// Compute the layout of a borrow from the layout of its referent, following
+/// swift_getBorrowRepresentation and the BorrowCacheEntry initialization in
+/// the runtime: a borrow of a small, bitwise-borrowable value that isn't
+/// addressable for dependencies has the layout of the value; any other borrow
+/// has the layout of a pointer. Old runtimes never set the flags that
+/// describe addressability or non-borrowability, so this agrees with newer
+/// runtimes for any referent that an older runtime could have produced.
+static InlineBorrowLayout
+computeInlineBorrowLayout(IRGenFunction &IGF, llvm::Value *size,
+                          llvm::Value *stride, llvm::Value *flags,
+                          llvm::Value *extraInhabitantCount) {
+  auto &IGM = IGF.IGM;
+  auto &B = IGF.Builder;
+  auto ptrSize = IGM.getPointerSize().getValue();
+
+  // Same logic as emitLoadOfIsBitwiseBorrowable and
+  // emitLoadOfIsAddressableForDependencies.
+  auto nonBorrowableMask = IGM.getInt32(ValueWitnessFlags::IsNonBitwiseBorrowable
+                                        | ValueWitnessFlags::IsNonBitwiseTakable);
+  auto isBitwiseBorrowable = B.CreateICmpEQ(
+      B.CreateAnd(flags, nonBorrowableMask), IGM.getInt32(0));
+  auto isAddressable = B.CreateICmpNE(
+      B.CreateAnd(flags,
+                  IGM.getInt32(ValueWitnessFlags::IsAddressableForDependencies)),
+      IGM.getInt32(0));
+  auto isValueRep = emitIsBorrowValueRepresentation(
+      IGF, size, isBitwiseBorrowable, isAddressable);
+
+  auto &rawPointerTI = IGM.getRawPointerTypeInfo();
+  auto ptrSizeValue = llvm::ConstantInt::get(IGM.SizeTy, ptrSize);
+  auto ptrXI = IGM.getInt32(rawPointerTI.getFixedExtraInhabitantCount(IGM));
+
+  InlineBorrowLayout result;
+  result.size = B.CreateSelect(isValueRep, size, ptrSizeValue);
+  result.stride = B.CreateSelect(isValueRep, stride, ptrSizeValue);
+  result.extraInhabitantCount =
+      B.CreateSelect(isValueRep, extraInhabitantCount, ptrXI);
+
+  auto alignMask = B.CreateSelect(
+      isValueRep,
+      B.CreateAnd(flags, IGM.getInt32(ValueWitnessFlags::AlignmentMask)),
+      IGM.getInt32(ptrSize - 1));
+
+  // Match ValueWitnessTable::isValueInline for a bitwise-takable type.
+  auto fitsInBuffer = B.CreateICmpULE(
+      result.size, llvm::ConstantInt::get(IGM.SizeTy, ptrSize * 3));
+  auto alignFits = B.CreateICmpULE(alignMask, IGM.getInt32(ptrSize - 1));
+  auto isInline = B.CreateAnd(fitsInBuffer, alignFits);
+  result.flags = B.CreateOr(
+      alignMask,
+      B.CreateSelect(isInline, IGM.getInt32(0),
+                     IGM.getInt32(ValueWitnessFlags::IsNonInline)));
+  return result;
+}
+
+llvm::Value *irgen::emitInlineBorrowValueWitnessValue(IRGenFunction &IGF,
+                                                      SILType T,
+                                                      ValueWitness index) {
+  auto astBorrowTy = T.castTo<BuiltinBorrowType>();
+  auto referentTy =
+      SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+  auto layout = computeInlineBorrowLayout(
+      IGF, IGF.emitValueWitnessValue(referentTy, ValueWitness::Size),
+      IGF.emitValueWitnessValue(referentTy, ValueWitness::Stride),
+      IGF.emitValueWitnessValue(referentTy, ValueWitness::Flags),
+      IGF.emitValueWitnessValue(referentTy, ValueWitness::ExtraInhabitantCount));
+
+  switch (index) {
+  case ValueWitness::Size:
+    return layout.size;
+  case ValueWitness::Stride:
+    return layout.stride;
+  case ValueWitness::Flags:
+    return layout.flags;
+  case ValueWitness::ExtraInhabitantCount:
+    return layout.extraInhabitantCount;
+  default:
+    llvm_unreachable("not a value witness value");
+  }
+}
+
+llvm::Value *irgen::emitInlineBorrowTypeLayout(IRGenFunction &IGF,
+                                               llvm::Value *referentLayout) {
+  auto &IGM = IGF.IGM;
+  auto &B = IGF.Builder;
+
+  // The layout of the referent is a pointer to a TypeLayout.
+  auto layoutTy = IGM.TypeLayoutTy;
+  auto loadField = [&](llvm::Value *layoutPtr, unsigned field,
+                       llvm::Type *ty) -> llvm::Value * {
+    auto gep = B.CreateStructGEP(layoutTy, layoutPtr, field);
+    return B.CreateLoad(gep, ty, IGM.getPointerAlignment());
+  };
+  auto layout = computeInlineBorrowLayout(
+      IGF, loadField(referentLayout, 0, IGM.SizeTy),
+      loadField(referentLayout, 1, IGM.SizeTy),
+      loadField(referentLayout, 2, IGM.Int32Ty),
+      loadField(referentLayout, 3, IGM.Int32Ty));
+
+  // Like the layouts of tuples, this has no reasonable scope, so we use an
+  // alloca in the entry block.
+  auto result = IGF.createAlloca(layoutTy, IGM.getPointerAlignment()).getAddress();
+  auto storeField = [&](unsigned field, llvm::Value *value) {
+    B.CreateStore(value, B.CreateStructGEP(layoutTy, result, field),
+                  IGM.getPointerAlignment());
+  };
+  storeField(0, layout.size);
+  storeField(1, layout.stride);
+  storeField(2, layout.flags);
+  storeField(3, layout.extraInhabitantCount);
+  return result;
 }

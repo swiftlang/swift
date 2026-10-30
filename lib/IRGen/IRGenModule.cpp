@@ -1664,6 +1664,14 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     return true;
   }
 
+  // The conformances of a back-deployed type from another module are only
+  // emitted where the type is used, and must provide conformance records
+  // for dynamic casts even if nothing references them directly.
+  if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance()))
+    if (LinkEntity::forProtocolConformanceDescriptor(normal)
+            .isBackDeployedIntoClient())
+      return false;
+
   // Regardless of the access level, if the witness table is shared it means
   // we can safely not emit it. Every other module which needs it will generate
   // its own shared copy of it.
@@ -2708,6 +2716,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   auto &ctx = getSwiftModule()->getASTContext();
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
+}
+
+bool IRGenModule::isBorrowRuntimeAvailable() {
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(ctx.getBorrowingAvailability());
 }
 
 bool IRGenModule::isTypedAllocationAvailable() {

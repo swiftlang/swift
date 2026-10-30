@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Removes and returns the element at the specified position.
   ///
@@ -22,7 +21,6 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @discardableResult
   internal mutating func remove(at index: Int) -> Element {
@@ -36,7 +34,6 @@ extension _RigidArray where Element: ~Copyable {
   /// Removes all elements from the array, preserving its allocated capacity.
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func removeAll() {
     unsafe _items.deinitialize()
@@ -50,7 +47,6 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: The last element of the original array.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @discardableResult
   internal mutating func removeLast() -> Element {
@@ -71,7 +67,6 @@ extension _RigidArray where Element: ~Copyable {
   ///   the count of the array.
   ///
   /// - Complexity: O(`k`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func removeLast(_ k: Int) {
     if k == 0 { return }
@@ -93,7 +88,6 @@ extension _RigidArray where Element: ~Copyable {
   ///   of the range must be valid indices of the array.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func removeSubrange(_  bounds: Range<Int>) {
     _checkValidBounds(bounds)
@@ -109,7 +103,6 @@ extension _RigidArray where Element: ~Copyable {
   ///   range must be valid indices of the array.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
@@ -117,7 +110,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Removes and returns the last element of the array, if there is one.
   ///
@@ -125,7 +117,6 @@ extension _RigidArray where Element: ~Copyable {
   ///     otherwise, `nil`.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func popLast() -> Element? {
     // FIXME: Remove this in favor of a standard algorithm.
