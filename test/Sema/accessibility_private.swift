@@ -222,3 +222,36 @@ fileprivate struct C_45184 {
   private var outerProperty = Inner().innerProperty // expected-error {{property cannot be declared in this context because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
   var outerProperty2 = Inner().innerProperty // expected-error {{property must be declared private because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
 }
+
+// https://github.com/swiftlang/swift/issues/85529
+// A witness in a private type nested inside another type must still be at
+// least fileprivate, since a private witness is not visible throughout the
+// enclosing type.
+struct VIPOuter {
+  private struct NestedPrivateType : VeryImportantProto {
+    private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
+    // expected-note@-1 {{mark the type alias as 'fileprivate' to satisfy the requirement}} {{5-12=fileprivate}}
+    var value: Int
+  }
+
+  private struct NestedPrivateProp : VeryImportantProto {
+    typealias Assoc = Int
+    private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
+    // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{5-12=fileprivate}}
+  }
+
+  private struct NestedPrivateSetProp : VeryImportantProto {
+    typealias Assoc = Int
+    private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
+    // expected-note@-1 {{mark the property as 'fileprivate' to satisfy the requirement}} {{5-12=fileprivate}}
+  }
+
+  private protocol NestedPrivateProto {
+    func requirement()
+  }
+
+  struct NestedConformer : NestedPrivateProto {
+    private func requirement() {} // expected-error {{method 'requirement()' must be declared fileprivate because it matches a requirement in private protocol 'NestedPrivateProto'}} {{none}}
+    // expected-note@-1 {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{5-12=fileprivate}}
+  }
+}
