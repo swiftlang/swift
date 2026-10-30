@@ -61,6 +61,9 @@ private:
 
   bool isMachOWithPtrAuth() const;
 
+  /// TEMPORARY: log everything we know about this image (diagnostics only).
+  void diagDescribe() const;
+
 public:
   explicit Image(const llvm::object::ObjectFile *O);
 
