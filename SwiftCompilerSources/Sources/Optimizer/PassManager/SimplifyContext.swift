@@ -21,6 +21,12 @@ struct SimplifyContext : MutatingContext {
   func constantFold(builtin: BuiltinInst) -> Value? {
     bridgedPassContext.constantFoldBuiltin(builtin.bridged).value
   }
+
+  /// Returns an existing value which `instruction` can be replaced with, using the C++
+  /// instruction simplifications. This function makes no changes.
+  func simplify(instruction: SingleValueInstruction) -> Value? {
+    bridgedPassContext.simplifyInstruction(instruction.bridged).value
+  }
 }
 
 // Those Type APIs get information from IRGenModule, so they are formally not part of SIL and

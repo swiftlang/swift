@@ -25,6 +25,19 @@ extension PointerToAddressInst : OnoneSimplifiable, SILCombineSimplifiable {
   }
 }
 
+extension PointerToAddressInst : DebugReconstructionBlockSimplifiable {
+  /// Folds undef, and removes redundant pairs.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    // Cannot use `simplify` here, as it checks the lifetime before simplifying.
+    if let addr2Ptr = pointer as? AddressToPointerInst, addr2Ptr.address.type == type {
+      replace(with: addr2Ptr.address, context)
+    }
+  }
+}
+
 /// Remove a redundant pair of pointer-address conversions:
 /// ```
 ///   %2 = address_to_pointer %1
