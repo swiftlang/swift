@@ -866,9 +866,9 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
 }
 
 /// Whether \p dest must be preserved in mandatory passes.
-static bool isVariableOrLexicalStorage(SILValue dest) {
+static bool isVariableStorage(SILValue dest) {
   auto *ASI = dyn_cast<AllocStackInst>(dest);
-  return ASI && (ASI->getVarInfo() || ASI->isLexical());
+  return ASI && ASI->getVarInfo();
 }
 
 /// Marks the variable stored in \p dest as optimized out, for when the cast
@@ -919,7 +919,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
 
   bool ResultNotUsed = !Dest || isa<AllocStackInst>(Dest);
   // When preserving debug info, a variable counts as a use.
-  if (Dest && preserveDebugInfo && isVariableOrLexicalStorage(Dest))
+  if (Dest && preserveDebugInfo && isVariableStorage(Dest))
     ResultNotUsed = false;
   if (ResultNotUsed && Dest) {
     for (auto Use : Dest->getUses()) {
@@ -1640,7 +1640,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     bool ResultNotUsed = isa<AllocStackInst>(dest);
     DestroyAddrInst *DestroyDestInst = nullptr;
     // When preserving debug info, a variable counts as a use.
-    if (preserveDebugInfo && isVariableOrLexicalStorage(dest))
+    if (preserveDebugInfo && isVariableStorage(dest))
       ResultNotUsed = false;
     if (ResultNotUsed) {
       for (auto Use : dest->getUses()) {

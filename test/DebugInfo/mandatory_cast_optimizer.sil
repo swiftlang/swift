@@ -36,27 +36,6 @@ bb0(%0 : $*Int):
   return %r : $()
 }
 
-// The lexical lifetime of the storage is kept when preserving debug info.
-
-// CHECK-LABEL: sil @unconditional_lexical :
-// CHECK:       bb0([[UL_SRC:%[0-9]+]] : $*Int):
-// CHECK-NEXT:    [[UL_S:%[0-9]+]] = alloc_stack [lexical] $any P
-// DIAG-NEXT:     [[UL_PAYLOAD:%[0-9]+]] = init_existential_addr [[UL_S]], $Int
-// DIAG-NEXT:     copy_addr [take] [[UL_SRC]] to [init] [[UL_PAYLOAD]]
-// DIAG-NEXT:     destroy_addr [[UL_S]]
-// PERF-NEXT:     destroy_addr [[UL_SRC]]
-// CHECK-NEXT:    dealloc_stack [[UL_S]]
-// CHECK-LABEL: } // end sil function 'unconditional_lexical'
-sil @unconditional_lexical : $@convention(thin) (@in Int) -> () {
-bb0(%0 : $*Int):
-  %1 = alloc_stack [lexical] $any P
-  unconditional_checked_cast_addr Int in %0 : $*Int to any P in %1 : $*any P
-  destroy_addr %1 : $*any P
-  dealloc_stack %1 : $*any P
-  %r = tuple ()
-  return %r : $()
-}
-
 // The cast is optimized out in both modes, as there are no variables attached to it.
 
 // CHECK-LABEL: sil @unconditional_temp :
