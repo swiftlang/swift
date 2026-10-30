@@ -115,7 +115,7 @@ func sendGeneric<W: Worker>(_ w: W, _ reason: String) throws {
     // RECIPIENT-LABEL: [swift] test_remote
     // RECIPIENT-DAG: >> executeDistributedTarget: $s4main5PlainC4stopyySSYaKFTE oneway: true target: false
     // RECIPIENT-DAG: >> executeDistributedTarget: $s4main5PlainC4stopyySSYaKFTE oneway: true target: false
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7$WorkerC4stopyySSKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7$WorkerC4stopyySSYaKFTE oneway: true target: true
     // CHECK: [swift] host received: ["stop 1", "stop 2", "stop 3"]
 
     print("[swift] test_exact")
@@ -131,7 +131,7 @@ func sendGeneric<W: Worker>(_ w: W, _ reason: String) throws {
     // CHECK-DAG: [swift] Exact.oneway stop x
     // CHECK-DAG: [swift] Exact.oneway stop y
     // RECIPIENT-LABEL: [swift] test_exact
-    // RECIPIENT: >> executeDistributedTarget: $s4main5ExactC4stopyySSKFTE oneway: true target: true
+    // RECIPIENT: >> executeDistributedTarget: $s4main5ExactC4stopyySSYaKFTE oneway: true target: true
     // CHECK: [swift] exact received:
 
     print("[swift] done")

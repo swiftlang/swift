@@ -8479,8 +8479,9 @@ public:
   /// (see \c getDistributedThunk()) is the synchronous thunk that a 'send'
   /// calls, get the 'await thunk': the regular 'async' thunk that any other
   /// call, e.g. an 'await', calls. It waits for the call, and makes a remote
-  /// call as a regular request-reply call through 'remoteCallVoid', with the
-  /// same remote call target identifier as the synchronous thunk
+  /// call as a regular request-reply call through 'remoteCallVoid'. It is the
+  /// thunk that the function would have if it was not '@oneway', and the
+  /// remote calls of both thunks use its identifier
   ///
   /// \return the await thunk, or null if the function is not a
   ///         '@oneway' 'distributed' function

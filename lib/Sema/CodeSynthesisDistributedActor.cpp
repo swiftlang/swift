@@ -324,12 +324,10 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       cast<FuncDecl>(thunk)->isDistributedOnewayWitnessAdapter();
 
   // The await thunk of a '@oneway' function is the thunk that any
-  // call which is not a 'send' calls. It behaves like the thunk of any other
-  // function returning 'Void': it waits for a local call, and makes a regular
-  // request-reply remote call through 'remoteCallVoid', which is not marked
-  // as a 'oneway' remote call. It uses the remote call target identifier of
-  // the synchronous thunk, so the recipient runs the same function whichever
-  // of the two thunks the caller used
+  // call which is not a 'send' calls. It is the thunk that the function would
+  // have if it was not '@oneway': it waits for a local call, and makes a
+  // regular request-reply remote call through 'remoteCallVoid', which is not
+  // marked as a 'oneway' remote call
   const bool isAwaitThunk = cast<FuncDecl>(thunk)->isDistributedAwaitThunk();
 
   // The '@oneway' attribute of an invalid function, e.g. one that returns a
@@ -750,14 +748,21 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   {
     // --- Mangle the thunk name
     //
-    // The adapter makes the remote call with the identifier of the thunk of
-    // the function it adapts, because that is the accessible function record
-    // that the receiving side looks up to run the function. So does the await
-    // thunk of a '@oneway' function, whose accessible function record
-    // is the one of its synchronous thunk
-    auto mangledAccessorRecordName = mangleDistributedThunkForAccessorRecordName(
-        C, (isOnewayAdapter || isAwaitThunk) ? func->getDistributedThunk()
-                                             : thunk);
+    // Every remote call of a function uses the identifier of its regular
+    // 'async' thunk, the one with an accessible function record, which the
+    // receiving side looks up to run the function. For a '@oneway' function
+    // that is its await thunk, whose name is the one of the thunk of the
+    // function if it was not '@oneway', so sent and awaited calls use the same
+    // identifier, which does not change when '@oneway' is added or removed.
+    // Only 'isOnewayRemoteCall' tells a sent call apart. The adapter uses the
+    // identifier of the thunk of the function it adapts
+    AbstractFunctionDecl *identifierThunk = thunk;
+    if (isOnewayAdapter)
+      identifierThunk = func->getDistributedThunk();
+    else if (isSyncOneway)
+      identifierThunk = func->getDistributedAwaitThunk();
+    auto mangledAccessorRecordName =
+        mangleDistributedThunkForAccessorRecordName(C, identifierThunk);
 
     StringLiteralExpr *mangledTargetStringLiteral =
         new (C) StringLiteralExpr(mangledAccessorRecordName,
@@ -1056,8 +1061,9 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(
     // Let's use the name of a 'distributed func'
     DeclName thunkName = func->getName();
     if (isOnewayAdapter) {
-      // A distinct name keeps the symbol of the adapter apart from the
-      // synchronous thunk of a '@oneway' function with the same signature
+      // A distinct name keeps the symbol of the adapter, which the module of
+      // the conformance emits, apart from the synchronous thunk that the
+      // function would get if it was made '@oneway' later
       SmallString<32> adapterName("$onewayWitness$");
       adapterName += thunkName.getBaseIdentifier().str();
       thunkName = DeclName(C, C.getIdentifier(adapterName),
@@ -1884,6 +1890,10 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
       auto *thunkFunc = funcDecl->getDistributedThunk();
       if (!thunkFunc)
         continue;
+      // Sent and awaited calls of a '@oneway' function both use the
+      // identifier of its await thunk, the regular 'async' thunk
+      if (auto *awaitThunk = funcDecl->getDistributedAwaitThunk())
+        thunkFunc = awaitThunk;
       auto mangled = mangler.mangleDistributedThunk(thunkFunc);
 
       AbstractFunctionDecl *impl = distFunc;
@@ -2279,9 +2289,8 @@ FuncDecl *GetDistributedAwaitThunkRequest::evaluate(
   if (!func || !func->hasSynchronousDistributedThunk())
     return nullptr;
 
-  // The synchronous thunk is the one that is checked for errors, and the one
-  // whose identifier the await thunk uses, so the await thunk only exists if
-  // that exists
+  // The synchronous thunk is the one that is checked for errors, so the await
+  // thunk only exists if that exists
   if (!func->getDistributedThunk())
     return nullptr;
 
@@ -2346,18 +2355,7 @@ GetDistributedRecipientResolvableProxyAdapterThunkRequest::evaluate(
     // The resolvable proxy adapter thunk is only needed when a parameter or
     // the result is `@Resolvable` `any P` / `some P` and so must be adapted
     // to / from the proxy stub `$P`. Otherwise, the call is made directly.
-    //
-    // The distributed target accessor of a 'oneway' function, which is
-    // 'async' like every accessor, dispatches through this thunk as well:
-    // the function's distributed thunk is synchronous and would only run the
-    // call on the actor without waiting for it, while this thunk awaits the
-    // call. The accessor record keeps the name of the distributed thunk,
-    // which is the remote call target identifier. Embedded Swift has no
-    // accessors, its synthesized dispatcher calls the function directly
-    bool isOnewayRecipient = func->hasSynchronousDistributedThunk() &&
-                             !C.LangOpts.hasFeature(Feature::Embedded);
-    if (!isOnewayRecipient &&
-        !distributedTargetNeedsResolvableProxyAdapterThunk(func))
+    if (!distributedTargetNeedsResolvableProxyAdapterThunk(func))
       return nullptr;
 
     return createDistributedResolvableProxyAdapterThunkFunction(func);

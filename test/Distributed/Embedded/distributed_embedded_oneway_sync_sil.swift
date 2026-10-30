@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Embedded -enable-experimental-feature SendCalls -parse-as-library -wmo -module-name main -target %target-cpu-apple-macos14 %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift -o %t/out.sil
-// RUN: %FileCheck %s --check-prefix=THUNK < %t/out.sil
+// RUN: %FileCheck %s --check-prefix=THUNK --implicit-check-not='string_literal utf8 "$e4main7GreeterC5greetyySiKFTE"' < %t/out.sil
 // RUN: %FileCheck %s --check-prefix=THUNK-NOHOP < %t/out.sil
 // RUN: %FileCheck %s --check-prefix=CALLER < %t/out.sil
 // RUN: %FileCheck %s --check-prefix=DISPATCH < %t/out.sil
@@ -15,7 +15,9 @@
 // synchronous 'remoteCallOneway' of the '_DistributedOnewayActorSystem' and
 // the local branch enqueues the call via
 // '_enqueueOnewayDistributed'. A 'send' of it from a synchronous function is
-// a plain 'try_apply' of the thunk, without any task creation
+// a plain 'try_apply' of the thunk, without any task creation. Its remote calls
+// use the identifier of the func's await thunk, like awaited calls, and the
+// receive dispatcher matches that identifier for both
 
 import _Concurrency
 import Distributed
@@ -44,6 +46,7 @@ func send(_ g: Greeter) throws {
 // MARK: The distributed thunk is synchronous
 
 // THUNK-LABEL: sil {{.*}}@$e4main7GreeterC5greet{{.*}}TE : $@convention(method) ({{.*}}) -> @error any Error {
+// THUNK-DAG: string_literal utf8 "$e4main7GreeterC5greetyySiYaKFTE"
 // THUNK-DAG: function_ref @{{.*}}16remoteCallOneway2on6target10invocation
 // THUNK-DAG: // function_ref {{.*}}_enqueueOnewayDistributed<A>(on:_:)
 // THUNK: end sil function '$e4main7GreeterC5greet{{.*}}TE'
@@ -77,6 +80,7 @@ func send(_ g: Greeter) throws {
 // reported to the result handler (see
 // distributed_embedded_oneway_sync_dispatch_reply_sil.swift)
 // DISPATCH-LABEL: sil{{.*}} @${{.+}}GreeterC25_executeDistributedTarget6target17invocationDecoder13resultHandler
+// DISPATCH: string_literal utf8 "$e4main7GreeterC5greetyySiYaKFTE"
 // DISPATCH: // function_ref RemoteCallTarget.isOnewayRemoteCall.getter
 // DISPATCH: cond_br {{%[0-9]+}}, [[ONEWAY_BB:bb[0-9]+]], [[REPLY_BB:bb[0-9]+]]
 // DISPATCH: [[ONEWAY_BB]]:

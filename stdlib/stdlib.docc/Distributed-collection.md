@@ -126,11 +126,18 @@ func stop(_ worker: some Worker) throws {
   it. Calls made on the same actor run in the order they were made.
 - On the receiving side the call is executed like any other distributed call.
 
+A sent and an awaited call of a `@oneway` function use the same remote call
+target identifier, the one the function would have if it was not `@oneway`,
+and the receiving side runs both through the same distributed target accessor.
+Only `RemoteCallTarget.isOnewayRemoteCall`, which the actor system carries in
+its message, tells them apart. Adding `@oneway` to a function, or removing it,
+therefore does not change its identifier, and peers which disagree about
+whether the function is `@oneway` can still call each other.
+
 Outside of Embedded Swift a `@oneway` distributed function requires the
-availability of the Swift 6.5 runtime, because its remote call target
-identifier carries the `@oneway` marker, which a recipient running an older
-runtime cannot demangle. Other `@oneway` functions have no remote call
-target, and have no such requirement.
+availability of the Swift 6.5 runtime, because its synchronous thunk calls
+`remoteCallOneway`. Other `@oneway` functions have no remote call target, and
+have no such requirement.
 
 A `send` of a distributed function which is not `@oneway` is an error when
 the call may be remote, since only the synchronous thunk of a `@oneway`

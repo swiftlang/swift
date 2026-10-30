@@ -21,8 +21,11 @@
 // 'remoteCallVoid', not marked as a 'oneway' remote call, so the caller
 // waits for the reply and gets the errors that the actor system throws. A
 // 'send' calls the synchronous thunk, which makes a remote call through
-// 'remoteCallOneway', marked as a 'oneway' remote call. Both mark the target as
-// the target of a '@oneway' function ('isOnewayTarget'). The same holds for calls
+// 'remoteCallOneway', marked as a 'oneway' remote call. Both use the same
+// identifier, the one of the regular 'async' thunk, which the function would
+// have if it was not '@oneway', and the recipient runs both through
+// 'executeDistributedTarget'. Both mark the target as the target of a
+// '@oneway' function ('isOnewayTarget'). The same holds for calls
 // through a distributed protocol requirement, an existential and a
 // '@Resolvable' stub. ('send' of a distributed
 // function which is not '@oneway' is an error, see
@@ -174,26 +177,26 @@ func testThroughRequirement<T: Teller>(_ t: T, _ label: String) async throws {
     let remote = try Worker.resolve(id: host.id, using: system)
     try await test(remote, "remote")
     // CHECK-LABEL: [swift] test remote
-    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiKFTE oneway: false target: true
-    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
+    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
     // CHECK: Worker.tell(1)
     // CHECK: system.remoteCallVoid returned
     // CHECK-NEXT: [swift] awaited tell(1)
-    // CHECK: system.remoteCallOneway $s4main6WorkerC4tellyySiKFTE oneway: true target: true
-    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiKFTE oneway: true target: true
+    // CHECK: system.remoteCallOneway $s4main6WorkerC4tellyySiYaKFTE oneway: true target: true
+    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiYaKFTE oneway: true target: true
     // CHECK: Worker.tell(2)
     // CHECK: [swift] sent tell(2)
 
     try await testThroughRequirement(remote, "remote")
     try await waitUntil { try await remote.count() >= 4 }
     // CHECK-LABEL: [swift] test requirement remote
-    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiKFTE oneway: false target: true
-    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
+    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
     // CHECK: Worker.tell(3)
     // CHECK: system.remoteCallVoid returned
     // CHECK-NEXT: [swift] awaited tell(3)
-    // CHECK: system.remoteCallOneway $s4main6WorkerC4tellyySiKFTE oneway: true target: true
-    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiKFTE oneway: true target: true
+    // CHECK: system.remoteCallOneway $s4main6WorkerC4tellyySiYaKFTE oneway: true target: true
+    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiYaKFTE oneway: true target: true
     // CHECK: Worker.tell(4)
 
     // Through an existential, and through the '@Resolvable' stub, which the
@@ -207,18 +210,18 @@ func testThroughRequirement<T: Teller>(_ t: T, _ label: String) async throws {
     try send stub.tell(7)
     try await waitUntil { try await remote.count() >= 7 }
     print("[swift] sent stub tell(7)")
-    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiKFTE oneway: false target: true
-    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
+    // CHECK: >> executeDistributedTarget: $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
     // CHECK: Worker.tell(5)
     // CHECK: system.remoteCallVoid returned
     // CHECK-NEXT: [swift] awaited existential tell(5)
-    // CHECK: system.remoteCallVoid $s4main7$TellerC4tellyySiKFTE oneway: false target: true
-    // CHECK: >> executeDistributedTarget: $s4main7$TellerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main7$TellerC4tellyySiYaKFTE oneway: false target: true
+    // CHECK: >> executeDistributedTarget: $s4main7$TellerC4tellyySiYaKFTE oneway: false target: true
     // CHECK: Worker.tell(6)
     // CHECK: system.remoteCallVoid returned
     // CHECK-NEXT: [swift] awaited stub tell(6)
-    // CHECK: system.remoteCallOneway $s4main7$TellerC4tellyySiKFTE oneway: true target: true
-    // CHECK: >> executeDistributedTarget: $s4main7$TellerC4tellyySiKFTE oneway: true target: true
+    // CHECK: system.remoteCallOneway $s4main7$TellerC4tellyySiYaKFTE oneway: true target: true
+    // CHECK: >> executeDistributedTarget: $s4main7$TellerC4tellyySiYaKFTE oneway: true target: true
     // CHECK: Worker.tell(7)
     // CHECK: [swift] sent stub tell(7)
 
@@ -245,14 +248,14 @@ func testThroughRequirement<T: Teller>(_ t: T, _ label: String) async throws {
     }
     print("[swift] count \(try await remote.count())")
     // CHECK-LABEL: [swift] test failing
-    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
     // CHECK-NOT: Worker.tell
     // CHECK: [swift] caught TransportError()
     // CHECK: [swift] test requirement failing
-    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main6WorkerC4tellyySiYaKFTE oneway: false target: true
     // CHECK-NOT: Worker.tell
     // CHECK: [swift] caught through requirement TransportError()
-    // CHECK: system.remoteCallVoid $s4main7$TellerC4tellyySiKFTE oneway: false target: true
+    // CHECK: system.remoteCallVoid $s4main7$TellerC4tellyySiYaKFTE oneway: false target: true
     // CHECK-NOT: Worker.tell
     // CHECK: [swift] caught through stub TransportError()
     // CHECK: [swift] count 7

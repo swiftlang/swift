@@ -1046,7 +1046,7 @@ namespace {
           declRef = declRef.asAutoDiffDerivativeFunction(
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
-          // A synchronous 'oneway' distributed thunk (Embedded) is not async
+          // The synchronous thunk of a '@oneway' function is not async
           if (cast<AbstractFunctionDecl>(func.getDecl())->hasAsync())
             flags = flags.withIsAsync(true);
           declRef = declRef.getDistributedThunkDeclRef();

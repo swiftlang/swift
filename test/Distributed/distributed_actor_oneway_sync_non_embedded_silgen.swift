@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.2-abi-triple -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -emit-silgen -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s --implicit-check-not='distributedProxyAdapter'
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s --check-prefix=THUNK
-// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s --check-prefix=IR --implicit-check-not='distributedProxyAdapter' --implicit-check-not='greetyySiKFTEHF' --implicit-check-not='greetyySiKFTETF' --implicit-check-not='greetLateryySiKFTEHF' --implicit-check-not='greetLateryySiKFTETF'
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
@@ -11,10 +11,11 @@
 // A '@oneway' distributed func, 'async' or not, has a synchronous, throwing
 // distributed thunk in every mode, and 'try send' calls it directly, without
 // a task at the call site. The thunk hands a remote call to
-// 'remoteCallOneway' and sends a local call to the func itself. The
-// distributed target accessor, which is 'async', dispatches to the async
-// recipient thunk instead, but its accessible function record keeps the name
-// of the synchronous thunk, which is the remote call target identifier
+// 'remoteCallOneway' and sends a local call to the func itself. Remote calls,
+// sent or awaited, use the identifier of the func's regular 'async' thunk, its
+// await thunk, which is the only one with an accessible function record and a
+// distributed target accessor, like the thunk of any other func. There is no
+// resolvable proxy adapter thunk (see the '--implicit-check-not's)
 
 import Distributed
 import FakeDistributedActorSystems
@@ -29,12 +30,9 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 // CHECK: } // end sil function '$s4main7GreeterC5greetyySiKFTE'
 // CHECK-LABEL: sil private [ossa] @$s4main7GreeterC5greetyySiKFyyYaKXOfU_ :
 // CHECK: function_ref @$s4main7GreeterC5greetyySiF :
-// CHECK-LABEL: sil hidden [distributed_proxy_adapter_thunk] [ossa] @$s4main7GreeterC30$distributedProxyAdapter$greetyySiYaKF : $@convention(method) @async (@sil_sending Int, @guaranteed Greeter) -> @error any Error {
-// CHECK: function_ref @$s4main7GreeterC5greetyySiF :
 
 // The thunk of an 'async' '@oneway' func is synchronous too
 // CHECK-LABEL: sil hidden [thunk] [distributed]{{.*}} @$s4main7GreeterC10greetLateryySiKFTE : $@convention(method) (@sil_sending Int, @guaranteed Greeter) -> @error any Error {
-// CHECK-LABEL: sil hidden [distributed_proxy_adapter_thunk] [ossa] @$s4main7GreeterC35$distributedProxyAdapter$greetLateryySiYaKF : $@convention(method) @async (@sil_sending Int, @guaranteed Greeter) -> @error any Error {
 distributed actor Greeter {
   @oneway distributed func greet(_ n: Int) {}
   @oneway distributed func greetLater(_ n: Int) async {}
@@ -102,17 +100,17 @@ func sendDistributed(_ g: Greeter) throws {
   try send g.greetLater(4)
 }
 
-// The accessible function records carry the names of the synchronous thunks
-// IR-DAG: @"$s4main7GreeterC5greetyySiKFTEHF" = private constant %swift.accessible_function { {{.*}}@".str.30.$s4main7GreeterC5greetyySiKFTE"{{.*}}@"$s4main7GreeterC5greetyySiKFTETFTu"
-// IR-DAG: @"$s4main7GreeterC10greetLateryySiKFTEHF" = private constant %swift.accessible_function { {{.*}}@".str.36.$s4main7GreeterC10greetLateryySiKFTE"{{.*}}@"$s4main7GreeterC10greetLateryySiKFTETFTu"
+// The accessible function records carry the names of the await thunks
+// IR-DAG: @"$s4main7GreeterC5greetyySiYaKFTEHF" = private constant %swift.accessible_function { {{.*}}@".str.32.$s4main7GreeterC5greetyySiYaKFTE"{{.*}}@"$s4main7GreeterC5greetyySiYaKFTETFTu"
+// IR-DAG: @"$s4main7GreeterC10greetLateryySiYaKFTEHF" = private constant %swift.accessible_function { {{.*}}@".str.38.$s4main7GreeterC10greetLateryySiYaKFTE"{{.*}}@"$s4main7GreeterC10greetLateryySiYaKFTETFTu"
 
 // The synchronous thunk is a plain function
 // IR-DAG: define hidden swiftcc void @"$s4main7GreeterC5greetyySiKFTE"(i64 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
 
-// The accessor dispatches to the async recipient thunk
-// IR-LABEL: define linkonce_odr hidden swifttailcc void @"$s4main7GreeterC5greetyySiKFTETF"(
+// The accessor calls the await thunk
+// IR-LABEL: define linkonce_odr hidden swifttailcc void @"$s4main7GreeterC5greetyySiYaKFTETF"(
 // IR-NOT: call swiftcc void @"$s4main7GreeterC5greetyySiKFTE"(
-// IR: musttail call swifttailcc void @"$s4main7GreeterC30$distributedProxyAdapter$greetyySiYaKF"(
+// IR: call swifttailcc void @"$s4main7GreeterC5greetyySiYaKFTE"(
 
 // The call site calls the synchronous thunks and creates no task
 // IR-LABEL: define hidden swiftcc void @"$s4main15sendDistributedyyAA7GreeterCKF"(

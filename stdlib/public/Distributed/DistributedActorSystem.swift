@@ -1172,13 +1172,13 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   /// call through ``DistributedActorSystem/remoteCallVoid(on:target:invocation:throwing:)``
   /// and does not set this
   ///
-  /// A recipient's actor system should set this on the target it passes to
-  /// `executeDistributedTarget` if the call was made using `send`, which it
-  /// must carry to the recipient as part of its message format
-  ///
-  /// A `@oneway` distributed function requires Swift 6.5 availability, because
-  /// an older recipient cannot demangle the `@oneway` remote call target
-  /// identifier
+  /// Both kinds of call use the same ``identifier``, the one the function
+  /// would have if it was not `@oneway`, and the recipient runs both through
+  /// the same distributed target accessor, so this flag is the only difference
+  /// between them. A recipient's actor system should set this on the target it
+  /// passes to `executeDistributedTarget` if the call was made using `send`,
+  /// which it must carry to the recipient as part of its message format, and
+  /// must not send a reply for such a call
   @_spi(OnewaySend)
   @available(SwiftStdlib 6.5, *)
   public var isOnewayRemoteCall: Bool {

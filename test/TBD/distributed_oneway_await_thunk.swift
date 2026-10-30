@@ -42,5 +42,7 @@ public distributed actor Worker: Teller {
 // CHECK-DAG: "_$s4test6TellerP4tellyySiYaKFTjTETu"
 // CHECK-DAG: "_$s4test6TellerP4tellyySiYaKFTqTE"
 
-// The synchronous thunk has no async function pointer
+// The synchronous thunk has no async function pointer, and the await thunk,
+// whose accessor is the one of the func, needs no resolvable proxy adapter
 // NEG-NOT: "_$s4test6WorkerC4tellyySiKFTETu"
+// NEG-NOT: distributedProxyAdapter

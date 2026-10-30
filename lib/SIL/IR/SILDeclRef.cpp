@@ -2127,7 +2127,7 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
 
 bool SILDeclRef::hasAsync() const {
   if (isDistributedThunk()) {
-    // A synchronous 'oneway' function (Embedded) gets a synchronous thunk
+    // A '@oneway' function gets a synchronous thunk
     if (auto *thunk = getDistributedThunk())
       return thunk->hasAsync();
     return true;

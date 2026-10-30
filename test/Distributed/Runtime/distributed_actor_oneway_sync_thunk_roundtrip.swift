@@ -23,8 +23,9 @@
 // - a local call copies the task locals of the caller
 // - a remote call is handed to 'remoteCallOneway' of the
 //   '_DistributedOnewayActorSystem' right away, in the order the calls were
-//   made, and the recipient executes them, through the async recipient thunk
-//   that the distributed target accessor dispatches to
+//   made, with the identifier of the function's regular 'async' thunk, and
+//   the recipient executes them through the distributed target accessor of
+//   that thunk
 // - the same holds for an 'async' '@oneway' function, through an optional chain,
 //   a generic or existential distributed protocol, a '@Resolvable' stub, a
 //   distributed actor which is generic over its actor system, a '@Resolvable'
@@ -207,10 +208,10 @@ func sendExistential(_ w: any Worker, _ reason: String) throws {
     // CHECK: [swift] host received: ["greet 1", "greet 2", "greetLater 3", "greet 4"]
     // The recipient sees the flags of the sender
     // RECIPIENT-LABEL: [swift] test_remote
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC5greetyySSKFTE oneway: true target: true
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC5greetyySSKFTE oneway: true target: true
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC10greetLateryySSKFTE oneway: true target: true
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC5greetyySSKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC5greetyySSYaKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC5greetyySSYaKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC10greetLateryySSYaKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC5greetyySSYaKFTE oneway: true target: true
 
     print("[swift] test_protocols")
     try sendGeneric(remote, "generic")
@@ -225,9 +226,9 @@ func sendExistential(_ w: any Worker, _ reason: String) throws {
     // CHECK: >> remoteCallOneway: on:main.$Worker, target:main.$Worker.stop(_:), {{.*}}arguments: ["stub"]{{.*}}, oneway: true
     // CHECK: [swift] host received: ["greet 1", "greet 2", "greetLater 3", "greet 4", "stop generic", "stop existential", "stop stub"]
     // RECIPIENT-LABEL: [swift] test_protocols
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC4stopyySSKFTE oneway: true target: true
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC4stopyySSKFTE oneway: true target: true
-    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7$WorkerC4stopyySSKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC4stopyySSYaKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7GreeterC4stopyySSYaKFTE oneway: true target: true
+    // RECIPIENT-DAG: >> executeDistributedTarget: $s4main7$WorkerC4stopyySSYaKFTE oneway: true target: true
 
     print("[swift] test_generic_actor")
     let genericSystem = FakeRoundtripActorSystem()
@@ -242,7 +243,7 @@ func sendExistential(_ w: any Worker, _ reason: String) throws {
     // CHECK-DAG: [swift] GenericGreeter.greet x
     // CHECK-DAG: [swift] GenericGreeter.greet y
     // RECIPIENT-LABEL: [swift] test_generic_actor
-    // RECIPIENT: >> executeDistributedTarget: $s4main14GenericGreeterC5greetyySSKFTE oneway: true target: true
+    // RECIPIENT: >> executeDistributedTarget: $s4main14GenericGreeterC5greetyySSYaKFTE oneway: true target: true
 
     print("[swift] test_resolvable_generic")
     let serviceSystem = FakeRoundtripActorSystem()
@@ -257,7 +258,7 @@ func sendExistential(_ w: any Worker, _ reason: String) throws {
     // CHECK: [swift] ServiceImpl.shutdown now
     // CHECK: [swift] shutdowns: ["now"]
     // RECIPIENT-LABEL: [swift] test_resolvable_generic
-    // RECIPIENT: >> executeDistributedTarget: $s4main8$ServiceC8shutdownyySSKFTE oneway: true target: true
+    // RECIPIENT: >> executeDistributedTarget: $s4main8$ServiceC8shutdownyySSYaKFTE oneway: true target: true
 
     print("[swift] test_local_only_system")
     let localOnly = LocalOnly(actorSystem: LocalTestingDistributedActorSystem())

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.2-abi-triple -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-swift-frontend -emit-silgen -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main -verify | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main | %FileCheck %s --check-prefix=IR --implicit-check-not='tellyySiKFTEHF' --implicit-check-not='tellyySiKFTETF' --implicit-check-not='.$s4main6WorkerC4tellyySiKFTE"' --implicit-check-not='distributedProxyAdapter'
 // RUN: %target-swift-frontend -emit-ir -target %target-swift-6.2-abi-triple -disable-availability-checking -enable-experimental-feature SendCalls -I %t %s -module-name main -validate-tbd-against-ir=all
 
 // REQUIRES: concurrency
@@ -17,11 +17,13 @@
 //   local call, and makes a remote call through 'remoteCallVoid', which is
 //   not marked as a 'oneway' remote call
 //
-// Both use the remote call target identifier of the synchronous thunk, which
-// is the name of the one accessible function record of the func, and both
-// mark the target as the target of a '@oneway' func ('isOnewayTarget'). The
-// thunks of a plain func, and the oneway witness adapter of a plain witness of
-// a '@oneway' requirement, do not
+// Both use the remote call target identifier of the await thunk, which is the
+// identifier that the func would have if it was not '@oneway', and the name of
+// its one accessible function record, so the recipient runs sent and awaited
+// calls the same way. Only 'isOnewayRemoteCall' tells them apart. Both mark the
+// target as the target of a '@oneway' func ('isOnewayTarget'). The thunks of a
+// plain func, and the oneway witness adapter of a plain witness of a '@oneway'
+// requirement, do not
 
 import Distributed
 import FakeDistributedActorSystems
@@ -46,7 +48,7 @@ distributed actor PlainWorker: Teller {
 
 // The synchronous thunk: a remote call is a 'oneway' remote call
 // CHECK-LABEL: sil hidden [thunk] [distributed]{{.*}} @$s4main6WorkerC4tellyySiKFTE : $@convention(method) (@sil_sending Int, @guaranteed Worker) -> @error any Error {
-// CHECK: string_literal utf8 "$s4main6WorkerC4tellyySiKFTE"
+// CHECK: string_literal utf8 "$s4main6WorkerC4tellyySiYaKFTE"
 // CHECK: // function_ref RemoteCallTarget._markOnewayRemoteCall()
 // CHECK: // function_ref RemoteCallTarget._markOnewayTarget()
 // CHECK-NEXT: function_ref @$s11Distributed16RemoteCallTargetV{{.*}}markOneway{{.*}} :
@@ -58,7 +60,7 @@ distributed actor PlainWorker: Teller {
 // CHECK-LABEL: sil hidden [thunk] [distributed]{{.*}} @$s4main6WorkerC4tellyySiYaKFTE : $@convention(method) @async (@sil_sending Int, @guaranteed Worker) -> @error any Error {
 // CHECK-NOT: _markOnewayRemoteCall
 // CHECK-NOT: remoteCallOneway
-// CHECK: string_literal utf8 "$s4main6WorkerC4tellyySiKFTE"
+// CHECK: string_literal utf8 "$s4main6WorkerC4tellyySiYaKFTE"
 // CHECK-NOT: _markOnewayRemoteCall
 // CHECK-NOT: remoteCallOneway
 // CHECK: // function_ref RemoteCallTarget._markOnewayTarget()
@@ -75,11 +77,13 @@ distributed actor PlainWorker: Teller {
 
 // The thunks of the plain witness do not mark the target as the target of a
 // '@oneway' func, neither does its oneway witness adapter, which makes a
-// 'oneway' remote call of it
+// 'oneway' remote call of it with the identifier of its regular thunk
 // CHECK-LABEL: sil hidden [thunk] [distributed]{{.*}} @$s4main11PlainWorkerC4tellyySiYaKFTE :
 // CHECK-NOT: _markOnewayTarget
 // CHECK: } // end sil function '$s4main11PlainWorkerC4tellyySiYaKFTE'
 // CHECK-LABEL: sil shared [thunk] [distributed]{{.*}} @$s4main11PlainWorkerC19$onewayWitness$tellyySiKFTE :
+// CHECK-NOT: _markOnewayTarget
+// CHECK: string_literal utf8 "$s4main11PlainWorkerC4tellyySiYaKFTE"
 // CHECK-NOT: _markOnewayTarget
 // CHECK: // function_ref RemoteCallTarget._markOnewayRemoteCall()
 // CHECK-NOT: _markOnewayTarget
@@ -144,9 +148,13 @@ func awaitTeller<T: Teller>(_ t: T) async throws {
 // ==== -----------------------------------------------------------------------
 // MARK: IR
 
-// One accessible function record per func, named after the synchronous thunk
-// IR-DAG: @"$s4main6WorkerC4tellyySiKFTEHF" = private constant
-// IR-NOT: @"$s4main6WorkerC4tellyySiYaKFTEHF"
-// IR-NOT: @"$s4main6WorkerC4tellyySiYaKFTETF"
+// One accessible function record per func, named after the await thunk, like
+// the record of a plain func, whose accessor calls the await thunk directly.
+// The synchronous thunk has no record and no accessor, its name is no remote
+// call target identifier, and there is no resolvable proxy adapter thunk (see
+// the '--implicit-check-not's)
+// IR-DAG: @"$s4main6WorkerC4tellyySiYaKFTEHF" = private constant %swift.accessible_function { {{.*}}@".str.{{[0-9]+}}.$s4main6WorkerC4tellyySiYaKFTE"{{.*}}@"$s4main6WorkerC4tellyySiYaKFTETFTu"
+// IR-DAG: @"$s4main11PlainWorkerC4tellyySiYaKFTEHF" = private constant
+// IR-DAG: define {{.*}}swifttailcc void @"$s4main6WorkerC4tellyySiYaKFTETF"(
 // IR-DAG: define hidden swift{{(tail)?}}cc void @"$s4main6WorkerC4tellyySiYaKFTE"(
 // IR-DAG: define hidden swift{{(tail)?}}cc void @"$s4main6WorkerC4tellyySiKFTE"(

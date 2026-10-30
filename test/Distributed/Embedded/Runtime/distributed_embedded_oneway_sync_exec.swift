@@ -18,7 +18,9 @@
 // - the receive dispatcher enqueues a 'oneway' remote call and sends no
 //   reply, but makes any other call of it, which waits for a reply (e.g. one
 //   of a client compiled against a version of the func which was not
-//   '@oneway'), on the actor and replies to it
+//   '@oneway', or an 'await'), on the actor and replies to it
+// - a sent and an awaited remote call use the same identifier, only
+//   'isOnewayRemoteCall' tells them apart
 
 import _Concurrency
 @_spi(OnewaySend) import Distributed
@@ -119,7 +121,18 @@ final class ProbeActorSystem: _DistributedOnewayActorSystem, @unchecked Sendable
     throwing: Err.Type
   ) async throws
       where Act: DistributedActor, Act.ID == ActorID, Err: Error {
-    fatalError("[swift] unexpected remoteCallVoid")
+    // An awaited call of a '@oneway' func uses the same identifier as the
+    // sent one, and is not a 'oneway' remote call
+    let identifierBytes = unsafe target.identifier.withUnsafeBytes { unsafe [UInt8]($0) }
+    print("[swift] remoteCallVoid reached, oneway: \(target.isOnewayRemoteCall), same identifier as the last send: \(identifierBytes == lastIdentifier)")
+    guard let dispatch = active[actor.id] else {
+      fatalError("no local actor hosted for the target id")
+    }
+    let requestBuffer = CallBuffer()
+    requestBuffer.argBytes = invocation.buffer.argBytes
+    let receivedTarget = RemoteCallTarget(identifierBytes.span.bytes)
+    var decoder = InvocationDecoder(buffer: requestBuffer)
+    try await dispatch(receivedTarget, &decoder, ResultHandler())
   }
 
   // The synchronous send: hand the serialized arguments to the "peer" and
@@ -338,6 +351,10 @@ func test_remote_awaited_call_replies() async throws {
   // actor before it is replied to, and the caller resumes
   try await system.deliverLastAsAwaitedCall(to: local)
   print("[swift] awaited delivered: \(try await local.order())")
+  // An 'await' of the remote actor makes that call through 'remoteCallVoid',
+  // with the same identifier as the 'send'
+  try await remote.step(32)
+  print("[swift] awaited remote call returned: \(try await local.order())")
 }
 // CHECK-LABEL: [swift] test_remote_awaited_call_replies
 // CHECK: [swift] remoteCallOneway reached, oneway: true, onewayTarget: true
@@ -349,6 +366,10 @@ func test_remote_awaited_call_replies() async throws {
 // CHECK-NEXT: [swift] onReturnVoid
 // CHECK-NEXT: [swift] awaited call replied
 // CHECK-NEXT: [swift] awaited delivered: 31 31
+// CHECK-NEXT: [swift] remoteCallVoid reached, oneway: false, same identifier as the last send: true
+// CHECK-NEXT: [swift] ProbeStepper.step(32) tag: 0
+// CHECK-NEXT: [swift] onReturnVoid
+// CHECK-NEXT: [swift] awaited remote call returned: 31 31 32
 
 @main struct Main {
   static func main() async {
