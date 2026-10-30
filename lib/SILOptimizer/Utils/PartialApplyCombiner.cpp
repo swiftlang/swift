@@ -327,6 +327,19 @@ bool PartialApplyCombiner::combine() {
   if (foundApplySites.empty())
     return false;
 
+  // A combined call doesn't call the closure, so an exactly-once closure traps
+  // when it's destroyed afterwards. It has to be deleted instead, which
+  // requires that its other uses go away with it.
+  if (pai->getFunctionType()->isCalledOnce()) {
+    SmallPtrSet<SILInstruction *, 4> combinedApplies;
+    for (FullApplySite ai : foundApplySites)
+      combinedApplies.insert(ai.getInstruction());
+    if (!canDeleteDeadClosure(pai, [&](SILInstruction *user) {
+          return combinedApplies.contains(user);
+        }))
+      return false;
+  }
+
   if (!copyArgsToTemporaries(foundApplySites))
     return false;
 

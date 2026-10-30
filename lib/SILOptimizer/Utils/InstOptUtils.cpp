@@ -1131,6 +1131,53 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
   return true;
 }
 
+/// Returns true if each use of the on-stack closure \p value, which is the
+/// closure itself or a mark_dependence of it, is removed or dead.
+static bool areOnStackClosureUsesDeadOrRemoved(
+    SingleValueInstruction *value,
+    function_ref<bool(SILInstruction *)> isRemoved) {
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (isRemoved(user) || isDeadOnStackClosureUser(user))
+      continue;
+    // See deadMarkDependenceUser().
+    auto *mdi = dyn_cast<MarkDependenceInst>(user);
+    if (!mdi || use->getOperandNumber() != MarkDependenceInst::Dependent ||
+        !areOnStackClosureUsesDeadOrRemoved(mdi, isRemoved))
+      return false;
+  }
+  return true;
+}
+
+/// Returns true if each use of \p value, which is the closure or a value with
+/// transitive ownership of it, is removed or doesn't keep it alive.
+static bool
+areClosureUsesDeadOrRemoved(SingleValueInstruction *value,
+                            function_ref<bool(SILInstruction *)> isRemoved) {
+  // See collectDestroysRecursively().
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (isRemoved(user) || useDoesNotKeepValueAlive(user))
+      continue;
+    if (!useHasTransitiveOwnership(user) ||
+        !areClosureUsesDeadOrRemoved(cast<SingleValueInstruction>(user),
+                                     isRemoved))
+      return false;
+  }
+  return true;
+}
+
+bool swift::canDeleteDeadClosure(
+    SingleValueInstruction *closure,
+    function_ref<bool(SILInstruction *)> isRemoved) {
+  auto *pa = dyn_cast<PartialApplyInst>(closure);
+  if (!pa && !isa<ThinToThickFunctionInst>(closure))
+    return false;
+  if (pa && pa->isOnStack())
+    return areOnStackClosureUsesDeadOrRemoved(pa, isRemoved);
+  return areClosureUsesDeadOrRemoved(closure, isRemoved);
+}
+
 bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                  InstModCallbacks callbacks,
                                  bool needKeepArgsAlive) {
