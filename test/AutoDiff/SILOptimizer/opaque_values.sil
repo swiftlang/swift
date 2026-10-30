@@ -1,0 +1,486 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -differentiation -sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -differentiation -address-lowering -sil-verify-all -emit-sorted-sil %s | %FileCheck %s --check-prefix=LOWERED
+
+// `@viaTuple` hardcodes `Builtin.Int64` for `Int`.
+// REQUIRES: PTRSIZE=64
+
+// Differentiation of opaque-values SIL, run directly with `sil-opt`, so the
+// results do not depend on where AddressLowering sits in the pipeline.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+// The reabstraction thunks generated for `viaFunctionValue` and
+// `viaFunctionValueDouble`.
+
+// The reabstraction thunk that converts between the substituted and the
+// unsubstituted tangent function type is generated in address form.
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @{{.*}}TR : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[THUNK_RESULT:%.*]] : $*τ_0_0.TangentVector, [[THUNK_ARG:%.*]] : $*τ_0_0.TangentVector, [[THUNK_FN:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector):
+// CHECK:         apply [[THUNK_FN]]([[THUNK_RESULT]], [[THUNK_ARG]])
+
+// The thunk that adapts the generic pullback to the loadable one takes and
+// returns its `Double` indirectly. It is generated in address form.
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2dIegyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @callee_guaranteed (Double) -> Double) -> @out Double {
+// CHECK:       bb0([[THUNK_RESULT:%.*]] : $*Double, [[THUNK_ARG:%.*]] : $*Double, [[THUNK_FN:%.*]] : @guaranteed $@callee_guaranteed (Double) -> Double):
+// CHECK:         [[THUNK_LOADED:%.*]] = load [trivial] [[THUNK_ARG]] : $*Double
+// CHECK:         [[THUNK_APPLIED:%.*]] = apply [[THUNK_FN]]([[THUNK_LOADED]]) : $@callee_guaranteed (Double) -> Double
+// CHECK:         store [[THUNK_APPLIED]] to [trivial] [[THUNK_RESULT]] : $*Double
+
+// Differentiation of loadable values that flow through generic callees.
+//
+// With opaque values a `Double` is an object, even where a generic callee
+// takes or returns it indirectly (`@in_guaranteed T`, `@out T`). The pullback
+// still has to pass seeds to, and receive tangents from, the callee's pullback
+// through memory.
+//
+// Here the callee is `@identity`: its pullback takes its seed and returns its
+// tangent indirectly.
+
+// The pullback has an object seed, but the callee's pullback takes its seed
+// and returns its tangent indirectly. The seed is stored to a temporary
+// buffer, and the returned tangent is loaded.
+// CHECK-LABEL: sil private [ossa] @callDouble{{.*}}TJpSpSr : $@convention(thin) (Double, @owned @callee_guaranteed (Double) -> Double) -> Double {
+// CHECK:       bb0([[SEED:%.*]] : $Double, {{%.*}} : @owned $@callee_guaranteed (Double) -> Double):
+// CHECK:         [[TANGENT:%.*]] = alloc_stack $Double
+// CHECK:         [[SPILL:%.*]] = alloc_stack $Double
+// CHECK-NEXT:    store [[SEED]] to [trivial] [[SPILL]] : $*Double
+// CHECK:         apply {{%.*}}([[TANGENT]], [[SPILL]]) : $@callee_guaranteed (@in_guaranteed Double) -> @out Double
+// CHECK:         [[LOADED:%.*]] = load [trivial] [[TANGENT]] : $*Double
+// CHECK:         return [[LOADED]] : $Double
+
+// Address lowering accepts the pullback.
+// LOWERED-LABEL: sil private [ossa] @callDouble{{.*}}TJpSpSr
+// LOWERED:         store {{%.*}} to [trivial] {{%.*}} : $*Double
+sil [ossa] @callDouble : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  debug_value %0 : $Double, let, name "x", argno 1
+  %2 = function_ref @identity : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %3 = apply %2<Double>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  return %3 : $Double
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] @callDouble : $@convention(thin) (Double) -> Double {
+}
+
+// Differentiation of a call whose callee returns an address-only value.
+//
+// With opaque values, the apply of `@identity` returns an object and takes its
+// argument as an object. The pullback of the caller calls the callee's
+// pullback, which takes its seed and returns its result indirectly.
+
+// The pullback calls the callee's pullback, which takes its seed and returns its
+// tangent indirectly. The seed is copied to a temporary buffer, and the
+// returned tangent is accumulated into the adjoint buffer.
+// CHECK-LABEL: sil private [ossa] @caller{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{%.*}} : @owned
+// CHECK:         [[ADJOINT_X:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:         [[SEED_COPY:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK-NEXT:    copy_addr [[SEED]] to [init] [[SEED_COPY]] : $*τ_0_0.TangentVector
+// CHECK:         [[CALLEE_TANGENT:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:         apply {{%.*}}([[CALLEE_TANGENT]], [[SEED_COPY]]) : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector
+// CHECK:         witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
+// CHECK:         apply {{%.*}}<τ_0_0.TangentVector>([[ADJOINT_X]], [[CALLEE_TANGENT]], {{%.*}})
+// CHECK:         copy_addr [take] [[ADJOINT_X]] to [init] [[RESULT]] : $*τ_0_0.TangentVector
+
+// The VJP calls the callee's VJP with indirect result and argument.
+// CHECK-LABEL: sil [ossa] @caller{{.*}}TJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) {
+// CHECK:       bb0([[VJP_RESULT:%.*]] : $*τ_0_0, [[X:%.*]] : $*τ_0_0):
+// CHECK:         differentiable_function_extract [vjp]
+// CHECK:         apply {{%.*}}([[VJP_RESULT]], [[X]])
+// CHECK:         function_ref @caller{{.*}}TJpSpSr
+
+// After address lowering, the original calls the callee with an indirect result.
+// LOWERED-LABEL: sil [ossa] @caller : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_RESULT:%.*]] : $*T, [[ORIG_X:%.*]] : $*T):
+// LOWERED:         apply {{%.*}}<T>([[ORIG_RESULT]], [[ORIG_X]])
+sil [ossa] @caller : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = function_ref @identity : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %3 = apply %2<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  return %3 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @caller : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// The same through a `try_apply`: the callee's pullback is applied on the
+// path through the normal destination, with the seed stored to a buffer.
+// CHECK-LABEL: sil private [ossa] @catchDouble{{.*}}TJpSpSr : $@convention(thin) (Double, @owned _AD__catchDouble_bb2__Pred__src_0_wrt_0) -> Double {
+// CHECK:       bb0([[CATCH_SEED:%.*]] : $Double, {{%.*}} : @owned $_AD__catchDouble_bb2__Pred__src_0_wrt_0):
+// CHECK:         switch_enum {{%.*}} : $Optional<@callee_guaranteed (Double) -> Double>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]]
+// CHECK:       [[SOME]]({{%.*}} : @owned $@callee_guaranteed (Double) -> Double):
+// CHECK:         [[CATCH_TANGENT:%.*]] = alloc_stack $Double
+// CHECK:         [[CATCH_SPILL:%.*]] = alloc_stack $Double
+// CHECK-NEXT:    store [[CATCH_SEED]] to [trivial] [[CATCH_SPILL]] : $*Double
+// CHECK:         apply {{%.*}}([[CATCH_TANGENT]], [[CATCH_SPILL]]) : $@callee_guaranteed (@in_guaranteed Double) -> @out Double
+// CHECK:         load [trivial] [[CATCH_TANGENT]] : $*Double
+sil [ossa] @catchDouble : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  debug_value %0 : $Double, let, name "x", argno 1
+  %2 = function_ref @mayThrow : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
+  try_apply %2<Double>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error), normal bb1, error bb3
+
+bb1(%4 : $Double):
+  br bb2(%4 : $Double)
+
+bb2(%6 : $Double):
+  return %6 : $Double
+
+bb3(%8 : @owned $any Error):
+  destroy_value %8 : $any Error
+  br bb2(%0 : $Double)
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] @catchDouble : $@convention(thin) (Double) -> Double {
+}
+
+// Differentiation of a `try_apply` whose normal result is an address-only value.
+//
+// With opaque values the normal result is an argument of the normal
+// destination block, not an indirect result of the callee. The pullback must
+// still accumulate its adjoint into a buffer.
+
+// The pullback applies the callee's pullback on the path that came through the
+// normal destination of the `try_apply`. It passes the adjoint of the normal
+// result, the buffer that the block argument's adjoint was copied into, as the
+// seed, and accumulates the returned tangent into the adjoint of
+// `x`.
+// CHECK-LABEL: sil private [ossa] @catcher{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned _AD__catcher_bb2__Pred__src_0_wrt_0_16_Differentiation14DifferentiableRzl<τ_0_0>) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{%.*}} : @owned $_AD__catcher_bb2__Pred__src_0_wrt_0_16_Differentiation14DifferentiableRzl<τ_0_0>):
+// CHECK:         copy_addr {{%.*}} to {{%[0-9]+}} : $*τ_0_0.TangentVector
+// CHECK:         copy_addr {{%.*}} to {{%[0-9]+}} : $*τ_0_0.TangentVector
+// CHECK:         copy_addr {{%.*}} to {{%[0-9]+}} : $*τ_0_0.TangentVector
+// CHECK:         copy_addr {{%.*}} to [[NORMAL_ADJOINT:%[0-9]+]] : $*τ_0_0.TangentVector
+// CHECK-NEXT:    switch_enum {{%.*}} : $_AD__catcher_bb2__Pred__src_0_wrt_0_16_Differentiation14DifferentiableRzl<τ_0_0>
+// CHECK:         switch_enum {{%.*}} : $Optional<@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]]
+// CHECK:       [[SOME]]({{%.*}} : @owned $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>):
+// CHECK:         [[CALLEE_TANGENT:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:         apply {{%.*}}([[CALLEE_TANGENT]], [[NORMAL_ADJOINT]]) : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector
+// CHECK:         witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
+// CHECK:         apply {{%.*}}<τ_0_0.TangentVector>({{%.*}}, [[CALLEE_TANGENT]], {{%.*}})
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[RESULT]] : $*τ_0_0.TangentVector
+
+// The VJP calls the callee's VJP with an indirect result. On the normal path
+// the only block argument is the callee's pullback; on the error path the
+// original's fallback result is copied into the indirect result.
+// CHECK-LABEL: sil [ossa] @catcher{{.*}}TJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) {
+// CHECK:       bb0([[VJP_RESULT:%.*]] : $*τ_0_0, [[X:%.*]] : $*τ_0_0):
+// CHECK:         differentiable_function_extract [vjp]
+// CHECK:         try_apply {{%.*}}([[VJP_RESULT]], [[X]]) : {{.*}}, normal bb{{[0-9]+}}, error [[ERROR:bb[0-9]+]]
+// CHECK:       [[ERROR]]({{%.*}} : @owned $any Error):
+// CHECK:         copy_addr [[X]] to [init] [[VJP_RESULT]] : $*τ_0_0
+// CHECK:       bb{{[0-9]+}}({{%.*}} : @owned $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>):
+
+// After address lowering, the original passes the indirect result to the callee.
+// LOWERED-LABEL: sil [ossa] @catcher : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_RESULT:%.*]] : $*T, [[ORIG_X:%.*]] : $*T):
+// LOWERED:         try_apply {{%.*}}<T>([[ORIG_RESULT]], [[ORIG_X]])
+sil [ossa] @catcher : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = function_ref @mayThrow : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
+  try_apply %2<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error), normal bb1, error bb3
+
+bb1(%4 : @owned $T):
+  br bb2(%4 : $T)
+
+bb2(%6 : @owned $T):
+  return %6 : $T
+
+bb3(%8 : @owned $any Error):
+  %9 = copy_value %8 : $any Error
+  %10 = move_value [lexical] [var_decl] %9 : $any Error
+  debug_value %10 : $any Error, let, name "error"
+  %12 = copy_value %0 : $T
+  destroy_value %10 : $any Error
+  destroy_value %8 : $any Error
+  br bb2(%12 : $T)
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @catcher : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// Differentiation of an address-only value whose tangent type is a loadable
+// type: `T.TangentVector == Float`.
+//
+// With opaque values the original result and parameters are objects of type
+// `T`, while the pullback takes its seed, and returns the tangents, as `Float`
+// values.
+
+// The pullback takes its seed and returns both tangents indirectly, but the
+// original's result and parameters are objects. The seed is loaded to become
+// the adjoint of the result, and each adjoint is returned through its indirect
+// result.
+// CHECK-LABEL: sil private [ossa] @first{{.*}}TJp{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable, τ_0_0.TangentVector == Float> (@in_guaranteed Float{{.*}}{
+// CHECK:       bb0([[RESULT0:%.*]] : $*Float, [[RESULT1:%.*]] : $*Float, [[SEED:%.*]] : $*Float):
+// CHECK:         load [trivial] [[SEED]] : $*Float
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[RESULT0]] : $*Float
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[RESULT1]] : $*Float
+
+// LOWERED-LABEL: sil [ossa] @first : $@convention(thin) <T where T : Differentiable, T.TangentVector == Float> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_RESULT:%.*]] : $*T, [[ORIG_LHS:%.*]] : $*T, {{%.*}} : $*T):
+// LOWERED:         copy_addr [[ORIG_LHS]] to [init] [[ORIG_RESULT]] : $*T
+sil [ossa] @first : $@convention(thin) <T where T : Differentiable, T.TangentVector == Float> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T):
+  debug_value %0 : $T, let, name "lhs", argno 1
+  debug_value %1 : $T, let, name "rhs", argno 2
+  %4 = copy_value %0 : $T
+  return %4 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0 1] [results 0] <T where T : Differentiable, T.TangentVector == Float> @first : $@convention(thin) <T where T : Differentiable, T.TangentVector == Float> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+}
+
+// Differentiation of a function that takes and returns an address-only value.
+//
+// With opaque values such a value is an object: the original has no indirect
+// result argument and no stack slots. Differentiation runs on this form
+// directly, wherever AddressLowering sits in the pipeline.
+//
+// `identity` is also the callee of several functions below.
+
+// The original stays in object form.
+// CHECK-LABEL: sil [ossa] [opaque] @identity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// CHECK:       bb0(%0 : @guaranteed $T):
+// CHECK:         [[COPY:%.*]] = copy_value %0 : $T
+// CHECK:         return [[COPY]] : $T
+
+// The pullback is generated in address form: its adjoint is a buffer, and its
+// seed and result are passed indirectly.
+// CHECK-LABEL: sil private [ossa] @identity{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector):
+// CHECK:         [[ADJOINT:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:         witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
+// CHECK:         copy_addr [[SEED]] to [init] {{%.*}} : $*τ_0_0.TangentVector
+// CHECK:         witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
+// CHECK:         copy_addr [take] [[ADJOINT]] to [init] [[RESULT]] : $*τ_0_0.TangentVector
+
+// So is the VJP: it has no object-form results.
+// CHECK-LABEL: sil [ossa] @identity{{.*}}TJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) {
+// CHECK:       bb0([[VJP_RESULT:%.*]] : $*τ_0_0, [[X:%.*]] : $*τ_0_0):
+// CHECK:         copy_addr [[X]] to [init] [[VJP_RESULT]] : $*τ_0_0
+// CHECK:         [[PULLBACK:%.*]] = function_ref @identity{{.*}}TJpSpSr
+// CHECK:         partial_apply [callee_guaranteed] [[PULLBACK]]<τ_0_0>()
+
+// Address lowering accepts the result and lowers the original too.
+// LOWERED-LABEL: sil [ossa] @identity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_RESULT:%.*]] : $*T, [[ORIG_X:%.*]] : $*T):
+// LOWERED:         copy_addr [[ORIG_X]] to [init] [[ORIG_RESULT]] : $*T
+// LOWERED-LABEL: sil private [ossa] @identity{{.*}}TJpSpSr
+// LOWERED:         alloc_stack $τ_0_0.TangentVector
+sil [ossa] @identity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  return %2 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @identity : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// A throwing callee that returns an address-only value; the callee of `catcher`
+// and `catchDouble`.
+sil [ossa] @mayThrow : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> (@out T, @error any Error) {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  debug_value undef : $any Error, var, name "$error", argno 2
+  %3 = copy_value %0 : $T
+  return %3 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @mayThrow : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> (@out T, @error any Error) {
+}
+
+// Differentiation of `unconditional_checked_cast` on an address-only value in
+// object form.
+
+// The pullback casts the adjoint in address form.
+// CHECK-LABEL: sil private [ossa] @viaCast{{.*}}TJpSpSr : $@convention(thin)
+// CHECK:       bb0({{%.*}} : $*τ_0_0.TangentVector, {{%.*}} : $*τ_0_0.TangentVector):
+// CHECK:         unconditional_checked_cast_addr τ_0_0.TangentVector in {{%.*}} : $*τ_0_0.TangentVector to τ_0_0.TangentVector in {{%.*}} : $*τ_0_0.TangentVector
+
+// The VJP turns the object-form cast of the original into the address form.
+// CHECK-LABEL: sil [ossa] @viaCast{{.*}}TJrSpSr : $@convention(thin)
+// CHECK:       bb0([[CAST_RESULT:%.*]] : $*τ_0_0, [[CAST_X:%.*]] : $*τ_0_0):
+// CHECK:         [[CAST_COPY:%.*]] = alloc_stack $τ_0_0
+// CHECK:         copy_addr [[CAST_X]] to [init] [[CAST_COPY]] : $*τ_0_0
+// CHECK:         unconditional_checked_cast_addr τ_0_0 in [[CAST_COPY]] : $*τ_0_0 to τ_0_0 in [[CAST_RESULT]] : $*τ_0_0
+
+// LOWERED-LABEL: sil [ossa] @viaCast : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_CAST_RESULT:%.*]] : $*T, [[ORIG_CAST_X:%.*]] : $*T):
+// LOWERED:         unconditional_checked_cast_addr T in {{%.*}} : $*T to T in [[ORIG_CAST_RESULT]] : $*T
+sil [ossa] @viaCast : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  %3 = unconditional_checked_cast %2 : $T to T
+  return %3 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @viaCast : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// Canonicalization of a `differentiable_function` instruction whose operand is a
+// function value over an address-only type. The derivative functions of the
+// operand are wrapped in reabstraction thunks that are generated in address
+// form. The checks for the thunks are at the top of the file.
+
+// The canonicalized `differentiable_function` of the original keeps its object
+// form. Its derivative functions are the ones generated above.
+// CHECK-LABEL: sil [ossa] [opaque] @viaFunctionValue : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// CHECK:         differentiable_function [parameters 0] [results 0] {{%.*}} : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T> with_derivative
+
+// The pullback calls the thunked pullback of the function value.
+// CHECK-LABEL: sil private [ossa] @viaFunctionValue{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{%.*}} : @owned
+// CHECK:         [[ADJOINT_X:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:         [[SEED_COPY:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK-NEXT:    copy_addr [[SEED]] to [init] [[SEED_COPY]]
+// CHECK:         [[PULLBACK_TANGENT:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK:         function_ref @{{.*}}TR
+// CHECK:         apply {{%.*}}([[PULLBACK_TANGENT]], [[SEED_COPY]])
+
+// The VJP calls the function value's VJP with an indirect result.
+// CHECK-LABEL: sil [ossa] @viaFunctionValue{{.*}}TJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>) {
+// CHECK:       bb0([[VJP_RESULT:%.*]] : $*τ_0_0, [[X:%.*]] : $*τ_0_0):
+// CHECK:         differentiable_function_extract [vjp]
+// CHECK:         apply {{%.*}}([[VJP_RESULT]], [[X]])
+
+// After address lowering, the original applies the function value with an
+// indirect result.
+// LOWERED-LABEL: sil [ossa] @viaFunctionValue : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_RESULT:%.*]] : $*T, [[ORIG_X:%.*]] : $*T):
+// LOWERED:         apply {{%.*}}([[ORIG_RESULT]], [[ORIG_X]])
+sil [ossa] @viaFunctionValue : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = function_ref @identity : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %3 = partial_apply [callee_guaranteed] %2<T>() : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %4 = convert_function %3 : $@callee_guaranteed (@in_guaranteed T) -> @out T to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  %5 = differentiable_function [parameters 0] [results 0] %4 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  %6 = move_value [lexical] [var_decl] %5 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  debug_value %6 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>, let, name "g"
+  %8 = copy_value %6 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  %9 = apply %8(%0) : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  destroy_value %8 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  destroy_value %6 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>
+  return %9 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @viaFunctionValue : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// A hand-written reabstraction thunk from a generic function value to a
+// `Double` one.
+sil shared [transparent] [reabstraction_thunk] [ossa] @reabstractionThunk : $@convention(thin) (Double, @guaranteed @callee_guaranteed (@in_guaranteed Double) -> @out Double) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed Double) -> @out Double):
+  %2 = apply %1(%0) : $@callee_guaranteed (@in_guaranteed Double) -> @out Double
+  return %2 : $Double
+}
+
+// The same for a function value over a loadable type, built from the
+// hand-written reabstraction thunk above. The checks for the generated thunk are
+// at the top of the file.
+
+// The pullback of a function value whose pullback is loadable applies it
+// directly.
+// CHECK-LABEL: sil private [ossa] @viaFunctionValueDouble{{.*}}TJpSpSr : $@convention(thin) (Double, @owned @callee_guaranteed (Double) -> Double) -> Double {
+// CHECK:       bb0([[FN_SEED:%.*]] : $Double, [[FN_PULLBACK:%.*]] : @owned $@callee_guaranteed (Double) -> Double):
+// CHECK:         [[FN_RESULT:%.*]] = apply [[FN_PULLBACK]]([[FN_SEED]]) : $@callee_guaranteed (Double) -> Double
+// CHECK:         return [[FN_RESULT]] : $Double
+sil [ossa] @viaFunctionValueDouble : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  debug_value %0 : $Double, let, name "x", argno 1
+  %2 = function_ref @identity : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %3 = partial_apply [callee_guaranteed] %2<Double>() : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %4 = function_ref @reabstractionThunk : $@convention(thin) (Double, @guaranteed @callee_guaranteed (@in_guaranteed Double) -> @out Double) -> Double
+  %5 = partial_apply [callee_guaranteed] %4(%3) : $@convention(thin) (Double, @guaranteed @callee_guaranteed (@in_guaranteed Double) -> @out Double) -> Double
+  %6 = differentiable_function [parameters 0] [results 0] %5 : $@callee_guaranteed (Double) -> Double
+  %7 = move_value [lexical] [var_decl] %6 : $@differentiable(reverse) @callee_guaranteed (Double) -> Double
+  debug_value %7 : $@differentiable(reverse) @callee_guaranteed (Double) -> Double, let, name "g"
+  %9 = copy_value %7 : $@differentiable(reverse) @callee_guaranteed (Double) -> Double
+  %10 = apply %9(%0) : $@differentiable(reverse) @callee_guaranteed (Double) -> Double
+  destroy_value %9 : $@differentiable(reverse) @callee_guaranteed (Double) -> Double
+  destroy_value %7 : $@differentiable(reverse) @callee_guaranteed (Double) -> Double
+  return %10 : $Double
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] @viaFunctionValueDouble : $@convention(thin) (Double) -> Double {
+}
+
+// Differentiation of `move_value` on an address-only value in object form.
+
+// The pullback has adjoint buffers for both `x` and the moved variable `y`.
+// CHECK-LABEL: sil private [ossa] @viaMove{{.*}}TJpSpSr : $@convention(thin)
+// CHECK:       alloc_stack $τ_0_0.TangentVector, let, name "derivative of 'x'
+// CHECK:       alloc_stack $τ_0_0.TangentVector, let, name "derivative of 'y'
+
+// The VJP turns the object-form move into a lexical stack slot.
+// CHECK-LABEL: sil [ossa] @viaMove{{.*}}TJrSpSr : $@convention(thin)
+// CHECK:       bb0([[MOVE_RESULT:%.*]] : $*τ_0_0, [[MOVE_X:%.*]] : $*τ_0_0):
+// CHECK:         [[Y:%.*]] = alloc_stack [lexical] $τ_0_0
+// CHECK:         copy_addr [[MOVE_X]] to [init] [[Y]] : $*τ_0_0
+
+// LOWERED-LABEL: sil [ossa] @viaMove : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_MOVE_RESULT:%.*]] : $*T, [[ORIG_MOVE_X:%.*]] : $*T):
+// LOWERED:         [[ORIG_Y:%.*]] = alloc_stack [lexical] $T
+// LOWERED:         copy_addr [[ORIG_MOVE_X]] to [init] [[ORIG_Y]] : $*T
+sil [ossa] @viaMove : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  %3 = move_value [lexical] [var_decl] %2 : $T
+  debug_value %3 : $T, let, name "y"
+  %5 = copy_value %3 : $T
+  destroy_value %3 : $T
+  return %5 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @viaMove : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// Differentiation of a tuple that has a single differentiable element, with
+// the address-only value in object form.
+
+// The tangent of `(T, Int)` is the tangent of `T`: the adjoint buffer of the
+// tuple variable `t` has type `T.TangentVector`.
+// CHECK-LABEL: sil private [ossa] @viaTuple{{.*}}TJpSpSr : $@convention(thin)
+// CHECK:       bb0({{%.*}} : $*τ_0_0.TangentVector, {{%.*}} : $*τ_0_0.TangentVector):
+// CHECK:         alloc_stack $τ_0_0.TangentVector, let, name "derivative of 't'
+
+// The VJP builds the tuple in memory.
+// CHECK-LABEL: sil [ossa] @viaTuple{{.*}}TJrSpSr : $@convention(thin)
+// CHECK:       bb0([[TUPLE_RESULT:%.*]] : $*τ_0_0, [[TUPLE_X:%.*]] : $*τ_0_0):
+// CHECK:         [[TUPLE:%.*]] = alloc_stack [lexical] $(τ_0_0, Int)
+// CHECK:         [[ELEMENT:%.*]] = tuple_element_addr [[TUPLE]] : $*(τ_0_0, Int), 0
+// CHECK:         copy_addr [[TUPLE_X]] to [init] [[ELEMENT]] : $*τ_0_0
+
+// LOWERED-LABEL: sil [ossa] @viaTuple : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// LOWERED:       bb0([[ORIG_TUPLE_RESULT:%.*]] : $*T, [[ORIG_TUPLE_X:%.*]] : $*T):
+// LOWERED:         [[ORIG_TUPLE:%.*]] = alloc_stack [lexical] $(T, Int)
+// LOWERED:         [[ORIG_ELEMENT:%.*]] = tuple_element_addr [[ORIG_TUPLE]] : $*(T, Int), 0
+// LOWERED:         copy_addr [[ORIG_TUPLE_X]] to [init] [[ORIG_ELEMENT]] : $*T
+sil [ossa] @viaTuple : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int (%3 : $Builtin.Int64)
+  %5 = tuple (%2 : $T, %4 : $Int)
+  %6 = move_value [lexical] [var_decl] %5 : $(T, Int)
+  debug_value %6 : $(T, Int), let, name "t"
+  %8 = copy_value %6 : $(T, Int)
+  (%9, %10) = destructure_tuple %8 : $(T, Int)
+  destroy_value %6 : $(T, Int)
+  return %9 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @viaTuple : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
