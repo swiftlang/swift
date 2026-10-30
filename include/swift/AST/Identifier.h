@@ -501,10 +501,17 @@ namespace swift {
 /// A declaration name, which may comprise one or more identifier pieces.
 class DeclName {
   friend class ASTContext;
+  friend struct llvm::PointerLikeTypeTraits<DeclName>;
 
   /// Represents a compound declaration name.
-  struct alignas(Identifier) CompoundDeclName final : llvm::FoldingSetNode,
-      private llvm::TrailingObjects<CompoundDeclName, Identifier> {
+  ///
+  /// \c Storage packs a \c CompoundDeclName pointer next to a
+  /// \c DeclBaseName. Align it like the identifier's storage, not
+  /// \c alignof(Identifier), which is only 4 on 32-bit hosts, so that both
+  /// leave the same number of low bits free.
+  struct alignas(Identifier::RequiredAlignment) CompoundDeclName final
+      : llvm::FoldingSetNode,
+        private llvm::TrailingObjects<CompoundDeclName, Identifier> {
     friend TrailingObjects;
     friend class DeclName;
 
@@ -532,7 +539,11 @@ class DeclName {
 
   /// Either a single identifier piece stored inline, or a reference to a
   /// compound declaration name.
-  llvm::PointerUnion<DeclBaseName, CompoundDeclName *> BaseNameOrCompound;
+  using Storage = llvm::PointerUnion<DeclBaseName, CompoundDeclName *>;
+  Storage BaseNameOrCompound;
+
+  static_assert(alignof(CompoundDeclName) >= Identifier::RequiredAlignment,
+                "CompoundDeclName must leave Identifier's spare bits free");
 
   explicit DeclName(void *_Nullable Opaque)
       : BaseNameOrCompound(
@@ -736,7 +747,11 @@ class DeclNameRef {
   friend struct llvm::PointerLikeTypeTraits<DeclNameRef>;
 
   /// Contains the name and module for a DeclNameRef with a module selector.
-  struct alignas(Identifier) SelectiveDeclNameRef : llvm::FoldingSetNode {
+  ///
+  /// Aligned like \c DeclName::CompoundDeclName, because \c Storage packs a
+  /// pointer to it next to a \c DeclName.
+  struct alignas(Identifier::RequiredAlignment) SelectiveDeclNameRef
+      : llvm::FoldingSetNode {
     Identifier moduleSelector;   // Note: currently can never be empty().
     DeclName fullName;
 
@@ -754,6 +769,9 @@ class DeclNameRef {
 
   using Storage = llvm::PointerUnion<DeclName, SelectiveDeclNameRef *>;
   Storage storage;
+
+  static_assert(alignof(SelectiveDeclNameRef) >= Identifier::RequiredAlignment,
+                "SelectiveDeclNameRef must leave Identifier's spare bits free");
 
   explicit DeclNameRef(void *_Nullable Opaque)
     : storage(decltype(storage)::getFromOpaqueValue(Opaque)) { }
@@ -1070,7 +1088,7 @@ namespace llvm {
     static inline swift::DeclName getFromVoidPointer(void *_Nullable ptr) {
       return swift::DeclName::getFromOpaqueValue(ptr);
     }
-    enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclBaseName>::NumLowBitsAvailable - 1 };
+    enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclName::Storage>::NumLowBitsAvailable };
   };
 
   // DeclNames hash just like pointers.

@@ -62,11 +62,11 @@ import ContiguousArrayTests
 import CountAlgo
 import CreateObjects
 // rdar://128520766
-// import CxxSetToCollection
+import CxxSetToCollection
 import CxxSpanTests
 import CxxStringConversion
 // rdar://128520766
-// import CxxVectorSum
+import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -285,11 +285,11 @@ register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 // rdar://128520766
-// register(CxxSetToCollection.benchmarks)
+register(CxxSetToCollection.benchmarks)
 register(CxxSpanTests.benchmarks)
 register(CxxStringConversion.benchmarks)
 // rdar://128520766
-// register(CxxVectorSum.benchmarks)
+register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
