@@ -73,10 +73,10 @@ open class CBox<T> {
 // LIBRARY-DAG: @"$e7Library4EBoxOySiGMf" = {{(dso_local |dllexport |protected )?}}{{(local_unnamed_addr )?}}constant
 // LIBRARY-DAG: @"$e7Library4EBoxOySiGWV" = {{(dso_local |dllexport |protected )?}}{{(local_unnamed_addr )?}}constant
 // The vtable and deinit are the exported members.
-// LIBRARY-DAG: @"$e7Library4CBoxCySiGMf" = {{(dso_local |dllexport |protected )?}}{{(local_unnamed_addr )?}}constant {{.*}} ptr @"$e7Library4CBoxCfDSi_Ts5", ptr null, ptr @"$e7Library4CBoxC1vxvgSi_Ts5", ptr @"$e7Library4CBoxC1vxvsSi_Ts5", ptr @"$e7Library4CBoxC1vxvMSi_Ts5", ptr @"$e7Library4CBoxCyACyxGxcfCSi_Ts5", ptr @"$e7Library4CBoxC3getxyFSi_Ts5" }>
+// LIBRARY-DAG: @"$e7Library4CBoxCySiGMf" = {{(dso_local |dllexport |protected )?}}{{(local_unnamed_addr )?}}constant {{.*}} ptr @"$e7Library4CBoxCfDSi_Ts5{{(\.ptrauth)?}}", ptr null, ptr @"$e7Library4CBoxC1vxvgSi_Ts5{{(\.ptrauth)?}}", ptr @"$e7Library4CBoxC1vxvsSi_Ts5{{(\.ptrauth)?}}", ptr @"$e7Library4CBoxC1vxvMSi_Ts5{{(\.ptrauth)?}}", ptr @"$e7Library4CBoxCyACyxGxcfCSi_Ts5{{(\.ptrauth)?}}", ptr @"$e7Library4CBoxC3getxyFSi_Ts5{{(\.ptrauth)?}}" }>
 
 // Protocol witness table; the generic requirement has no witness.
-// LIBRARY-DAG: @"$e7Library4SBoxVySiGAA5ShapeAAWP" = {{(dso_local |dllexport |protected )?}}{{(local_unnamed_addr )?}}constant [3 x ptr] [ptr null, ptr @"{{[^"]+}}", ptr @swift_deletedMethodError]
+// LIBRARY-DAG: @"$e7Library4SBoxVySiGAA5ShapeAAWP" = {{(dso_local |dllexport |protected )?}}{{(local_unnamed_addr )?}}constant [3 x ptr] [ptr null, ptr @"{{[^"]+}}", ptr @swift_deletedMethodError{{(\.ptrauth)?}}]
 
 // Members, including a satisfied constrained extension.
 // LIBRARY-DAG: define {{(dso_local |dllexport |protected )?}}swiftcc {{.*}}@"$e7Library4SBoxVyACyxGxcfCSi_Ts5"
@@ -111,7 +111,7 @@ public func get(_ b: CBox<Int>) -> Int { b.get() + SBox(2).doubled() }
 // APPLICATION-DAG: @"$e7Library4SBoxVySiGAA5ShapeAAWP" = external global
 
 // A subclass's superclass and inherited vtable entries are the library's.
-// APPLICATION-DAG: @"$e11Application3SubCMf" = {{.*}} ptr @"$e7Library4CBoxCySiGMf"{{.*}} ptr @"$e7Library4CBoxC1vxvgSi_Ts5"{{.*}} ptr @"$e7Library4CBoxC3getxyFSi_Ts5" }>
+// APPLICATION-DAG: @"$e11Application3SubCMf" = {{.*}} ptr @"$e7Library4CBoxCySiGMf"{{.*}} ptr @"$e7Library4CBoxC1vxvgSi_Ts5{{(\.ptrauth)?}}"{{.*}} ptr @"$e7Library4CBoxC3getxyFSi_Ts5{{(\.ptrauth)?}}" }>
 
 // APPLICATION-NOT-NOT: define {{.*}}@"$e7Library
-// APPLICATION-NOT-NOT: @"$e7Library{{[^"]*}}" = {{.*}}constant
+// APPLICATION-NOT-NOT: @"$e7Library{{[^".]*}}" = {{.*}}constant
