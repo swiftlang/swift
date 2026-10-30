@@ -24,6 +24,10 @@
 #if defined(_WIN64)
 #include <intrin.h>
 #endif
+#if (defined(__x86_64__) || defined(_M_X64)) && defined(__clang__) &&        \
+    !defined(__AVX__)
+#include <cpuid.h>
+#endif
 
 
 // FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
@@ -46,6 +50,71 @@
 
 namespace swift {
 namespace impl {
+
+#if (defined(__x86_64__) || defined(_M_X64)) && defined(__clang__)
+#define SWIFT_ATOMIC_VECTOR_LOAD16 1
+#if !defined(__AVX__)
+/// Whether this processor has atomic 16-byte vector loads (see
+/// has16ByteAtomicVectorLoads): unknown until the first 16-byte load asks
+/// CPUID. A single byte, so the common path is one load with no
+/// initialization guard; threads that race to set it agree on the value.
+enum : unsigned char {
+  VectorLoad16Unknown,
+  VectorLoad16Unsupported,
+  VectorLoad16Supported,
+};
+inline std::atomic<unsigned char> vectorLoad16Support{VectorLoad16Unknown};
+
+__attribute__((noinline, cold))
+inline bool detect16ByteAtomicVectorLoads() {
+  unsigned a, b, c, d;
+  bool supported = __get_cpuid(1, &a, &b, &c, &d) && (c & bit_AVX) != 0;
+  vectorLoad16Support.store(supported ? VectorLoad16Supported
+                                      : VectorLoad16Unsupported,
+                            std::memory_order_relaxed);
+  return supported;
+}
+#endif
+
+/// Intel and AMD guarantee that aligned 16-byte SSE loads (MOVDQA and
+/// friends) are atomic on every processor that enumerates AVX (Intel SDM
+/// vol. 3A 9.1.1, AMD APM vol. 2 7.3.2); libatomic relies on the same rule.
+/// Without it the only atomic 16-byte load is LOCK CMPXCHG16B, which takes
+/// the cache line exclusive like a store and costs as much as one: it was
+/// most of the time spent reading a task's status.
+inline bool has16ByteAtomicVectorLoads() {
+#if defined(__AVX__)
+  // Built for AVX: every processor this code runs on has them.
+  return true;
+#else
+  auto support = vectorLoad16Support.load(std::memory_order_relaxed);
+  if (__builtin_expect(support == VectorLoad16Supported, true))
+    return true;
+  if (support == VectorLoad16Unsupported)
+    return false;
+  return detect16ByteAtomicVectorLoads();
+#endif
+}
+
+template <class Value>
+inline Value vectorLoad16(const volatile void *address) {
+  static_assert(sizeof(Value) == 16, "16-byte values only");
+  typedef long long vector16 __attribute__((vector_size(16)));
+  vector16 bits;
+  // The memory clobber keeps the compiler from moving accesses across the
+  // load; x86 itself gives every load acquire semantics.
+  __asm__ __volatile__("movdqa %1, %0"
+                       : "=x"(bits)
+                       : "m"(*(const volatile vector16 *)address)
+                       : "memory");
+  // A bit cast, not a copy into a default-constructed Value: not every
+  // Value has a default constructor.
+  return __builtin_bit_cast(Value, bits);
+}
+#else
+#define SWIFT_ATOMIC_VECTOR_LOAD16 0
+#endif
+
 /// The default implementation for swift::atomic<T>, which just wraps
 /// std::atomic with minor differences.
 ///
@@ -59,6 +128,12 @@ public:
 
   /// Force clients to always pass an order.
   Value load(std::memory_order order) const {
+#if SWIFT_ATOMIC_VECTOR_LOAD16
+    if constexpr (Size == 16) {
+      if (__builtin_expect(has16ByteAtomicVectorLoads(), true))
+        return vectorLoad16<Value>(&value);
+    }
+#endif
     return value.load(order);
   }
 
@@ -102,6 +177,10 @@ public:
     assert(order == std::memory_order_relaxed ||
            order == std::memory_order_acquire ||
            order == std::memory_order_consume);
+#if SWIFT_ATOMIC_VECTOR_LOAD16
+    if (__builtin_expect(has16ByteAtomicVectorLoads(), true))
+      return vectorLoad16<Value>(&atomicValue);
+#endif
     // Aligned SSE loads are atomic on every known processor, but
     // the only 16-byte access that's architecturally guaranteed to be
     // atomic is lock cmpxchg16b, so we do that with identical comparison
