@@ -7318,8 +7318,6 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
 
   auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
 
   auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
                                                         Type.getASTType());
@@ -7327,7 +7325,9 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
       payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
-      copyable, isABIAccessible);
+      // Computed from the declaration and the payload, not the declaration
+      // alone: Optional<NC> is not Copyable.
+      Copyable, isABIAccessible);
 
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
@@ -7357,13 +7357,11 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
 
   auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
          deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
          payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
-         copyable,
+         Copyable,
          enumAccessible));
 }
 
@@ -7393,8 +7391,6 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   // of the largest payload.
   CommonSpareBits = {};
   Alignment worstAlignment(1);
-  auto isCopyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   auto isTriviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
@@ -7552,7 +7548,8 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
                                                         Type.getASTType());
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isTriviallyDestroyable, isBT,
-                       isCopyable, isABIAccessible);
+                       // Computed from the declaration and every payload.
+                       Copyable, isABIAccessible);
 
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
