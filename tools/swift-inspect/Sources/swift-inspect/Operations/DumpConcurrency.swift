@@ -55,6 +55,7 @@ fileprivate class ConcurrencyDumper {
     var isFuture: Bool
     var isGroupChildTask: Bool
     var isAsyncLetTask: Bool
+    var hasSynchronousOperation: Bool
     var maxPriority: UInt32
     var isCancelled: Bool
     var isStatusRecordLocked: Bool
@@ -230,6 +231,7 @@ fileprivate class ConcurrencyDumper {
       isFuture: reflectionInfo.IsFuture,
       isGroupChildTask: reflectionInfo.IsGroupChildTask,
       isAsyncLetTask: reflectionInfo.IsAsyncLetTask,
+      hasSynchronousOperation: reflectionInfo.HasSynchronousOperation,
       maxPriority: reflectionInfo.MaxPriority,
       isCancelled: reflectionInfo.IsCancelled,
       isStatusRecordLocked: reflectionInfo.IsStatusRecordLocked,
@@ -296,6 +298,7 @@ fileprivate class ConcurrencyDumper {
     if info.isFuture { flags.append("future") }
     if info.isGroupChildTask { flags.append("groupChildTask") }
     if info.isAsyncLetTask { flags.append("asyncLetTask") }
+    if info.hasSynchronousOperation { flags.append("synchronousOperation") }
     if info.isCancelled { flags.append("cancelled") }
     if info.isStatusRecordLocked { flags.append("statusRecordLocked") }
     if info.isEscalated { flags.append("escalated") }

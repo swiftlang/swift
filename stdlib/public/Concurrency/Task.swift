@@ -634,11 +634,15 @@ struct JobFlags {
 @available(SwiftStdlib 5.1, *)
 @export(implementation)
 func taskCreateFlags(
-  priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
-  inheritContext: Bool, enqueueJob: Bool,
+  priority: TaskPriority?,
+  isChildTask: Bool,
+  copyTaskLocals: Bool,
+  inheritContext: Bool,
+  enqueueJob: Bool,
   addPendingGroupTaskUnconditionally: Bool,
   isDiscardingTask: Bool,
-  isSynchronousStart: Bool
+  isSynchronousStart: Bool,
+  hasSynchronousOperation: Bool = false
 ) -> Int {
   var bits = 0
   bits |= (bits & ~0xFF) | Int(priority?.rawValue ?? 0)
@@ -664,7 +668,38 @@ func taskCreateFlags(
   if isSynchronousStart {
     bits |= 1 << 16
   }
+  // Only for 'Builtin.createSynchronousDiscardingTask'
+  if hasSynchronousOperation {
+    bits |= 1 << 17
+  }
   return bits
+}
+
+/// SPI for tests and other direct users of the builtins.
+@_spi(Concurrency)
+@available(SwiftStdlib 5.1, *)
+@export(implementation)
+public func _taskCreateFlags(
+  priority: TaskPriority?,
+  isChildTask: Bool,
+  copyTaskLocals: Bool,
+  inheritContext: Bool,
+  enqueueJob: Bool,
+  addPendingGroupTaskUnconditionally: Bool,
+  isDiscardingTask: Bool,
+  isSynchronousStart: Bool,
+  hasSynchronousOperation: Bool
+) -> Int {
+  taskCreateFlags(
+    priority: priority,
+    isChildTask: isChildTask,
+    copyTaskLocals: copyTaskLocals,
+    inheritContext: inheritContext,
+    enqueueJob: enqueueJob,
+    addPendingGroupTaskUnconditionally: addPendingGroupTaskUnconditionally,
+    isDiscardingTask: isDiscardingTask,
+    isSynchronousStart: isSynchronousStart,
+    hasSynchronousOperation: hasSynchronousOperation)
 }
 
 // ==== Task Name --------------------------------------------------------------

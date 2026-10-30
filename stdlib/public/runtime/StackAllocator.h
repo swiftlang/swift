@@ -373,6 +373,15 @@ public:
     return Slab::headerSize();
   }
 
+  /// The number of bytes an allocation of \p size takes up in a slab,
+  /// including the allocation header and the overhead for guardAllocations.
+  static size_t slabCapacityForAllocation(size_t size) {
+    if (guardAllocations)
+      size += sizeof(uintptr_t);
+    return Allocation::includingHeader(
+        llvm::alignTo(size, llvm::Align(alignment)));
+  }
+
   /// Allocate a memory buffer of \p size.
   void *alloc(size_t size) {
     if (guardAllocations)

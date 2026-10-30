@@ -1684,27 +1684,38 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
       _tuple(_nativeObject, _rawPointer));
 }
 
-static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+/// Create of "discarding" tasks, i.e. those that discard their successful result.
+static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id,
+                                          bool hasSyncOperation) {
   auto taskExecutorIsAvailable =
       ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
 
+  auto parameters = [&](auto operationType) {
+    return _parameters(
+        _label("flags", _swiftInt),
+        _label("initialSerialExecutor",
+               _defaulted(_optional(_executor), _nil)),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutorConsuming",
+               _defaulted(_consuming(_optional(_bincompatType(
+                              /*if*/ taskExecutorIsAvailable,
+                              _existential(_taskExecutor),
+                              /*else*/ _executor))),
+                          _nil)),
+        _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
+        _label("operation", _sending(operationType)));
+  };
+
+  if (hasSyncOperation) {
+    return getBuiltinFunction(
+        ctx, id, _thin,
+        parameters(_function(_thick, _void, _parameters())),
+        _tuple(_nativeObject, _rawPointer));
+  }
   return getBuiltinFunction(
       ctx, id, _thin,
-      _parameters(
-          _label("flags", _swiftInt),
-          _label("initialSerialExecutor",
-                 _defaulted(_optional(_executor), _nil)),
-          _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
-          _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-          _label("initialTaskExecutorConsuming",
-                 _defaulted(_consuming(_optional(_bincompatType(
-                                /*if*/ taskExecutorIsAvailable,
-                                _existential(_taskExecutor),
-                                /*else*/ _executor))),
-                            _nil)),
-          _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
-          _label("operation", _sending(_function(_async(_throws(_thick)), _void,
-                                                 _parameters())))),
+      parameters(_function(_async(_throws(_thick)), _void, _parameters())),
       _tuple(_nativeObject, _rawPointer));
 }
 
@@ -3648,7 +3659,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getCreateTask(Context, Id);
 
   case BuiltinValueKind::CreateDiscardingTask:
-    return getCreateDiscardingTask(Context, Id);
+    return getCreateDiscardingTask(Context, Id, /*hasSyncOperation=*/false);
+
+  case BuiltinValueKind::CreateSynchronousDiscardingTask:
+    return getCreateDiscardingTask(Context, Id, /*hasSyncOperation=*/true);
 
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,

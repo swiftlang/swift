@@ -2816,10 +2816,18 @@ public:
                                       "result of createAsyncTask");
       bool haveSending =
           F.getASTContext().LangOpts.hasFeature(Feature::SendingArgsAndResults);
-      auto expectedExtInfo = SILExtInfoBuilder()
-                                 .withAsync(true)
-                                 .withSendable(!haveSending)
-                                 .build();
+      // The operation may be a synchronous function.
+      bool hasSyncOperation = !fnType->isAsync();
+      require(!hasSyncOperation || !BI->getSubstitutions(),
+              "a createAsyncTask whose operation is synchronous must be "
+              "discarding and have no result type");
+      require(!hasSyncOperation || !fnType->hasErrorResult(),
+              "the synchronous operation of a createAsyncTask cannot throw");
+      auto expectedExtInfo =
+          SILExtInfoBuilder()
+              .withAsync(!hasSyncOperation)
+              .withSendable(!haveSending)
+              .build();
       require(fnType->getExtInfo().isEqualTo(expectedExtInfo, /*clang types*/true),
               "function argument to createAsyncTask has incorrect ext info");
       // FIXME: it'd be better if we took a consuming closure here
@@ -2846,11 +2854,12 @@ public:
       // and non-discarding tasks so that we can't get this wrong?
       // If we generalize this to allow an arbitrary error type,
       // handle that here.
-      require(fnType->hasErrorResult() &&
+      require(hasSyncOperation ||
+              (fnType->hasErrorResult() &&
               fnType->getErrorResult().getConvention()
                 == ResultConvention::Owned &&
               fnType->getErrorResult().getInterfaceType()
-                == F.getASTContext().getErrorExistentialType(),
+                == F.getASTContext().getErrorExistentialType()),
               "function argument to createAsyncTask has wrong error convention");
     }
 
