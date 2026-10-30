@@ -37,11 +37,28 @@ class GitException(Exception):
         self.repo_name = repo_name
         self.stderr = output
 
+    # Substrings of git's error output (compared case-insensitively) for
+    # failures that running the same command again can't fix.
+    _NON_RETRYABLE_ERRORS = (
+        "not a git repository",
+        "does not appear to be a git repository",
+        "repository not found",
+        "could not read username",
+        "authentication failed",
+        "permission denied (publickey)",
+    )
+
     def __str__(self):
         return (
             f"[{self.repo_name}] '{Git._quote_command(self.command)}' "
             f"returned ({self.returncode}) with the following {self.stderr}."
         )
+
+    @property
+    def is_retryable(self) -> bool:
+        """Whether running the same command again might succeed."""
+        stderr = self.stderr.lower()
+        return not any(error in stderr for error in self._NON_RETRYABLE_ERRORS)
 
 
 class Git:

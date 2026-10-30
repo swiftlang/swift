@@ -5,6 +5,27 @@ from typing import Callable, TypeVar, Any
 T = TypeVar("T")
 
 
+def is_retryable(error: BaseException) -> bool:
+    """
+    Returns whether a failure might succeed if retried. Exceptions can opt out
+    of retrying by defining an ``is_retryable`` attribute that is ``False``.
+    """
+    return getattr(error, "is_retryable", True)
+
+
+class NonRetryableFailures(Exception):
+    """
+    Raised by a retried function whose failures are all non-retryable, to stop
+    retrying without waiting. ``fail_count`` is the number of failures.
+    """
+
+    is_retryable = False
+
+    def __init__(self, fail_count: int):
+        super().__init__(f"{fail_count} non-retryable failure(s)")
+        self.fail_count = fail_count
+
+
 def exponential_retry(
     max_retries: int = 3,
     base_delay: float = 10.0,
@@ -13,7 +34,9 @@ def exponential_retry(
     """
     Retries with exponential backoff if the method returns a value > 0.
 
-    A ``None`` return counts as success.
+    A ``None`` return counts as success. An exception for which
+    ``is_retryable`` returns ``False`` is re-raised immediately, without
+    waiting or retrying.
 
     Args:
         max_retries (int): Maximum number of retry attempts. 0 is for no
@@ -39,6 +62,11 @@ def exponential_retry(
                     fail_count is None or fail_count <= 0
                 ):
                     return fail_count
+
+                if caught_exception is not None and not is_retryable(
+                    caught_exception
+                ):
+                    raise caught_exception
 
                 if retries == max_retries:
                     if caught_exception is not None:
